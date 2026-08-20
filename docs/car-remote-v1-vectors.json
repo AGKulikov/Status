@@ -1,0 +1,104 @@
+{
+  "schema": "natro-car-remote-v1",
+  "frame_bytes": 20,
+  "byte_order": "little-endian",
+  "crc": "CRC-16/CCITT-FALSE over bytes 0..17",
+  "vectors": [
+    {
+      "name": "hello",
+      "type": 1,
+      "control_id": 0,
+      "code": 0,
+      "flags": 0,
+      "transaction_id": 0,
+      "sequence": 270544960,
+      "value": 0,
+      "max_age_deciseconds": 0,
+      "hex": "4e0101000000000040302010000000000000723d"
+    },
+    {
+      "name": "catalog_trunk_available_mechanical_confirmed_more",
+      "type": 2,
+      "control_id": 30,
+      "code": 1,
+      "flags": 57,
+      "transaction_id": 0,
+      "sequence": 270544961,
+      "value": 0,
+      "max_age_deciseconds": 0,
+      "hex": "4e01021e01390000413020100000000000005a0b"
+    },
+    {
+      "name": "state_circulation_outside_exact_int32",
+      "type": 3,
+      "control_id": 8,
+      "code": 0,
+      "flags": 7,
+      "transaction_id": 0,
+      "sequence": 270544962,
+      "value": 268632322,
+      "max_age_deciseconds": 0,
+      "hex": "4e010308000700004230201002010310000072b7"
+    },
+    {
+      "name": "command_dynamic_drive_mode",
+      "type": 4,
+      "control_id": 31,
+      "code": 1,
+      "flags": 0,
+      "transaction_id": 4660,
+      "sequence": 270544963,
+      "value": 570491139,
+      "max_age_deciseconds": 30,
+      "hex": "4e01041f0100341243302010030101221e0007b5"
+    },
+    {
+      "name": "command_trunk_with_local_confirmation",
+      "type": 4,
+      "control_id": 30,
+      "code": 1,
+      "flags": 64,
+      "transaction_id": 4661,
+      "sequence": 270544964,
+      "value": 1,
+      "max_age_deciseconds": 30,
+      "hex": "4e01041e0140351244302010010000001e00a7e1"
+    },
+    {
+      "name": "result_ok_exact_drive_mode",
+      "type": 5,
+      "control_id": 31,
+      "code": 0,
+      "flags": 0,
+      "transaction_id": 4660,
+      "sequence": 270544965,
+      "value": 570491139,
+      "max_age_deciseconds": 0,
+      "hex": "4e01051f00003412453020100301012200008135"
+    },
+    {
+      "name": "sync_complete",
+      "type": 6,
+      "control_id": 0,
+      "code": 0,
+      "flags": 0,
+      "transaction_id": 0,
+      "sequence": 270544966,
+      "value": 0,
+      "max_age_deciseconds": 0,
+      "hex": "4e01060000000000463020100000000000005226"
+    },
+    {
+      "name": "command_temperature_22_5_scaled_100",
+      "type": 4,
+      "control_id": 11,
+      "code": 1,
+      "flags": 0,
+      "transaction_id": 4662,
+      "sequence": 270544967,
+      "value": 2250,
+      "max_age_deciseconds": 30,
+      "hex": "4e01040b0100361247302010ca0800001e005c0b"
+    }
+  ]
+}

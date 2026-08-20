@@ -156,7 +156,16 @@ final class GeelyCarIntegration implements CarIntegration {
      * 0, 0.75, 1.5 and 3 seconds; this is intentionally not a permanent command flood.
      */
     private static final long[] HUD_AR_FALLBACK_GAPS_MS = { 0L, 750L, 750L, 1_500L };
-    private static final int NO_ZONE = Integer.MIN_VALUE;
+    /** Internal route marker; this value is never sent to ECARX. */
+    private static final int NO_ZONE = Integer.MAX_VALUE;
+    /** ECARX's real default-zone value, used by Passenger before its global fallback. */
+    private static final int DEFAULT_ZONE = Integer.MIN_VALUE;
+    /**
+     * Internal policy marker for Passenger screen brightness. Passenger 1.14.0 probes the
+     * default zone, passenger zone 1, the global overload, and passenger seat zone 4 in exactly
+     * that order. Keeping the policy finite prevents a Bluetooth peer from choosing a raw zone.
+     */
+    private static final int PASSENGER_BRIGHTNESS_ZONE_POLICY = Integer.MAX_VALUE - 1;
     private static final String FAN_CONTROL_ID = "climate.fan";
     private static final String AIRFLOW_CONTROL_ID = "climate.airflow";
     /** Exact zoned extension decoded from the working stock-compatible KX11 trunk APK. */
@@ -164,6 +173,23 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final int TRUNK_ZONE = 0x20000000;
     /** ECARX front-row aggregate zone used by both manual and AUTO fan functions. */
     private static final int FRONT_FAN_ZONE = VehicleZone.ZONE_ROW_1_ALL;
+    /* Exact public-ICarFunction ids/zones recovered from Monjaro Passenger 1.14.0. */
+    private static final int HVAC_REAR_ZONE = 0x80;
+    private static final int HVAC_REAR_LEFT_ZONE = 0x10;
+    private static final int HVAC_REAR_RIGHT_ZONE = 0x40;
+    private static final int HVAC_REAR_POWER_FUNCTION = 0x10010100;
+    private static final int HVAC_REAR_AUTO_FUNCTION = 0x10010200;
+    private static final int HVAC_FAN_FUNCTION = 0x10020100;
+    private static final int HVAC_CIRCULATION_FUNCTION = 0x10030100;
+    private static final int HVAC_DEFROST_FRONT_MAX_FUNCTION = 0x10040200;
+    private static final int HVAC_TEMPERATURE_FUNCTION = 0x10060100;
+    private static final int HVAC_NATIVE_SYNC_FUNCTION = 0x10060500;
+    private static final int HVAC_PANEL_LOCK_FUNCTION = 0x10100200;
+    private static final int AMBIENT_ENABLED_FUNCTION = 0x21051000;
+    private static final int AMBIENT_BRIGHTNESS_FUNCTION = 0x2A010100;
+    private static final int PASSENGER_SCREEN_ENABLED_FUNCTION = 0x20280E00;
+    private static final int PASSENGER_SCREEN_DAY_BRIGHTNESS_FUNCTION = 0x20150300;
+    private static final int PASSENGER_SCREEN_NIGHT_BRIGHTNESS_FUNCTION = 0x20150400;
     /**
      * A short Binder failure may hide the AUTO bit while the ECU is still in AUTO. Reuse only a
      * recent confirmed mode; after this window an unresolved mode is UNKNOWN and no fan write is
@@ -615,6 +641,29 @@ final class GeelyCarIntegration implements CarIntegration {
 
         boolean zoned() { return zone != NO_ZONE; }
 
+        boolean defaultThenGlobal() { return zone == DEFAULT_ZONE; }
+
+        boolean passengerBrightnessRoutes() {
+            return zone == PASSENGER_BRIGHTNESS_ZONE_POLICY;
+        }
+
+        /** Ordered access routes; {@link #NO_ZONE} means use the global overload. */
+        int[] accessRoutes() {
+            if (passengerBrightnessRoutes()) {
+                return new int[] { DEFAULT_ZONE, 1, NO_ZONE, VehicleSeat.SEAT_ROW_1_RIGHT };
+            }
+            if (defaultThenGlobal()) return new int[] { DEFAULT_ZONE, NO_ZONE };
+            return new int[] { zone };
+        }
+
+        boolean acceptsVendorZone(int vendorZone) {
+            if (!zoned()) return true;
+            for (int route : accessRoutes()) {
+                if (route != NO_ZONE && route == vendorZone) return true;
+            }
+            return false;
+        }
+
         CarControlDescriptor descriptorWithOptions(List<CarControlDescriptor.Option> options) {
             return new CarControlDescriptor(descriptor.id, descriptor.label, descriptor.category,
                     descriptor.iconKey, descriptor.kind, descriptor.availability, options,
@@ -682,6 +731,14 @@ final class GeelyCarIntegration implements CarIntegration {
 
     private static List<CarControlDescriptor.Option> trunkOptions() {
         return Arrays.asList(option(0, "Закрыт"), option(1, "Открыт"));
+    }
+
+    private static List<CarControlDescriptor.Option> circulationOptions() {
+        return Arrays.asList(
+                option(0, "Выкл"),
+                option(HVAC_CIRCULATION_FUNCTION + 1d, "Рециркуляция"),
+                option(HVAC_CIRCULATION_FUNCTION + 2d, "Свежий воздух"),
+                option(HVAC_CIRCULATION_FUNCTION + 3d, "Auto"));
     }
 
     private static List<CarControlDescriptor.Option> heatOptions() {
@@ -824,10 +881,31 @@ final class GeelyCarIntegration implements CarIntegration {
                     "defrost_front", CarControlDescriptor.Kind.TOGGLE,
                     IHvac.HVAC_FUNC_DEFROST_FRONT, NO_ZONE, false, toggleOptions(),
                     0, 1, 1, "", "#FF80DEEA"),
+            new ControlDefinition("climate.defrost_front_max", "Обдув лобового MAX", "Климат",
+                    "defrost_front", CarControlDescriptor.Kind.TOGGLE,
+                    HVAC_DEFROST_FRONT_MAX_FUNCTION, NO_ZONE, false, toggleOptions(),
+                    0, 1, 1, "", "#FF80DEEA"),
             new ControlDefinition("climate.defrost_rear", "Обогрев заднего стекла", "Климат",
                     "defrost_rear", CarControlDescriptor.Kind.TOGGLE,
                     IHvac.HVAC_FUNC_DEFROST_REAR, NO_ZONE, false, toggleOptions(),
                     0, 1, 1, "", "#FF80DEEA"),
+            new ControlDefinition("climate.sync", "SYNC климата", "Климат", "climate_sync",
+                    CarControlDescriptor.Kind.TOGGLE, HVAC_NATIVE_SYNC_FUNCTION, NO_ZONE, false,
+                    toggleOptions(), 0, 1, 1, "", "#FF4FC3F7"),
+            new ControlDefinition("climate.circulation", "Рециркуляция", "Климат",
+                    "circulation", CarControlDescriptor.Kind.OPTIONS,
+                    HVAC_CIRCULATION_FUNCTION, NO_ZONE, false, circulationOptions(),
+                    0, 0, 0, "", "#FF4FC3F7"),
+            new ControlDefinition("climate.rear_power", "Задний климат", "Климат", "climate",
+                    CarControlDescriptor.Kind.TOGGLE, HVAC_REAR_POWER_FUNCTION, HVAC_REAR_ZONE,
+                    false, toggleOptions(), 0, 1, 1, "", "#FF4FC3F7"),
+            new ControlDefinition("climate.rear_auto", "AUTO задней зоны", "Климат",
+                    "climate_auto", CarControlDescriptor.Kind.TOGGLE,
+                    HVAC_REAR_AUTO_FUNCTION, HVAC_REAR_ZONE, false, toggleOptions(),
+                    0, 1, 1, "", "#FF66BB6A"),
+            new ControlDefinition("climate.panel_lock", "Блокировка задней панели", "Климат",
+                    "lock", CarControlDescriptor.Kind.TOGGLE, HVAC_PANEL_LOCK_FUNCTION,
+                    DEFAULT_ZONE, false, toggleOptions(), 0, 1, 1, "", "#FFFFC107"),
             new ControlDefinition("climate.seat_heat_driver", "Подогрев сиденья водителя",
                     "Сиденья", "seat_heat", CarControlDescriptor.Kind.LEVELS,
                     IHvac.HVAC_FUNC_SEAT_HEATING, VehicleSeat.SEAT_ROW_1_LEFT, false,
@@ -849,6 +927,9 @@ final class GeelyCarIntegration implements CarIntegration {
                     IHvac.HVAC_FUNC_STEERING_WHEEL_HEAT, NO_ZONE, false,
                     wheelHeatOptions(), 0, 3, 1, "", "#FFFF9800"),
             FAN_DEFINITION,
+            new ControlDefinition("climate.rear_fan", "Задний вентилятор", "Климат", "fan",
+                    CarControlDescriptor.Kind.LEVELS, HVAC_FAN_FUNCTION, HVAC_REAR_ZONE,
+                    false, fanOptions(), 0, 9, 1, "", "#FF42A5F5"),
             new ControlDefinition(AIRFLOW_CONTROL_ID, "Направление обдува", "Климат",
                     "airflow", CarControlDescriptor.Kind.OPTIONS,
                     IHvac.HVAC_FUNC_BLOWING_MODE, FRONT_FAN_ZONE, false,
@@ -861,6 +942,33 @@ final class GeelyCarIntegration implements CarIntegration {
                     "temperature", CarControlDescriptor.Kind.RANGE, IHvac.HVAC_FUNC_TEMP,
                     VehicleSeat.SEAT_ROW_1_RIGHT, true, Collections.emptyList(),
                     16, 30, .5, "°C", "#FF66BB6A"),
+            new ControlDefinition("climate.temp_rear_left", "Температура сзади слева", "Климат",
+                    "temperature", CarControlDescriptor.Kind.RANGE,
+                    HVAC_TEMPERATURE_FUNCTION, HVAC_REAR_LEFT_ZONE, true,
+                    Collections.emptyList(), 16, 30, .5, "°C", "#FF66BB6A"),
+            new ControlDefinition("climate.temp_rear_right", "Температура сзади справа", "Климат",
+                    "temperature", CarControlDescriptor.Kind.RANGE,
+                    HVAC_TEMPERATURE_FUNCTION, HVAC_REAR_RIGHT_ZONE, true,
+                    Collections.emptyList(), 16, 30, .5, "°C", "#FF66BB6A"),
+            new ControlDefinition("comfort.ambient_enabled", "Атмосферная подсветка", "Комфорт",
+                    "ambient", CarControlDescriptor.Kind.TOGGLE, AMBIENT_ENABLED_FUNCTION,
+                    DEFAULT_ZONE, false, toggleOptions(), 0, 1, 1, "", "#FFAB47BC"),
+            new ControlDefinition("comfort.ambient_brightness", "Яркость подсветки", "Комфорт",
+                    "ambient", CarControlDescriptor.Kind.RANGE, AMBIENT_BRIGHTNESS_FUNCTION,
+                    DEFAULT_ZONE, true, Collections.emptyList(), 0, 100, 5, "%", "#FFAB47BC"),
+            new ControlDefinition("comfort.passenger_screen", "Экран пассажира", "Комфорт",
+                    "screen", CarControlDescriptor.Kind.TOGGLE, PASSENGER_SCREEN_ENABLED_FUNCTION,
+                    DEFAULT_ZONE, false, toggleOptions(), 0, 1, 1, "", "#FF42A5F5"),
+            new ControlDefinition("comfort.passenger_screen_day", "Дневная яркость экрана",
+                    "Комфорт", "screen", CarControlDescriptor.Kind.RANGE,
+                    PASSENGER_SCREEN_DAY_BRIGHTNESS_FUNCTION,
+                    PASSENGER_BRIGHTNESS_ZONE_POLICY, true,
+                    Collections.emptyList(), 0, 100, 5, "%", "#FF42A5F5"),
+            new ControlDefinition("comfort.passenger_screen_night", "Ночная яркость экрана",
+                    "Комфорт", "screen", CarControlDescriptor.Kind.RANGE,
+                    PASSENGER_SCREEN_NIGHT_BRIGHTNESS_FUNCTION,
+                    PASSENGER_BRIGHTNESS_ZONE_POLICY, true,
+                    Collections.emptyList(), 0, 100, 5, "%", "#FF5C6BC0"),
             new ControlDefinition("vehicle.drive_mode", "Режим движения", "Автомобиль",
                     "drive_mode", CarControlDescriptor.Kind.OPTIONS,
                     IDriveMode.DM_FUNC_DRIVE_MODE_SELECT, NO_ZONE, false,
@@ -2910,25 +3018,27 @@ final class GeelyCarIntegration implements CarIntegration {
                 Log.d(TAG, "direct trunk probe is not ready", directReadFailure);
             }
         }
-        try {
-            FunctionStatus status = definition.zoned()
-                    ? source.isFunctionSupported(definition.functionId, definition.zone)
-                    : source.isFunctionSupported(definition.functionId);
-            if (status == FunctionStatus.active) {
-                return CarControlDescriptor.Availability.SUPPORTED;
+        boolean unknownRoute = false;
+        for (int route : definition.accessRoutes()) {
+            try {
+                FunctionStatus status = route == NO_ZONE
+                        ? source.isFunctionSupported(definition.functionId)
+                        : source.isFunctionSupported(definition.functionId, route);
+                if (status == FunctionStatus.active) {
+                    return CarControlDescriptor.Availability.SUPPORTED;
+                }
+                if (status != FunctionStatus.notavailable) unknownRoute = true;
+            } catch (Throwable t) {
+                // An optional overload can be absent while a later Passenger-compatible route is
+                // active. Do not invalidate the shared Binder until all actual reads fail.
+                unknownRoute = true;
+                Log.d(TAG, "vehicle function support route is not ready: "
+                        + definition.descriptor.id + "/" + route, t);
             }
-            if (status == FunctionStatus.notavailable) {
-                return CarControlDescriptor.Availability.UNSUPPORTED;
-            }
-            return CarControlDescriptor.Availability.UNKNOWN;
-        } catch (Throwable t) {
-            // Some firmware throws UnsupportedOperationException for one optional function while
-            // the shared ICarFunction Binder remains perfectly usable for the rest of climate.
-            // A real read/write failure below still invalidates the dead proxy.
-            Log.d(TAG, "vehicle function support is not ready: "
-                    + definition.descriptor.id, t);
-            return CarControlDescriptor.Availability.UNKNOWN;
         }
+        return unknownRoute
+                ? CarControlDescriptor.Availability.UNKNOWN
+                : CarControlDescriptor.Availability.UNSUPPORTED;
     }
 
     @Override
@@ -3170,32 +3280,17 @@ final class GeelyCarIntegration implements CarIntegration {
                     Double.NaN, "Готово", false, 0, null, System.currentTimeMillis()));
             return ControlReadResult.CONFIRMED;
         }
-        try {
-            double value;
-            if (definition.customFloat) {
-                value = definition.zoned()
-                        ? source.getCustomizeFunctionValue(definition.functionId, definition.zone)
-                        : source.getCustomizeFunctionValue(definition.functionId);
-            } else {
-                value = definition.zoned()
-                        ? source.getFunctionValue(definition.functionId, definition.zone)
-                        : source.getFunctionValue(definition.functionId);
-            }
-            if (!isValidControlValue(definition, value)) {
-                if (isReadableUnknownControlValue(definition, value)) {
-                    deliverControlState(unknownControlState(definition, value));
-                }
-                return ControlReadResult.RETRY;
-            }
-            rememberConfirmedRuntimeValue(definition, value);
-            deliverControlState(normalizeControlState(definition, value));
-            confirmActiveControlCommandFromState(definition, value);
-            return ControlReadResult.CONFIRMED;
-        } catch (Throwable t) {
-            invalidateFunctionProxy(source);
-            Log.w(TAG, "vehicle control read failed for " + definition.descriptor.id, t);
-            return ControlReadResult.CONNECTION_FAILED;
+        Double observed = readControlValue(source, definition, true);
+        if (observed == null) return ControlReadResult.RETRY;
+        double value = observed;
+        if (!isValidControlValue(definition, value)) {
+            deliverControlState(unknownControlState(definition, value));
+            return ControlReadResult.RETRY;
         }
+        rememberConfirmedRuntimeValue(definition, value);
+        deliverControlState(normalizeControlState(definition, value));
+        confirmActiveControlCommandFromState(definition, value);
+        return ControlReadResult.CONFIRMED;
     }
 
     private void deliverVendorControlValue(int functionId, int zone, double value,
@@ -3222,7 +3317,7 @@ final class GeelyCarIntegration implements CarIntegration {
         for (ControlDefinition definition : CONTROL_DEFINITIONS) {
             if (definition.functionId != functionId || definition.customFloat != customFloat
                     || !demanded.contains(definition.descriptor.id)) continue;
-            if (definition.zoned() && definition.zone != zone) continue;
+            if (!definition.acceptsVendorZone(zone)) continue;
             if (!isValidControlValue(definition, value)) {
                 if (isReadableUnknownControlValue(definition, value)) {
                     deliverControlState(unknownControlState(definition, value));
@@ -3464,7 +3559,7 @@ final class GeelyCarIntegration implements CarIntegration {
             boolean accepted;
             boolean zoned = true;
             try {
-                accepted = source.setFunctionValue(functionId, NO_ZONE, desired);
+                accepted = source.setFunctionValue(functionId, DEFAULT_ZONE, desired);
             } catch (Throwable zonedFailure) {
                 zoned = false;
                 try {
@@ -3479,7 +3574,7 @@ final class GeelyCarIntegration implements CarIntegration {
             Integer confirmed = null;
             try {
                 int value = zoned
-                        ? source.getFunctionValue(functionId, NO_ZONE)
+                        ? source.getFunctionValue(functionId, DEFAULT_ZONE)
                         : source.getFunctionValue(functionId);
                 if (value == ICarFunction.COMMON_VALUE_ON
                         || value == ICarFunction.COMMON_VALUE_OFF) {
@@ -4013,38 +4108,123 @@ final class GeelyCarIntegration implements CarIntegration {
 
     private boolean writeControlValue(ICarFunction source, ControlDefinition definition,
                                       double target) {
-        if (definition.customFloat) {
-            return definition.zoned()
-                    ? source.setCustomizeFunctionValue(definition.functionId,
-                    definition.zone, (float) target)
-                    : source.setCustomizeFunctionValue(definition.functionId, (float) target);
+        Integer supportedRoute = firstSupportedControlRoute(source, definition);
+        if (supportedRoute != null) {
+            return writeControlValueOnRoute(source, definition, supportedRoute, target);
         }
-        int value = (int) Math.round(target);
-        return definition.zoned()
-                ? source.setFunctionValue(definition.functionId, definition.zone, value)
-                : source.setFunctionValue(definition.functionId, value);
+
+        // The stock trunk implementation is readable even when its support query throws. The
+        // same bounded direct fallback also covers a capability service racing a command.
+        Throwable lastFailure = null;
+        for (int route : definition.accessRoutes()) {
+            try {
+                return writeControlValueOnRoute(source, definition, route, target);
+            } catch (Throwable failure) {
+                lastFailure = failure;
+            }
+        }
+        throw new IllegalStateException("All ECARX control routes failed for "
+                + definition.descriptor.id, lastFailure);
     }
 
     @Nullable
     private Double readControlValue(ICarFunction source, ControlDefinition definition) {
-        try {
-            double value;
-            if (definition.customFloat) {
-                value = definition.zoned()
-                        ? source.getCustomizeFunctionValue(definition.functionId, definition.zone)
-                        : source.getCustomizeFunctionValue(definition.functionId);
-            } else {
-                value = definition.zoned()
-                        ? source.getFunctionValue(definition.functionId, definition.zone)
-                        : source.getFunctionValue(definition.functionId);
+        return readControlValue(source, definition, false);
+    }
+
+    @Nullable
+    private Double readControlValue(ICarFunction source, ControlDefinition definition,
+                                    boolean acceptReadableUnknown) {
+        Integer preferredRoute = firstSupportedControlRoute(source, definition);
+        int failedRoutes = 0;
+        int attemptedRoutes = 0;
+        Throwable lastFailure = null;
+        int[] routes = definition.accessRoutes();
+        if (preferredRoute != null) {
+            attemptedRoutes++;
+            try {
+                Double accepted = acceptControlRead(definition,
+                        readControlValueOnRoute(source, definition, preferredRoute),
+                        acceptReadableUnknown);
+                if (accepted != null) return accepted;
+            } catch (Throwable failure) {
+                failedRoutes++;
+                lastFailure = failure;
             }
-            if (!isValidControlValue(definition, value)) return null;
+        }
+        for (int route : routes) {
+            if (preferredRoute != null && preferredRoute == route) continue;
+            attemptedRoutes++;
+            try {
+                Double accepted = acceptControlRead(definition,
+                        readControlValueOnRoute(source, definition, route),
+                        acceptReadableUnknown);
+                if (accepted != null) return accepted;
+            } catch (Throwable failure) {
+                failedRoutes++;
+                lastFailure = failure;
+            }
+        }
+        if (attemptedRoutes > 0 && failedRoutes == attemptedRoutes && lastFailure != null) {
+            invalidateFunctionProxy(source);
+            Log.w(TAG, "vehicle control read failed on every route for "
+                    + definition.descriptor.id, lastFailure);
+        }
+        return null;
+    }
+
+    @Nullable
+    private Double acceptControlRead(ControlDefinition definition, double value,
+                                     boolean acceptReadableUnknown) {
+        if (isValidControlValue(definition, value)) {
             rememberConfirmedRuntimeValue(definition, value);
             return value;
-        } catch (Throwable t) {
-            invalidateFunctionProxy(source);
-            return null;
         }
+        return acceptReadableUnknown && isReadableUnknownControlValue(definition, value)
+                ? value : null;
+    }
+
+    @Nullable
+    private static Integer firstSupportedControlRoute(ICarFunction source,
+                                                       ControlDefinition definition) {
+        for (int route : definition.accessRoutes()) {
+            try {
+                FunctionStatus status = route == NO_ZONE
+                        ? source.isFunctionSupported(definition.functionId)
+                        : source.isFunctionSupported(definition.functionId, route);
+                if (status == FunctionStatus.active) return route;
+            } catch (Throwable ignored) {
+                // A direct, bounded fallback is used only if no route can be confirmed active.
+            }
+        }
+        return null;
+    }
+
+    private static double readControlValueOnRoute(ICarFunction source,
+                                                   ControlDefinition definition, int route) {
+        if (definition.customFloat) {
+            return route == NO_ZONE
+                    ? source.getCustomizeFunctionValue(definition.functionId)
+                    : source.getCustomizeFunctionValue(definition.functionId, route);
+        }
+        return route == NO_ZONE
+                ? source.getFunctionValue(definition.functionId)
+                : source.getFunctionValue(definition.functionId, route);
+    }
+
+    private static boolean writeControlValueOnRoute(ICarFunction source,
+                                                     ControlDefinition definition,
+                                                     int route, double target) {
+        if (definition.customFloat) {
+            return route == NO_ZONE
+                    ? source.setCustomizeFunctionValue(definition.functionId, (float) target)
+                    : source.setCustomizeFunctionValue(
+                            definition.functionId, route, (float) target);
+        }
+        int value = (int) Math.round(target);
+        return route == NO_ZONE
+                ? source.setFunctionValue(definition.functionId, value)
+                : source.setFunctionValue(definition.functionId, route, value);
     }
 
     @Nullable
@@ -4154,24 +4334,31 @@ final class GeelyCarIntegration implements CarIntegration {
             return definition.descriptor.options;
         }
         List<CarControlDescriptor.Option> discovered = Collections.emptyList();
-        try {
-            int[] values = definition.zoned()
-                    ? source.getSupportedFunctionValue(definition.functionId, definition.zone)
-                    : source.getSupportedFunctionValue(definition.functionId);
-            if (values != null && values.length > 0) {
-                Set<Integer> supported = new HashSet<>();
-                for (int value : values) supported.add(value);
-                List<CarControlDescriptor.Option> result = new ArrayList<>();
-                for (CarControlDescriptor.Option option : definition.descriptor.options) {
-                    if (option.value == 0
-                            || supported.contains((int) Math.round(option.value))) {
-                        result.add(option);
+        for (int route : definition.accessRoutes()) {
+            try {
+                FunctionStatus status = route == NO_ZONE
+                        ? source.isFunctionSupported(definition.functionId)
+                        : source.isFunctionSupported(definition.functionId, route);
+                if (status != FunctionStatus.active) continue;
+                int[] values = route == NO_ZONE
+                        ? source.getSupportedFunctionValue(definition.functionId)
+                        : source.getSupportedFunctionValue(definition.functionId, route);
+                if (values != null && values.length > 0) {
+                    Set<Integer> supported = new HashSet<>();
+                    for (int value : values) supported.add(value);
+                    List<CarControlDescriptor.Option> result = new ArrayList<>();
+                    for (CarControlDescriptor.Option option : definition.descriptor.options) {
+                        if (option.value == 0
+                                || supported.contains((int) Math.round(option.value))) {
+                            result.add(option);
+                        }
                     }
+                    discovered = result;
                 }
-                discovered = result;
+                break;
+            } catch (Throwable ignored) {
+                // Continue through the same finite route order used by Passenger.
             }
-        } catch (Throwable ignored) {
-            // The safe fallback below is definition-specific.
         }
         if (isAutoFanDefinition(definition)) {
             List<CarControlDescriptor.Option> safe = safeAutoFanOptions(discovered,

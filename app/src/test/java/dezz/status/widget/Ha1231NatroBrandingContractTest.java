@@ -10,14 +10,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Source-native Natro 2.1.4 / Helper 52 publication identity. */
+/** Frozen source-native Natro 2.1.4 / Helper 52 publication identity. */
 public final class Ha1231NatroBrandingContractTest {
     @Test public void restoredSourceIsAnInstallCompatiblePublicRelease() throws Exception {
         ReleaseIdentityContract.assertCurrentAtLeast(1231);
         String gradle = project("build.gradle").replaceAll("\\s+", " ");
         String current = "if (version == '2.1.4') { return 208021231";
         String previous = "if (version == '2.0.3') { return 208021220";
-        assertTrue(gradle.contains("return '2.1.4'"));
+        assertTrue(gradle.contains("if (version == '2.1.4')"));
         assertTrue(gradle.contains(current));
         assertTrue(gradle.contains(previous));
         assertTrue(gradle.indexOf(current) < gradle.indexOf(previous));

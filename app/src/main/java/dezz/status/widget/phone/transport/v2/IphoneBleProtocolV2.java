@@ -23,6 +23,15 @@ public final class IphoneBleProtocolV2 {
     /** Plain pre-SMP enrollment/routine-auth channel introduced by Helper 51. */
     public static final UUID ENROLLMENT_CHARACTERISTIC =
             UUID.fromString("d2d9e4c4-47f1-4e44-a8bb-a932fd5af200");
+    /**
+     * Enumerated vehicle-control RPC on the already authenticated BLE owner.
+     *
+     * <p>This is deliberately separate from {@link #CONTROL_CHARACTERISTIC}: the latter is a
+     * fixed role-switch protocol and must remain usable while vehicle commands are disabled.
+     * Commands are never accepted before the exact encrypted peer proof has reached READY.</p>
+     */
+    public static final UUID CAR_REMOTE_CHARACTERISTIC =
+            UUID.fromString("d2d9e4c5-47f1-4e44-a8bb-a932fd5af200");
 
     private IphoneBleProtocolV2() {
     }

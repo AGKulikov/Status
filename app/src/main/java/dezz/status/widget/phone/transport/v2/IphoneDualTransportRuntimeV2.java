@@ -189,6 +189,17 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         enqueue(() -> requestModeOnSerialized(desiredMode));
     }
 
+    /** Enqueues one C5 response/state frame on the currently authenticated route owner. */
+    public void sendCarRemoteFrame(byte[] frame) {
+        if (frame == null || frame.length != IphoneCarRemoteProtocolV1.FRAME_BYTES) return;
+        byte[] exact = frame.clone();
+        enqueue(() -> {
+            if (closed || slot == null || slot.terminalObserved || slot.status == null
+                    || slot.status.lifecycle != IphoneTransportLifecycle.READY) return;
+            slot.transport.sendCarRemoteFrame(exact);
+        });
+    }
+
     /** Requests a fresh owner of the current topology after an attributable route loss. */
     public void requestSameModeRecovery() {
         enqueue(this::requestSameModeRecoveryOnSerialized);
@@ -766,6 +777,17 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                 IphoneRoleControlV2 control, boolean success) {
             enqueue(() -> {
                 if (isCurrentSlot(bound)) listener.onRoleControlWriteResult(control, success);
+            });
+        }
+
+        @Override public void onCarRemoteFrame(byte[] frame) {
+            byte[] exact = frame == null ? null : frame.clone();
+            enqueue(() -> {
+                if (!isCurrentSlot(bound) || bound.status == null
+                        || bound.status.lifecycle != IphoneTransportLifecycle.READY
+                        || exact == null
+                        || exact.length != IphoneCarRemoteProtocolV1.FRAME_BYTES) return;
+                listener.onCarRemoteFrame(exact);
             });
         }
 

@@ -192,6 +192,7 @@ public final class PhoneConnectorController {
     private final Object lifecycleLock = new Object();
     private final Handler mainHandler;
     private final PhoneTelemetryStore telemetryStore;
+    private final CarRemoteControllerV1 carRemote;
 
     private long generation;
     private boolean running;
@@ -331,6 +332,10 @@ public final class PhoneConnectorController {
         this.presenceSink = presenceSink == null ? NO_PRESENCE_SINK : presenceSink;
         this.mainHandler = new Handler(Looper.getMainLooper());
         this.telemetryStore = new PhoneTelemetryStore(this.context);
+        this.carRemote = new CarRemoteControllerV1(this.context, frame -> {
+            IphoneDualTransportRuntimeV2 current = ancsRuntimeV2;
+            if (current != null) current.sendCarRemoteFrame(frame);
+        });
         PhoneConnectionJournal.initialize(this.context);
         PhoneConnectionJournal.append("controller", "контроллер создан; foreground owner готов");
     }
@@ -632,6 +637,7 @@ public final class PhoneConnectorController {
         }
         closeOemObservation(oldOemObservation);
         if (oldV2Runtime != null) oldV2Runtime.close();
+        carRemote.routeUnavailable();
         if (oldEnrollment != null) oldEnrollment.close();
         cancelAllMirroredNotifications();
         clearRuntimeState(reason);
@@ -1465,8 +1471,13 @@ public final class PhoneConnectorController {
         }
 
         @Override public void onStatus(IphoneTransportStatusV2 status) {
-            dispatchAncsTransport(token, transportSession,
-                    () -> applyV2RouteStatus(token, status));
+            dispatchAncsTransport(token, transportSession, () -> {
+                if (status == null
+                        || status.lifecycle != IphoneTransportLifecycle.READY) {
+                    carRemote.routeUnavailable();
+                }
+                applyV2RouteStatus(token, status);
+            });
         }
 
         @Override public void onTelemetry(IphoneTelemetryV2 telemetry) {
@@ -1511,6 +1522,13 @@ public final class PhoneConnectorController {
                 IphoneRoleControlV2 control, boolean success) {
             PhoneConnectionJournal.append("v2-switch",
                     "control completion=" + success);
+        }
+
+        @Override public void onCarRemoteFrame(byte[] frame) {
+            byte[] exact = frame == null ? null : frame.clone();
+            dispatchAncsTransport(token, transportSession, () -> {
+                if (exact != null) carRemote.accept(exact);
+            });
         }
 
         @Override public void onLocalTerminal(IphoneBleMode mode, BleRouteEpoch epoch) {
@@ -2670,6 +2688,7 @@ public final class PhoneConnectorController {
         lastTypedV2Error = "";
         lastTypedV2ErrorTransportSession = -1L;
         if (previousV2 != null) previousV2.close();
+        carRemote.routeUnavailable();
         ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
     }
 
