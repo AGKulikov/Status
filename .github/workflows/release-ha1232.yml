@@ -359,8 +359,10 @@ jobs:
           APK="$OUT/Natro-2.2.0-unsigned.apk"
           COLLECTOR="$OUT/$COLLECTOR_ASSET"
           test -s "$APK"
-          test -x "$COLLECTOR"
+          test -s "$COLLECTOR"
           (cd "$OUT" && sha256sum -c HA1232-unsigned-SHA256SUMS.txt)
+          chmod 755 "$COLLECTOR"
+          test -x "$COLLECTOR"
           test "$(sha256sum "$APK" | awk '{print $1}')" = "$UNSIGNED_APK_SHA256"
           COLLECTOR_SHA=$(sha256sum "$COLLECTOR" | awk '{print $1}')
           bash -n "$COLLECTOR"
@@ -773,8 +775,10 @@ jobs:
           set -euo pipefail
           OUT="$RUNNER_TEMP/ha1232-release"
           test -s "$OUT/$APK_NAME"
-          test -x "$OUT/$COLLECTOR_ASSET"
+          test -s "$OUT/$COLLECTOR_ASSET"
           (cd "$OUT" && sha256sum -c SHA256SUMS.txt)
+          chmod 755 "$OUT/$COLLECTOR_ASSET"
+          test -x "$OUT/$COLLECTOR_ASSET"
           test "$(sha256sum "$OUT/$APK_NAME" | awk '{print $1}')" = "$APK_SHA256"
           COLLECTOR_SHA=$(sha256sum "$OUT/$COLLECTOR_ASSET" | awk '{print $1}')
           bash -n "$OUT/$COLLECTOR_ASSET"
