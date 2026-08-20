@@ -65,7 +65,9 @@ import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Role;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -207,7 +209,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
             }
 
             @Override public void onNotificationSent(BluetoothDevice device, int status) {
-                dispatch(() -> handleControlIndicationSent(
+                dispatch(() -> handleNotificationSent(
                         ServerAttempt.this, device, status));
             }
         };
@@ -285,6 +287,10 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
     private BleRouteToken inboundOwnerToken;
     private BleRouteToken reverseGattOwnerToken;
     private boolean controlIndicationsEnabled;
+    private boolean carRemoteIndicationsEnabled;
+    private final Deque<byte[]> carRemoteIndications = new ArrayDeque<>();
+    private byte[] pendingCarRemoteIndication;
+    private Runnable carRemoteIndicationWatchdog;
     private boolean serverCloseRequested;
     private PendingReverseOperation pendingReverse;
     private BleRouteToken observingReverseToken;
@@ -354,10 +360,22 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         });
     }
 
+    @Override public void sendCarRemoteFrame(byte[] frame) {
+        if (frame == null || frame.length != 20) return;
+        byte[] exact = frame.clone();
+        main.post(() -> {
+            if (closed || ingressFrozen || state == null || !state.isReady()) return;
+            if (carRemoteIndications.size() >= 64) carRemoteIndications.removeFirst();
+            carRemoteIndications.addLast(exact);
+            drainCarRemoteIndications();
+        });
+    }
+
     @Override public void radioOff(BleRouteEpoch epoch) {
         Objects.requireNonNull(epoch, "epoch");
         main.post(() -> {
             ingressFrozen = true;
+            clearCarRemoteState();
             radioResetProven = true;
             cancelAllTimers();
             stopAdvertisingForFreeze();
@@ -428,6 +446,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
                 restorationCompletion = completion;
                 restorationTerminalReported = false;
                 ingressFrozen = true;
+                clearCarRemoteState();
                 ProcessGattRegistrationGateV2.whenFreeForDrain(
                         restorationGateWaiter,
                         () -> dispatchMain(() -> completeRestorationPrepared(
@@ -454,6 +473,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
             FreezeResult result = FreezeResult.FAILED;
             if (ownsSwitchSource(source)) {
                 ingressFrozen = true;
+                clearCarRemoteState();
                 cancelAllTimers();
                 stopAdvertisingForFreeze();
                 boolean exactRemoteControl = inboundPhysicalFacade != null
@@ -575,6 +595,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         this.listener = newListener;
         this.startRequest = request;
         this.ingressFrozen = false;
+        clearCarRemoteState();
         this.inboundBondAttribution = null;
         this.lastInboundCloseRequest = null;
         this.lastOutboundControl = null;
@@ -750,9 +771,19 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
                 IphoneBleProtocolV2.TELEMETRY_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_WRITE,
                 BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED);
+        BluetoothGattCharacteristic carRemote = new BluetoothGattCharacteristic(
+                IphoneBleProtocolV2.CAR_REMOTE_CHARACTERISTIC,
+                BluetoothGattCharacteristic.PROPERTY_WRITE
+                        | BluetoothGattCharacteristic.PROPERTY_INDICATE,
+                BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED);
+        carRemote.addDescriptor(new BluetoothGattDescriptor(
+                AncsProtocol.CLIENT_CONFIGURATION,
+                BluetoothGattDescriptor.PERMISSION_READ_ENCRYPTED
+                        | BluetoothGattDescriptor.PERMISSION_WRITE_ENCRYPTED));
         service.addCharacteristic(proof);
         service.addCharacteristic(control);
         service.addCharacteristic(telemetry);
+        service.addCharacteristic(carRemote);
         ServerAttempt attempt = serverAttempt;
         if (attempt == null || !isCurrentServerAttempt(attempt)) {
             postServiceAdded(token, false);
@@ -929,6 +960,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
             inboundPhysicalFacade = device;
             inboundBondAttribution = attribution;
             controlIndicationsEnabled = false;
+            clearCarRemoteState();
             BleRouteTransition<AndroidPeripheralRoute.State> transition =
                     AndroidPeripheralRoute.inboundConnected(state, state.serverOwner);
             if (transition.accepted && transition.state.inboundOwner != null) {
@@ -948,6 +980,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         BleRouteToken terminalToken = inboundOwnerToken;
         inboundOwnerToken = null;
         controlIndicationsEnabled = false;
+        clearCarRemoteState();
         pendingControlIndication = null;
         failPendingControlTransmit(ControlTransmitResult.TERMINAL_FAILURE);
         AndroidPeripheralRoute.State current = state;
@@ -1007,6 +1040,9 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         } else if (IphoneBleProtocolV2.TELEMETRY_CHARACTERISTIC.equals(
                 characteristic.getUuid())) {
             handleTelemetryWrite(device, requestId, responseNeeded, value);
+        } else if (IphoneBleProtocolV2.CAR_REMOTE_CHARACTERISTIC.equals(
+                characteristic.getUuid())) {
+            handleCarRemoteWrite(device, requestId, responseNeeded, value);
         } else if (responseNeeded) {
             sendServerResponse(device, requestId,
                     BluetoothGatt.GATT_WRITE_NOT_PERMITTED, offset, null);
@@ -1020,12 +1056,15 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
                     offset, null);
             return;
         }
-        if (!ownsControlDescriptor(device, descriptor) || offset != 0) {
+        boolean controlDescriptor = ownsControlDescriptor(device, descriptor);
+        boolean carRemoteDescriptor = ownsCarRemoteDescriptor(device, descriptor);
+        if ((!controlDescriptor && !carRemoteDescriptor) || offset != 0) {
             sendServerResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED,
                     offset, null);
             return;
         }
-        byte[] value = controlIndicationsEnabled
+        byte[] value = (controlDescriptor
+                ? controlIndicationsEnabled : carRemoteIndicationsEnabled)
                 ? BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
                 : BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE;
         sendServerResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, value);
@@ -1038,6 +1077,22 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         if (ingressFrozen) {
             if (responseNeeded) sendServerResponse(device, requestId,
                     BluetoothGatt.GATT_WRITE_NOT_PERMITTED, offset, null);
+            return;
+        }
+        if (ownsCarRemoteDescriptor(device, descriptor)) {
+            boolean accepted = !preparedWrite && offset == 0
+                    && Arrays.equals(value, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
+                    && state != null && state.inboundOwner != null
+                    && controlIndicationsEnabled;
+            if (accepted) {
+                carRemoteIndicationsEnabled = true;
+                if (responseNeeded) sendServerResponse(device, requestId,
+                        BluetoothGatt.GATT_SUCCESS, 0, null);
+                drainCarRemoteIndications();
+            } else if (responseNeeded) {
+                sendServerResponse(device, requestId,
+                        BluetoothGatt.GATT_WRITE_NOT_PERMITTED, offset, null);
+            }
             return;
         }
         if (!ownsControlDescriptor(device, descriptor) || preparedWrite || offset != 0
@@ -1063,6 +1118,22 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         if (responseNeeded) sendServerResponse(device, requestId,
                 BluetoothGatt.GATT_SUCCESS, 0, null);
         for (BleRouteEffect effect : transition.effects) execute(effect);
+    }
+
+    private void handleCarRemoteWrite(BluetoothDevice device, int requestId,
+                                      boolean responseNeeded, byte[] value) {
+        boolean accepted = !ingressFrozen && state != null && state.isReady()
+                && controlIndicationsEnabled && value != null && value.length == 20
+                && listener != null;
+        if (!accepted) {
+            if (responseNeeded) sendServerResponse(device, requestId,
+                    BluetoothGatt.GATT_WRITE_NOT_PERMITTED, 0, null);
+            return;
+        }
+        // Delivery occurs only after encrypted H proof and reverse ANCS ownership reached READY.
+        listener.onCarRemoteFrame(value.clone());
+        if (responseNeeded) sendServerResponse(device, requestId,
+                BluetoothGatt.GATT_SUCCESS, 0, null);
     }
 
     private void handleControlWrite(BluetoothDevice device, int requestId,
@@ -1287,6 +1358,15 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
                 && AncsProtocol.CLIENT_CONFIGURATION.equals(descriptor.getUuid())
                 && descriptor.getCharacteristic() != null
                 && IphoneBleProtocolV2.CONTROL_CHARACTERISTIC.equals(
+                        descriptor.getCharacteristic().getUuid());
+    }
+
+    private boolean ownsCarRemoteDescriptor(BluetoothDevice device,
+                                             BluetoothGattDescriptor descriptor) {
+        return ownsInbound(device) && descriptor != null
+                && AncsProtocol.CLIENT_CONFIGURATION.equals(descriptor.getUuid())
+                && descriptor.getCharacteristic() != null
+                && IphoneBleProtocolV2.CAR_REMOTE_CHARACTERISTIC.equals(
                         descriptor.getCharacteristic().getUuid());
     }
 
@@ -1886,6 +1966,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         serverAttemptFence.retire(closingAttempt);
         serverCloseRequested = false;
         controlIndicationsEnabled = false;
+        clearCarRemoteState();
         pendingControlIndication = null;
         pendingControlServerAttempt = null;
         failPendingControlTransmit(ControlTransmitResult.TERMINAL_FAILURE);
@@ -1914,6 +1995,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         inboundOwnerToken = null;
         inboundBondAttribution = null;
         controlIndicationsEnabled = false;
+        clearCarRemoteState();
         pendingControlIndication = null;
         failPendingControlTransmit(ControlTransmitResult.TERMINAL_FAILURE);
         if (server != null || serverAttempt != null) finishServerClose();
@@ -2003,7 +2085,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
                                        ControlCompletion completion) {
         ServerAttempt exactServerAttempt = serverAttempt;
         if (server == null || inboundPhysicalFacade == null || !controlIndicationsEnabled
-                || pendingControlIndication != null
+                || pendingControlIndication != null || pendingCarRemoteIndication != null
                 || !isCurrentServerAttempt(exactServerAttempt)) {
             notifyControlWriteResult(control, false);
             if (transmit != null) completeControlTransmit(transmit, completion,
@@ -2054,6 +2136,82 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         }
         lastOutboundControl = control;
         // Exact ATT indication confirmation owns completion; queue return is not wire evidence.
+    }
+
+    private void clearCarRemoteState() {
+        if (carRemoteIndicationWatchdog != null) {
+            main.removeCallbacks(carRemoteIndicationWatchdog);
+            carRemoteIndicationWatchdog = null;
+        }
+        carRemoteIndicationsEnabled = false;
+        carRemoteIndications.clear();
+        pendingCarRemoteIndication = null;
+    }
+
+    private void drainCarRemoteIndications() {
+        if (closed || ingressFrozen || state == null || !state.isReady()
+                || server == null || inboundPhysicalFacade == null
+                || !carRemoteIndicationsEnabled || pendingCarRemoteIndication != null
+                || pendingControlIndication != null || carRemoteIndications.isEmpty()) return;
+        ServerAttempt exactServerAttempt = serverAttempt;
+        if (!isCurrentServerAttempt(exactServerAttempt)) return;
+        BluetoothGattService service = server.getService(
+                IphoneBleProtocolV2.ANDROID_PERIPHERAL_SERVICE);
+        BluetoothGattCharacteristic characteristic = service == null ? null
+                : service.getCharacteristic(IphoneBleProtocolV2.CAR_REMOTE_CHARACTERISTIC);
+        if (characteristic == null
+                || (characteristic.getProperties()
+                    & BluetoothGattCharacteristic.PROPERTY_INDICATE) == 0) {
+            carRemoteIndications.clear();
+            return;
+        }
+        byte[] frame = carRemoteIndications.removeFirst();
+        characteristic.setValue(frame);
+        pendingCarRemoteIndication = frame;
+        boolean queued;
+        try {
+            queued = exactServerAttempt.exactServer.notifyCharacteristicChanged(
+                    inboundPhysicalFacade, characteristic, true);
+        } catch (RuntimeException rejected) {
+            queued = false;
+        }
+        if (!queued) {
+            pendingCarRemoteIndication = null;
+            if (!carRemoteIndications.isEmpty()) {
+                main.postDelayed(this::drainCarRemoteIndications, 150L);
+            }
+            return;
+        }
+        carRemoteIndicationWatchdog = () -> {
+            carRemoteIndicationWatchdog = null;
+            if (pendingCarRemoteIndication != frame) return;
+            // C5 is optional and may never strand the critical C/A indication lane.
+            pendingCarRemoteIndication = null;
+            carRemoteIndications.clear();
+            reportError(IphoneTransportErrorV2.Kind.GATT,
+                    "C5 response indication timed out; remote queue dropped", true);
+        };
+        main.postDelayed(carRemoteIndicationWatchdog, 5_000L);
+    }
+
+    private void handleNotificationSent(
+            ServerAttempt attempt, BluetoothDevice device, int status) {
+        if (pendingControlIndication != null) {
+            handleControlIndicationSent(attempt, device, status);
+            return;
+        }
+        if (!isCurrentServerAttempt(attempt) || device != inboundPhysicalFacade
+                || pendingCarRemoteIndication == null) return;
+        if (carRemoteIndicationWatchdog != null) {
+            main.removeCallbacks(carRemoteIndicationWatchdog);
+            carRemoteIndicationWatchdog = null;
+        }
+        pendingCarRemoteIndication = null;
+        if (status != BluetoothGatt.GATT_SUCCESS) {
+            reportError(IphoneTransportErrorV2.Kind.GATT,
+                    "C5 response indication failed: status=" + status, true);
+        }
+        drainCarRemoteIndications();
     }
 
     private void handleControlIndicationSent(

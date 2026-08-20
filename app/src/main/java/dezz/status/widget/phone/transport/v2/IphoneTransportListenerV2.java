@@ -39,6 +39,10 @@ public interface IphoneTransportListenerV2 {
 
     void onRoleControlWriteResult(IphoneRoleControlV2 control, boolean success);
 
+    /** One validated-length payload from C5 on the already authenticated exact owner. */
+    default void onCarRemoteFrame(byte[] frame) {
+    }
+
     /** Input to the role-switch coordinator; it must still verify app-owned owner count is zero. */
     void onLocalTerminal(IphoneBleMode mode, BleRouteEpoch epoch);
 

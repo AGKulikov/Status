@@ -71,6 +71,8 @@ import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Control
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Role;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -123,7 +125,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         WRITE_CONTROL_POINT,
         WRITE_ROUTE_CONTROL,
         /** Helper 52 R request; appended so historical operation ordinals stay stable. */
-        REQUEST_TELEMETRY
+        REQUEST_TELEMETRY,
+        /** Helper 53 C5 subscription and Android-to-Helper response write. */
+        SUBSCRIBE_CAR_REMOTE,
+        WRITE_CAR_REMOTE
     }
 
     private enum RoutineStage {
@@ -143,6 +148,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         final BluetoothGattDescriptor descriptor;
         final ControlTransmit controlTransmit;
         final ControlCompletion controlCompletion;
+        final byte[] carRemoteFrame;
 
         PendingGattOperation(RawOperation type, BleRouteToken routeToken,
                              AncsRequestTokenV2 ancsRequest,
@@ -155,6 +161,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             this.descriptor = descriptor;
             this.controlTransmit = null;
             this.controlCompletion = null;
+            this.carRemoteFrame = null;
         }
 
         PendingGattOperation(ControlTransmit controlTransmit,
@@ -168,6 +175,19 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             this.controlTransmit = Objects.requireNonNull(controlTransmit, "controlTransmit");
             this.controlCompletion = Objects.requireNonNull(controlCompletion,
                     "controlCompletion");
+            this.carRemoteFrame = null;
+        }
+
+        PendingGattOperation(byte[] carRemoteFrame,
+                             BluetoothGattCharacteristic characteristic) {
+            this.type = RawOperation.WRITE_CAR_REMOTE;
+            this.routeToken = null;
+            this.ancsRequest = null;
+            this.characteristic = characteristic;
+            this.descriptor = null;
+            this.controlTransmit = null;
+            this.controlCompletion = null;
+            this.carRemoteFrame = Objects.requireNonNull(carRemoteFrame, "carRemoteFrame");
         }
     }
 
@@ -265,6 +285,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private PendingGattOperation pendingGatt;
     private BluetoothGattCharacteristic telemetryCharacteristic;
     private BleRouteToken telemetrySubscriptionToken;
+    private BluetoothGattCharacteristic carRemoteCharacteristic;
+    private BleRouteToken carRemoteSubscriptionToken;
+    private final Deque<byte[]> carRemoteWrites = new ArrayDeque<>();
+    private Runnable carRemoteSubscribeTimer;
+    private Runnable carRemoteDrainTimer;
+    private Runnable carRemoteWriteWatchdog;
     private Runnable telemetryRefreshTimer;
     private AncsRequestTokenV2 deferredAncsRequest;
     private byte[] deferredAncsValue;
@@ -345,6 +371,17 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         Objects.requireNonNull(reason, "reason");
         main.post(() -> {
             stopOnMain(epoch, reason);
+        });
+    }
+
+    @Override public void sendCarRemoteFrame(byte[] frame) {
+        if (frame == null || frame.length != 20) return;
+        byte[] exact = frame.clone();
+        main.post(() -> {
+            if (closed || ingressFrozen || state == null || !state.isReady()) return;
+            if (carRemoteWrites.size() >= 64) carRemoteWrites.removeFirst();
+            carRemoteWrites.addLast(exact);
+            scheduleCarRemoteDrain(0L);
         });
     }
 
@@ -449,6 +486,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 cancelAllTimers();
                 stopBootstrapScanForFreeze();
                 clearTelemetrySubscription();
+                clearCarRemoteChannel();
                 closeAncsSession();
                 if (owner != null && owner.connected
                         && state != null && state.isReady()) {
@@ -580,6 +618,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         resetRoutineAuthState();
         this.ingressFrozen = false;
         clearTelemetrySubscription();
+        clearCarRemoteChannel();
         this.lastInboundCloseRequest = null;
         this.lastOutboundControl = null;
         this.radioOffTerminalEpoch = null;
@@ -650,6 +689,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 break;
             case RESET_SESSION_STATE:
                 clearTelemetrySubscription();
+                clearCarRemoteChannel();
                 closeAncsSession();
                 resetRoutineAuthState();
                 if (pendingGatt == null
@@ -668,6 +708,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 if (ancsSession != null) {
                     applyAncsEffects(ancs.subscriptionsReady(ancsSession));
                 }
+                subscribeCarRemoteIfPresent(effect.token);
                 scheduleStandardBatteryMonitoring(1_500L);
                 break;
             case REPORT_HELPER_ID_LEARNED:
@@ -1012,6 +1053,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         owner = null;
         clearTelemetrySubscription();
+        clearCarRemoteChannel();
         failPendingRouteControl();
         try {
             if (closing.gatt != null) closing.gatt.close();
@@ -1278,6 +1320,15 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 }
                 apply(telemetry);
                 break;
+            case SUBSCRIBE_CAR_REMOTE:
+                if (result == GattResultV2.SUCCESS && characteristic != null) {
+                    carRemoteCharacteristic = characteristic;
+                    carRemoteSubscriptionToken = token;
+                    scheduleCarRemoteDrain(0L);
+                } else {
+                    scheduleCarRemoteSubscribe(token, 250L);
+                }
+                break;
             case SUBSCRIBE_NOTIFICATION_SOURCE:
                 apply(AndroidCentralRoute.notificationSourceSubscribed(current, token, result));
                 break;
@@ -1325,6 +1376,105 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         telemetryCharacteristic = null;
         telemetrySubscriptionToken = null;
         clearStandardBatteryMonitoring();
+    }
+
+    /** C5 is optional for Helper 52 compatibility and never participates in ANCS readiness. */
+    private void subscribeCarRemoteIfPresent(BleRouteToken token) {
+        BluetoothGattCharacteristic characteristic = characteristic(
+                IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                IphoneBleProtocolV2.CAR_REMOTE_CHARACTERISTIC);
+        if (characteristic == null || !writable(characteristic)
+                || (!indicatable(characteristic) && !notifiable(characteristic))) return;
+        if (pendingGatt != null) {
+            scheduleCarRemoteSubscribe(token, 150L);
+            return;
+        }
+        subscribe(token, RawOperation.SUBSCRIBE_CAR_REMOTE,
+                IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                IphoneBleProtocolV2.CAR_REMOTE_CHARACTERISTIC,
+                indicatable(characteristic));
+    }
+
+    private void scheduleCarRemoteSubscribe(BleRouteToken token, long delayMillis) {
+        if (carRemoteSubscribeTimer != null || token == null) return;
+        carRemoteSubscribeTimer = () -> {
+            carRemoteSubscribeTimer = null;
+            if (closed || ingressFrozen || state == null || !state.isReady()
+                    || owner == null || !token.sameOwner(owner.ownerToken)
+                    || carRemoteSubscriptionToken != null) return;
+            subscribeCarRemoteIfPresent(token);
+        };
+        main.postDelayed(carRemoteSubscribeTimer, Math.max(0L, delayMillis));
+    }
+
+    private void clearCarRemoteChannel() {
+        if (carRemoteSubscribeTimer != null) main.removeCallbacks(carRemoteSubscribeTimer);
+        if (carRemoteDrainTimer != null) main.removeCallbacks(carRemoteDrainTimer);
+        if (carRemoteWriteWatchdog != null) main.removeCallbacks(carRemoteWriteWatchdog);
+        carRemoteSubscribeTimer = null;
+        carRemoteDrainTimer = null;
+        carRemoteWriteWatchdog = null;
+        carRemoteWrites.clear();
+        carRemoteCharacteristic = null;
+        carRemoteSubscriptionToken = null;
+        if (pendingGatt != null && (pendingGatt.type == RawOperation.WRITE_CAR_REMOTE
+                || pendingGatt.type == RawOperation.SUBSCRIBE_CAR_REMOTE)) {
+            pendingGatt = null;
+        }
+    }
+
+    private void scheduleCarRemoteDrain(long delayMillis) {
+        if (carRemoteDrainTimer != null) return;
+        carRemoteDrainTimer = () -> {
+            carRemoteDrainTimer = null;
+            drainCarRemoteWrites();
+        };
+        main.postDelayed(carRemoteDrainTimer, Math.max(0L, delayMillis));
+    }
+
+    private void drainCarRemoteWrites() {
+        GattOwner exactOwner = owner;
+        BluetoothGattCharacteristic characteristic = carRemoteCharacteristic;
+        BleRouteToken subscription = carRemoteSubscriptionToken;
+        if (closed || ingressFrozen || exactOwner == null || exactOwner.gatt == null
+                || !exactOwner.connected || state == null || !state.isReady()
+                || characteristic == null || subscription == null
+                || !subscription.sameOwner(exactOwner.ownerToken)) {
+            carRemoteWrites.clear();
+            return;
+        }
+        if (carRemoteWrites.isEmpty()) return;
+        if (pendingGatt != null || !requestTimers.isEmpty()
+                || !controlRetryTimers.isEmpty()) {
+            scheduleCarRemoteDrain(75L);
+            return;
+        }
+        byte[] frame = carRemoteWrites.removeFirst();
+        characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+        characteristic.setValue(frame);
+        PendingGattOperation pending = new PendingGattOperation(frame, characteristic);
+        pendingGatt = pending;
+        boolean started;
+        try {
+            started = exactOwner.gatt.writeCharacteristic(characteristic);
+        } catch (RuntimeException rejected) {
+            started = false;
+        }
+        if (!started) {
+            pendingGatt = null;
+            scheduleCarRemoteDrain(150L);
+            return;
+        }
+        carRemoteWriteWatchdog = () -> {
+            carRemoteWriteWatchdog = null;
+            if (pendingGatt != pending) return;
+            // A missing ATT write callback must not strand ANCS behind an optional response.
+            pendingGatt = null;
+            carRemoteWrites.clear();
+            reportError(IphoneTransportErrorV2.Kind.GATT,
+                    "C5 response write timed out; remote queue dropped", true);
+        };
+        main.postDelayed(carRemoteWriteWatchdog, 5_000L);
     }
 
     private void cancelTelemetryRefresh() {
@@ -2665,6 +2815,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         if (pending.type != RawOperation.SUBSCRIBE_ROUTE_CONTROL
                 && pending.type != RawOperation.SUBSCRIBE_TELEMETRY
+                && pending.type != RawOperation.SUBSCRIBE_CAR_REMOTE
                 && pending.type != RawOperation.SUBSCRIBE_SERVICE_CHANGED
                 && pending.type != RawOperation.SUBSCRIBE_NOTIFICATION_SOURCE
                 && pending.type != RawOperation.SUBSCRIBE_DATA_SOURCE) return;
@@ -2703,7 +2854,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 || pending.characteristic != characteristic) return;
         if (ingressFrozen && pending.type != RawOperation.WRITE_ROUTE_CONTROL) {
             if (pending.type == RawOperation.WRITE_CONTROL_POINT
-                    || pending.type == RawOperation.REQUEST_TELEMETRY) {
+                    || pending.type == RawOperation.REQUEST_TELEMETRY
+                    || pending.type == RawOperation.WRITE_CAR_REMOTE) {
                 pendingGatt = null;
                 if (pending.type == RawOperation.REQUEST_TELEMETRY) {
                     cancelTelemetryRefresh();
@@ -2739,6 +2891,16 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                                 ? ControlTransmitResult.RETRYABLE_FAILURE
                                 : ControlTransmitResult.TERMINAL_FAILURE,
                     control);
+        } else if (pending.type == RawOperation.WRITE_CAR_REMOTE) {
+            if (carRemoteWriteWatchdog != null) {
+                main.removeCallbacks(carRemoteWriteWatchdog);
+                carRemoteWriteWatchdog = null;
+            }
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                reportError(IphoneTransportErrorV2.Kind.GATT,
+                        "C5 response write failed: status=" + status, true);
+            }
+            scheduleCarRemoteDrain(status == BluetoothGatt.GATT_SUCCESS ? 0L : 150L);
         }
     }
 
@@ -2768,7 +2930,19 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             handleTelemetryChanged(characteristic, value);
         } else if (IphoneBleProtocolV2.CONTROL_CHARACTERISTIC.equals(uuid)) {
             handleInboundRoleControl(value);
+        } else if (IphoneBleProtocolV2.CAR_REMOTE_CHARACTERISTIC.equals(uuid)) {
+            handleInboundCarRemote(characteristic, value);
         }
+    }
+
+    private void handleInboundCarRemote(BluetoothGattCharacteristic characteristic,
+                                        byte[] value) {
+        if (ingressFrozen || state == null || !state.isReady()
+                || owner == null || characteristic != carRemoteCharacteristic
+                || carRemoteSubscriptionToken == null
+                || !carRemoteSubscriptionToken.sameOwner(owner.ownerToken)
+                || value == null || value.length != 20 || listener == null) return;
+        listener.onCarRemoteFrame(value.clone());
     }
 
     private void handleTelemetryChanged(BluetoothGattCharacteristic characteristic,

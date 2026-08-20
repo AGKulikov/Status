@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return '2.1.4'
+    return '2.2.0'
 }
 
 int getVersionCode() {
@@ -32,8 +32,12 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
-    // Source-native restoration after the supplied 2.1.3 binary. Keep the code above 208021230
-    // so Android installs this build in place without deleting settings or Bluetooth enrollment.
+    // Helper 53 Bluetooth car control follows the source-native 2.1.4 release. Keep the code
+    // monotonic so Android installs it in place without deleting settings or BLE enrollment.
+    if (version == '2.2.0') {
+        return 208021232
+    }
+    // Preserve the previous public source-native identity for exact release replay.
     if (version == '2.1.4') {
         return 208021231
     }

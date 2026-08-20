@@ -32,7 +32,9 @@ public final class Ha1197TrunkAndReconnectContractTest {
                 "private boolean writeControlValue",
                 "private Double readControlValue");
         assertTrue(write.contains(
-                "source.setFunctionValue(definition.functionId, definition.zone, value)"));
+                "writeControlValueOnRoute(source, definition, supportedRoute, target)"));
+        assertTrue(integration.contains(
+                "source.setFunctionValue(definition.functionId, route, value)"));
     }
 
     @Test public void playPauseIsVectorAndUsesTheSameContentScaleAsTransportButtons()

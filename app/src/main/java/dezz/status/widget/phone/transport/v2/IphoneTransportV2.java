@@ -18,5 +18,9 @@ public interface IphoneTransportV2 extends AutoCloseable {
 
     IphoneTransportStatusV2 status();
 
+    /** Best-effort enqueue to C5; implementations must preserve the platform GATT FIFO. */
+    default void sendCarRemoteFrame(byte[] frame) {
+    }
+
     @Override void close();
 }
