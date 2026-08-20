@@ -1,0 +1,210 @@
+name: Build Natro 2.2.0 r2 signed-input candidate
+
+on:
+  push:
+    branches: ['agent/natro-helper-car-control-2.2.0']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: natro-2.2.0-r2-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERSION_NAME: '2.2.0'
+  # 208021232 is already installed in the vehicle. Keep the marketing version while making this
+  # exact rebuild an unambiguous in-place upgrade through Android's ordinary package installer.
+  VERSION_CODE: '208021233'
+  HELPER_TREE: '6e38ebfbee71f080374609a11391a9ae1d288621'
+  BUILD_TOOLS_VERSION: '36.0.0'
+
+jobs:
+  test-and-build:
+    name: Full geely suite and unsigned Natro r2 handoff
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Record exact source and Helper identities
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --short --ignore-submodules=none)"
+          SOURCE_TREE=$(git rev-parse 'HEAD^{tree}')
+          echo "tree=$SOURCE_TREE" >> "$GITHUB_OUTPUT"
+          git bundle create "$RUNNER_TEMP/natro-2.2.0-r2-source.bundle" HEAD
+          BUNDLE_SHA=$(sha256sum "$RUNNER_TEMP/natro-2.2.0-r2-source.bundle" \
+            | awk '{print $1}')
+          echo "bundle_sha=$BUNDLE_SHA" >> "$GITHUB_OUTPUT"
+          HELPER_ACTUAL_TREE=$(git rev-parse 'HEAD:ios/KX11-iPhone-ANCS-Helper-v53')
+          test "$HELPER_ACTUAL_TREE" = "$HELPER_TREE"
+          echo "helper_tree=$HELPER_ACTUAL_TREE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify paired Helper and collector contracts
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          bash ios/KX11-iPhone-ANCS-Helper-v53/verify-v53-contract.sh
+          bash -n tools/KX11_Bluetooth_Collect.sh
+          BASH_COMPAT=3.2 bash -n tools/KX11_Bluetooth_Collect.sh
+          KX11_COLLECTOR_UNDER_TEST=tools/KX11_Bluetooth_Collect.sh \
+            bash tools/tests/test_KX11_Bluetooth_Collect.sh
+          test -z "$(git status --short --ignore-submodules=none)"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Install Android SDK and build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_HOME:-}"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
+          "$SDKMANAGER" \
+            'platforms;android-36' "build-tools;${BUILD_TOOLS_VERSION}"
+
+      - name: Run complete unit suite and assemble release
+        shell: bash
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            clean testGeelyDebugUnitTest
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            assembleGeelyRelease
+
+      - name: Verify exact unsigned APK
+        id: unsigned
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+          test -s "$APK"
+          OUT="$RUNNER_TEMP/Natro-2.2.0-r2-unsigned.apk"
+          cp "$APK" "$OUT"
+          unzip -Z1 "$OUT" | grep -Fx 'AndroidManifest.xml'
+          unzip -Z1 "$OUT" | grep -Fx 'resources.arsc'
+          unzip -Z1 "$OUT" | grep -Fx 'classes.dex'
+          test "$(unzip -Z1 "$OUT" | grep -c '^res/')" -gt 500
+          TOOLS="$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}"
+          "$TOOLS/aapt" dump resources "$OUT" >/dev/null
+          BADGING=$("$TOOLS/aapt" dump badging "$OUT")
+          printf '%s\n' "$BADGING" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='208021233' versionName='2.2.0'"
+          LABELS=$(printf '%s\n' "$BADGING" | grep '^application-label')
+          printf '%s\n' "$LABELS" | grep -Fx "application-label:'Natro'"
+          if printf '%s\n' "$LABELS" \
+              | grep -Ev "^application-label(-[^:]+)?:'Natro'$"; then
+            echo 'Every localized application label must be exactly Natro' >&2
+            exit 1
+          fi
+          printf '%s\n' "$BADGING" | grep -F "sdkVersion:'28'"
+          printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'28'"
+          if printf '%s\n' "$BADGING" | grep -Fq 'application-debuggable'; then
+            echo 'Release candidate must not be debuggable' >&2
+            exit 1
+          fi
+          "$TOOLS/zipalign" -c -P 16 -v 4 "$OUT" >/dev/null
+          if "$TOOLS/apksigner" verify "$OUT" >/dev/null 2>&1; then
+            echo 'Unsigned handoff unexpectedly contains a valid signature' >&2
+            exit 1
+          fi
+          APK_SHA=$(sha256sum "$OUT" | awk '{print $1}')
+          echo "apk_sha256=$APK_SHA" >> "$GITHUB_OUTPUT"
+          printf '%s  %s\n' "$APK_SHA" "$(basename "$OUT")" \
+            > "$RUNNER_TEMP/natro-2.2.0-r2-unsigned.sha256"
+          test -z "$(git status --short --untracked-files=no --ignore-submodules=none)"
+
+      - name: Write exact-byte provenance
+        shell: bash
+        env:
+          SOURCE_TREE: ${{ steps.source.outputs.tree }}
+          SOURCE_BUNDLE_SHA: ${{ steps.source.outputs.bundle_sha }}
+          HELPER_ACTUAL_TREE: ${{ steps.source.outputs.helper_tree }}
+          APK_SHA: ${{ steps.unsigned.outputs.apk_sha256 }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg schema 'natro-local-signing-handoff/v1' \
+            --arg sourceSha "$GITHUB_SHA" \
+            --arg sourceTree "$SOURCE_TREE" \
+            --arg sourceBundleSha256 "$SOURCE_BUNDLE_SHA" \
+            --arg helperTree "$HELPER_ACTUAL_TREE" \
+            --arg unsignedSha256 "$APK_SHA" \
+            --arg runId "$GITHUB_RUN_ID" \
+            '{schema: $schema, sourceSha: $sourceSha, sourceTree: $sourceTree,
+              sourceBundleSha256: $sourceBundleSha256,
+              helper: {version: "53.0", build: 53, tree: $helperTree},
+              android: {appName: "Natro", package: "ru.natro.statuswidget",
+                versionName: "2.2.0", versionCode: 208021233,
+                minSdk: 28, targetSdk: 28, flavor: "geely", buildType: "release",
+                unsigned: true, apk: "Natro-2.2.0-r2-unsigned.apk",
+                apkSha256: $unsignedSha256,
+                requiredSigningCertificateSha256:
+                  "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"},
+              validation: {unitTask: "testGeelyDebugUnitTest",
+                helperContract: "verify-v53-contract.sh"},
+              github: {runId: $runId, ref: env.GITHUB_REF}}' \
+            > "$RUNNER_TEMP/natro-2.2.0-r2-candidate.json"
+
+      - name: Upload exact unsigned handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: natro-2.2.0-r2-unsigned-release
+          path: |
+            ${{ runner.temp }}/Natro-2.2.0-r2-unsigned.apk
+            ${{ runner.temp }}/natro-2.2.0-r2-unsigned.sha256
+            ${{ runner.temp }}/natro-2.2.0-r2-candidate.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload exact source snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: natro-2.2.0-r2-source-bundle
+          path: ${{ runner.temp }}/natro-2.2.0-r2-source.bundle
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Pack official Android signing tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLS="$RUNNER_TEMP/android-build-tools-36"
+          mkdir -p "$TOOLS/lib" "$TOOLS/lib64"
+          cp "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/apksigner" "$TOOLS/"
+          cp "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/lib/apksigner.jar" "$TOOLS/lib/"
+          cp "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/zipalign" "$TOOLS/"
+          cp "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/aapt" "$TOOLS/"
+          cp "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/aapt2" "$TOOLS/"
+          cp "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/lib64/libc++.so" "$TOOLS/lib64/"
+
+      - name: Upload official Android signing tools
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: natro-2.2.0-r2-android-build-tools
+          path: ${{ runner.temp }}/android-build-tools-36
+          if-no-files-found: error
+          retention-days: 2
