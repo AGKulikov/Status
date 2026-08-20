@@ -558,6 +558,35 @@ public final class AndroidCentralRoute {
                 BleRouteEffect.deadline(reconnect, CONNECT_TIMEOUT_MS));
     }
 
+    /**
+     * Uses an exact selected-phone Classic edge only as a liveness prompt for the sole GATT owner.
+     *
+     * <p>The Classic profile is not LE identity proof.  It therefore cannot select a device,
+     * allocate a wrapper, or advance authentication.  It may only bring forward the already
+     * scheduled same-wrapper reassertion, including the first CONNECTING attempt and after the
+     * ordinary silent-owner budget has entered {@link Phase#WAIT_SYSTEM_CONNECTION}.</p>
+     */
+    public static BleRouteTransition<State> selectedPhonePresent(State state) {
+        if (state == null || state.expected == null
+                || (state.phase != Phase.CONNECTING
+                && state.phase != Phase.WAIT_REASSERT
+                && state.phase != Phase.WAIT_SYSTEM_CONNECTION)) {
+            return BleRouteTransition.ignored(state);
+        }
+        BleRouteToken previous = state.expected;
+        BleRouteToken reconnect = nextOperation(previous);
+        if (reconnect == null) return counterExhausted(state, previous, "operation");
+        State connecting = copy(state, Phase.CONNECTING, reconnect, previous.ownerId,
+                state.nextOwnerId, state.consecutiveFailures,
+                "exact Classic presence; same public BluetoothGatt.connect() prompt");
+        return BleRouteTransition.accepted(connecting,
+                op(BleRouteEffect.Type.CANCEL_DEADLINE, previous,
+                        "selected phone is present"),
+                op(BleRouteEffect.Type.REASSERT_SAME_GATT, reconnect,
+                        "liveness only; retain sole wrapper and exact enrolled identity"),
+                BleRouteEffect.deadline(reconnect, CONNECT_TIMEOUT_MS));
+    }
+
     public static BleRouteTransition<State> retryElapsed(State state, BleRouteToken token,
                                                           boolean radioEnabled) {
         if (!expects(state, Phase.RETRY_WAIT, token)) return BleRouteTransition.ignored(state);
@@ -566,12 +595,6 @@ public final class AndroidCentralRoute {
                     state.consecutiveFailures, "radio off; start again with a fresh epoch");
             return BleRouteTransition.accepted(waiting,
                     op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "radio off"));
-        }
-        if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
-                && state.consecutiveFailures == 1
-                && "link lost: enrolled locator status failure; one identity scan"
-                .equals(state.detail)) {
-            return beginScan(state);
         }
         State base = copy(state, Phase.STARTUP_QUIET, null, 0L, state.nextOwnerId,
                 state.consecutiveFailures, "retry");
@@ -722,10 +745,17 @@ public final class AndroidCentralRoute {
         State state = copyWithReassertions(base, Phase.CONNECTING, connect,
                 owner, afterOwnerAllocation(owner), base.consecutiveFailures, 0,
                 "selected-bond public GATT");
+        boolean passiveEnrolledRetry = base.acquisitionMode
+                == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                && base.consecutiveFailures > 0;
         return BleRouteTransition.accepted(state,
                 op(BleRouteEffect.Type.CONNECT_SELECTED_BOND, connect,
-                        "one active autoConnect=false public owner for selectedSystemBondAddress; "
-                                + "no scan/name/topology fallback"),
+                        "one public owner for selectedSystemBondAddress; autoConnect="
+                                + passiveEnrolledRetry
+                                + (passiveEnrolledRetry
+                                ? " after registered-client failure"
+                                : " on first active attempt")
+                                + "; no scan/name/topology fallback"),
                 BleRouteEffect.deadline(connect, CONNECT_TIMEOUT_MS));
     }
 
