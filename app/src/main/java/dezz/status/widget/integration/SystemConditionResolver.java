@@ -29,7 +29,7 @@ import dezz.status.widget.scenario.ValueResolver;
  * <ul>
  *   <li>{@code time.range:HHmm-HHmm}</li>
  *   <li>{@code vehicle.passenger_present}</li>
- *   <li>{@code hwgps.route_lost}</li>
+ *   <li>{@code hwgps.dr_active}</li>
  *   <li>{@code automation.visible:SCOPE:element_id}</li>
  * </ul>
  */
@@ -37,7 +37,9 @@ public final class SystemConditionResolver implements ValueResolver {
     public static final String CONNECTOR_TYPE = "SYSTEM";
     public static final String CONNECTOR_ID = "default";
     public static final String PASSENGER_RESOURCE = "vehicle.passenger_present";
-    public static final String HWGPS_ROUTE_LOST_RESOURCE = "hwgps.route_lost";
+    public static final String HWGPS_DR_ACTIVE_RESOURCE = "hwgps.dr_active";
+    /** Compatibility alias for scenarios saved before the HWGPS condition was defined precisely. */
+    @Deprecated public static final String HWGPS_ROUTE_LOST_RESOURCE = "hwgps.route_lost";
     public static final String TIME_RANGE_PREFIX = "time.range:";
     public static final String AUTOMATION_VISIBLE_PREFIX = "automation.visible:";
     public static final String PASSENGER_METRIC =
@@ -46,7 +48,7 @@ public final class SystemConditionResolver implements ValueResolver {
     private final AutomationStateStore states;
     private final PopupOverlayConfigStore overlays;
     @Nullable private final CarIntegration carIntegration;
-    @Nullable private final HwgpsIntegration.RouteStateSubscription hwgpsRouteState;
+    @Nullable private final HwgpsIntegration.DrStateSubscription hwgpsDrState;
     private final Runnable changeListener;
     private final CarIntegration.TelemetryListener passengerListener;
 
@@ -71,8 +73,8 @@ public final class SystemConditionResolver implements ValueResolver {
         this.overlays = new PopupOverlayConfigStore(prefs);
         this.carIntegration = carIntegration;
         this.changeListener = changeListener;
-        this.hwgpsRouteState = context == null ? null
-                : new HwgpsIntegration.RouteStateSubscription(context,
+        this.hwgpsDrState = context == null ? null
+                : new HwgpsIntegration.DrStateSubscription(context,
                 ignored -> this.changeListener.run());
         this.passengerListener = value -> {
             if (!PASSENGER_METRIC.equals(value.id)) return;
@@ -93,7 +95,7 @@ public final class SystemConditionResolver implements ValueResolver {
                 ValueReference reference = condition.reference;
                 if (!isSystem(reference)) continue;
                 if (PASSENGER_RESOURCE.equals(reference.resourceId)) passengerNeeded = true;
-                if (HWGPS_ROUTE_LOST_RESOURCE.equals(reference.resourceId)) hwgpsNeeded = true;
+                if (isHwgpsDrResource(reference.resourceId)) hwgpsNeeded = true;
             }
             if (passengerNeeded && hwgpsNeeded) break;
         }
@@ -108,9 +110,9 @@ public final class SystemConditionResolver implements ValueResolver {
                 passengerPresent = false;
             }
         }
-        if (hwgpsNeeded != hwgpsSubscribed && hwgpsRouteState != null) {
+        if (hwgpsNeeded != hwgpsSubscribed && hwgpsDrState != null) {
             hwgpsSubscribed = hwgpsNeeded;
-            if (hwgpsNeeded) hwgpsRouteState.start(); else hwgpsRouteState.stop();
+            if (hwgpsNeeded) hwgpsDrState.start(); else hwgpsDrState.stop();
         }
     }
 
@@ -120,7 +122,7 @@ public final class SystemConditionResolver implements ValueResolver {
         }
         passengerSubscribed = false;
         passengerKnown = false;
-        if (hwgpsRouteState != null) hwgpsRouteState.stop();
+        if (hwgpsDrState != null) hwgpsDrState.stop();
         hwgpsSubscribed = false;
     }
 
@@ -128,6 +130,12 @@ public final class SystemConditionResolver implements ValueResolver {
         return reference != null
                 && CONNECTOR_TYPE.equalsIgnoreCase(reference.connectorType)
                 && CONNECTOR_ID.equals(reference.connectorId);
+    }
+
+    /** Accepts the precise v2 id and transparently preserves already-saved v1 scenarios. */
+    public static boolean isHwgpsDrResource(@Nullable String resourceId) {
+        return HWGPS_DR_ACTIVE_RESOURCE.equals(resourceId)
+                || HWGPS_ROUTE_LOST_RESOURCE.equals(resourceId);
     }
 
     @Override
@@ -140,11 +148,11 @@ public final class SystemConditionResolver implements ValueResolver {
                     ? Input.value(passengerPresent, true, true)
                     : Input.unavailable();
         }
-        if (HWGPS_ROUTE_LOST_RESOURCE.equals(resource)) {
-            if (hwgpsRouteState == null) return Input.unavailable();
-            switch (hwgpsRouteState.state()) {
-                case ROUTE_LOST: return Input.value(true, true, true);
-                case ROUTE_AVAILABLE: return Input.value(false, true, true);
+        if (isHwgpsDrResource(resource)) {
+            if (hwgpsDrState == null) return Input.unavailable();
+            switch (hwgpsDrState.state()) {
+                case DR_ACTIVE: return Input.value(true, true, true);
+                case DR_INACTIVE: return Input.value(false, true, true);
                 case UNAVAILABLE:
                 default: return Input.unavailable();
             }
