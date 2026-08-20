@@ -1,0 +1,160 @@
+name: Publish verified HA1232 Natro signed artifact
+
+on:
+  push:
+    branches:
+      - 'agent/natro-helper-car-control-2.2.0'
+    paths:
+      - '.github/workflows/publish-ha1232-verified-artifact.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publish-verified-ha1232-natro-v2.2.0
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: 'natro-v2.2.0'
+  SOURCE_SHA: 'adcf253033125d6428523669507340fecdc7b4e3'
+  SOURCE_TREE: '9ae32530020cc7dc732f3120522988bdfa42863d'
+  HELPER_TREE: '6e38ebfbee71f080374609a11391a9ae1d288621'
+  SIGNED_APK_SHA256: 'ae6c588b5819d5d4a913b095fb552e812b3bdc762e94ff212619cf0c04987125'
+  UNSIGNED_APK_SHA256: '60a777c21a79adbcefae8be726f12d44baccfa80001cc559a0ab40dca075499e'
+  STABLE_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
+  SIGNED_ARTIFACT: 'ha1232-natro-signed-adcf25303312'
+  SIGNED_RUN_ID: '32370599858'
+
+jobs:
+  publish:
+    name: Publish exact signed bytes from verified run 32370599858
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download the exact successful signed artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ env.SIGNED_ARTIFACT }}
+          path: ${{ runner.temp }}/ha1232-release
+          repository: ${{ github.repository }}
+          run-id: ${{ env.SIGNED_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Reverify every release byte and immutable identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/ha1232-release"
+          EXPECTED=$(mktemp)
+          ACTUAL=$(mktemp)
+          trap 'shred -u -- "$EXPECTED" "$ACTUAL" 2>/dev/null || true' EXIT
+          printf '%s\n' \
+            HA1232-provenance.json \
+            HA1232-release-notes.md \
+            KX11-iPhone-ANCS-Helper-v53-source.zip \
+            KX11_Bluetooth_Collect.sh \
+            Natro-2.2.0-signed.apk \
+            Natro-2.2.0-source.bundle \
+            Natro-2.2.0-source.tar.gz \
+            SHA256SUMS.txt \
+            apk-certificates.txt \
+            | sort > "$EXPECTED"
+          find "$OUT" -mindepth 1 -maxdepth 1 -type f -printf '%f\n' \
+            | sort > "$ACTUAL"
+          diff -u "$EXPECTED" "$ACTUAL"
+          (cd "$OUT" && sha256sum -c SHA256SUMS.txt)
+          test "$(sha256sum "$OUT/Natro-2.2.0-signed.apk" | awk '{print $1}')" \
+            = "$SIGNED_APK_SHA256"
+          chmod 755 "$OUT/KX11_Bluetooth_Collect.sh"
+          bash -n "$OUT/KX11_Bluetooth_Collect.sh"
+          BASH_COMPAT=3.2 bash -n "$OUT/KX11_Bluetooth_Collect.sh"
+          unzip -Z1 "$OUT/Natro-2.2.0-signed.apk" | grep -Fx AndroidManifest.xml
+          unzip -Z1 "$OUT/Natro-2.2.0-signed.apk" | grep -Fx resources.arsc
+          unzip -Z1 "$OUT/Natro-2.2.0-signed.apk" | grep -Fx classes.dex
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' \
+            "$OUT/apk-certificates.txt"
+          grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' \
+            "$OUT/apk-certificates.txt"
+          grep -Fq "Signer #1 certificate SHA-256 digest: ${STABLE_CERT_SHA256}" \
+            "$OUT/apk-certificates.txt"
+          jq -e \
+            --arg tag "$RELEASE_TAG" \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg sourceTree "$SOURCE_TREE" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg signedSha "$SIGNED_APK_SHA256" \
+            --arg unsignedSha "$UNSIGNED_APK_SHA256" \
+            --arg cert "$STABLE_CERT_SHA256" \
+            '.tag == $tag and .tagObjectSha == $sourceSha
+              and .sourceSha == $sourceSha and .sourceTree == $sourceTree
+              and .helper.tree == $helperTree
+              and .android.appName == "Natro"
+              and .android.package == "ru.natro.statuswidget"
+              and .android.versionName == "2.2.0"
+              and .android.versionCode == 208021232
+              and .android.apk == "Natro-2.2.0-signed.apk"
+              and .android.apkSha256 == $signedSha
+              and .android.unsignedInputSha256 == $unsignedSha
+              and .android.certificateSha256 == $cert
+              and .android.signatureSchemes == ["v2", "v3"]
+              and .validation.signingRunnerCheckedOutRepository == false' \
+            "$OUT/HA1232-provenance.json" >/dev/null
+
+      - name: Create exact prerelease without a redundant target override
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG_REF=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")
+          test "$(jq -r '.object.type' <<<"$TAG_REF")" = commit
+          test "$(jq -r '.object.sha' <<<"$TAG_REF")" = "$SOURCE_SHA"
+          if gh api \
+              "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" \
+              >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists; refusing to replace it" >&2
+            exit 1
+          fi
+          OUT="$RUNNER_TEMP/ha1232-release"
+          TITLE='Natro — signed release 2.2.0 + Helper v53'
+          REQUEST="$RUNNER_TEMP/ha1232-release-request.json"
+          jq -n \
+            --arg tag "$RELEASE_TAG" \
+            --arg name "$TITLE" \
+            --rawfile body "$OUT/HA1232-release-notes.md" \
+            '{tag_name: $tag, name: $name, body: $body,
+              draft: false, prerelease: true}' > "$REQUEST"
+          # The tag already exists and was verified above. Omitting target_commitish is
+          # required because GitHub's automatic token cannot receive Workflows:write.
+          CREATED=$(gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/releases" --input "$REQUEST")
+          test "$(jq -r '.tag_name' <<<"$CREATED")" = "$RELEASE_TAG"
+          test "$(jq -r '.draft' <<<"$CREATED")" = false
+          test "$(jq -r '.prerelease' <<<"$CREATED")" = true
+          test "$(jq '.assets | length' <<<"$CREATED")" -eq 0
+          gh release upload "$RELEASE_TAG" "$OUT"/* \
+            --repo "$GITHUB_REPOSITORY"
+          PUBLISHED=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")
+          EXPECTED_COUNT=$(find "$OUT" -mindepth 1 -maxdepth 1 -type f | wc -l)
+          test "$(jq -r '.name' <<<"$PUBLISHED")" = "$TITLE"
+          test "$(jq -r '.draft' <<<"$PUBLISHED")" = false
+          test "$(jq -r '.prerelease' <<<"$PUBLISHED")" = true
+          test "$(jq '.assets | length' <<<"$PUBLISHED")" -eq "$EXPECTED_COUNT"
+          while IFS= read -r FILE; do
+            NAME=$(basename "$FILE")
+            SIZE=$(stat -c '%s' "$FILE")
+            SHA=$(sha256sum "$FILE" | awk '{print $1}')
+            jq -e --arg name "$NAME" --argjson size "$SIZE" \
+              --arg digest "sha256:${SHA}" \
+              '.assets[] | select(.name == $name and .size == $size
+                and (.digest == null or .digest == $digest))' \
+              <<<"$PUBLISHED" >/dev/null
+          done < <(find "$OUT" -mindepth 1 -maxdepth 1 -type f -print | sort)
