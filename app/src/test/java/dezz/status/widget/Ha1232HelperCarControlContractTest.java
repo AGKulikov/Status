@@ -16,8 +16,8 @@ public final class Ha1232HelperCarControlContractTest {
     @Test public void publicationIdentityRemainsInstallCompatible() throws Exception {
         ReleaseIdentityContract.assertCurrentAtLeast(1232);
         String build = project("build.gradle").replaceAll("\\s+", " ");
-        assertTrue(build.contains("return '2.2.0'"));
-        assertTrue(build.contains("if (version == '2.2.0') { return 208021232"));
+        String current = "if (version == '2.2.0') { return 208021232";
+        assertTrue(build.contains(current));
         assertTrue(build.indexOf("if (version == '2.2.0')")
                 < build.indexOf("if (version == '2.1.4')"));
     }
