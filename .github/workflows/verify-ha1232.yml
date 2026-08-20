@@ -3,6 +3,8 @@ name: Verify HA1232 Natro release 2.2.0 candidate
 on:
   push:
     branches: ['agent/natro-helper-car-control-2.2.0']
+  pull_request:
+    branches: ['agent/natro-source-restoration-2.1.4']
   workflow_dispatch:
 
 permissions:
