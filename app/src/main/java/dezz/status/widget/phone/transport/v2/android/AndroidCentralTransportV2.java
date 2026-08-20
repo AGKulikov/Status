@@ -329,6 +329,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private final Object restorationGateWaiter = new Object();
     private boolean processGateDrainRetained;
     private PendingHelperIdentity pendingHelperIdentity;
+    private boolean selectedPhonePresencePending;
     private boolean closed;
 
     public AndroidCentralTransportV2(Context context) {
@@ -385,12 +386,22 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         });
     }
 
+    @Override public void selectedPhonePresent() {
+        main.post(() -> {
+            if (closed || ingressFrozen || state == null) return;
+            if (state.isReady()) return;
+            selectedPhonePresencePending = true;
+            applySelectedPhonePresenceIfPossible();
+        });
+    }
+
     /** Radio-off is terminal for this activation; radio-on must call start with a fresh epoch. */
     @Override public void radioOff(BleRouteEpoch epoch) {
         Objects.requireNonNull(epoch, "epoch");
         main.post(() -> {
             radioResetProven = true;
             ingressFrozen = true;
+            selectedPhonePresencePending = false;
             cancelAllTimers();
             stopBootstrapScanForFreeze();
             ProcessGattRegistrationGateV2.radioReset();
@@ -428,6 +439,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     @Override public void close() {
         main.post(() -> {
             closed = true;
+            selectedPhonePresencePending = false;
             ProcessGattRegistrationGateV2.cancelWaiter(restorationGateWaiter);
             ProcessGattRegistrationGateV2.cancelWaiter(processGateDrainWaiter);
             processGateDrainRetained = false;
@@ -624,6 +636,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         this.radioOffTerminalEpoch = null;
         this.radioResetProven = false;
         this.deferredStopTerminalEpoch = null;
+        this.selectedPhonePresencePending = false;
         cancelHelperIdentityCommit();
         apply(AndroidCentralRoute.start(request));
     }
@@ -634,6 +647,30 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         state = transition.state;
         publishStatus();
         for (BleRouteEffect effect : transition.effects) execute(effect);
+        applySelectedPhonePresenceIfPossible();
+    }
+
+    /** Retains a pre-start Classic hint until the sole public wrapper can consume it. */
+    private void applySelectedPhonePresenceIfPossible() {
+        if (!selectedPhonePresencePending || state == null || closed || ingressFrozen) return;
+        switch (state.phase) {
+            case CONNECTING:
+            case WAIT_REASSERT:
+            case WAIT_SYSTEM_CONNECTION:
+                selectedPhonePresencePending = false;
+                apply(AndroidCentralRoute.selectedPhonePresent(state));
+                break;
+            case READY:
+            case WAIT_RADIO:
+            case STOPPING:
+            case STOPPED:
+            case FAILED:
+                selectedPhonePresencePending = false;
+                break;
+            default:
+                // STARTUP_QUIET and the bounded drain/retry phases retain the liveness hint.
+                break;
+        }
     }
 
     private void execute(BleRouteEffect effect) {
@@ -848,7 +885,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 reportPlatformDiagnostic(token,
                         "enrolled_le exact_record=true, pending_recovery="
                                 + enrollmentRecordPending + ", direct_locator=true");
-                createGattOwner(token, enrolled, false, null);
+                boolean passiveRetry = state != null
+                        && state.consecutiveFailures > 0;
+                createGattOwner(token, enrolled, passiveRetry, null);
                 return;
             } catch (RuntimeException unavailable) {
                 failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
@@ -2568,7 +2607,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (current.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
                 && status != BluetoothGatt.GATT_SUCCESS) {
             apply(AndroidCentralRoute.linkLost(current, owner.ownerToken,
-                    "enrolled locator status failure; one identity scan"));
+                    "enrolled locator status failure; retry exact saved owner"));
             return;
         }
         if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
