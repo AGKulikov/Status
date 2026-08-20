@@ -518,7 +518,10 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
             drag.setAlpha(.74f);
             drag.setContentDescription("Перетащить " + element.label);
             drag.setLongClickable(true);
-            drag.setOnLongClickListener(v -> beginElementDrag(card, element.id));
+            drag.setOnLongClickListener(v -> {
+                LongPressFeedback.play(v);
+                return beginElementDrag(card, element.id);
+            });
             header.addView(drag, new LinearLayout.LayoutParams(dp(46), dp(48)));
             MaterialSwitch enabled = new MaterialSwitch(this);
             enabled.setText(element.label);

@@ -311,6 +311,13 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
                         + (InformationPanelConfig.MIN_SCALE + progress) + "%")));
         form.addView(scale, new LinearLayout.LayoutParams(match(), dp(48)));
 
+        TextView typography = text("Размер текста", 14, true);
+        form.addView(typography, lp(match(), wrap(), 0, dp(8), 0, 0));
+        SeekBar labelTextSize = dialogSeek(form, "Подпись", 8, 72,
+                item.labelTextSizeSp, " sp");
+        SeekBar valueTextSize = dialogSeek(form, "Значение", 8, 96,
+                item.valueTextSizeSp, " sp");
+
         LinearLayout toggles = column();
         MaterialSwitch enabled = toggle("Показывать статус", item.enabled);
         MaterialSwitch showIcon = toggle("Показывать иконку", item.showIcon);
@@ -364,6 +371,8 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
                 item.rowSpan = positive(rowSpan, "Высота");
                 item.scalePercent = InformationPanelConfig.MIN_SCALE
                         + scale.getProgress();
+                item.labelTextSizeSp = 8 + labelTextSize.getProgress();
+                item.valueTextSizeSp = 8 + valueTextSize.getProgress();
                 item.enabled = enabled.isChecked();
                 item.showIcon = showIcon.isChecked();
                 item.showLabel = showLabel.isChecked();
@@ -495,6 +504,28 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         row.addView(seek, new LinearLayout.LayoutParams(0, wrap(), .62f));
         row.addView(value);
         parent.addView(row, new LinearLayout.LayoutParams(match(), dp(54)));
+    }
+
+    @NonNull
+    private SeekBar dialogSeek(@NonNull LinearLayout parent, @NonNull String label,
+                               int minimum, int maximum, int initial,
+                               @NonNull String suffix) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text(label, 14, false);
+        TextView value = text(initial + suffix, 14, false);
+        value.setGravity(Gravity.END);
+        value.setMinWidth(dp(72));
+        SeekBar seek = new SeekBar(this);
+        seek.setMax(maximum - minimum);
+        seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
+        seek.setOnSeekBarChangeListener(new SimpleSeekListener(progress ->
+                value.setText((minimum + progress) + suffix)));
+        row.addView(title, new LinearLayout.LayoutParams(0, wrap(), .30f));
+        row.addView(seek, new LinearLayout.LayoutParams(0, wrap(), .70f));
+        row.addView(value);
+        parent.addView(row, new LinearLayout.LayoutParams(match(), dp(54)));
+        return seek;
     }
 
     @NonNull

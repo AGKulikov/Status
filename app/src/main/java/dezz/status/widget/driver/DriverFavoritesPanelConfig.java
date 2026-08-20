@@ -20,6 +20,10 @@ public final class DriverFavoritesPanelConfig {
     public static final int MAX_CELL_SIZE_PX = 180;
     public static final int MAX_GAP_PX = 40;
     public static final int MAX_BORDER_WIDTH_PX = 12;
+    /** Zero disables inactivity dismissal; positive values are configured per panel. */
+    public static final int AUTO_CLOSE_DISABLED_SECONDS = 0;
+    public static final int MIN_AUTO_CLOSE_SECONDS = 5;
+    public static final int MAX_AUTO_CLOSE_SECONDS = 600;
 
     @NonNull public String id = newId();
     @NonNull public String title = "Избранное";
@@ -30,6 +34,7 @@ public final class DriverFavoritesPanelConfig {
     public boolean borderEnabled = false;
     public int borderWidthPx = 1;
     @NonNull public String borderColor = "#55FFFFFF";
+    public int autoCloseSeconds = AUTO_CLOSE_DISABLED_SECONDS;
 
     @NonNull
     public DriverFavoritesPanelConfig copy() {
@@ -43,6 +48,7 @@ public final class DriverFavoritesPanelConfig {
         value.borderEnabled = borderEnabled;
         value.borderWidthPx = borderWidthPx;
         value.borderColor = borderColor;
+        value.autoCloseSeconds = autoCloseSeconds;
         return value;
     }
 

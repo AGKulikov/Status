@@ -32,6 +32,10 @@ public final class LauncherShortcutStore {
     public static final int MIN_DRIVER_BUTTON_HEIGHT_PX = 16;
     public static final int MAX_DRIVER_BUTTON_HEIGHT_PX = 480;
     public static final int MAX_DRIVER_PANEL_SHORTCUTS = 10;
+    public static final int MIN_INFORMATION_LABEL_TEXT_SIZE_SP = 8;
+    public static final int MAX_INFORMATION_LABEL_TEXT_SIZE_SP = 72;
+    public static final int MIN_INFORMATION_VALUE_TEXT_SIZE_SP = 8;
+    public static final int MAX_INFORMATION_VALUE_TEXT_SIZE_SP = 96;
 
     public enum Kind { APP, BUILTIN, RULE, INTENT, CAR, INFO, DIVIDER }
 
@@ -596,10 +600,12 @@ public final class LauncherShortcutStore {
                 Math.min(LauncherActionsGridConfig.MAX_COLUMNS, value.columnSpan));
         value.rowSpan = Math.max(1,
                 Math.min(LauncherActionsGridConfig.MAX_ROWS, value.rowSpan));
-        value.informationLabelTextSizeSp = Math.max(8,
-                Math.min(72, value.informationLabelTextSizeSp));
-        value.informationValueTextSizeSp = Math.max(8,
-                Math.min(96, value.informationValueTextSizeSp));
+        value.informationLabelTextSizeSp = Math.max(MIN_INFORMATION_LABEL_TEXT_SIZE_SP,
+                Math.min(MAX_INFORMATION_LABEL_TEXT_SIZE_SP,
+                        value.informationLabelTextSizeSp));
+        value.informationValueTextSizeSp = Math.max(MIN_INFORMATION_VALUE_TEXT_SIZE_SP,
+                Math.min(MAX_INFORMATION_VALUE_TEXT_SIZE_SP,
+                        value.informationValueTextSizeSp));
         value.informationFontFamily = Fonts.findByKey(
                 value.informationFontFamily).key;
         value.informationHorizontalAlignment = Math.max(0,

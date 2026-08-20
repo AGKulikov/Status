@@ -3323,6 +3323,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 favoritesGrid.setOnItemClickListener((parent, view, position, id) ->
                         launchApp((AppEntry) parent.getItemAtPosition(position)));
                 favoritesGrid.setOnItemLongClickListener((parent, view, position, id) -> {
+                    LongPressFeedback.play(view);
                     AppEntry entry = (AppEntry) parent.getItemAtPosition(position);
                     appCatalog.toggleFavorite(entry.packageName);
                     refreshFavorites();
@@ -3951,6 +3952,7 @@ public final class LauncherActivity extends AppCompatActivity {
             card.setOnClickListener(v -> executeShortcut(shortcut));
             if (shortcut.hasLongAction) {
                 card.setOnLongClickListener(v -> {
+                    LongPressFeedback.play(v);
                     LauncherShortcutStore.Shortcut action = shortcut.copy();
                     action.kind = shortcut.longKind;
                     action.target = shortcut.longTarget;
@@ -5276,6 +5278,7 @@ public final class LauncherActivity extends AppCompatActivity {
                         "Приложение · " + entry.label);
                 tile.setOnClickListener(view -> launchApp(entry));
                 tile.setOnLongClickListener(view -> {
+                    LongPressFeedback.play(view);
                     appCatalog.toggleFavorite(entry.packageName);
                     refreshFavorites();
                     return true;
