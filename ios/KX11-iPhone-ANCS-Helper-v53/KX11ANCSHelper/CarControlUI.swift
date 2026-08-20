@@ -274,9 +274,10 @@ private final class CarControlSectionViewController: UITableViewController {
 
     @objc private func activate(_ button: RemoteButton) {
         guard let definition = CarRemoteCatalogV1.byID[button.controlID] else { return }
-        let execute = { [weak self] in
-            self?.remote.send(controlID: definition.id, operation: .activate,
-                              value: 1, confirmed: definition.requiresConfirmation)
+        let execute: () -> Void = { [weak self] in
+            guard let self = self else { return }
+            self.remote.send(controlID: definition.id, operation: .activate,
+                             value: 1, confirmed: definition.requiresConfirmation)
         }
         if definition.requiresConfirmation {
             confirmMechanical(definition, execute: execute)
