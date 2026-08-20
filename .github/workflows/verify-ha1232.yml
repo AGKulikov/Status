@@ -19,6 +19,7 @@ env:
   # Keep the frozen public HA1232 identity available to the source contract tests.
   VERSION_CODE: '208021232'
   # 208021232 is already installed in the vehicle; only this rebuilt APK gets the next code.
+  # Keep the override under a distinct name so the publication contract still has one identity.
   REBUILD_VERSION_CODE: '208021233'
   HELPER_TREE: '6e38ebfbee71f080374609a11391a9ae1d288621'
   BUILD_TOOLS_VERSION: '36.0.0'
