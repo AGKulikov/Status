@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Microsoft Fluent UI System Icons 1.1.328 (road_cone, filled 24px); MIT. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@android:color/white"
+        android:pathData="M11.2 2c-.58 0-1.08.4-1.22.96A325.4 325.4 0 0 1 7.59 12h5.16a.75.75 0 0 1 0 1.5H7.18l-.55 2h7.12a.75.75 0 0 1 0 1.5H6.22l-.93 3.5H2.75a.75.75 0 0 0 0 1.5h18.5a.75.75 0 0 0 0-1.5h-2.54L14.02 2.93a1.25 1.25 0 0 0-1.2-.93h-1.63Z" />
+</vector>

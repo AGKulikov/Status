@@ -90,6 +90,8 @@ public class PresetsActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_presets);
+        View root = findViewById(R.id.presetsRoot);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, root);
 
         prefs = new Preferences(this);
 
@@ -187,24 +189,36 @@ public class PresetsActivity extends AppCompatActivity {
             return;
         }
         try {
-            prefs.importFromJson(json);
+            if (entry.bundled != null) {
+                // Built-in presets are intentionally partial status-row themes. Merge only their
+                // listed keys so applying "Sunlight" cannot erase HOME, climate or automation.
+                prefs.applyPatchFromJson(json);
+            } else {
+                // A user preset is a complete snapshot created by exportToJson(name).
+                prefs.importFromJson(json);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Failed to apply preset " + entry.name, e);
             Toast.makeText(this, R.string.preset_apply_failed, Toast.LENGTH_LONG).show();
             return;
         }
-        // Same restart pattern MainActivity itself uses for reset / preset application — start
-        // a fresh MainActivity with CLEAR_TASK so view-state restoration can't write the old
-        // values back through listeners attached during initializeViews().
-        if (WidgetService.isRunning()) {
-            stopService(new Intent(this, WidgetService.class));
+        // Reconfigure the live integration host in place. This preserves a driver-only
+        // headless host and lets WidgetService attach/detach the status surface dynamically.
+        WidgetService running = WidgetService.getInstance();
+        if (running != null) {
+            running.applyPreferences();
+        } else {
+            WidgetServiceStarter.startIfNeeded(this);
         }
-        if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
-            startForegroundService(new Intent(this, WidgetService.class));
-        }
+        // A complete user preset may also switch the driver rail profile or disable it.
+        dezz.status.widget.driver.DriverPanelService.apply(this);
+        // Applying a complete user preset may switch reserved/compact/off climate modes. Do not
+        // rely on a particular next Activity to reconcile WindowManager state.
+        dezz.status.widget.climate.ClimatePanelService.apply(this);
         Toast.makeText(this, getString(R.string.preset_applied_toast, entry.name),
                 Toast.LENGTH_SHORT).show();
-        Intent restart = new Intent(this, MainActivity.class);
+        Intent restart = SettingsHubActivity.intent(this,
+                dezz.status.widget.settings.SettingsDestinationCatalog.Group.STATUS);
         restart.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(restart);
         finish();

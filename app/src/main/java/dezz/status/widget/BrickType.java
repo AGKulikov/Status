@@ -30,7 +30,41 @@ import java.util.List;
 public enum BrickType {
     // New constants must be APPENDED — the ordinal doubles as the RecyclerView stable id and
     // the name is persisted in brickOrder / hideSource prefs.
-    TIME, DATE, MEDIA, WIFI, GPS, BLUETOOTH, INDOOR_TEMP, OUTDOOR_TEMP;
+    TIME, DATE, MEDIA, WIFI, GPS, BLUETOOTH, INDOOR_TEMP, OUTDOOR_TEMP,
+    /** Dynamic row containing any number of independently configured HA text bricks. */
+    HOME_ASSISTANT,
+    /**
+     * Dynamic row containing the user-selected scalar values of the exact paired iPhone.
+     *
+     * <p>Keep this appended: enum ordinals are RecyclerView stable ids in existing installs.</p>
+     */
+    PHONE_STATUS,
+    /** iPhone cellular signal rendered as the familiar four ascending bars. */
+    PHONE_CELLULAR,
+    /** Exact paired-iPhone battery level rendered as an iPhone battery glyph. */
+    PHONE_BATTERY,
+    /** Helper-provided cellular radio generation rendered as an iPhone-style text label. */
+    PHONE_NETWORK_TYPE;
+
+    /** Stable id used by Home Assistant/MQTT visibility commands. Never derive this from ordinal. */
+    public String automationId() {
+        switch (this) {
+            case TIME: return "builtin.time";
+            case DATE: return "builtin.date";
+            case MEDIA: return "builtin.media";
+            case WIFI: return "builtin.wifi";
+            case GPS: return "builtin.gps";
+            case BLUETOOTH: return "builtin.bluetooth";
+            case INDOOR_TEMP: return "builtin.indoor_temp";
+            case OUTDOOR_TEMP: return "builtin.outdoor_temp";
+            case HOME_ASSISTANT: return "builtin.home_assistant";
+            case PHONE_STATUS: return "builtin.phone_status";
+            case PHONE_CELLULAR: return "builtin.phone_cellular";
+            case PHONE_BATTERY: return "builtin.phone_battery";
+            case PHONE_NETWORK_TYPE: return "builtin.phone_network_type";
+            default: throw new IllegalStateException("Unknown brick type " + this);
+        }
+    }
 
     /**
      * Car-specific bricks are fed by the flavor's {@link dezz.status.widget.car.CarIntegration}

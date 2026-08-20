@@ -18,6 +18,7 @@
 package dezz.status.widget.shell;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -118,6 +119,13 @@ public class PrivilegedShell {
      * dependent {@code runCommand} starts.
      */
     private final ExecutorService executor = Executors.newSingleThreadExecutor(daemonThreads("priv-shell"));
+    /**
+     * Long-lived commands must not occupy {@link #executor}: the HUD SurfaceFlinger bridge stays
+     * in the foreground for as long as the HUD is enabled, while regular key events and grants
+     * still need a responsive privileged channel.
+     */
+    private final ExecutorService longRunningExecutor =
+            Executors.newCachedThreadPool(daemonThreads("priv-shell-long"));
 
     private PrivilegedShell(Context appContext) {
         this.appContext = appContext;
@@ -180,6 +188,17 @@ public class PrivilegedShell {
     public interface CommandCallback {
         /** Delivered on the main thread. {@code output} is null on transport failure. */
         void onResult(@Nullable String output, @Nullable String error);
+    }
+
+    public interface LongRunningCommandCallback {
+        /** A dedicated privileged transport is open and the command is about to be submitted. */
+        void onStarted();
+
+        /**
+         * Delivered when the command exits or its transport fails. A normal long-lived command
+         * commonly finishes only after its owning feature has already been stopped.
+         */
+        void onFinished(@Nullable String output, @Nullable String error);
     }
 
     /** Request for {@link #ensurePrivileges}: which permissions the caller wants verified/granted. */
@@ -285,6 +304,50 @@ public class PrivilegedShell {
             } finally {
                 if (transport != null) transport.close();
             }
+        });
+    }
+
+    /**
+     * Run a foreground command on a dedicated transport without blocking regular privileged
+     * operations. This is intentionally different from shell backgrounding: an {@code app_process}
+     * child launched with {@code &} can receive SIGHUP as soon as the short ADB/Telnet command
+     * channel closes. Keeping the transport and remote shell alive gives the child a deterministic
+     * lifetime and also preserves its stderr for actionable diagnostics.
+     */
+    public void runLongRunningCommand(String command, LongRunningCommandCallback callback) {
+        executor.execute(() -> {
+            ConnectionStorage.Endpoint endpoint = ensureEndpoint();
+            if (endpoint == null) {
+                mainHandler.post(() -> callback.onFinished(
+                        null, "No privileged transport available"));
+                return;
+            }
+            longRunningExecutor.execute(() -> {
+                ShellTransport transport = null;
+                try {
+                    transport = open(endpoint);
+                    mainHandler.post(callback::onStarted);
+                    String output;
+                    if (transport instanceof TelnetTransport) {
+                        // Zero is an infinite Socket read timeout. The bridge itself has bounded
+                        // accept/frame timeouts, so this cannot leave an orphaned remote process.
+                        output = ((TelnetTransport) transport).exec(command, 0);
+                    } else {
+                        output = transport.exec(command);
+                    }
+                    String completedOutput = output;
+                    mainHandler.post(() -> callback.onFinished(completedOutput, null));
+                } catch (Exception failure) {
+                    Log.w(TAG, "Long-running command failed", failure);
+                    if (activeEndpoint.compareAndSet(endpoint, null)) {
+                        storage.clear();
+                    }
+                    String message = failure.getMessage();
+                    mainHandler.post(() -> callback.onFinished(null, message));
+                } finally {
+                    if (transport != null) transport.close();
+                }
+            });
         });
     }
 
@@ -543,8 +606,12 @@ public class PrivilegedShell {
             }
             if (request.usageAccess) {
                 applyPermission(transport,
-                        new String[]{"appops set " + pkg + " GET_USAGE_STATS allow"},
-                        () -> Permissions.isUsageAccessGranted(appContext),
+                        new String[]{
+                                "pm grant " + pkg
+                                        + " android.permission.PACKAGE_USAGE_STATS",
+                                "appops set " + pkg + " GET_USAGE_STATS allow"
+                        },
+                        this::isCompleteUsageAccess,
                         PermissionKind.USAGE_ACCESS,
                         granted, failed);
             }
@@ -617,6 +684,16 @@ public class PrivilegedShell {
             granted.add(kind);
         } else {
             failed.add(kind);
+        }
+    }
+
+    private boolean isCompleteUsageAccess() {
+        try {
+            return appContext.checkSelfPermission("android.permission.PACKAGE_USAGE_STATS")
+                    == PackageManager.PERMISSION_GRANTED
+                    && Permissions.isUsageAccessGranted(appContext);
+        } catch (RuntimeException ignored) {
+            return false;
         }
     }
 

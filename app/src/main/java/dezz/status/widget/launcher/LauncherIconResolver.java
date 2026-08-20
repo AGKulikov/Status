@@ -1,0 +1,371 @@
+/*
+ * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+package dezz.status.widget.launcher;
+
+import android.content.ComponentName;
+import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
+
+import androidx.annotation.DrawableRes;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
+
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import dezz.status.widget.R;
+
+/** Resolves application icons and the built-in human-friendly preset library. */
+public final class LauncherIconResolver {
+    public static final class Preset {
+        @NonNull public final String key;
+        @NonNull public final String label;
+        @NonNull public final String category;
+        @NonNull public final String searchTerms;
+        Preset(String key, String label) {
+            this(key, label, "Основные", key.replace('_', ' '));
+        }
+        Preset(String key, String label, String category, String searchTerms) {
+            this.key = key;
+            this.label = label;
+            this.category = category;
+            this.searchTerms = searchTerms;
+        }
+        @Override public String toString() { return label; }
+    }
+
+    private static List<Preset> buildBasePresets() { return Arrays.asList(
+            new Preset("app", "Иконка приложения"),
+            new Preset("apps", "Приложения"),
+            new Preset("navigation", "Навигация"),
+            new Preset("home", "Домой"),
+            new Preset("back", "Назад"),
+            new Preset("work", "Работа"),
+            new Preset("media", "Медиа"),
+            new Preset("media_previous", "Предыдущий трек"),
+            new Preset("media_next", "Следующий трек"),
+            new Preset("garage", "Гараж / ворота"),
+            new Preset("gate", "Ворота"),
+            new Preset("door", "Дверь"),
+            new Preset("lock", "Замок"),
+            new Preset("light", "Свет"),
+            new Preset("power", "Питание"),
+            new Preset("temperature", "Температура"),
+            new Preset("climate", "Климат / вентилятор"),
+            new Preset("climate_ac", "Кондиционер"),
+            new Preset("climate_auto", "Климат AUTO"),
+            new Preset("fan", "Скорость вентилятора"),
+            new Preset("seat_heat", "Подогрев сиденья"),
+            new Preset("seat_vent", "Вентиляция сиденья"),
+            new Preset("wheel_heat", "Подогрев руля"),
+            new Preset("defrost_front", "Обогрев лобового"),
+            new Preset("defrost_rear", "Обогрев заднего стекла"),
+            new Preset("wiper", "Дворники"),
+            new Preset("drive_mode", "Режим движения"),
+            new Preset("auto_hold", "Auto Hold"),
+            new Preset("start_stop", "Start/Stop"),
+            new Preset("fuel_save", "Экономия топлива"),
+            new Preset("trunk_closed", "Багажник закрыт"),
+            new Preset("trunk_open", "Багажник открыт"),
+            new Preset("front_car", "Автомобиль спереди"),
+            new Preset("car_side", "Автомобиль сбоку"),
+            new Preset("car_rear", "Автомобиль сзади"),
+            new Preset("car_lock", "Закрыть автомобиль"),
+            new Preset("car_unlock", "Открыть автомобиль"),
+            new Preset("car_doors", "Двери автомобиля"),
+            new Preset("headlights", "Фары"),
+            new Preset("high_beam", "Дальний свет"),
+            new Preset("fog_lights", "Противотуманные фары"),
+            new Preset("hazard", "Аварийная сигнализация"),
+            new Preset("horn", "Клаксон"),
+            new Preset("air_recirculation", "Рециркуляция воздуха"),
+            new Preset("steering", "Рулевое колесо"),
+            new Preset("charging", "Зарядка автомобиля"),
+            new Preset("ev_battery", "Тяговая батарея"),
+            new Preset("fuel", "Топливо"),
+            new Preset("tire_pressure", "Давление в шинах"),
+            new Preset("parking", "Парковка"),
+            new Preset("car_camera", "Камера автомобиля"),
+            new Preset("car_key", "Ключ автомобиля"),
+            new Preset("wiper_wash", "Омыватель стекла"),
+            new Preset("water", "Вода"),
+            new Preset("humidity", "Влажность"),
+            new Preset("motion", "Движение / присутствие"),
+            new Preset("smoke", "Дым / газ"),
+            new Preset("camera", "Камера / звонок"),
+            new Preset("blinds", "Шторы / жалюзи"),
+            new Preset("thermostat", "Термостат"),
+            new Preset("plug", "Розетка"),
+            new Preset("battery", "Батарея"),
+            new Preset("energy", "Энергия"),
+            new Preset("alarm", "Сигнализация"),
+            new Preset("vacuum", "Пылесос"),
+            new Preset("weather", "Погода"),
+            new Preset("music", "Музыка / колонка"),
+            new Preset("phone", "Телефон"),
+            new Preset("messages", "Сообщения"),
+            new Preset("mail", "Почта"),
+            new Preset("calendar", "Календарь"),
+            new Preset("chat", "Чат"),
+            new Preset("social", "Социальные сети"),
+            new Preset("photo", "Фото"),
+            new Preset("maps", "Карты"),
+            new Preset("video", "Видео"),
+            new Preset("phone_app_phone", "Звонок с iPhone"),
+            new Preset("phone_app_music", "Музыкальное приложение"),
+            new Preset("phone_app_work", "Рабочее приложение"),
+            new Preset("missed_call", "Пропущенный звонок"),
+            new Preset("voicemail", "Голосовая почта"),
+            new Preset("news", "Новости"),
+            new Preset("health", "Здоровье"),
+            new Preset("finance", "Финансы"),
+            new Preset("phone_notification", "Уведомление телефона"),
+            new Preset("car", "Автомобиль"),
+            new Preset("location", "Местоположение"),
+            new Preset("status_wifi", "Wi‑Fi статусной строки"),
+            new Preset("status_gps", "GPS статусной строки"),
+            new Preset("status_bluetooth", "Bluetooth статусной строки"),
+            new Preset("status_phone_cellular", "Оператор и сигнал iPhone"),
+            new Preset("status_phone_battery", "Батарея iPhone"),
+            // Kept as selectable aliases because popup/scenario configurations have stored
+            // these offline identifiers since the first icon catalog.
+            new Preset("wifi", "Wi-Fi"),
+            new Preset("gps", "GPS"),
+            new Preset("bluetooth", "Bluetooth"),
+            new Preset("devices", "Умный дом"),
+            new Preset("scenario", "Сценарий"),
+            new Preset("edit", "Изменить"),
+            new Preset("settings", "Настройки"),
+            new Preset("notification", "Уведомления")); }
+    private LauncherIconResolver() {}
+
+    /** The expanded catalog is allocated only when a settings picker is actually opened. */
+    @NonNull public static List<Preset> presets() { return PresetHolder.PRESETS; }
+
+    /** Finds a catalog item without changing or normalizing its persistent key. */
+    @Nullable public static Preset preset(@Nullable String key) {
+        if (key == null) return null;
+        for (Preset preset : presets()) if (preset.key.equals(key)) return preset;
+        return null;
+    }
+
+    @NonNull public static String label(@Nullable String key) {
+        Preset preset = preset(key);
+        return preset == null ? "Иконка" : preset.label;
+    }
+
+    @Nullable
+    public static Drawable resolve(@NonNull Context context,
+                                   @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        return resolve(context, shortcut, null);
+    }
+
+    @Nullable
+    public static Drawable resolve(@NonNull Context context,
+                                   @NonNull LauncherShortcutStore.Shortcut shortcut,
+                                   @Nullable String colorOverride) {
+        if ("none".equalsIgnoreCase(shortcut.icon)) return null;
+        Drawable source = null;
+        if ("app".equals(shortcut.icon) && shortcut.kind == LauncherShortcutStore.Kind.APP) {
+            ComponentName component = ComponentName.unflattenFromString(shortcut.target);
+            if (component != null) source = HighResolutionAppIconLoader.load(context, component);
+        }
+        if (source == null) {
+            source = ContextCompat.getDrawable(context, shortcutDrawable(shortcut));
+        }
+        if (source == null) return null;
+        source = DrawableCompat.wrap(source).mutate();
+        String tint = colorOverride == null ? shortcut.iconColor : colorOverride;
+        if (!"none".equalsIgnoreCase(tint)
+                && !("app".equals(shortcut.icon) && shortcut.kind == LauncherShortcutStore.Kind.APP)) {
+            try { DrawableCompat.setTint(source, Color.parseColor(tint)); }
+            catch (IllegalArgumentException ignored) { DrawableCompat.setTint(source, Color.WHITE); }
+        }
+        return source;
+    }
+
+    /** Resolves a built-in icon without manufacturing a launcher shortcut. */
+    @Nullable
+    public static Drawable resolvePreset(@NonNull Context context, @NonNull String iconKey,
+                                         @Nullable String colorOverride) {
+        if ("none".equalsIgnoreCase(iconKey)) return null;
+        Drawable source = ContextCompat.getDrawable(context, resource(iconKey));
+        if (source == null) return null;
+        source = DrawableCompat.wrap(source).mutate();
+        if (colorOverride != null && !"none".equalsIgnoreCase(colorOverride)) {
+            try { DrawableCompat.setTint(source, Color.parseColor(colorOverride)); }
+            catch (IllegalArgumentException ignored) { DrawableCompat.setTint(source, Color.WHITE); }
+        }
+        return source;
+    }
+
+    /** Resource-only resolver used by every visual icon picker and popup allow-list. */
+    @DrawableRes public static int resource(@Nullable String key) {
+        int known = knownResource(key);
+        return known == 0 ? R.drawable.ic_launcher_apps : known;
+    }
+
+    /** Offline allow-list check that does not allocate the expanded settings catalog. */
+    public static boolean isKnownKey(@Nullable String key) {
+        return knownResource(key) != 0;
+    }
+
+    @DrawableRes private static int knownResource(@Nullable String key) {
+        int automotive = LauncherAutomotiveCatalog.resource(key);
+        if (automotive != 0) return automotive;
+        if (key == null) return 0;
+        if (key.startsWith("fluent_")) {
+            int fluent = FluentIconCatalog.resource(key);
+            if (fluent != 0) return fluent;
+        }
+        switch (key) {
+            case "navigation": return R.drawable.ic_launcher_navigation;
+            case "home": return R.drawable.ic_launcher_home;
+            case "back": return R.drawable.ic_launcher_back;
+            case "work": return R.drawable.ic_launcher_work;
+            case "media": return R.drawable.ic_media_play;
+            case "media_previous": return R.drawable.ic_media_previous;
+            case "media_next": return R.drawable.ic_media_next;
+            case "garage": return R.drawable.ic_popup_garage;
+            case "gate": return R.drawable.ic_popup_gate;
+            case "door": return R.drawable.ic_popup_door;
+            case "lock": return R.drawable.ic_popup_lock;
+            case "light": return R.drawable.ic_popup_light;
+            case "power": return R.drawable.ic_popup_power;
+            case "temperature": return R.drawable.ic_popup_temperature;
+            case "climate": return R.drawable.ic_car_climate;
+            case "climate_ac": return R.drawable.ic_car_ac;
+            case "climate_auto": return R.drawable.ic_car_climate_auto;
+            case "fan": return R.drawable.ic_car_fan;
+            case "seat_heat": return R.drawable.ic_car_seat_heat;
+            case "seat_vent": return R.drawable.ic_car_seat_vent;
+            case "wheel_heat": return R.drawable.ic_car_wheel_heat;
+            case "defrost_front": return R.drawable.ic_car_defrost_front;
+            case "defrost_rear": return R.drawable.ic_car_defrost_rear;
+            case "wiper": return R.drawable.ic_car_wiper;
+            case "drive_mode": return R.drawable.ic_car_drive_mode;
+            case "fuel_save": return R.drawable.ic_car_fuel_save;
+            case "trunk_closed": return R.drawable.ic_car_trunk_closed;
+            case "trunk_open": return R.drawable.ic_car_trunk_open;
+            case "front_car": return R.drawable.ic_car_front;
+            case "car_side": return R.drawable.ic_car_side;
+            case "car_rear": return R.drawable.ic_car_rear;
+            case "car_lock": return R.drawable.ic_car_lock;
+            case "car_unlock": return R.drawable.ic_car_unlock;
+            case "hood_open": return R.drawable.ic_car_hood_open;
+            case "car_doors": return R.drawable.ic_car_doors;
+            case "car_window": return R.drawable.ic_car_window;
+            case "sunroof": return R.drawable.ic_car_sunroof;
+            case "mirror_fold": return R.drawable.ic_car_mirror_fold;
+            case "headlights": return R.drawable.ic_car_headlight;
+            case "high_beam": return R.drawable.ic_car_high_beam;
+            case "fog_lights": return R.drawable.ic_car_fog_light;
+            case "hazard": return R.drawable.ic_car_hazard;
+            case "horn": return R.drawable.ic_car_horn;
+            case "air_recirculation": return R.drawable.ic_car_air_recirculation;
+            case "steering": return R.drawable.ic_car_steering;
+            case "charging": return R.drawable.ic_car_charging;
+            case "ev_battery": return R.drawable.ic_car_ev_battery;
+            case "fuel": return R.drawable.ic_car_fuel;
+            case "tire_pressure": return R.drawable.ic_car_tire_pressure;
+            case "parking": return R.drawable.ic_car_parking;
+            case "parking_sensor": return R.drawable.ic_car_parking_sensor;
+            case "car_camera": return R.drawable.ic_car_camera;
+            case "car_key": return R.drawable.ic_car_key;
+            case "child_lock": return R.drawable.ic_car_child_lock;
+            case "wiper_wash": return R.drawable.ic_car_wiper_wash;
+            case "auto_hold":
+            case "start_stop": return R.drawable.ic_popup_power;
+            case "water": return R.drawable.ic_popup_water;
+            case "humidity": return R.drawable.ic_smart_humidity;
+            case "motion": return R.drawable.ic_smart_motion;
+            case "smoke": return R.drawable.ic_smart_smoke;
+            case "camera": return R.drawable.ic_smart_camera;
+            case "blinds": return R.drawable.ic_smart_blinds;
+            case "thermostat": return R.drawable.ic_smart_thermostat;
+            case "plug": return R.drawable.ic_smart_plug;
+            case "battery": return R.drawable.ic_smart_battery;
+            case "energy": return R.drawable.ic_smart_energy;
+            case "alarm": return R.drawable.ic_smart_alarm;
+            case "vacuum": return R.drawable.ic_smart_vacuum;
+            case "weather": return R.drawable.ic_smart_weather;
+            case "music": return R.drawable.ic_smart_music;
+            case "phone": return R.drawable.ic_smart_phone;
+            case "messages": return R.drawable.ic_phone_app_messages;
+            case "mail": return R.drawable.ic_phone_app_mail;
+            case "calendar": return R.drawable.ic_phone_app_calendar;
+            case "chat": return R.drawable.ic_phone_app_chat;
+            case "social": return R.drawable.ic_phone_app_social;
+            case "photo": return R.drawable.ic_phone_app_photo;
+            case "maps": return R.drawable.ic_phone_app_maps;
+            case "video": return R.drawable.ic_phone_app_video;
+            case "phone_app_phone": return R.drawable.ic_phone_app_phone;
+            case "phone_app_music": return R.drawable.ic_phone_app_music;
+            case "phone_app_work": return R.drawable.ic_phone_app_work;
+            case "missed_call": return R.drawable.ic_phone_app_missed_call;
+            case "voicemail": return R.drawable.ic_phone_app_voicemail;
+            case "news": return R.drawable.ic_phone_app_news;
+            case "health": return R.drawable.ic_phone_app_health;
+            case "finance": return R.drawable.ic_phone_app_finance;
+            case "phone_notification": return R.drawable.ic_phone_app_notification;
+            case "car": return R.drawable.ic_smart_car;
+            case "location": return R.drawable.ic_smart_location;
+            case "status_wifi": return R.drawable.ic_status_iphone_wifi_level;
+            case "status_gps": return R.drawable.ic_status_iphone_gps_active;
+            case "status_bluetooth": return R.drawable.ic_status_iphone_bluetooth_solid;
+            case "status_phone_cellular": return R.drawable.ic_status_iphone_cellular_level;
+            case "status_phone_battery": return R.drawable.ic_status_iphone_battery;
+            case "wifi": return R.drawable.ic_status_filled_wifi_internet;
+            case "gps": return R.drawable.ic_status_iphone_gps_active;
+            case "bluetooth": return R.drawable.ic_status_iphone_bluetooth_solid;
+            case "devices": return R.drawable.ic_section_widget;
+            case "scenario": return R.drawable.ic_section_content;
+            case "edit": return R.drawable.ic_drag_handle;
+            case "settings": return R.drawable.ic_settings;
+            case "notification": return R.drawable.ic_info;
+            case "favorite": return R.drawable.ic_media_like;
+            case "wrong_location": return R.drawable.ic_hwgps_find_me;
+            case "app":
+            case "apps": return R.drawable.ic_launcher_apps;
+            default: return 0;
+        }
+    }
+
+    @NonNull private static List<Preset> buildPresets() {
+        List<Preset> values = new ArrayList<>(
+                BasePresetHolder.PRESETS.size() + FluentIconCatalog.presets().size() + 46);
+        values.addAll(BasePresetHolder.PRESETS);
+        LauncherAutomotiveCatalog.addPresets(values);
+        values.addAll(FluentIconCatalog.presets());
+        return Collections.unmodifiableList(values);
+    }
+
+    private static final class PresetHolder {
+        @NonNull static final List<Preset> PRESETS = buildPresets();
+    }
+
+    private static final class BasePresetHolder {
+        @NonNull static final List<Preset> PRESETS = buildBasePresets();
+    }
+
+    private static int shortcutDrawable(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (shortcut.kind == LauncherShortcutStore.Kind.CAR
+                && shortcut.target.endsWith("_passenger")) {
+            if ("seat_heat".equals(shortcut.icon)) {
+                return R.drawable.ic_car_seat_heat_passenger;
+            }
+            if ("seat_vent".equals(shortcut.icon)) {
+                return R.drawable.ic_car_seat_vent_passenger;
+            }
+        }
+        return resource(shortcut.icon);
+    }
+}

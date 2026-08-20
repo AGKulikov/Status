@@ -1,0 +1,27 @@
+/*
+ * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+package dezz.status.widget.launcher;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+
+import androidx.annotation.NonNull;
+
+/** Exported entry point that retains media updates even when the launcher is not visible. */
+public final class MediaInfoBroadcastReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (context == null || intent == null) return;
+        dezz.status.widget.diagnostics.ActionRecorder.record(
+                dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
+                "BROADCAST_RECEIVED",
+                dezz.status.widget.diagnostics.ActionRecorder.object(
+                        "receiver", getClass().getName(), "action", intent.getAction()));
+        PendingResult result = goAsync();
+        MediaBroadcastRepository.processAsync(context, intent, result::finish);
+    }
+}
