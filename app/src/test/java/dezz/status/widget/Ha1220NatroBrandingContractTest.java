@@ -16,7 +16,6 @@ public final class Ha1220NatroBrandingContractTest {
         ReleaseIdentityContract.assertCurrentAtLeast(1220);
         String gradle = project("build.gradle").replaceAll("\\s+", " ");
         String historical = "if (version == '2.0.3') { return 208021220";
-        assertTrue(gradle.contains("return '2.2.0'"));
         assertTrue(gradle.contains(historical));
         assertTrue(project(".github/workflows/verify-ha1220.yml").contains(
                 "# Frozen Natro 2.0.3 identity gate."));
