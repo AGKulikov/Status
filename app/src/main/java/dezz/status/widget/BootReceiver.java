@@ -165,6 +165,12 @@ public class BootReceiver extends BroadcastReceiver {
             // snapshot and generation work off the receiver's main Looper.
             if (!Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
                 MediaAutoResumeController.captureBootHistorySnapshot(context, action);
+                if (Intent.ACTION_BOOT_COMPLETED.equals(action)
+                        || ACTION_QUICKBOOT_POWERON.equals(action)) {
+                    // Start the user-selected countdown at the usable boot boundary. The
+                    // coordinator's media phase remains an idempotent durable re-arm.
+                    MediaAutoResumeController.scheduleAfterBoot(context);
+                }
             }
             if (ACTION_QUICKBOOT_POWERON.equals(action)) {
                 WidgetService survivingHost = WidgetService.getInstance();

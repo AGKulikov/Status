@@ -35,6 +35,7 @@ import dezz.status.widget.phone.transport.v2.BleRouteEffect;
 import dezz.status.widget.phone.transport.v2.BleRouteEpoch;
 import dezz.status.widget.phone.transport.v2.BleRouteToken;
 import dezz.status.widget.phone.transport.v2.BleRouteTransition;
+import dezz.status.widget.phone.transport.v2.CarRemoteFrameQueueV1;
 import dezz.status.widget.phone.transport.v2.ExactCallbackAttemptFenceV2;
 import dezz.status.widget.phone.transport.v2.GattResultV2;
 import dezz.status.widget.phone.transport.v2.IphoneAppNameV2;
@@ -65,9 +66,7 @@ import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Role;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.ArrayDeque;
 import java.util.Arrays;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -288,7 +287,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
     private BleRouteToken reverseGattOwnerToken;
     private boolean controlIndicationsEnabled;
     private boolean carRemoteIndicationsEnabled;
-    private final Deque<byte[]> carRemoteIndications = new ArrayDeque<>();
+    private final CarRemoteFrameQueueV1 carRemoteIndications = new CarRemoteFrameQueueV1();
     private byte[] pendingCarRemoteIndication;
     private Runnable carRemoteIndicationWatchdog;
     private boolean serverCloseRequested;
@@ -365,8 +364,13 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         byte[] exact = frame.clone();
         main.post(() -> {
             if (closed || ingressFrozen || state == null || !state.isReady()) return;
-            if (carRemoteIndications.size() >= 64) carRemoteIndications.removeFirst();
-            carRemoteIndications.addLast(exact);
+            CarRemoteFrameQueueV1.OfferResult result = carRemoteIndications.offer(exact);
+            if (result == CarRemoteFrameQueueV1.OfferResult.REJECTED_INVALID) return;
+            if (result == CarRemoteFrameQueueV1.OfferResult.REJECTED_PRESSURE) {
+                reportError(IphoneTransportErrorV2.Kind.PROTOCOL,
+                        "C5 protected indication queue reached its hard limit", true);
+                return;
+            }
             drainCarRemoteIndications();
         });
     }
@@ -2165,7 +2169,8 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
             carRemoteIndications.clear();
             return;
         }
-        byte[] frame = carRemoteIndications.removeFirst();
+        byte[] frame = carRemoteIndications.poll();
+        if (frame == null) return;
         characteristic.setValue(frame);
         pendingCarRemoteIndication = frame;
         boolean queued;
@@ -2177,9 +2182,8 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         }
         if (!queued) {
             pendingCarRemoteIndication = null;
-            if (!carRemoteIndications.isEmpty()) {
-                main.postDelayed(this::drainCarRemoteIndications, 150L);
-            }
+            carRemoteIndications.offerFirst(frame);
+            main.postDelayed(this::drainCarRemoteIndications, 150L);
             return;
         }
         carRemoteIndicationWatchdog = () -> {
@@ -2206,8 +2210,10 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
             main.removeCallbacks(carRemoteIndicationWatchdog);
             carRemoteIndicationWatchdog = null;
         }
+        byte[] completedFrame = pendingCarRemoteIndication;
         pendingCarRemoteIndication = null;
         if (status != BluetoothGatt.GATT_SUCCESS) {
+            carRemoteIndications.offerFirst(completedFrame);
             reportError(IphoneTransportErrorV2.Kind.GATT,
                     "C5 response indication failed: status=" + status, true);
         }

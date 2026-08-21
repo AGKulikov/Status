@@ -348,7 +348,8 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(freeze.contains("ingressFrozen = true"));
         assertTrue(freeze.contains("cancelAllTimers()"));
         assertTrue(freeze.contains("stopBootstrapScanForFreeze()"));
-        assertTrue(freeze.contains("owner == null && !scanRunning"));
+        assertTrue(freeze.contains("FROZEN_NO_REMOTE_OWNER"));
+        assertFalse(freeze.contains("owner == null && !scanRunning"));
 
         String prepare = between(source, "@Override public void prepareRestorationDrain",
                 "@Override public void freezeIngress");

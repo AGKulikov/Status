@@ -13,14 +13,13 @@ import org.junit.Test;
 
 /** Regression boundary for the Android 9 ANCS/C5 failure captured on 2026-08-21. */
 public final class Ha1235AncsActiveRecoveryContractTest {
-    @Test public void publicationIsNextAndPreservesEveryReleasedMapping() throws Exception {
+    @Test public void publicationMappingRemainsFrozenForReplay() throws Exception {
         ReleaseIdentityContract.assertCurrentAtLeast(1235);
         String build = project("build.gradle").replaceAll("\\s+", " ");
         String current = "if (version == '2.2.3') { return 208021235";
         String frozen222 = "if (version == '2.2.2') { return 208021234";
         String frozen221 = "if (version == '2.2.1') { return 208021233";
         String frozen220 = "if (version == '2.2.0') { return 208021232";
-        assertTrue(build.contains("return '2.2.3'"));
         assertTrue(build.contains(current));
         assertTrue(build.contains(frozen222));
         assertTrue(build.contains(frozen221));

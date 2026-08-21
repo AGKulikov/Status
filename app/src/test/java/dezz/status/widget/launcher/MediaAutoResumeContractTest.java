@@ -33,6 +33,10 @@ public final class MediaAutoResumeContractTest {
         assertTrue(controller.contains("KEY_TARGET_PACKAGE"));
         assertTrue(controller.contains("KEY_BOOT_TOKEN"));
         assertTrue(controller.contains("MediaPlaybackTargetPolicy.shouldAutoResume("));
+        assertTrue(controller.contains("setExactAndAllowWhileIdle"));
+        assertTrue(controller.contains("canScheduleExactAlarms"));
+        assertTrue(controller.contains("KEY_TARGET_ELAPSED"));
+        assertTrue(controller.contains("onPlaybackObservation"));
         assertTrue(preferences.contains("\"launcherMediaFixedPlayerEnabled\", false"));
         assertTrue(preferences.contains("\"launcherMediaFixedPlayerPackage\", \"\""));
         assertTrue(boot.contains(

@@ -38,6 +38,7 @@ import dezz.status.widget.phone.transport.v2.BleRouteEffect;
 import dezz.status.widget.phone.transport.v2.BleRouteEpoch;
 import dezz.status.widget.phone.transport.v2.BleRouteToken;
 import dezz.status.widget.phone.transport.v2.BleRouteTransition;
+import dezz.status.widget.phone.transport.v2.CarRemoteFrameQueueV1;
 import dezz.status.widget.phone.transport.v2.ExactCallbackAttemptFenceV2;
 import dezz.status.widget.phone.transport.v2.IphoneBleAdvertisement;
 import dezz.status.widget.phone.transport.v2.IphoneBleControlProtocolV2;
@@ -71,8 +72,6 @@ import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Control
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Role;
 
 import java.util.ArrayList;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,8 +98,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private static final long TELEMETRY_REFRESH_QUIET_MS = 30_000L;
     private static final long TELEMETRY_REFRESH_RETRY_MS = 5_000L;
     private static final long CAR_REMOTE_WRITE_TIMEOUT_MS = 5_000L;
-    private static final long CAR_REMOTE_BACKOFF_MIN_MS = 5 * 60_000L;
-    private static final long CAR_REMOTE_BACKOFF_MAX_MS = 30 * 60_000L;
+    private static final long CAR_REMOTE_BACKOFF_MIN_MS = 2_000L;
+    private static final long CAR_REMOTE_BACKOFF_MAX_MS = 30_000L;
     private static final int PLATFORM_DIAGNOSTIC_LIMIT = 256;
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
@@ -290,7 +289,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private BleRouteToken telemetrySubscriptionToken;
     private BluetoothGattCharacteristic carRemoteCharacteristic;
     private BleRouteToken carRemoteSubscriptionToken;
-    private final Deque<byte[]> carRemoteWrites = new ArrayDeque<>();
+    private final CarRemoteFrameQueueV1 carRemoteWrites = new CarRemoteFrameQueueV1();
     private Runnable carRemoteSubscribeTimer;
     private Runnable carRemoteDrainTimer;
     private Runnable carRemoteWriteWatchdog;
@@ -385,8 +384,13 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         byte[] exact = frame.clone();
         main.post(() -> {
             if (closed || ingressFrozen || state == null || !state.isReady()) return;
-            if (carRemoteWrites.size() >= 64) carRemoteWrites.removeFirst();
-            carRemoteWrites.addLast(exact);
+            CarRemoteFrameQueueV1.OfferResult result = carRemoteWrites.offer(exact);
+            if (result == CarRemoteFrameQueueV1.OfferResult.REJECTED_INVALID) return;
+            if (result == CarRemoteFrameQueueV1.OfferResult.REJECTED_PRESSURE) {
+                reportError(IphoneTransportErrorV2.Kind.PROTOCOL,
+                        "C5 protected output queue reached its hard limit", true);
+                return;
+            }
             scheduleCarRemoteDrain(0L);
         });
     }
@@ -508,7 +512,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 if (owner != null && owner.connected
                         && state != null && state.isReady()) {
                     result = FreezeResult.FROZEN_WITH_REMOTE_CONTROL;
-                } else if (owner == null && !scanRunning) {
+                } else {
+                    // A disconnected/reconnecting wrapper is local drainable state, not a
+                    // proven remote owner. Let same-role recovery retire it cleanly.
                     result = FreezeResult.FROZEN_NO_REMOTE_OWNER;
                 }
             }
@@ -1138,9 +1144,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 requested = false;
             }
             if (requested) return;
-            pendingMtuDiscoveryToken = null;
-            failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PROTOCOL,
-                    "routine C4 MTU request rejected before H; explicit re-enroll required");
+            failRoutineTransport("routine C4 MTU request was not queued");
             return;
         }
         pendingGatt = new PendingGattOperation(
@@ -1206,11 +1210,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             routineStage = RoutineStage.HELLO_WRITE;
             if (writeRoutineC4(c4, routineHello)) return;
         } catch (RuntimeException invalidIdentity) {
-            // Fall through to the exact typed terminal below.
+            pendingGatt = null;
+            failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PROTOCOL,
+                    "routine C4 hello construction failed; explicit re-enroll required");
+            return;
         }
-        pendingGatt = null;
-        failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PROTOCOL,
-                "routine C4 hello was not accepted; explicit re-enroll required");
+        failRoutineTransport("routine C4 hello write was not queued");
     }
 
     private boolean writeRoutineC4(BluetoothGattCharacteristic c4, byte[] frame) {
@@ -1503,7 +1508,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             scheduleCarRemoteDrain(75L);
             return;
         }
-        byte[] frame = carRemoteWrites.removeFirst();
+        byte[] frame = carRemoteWrites.poll();
+        if (frame == null) return;
         characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
         characteristic.setValue(frame);
         PendingGattOperation pending = new PendingGattOperation(frame, characteristic);
@@ -1516,6 +1522,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         if (!started) {
             pendingGatt = null;
+            carRemoteWrites.offerFirst(frame);
             scheduleCarRemoteDrain(150L);
             return;
         }
@@ -2677,7 +2684,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         BleRouteToken token = pendingMtuDiscoveryToken;
         if (owner == null || owner.gatt != callbackGatt || token == null) return;
         pendingMtuDiscoveryToken = null;
-        if (status != BluetoothGatt.GATT_SUCCESS || mtu < ROUTINE_REQUIRED_MTU) {
+        if (status != BluetoothGatt.GATT_SUCCESS) {
+            failRoutineTransport("routine C4 MTU negotiation failed: status=" + status);
+            return;
+        }
+        if (mtu < ROUTINE_REQUIRED_MTU) {
             failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PROTOCOL,
                     "routine C4 requires negotiated MTU >=69 before H; "
                             + "explicit re-enroll required");
@@ -2698,7 +2709,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                                         byte[] value, int status) {
         if (owner == null || owner.gatt != callbackGatt || enrollmentRecord == null
                 || status != BluetoothGatt.GATT_SUCCESS || value == null) {
-            failRoutine("routine C4 Helper proof read failed");
+            failRoutineTransport("routine C4 Helper proof read failed: status=" + status);
             return;
         }
         IphoneLeEnrollmentProtocolV2.RoutineSession verified =
@@ -2723,9 +2734,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             routineStage = RoutineStage.CONFIRM_WRITE;
             if (writeRoutineC4(c4, routineConfirm)) return;
         } catch (RuntimeException | GeneralSecurityException rejected) {
-            // Exact fail-closed terminal below.
+            failRoutine("routine C4 confirmation construction failed");
+            return;
         }
-        failRoutine("routine C4 confirmation construction/write failed");
+        failRoutineTransport("routine C4 confirmation write was not queued");
     }
 
     private IphoneLeEnrollmentProtocolV2.RoutineSession verifyRoutineProofForRecord(
@@ -2748,10 +2760,13 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void handleRoutineAckRead(BluetoothGatt callbackGatt,
                                       BluetoothGattCharacteristic c4,
                                       byte[] value, int status) {
+        if (owner == null || owner.gatt != callbackGatt
+                || status != BluetoothGatt.GATT_SUCCESS || value == null) {
+            failRoutineTransport("routine C4 Helper ACK read failed: status=" + status);
+            return;
+        }
         boolean verified = false;
-        if (owner != null && owner.gatt == callbackGatt
-                && status == BluetoothGatt.GATT_SUCCESS && value != null
-                && routineSession != null) {
+        if (routineSession != null) {
             try {
                 verified = routineSession.verifyAck(routineConfirm, value);
             } catch (RuntimeException | GeneralSecurityException rejected) {
@@ -2788,7 +2803,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 started = false;
             }
         }
-        if (!started) failRoutine("encrypted H read rejected after routine proof");
+        if (!started) {
+            failRoutineTransport("encrypted H read was not queued after routine proof");
+        }
     }
 
     private void failRoutine(String detail) {
@@ -2804,6 +2821,23 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
                     detail + "; explicit re-enroll required");
         }
+    }
+
+    /**
+     * A framework queue/callback failure is not evidence that the enrolled key was rejected.
+     * Retire the exact GATT owner and let the reducer retry while preserving enrollment.
+     */
+    private void failRoutineTransport(String detail) {
+        routineStage = RoutineStage.NONE;
+        if (routineSession != null) routineSession.destroy();
+        routineSession = null;
+        routineHello = null;
+        routineConfirm = null;
+        routineRouteToken = null;
+        pendingMtuDiscoveryToken = null;
+        pendingGatt = null;
+        reportError(IphoneTransportErrorV2.Kind.GATT, detail, true);
+        resetCurrentOwner(detail);
     }
 
     private void handleCharacteristicRead(BluetoothGatt callbackGatt,
@@ -2907,10 +2941,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                     && status == BluetoothGatt.GATT_SUCCESS) {
                 routineStage = RoutineStage.PROOF_READ;
                 if (readRoutineC4(characteristic)) return;
-                failRoutine("routine C4 proof read rejected");
+                failRoutineTransport("routine C4 proof read was not queued");
                 return;
             }
-            failRoutine("routine C4 hello write failed");
+            failRoutineTransport("routine C4 hello write failed: status=" + status);
             return;
         }
         if (isRoutineC4(characteristic) && routineStage == RoutineStage.CONFIRM_WRITE) {
@@ -2918,10 +2952,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                     && status == BluetoothGatt.GATT_SUCCESS) {
                 routineStage = RoutineStage.ACK_READ;
                 if (readRoutineC4(characteristic)) return;
-                failRoutine("routine C4 ACK read rejected");
+                failRoutineTransport("routine C4 ACK read was not queued");
                 return;
             }
-            failRoutine("routine C4 confirm write failed");
+            failRoutineTransport("routine C4 confirm write failed: status=" + status);
             return;
         }
         PendingGattOperation pending = pendingGatt;
@@ -2974,6 +3008,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             carRemoteWriteTimeouts = 0;
             carRemoteRetryNotBeforeMillis = 0L;
             if (status != BluetoothGatt.GATT_SUCCESS) {
+                carRemoteWrites.offerFirst(pending.carRemoteFrame);
                 reportError(IphoneTransportErrorV2.Kind.GATT,
                         "C5 response write failed: status=" + status, true);
             }

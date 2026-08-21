@@ -45,6 +45,7 @@ public final class MediaPlaybackHistoryStore {
                               boolean playing) {
         String normalized = packageName.trim();
         if (normalized.isEmpty() || normalized.equals(context.getPackageName())) return;
+        MediaAutoResumeController.onPlaybackObservation(context, normalized, playing);
         SharedPreferences preferences = preferences(context);
         if (normalized.equals(preferences.getString(KEY_PACKAGE, ""))
                 && playing == preferences.getBoolean(KEY_WAS_PLAYING, false)) {

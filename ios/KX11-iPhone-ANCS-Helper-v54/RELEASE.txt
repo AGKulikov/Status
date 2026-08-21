@@ -1,0 +1,52 @@
+KX11 ANCS Helper v54 — complete-catalog and reconnect candidate
+Bundle ID: ru.natro.kx11ancshelper
+Build: 54
+Marketing version: 54.0
+Minimum iOS: 14.0
+Paired runtime: Natro 2.2.4 using enrollment_v1_vectors.json, R/T and C5 wire fixtures
+Status: source/replay accepted; hosted Xcode build and physical-device matrix remain release gates
+
+Implemented:
+
+- waits for all 39 C5 catalog IDs and the final boundary before enabling vehicle controls;
+- clears torn catalog generations and retries HELLO at a bounded interval;
+- main Climate, Seats, Media and Comfort tabs with scenarios; the former Bluetooth/helper screen
+  is retained under Settings;
+- separate encrypted C5 car-control channel over the existing exact BLE owner, with no Passenger
+  Wi-Fi server, QR code or second PIN;
+- fixed ATT20 Int32/CRC/sequence/age protocol, 39-entry finite registry, capability-gated state,
+  local confirmation for mechanical commands and Android read-back/safety enforcement;
+- new plain F201 C4 enrollment-only characteristic; existing H, CONTROL and telemetry remain
+  encryption-required and exact-central/generation gated;
+- authenticated CONTROL `R` (0x52) requests one current battery/power/network/lock sample after
+  Android's 30-second quiet window; Helper no longer runs the one-second telemetry timer;
+- overlapping refreshes coalesce, Route-A C/A indications drain before telemetry, and diagnostic
+  Route B retains one ATT-with-response write in flight with C/A ahead of telemetry;
+- exact 99-byte P-256 ECDH HELLO/RESPONSE after observed ATT MTU >= 103, HKDF-SHA256 transcript,
+  unbiased 8-digit SAS, explicit confirmation on both screens and a 60-second foreground window;
+- order-independent user confirmation using authenticated 0x80 WAITING_SAS and 0x83 PREAUTH_ACK;
+  plain C4 never emits an ATT auth/encryption status that could start Android 9 SMP early;
+- no BLE name, address equality, RSSI or manufacturer-data identity and no session/key logging;
+- FINAL_COMMIT only after exact 0x83 read and a successful, non-partial encrypted H read; Android
+  additionally gates it on selected Classic BOND_BONDED;
+- device-only Keychain active+pending dual-key WAL: old active survives COMMIT, pending-key routine
+  proof returns authenticated 0x84, and only a following exact encrypted H read promotes atomically;
+  ACK/H/process loss remains recoverable;
+- monotonic deadlines/rate limits, exact generation/session/central fencing and idempotent duplicate
+  COMMIT within the live transaction;
+- v51 device-only installation UUID plus active/pending enrollment WAL are preserved unchanged;
+- explicit foreground “Сбросить связь Natro” confirmation that atomically removes active and
+  pending Natro records, never the system Classic pair or Helper installation identity;
+- shared deterministic enrollment/routine vector and portable source/replay verification;
+- Route B remains behind KX11ANCSHelper.experimentalRouteB and cannot coexist with Route A.
+
+Not yet claimed:
+
+- an Xcode/Apple-SDK build from this Linux workspace;
+- a signed IPA or physical-device installation;
+- physical iPhone/KX11 enrollment, ANCS recovery or completion of the README acceptance matrix;
+- immunity from iOS force-quit, ANCS authorization policy, background scheduling or historical
+  Bluetooth UI caches.
+
+Install over v51 with the same bundle ID and existing system pair. Do not label this candidate stable
+until the Apple-SDK build and physical acceptance matrix pass.

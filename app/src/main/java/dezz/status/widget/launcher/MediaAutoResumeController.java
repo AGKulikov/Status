@@ -10,6 +10,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
@@ -18,6 +19,7 @@ import androidx.annotation.NonNull;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.StartupWorkCoordinator;
+import dezz.status.widget.phone.PhoneConnectionJournal;
 
 /**
  * Captures the pre-boot media target and schedules a bounded, idempotent MEDIA_PLAY retry.
@@ -45,12 +47,15 @@ public final class MediaAutoResumeController {
     private static final String KEY_CAPTURE_HISTORY_WAS_PLAYING = "captureHistoryWasPlaying";
     private static final String KEY_BOOT_TOKEN = "bootToken";
     private static final String KEY_TARGET_PACKAGE = "targetPackage";
+    private static final String KEY_TARGET_ELAPSED = "targetElapsed";
+    private static final String KEY_NEXT_ATTEMPT = "nextAttempt";
+    private static final String KEY_OBSERVATION_KICK_ELAPSED = "observationKickElapsed";
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
     private static final int MAX_ATTEMPTS = 6;
     private static final long CAPTURE_BURST_COALESCE_MS = 120_000L;
     private static final long[] RETRY_DELAYS_MS = {
-            2_000L, 5_000L, 10_000L, 15_000L, 20_000L
+            500L, 1_000L, 2_000L, 4_000L, 8_000L
     };
 
     private MediaAutoResumeController() {}
@@ -110,6 +115,7 @@ public final class MediaAutoResumeController {
                 .putInt(KEY_CAPTURE_BOOT_COUNT, bootCount)
                 .putString(KEY_CAPTURE_HISTORY_PACKAGE, history.packageName)
                 .putBoolean(KEY_CAPTURE_HISTORY_WAS_PLAYING, history.wasPlaying)
+                .putLong(KEY_OBSERVATION_KICK_ELAPSED, Long.MIN_VALUE)
                 .putBoolean(KEY_COMPLETED, false)
                 .commit();
         // A queued retry from the previous standard/QuickBoot lifecycle must never cross the new
@@ -117,6 +123,9 @@ public final class MediaAutoResumeController {
         cancelAlarm(app);
         Log.i(TAG, "Frozen media history for lifecycle token=" + captureToken
                 + " package=" + history.packageName + " playing=" + history.wasPlaying);
+        PhoneConnectionJournal.append("media-auto-resume",
+                "снимок загрузки token=" + captureToken
+                        + ", playing=" + history.wasPlaying);
         return captureToken;
     }
 
@@ -130,6 +139,14 @@ public final class MediaAutoResumeController {
             state = state(app);
         }
         if (state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE) == captureToken) {
+            if (!state.getBoolean(KEY_COMPLETED, false)) {
+                long targetElapsed = state.getLong(KEY_TARGET_ELAPSED, 0L);
+                int nextAttempt = state.getInt(KEY_NEXT_ATTEMPT, 0);
+                if (targetElapsed > 0L) {
+                    schedule(app, captureToken, nextAttempt,
+                            Math.max(0L, targetElapsed - SystemClock.elapsedRealtime()));
+                }
+            }
             return;
         }
         Preferences preferences = new Preferences(app);
@@ -164,6 +181,8 @@ public final class MediaAutoResumeController {
         schedule(app, captureToken, 0, delayMillis);
         Log.i(TAG, "Scheduled auto-resume for " + target
                 + " after " + (delayMillis / 1_000L) + " s");
+        PhoneConnectionJournal.append("media-auto-resume",
+                "точный план token=" + captureToken + ", delayMs=" + delayMillis);
     }
 
     static void execute(@NonNull Context context, long bootToken, int attempt) {
@@ -185,7 +204,12 @@ public final class MediaAutoResumeController {
             return;
         }
 
+        long planned = state.getLong(KEY_TARGET_ELAPSED, SystemClock.elapsedRealtime());
+        long lateness = Math.max(0L, SystemClock.elapsedRealtime() - planned);
         MediaResumeCommand.Result result = MediaResumeCommand.play(app, target);
+        PhoneConnectionJournal.append("media-auto-resume",
+                "попытка=" + (attempt + 1) + ", result=" + result
+                        + ", latenessMs=" + lateness);
         if (result == MediaResumeCommand.Result.ALREADY_PLAYING) {
             Log.i(TAG, "Playback is already active; no duplicate command sent");
             complete(app);
@@ -206,6 +230,11 @@ public final class MediaAutoResumeController {
 
     private static void schedule(@NonNull Context app, long bootToken, int attempt,
                                  long delayMillis) {
+        long triggerElapsed = SystemClock.elapsedRealtime() + Math.max(0L, delayMillis);
+        state(app).edit()
+                .putLong(KEY_TARGET_ELAPSED, triggerElapsed)
+                .putInt(KEY_NEXT_ATTEMPT, attempt)
+                .apply();
         Intent intent = new Intent(app, MediaAutoResumeReceiver.class)
                 .setAction(ACTION_RESUME)
                 .putExtra(EXTRA_BOOT_TOKEN, bootToken)
@@ -218,11 +247,57 @@ public final class MediaAutoResumeController {
             return;
         }
         try {
-            alarms.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    SystemClock.elapsedRealtime() + Math.max(0L, delayMillis), pending);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    && !alarms.canScheduleExactAlarms()) {
+                alarms.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerElapsed, pending);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarms.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerElapsed, pending);
+            } else {
+                alarms.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerElapsed, pending);
+            }
+        } catch (SecurityException exactAlarmDenied) {
+            try {
+                alarms.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerElapsed, pending);
+            } catch (RuntimeException fallbackFailure) {
+                Log.w(TAG, "Could not schedule media auto-resume fallback", fallbackFailure);
+            }
         } catch (RuntimeException failure) {
             Log.w(TAG, "Could not schedule media auto-resume", failure);
         }
+    }
+
+    /** Wakes a due plan as soon as the target player exposes its MediaSession after boot. */
+    public static void onPlaybackObservation(@NonNull Context context,
+                                             @NonNull String packageName,
+                                             boolean playing) {
+        Context app = applicationContext(context);
+        SharedPreferences state = state(app);
+        if (state.getBoolean(KEY_COMPLETED, true)) return;
+        String target = state.getString(KEY_TARGET_PACKAGE, "").trim();
+        if (!target.equals(packageName.trim())) return;
+        if (playing) {
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "целевая MediaSession уже воспроизводит; план завершён");
+            complete(app);
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        long targetElapsed = state.getLong(KEY_TARGET_ELAPSED, Long.MAX_VALUE);
+        long lastKick = state.getLong(KEY_OBSERVATION_KICK_ELAPSED, Long.MIN_VALUE);
+        if (now < targetElapsed || (lastKick != Long.MIN_VALUE && now - lastKick < 1_000L)) {
+            return;
+        }
+        long bootToken = state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE);
+        if (bootToken == Long.MIN_VALUE
+                || state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken) return;
+        state.edit().putLong(KEY_OBSERVATION_KICK_ELAPSED, now).apply();
+        schedule(app, bootToken, state.getInt(KEY_NEXT_ATTEMPT, 0), 100L);
+        PhoneConnectionJournal.append("media-auto-resume",
+                "MediaSession готова; просроченная попытка ускорена");
     }
 
     private static void complete(@NonNull Context app) {

@@ -34,6 +34,7 @@ final class CarRemoteControllerV1 {
 
     private static final int MAX_COMMANDS_PER_SECOND = 12;
     private static final long RATE_WINDOW_MS = 1_000L;
+    private static final long HELLO_COALESCE_MS = 12_000L;
 
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -50,6 +51,8 @@ final class CarRemoteControllerV1 {
     private long rateWindowStarted;
     private int rateWindowCommands;
     private long sessionGeneration;
+    private long sessionStartedElapsed;
+    private int coalescedHellos;
 
     CarRemoteControllerV1(@NonNull Context context, @NonNull Sender sender) {
         this.context = context.getApplicationContext();
@@ -113,11 +116,24 @@ final class CarRemoteControllerV1 {
     }
 
     private void beginSession(long helloSequence) {
+        long now = SystemClock.elapsedRealtime();
+        if (sessionOpen && now - sessionStartedElapsed < HELLO_COALESCE_MS) {
+            coalescedHellos++;
+            if (coalescedHellos == 1) {
+                PhoneConnectionJournal.append("car-remote",
+                        "повторный HELLO объединён с текущей синхронизацией C5");
+            }
+            return;
+        }
         resetSessionOnMain();
         sessionOpen = true;
+        sessionStartedElapsed = now;
+        coalescedHellos = 0;
         long exactGeneration = ++sessionGeneration;
         lastInboundSequence = helloSequence;
         outboundSequence = helloSequence ^ 0x5a5a5a5aL;
+        PhoneConnectionJournal.append("car-remote",
+                "начата синхронизация C5 generation=" + exactGeneration);
         car.requestControlCatalog(descriptors -> {
             if (sessionOpen && sessionGeneration == exactGeneration) publishCatalog(descriptors);
         });
@@ -143,16 +159,25 @@ final class CarRemoteControllerV1 {
             boolean exposed = descriptor != null
                     && descriptor.availability != CarControlDescriptor.Availability.UNSUPPORTED;
             if (exposed) subscribedIds.add(entry.controlId);
-            sendCatalog(entry, descriptor == null ? 0 : descriptor.kind.ordinal() + 1,
+            // CATALOG kind is required even for an unavailable control. Kind zero made the
+            // frame invalid in both codecs, so Helper silently lost most of the registry.
+            sendCatalog(entry, descriptor == null
+                            ? CarControlDescriptor.Kind.ACTION.ordinal() + 1
+                            : descriptor.kind.ordinal() + 1,
                     exposed, index + 1 < entries.size());
-        }
-        if (!subscribedIds.isEmpty()) {
-            car.subscribeControlStates(new LinkedHashSet<>(subscribedIds), stateListener);
         }
         sendMediaVolumeState();
         send(new IphoneCarRemoteProtocolV1.Frame(
                 IphoneCarRemoteProtocolV1.Type.SYNC_COMPLETE, 0, 0, 0, 0,
                 nextOutboundSequence(), 0, 0));
+        PhoneConnectionJournal.append("car-remote",
+                "каталог C5 отправлен entries=" + entries.size()
+                        + ", available=" + subscribedIds.size());
+        // Subscribe only after the protected catalog boundary is queued. Some integrations call
+        // the listener synchronously; publishing STATE earlier could overtake SYNC_COMPLETE.
+        if (!subscribedIds.isEmpty()) {
+            car.subscribeControlStates(new LinkedHashSet<>(subscribedIds), stateListener);
+        }
     }
 
     private void sendCatalog(CarRemoteControlRegistryV1.Entry entry, int kind,
@@ -382,5 +407,7 @@ final class CarRemoteControllerV1 {
         outboundSequence = 0L;
         rateWindowStarted = 0L;
         rateWindowCommands = 0;
+        sessionStartedElapsed = 0L;
+        coalescedHellos = 0;
     }
 }

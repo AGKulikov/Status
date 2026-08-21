@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return '2.2.3'
+    return '2.2.4'
 }
 
 int getVersionCode() {
@@ -32,6 +32,11 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
+    // C4 transport recovery, complete C5 catalog delivery and exact media startup follow the
+    // frozen 2.2.3 active-ANCS release.
+    if (version == '2.2.4') {
+        return 208021236
+    }
     // Active exact-owner ANCS recovery and strict ATT serialization follow the frozen 2.2.2
     // panel interaction release.
     if (version == '2.2.3') {
