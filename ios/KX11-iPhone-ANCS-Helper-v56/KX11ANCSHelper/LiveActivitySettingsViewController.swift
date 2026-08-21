@@ -1,6 +1,8 @@
 import ActivityKit
 import UIKit
 
+private let liveActivityCyan = UIColor(red: 0.16, green: 0.70, blue: 0.96, alpha: 1)
+
 final class LiveActivitySettingsViewController: UITableViewController {
     private enum Section: Int, CaseIterable {
         case behavior
@@ -226,7 +228,7 @@ final class LiveActivitySettingsViewController: UITableViewController {
         cell.textLabel?.text = "Кнопка \(slot + 1)"
         cell.detailTextLabel?.text = control.title
         cell.imageView?.image = UIImage(systemName: control.systemImage)
-        cell.imageView?.tintColor = control.isVentilation ? .systemCyan : .systemOrange
+        cell.imageView?.tintColor = control.isVentilation ? liveActivityCyan : .systemOrange
         cell.accessoryType = .disclosureIndicator
         return cell
     }
@@ -330,7 +332,7 @@ private final class LiveControlPickerViewController: UITableViewController {
         cell.textLabel?.text = control.settingsTitle
         cell.detailTextLabel?.text = control.isThreeStage ? "Выкл · 1 · 2 · 3 · Auto" : nil
         cell.imageView?.image = UIImage(systemName: control.systemImage)
-        cell.imageView?.tintColor = control.isVentilation ? .systemCyan : .systemOrange
+        cell.imageView?.tintColor = control.isVentilation ? liveActivityCyan : .systemOrange
         cell.accessoryType = control == selected ? .checkmark : .none
         return cell
     }

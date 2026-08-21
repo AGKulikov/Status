@@ -1,5 +1,7 @@
 import UIKit
 
+private let natroCyan = UIColor(red: 0.16, green: 0.70, blue: 0.96, alpha: 1)
+
 /// Main Helper surface: a single Live-Activity-style dashboard plus diagnostics/settings.
 final class ViewController: UITabBarController {
     private let settingsController = HelperSettingsViewController()
@@ -41,7 +43,7 @@ final class ViewController: UITabBarController {
             navigationController(for: settingsController)
         ]
         selectedIndex = 0
-        tabBar.tintColor = .systemCyan
+        tabBar.tintColor = natroCyan
         if #available(iOS 15.0, *) {
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
@@ -67,7 +69,7 @@ final class ViewController: UITabBarController {
             navigation.navigationBar.standardAppearance = appearance
             navigation.navigationBar.scrollEdgeAppearance = appearance
         }
-        navigation.navigationBar.tintColor = .systemCyan
+        navigation.navigationBar.tintColor = natroCyan
         return navigation
     }
 }
@@ -164,7 +166,7 @@ private final class VehicleDashboardViewController: UIViewController {
         let mark = UILabel()
         mark.text = "N"
         mark.font = .italicSystemFont(ofSize: 28)
-        mark.textColor = .systemCyan
+        mark.textColor = natroCyan
         mark.setContentHuggingPriority(.required, for: .horizontal)
         let text = UIStackView()
         text.axis = .vertical
@@ -198,7 +200,7 @@ private final class VehicleDashboardViewController: UIViewController {
         }
         let live = UIButton(type: .system)
         live.setImage(UIImage(systemName: "rectangle.stack.badge.play"), for: .normal)
-        live.tintColor = .systemCyan
+        live.tintColor = natroCyan
         live.accessibilityLabel = "Настройки Live Activity"
         live.addTarget(self, action: #selector(openLiveActivitySettings), for: .touchUpInside)
         container.addArrangedSubview(live)
@@ -297,9 +299,9 @@ private final class VehicleDashboardViewController: UIViewController {
         button.titleLabel?.font = .systemFont(ofSize: 10, weight: .medium)
         button.titleLabel?.numberOfLines = 2
         button.titleLabel?.textAlignment = .center
-        button.setTitleColor(active ? .systemCyan : .white, for: .normal)
+        button.setTitleColor(active ? natroCyan : .white, for: .normal)
         button.backgroundColor = active
-            ? UIColor.systemCyan.withAlphaComponent(0.13)
+            ? natroCyan.withAlphaComponent(0.13)
             : UIColor.white.withAlphaComponent(0.055)
         button.layer.cornerRadius = 14
         button.isEnabled = manager.isAvailable(definition.id)
@@ -351,7 +353,7 @@ private final class VehicleDashboardViewController: UIViewController {
         switch definition.kind {
         case .toggle:
             let execute = { [weak self] in
-                self?.manager.send(
+                _ = self?.manager.send(
                     controlID: definition.id,
                     operation: .toggle,
                     confirmed: definition.requiresConfirmation
@@ -364,7 +366,7 @@ private final class VehicleDashboardViewController: UIViewController {
             break
         case .action:
             let execute = { [weak self] in
-                self?.manager.send(
+                _ = self?.manager.send(
                     controlID: definition.id,
                     operation: .activate,
                     value: 1,
@@ -661,9 +663,9 @@ private func iconName(_ definition: CarRemoteControlDefinition) -> String {
 
 private func accent(_ definition: CarRemoteControlDefinition) -> UIColor {
     switch definition.section {
-    case .climate: return .systemCyan
+    case .climate: return natroCyan
     case .seats:
-        return [22, 23, 27, 28].contains(definition.id) ? .systemCyan : .systemOrange
+        return [22, 23, 27, 28].contains(definition.id) ? natroCyan : .systemOrange
     case .vehicle: return .systemOrange
     case .comfort: return .systemPurple
     case .media: return .systemGreen

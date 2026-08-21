@@ -63,7 +63,7 @@ jobs:
             app/src/main/res/values-ru/strings.xml)" = 'Natro'
           HELPER_TREE=$(git rev-parse \
             "${GITHUB_SHA}:ios/KX11-iPhone-ANCS-Helper-v56")
-          test "$HELPER_TREE" = '5abc9518608316f8251c115de06f01b3957d063a'
+          test "$HELPER_TREE" = '67c56cc656d09fab275536a762bd9237241448a0'
 
       - name: Create exact tag without moving or overwriting anything
         id: tag
