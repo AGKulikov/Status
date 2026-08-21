@@ -1,6 +1,8 @@
 name: Authorize exact HA1238 Natro signed prerelease
 
 on:
+  push:
+    branches: ['release-auth/natro-v2.2.4-r3']
   workflow_dispatch:
 
 permissions:
@@ -37,7 +39,11 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = 'AGKulikov/Status'
-          test "$GITHUB_REF" = 'refs/heads/agent/natro-live-activity-2.2.4-r3'
+          case "$GITHUB_REF" in
+            refs/heads/agent/natro-live-activity-2.2.4-r3|\
+            refs/heads/release-auth/natro-v2.2.4-r3) ;;
+            *) echo "Unexpected release authorization ref: $GITHUB_REF" >&2; exit 1 ;;
+          esac
           test "$GITHUB_SHA" = "$(git rev-parse 'HEAD^{commit}')"
           test -z "$(git status --short --ignore-submodules=none)"
           REMOTE_BRANCH_SHA=$(gh api \
