@@ -1,6 +1,11 @@
 name: Authorize exact HA1237 Natro signed prerelease
 
 on:
+  push:
+    branches:
+      - 'agent/natro-live-activity-2.2.4-r2'
+    paths:
+      - '.github/workflows/create-ha1237-release-tag.yml'
   workflow_dispatch:
 
 permissions:
