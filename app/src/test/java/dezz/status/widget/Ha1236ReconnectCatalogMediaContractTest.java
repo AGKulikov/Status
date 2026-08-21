@@ -16,12 +16,15 @@ public final class Ha1236ReconnectCatalogMediaContractTest {
     @Test public void publicationIsMonotonicAndLeaves223Frozen() throws Exception {
         ReleaseIdentityContract.assertCurrentAtLeast(1236);
         String build = project("build.gradle").replaceAll("\\s+", " ");
-        String current = "if (version == '2.2.4') { return 208021236";
+        String current = "if (version == '2.2.4') { return 208021237";
         String frozen = "if (version == '2.2.3') { return 208021235";
         assertTrue(build.contains("return '2.2.4'"));
         assertTrue(build.contains(current));
         assertTrue(build.contains(frozen));
         assertTrue(build.indexOf(current) < build.indexOf(frozen));
+        String original = project("release-manifests/HA1236.md");
+        assertTrue(original.contains("Android version code: `208021236`"));
+        assertTrue(original.contains("Release tag: `natro-v2.2.4`"));
     }
 
     @Test public void c4FrameworkFailuresRetryWithoutErasingEnrollment() throws Exception {

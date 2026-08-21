@@ -134,8 +134,18 @@ final class ReleaseIdentityContract {
                 Integer.toString(MIN_SDK), yamlScalar(releaseWorkflow, "MIN_SDK"));
         assertEquals("Signed workflow must retain the installed signing lineage",
                 STABLE_CERT_SHA256, yamlScalar(releaseWorkflow, "STABLE_CERT_SHA256"));
-        assertEquals("Signed workflow must accept only the frozen public release tag",
-                "natro-v" + versionName, yamlScalar(releaseWorkflow, "RELEASE_TAG"));
+        String baseReleaseTag = "natro-v" + versionName;
+        String releaseTag = yamlScalar(releaseWorkflow, "RELEASE_TAG");
+        assertTrue("Signed workflow must use the public tag or a monotonic immutable revision",
+                releaseTag.matches(Pattern.quote(baseReleaseTag) + "(?:-r[2-9][0-9]*)?"));
+        assertTrue("Release manifest must carry the exact immutable release tag",
+                releaseManifest.contains("Release tag: `" + releaseTag + "`"));
+        String publishIntent = read(root.resolve(
+                "release-manifests/HA" + suffix + ".publish.json"));
+        assertTrue("Release intent must carry the exact immutable release tag",
+                publishIntent.contains("\"tag\": \"" + releaseTag + "\""));
+        assertTrue("Release intent must carry the current versionCode",
+                publishIntent.contains("\"versionCode\": " + versionCode));
         assertTrue("Signed APK must expose only the public Natro application name",
                 releaseWorkflow.contains("application-label:'Natro'"));
         assertTrue("Signed APK must require v2", releaseWorkflow.contains(

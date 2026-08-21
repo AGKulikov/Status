@@ -3237,6 +3237,7 @@ public final class PhoneConnectorController {
     }
 
     private void updateAncsPresenceLocked(boolean value) {
+        carRemote.setAncsReady(value);
         if (lastAncsPresence == value) return;
         lastAncsPresence = value;
         try {

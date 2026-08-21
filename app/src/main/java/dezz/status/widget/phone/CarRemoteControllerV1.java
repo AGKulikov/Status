@@ -35,6 +35,12 @@ final class CarRemoteControllerV1 {
     private static final int MAX_COMMANDS_PER_SECOND = 12;
     private static final long RATE_WINDOW_MS = 1_000L;
     private static final long HELLO_COALESCE_MS = 12_000L;
+    /** Read-only companion states; intentionally outside the finite command registry. */
+    private static final int STATE_CABIN_TEMPERATURE = 0xfc;
+    private static final int STATE_OUTDOOR_TEMPERATURE = 0xfd;
+    private static final int STATE_ANCS_CONNECTED = 0xfe;
+    private static final String TELEMETRY_CABIN = "ISensor.indoor_temp";
+    private static final String TELEMETRY_OUTDOOR = "ISensor.ambient_temp";
 
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -44,6 +50,8 @@ final class CarRemoteControllerV1 {
     private final Map<String, CarControlDescriptor> catalog = new HashMap<>();
     private final Set<String> subscribedIds = new LinkedHashSet<>();
     private final CarIntegration.ControlStateListener stateListener = this::sendState;
+    private final CarIntegration.TelemetryListener telemetryListener = this::sendTelemetry;
+    private final Set<String> liveActivityTelemetryIds = new LinkedHashSet<>();
 
     private boolean sessionOpen;
     private long lastInboundSequence;
@@ -53,12 +61,24 @@ final class CarRemoteControllerV1 {
     private long sessionGeneration;
     private long sessionStartedElapsed;
     private int coalescedHellos;
+    private boolean ancsReady;
 
     CarRemoteControllerV1(@NonNull Context context, @NonNull Sender sender) {
         this.context = context.getApplicationContext();
         this.car = CarIntegrations.get(this.context);
         this.audio = (AudioManager) this.context.getSystemService(Context.AUDIO_SERVICE);
         this.sender = sender;
+        liveActivityTelemetryIds.add(TELEMETRY_CABIN);
+        liveActivityTelemetryIds.add(TELEMETRY_OUTDOOR);
+    }
+
+    /** Publish the exact ANCS-ready transition into an already-open C5 session when possible. */
+    void setAncsReady(boolean ready) {
+        main.post(() -> {
+            boolean changed = ancsReady != ready;
+            ancsReady = ready;
+            if (changed && sessionOpen) sendAncsState();
+        });
     }
 
     void accept(byte[] rawFrame) {
@@ -170,6 +190,7 @@ final class CarRemoteControllerV1 {
         send(new IphoneCarRemoteProtocolV1.Frame(
                 IphoneCarRemoteProtocolV1.Type.SYNC_COMPLETE, 0, 0, 0, 0,
                 nextOutboundSequence(), 0, 0));
+        sendAncsState();
         PhoneConnectionJournal.append("car-remote",
                 "каталог C5 отправлен entries=" + entries.size()
                         + ", available=" + subscribedIds.size());
@@ -178,6 +199,7 @@ final class CarRemoteControllerV1 {
         if (!subscribedIds.isEmpty()) {
             car.subscribeControlStates(new LinkedHashSet<>(subscribedIds), stateListener);
         }
+        car.subscribeTelemetry(new LinkedHashSet<>(liveActivityTelemetryIds), telemetryListener);
     }
 
     private void sendCatalog(CarRemoteControlRegistryV1.Entry entry, int kind,
@@ -209,6 +231,37 @@ final class CarRemoteControllerV1 {
                 ? scaledWireValue(state.value, entry.scale) : 0;
         send(new IphoneCarRemoteProtocolV1.Frame(
                 IphoneCarRemoteProtocolV1.Type.STATE, entry.wireId, 0, flags, 0,
+                nextOutboundSequence(), value, 0));
+    }
+
+    private void sendAncsState() {
+        int flags = IphoneCarRemoteProtocolV1.FLAG_AVAILABLE
+                | IphoneCarRemoteProtocolV1.FLAG_KNOWN
+                | (ancsReady ? IphoneCarRemoteProtocolV1.FLAG_ACTIVE : 0);
+        sendCompanionState(STATE_ANCS_CONNECTED, flags, ancsReady ? 1 : 0);
+    }
+
+    private void sendTelemetry(@NonNull CarIntegration.TelemetryValue value) {
+        if (!sessionOpen) return;
+        final int stateId;
+        if (TELEMETRY_CABIN.equals(value.id)) {
+            stateId = STATE_CABIN_TEMPERATURE;
+        } else if (TELEMETRY_OUTDOOR.equals(value.id)) {
+            stateId = STATE_OUTDOOR_TEMPERATURE;
+        } else {
+            return;
+        }
+        sendCompanionState(
+                stateId,
+                IphoneCarRemoteProtocolV1.FLAG_AVAILABLE
+                        | IphoneCarRemoteProtocolV1.FLAG_KNOWN,
+                scaledWireValue(value.value, 10)
+        );
+    }
+
+    private void sendCompanionState(int stateId, int flags, int value) {
+        send(new IphoneCarRemoteProtocolV1.Frame(
+                IphoneCarRemoteProtocolV1.Type.STATE, stateId, 0, flags, 0,
                 nextOutboundSequence(), value, 0));
     }
 
@@ -401,6 +454,7 @@ final class CarRemoteControllerV1 {
     private void resetSessionOnMain() {
         sessionOpen = false;
         car.unsubscribeControlStates(stateListener);
+        car.unsubscribeTelemetry(telemetryListener);
         catalog.clear();
         subscribedIds.clear();
         lastInboundSequence = 0L;

@@ -32,10 +32,11 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
-    // C4 transport recovery, complete C5 catalog delivery and exact media startup follow the
-    // frozen 2.2.3 active-ANCS release.
+    // Revision 2 keeps the public 2.2.4 name while advancing the install code for Helper 55,
+    // Live Activity companion states and exact ANCS App Intents. The immutable first 2.2.4 tag
+    // remains reproducible from its own source commit at code 208021236.
     if (version == '2.2.4') {
-        return 208021236
+        return 208021237
     }
     // Active exact-owner ANCS recovery and strict ATT serialization follow the frozen 2.2.2
     // panel interaction release.
