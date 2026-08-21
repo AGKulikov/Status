@@ -185,11 +185,27 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final int HVAC_TEMPERATURE_FUNCTION = 0x10060100;
     private static final int HVAC_NATIVE_SYNC_FUNCTION = 0x10060500;
     private static final int HVAC_PANEL_LOCK_FUNCTION = 0x10100200;
+    private static final int HVAC_SEAT_HEATING_FUNCTION = 0x10050200;
+    private static final int HVAC_SEAT_VENTILATION_FUNCTION = 0x10050100;
+    private static final int SEAT_REAR_LEFT_ZONE = 0x10;
+    private static final int SEAT_REAR_RIGHT_ZONE = 0x40;
     private static final int AMBIENT_ENABLED_FUNCTION = 0x21051000;
     private static final int AMBIENT_BRIGHTNESS_FUNCTION = 0x2A010100;
+    private static final int AMBIENT_MODE_FUNCTION = 0x200A0200;
+    private static final int AMBIENT_EFFECT_FUNCTION = 0x2A080100;
+    private static final int AMBIENT_COLOR_FUNCTION = 0x2A010200;
+    private static final int AMBIENT_THEME_FUNCTION = 0x2A080400;
     private static final int PASSENGER_SCREEN_ENABLED_FUNCTION = 0x20280E00;
     private static final int PASSENGER_SCREEN_DAY_BRIGHTNESS_FUNCTION = 0x20150300;
     private static final int PASSENGER_SCREEN_NIGHT_BRIGHTNESS_FUNCTION = 0x20150400;
+    private static final int WINDOW_POSITION_FUNCTION = 0x21030300;
+    private static final int SUNROOF_TILT_FUNCTION = 0x21030400;
+    private static final int WINDOW_DRIVER_ZONE = 0x10;
+    private static final int WINDOW_PASSENGER_ZONE = 0x20;
+    private static final int WINDOW_REAR_LEFT_ZONE = 0x100;
+    private static final int WINDOW_REAR_RIGHT_ZONE = 0x200;
+    private static final String WINDOW_CLOSE_CONTROL_PREFIX = "vehicle.window_close_";
+    private static final String SUNROOF_CLOSE_CONTROL_ID = "vehicle.sunroof_close";
     /**
      * A short Binder failure may hide the AUTO bit while the ECU is still in AUTO. Reuse only a
      * recent confirmed mode; after this window an unresolved mode is UNKNOWN and no fan write is
@@ -765,6 +781,47 @@ final class GeelyCarIntegration implements CarIntegration {
                 option(IHvac.STEERING_WHEEL_HEAT_AUTO, "Auto"));
     }
 
+    private static List<CarControlDescriptor.Option> ambientModeOptions() {
+        return Arrays.asList(
+                option(0x200A0203, "Свой цвет"),
+                option(0x200A0204, "В ритм музыке"));
+    }
+
+    private static List<CarControlDescriptor.Option> ambientEffectOptions() {
+        return Arrays.asList(
+                option(0x2A080101, "Статичный"),
+                option(0x2A080102, "Градиент"),
+                option(0x2A080103, "Дыхание"));
+    }
+
+    /** Exact finite color set accepted by Monjaro Passenger 1.14.0. */
+    private static List<CarControlDescriptor.Option> ambientColorOptions() {
+        return Arrays.asList(
+                option(0x2A010201, "Красный"),
+                option(0x2A01020A, "Закатный"),
+                option(0x2A01020B, "Гранатовый"),
+                option(0x2A010202, "Оранжевый"),
+                option(0x2A010203, "Жёлтый"),
+                option(0x2A010204, "Зелёный"),
+                option(0x2A01020C, "Лаймовый"),
+                option(0x2A010209, "Ледяной"),
+                option(0x2A010206, "Синий"),
+                option(0x2A010205, "Индиго"),
+                option(0x2A010207, "Фиолетовый"),
+                option(0x2A01020D, "Розовый"),
+                option(0x2A010208, "Белый"));
+    }
+
+    private static List<CarControlDescriptor.Option> ambientThemeOptions() {
+        return Arrays.asList(
+                option(0x2A080101, "Динамичный"),
+                option(0x2A080102, "Спокойный"),
+                option(0x2A080103, "Свободный"),
+                option(0x2A080104, "Живой"),
+                option(0x2A080105, "Модный"),
+                option(0x2A080106, "Электро"));
+    }
+
     private static List<CarControlDescriptor.Option> fanOptions() {
         return Arrays.asList(option(IHvac.FAN_SPEED_OFF, "Выкл"),
                 option(IHvac.FAN_SPEED_LEVEL_1, "1"),
@@ -922,6 +979,22 @@ final class GeelyCarIntegration implements CarIntegration {
                     "Сиденья", "seat_vent", CarControlDescriptor.Kind.LEVELS,
                     IHvac.HVAC_FUNC_SEAT_VENTILATION, VehicleSeat.SEAT_ROW_1_RIGHT, false,
                     ventilationOptions(), 0, 3, 1, "", "#FF29B6F6"),
+            new ControlDefinition("climate.seat_heat_rear_left", "Подогрев сзади слева",
+                    "Сиденья", "seat_heat", CarControlDescriptor.Kind.LEVELS,
+                    HVAC_SEAT_HEATING_FUNCTION, SEAT_REAR_LEFT_ZONE, false,
+                    heatOptions(), 0, 3, 1, "", "#FFFF9800"),
+            new ControlDefinition("climate.seat_heat_rear_right", "Подогрев сзади справа",
+                    "Сиденья", "seat_heat", CarControlDescriptor.Kind.LEVELS,
+                    HVAC_SEAT_HEATING_FUNCTION, SEAT_REAR_RIGHT_ZONE, false,
+                    heatOptions(), 0, 3, 1, "", "#FFFF9800"),
+            new ControlDefinition("climate.seat_vent_rear_left", "Вентиляция сзади слева",
+                    "Сиденья", "seat_vent", CarControlDescriptor.Kind.LEVELS,
+                    HVAC_SEAT_VENTILATION_FUNCTION, SEAT_REAR_LEFT_ZONE, false,
+                    ventilationOptions(), 0, 3, 1, "", "#FF29B6F6"),
+            new ControlDefinition("climate.seat_vent_rear_right", "Вентиляция сзади справа",
+                    "Сиденья", "seat_vent", CarControlDescriptor.Kind.LEVELS,
+                    HVAC_SEAT_VENTILATION_FUNCTION, SEAT_REAR_RIGHT_ZONE, false,
+                    ventilationOptions(), 0, 3, 1, "", "#FF29B6F6"),
             new ControlDefinition("climate.wheel_heat", "Подогрев руля", "Климат",
                     "wheel_heat", CarControlDescriptor.Kind.LEVELS,
                     IHvac.HVAC_FUNC_STEERING_WHEEL_HEAT, NO_ZONE, false,
@@ -956,6 +1029,18 @@ final class GeelyCarIntegration implements CarIntegration {
             new ControlDefinition("comfort.ambient_brightness", "Яркость подсветки", "Комфорт",
                     "ambient", CarControlDescriptor.Kind.RANGE, AMBIENT_BRIGHTNESS_FUNCTION,
                     DEFAULT_ZONE, true, Collections.emptyList(), 0, 100, 5, "%", "#FFAB47BC"),
+            new ControlDefinition("comfort.ambient_mode", "Режим подсветки", "Комфорт",
+                    "ambient", CarControlDescriptor.Kind.OPTIONS, AMBIENT_MODE_FUNCTION,
+                    DEFAULT_ZONE, false, ambientModeOptions(), 0, 0, 0, "", "#FFAB47BC"),
+            new ControlDefinition("comfort.ambient_effect", "Эффект подсветки", "Комфорт",
+                    "ambient", CarControlDescriptor.Kind.OPTIONS, AMBIENT_EFFECT_FUNCTION,
+                    DEFAULT_ZONE, false, ambientEffectOptions(), 0, 0, 0, "", "#FFAB47BC"),
+            new ControlDefinition("comfort.ambient_color", "Цвет подсветки", "Комфорт",
+                    "ambient", CarControlDescriptor.Kind.OPTIONS, AMBIENT_COLOR_FUNCTION,
+                    DEFAULT_ZONE, false, ambientColorOptions(), 0, 0, 0, "", "#FFAB47BC"),
+            new ControlDefinition("comfort.ambient_theme", "Тема подсветки", "Комфорт",
+                    "ambient", CarControlDescriptor.Kind.OPTIONS, AMBIENT_THEME_FUNCTION,
+                    DEFAULT_ZONE, false, ambientThemeOptions(), 0, 0, 0, "", "#FFAB47BC"),
             new ControlDefinition("comfort.passenger_screen", "Экран пассажира", "Комфорт",
                     "screen", CarControlDescriptor.Kind.TOGGLE, PASSENGER_SCREEN_ENABLED_FUNCTION,
                     DEFAULT_ZONE, false, toggleOptions(), 0, 1, 1, "", "#FF42A5F5"),
@@ -977,6 +1062,26 @@ final class GeelyCarIntegration implements CarIntegration {
                     TrunkControlSafety.ICON_CLOSED, CarControlDescriptor.Kind.TOGGLE,
                     TRUNK_FUNCTION_ID, TRUNK_ZONE, false,
                     trunkOptions(), 0, 1, 1, "", "#FFFF9800"),
+            new ControlDefinition("vehicle.window_close_driver", "Закрыть окно водителя",
+                    "Автомобиль", "window", CarControlDescriptor.Kind.ACTION,
+                    WINDOW_POSITION_FUNCTION, WINDOW_DRIVER_ZONE, true,
+                    Collections.emptyList(), 0, 100, 4, "%", "#FF80DEEA"),
+            new ControlDefinition("vehicle.window_close_passenger", "Закрыть окно пассажира",
+                    "Автомобиль", "window", CarControlDescriptor.Kind.ACTION,
+                    WINDOW_POSITION_FUNCTION, WINDOW_PASSENGER_ZONE, true,
+                    Collections.emptyList(), 0, 100, 4, "%", "#FF80DEEA"),
+            new ControlDefinition("vehicle.window_close_rear_left", "Закрыть заднее левое окно",
+                    "Автомобиль", "window", CarControlDescriptor.Kind.ACTION,
+                    WINDOW_POSITION_FUNCTION, WINDOW_REAR_LEFT_ZONE, true,
+                    Collections.emptyList(), 0, 100, 4, "%", "#FF80DEEA"),
+            new ControlDefinition("vehicle.window_close_rear_right", "Закрыть заднее правое окно",
+                    "Автомобиль", "window", CarControlDescriptor.Kind.ACTION,
+                    WINDOW_POSITION_FUNCTION, WINDOW_REAR_RIGHT_ZONE, true,
+                    Collections.emptyList(), 0, 100, 4, "%", "#FF80DEEA"),
+            new ControlDefinition(SUNROOF_CLOSE_CONTROL_ID, "Закрыть наклон люка",
+                    "Автомобиль", "sunroof", CarControlDescriptor.Kind.ACTION,
+                    SUNROOF_TILT_FUNCTION, NO_ZONE, false,
+                    Collections.emptyList(), 0, 1, 1, "", "#FF80DEEA"),
             new ControlDefinition("vehicle.wiper_service", "Сервисное положение дворников",
                     "Автомобиль", "wiper", CarControlDescriptor.Kind.ACTION,
                     IVehicle.SETTING_FUNC_WINDSCREEN_SERVICE_POSITION, NO_ZONE, false,
@@ -4108,6 +4213,13 @@ final class GeelyCarIntegration implements CarIntegration {
 
     private boolean writeControlValue(ICarFunction source, ControlDefinition definition,
                                       double target) {
+        // These v56 actions intentionally expose closing only. The reference Passenger app has
+        // a separate lock/speed authority gate for opening; Natro never turns an unconfirmed
+        // one-tap BLE action into an opening command.
+        if (definition.descriptor.id.startsWith(WINDOW_CLOSE_CONTROL_PREFIX)
+                || SUNROOF_CLOSE_CONTROL_ID.equals(definition.descriptor.id)) {
+            target = 0d;
+        }
         Integer supportedRoute = firstSupportedControlRoute(source, definition);
         if (supportedRoute != null) {
             return writeControlValueOnRoute(source, definition, supportedRoute, target);

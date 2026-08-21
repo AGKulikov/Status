@@ -1467,6 +1467,7 @@ public final class PhoneConnectorController {
     private final class V2TransportListener implements IphoneDualTransportListenerV2 {
         private final long token;
         private final long transportSession;
+        private String lastRouteJournalState = "";
 
         V2TransportListener(long token, long transportSession) {
             this.token = token;
@@ -1488,12 +1489,36 @@ public final class PhoneConnectorController {
 
         @Override public void onStatus(IphoneTransportStatusV2 status) {
             dispatchAncsTransport(token, transportSession, () -> {
+                journalV2RouteStatus(status);
                 if (status == null
                         || status.lifecycle != IphoneTransportLifecycle.READY) {
                     carRemote.routeUnavailable();
                 }
                 applyV2RouteStatus(token, status);
             });
+        }
+
+        private void journalV2RouteStatus(@Nullable IphoneTransportStatusV2 status) {
+            if (status == null) {
+                if (!"null".equals(lastRouteJournalState)) {
+                    lastRouteJournalState = "null";
+                    PhoneConnectionJournal.append("v2-route",
+                            "маршрут не вернул состояние; C5 и ANCS недоступны");
+                }
+                return;
+            }
+            String signature = status.mode + "|" + status.epoch + "|"
+                    + status.lifecycle + "|" + status.recoveryState + "|"
+                    + status.consecutiveFailures + "|" + status.detail;
+            if (signature.equals(lastRouteJournalState)) return;
+            lastRouteJournalState = signature;
+            PhoneConnectionJournal.append("v2-route",
+                    "этап=" + v2LifecycleStage(status.lifecycle)
+                            + ", mode=" + status.mode
+                            + ", recovery=" + status.recoveryState
+                            + ", failures=" + status.consecutiveFailures
+                            + ", detail=" + bounded(
+                                    redactedDiagnostic(status.detail), 384));
         }
 
         @Override public void onTelemetry(IphoneTelemetryV2 telemetry) {
@@ -3240,10 +3265,47 @@ public final class PhoneConnectorController {
         carRemote.setAncsReady(value);
         if (lastAncsPresence == value) return;
         lastAncsPresence = value;
+        PhoneConnectionJournal.append("ancs-trigger", value
+                ? "точный переход ANCS false→true; C5 Helper обновлён; передаём событие автоматизации"
+                : "точный переход ANCS true→false; C5 Helper обновлён; снимаем событие автоматизации");
         try {
             presenceSink.onAncsConnectionChanged(value);
+            PhoneConnectionJournal.append("ancs-trigger", value
+                    ? "выход автоматизации принял состояние «ANCS подключён»"
+                    : "выход автоматизации принял состояние «ANCS отключён»");
         } catch (RuntimeException error) {
+            PhoneConnectionJournal.append("ancs-trigger",
+                    "выход автоматизации отклонил состояние: "
+                            + bounded(redactedDiagnostic(safeMessage(error)), 256));
             Log.w(TAG, "ANCS presence sink failed", error);
+        }
+    }
+
+    @NonNull
+    private static String v2LifecycleStage(@NonNull IphoneTransportLifecycle lifecycle) {
+        switch (lifecycle) {
+            case WAIT_RADIO:
+                return "ожидание Bluetooth";
+            case STARTING:
+                return "создание единственного BLE owner";
+            case CONNECTING:
+                return "GATT соединение с выбранной парой";
+            case AUTHENTICATING:
+                return "service discovery / peer proof / авторизация";
+            case SUBSCRIBING:
+                return "CONTROL / telemetry / ANCS / C5 подписки";
+            case READY:
+                return "ANCS готов";
+            case RETRY_WAIT:
+                return "безопасный retry после полного drain";
+            case STOPPING:
+                return "остановка BLE owner";
+            case STOPPED:
+                return "BLE owner остановлен";
+            case FAILED:
+                return "ошибка маршрута";
+            default:
+                throw new AssertionError(lifecycle);
         }
     }
 

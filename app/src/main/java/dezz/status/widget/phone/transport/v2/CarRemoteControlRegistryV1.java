@@ -7,7 +7,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Stable, finite mapping shared with Helper 53. No raw vehicle function can cross BLE. */
+/**
+ * Stable, finite mapping shared with Helper. No raw vehicle function can cross BLE.
+ *
+ * <p>The original 39 entries never change their ids. Optional v56 entries are appended so a
+ * v55 Helper can safely ignore them while a v56 Helper still accepts a Natro build exposing only
+ * the original catalog.</p>
+ */
 public final class CarRemoteControlRegistryV1 {
     public static final class Entry {
         public final int wireId;
@@ -59,6 +65,10 @@ public final class CarRemoteControlRegistryV1 {
         add(wire, control, 22, "climate.seat_vent_driver", false, false, false);
         add(wire, control, 23, "climate.seat_vent_passenger", false, false, false);
         add(wire, control, 24, "climate.wheel_heat", false, false, false);
+        add(wire, control, 25, "climate.seat_heat_rear_left", false, false, false);
+        add(wire, control, 26, "climate.seat_heat_rear_right", false, false, false);
+        add(wire, control, 27, "climate.seat_vent_rear_left", false, false, false);
+        add(wire, control, 28, "climate.seat_vent_rear_right", false, false, false);
         add(wire, control, 30, "vehicle.trunk", true, true, false);
         add(wire, control, 31, "vehicle.drive_mode", false, false, false);
         add(wire, control, 32, "vehicle.auto_hold", false, false, false);
@@ -70,11 +80,20 @@ public final class CarRemoteControlRegistryV1 {
         add(wire, control, 42, "comfort.passenger_screen", false, false, false);
         addScaled(wire, control, 43, "comfort.passenger_screen_day", 100);
         addScaled(wire, control, 44, "comfort.passenger_screen_night", 100);
+        add(wire, control, 45, "comfort.ambient_mode", false, false, false);
+        add(wire, control, 46, "comfort.ambient_effect", false, false, false);
+        add(wire, control, 47, "comfort.ambient_color", false, false, false);
+        add(wire, control, 48, "comfort.ambient_theme", false, false, false);
         add(wire, control, 50, "media.play_pause", false, false, true);
         add(wire, control, 51, "media.next", false, false, true);
         add(wire, control, 52, "media.previous", false, false, true);
         add(wire, control, 53, "media.mute", false, false, true);
         add(wire, control, 54, "media.volume", false, false, true, 100);
+        add(wire, control, 55, "vehicle.window_close_driver", true, true, false);
+        add(wire, control, 56, "vehicle.window_close_passenger", true, true, false);
+        add(wire, control, 57, "vehicle.window_close_rear_left", true, true, false);
+        add(wire, control, 58, "vehicle.window_close_rear_right", true, true, false);
+        add(wire, control, 59, "vehicle.sunroof_close", true, true, false);
         BY_WIRE = Collections.unmodifiableMap(wire);
         BY_CONTROL = Collections.unmodifiableMap(control);
         ALL = Collections.unmodifiableList(new ArrayList<>(wire.values()));

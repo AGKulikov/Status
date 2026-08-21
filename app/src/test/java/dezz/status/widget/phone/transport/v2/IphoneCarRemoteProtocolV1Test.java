@@ -73,7 +73,7 @@ public final class IphoneCarRemoteProtocolV1Test {
     }
 
     @Test public void registryIsFiniteUniqueAndMechanicalEntriesStayConfirmed() {
-        assertEquals(39, CarRemoteControlRegistryV1.all().size());
+        assertEquals(52, CarRemoteControlRegistryV1.all().size());
         Set<Integer> wire = new HashSet<>();
         Set<String> controls = new HashSet<>();
         for (CarRemoteControlRegistryV1.Entry entry : CarRemoteControlRegistryV1.all()) {
@@ -92,6 +92,11 @@ public final class IphoneCarRemoteProtocolV1Test {
         assertFalse(trunk.media);
         assertEquals(100, CarRemoteControlRegistryV1.forWireId(11).scale);
         assertEquals(100, CarRemoteControlRegistryV1.forWireId(54).scale);
+        CarRemoteControlRegistryV1.Entry windowClose =
+                CarRemoteControlRegistryV1.forWireId(55);
+        assertNotNull(windowClose);
+        assertTrue(windowClose.mechanical);
+        assertTrue(windowClose.requiresConfirmation);
     }
 
     private static void assertVector(IphoneCarRemoteProtocolV1.Frame source, String expectedHex) {
