@@ -75,7 +75,7 @@ public final class AndroidCentralRouteTest {
         assertFalse(hasEffect(repeatedPresence, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
     }
 
-    @Test public void enrolledGatt133RetriesSavedFacadePassivelyWithoutIdentityScan() {
+    @Test public void enrolledLinkLossRetriesSavedFacadeActivelyWithoutIdentityScan() {
         AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 3L));
         state = AndroidCentralRoute.startupQuietElapsed(
                 state, state.expected, true).state;
@@ -94,7 +94,8 @@ public final class AndroidCentralRouteTest {
         assertEquals(AndroidCentralRoute.Phase.CONNECTING, retry.state.phase);
         assertTrue(hasEffect(retry, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
         assertFalse(hasEffect(retry, BleRouteEffect.Type.START_SCAN));
-        assertTrue(retry.effects.get(0).detail.contains("autoConnect=true"));
+        assertTrue(retry.effects.get(0).detail.contains("autoConnect=false"));
+        assertTrue(retry.effects.get(0).detail.contains("every exact active attempt"));
     }
 
     @Test public void alphabeticSelectedBondCanonicalizesBeforeSingleOwnerAllocation() {

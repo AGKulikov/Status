@@ -128,10 +128,9 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(source.contains("case CONNECTING:"));
         assertTrue(source.contains("AndroidCentralRoute.selectedPhonePresent(state)"));
 
-        assertTrue(selected.contains("boolean passiveRetry = state != null"));
-        assertTrue(selected.contains("state.consecutiveFailures > 0"));
         assertTrue(selected.contains(
-                "createGattOwner(token, enrolled, passiveRetry, null)"));
+                "createGattOwner(token, enrolled, false, null)"));
+        assertFalse(selected.contains("passiveRetry"));
     }
 
     @Test public void selectedBondPlatformEvidenceIsBoundedAddressFreeAndSameWrapperOnly()

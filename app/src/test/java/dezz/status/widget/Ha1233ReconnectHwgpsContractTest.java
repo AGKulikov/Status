@@ -34,8 +34,8 @@ public final class Ha1233ReconnectHwgpsContractTest {
         assertTrue(controller.contains("runtime.selectedPhonePresent()"));
         assertTrue(route.contains("selectedPhonePresent(State state)"));
         assertTrue(route.contains("exact Classic presence; same public BluetoothGatt.connect()"));
-        assertTrue(route.contains("passiveEnrolledRetry"));
-        assertTrue(platform.contains("createGattOwner(token, enrolled, passiveRetry, null)"));
+        assertTrue(route.contains("autoConnect=false"));
+        assertTrue(platform.contains("createGattOwner(token, enrolled, false, null)"));
         assertTrue(platform.contains("retry exact saved owner"));
     }
 

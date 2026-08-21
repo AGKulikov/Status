@@ -98,6 +98,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private static final int ROUTINE_REQUIRED_MTU = 69;
     private static final long TELEMETRY_REFRESH_QUIET_MS = 30_000L;
     private static final long TELEMETRY_REFRESH_RETRY_MS = 5_000L;
+    private static final long CAR_REMOTE_WRITE_TIMEOUT_MS = 5_000L;
+    private static final long CAR_REMOTE_BACKOFF_MIN_MS = 5 * 60_000L;
+    private static final long CAR_REMOTE_BACKOFF_MAX_MS = 30 * 60_000L;
     private static final int PLATFORM_DIAGNOSTIC_LIMIT = 256;
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
@@ -291,6 +294,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private Runnable carRemoteSubscribeTimer;
     private Runnable carRemoteDrainTimer;
     private Runnable carRemoteWriteWatchdog;
+    private int carRemoteWriteTimeouts;
+    private long carRemoteRetryNotBeforeMillis;
     private Runnable telemetryRefreshTimer;
     private AncsRequestTokenV2 deferredAncsRequest;
     private byte[] deferredAncsValue;
@@ -885,9 +890,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 reportPlatformDiagnostic(token,
                         "enrolled_le exact_record=true, pending_recovery="
                                 + enrollmentRecordPending + ", direct_locator=true");
-                boolean passiveRetry = state != null
-                        && state.consecutiveFailures > 0;
-                createGattOwner(token, enrolled, passiveRetry, null);
+                // Android P/KX11 field evidence shows that autoConnect=true can retain a silent
+                // wrapper forever after a live ANCS link fails.  Every retry therefore uses the
+                // exact saved LE identity actively; the preceding registered owner is still
+                // drained before this sole replacement is allocated.
+                createGattOwner(token, enrolled, false, null);
                 return;
             } catch (RuntimeException unavailable) {
                 failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
@@ -1363,8 +1370,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 if (result == GattResultV2.SUCCESS && characteristic != null) {
                     carRemoteCharacteristic = characteristic;
                     carRemoteSubscriptionToken = token;
+                    drainDeferredAncsAfterGatt();
                     scheduleCarRemoteDrain(0L);
                 } else {
+                    drainDeferredAncsAfterGatt();
                     scheduleCarRemoteSubscribe(token, 250L);
                 }
                 break;
@@ -1419,6 +1428,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
 
     /** C5 is optional for Helper 52 compatibility and never participates in ANCS readiness. */
     private void subscribeCarRemoteIfPresent(BleRouteToken token) {
+        long backoff = Math.max(0L, carRemoteRetryNotBeforeMillis
+                - android.os.SystemClock.elapsedRealtime());
+        if (backoff > 0L) {
+            scheduleCarRemoteSubscribe(token, backoff);
+            return;
+        }
         BluetoothGattCharacteristic characteristic = characteristic(
                 IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
                 IphoneBleProtocolV2.CAR_REMOTE_CHARACTERISTIC);
@@ -1506,14 +1521,25 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         carRemoteWriteWatchdog = () -> {
             carRemoteWriteWatchdog = null;
-            if (pendingGatt != pending) return;
-            // A missing ATT write callback must not strand ANCS behind an optional response.
-            pendingGatt = null;
+            if (pendingGatt != pending || owner != exactOwner) return;
+            // Clearing pendingGatt here used to let ANCS overlap an ATT write whose terminal
+            // callback was still unknown.  The next Control Point request was then rejected and
+            // the route fell into a passive reconnect.  Treat the FIFO as poisoned, drain this
+            // registered owner, and suppress optional C5 resubscription for a bounded backoff.
             carRemoteWrites.clear();
+            int shift = Math.max(0, Math.min(3, carRemoteWriteTimeouts));
+            carRemoteWriteTimeouts = Math.min(Integer.MAX_VALUE,
+                    carRemoteWriteTimeouts + 1);
+            long backoff = Math.min(CAR_REMOTE_BACKOFF_MAX_MS,
+                    CAR_REMOTE_BACKOFF_MIN_MS << shift);
+            carRemoteRetryNotBeforeMillis = android.os.SystemClock.elapsedRealtime() + backoff;
             reportError(IphoneTransportErrorV2.Kind.GATT,
-                    "C5 response write timed out; remote queue dropped", true);
+                    "C5 response write callback timed out; exact GATT owner reset", true);
+            reportPlatformDiagnostic(exactOwner.ownerToken,
+                    "c5_write_timeout owner_reset=true, backoffMs=" + backoff);
+            resetCurrentOwner("C5 response write callback timed out; ATT queue unproven");
         };
-        main.postDelayed(carRemoteWriteWatchdog, 5_000L);
+        main.postDelayed(carRemoteWriteWatchdog, CAR_REMOTE_WRITE_TIMEOUT_MS);
     }
 
     private void cancelTelemetryRefresh() {
@@ -1549,7 +1575,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             if (pendingGatt.type == RawOperation.REQUEST_TELEMETRY) {
                 pendingGatt = null;
                 scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_RETRY_MS);
-                drainDeferredAncsAfterTelemetry();
+                drainDeferredAncsAfterGatt();
             } else {
                 scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_RETRY_MS);
             }
@@ -1587,10 +1613,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (!started) pendingGatt = null;
         // This watchdog also handles old Helper 51 rejecting/ignoring R without harming ANCS.
         scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_RETRY_MS);
-        if (!started) drainDeferredAncsAfterTelemetry();
+        if (!started) drainDeferredAncsAfterGatt();
     }
 
-    private void drainDeferredAncsAfterTelemetry() {
+    private void drainDeferredAncsAfterGatt() {
         AncsRequestTokenV2 request = deferredAncsRequest;
         byte[] value = deferredAncsValue;
         deferredAncsRequest = null;
@@ -1882,7 +1908,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             return;
         }
         if (pendingGatt != null) {
-            if (pendingGatt.type == RawOperation.REQUEST_TELEMETRY
+            // ANCS is the primary channel. A Notification Source edge may arrive while an
+            // optional telemetry, battery or C5 operation owns the one Android ATT slot. Keep
+            // the exact request pending behind that slot instead of falsely reporting a Control
+            // Point rejection. Its existing 15-second request watchdog remains the hard bound.
+            if (pendingGatt.type != RawOperation.WRITE_CONTROL_POINT
+                    && pendingGatt.type != RawOperation.WRITE_ROUTE_CONTROL
                     && deferredAncsRequest == null) {
                 deferredAncsRequest = request;
                 deferredAncsValue = value == null ? null : value.clone();
@@ -2037,10 +2068,13 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void poisonCurrentAncsOwner(String reason) {
+        resetCurrentOwner("terminal ANCS stream: " + reason);
+    }
+
+    private void resetCurrentOwner(String reason) {
         AndroidCentralRoute.State current = state;
         if (current == null || owner == null) return;
-        apply(AndroidCentralRoute.linkLost(current, owner.ownerToken,
-                "terminal ANCS stream: " + reason));
+        apply(AndroidCentralRoute.linkLost(current, owner.ownerToken, reason));
     }
 
     private BluetoothGattCharacteristic characteristic(UUID serviceUuid,
@@ -2795,6 +2829,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 acceptStandardBatteryValue(characteristic, value);
             }
             batteryProbeStage++;
+            drainDeferredAncsAfterGatt();
             scheduleStandardBatteryMonitoring(0L);
             return;
         }
@@ -2849,6 +2884,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             cancelStandardBatteryOperationWatchdog();
             pendingGatt = null;
             batteryProbeStage++;
+            drainDeferredAncsAfterGatt();
             scheduleStandardBatteryMonitoring(0L);
             return;
         }
@@ -2919,7 +2955,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 pendingGatt = pending;
             } else {
                 scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_RETRY_MS);
-                drainDeferredAncsAfterTelemetry();
+                drainDeferredAncsAfterGatt();
             }
         } else if (pending.type == RawOperation.WRITE_ROUTE_CONTROL) {
             IphoneRoleControlV2 control = roleControl(pending.controlTransmit);
@@ -2935,10 +2971,13 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 main.removeCallbacks(carRemoteWriteWatchdog);
                 carRemoteWriteWatchdog = null;
             }
+            carRemoteWriteTimeouts = 0;
+            carRemoteRetryNotBeforeMillis = 0L;
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 reportError(IphoneTransportErrorV2.Kind.GATT,
                         "C5 response write failed: status=" + status, true);
             }
+            drainDeferredAncsAfterGatt();
             scheduleCarRemoteDrain(status == BluetoothGatt.GATT_SUCCESS ? 0L : 150L);
         }
     }
@@ -3007,7 +3046,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (pending != null && pending.type == RawOperation.REQUEST_TELEMETRY) {
             pendingGatt = null;
             cancelTelemetryRefresh();
-            drainDeferredAncsAfterTelemetry();
+            drainDeferredAncsAfterGatt();
         } else {
             scheduleTelemetryRefresh();
         }
