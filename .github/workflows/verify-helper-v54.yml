@@ -98,7 +98,7 @@ jobs:
           test ! -d "$app/_CodeSignature"
           test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Info.plist")" = 'ru.natro.kx11ancshelper'
           test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Info.plist")" = '54.0'
-          test "$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")" = '53'
+          test "$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")" = '54'
           test "$(plutil -extract MinimumOSVersion raw -o - "$app/Info.plist")" = '14.0'
           test -f ios/KX11-iPhone-ANCS-Helper-v54/README.md
           test -f ios/KX11-iPhone-ANCS-Helper-v54/RELEASE.txt
