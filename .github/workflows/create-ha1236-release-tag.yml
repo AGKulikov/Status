@@ -80,6 +80,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          SOURCE_SHA='abdf9c60921b600b794ddf422133839874722471'
           TAG='natro-v2.2.4'
           TAG_API="repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}"
           if EXISTING=$(gh api "$TAG_API" 2>/dev/null); then
