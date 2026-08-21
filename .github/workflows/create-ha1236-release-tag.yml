@@ -1,6 +1,9 @@
 name: Authorize exact HA1236 Natro signed prerelease
 
 on:
+  push:
+    branches:
+      - 'release-auth/natro-v2.2.4-ha1236'
   workflow_dispatch:
 
 permissions:
@@ -25,7 +28,7 @@ jobs:
       - name: Checkout exact release-intent commit without persisted credentials
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: ${{ github.sha }}
+          ref: abdf9c60921b600b794ddf422133839874722471
           fetch-depth: 0
           submodules: recursive
           persist-credentials: false
@@ -36,14 +39,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          SOURCE_SHA='abdf9c60921b600b794ddf422133839874722471'
           test "$GITHUB_REPOSITORY" = 'AGKulikov/Status'
-          test "$GITHUB_REF" = 'refs/heads/agent/natro-ancs-c5-media-2.2.4'
-          test "$GITHUB_SHA" = "$(git rev-parse 'HEAD^{commit}')"
+          test "$GITHUB_REF" = 'refs/heads/release-auth/natro-v2.2.4-ha1236'
+          AUTH_BRANCH_SHA=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/heads/release-auth/natro-v2.2.4-ha1236" \
+            --jq '.object.sha')
+          test "$AUTH_BRANCH_SHA" = "$GITHUB_SHA"
+          test "$SOURCE_SHA" = "$(git rev-parse 'HEAD^{commit}')"
           test -z "$(git status --short --ignore-submodules=none)"
           REMOTE_BRANCH_SHA=$(gh api \
             "repos/${GITHUB_REPOSITORY}/git/ref/heads/agent/natro-ancs-c5-media-2.2.4" \
             --jq '.object.sha')
-          test "$REMOTE_BRANCH_SHA" = "$GITHUB_SHA"
+          test "$REMOTE_BRANCH_SHA" = "$SOURCE_SHA"
           jq -e \
             '.schema == "natro-release-intent/v1"
               and .appName == "Natro"
@@ -62,7 +70,7 @@ jobs:
           test "$(sed -n 's/.*<string name="app_name">\(.*\)<\/string>.*/\1/p' \
             app/src/main/res/values-ru/strings.xml)" = 'Natro'
           HELPER_TREE=$(git rev-parse \
-            "${GITHUB_SHA}:ios/KX11-iPhone-ANCS-Helper-v54")
+            "${SOURCE_SHA}:ios/KX11-iPhone-ANCS-Helper-v54")
           test "$HELPER_TREE" = 'e7638f3082be4c00a17b2b6b8f3744d3dc0fe310'
 
       - name: Create exact tag without moving or overwriting anything
@@ -76,7 +84,7 @@ jobs:
           TAG_API="repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}"
           if EXISTING=$(gh api "$TAG_API" 2>/dev/null); then
             test "$(jq -r '.object.type' <<<"$EXISTING")" = commit
-            test "$(jq -r '.object.sha' <<<"$EXISTING")" = "$GITHUB_SHA" || {
+            test "$(jq -r '.object.sha' <<<"$EXISTING")" = "$SOURCE_SHA" || {
               echo "Existing $TAG points to another commit; refusing to move it" >&2
               exit 1
             }
@@ -87,12 +95,12 @@ jobs:
             fi
             gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
               -f ref="refs/tags/${TAG}" \
-              -f sha="$GITHUB_SHA" >/dev/null
+              -f sha="$SOURCE_SHA" >/dev/null
           fi
           VERIFIED=$(gh api "$TAG_API")
           test "$(jq -r '.object.type' <<<"$VERIFIED")" = commit
-          test "$(jq -r '.object.sha' <<<"$VERIFIED")" = "$GITHUB_SHA"
-          echo "source_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          test "$(jq -r '.object.sha' <<<"$VERIFIED")" = "$SOURCE_SHA"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
 
   sign-and-publish:
     name: Build, sign, verify and publish exact Natro bytes
