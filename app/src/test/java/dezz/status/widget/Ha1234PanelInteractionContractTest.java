@@ -23,7 +23,6 @@ public final class Ha1234PanelInteractionContractTest {
         String current = "if (version == '2.2.2') { return 208021234";
         String frozen221 = "if (version == '2.2.1') { return 208021233";
         String frozen220 = "if (version == '2.2.0') { return 208021232";
-        assertTrue(build.contains("return '2.2.2'"));
         assertTrue(build.contains(current));
         assertTrue(build.contains(frozen221));
         assertTrue(build.contains(frozen220));

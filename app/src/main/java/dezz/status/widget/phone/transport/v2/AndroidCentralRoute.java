@@ -745,17 +745,11 @@ public final class AndroidCentralRoute {
         State state = copyWithReassertions(base, Phase.CONNECTING, connect,
                 owner, afterOwnerAllocation(owner), base.consecutiveFailures, 0,
                 "selected-bond public GATT");
-        boolean passiveEnrolledRetry = base.acquisitionMode
-                == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
-                && base.consecutiveFailures > 0;
         return BleRouteTransition.accepted(state,
                 op(BleRouteEffect.Type.CONNECT_SELECTED_BOND, connect,
-                        "one public owner for selectedSystemBondAddress; autoConnect="
-                                + passiveEnrolledRetry
-                                + (passiveEnrolledRetry
-                                ? " after registered-client failure"
-                                : " on first active attempt")
-                                + "; no scan/name/topology fallback"),
+                        "one public owner for selectedSystemBondAddress; autoConnect=false"
+                                + " on every exact active attempt;"
+                                + " no scan/name/topology fallback"),
                 BleRouteEffect.deadline(connect, CONNECT_TIMEOUT_MS));
     }
 
