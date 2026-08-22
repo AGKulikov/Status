@@ -412,7 +412,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          HANDOFF_BRANCH: 'agent/natro-2.2.7-helper58'
+          HANDOFF_BRANCH: 'agent/natro-2.2.7-ancs-recovery'
           SIGNING_BUNDLE_SHA256: '4fb34ee8aed62dad3896d7aa6240d4066ec9b6ef3da5459bca9d7d1c4c3b7fc0'
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
