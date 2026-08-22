@@ -10,7 +10,17 @@ import org.junit.Test;
 /** Release boundary for Natro 2.2.8 and Helper 60 readable Live Activity controls. */
 public final class Ha1242LiveActivityTypographyContractTest {
     private static String read(String relative) throws Exception {
-        return new String(Files.readAllBytes(Paths.get(relative)), StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(projectRoot().resolve(relative)),
+                StandardCharsets.UTF_8);
+    }
+
+    private static java.nio.file.Path projectRoot() {
+        java.nio.file.Path current = Paths.get("").toAbsolutePath().normalize();
+        while (current != null && !Files.exists(current.resolve("settings.gradle"))) {
+            current = current.getParent();
+        }
+        if (current == null) throw new IllegalStateException("project root not found");
+        return current;
     }
 
     @Test
