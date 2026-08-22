@@ -364,16 +364,16 @@ final class NatroLiveActivityManager: NSObject {
             activityUpdatesTask = Task { [weak self] in
                 for await activity in Activity<NatroLiveActivityAttributes>.activityUpdates {
                     guard !Task.isCancelled else { return }
+                    guard let manager = self else { return }
                     await MainActor.run {
-                        guard let self else { return }
-                        self.cancelLocalStartFallback()
-                        if self.isDemoMode || self.isVehicleConnected {
-                            self.observePushToken(for: activity)
-                            self.updateExistingActivities(immediate: true)
-                            self.publishChangeOnly()
+                        manager.cancelLocalStartFallback()
+                        if manager.isDemoMode || manager.isVehicleConnected {
+                            manager.observePushToken(for: activity)
+                            manager.updateExistingActivities(immediate: true)
+                            manager.publishChangeOnly()
                         } else {
                             let final = ActivityContent(
-                                state: self.contentState(
+                                state: manager.contentState(
                                     for: activity.attributes.resolvedControls),
                                 staleDate: nil
                             )
@@ -387,14 +387,14 @@ final class NatroLiveActivityManager: NSObject {
             pushToStartTask = Task { [weak self] in
                 for await token in Activity<NatroLiveActivityAttributes>.pushToStartTokenUpdates {
                     guard !Task.isCancelled else { return }
+                    guard let manager = self else { return }
                     await MainActor.run {
-                        guard let self else { return }
                         UserDefaults.standard.set(token, forKey: Self.pushToStartDefaultsKey)
-                        if let remote = self.remote, remote.isSynced {
+                        if let remote = manager.remote, remote.isSynced {
                             remote.sendLiveActivityProvisioning(
                                 type: .pushToStartToken, payload: token
                             )
-                            self.sendConfiguration(to: remote)
+                            manager.sendConfiguration(to: remote)
                         }
                         ANCSConnectionJournal.shared.append(
                             "live-activity", "push-to-start token обновлён и сохранён"
@@ -414,20 +414,20 @@ final class NatroLiveActivityManager: NSObject {
             guard let activity else { return }
             for await token in activity.pushTokenUpdates {
                 guard !Task.isCancelled else { return }
+                guard let manager = self else { return }
                 await MainActor.run {
-                    guard let self else { return }
-                    self.activityPushTokens[activity.id] = token
-                    if let remote = self.remote, remote.isSynced {
-                        self.sendActivityToken(activity: activity, token: token, to: remote)
+                    manager.activityPushTokens[activity.id] = token
+                    if let remote = manager.remote, remote.isSynced {
+                        manager.sendActivityToken(activity: activity, token: token, to: remote)
                     }
                 }
             }
+            guard let manager = self else { return }
             await MainActor.run {
-                guard let self else { return }
-                self.activityTokenTasks.removeValue(forKey: activity.id)
-                self.activityPushTokens.removeValue(forKey: activity.id)
-                if let remote = self.remote, remote.isSynced {
-                    self.sendActivityEnded(activity: activity, to: remote)
+                manager.activityTokenTasks.removeValue(forKey: activity.id)
+                manager.activityPushTokens.removeValue(forKey: activity.id)
+                if let remote = manager.remote, remote.isSynced {
+                    manager.sendActivityEnded(activity: activity, to: remote)
                 }
             }
         }
