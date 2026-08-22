@@ -1,5 +1,7 @@
 name: Verify iPhone Helper v57 · Bluetooth vehicle control
 
+# Kept as an explicit branch workflow so macOS/Xcode validates every Helper 57 candidate.
+
 on:
   push:
     paths:
