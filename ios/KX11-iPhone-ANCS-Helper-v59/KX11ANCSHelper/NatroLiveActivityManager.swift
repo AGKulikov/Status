@@ -34,7 +34,9 @@ final class NatroLiveActivityManager: NSObject {
     private var demoValues: [UInt8: Int32] = [:]
     private var replacingActivities = false
     private var lastActivityFingerprints: [String: Data] = [:]
-    private var pendingActivityStates: [String: NatroLiveActivityAttributes.ContentState] = [:]
+    // Keep iOS-16 ActivityKit types out of stored properties because the host app still supports
+    // iOS 14. The compact state is decoded only inside availability-gated update methods.
+    private var pendingActivityStates: [String: Data] = [:]
     private var scheduledActivityUpdates = Set<String>()
     private var lastActivityUpdateDates: [String: Date] = [:]
     private static let maximumEncodedStateBytes = 3_500
@@ -453,7 +455,8 @@ final class NatroLiveActivityManager: NSObject {
         // Record before starting the async update so a burst of identical BLE callbacks cannot
         // enqueue the same ActivityKit update multiple times.
         lastActivityFingerprints[activity.id] = fingerprint
-        pendingActivityStates[activity.id] = state
+        guard let pendingPayload = try? JSONEncoder().encode(state) else { return }
+        pendingActivityStates[activity.id] = pendingPayload
         guard !scheduledActivityUpdates.contains(activity.id) else { return }
         let elapsed = Date().timeIntervalSince(lastActivityUpdateDates[activity.id] ?? .distantPast)
         let delay = max(0, Self.minimumActivityUpdateInterval - elapsed)
@@ -468,7 +471,9 @@ final class NatroLiveActivityManager: NSObject {
     private func flushUpdate(_ activity: Activity<NatroLiveActivityAttributes>) {
         dispatchPrecondition(condition: .onQueue(.main))
         scheduledActivityUpdates.remove(activity.id)
-        guard let state = pendingActivityStates.removeValue(forKey: activity.id) else { return }
+        guard let payload = pendingActivityStates.removeValue(forKey: activity.id),
+              let state = try? JSONDecoder().decode(
+                NatroLiveActivityAttributes.ContentState.self, from: payload) else { return }
         lastActivityUpdateDates[activity.id] = Date()
         Task { await activity.update(ActivityContent(state: state, staleDate: nil)) }
     }
