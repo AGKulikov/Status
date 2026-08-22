@@ -38,6 +38,7 @@ public final class SettingsBackNavigationContractTest {
             "FavoriteRoutesSettingsActivity.java",
             "InformationPanelSettingsActivity.java",
             "LauncherSettingsActivity.java",
+            "LiveActivityApnsSettingsActivity.java",
             "MediaPanelSettingsActivity.java",
             "NavigationPanelSettingsActivity.java",
             "PanelElementSettingsActivity.java",
