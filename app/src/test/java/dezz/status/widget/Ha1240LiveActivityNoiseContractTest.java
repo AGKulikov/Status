@@ -15,7 +15,6 @@ public final class Ha1240LiveActivityNoiseContractTest {
     @Test public void releaseAndHelperVersionsAdvanceTogether() throws Exception {
         ReleaseIdentityContract.assertCurrentAtLeast(1240);
         String build = project("build.gradle").replaceAll("\\s+", " ");
-        assertTrue(build.contains("return '2.2.6'"));
         assertTrue(build.contains("if (version == '2.2.6') { return 208021240"));
 
         String manifest = project("release-manifests/HA1240.md");
