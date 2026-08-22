@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return '2.2.6'
+    return '2.2.7'
 }
 
 int getVersionCode() {
@@ -32,13 +32,16 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
-    // Every public release gets a distinct versionName. 2.2.6 pairs Natro with Helper 58,
-    // replaces the oversized Live Activity state and adds the vehicle control center.
+    // Every public release gets a distinct versionName. 2.2.7 hardens autonomous Route-A
+    // reacquisition while preserving the Helper 58 wire and stable update identity.
     if (version == '2.2.5') {
         return 208021239
     }
     if (version == '2.2.6') {
         return 208021240
+    }
+    if (version == '2.2.7') {
+        return 208021241
     }
     // Preserve the immutable 2.2.4-r3 build identity for exact release replay.
     if (version == '2.2.4') {

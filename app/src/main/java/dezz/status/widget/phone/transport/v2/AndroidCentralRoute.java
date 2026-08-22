@@ -24,6 +24,8 @@ public final class AndroidCentralRoute {
     public static final long STOP_TIMEOUT_MS = 4_000L;
     public static final long STARTUP_QUIET_MS = 1_500L;
     public static final long MAX_RETRY_MS = 15_000L;
+    /** Autonomous retained-owner probe after the bounded fast reassert ladder is exhausted. */
+    public static final long WAIT_SYSTEM_RECOVERY_MS = 180_000L;
     public static final int MAX_ATTEMPTS_PER_EPOCH = 6;
     private static final long[] SAME_OWNER_REASSERT_MS = {30_000L, 60_000L, 120_000L};
 
@@ -196,6 +198,17 @@ public final class AndroidCentralRoute {
         if (discover == null) return counterExhausted(state, completed, "operation");
         State next = copy(state, Phase.DISCOVERING, discover, token.ownerId,
                 state.nextOwnerId, state.consecutiveFailures, "connected");
+        if (state.phase == Phase.WAIT_SYSTEM_CONNECTION
+                && state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            return BleRouteTransition.accepted(next,
+                    op(BleRouteEffect.Type.CANCEL_DEADLINE, completed,
+                            "late system connection callback"),
+                    op(BleRouteEffect.Type.STOP_SCAN, completed,
+                            "retained owner connected; stop presence scan"),
+                    op(BleRouteEffect.Type.DISCOVER_SERVICES, discover,
+                            "discover exact public GATT database"),
+                    BleRouteEffect.deadline(discover, DISCOVERY_TIMEOUT_MS));
+        }
         return step(next, completed, discover, BleRouteEffect.Type.DISCOVER_SERVICES,
                 DISCOVERY_TIMEOUT_MS, "discover exact public GATT database");
     }
@@ -517,13 +530,23 @@ public final class AndroidCentralRoute {
                         BleRouteEffect.retry(timer, delay,
                                 "retain sole wrapper; never close while clientIf is unknown"));
             }
-            State blocked = copy(state, Phase.WAIT_SYSTEM_CONNECTION, token, token.ownerId,
+            BleRouteToken recovery = nextOperation(token);
+            if (recovery == null) return counterExhausted(state, token, "operation");
+            State blocked = copy(state, Phase.WAIT_SYSTEM_CONNECTION, recovery, token.ownerId,
                     state.nextOwnerId, state.consecutiveFailures + 1,
-                    "sole background owner retained; wait for system callback/radio/diagnostic");
-            return BleRouteTransition.accepted(blocked,
-                    op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "connect watchdog"),
-                    op(BleRouteEffect.Type.REPORT_ERROR, token,
-                            "OWNER_UNPROVABLE: retry budget spent; no second wrapper"));
+                    "sole background owner retained; autonomous same-owner recovery armed");
+            List<BleRouteEffect> effects = new ArrayList<>();
+            effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
+                    "connect watchdog"));
+            effects.add(op(BleRouteEffect.Type.REPORT_ERROR, token,
+                    "OWNER_UNPROVABLE: no second wrapper; periodic recovery remains armed"));
+            if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+                effects.add(op(BleRouteEffect.Type.START_SCAN, recovery,
+                        "unfiltered presence scan while retaining the sole GATT wrapper"));
+            }
+            effects.add(BleRouteEffect.retry(recovery, WAIT_SYSTEM_RECOVERY_MS,
+                    "autonomous retained-owner recovery; Classic is not required"));
+            return new BleRouteTransition<>(blocked, effects, true);
         }
         if (state.phase == Phase.STOPPING || state.phase == Phase.RETRY_DRAINING) {
             State failed = copy(state, Phase.FAILED, null, 0L, state.nextOwnerId,
@@ -558,6 +581,52 @@ public final class AndroidCentralRoute {
                 BleRouteEffect.deadline(reconnect, CONNECT_TIMEOUT_MS));
     }
 
+    /** Periodically reasserts an unprovable sole wrapper without allocating a second clientIf. */
+    public static BleRouteTransition<State> systemConnectionRecoveryElapsed(
+            State state, BleRouteToken token) {
+        if (!expects(state, Phase.WAIT_SYSTEM_CONNECTION, token)) {
+            return BleRouteTransition.ignored(state);
+        }
+        BleRouteToken reconnect = nextOperation(token);
+        if (reconnect == null) return counterExhausted(state, token, "operation");
+        State connecting = copy(state, Phase.CONNECTING, reconnect, token.ownerId,
+                state.nextOwnerId, state.consecutiveFailures,
+                "autonomous retained-owner recovery; exact enrolled identity");
+        List<BleRouteEffect> effects = new ArrayList<>();
+        effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
+                "retained-owner recovery timer"));
+        if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            effects.add(op(BleRouteEffect.Type.STOP_SCAN, token,
+                    "presence window complete"));
+        }
+        effects.add(op(BleRouteEffect.Type.REASSERT_SAME_GATT, reconnect,
+                "same wrapper only; recovery does not depend on Classic"));
+        effects.add(BleRouteEffect.deadline(reconnect, CONNECT_TIMEOUT_MS));
+        return new BleRouteTransition<>(connecting, effects, true);
+    }
+
+    /** A stack-resolved enrolled advertisement brings forward the retained-owner reassert. */
+    public static BleRouteTransition<State> systemConnectionAdvertisement(
+            State state, BleRouteToken token) {
+        if (!expects(state, Phase.WAIT_SYSTEM_CONNECTION, token)
+                || state.acquisitionMode != IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            return BleRouteTransition.ignored(state);
+        }
+        BleRouteToken reconnect = nextOperation(token);
+        if (reconnect == null) return counterExhausted(state, token, "operation");
+        State connecting = copy(state, Phase.CONNECTING, reconnect, token.ownerId,
+                state.nextOwnerId, state.consecutiveFailures,
+                "stack-resolved enrolled advertisement; reassert sole wrapper");
+        return BleRouteTransition.accepted(connecting,
+                op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
+                        "enrolled device observed"),
+                op(BleRouteEffect.Type.STOP_SCAN, token,
+                        "first exact enrolled presence wins"),
+                op(BleRouteEffect.Type.REASSERT_SAME_GATT, reconnect,
+                        "same wrapper after stack identity resolution"),
+                BleRouteEffect.deadline(reconnect, CONNECT_TIMEOUT_MS));
+    }
+
     /**
      * Uses an exact selected-phone Classic edge only as a liveness prompt for the sole GATT owner.
      *
@@ -579,12 +648,18 @@ public final class AndroidCentralRoute {
         State connecting = copy(state, Phase.CONNECTING, reconnect, previous.ownerId,
                 state.nextOwnerId, state.consecutiveFailures,
                 "exact Classic presence; same public BluetoothGatt.connect() prompt");
-        return BleRouteTransition.accepted(connecting,
-                op(BleRouteEffect.Type.CANCEL_DEADLINE, previous,
-                        "selected phone is present"),
-                op(BleRouteEffect.Type.REASSERT_SAME_GATT, reconnect,
-                        "liveness only; retain sole wrapper and exact enrolled identity"),
-                BleRouteEffect.deadline(reconnect, CONNECT_TIMEOUT_MS));
+        List<BleRouteEffect> effects = new ArrayList<>();
+        effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, previous,
+                "selected phone is present"));
+        if (state.phase == Phase.WAIT_SYSTEM_CONNECTION
+                && state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            effects.add(op(BleRouteEffect.Type.STOP_SCAN, previous,
+                    "Classic liveness prompt supersedes presence scan"));
+        }
+        effects.add(op(BleRouteEffect.Type.REASSERT_SAME_GATT, reconnect,
+                "liveness only; retain sole wrapper and exact enrolled identity"));
+        effects.add(BleRouteEffect.deadline(reconnect, CONNECT_TIMEOUT_MS));
+        return new BleRouteTransition<>(connecting, effects, true);
     }
 
     public static BleRouteTransition<State> retryElapsed(State state, BleRouteToken token,
@@ -629,7 +704,7 @@ public final class AndroidCentralRoute {
             return BleRouteTransition.accepted(failed,
                     op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "owner terminal"),
                     op(BleRouteEffect.Type.REPORT_ERROR, token,
-                            "bounded retry budget exhausted; no automatic topology fallback"));
+                            "bounded retry budget exhausted after direct/scan reacquisition"));
         }
         if (!canAllocateOwner(state.nextOwnerId)) {
             return counterExhausted(state, token, "owner");
@@ -722,7 +797,16 @@ public final class AndroidCentralRoute {
         if (base.acquisitionMode == IphoneAcquisitionModeV2.EXPLICIT_BOOTSTRAP_SCAN) {
             return beginScan(base);
         }
-        if (!startup) return beginDirectConnect(base);
+        if (!startup) {
+            // A registered callback proves the prior owner terminal, so the next enrolled
+            // attempt may safely use the existing unfiltered exact-identity recovery scan.
+            // A completely silent clientIf follows the retained-owner path above instead.
+            if (base.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                    && base.consecutiveFailures >= 1) {
+                return beginScan(base);
+            }
+            return beginDirectConnect(base);
+        }
         if (!canAllocateOwner(base.nextOwnerId)) {
             return counterExhausted(base, base.expected, "owner");
         }
@@ -748,8 +832,8 @@ public final class AndroidCentralRoute {
         return BleRouteTransition.accepted(state,
                 op(BleRouteEffect.Type.CONNECT_SELECTED_BOND, connect,
                         "one public owner for selectedSystemBondAddress; autoConnect=false"
-                                + " on every exact active attempt;"
-                                + " no scan/name/topology fallback"),
+                                + " on the fast exact active attempt;"
+                                + " enrolled retries may use exact-identity recovery scan"),
                 BleRouteEffect.deadline(connect, CONNECT_TIMEOUT_MS));
     }
 

@@ -23,6 +23,13 @@ public final class ClassicAncsRecoveryPolicy {
             FIRST_BACKOFF_MS, 60_000L, 120_000L, MAX_BACKOFF_MS
     };
 
+    /** Injectable decorrelation boundary; production supplies SecureRandom, tests stay exact. */
+    public interface DelayJitter {
+        long apply(long baseDelayMillis);
+    }
+
+    private static final DelayJitter NO_JITTER = delay -> delay;
+
     public enum Phase {
         NO_CLASSIC,
         ACQUIRING,
@@ -103,42 +110,53 @@ public final class ClassicAncsRecoveryPolicy {
     public static Transition observe(State previous, boolean classicConnected,
                                      IphoneTransportRecoveryStateV2 route,
                                      long nowMillis) {
+        return observe(previous, classicConnected, route, nowMillis, NO_JITTER);
+    }
+
+    public static Transition observe(State previous, boolean classicConnected,
+                                     IphoneTransportRecoveryStateV2 route,
+                                     long nowMillis, DelayJitter jitter) {
         Objects.requireNonNull(previous, "previous");
         Objects.requireNonNull(route, "route");
+        Objects.requireNonNull(jitter, "jitter");
         requireNonNegative(nowMillis);
-        if (!classicConnected) {
-            return settle(previous, Phase.NO_CLASSIC, false, route, 0);
-        }
         switch (route) {
             case READY:
-                return settle(previous, Phase.READY, true, route, 0);
+                return settle(previous, Phase.READY, classicConnected, route, 0);
             case WAIT_SERVICE_CHANGED:
                 return settle(previous, Phase.WAIT_SERVICE_CHANGED,
-                        true, route, previous.recoveryCommands);
+                        classicConnected, route, previous.recoveryCommands);
             case WAIT_AUTHORIZATION:
                 return settle(previous, Phase.WAIT_AUTHORIZATION,
-                        true, route, previous.recoveryCommands);
+                        classicConnected, route, previous.recoveryCommands);
             case PROGRESSING:
                 return settle(previous, Phase.ACQUIRING,
-                        true, route, previous.recoveryCommands);
+                        classicConnected, route, previous.recoveryCommands);
             case NO_OWNER:
             case OWNER_DOWN:
-                return observeDown(previous, route, nowMillis);
+                return observeDown(previous, classicConnected, route, nowMillis, jitter);
             default:
                 throw new AssertionError(route);
         }
     }
 
     public static Transition wakeup(State previous, long timerGeneration, long nowMillis) {
+        return wakeup(previous, timerGeneration, nowMillis, NO_JITTER);
+    }
+
+    public static Transition wakeup(State previous, long timerGeneration, long nowMillis,
+                                    DelayJitter jitter) {
         Objects.requireNonNull(previous, "previous");
+        Objects.requireNonNull(jitter, "jitter");
         requireNonNegative(nowMillis);
-        if (!previous.classicConnected || !previous.hasWakeup()
+        if (!previous.hasWakeup()
                 || timerGeneration != previous.timerGeneration
                 || nowMillis < previous.deadlineMillis
                 || !isDown(previous.route)) {
             return unchanged(previous);
         }
-        return commandAndArm(previous, previous.route, nowMillis);
+        return commandAndArm(previous, previous.classicConnected,
+                previous.route, nowMillis, jitter);
     }
 
     public static long backoffMillisAfter(int recoveryCommands) {
@@ -148,25 +166,31 @@ public final class ClassicAncsRecoveryPolicy {
     }
 
     private static Transition observeDown(State previous,
+                                          boolean classicConnected,
                                           IphoneTransportRecoveryStateV2 route,
-                                          long nowMillis) {
-        if (previous.classicConnected && previous.route == route && previous.hasWakeup()) {
-            return unchanged(previous);
+                                          long nowMillis, DelayJitter jitter) {
+        if (previous.route == route && previous.hasWakeup()) {
+            if (previous.classicConnected == classicConnected) return unchanged(previous);
+            return new Transition(new State(previous.phase, classicConnected, route,
+                    previous.recoveryCommands, previous.timerGeneration,
+                    previous.deadlineMillis), Collections.emptyList());
         }
         if (previous.recoveryCommands < IMMEDIATE_RECOVERIES) {
-            return commandAndArm(previous, route, nowMillis);
+            return commandAndArm(previous, classicConnected, route, nowMillis, jitter);
         }
-        return armOnly(previous, route, nowMillis,
-                backoffMillisAfter(previous.recoveryCommands));
+        return armOnly(previous, classicConnected, route, nowMillis,
+                jittered(jitter, backoffMillisAfter(previous.recoveryCommands)));
     }
 
     private static Transition commandAndArm(State previous,
+                                            boolean classicConnected,
                                             IphoneTransportRecoveryStateV2 route,
-                                            long nowMillis) {
+                                            long nowMillis, DelayJitter jitter) {
         int commands = previous.recoveryCommands == Integer.MAX_VALUE
                 ? Integer.MAX_VALUE : previous.recoveryCommands + 1;
         long generation = nextGeneration(previous.timerGeneration);
-        long deadline = saturatingAdd(nowMillis, backoffMillisAfter(commands));
+        long deadline = saturatingAdd(nowMillis,
+                jittered(jitter, backoffMillisAfter(commands)));
         List<Effect> effects = new ArrayList<>();
         if (previous.hasWakeup()) {
             effects.add(Effect.timer(EffectType.CANCEL_WAKEUP,
@@ -175,11 +199,12 @@ public final class ClassicAncsRecoveryPolicy {
         effects.add(Effect.action(route == IphoneTransportRecoveryStateV2.NO_OWNER
                 ? EffectType.ENSURE_ROUTE : EffectType.REQUEST_SAME_ROUTE_RECOVERY));
         effects.add(Effect.timer(EffectType.SCHEDULE_WAKEUP, generation, deadline));
-        return new Transition(new State(Phase.RECOVERY_SCHEDULED, true, route,
+        return new Transition(new State(Phase.RECOVERY_SCHEDULED, classicConnected, route,
                 commands, generation, deadline), effects);
     }
 
     private static Transition armOnly(State previous,
+                                      boolean classicConnected,
                                       IphoneTransportRecoveryStateV2 route,
                                       long nowMillis, long delayMillis) {
         long generation = nextGeneration(previous.timerGeneration);
@@ -190,8 +215,12 @@ public final class ClassicAncsRecoveryPolicy {
                     previous.timerGeneration, previous.deadlineMillis));
         }
         effects.add(Effect.timer(EffectType.SCHEDULE_WAKEUP, generation, deadline));
-        return new Transition(new State(Phase.RECOVERY_SCHEDULED, true, route,
+        return new Transition(new State(Phase.RECOVERY_SCHEDULED, classicConnected, route,
                 previous.recoveryCommands, generation, deadline), effects);
+    }
+
+    private static long jittered(DelayJitter jitter, long baseDelayMillis) {
+        return Math.max(1L, jitter.apply(baseDelayMillis));
     }
 
     private static Transition settle(State previous, Phase phase, boolean classicConnected,

@@ -22,6 +22,7 @@ import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Build;
 import android.os.ParcelUuid;
 
 import dezz.status.widget.Preferences;
@@ -102,6 +103,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private static final long CAR_REMOTE_BACKOFF_MIN_MS = 2_000L;
     private static final long CAR_REMOTE_BACKOFF_MAX_MS = 30_000L;
     private static final int PLATFORM_DIAGNOSTIC_LIMIT = 256;
+    private static final int RETRY_JITTER_PERCENT = 20;
+    private static final int CACHE_REFRESH_FAILURE_THRESHOLD = 2;
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
@@ -205,6 +208,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         boolean closing;
         boolean waitingForProcessGate;
         boolean quarantinedBeforeRegistration;
+        boolean cacheRefreshRequested;
 
         GattOwner(BleRouteToken ownerToken, BluetoothDevice device,
                   SelectedBondIdentityResolverV2.Candidate bondAttribution) {
@@ -303,6 +307,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private BluetoothGattCharacteristic batteryLevelCharacteristic;
     private int batteryProbeStage;
     private int batteryProbeRetries;
+    private int cacheSensitiveFailures;
     private Runnable batteryProbeTimer;
     private IphoneLeEnrollmentRecordV2 enrollmentRecord;
     private IphoneLeEnrollmentRecordV2 pendingEnrollmentRecord;
@@ -675,8 +680,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         AndroidCentralRoute.State next = transition.state;
         PhoneConnectionJournal.append("route-a-step",
-                "phase=" + String.valueOf(previous) + "→" + next.phase
+                "epoch=" + next.epoch + ", acquisition=" + next.acquisitionMode
+                        + ", phase=" + String.valueOf(previous) + "→" + next.phase
                         + ", recovery=" + recoveryState(next.phase)
+                        + ", owner=" + next.activeOwnerId
+                        + ", operation=" + (next.expected == null
+                                ? 0L : next.expected.operationId)
                         + ", failures=" + next.consecutiveFailures
                         + ", effects=" + (effects.length() == 0 ? "none" : effects)
                         + ", detail=" + next.detail);
@@ -767,13 +776,16 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 }
                 break;
             case ARM_DEADLINE:
-            case ARM_RETRY:
                 armRouteTimer(effect.token, effect.delayMillis);
+                break;
+            case ARM_RETRY:
+                armRouteTimer(effect.token, jitterRetryDelay(effect.delayMillis));
                 break;
             case CANCEL_DEADLINE:
                 cancelRouteTimer(effect.token);
                 break;
             case REPORT_READY:
+                cacheSensitiveFailures = 0;
                 if (ancsSession != null) {
                     applyAncsEffects(ancs.subscriptionsReady(ancsSession));
                 }
@@ -818,10 +830,14 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             postRouteDeadline(token);
             return;
         }
+        boolean enrolledRecovery = state != null
+                && state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY;
         List<ScanFilter> filters = new ArrayList<>();
-        filters.add(new ScanFilter.Builder()
-                .setServiceUuid(new ParcelUuid(IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE))
-                .build());
+        if (!enrolledRecovery) {
+            filters.add(new ScanFilter.Builder()
+                    .setServiceUuid(new ParcelUuid(IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE))
+                    .build());
+        }
         ScanSettings settings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .build();
@@ -834,6 +850,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         scanToken = token;
         scanAttempt = attempt;
         scanRunning = true;
+        reportPlatformDiagnostic(token,
+                enrolledRecovery
+                        ? "scan_start mode=unfiltered_enrolled_identity, filterCount=0"
+                        : "scan_start mode=bootstrap_f201, filterCount=1");
         try {
             exactScanner.startScan(filters, settings, attempt);
         } catch (RuntimeException error) {
@@ -1128,6 +1148,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         clearTelemetrySubscription();
         clearCarRemoteChannel();
         failPendingRouteControl();
+        maybeRefreshGattCache(closing);
         try {
             if (closing.gatt != null) closing.gatt.close();
         } catch (RuntimeException ignored) {
@@ -1136,6 +1157,38 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         ProcessGattRegistrationGateV2.cancelWaiter(closing);
         ProcessGattRegistrationGateV2.release(closing);
         dispatchMain(this::maybeCompleteTeardown);
+    }
+
+    private void noteCacheSensitiveFailure(GattOwner exact, int status, String stage) {
+        if (exact == null || status == BluetoothGatt.GATT_SUCCESS) return;
+        GattResultV2 result = GattResultV2.fromAndroidStatus(status);
+        if (status != 133 && result != GattResultV2.INVALID_HANDLE) return;
+        cacheSensitiveFailures = Math.min(Integer.MAX_VALUE, cacheSensitiveFailures + 1);
+        exact.cacheRefreshRequested = cacheSensitiveFailures >= CACHE_REFRESH_FAILURE_THRESHOLD;
+        reportPlatformDiagnostic(exact.ownerToken,
+                "gatt_cache_candidate stage=" + stage + ", status=" + status
+                        + ", count=" + cacheSensitiveFailures
+                        + ", refreshOnClose=" + exact.cacheRefreshRequested);
+    }
+
+    private void maybeRefreshGattCache(GattOwner exact) {
+        if (exact == null || exact.gatt == null || !exact.cacheRefreshRequested
+                || !exact.callbackObserved || Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+            return;
+        }
+        boolean refreshed = false;
+        String outcome;
+        try {
+            java.lang.reflect.Method refresh = exact.gatt.getClass().getMethod("refresh");
+            Object result = refresh.invoke(exact.gatt);
+            refreshed = result instanceof Boolean && (Boolean) result;
+            outcome = refreshed ? "accepted" : "returned_false";
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            outcome = "unavailable_" + error.getClass().getSimpleName();
+        }
+        reportPlatformDiagnostic(exact.ownerToken,
+                "gatt_cache_refresh guarded=true, outcome=" + outcome);
+        if (refreshed) cacheSensitiveFailures = 0;
     }
 
     private void failPendingRouteControl() {
@@ -1315,6 +1368,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 case WAIT_REASSERT:
                     apply(AndroidCentralRoute.sameOwnerReassertElapsed(current, token));
                     break;
+                case WAIT_SYSTEM_CONNECTION:
+                    apply(AndroidCentralRoute.systemConnectionRecoveryElapsed(current, token));
+                    break;
                 case RETRY_WAIT:
                     apply(AndroidCentralRoute.retryElapsed(current, token, radioEnabled()));
                     break;
@@ -1327,6 +1383,15 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         main.postDelayed(timer, delayMillis);
     }
 
+    private long jitterRetryDelay(long baseMillis) {
+        if (baseMillis <= 1L) return baseMillis;
+        int signedPercent = enrollmentRandom.nextInt(RETRY_JITTER_PERCENT * 2 + 1)
+                - RETRY_JITTER_PERCENT;
+        long delta = (baseMillis / 100L) * signedPercent;
+        long jittered = baseMillis + delta;
+        return Math.max(1L, jittered);
+    }
+
     private void cancelRouteTimer(BleRouteToken token) {
         Runnable timer = routeTimers.remove(token);
         if (timer != null) main.removeCallbacks(timer);
@@ -1335,7 +1400,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void postRouteDeadline(BleRouteToken token) {
         dispatchMain(() -> {
             AndroidCentralRoute.State current = state;
-            if (current != null) apply(AndroidCentralRoute.deadline(current, token));
+            if (current == null) return;
+            if (current.phase == AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION) {
+                apply(AndroidCentralRoute.systemConnectionRecoveryElapsed(current, token));
+            } else {
+                apply(AndroidCentralRoute.deadline(current, token));
+            }
         });
     }
 
@@ -2520,6 +2590,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             reportPlatformDiagnostic(attempt.token,
                     "enrolled_recovery_scan exact_saved_identity=true, bonded=true, "
                             + "unique_selected_classic=true, advertisement_untrusted=true");
+            if (state.phase == AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION) {
+                apply(AndroidCentralRoute.systemConnectionAdvertisement(
+                        state, attempt.token));
+                return;
+            }
             IphoneBleAdvertisement advertisement = new IphoneBleAdvertisement(
                     IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
                     IphoneBleProtocolV2.VERSION, BlePeerRole.IPHONE_HELPER_PERIPHERAL,
@@ -2641,6 +2716,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         reportPlatformDiagnostic(exact.ownerToken,
                 "connect_gatt callback elapsedMs=" + elapsed + ", status=" + status
                         + ", newState=" + newState);
+        noteCacheSensitiveFailure(exact, status, "connection");
         owner.callbackObserved = true;
         owner.connected = newState == BluetoothProfile.STATE_CONNECTED;
         if (!ProcessGattRegistrationGateV2.owns(exact)) {
@@ -2692,6 +2768,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (owner == null || owner.gatt != callbackGatt || pending == null
                 || pending.type != RawOperation.DISCOVER) return;
         pendingGatt = null;
+        noteCacheSensitiveFailure(owner, status, "service_discovery");
         IphoneGattInventoryV2 discovered = status == BluetoothGatt.GATT_SUCCESS
                 ? inventory(callbackGatt) : null;
         AndroidCentralRoute.State current = state;
@@ -2876,6 +2953,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         PendingGattOperation pending = pendingGatt;
         if (owner == null || owner.gatt != callbackGatt || pending == null
                 || pending.characteristic != characteristic) return;
+        noteCacheSensitiveFailure(owner, status, "characteristic_read");
         if (pending.type == RawOperation.READ_BATTERY_STATUS
                 || pending.type == RawOperation.READ_BATTERY_LEVEL) {
             cancelStandardBatteryOperationWatchdog();
@@ -2934,6 +3012,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         PendingGattOperation pending = pendingGatt;
         if (owner == null || owner.gatt != callbackGatt || pending == null
                 || pending.descriptor != descriptor) return;
+        noteCacheSensitiveFailure(owner, status, "descriptor_write");
         if (pending.type == RawOperation.SUBSCRIBE_BATTERY_STATUS
                 || pending.type == RawOperation.SUBSCRIBE_BATTERY_LEVEL) {
             cancelStandardBatteryOperationWatchdog();
@@ -2982,6 +3061,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         PendingGattOperation pending = pendingGatt;
         if (owner == null || owner.gatt != callbackGatt || pending == null
                 || pending.characteristic != characteristic) return;
+        noteCacheSensitiveFailure(owner, status, "characteristic_write");
         if (ingressFrozen && pending.type != RawOperation.WRITE_ROUTE_CONTROL) {
             if (pending.type == RawOperation.WRITE_CONTROL_POINT
                     || pending.type == RawOperation.REQUEST_TELEMETRY

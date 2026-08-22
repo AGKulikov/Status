@@ -47,8 +47,44 @@ public final class AndroidCentralRouteTest {
                 AndroidCentralRoute.deadline(state, state.expected);
         assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION, exhausted.state.phase);
         assertEquals(soleOwner, exhausted.state.activeOwnerId);
+        assertTrue(hasEffect(exhausted, BleRouteEffect.Type.ARM_RETRY));
+        assertFalse(hasEffect(exhausted, BleRouteEffect.Type.START_SCAN));
         assertFalse(hasEffect(exhausted, BleRouteEffect.Type.CLOSE_GATT));
         assertFalse(hasEffect(exhausted, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+
+        BleRouteTransition<AndroidCentralRoute.State> autonomous =
+                AndroidCentralRoute.systemConnectionRecoveryElapsed(
+                        exhausted.state, exhausted.state.expected);
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, autonomous.state.phase);
+        assertEquals(soleOwner, autonomous.state.activeOwnerId);
+        assertTrue(hasEffect(autonomous, BleRouteEffect.Type.REASSERT_SAME_GATT));
+        assertFalse(hasEffect(autonomous, BleRouteEffect.Type.STOP_SCAN));
+        assertFalse(hasEffect(autonomous, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+    }
+
+    @Test public void enrolledSilentOwnerUsesPresenceScanThenReassertsSameWrapper() {
+        AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 4L));
+        state = AndroidCentralRoute.startupQuietElapsed(
+                state, state.expected, true).state;
+        long soleOwner = state.activeOwnerId;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            state = AndroidCentralRoute.deadline(state, state.expected).state;
+            state = AndroidCentralRoute.sameOwnerReassertElapsed(
+                    state, state.expected).state;
+        }
+        BleRouteTransition<AndroidCentralRoute.State> exhausted =
+                AndroidCentralRoute.deadline(state, state.expected);
+        assertTrue(hasEffect(exhausted, BleRouteEffect.Type.START_SCAN));
+        assertFalse(hasEffect(exhausted, BleRouteEffect.Type.CLOSE_GATT));
+
+        BleRouteTransition<AndroidCentralRoute.State> observed =
+                AndroidCentralRoute.systemConnectionAdvertisement(
+                        exhausted.state, exhausted.state.expected);
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, observed.state.phase);
+        assertEquals(soleOwner, observed.state.activeOwnerId);
+        assertTrue(hasEffect(observed, BleRouteEffect.Type.STOP_SCAN));
+        assertTrue(hasEffect(observed, BleRouteEffect.Type.REASSERT_SAME_GATT));
+        assertFalse(hasEffect(observed, BleRouteEffect.Type.CONNECT_GATT));
     }
 
     @Test public void exactClassicPresencePromptsRetainedOwnerWithoutWrapperReplacement() {
@@ -75,7 +111,7 @@ public final class AndroidCentralRouteTest {
         assertFalse(hasEffect(repeatedPresence, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
     }
 
-    @Test public void enrolledLinkLossRetriesSavedFacadeActivelyWithoutIdentityScan() {
+    @Test public void enrolledLinkLossUsesUnfilteredExactIdentityRecoveryScan() {
         AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 3L));
         state = AndroidCentralRoute.startupQuietElapsed(
                 state, state.expected, true).state;
@@ -91,11 +127,11 @@ public final class AndroidCentralRouteTest {
         BleRouteTransition<AndroidCentralRoute.State> retry =
                 AndroidCentralRoute.retryElapsed(state, state.expected, true);
 
-        assertEquals(AndroidCentralRoute.Phase.CONNECTING, retry.state.phase);
-        assertTrue(hasEffect(retry, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
-        assertFalse(hasEffect(retry, BleRouteEffect.Type.START_SCAN));
-        assertTrue(retry.effects.get(0).detail.contains("autoConnect=false"));
-        assertTrue(retry.effects.get(0).detail.contains("every exact active attempt"));
+        assertEquals(AndroidCentralRoute.Phase.SCANNING, retry.state.phase);
+        assertFalse(hasEffect(retry, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+        assertTrue(hasEffect(retry, BleRouteEffect.Type.START_SCAN));
+        assertTrue(retry.effects.get(0).detail.contains("unfiltered scan"));
+        assertTrue(retry.effects.get(0).detail.contains("exact saved public identity"));
     }
 
     @Test public void alphabeticSelectedBondCanonicalizesBeforeSingleOwnerAllocation() {

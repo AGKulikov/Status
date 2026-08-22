@@ -37,6 +37,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.security.SecureRandom;
 import java.util.UUID;
 
 import dezz.status.widget.Preferences;
@@ -193,6 +194,7 @@ public final class PhoneConnectorController {
     private final Handler mainHandler;
     private final PhoneTelemetryStore telemetryStore;
     private final CarRemoteControllerV1 carRemote;
+    private final SecureRandom recoveryJitter = new SecureRandom();
 
     private long generation;
     private boolean running;
@@ -2600,7 +2602,8 @@ public final class PhoneConnectorController {
                         classicAncsRecovery,
                         isClassicConnected,
                         ancsRecoveryRoute,
-                        SystemClock.elapsedRealtime());
+                        SystemClock.elapsedRealtime(),
+                        this::jitterRecoveryDelay);
         applyClassicAncsRecoveryTransition(token, transition);
         if (!wasClassicConnected && isClassicConnected) {
             IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
@@ -2627,10 +2630,11 @@ public final class PhoneConnectorController {
                     break;
                 case ENSURE_ROUTE:
                     PhoneConnectionJournal.append("classic-ancs",
-                            "Classic exact profile is up; ensure "
+                            "Ensure autonomous "
                                     + PhoneBleRole.diagnosticName(config == null
                                     ? PhoneBleRole.IPHONE_PERIPHERAL : config.bleRole)
-                                    + " ANCS route without bond/radio mutation");
+                                    + " ANCS route without bond/radio mutation; classic="
+                                    + transition.state.classicConnected);
                     ancsStatus = "classic_connected_ancs_recovery";
                     IphoneDualTransportRuntimeV2 existing = ancsRuntimeV2;
                     if (existing != null) existing.requestSameModeRecovery();
@@ -2638,9 +2642,10 @@ public final class PhoneConnectorController {
                     break;
                 case REQUEST_SAME_ROUTE_RECOVERY:
                     PhoneConnectionJournal.append("classic-ancs",
-                            "ANCS owner is down while Classic is up; fresh same-route generation"
+                            "ANCS owner is down; fresh autonomous same-route generation"
                                     + " (command "
-                                    + transition.state.recoveryCommands + ")");
+                                    + transition.state.recoveryCommands + ", classic="
+                                    + transition.state.classicConnected + ")");
                     ancsStatus = "classic_connected_ancs_recovery";
                     IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
                     if (runtime != null) {
@@ -2672,7 +2677,8 @@ public final class PhoneConnectorController {
                     ClassicAncsRecoveryPolicy.wakeup(
                             classicAncsRecovery,
                             timerGeneration,
-                            SystemClock.elapsedRealtime());
+                            SystemClock.elapsedRealtime(),
+                            this::jitterRecoveryDelay);
             applyClassicAncsRecoveryTransition(token, transition);
             publishSnapshot(token);
         });
@@ -2680,6 +2686,13 @@ public final class PhoneConnectorController {
         long delay = Math.max(0L,
                 deadlineMillis - SystemClock.elapsedRealtime());
         handler.postDelayed(wakeup, delay);
+    }
+
+    private long jitterRecoveryDelay(long baseMillis) {
+        if (baseMillis <= 1L) return baseMillis;
+        int percent = recoveryJitter.nextInt(41) - 20;
+        long delta = (baseMillis / 100L) * percent;
+        return Math.max(1L, baseMillis + delta);
     }
 
     private void cancelClassicAncsRecoveryWakeup() {

@@ -100,19 +100,32 @@ public final class ClassicAncsRecoveryPolicyTest {
                 state, state.timerGeneration, state.deadlineMillis - 1L).state);
     }
 
-    @Test public void classicLossCancelsAndFutureStaleWakeupDoesNothing() {
+    @Test public void classicLossPreservesAutonomousBackoffAndWakeup() {
         ClassicAncsRecoveryPolicy.State state = twoCommandsThenDown();
-        long staleGeneration = state.timerGeneration;
-        long staleDeadline = state.deadlineMillis;
+        long generation = state.timerGeneration;
+        long deadline = state.deadlineMillis;
 
         ClassicAncsRecoveryPolicy.Transition lost = observe(
                 state, false, IphoneTransportRecoveryStateV2.OWNER_DOWN, 4_000L);
-        assertEquals(ClassicAncsRecoveryPolicy.Phase.NO_CLASSIC, lost.state.phase);
-        assertEquals(0, lost.state.recoveryCommands);
-        assertFalse(lost.state.hasWakeup());
-        assertEquals(CANCEL_WAKEUP, lost.effects.get(0).type);
-        assertTrue(ClassicAncsRecoveryPolicy.wakeup(
-                lost.state, staleGeneration, staleDeadline).effects.isEmpty());
+        assertEquals(ClassicAncsRecoveryPolicy.Phase.RECOVERY_SCHEDULED, lost.state.phase);
+        assertEquals(state.recoveryCommands, lost.state.recoveryCommands);
+        assertTrue(lost.state.hasWakeup());
+        assertTrue(lost.effects.isEmpty());
+        ClassicAncsRecoveryPolicy.Transition due = ClassicAncsRecoveryPolicy.wakeup(
+                lost.state, generation, deadline);
+        assertTrue(due.effects.stream().anyMatch(effect ->
+                effect.type == REQUEST_SAME_ROUTE_RECOVERY));
+    }
+
+    @Test public void noClassicNeverGatesInitialOrOwnerDownRecovery() {
+        ClassicAncsRecoveryPolicy.Transition initial = observe(
+                ClassicAncsRecoveryPolicy.State.initial(), false,
+                IphoneTransportRecoveryStateV2.NO_OWNER, 1_000L);
+        assertEquals(ENSURE_ROUTE, initial.effects.get(0).type);
+        ClassicAncsRecoveryPolicy.Transition down = observe(
+                initial.state, false, IphoneTransportRecoveryStateV2.OWNER_DOWN, 2_000L);
+        assertTrue(down.effects.stream().anyMatch(effect ->
+                effect.type == REQUEST_SAME_ROUTE_RECOVERY));
     }
 
     private static ClassicAncsRecoveryPolicy.State twoCommandsThenDown() {
