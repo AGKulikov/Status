@@ -12,9 +12,13 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
@@ -41,6 +45,11 @@ import com.google.android.material.materialswitch.MaterialSwitch;
 
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -84,10 +93,13 @@ import dezz.status.widget.sprut.SprutProtocolAdapter;
 public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private static final String PHONE_MIRROR_CHANNEL_ID = "phone_mirror";
     private static final int REQUEST_ICON_STORAGE = 11135;
+    private static final int REQUEST_JOURNAL_EXPORT = 11136;
     /** Deliberate diagnostics-only escape hatch; normal settings expose production Route A. */
     static final String EXTRA_EXPERIMENTAL_ROUTE_B = "kx11_experimental_route_b";
 
     private Preferences preferences;
+    private boolean pendingJournalExport;
+    private boolean journalExportPermissionResolved;
     private MaterialSwitch connectorEnabled;
     private MaterialSwitch iphoneCentralRole;
     private TextView iphoneBleRoleSubtitle;
@@ -758,13 +770,20 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
             @NonNull String[] permissions,
             @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != REQUEST_ICON_STORAGE) return;
         boolean granted = false;
         for (int result : grantResults) {
             if (result == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 granted = true;
             }
         }
+        if (requestCode == REQUEST_JOURNAL_EXPORT) {
+            boolean retry = pendingJournalExport;
+            pendingJournalExport = false;
+            journalExportPermissionResolved = true;
+            if (retry) exportConnectionJournal();
+            return;
+        }
+        if (requestCode != REQUEST_ICON_STORAGE) return;
         if (granted) {
             PhoneAppIconStore.get(this).promoteToExternalStorage();
             Toast.makeText(this,
@@ -1341,15 +1360,66 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
             Toast.makeText(this, "Журнал подключения пуст", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (!journalExportPermissionResolved && android.os.Build.VERSION.SDK_INT <= 28
+                && ContextCompat.checkSelfPermission(
+                this, "android.permission.WRITE_EXTERNAL_STORAGE")
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            pendingJournalExport = true;
+            requestPermissions(new String[]{"android.permission.WRITE_EXTERNAL_STORAGE"},
+                    REQUEST_JOURNAL_EXPORT);
+            return;
+        }
+        File exported = saveConnectionJournal(text);
+        if (exported == null) {
+            Toast.makeText(this, "Не удалось сохранить журнал", Toast.LENGTH_LONG).show();
+            return;
+        }
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(ClipData.newPlainText("Natro ANCS log path",
+                    exported.getAbsolutePath()));
+        }
         Intent share = new Intent(Intent.ACTION_SEND)
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_SUBJECT, "Natro — подключение iPhone")
                 .putExtra(Intent.EXTRA_TEXT, text);
-        try {
-            startActivity(Intent.createChooser(share, "Экспортировать журнал"));
-        } catch (RuntimeException error) {
-            Toast.makeText(this, "Не найдено приложение для экспорта",
-                    Toast.LENGTH_LONG).show();
+        boolean hasShareHandler = !getPackageManager().queryIntentActivities(share, 0).isEmpty();
+        PhoneConnectionJournal.append("journal-export",
+                "saved path=" + exported.getAbsolutePath()
+                        + " shareHandler=" + hasShareHandler);
+        if (hasShareHandler) {
+            try {
+                startActivity(Intent.createChooser(share, "Экспортировать журнал"));
+            } catch (RuntimeException error) {
+                Toast.makeText(this, "Журнал сохранён: " + exported.getAbsolutePath()
+                        + " (путь скопирован)", Toast.LENGTH_LONG).show();
+            }
+        } else {
+            Toast.makeText(this, "Журнал сохранён: " + exported.getAbsolutePath()
+                    + " (путь скопирован)", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Nullable
+    private File saveConnectionJournal(@NonNull String text) {
+        String stamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US)
+                .format(new java.util.Date());
+        String name = "Natro-ANCS-" + stamp + ".log";
+        File directory = new File(Environment.getExternalStorageDirectory(), "Download");
+        if ((!directory.isDirectory() && !directory.mkdirs()) || !directory.canWrite()) {
+            directory = getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
+        }
+        if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) return null;
+        File target = new File(directory, name);
+        try (FileOutputStream output = new FileOutputStream(target, false)) {
+            output.write(text.getBytes(StandardCharsets.UTF_8));
+            output.write('\n');
+            output.flush();
+            return target;
+        } catch (IOException | RuntimeException error) {
+            PhoneConnectionJournal.append("journal-export",
+                    "save failed: " + error.getClass().getSimpleName());
+            return null;
         }
     }
 

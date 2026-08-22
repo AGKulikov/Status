@@ -26,6 +26,8 @@ public final class AndroidCentralRoute {
     public static final long MAX_RETRY_MS = 15_000L;
     /** Autonomous retained-owner probe after the bounded fast reassert ladder is exhausted. */
     public static final long WAIT_SYSTEM_RECOVERY_MS = 180_000L;
+    /** Enrolled Route A must recover during one ignition cycle, not after multi-minute silence. */
+    public static final long ENROLLED_WAIT_SYSTEM_RECOVERY_MS = 15_000L;
     public static final int MAX_ATTEMPTS_PER_EPOCH = 6;
     private static final long[] SAME_OWNER_REASSERT_MS = {30_000L, 60_000L, 120_000L};
 
@@ -534,7 +536,7 @@ public final class AndroidCentralRoute {
                         op(BleRouteEffect.Type.START_SCAN, recovery,
                                 "unfiltered presence scan after first enrolled deadline; "
                                         + "retain sole GATT wrapper"),
-                        BleRouteEffect.retry(recovery, WAIT_SYSTEM_RECOVERY_MS,
+                        BleRouteEffect.retry(recovery, waitSystemRecoveryMillis(state),
                                 "autonomous retained-owner recovery; Classic is not required"));
             }
             if (state.sameOwnerReassertions < SAME_OWNER_REASSERT_MS.length) {
@@ -564,7 +566,7 @@ public final class AndroidCentralRoute {
                 effects.add(op(BleRouteEffect.Type.START_SCAN, recovery,
                         "unfiltered presence scan while retaining the sole GATT wrapper"));
             }
-            effects.add(BleRouteEffect.retry(recovery, WAIT_SYSTEM_RECOVERY_MS,
+            effects.add(BleRouteEffect.retry(recovery, waitSystemRecoveryMillis(state),
                     "autonomous retained-owner recovery; Classic is not required"));
             return new BleRouteTransition<>(blocked, effects, true);
         }
@@ -607,10 +609,18 @@ public final class AndroidCentralRoute {
         if (!expects(state, Phase.WAIT_SYSTEM_CONNECTION, token)) {
             return BleRouteTransition.ignored(state);
         }
+        if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                && state.sameOwnerReassertions > SAME_OWNER_REASSERT_MS.length) {
+            return retry(state, token,
+                    "retained enrolled owner still silent; drain and start fresh exact epoch");
+        }
         BleRouteToken reconnect = nextOperation(token);
         if (reconnect == null) return counterExhausted(state, token, "operation");
-        State connecting = copy(state, Phase.CONNECTING, reconnect, token.ownerId,
-                state.nextOwnerId, state.consecutiveFailures,
+        int reassertions = state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                ? Math.min(Integer.MAX_VALUE, state.sameOwnerReassertions + 1)
+                : state.sameOwnerReassertions;
+        State connecting = copyWithReassertions(state, Phase.CONNECTING, reconnect,
+                token.ownerId, state.nextOwnerId, state.consecutiveFailures, reassertions,
                 "autonomous retained-owner recovery; exact enrolled identity");
         List<BleRouteEffect> effects = new ArrayList<>();
         effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
@@ -623,6 +633,11 @@ public final class AndroidCentralRoute {
                 "same wrapper only; recovery does not depend on Classic"));
         effects.add(BleRouteEffect.deadline(reconnect, CONNECT_TIMEOUT_MS));
         return new BleRouteTransition<>(connecting, effects, true);
+    }
+
+    private static long waitSystemRecoveryMillis(State state) {
+        return state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                ? ENROLLED_WAIT_SYSTEM_RECOVERY_MS : WAIT_SYSTEM_RECOVERY_MS;
     }
 
     /** A stack-resolved enrolled advertisement brings forward the retained-owner reassert. */

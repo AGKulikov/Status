@@ -1,0 +1,202 @@
+name: Verify iPhone Helper v61 · Bluetooth vehicle control
+
+# Kept as an explicit branch workflow so macOS/Xcode validates every Helper 61 candidate.
+
+on:
+  push:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v61/**'
+      - 'docs/ancs-v2-wire-vectors-v52.json'
+      - 'docs/TELEMETRY_REFRESH_V52.md'
+      - 'docs/car-remote-v1-vectors.json'
+      - 'app/src/main/java/dezz/status/widget/phone/**'
+      - 'app/src/geely/java/dezz/status/widget/car/GeelyPassengerControlIntegration.java'
+      - 'app/src/main/java/dezz/status/widget/phone/transport/switching/ble-role-switch-transition-vectors.json'
+      - '.github/workflows/verify-helper-v61.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v61/**'
+      - 'docs/ancs-v2-wire-vectors-v52.json'
+      - 'docs/TELEMETRY_REFRESH_V52.md'
+      - 'docs/car-remote-v1-vectors.json'
+      - 'app/src/main/java/dezz/status/widget/phone/**'
+      - 'app/src/geely/java/dezz/status/widget/car/GeelyPassengerControlIntegration.java'
+      - 'app/src/main/java/dezz/status/widget/phone/transport/switching/ble-role-switch-transition-vectors.json'
+      - '.github/workflows/verify-helper-v61.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper-v61:
+    name: Compile and replay Helper v61 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Record exact Helper and fixture identities
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --short)"
+          HELPER_TREE=$(git rev-parse "${GITHUB_SHA}:ios/KX11-iPhone-ANCS-Helper-v61")
+          WIRE_FIXTURE_OBJECT=$(git rev-parse "${GITHUB_SHA}:docs/ancs-v2-wire-vectors-v52.json")
+          TELEMETRY_DOC_OBJECT=$(git rev-parse "${GITHUB_SHA}:docs/TELEMETRY_REFRESH_V52.md")
+          SWITCH_FIXTURE_OBJECT=$(git rev-parse "${GITHUB_SHA}:app/src/main/java/dezz/status/widget/phone/transport/switching/ble-role-switch-transition-vectors.json")
+          echo "helper_tree=$HELPER_TREE" >> "$GITHUB_OUTPUT"
+          echo "wire_fixture_object=$WIRE_FIXTURE_OBJECT" >> "$GITHUB_OUTPUT"
+          echo "telemetry_doc_object=$TELEMETRY_DOC_OBJECT" >> "$GITHUB_OUTPUT"
+          echo "switch_fixture_object=$SWITCH_FIXTURE_OBJECT" >> "$GITHUB_OUTPUT"
+
+      - name: Replay v61 wire, enrollment, route and telemetry contracts
+        shell: bash
+        run: ios/KX11-iPhone-ANCS-Helper-v61/verify-v61-contract.sh
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          settings="$RUNNER_TEMP/helper-v61-build-settings.txt"
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v61/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Release \
+            -sdk iphonesimulator \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings > "$settings"
+          grep -Eq '^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = ru\.natro\.kx11ancshelper$' "$settings"
+          grep -Eq '^[[:space:]]*MARKETING_VERSION = 60\.0$' "$settings"
+          grep -Eq '^[[:space:]]*CURRENT_PROJECT_VERSION = 60$' "$settings"
+          grep -Eq '^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET = 14\.0$' "$settings"
+          extension_settings="$RUNNER_TEMP/helper-v61-extension-build-settings.txt"
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v61/KX11ANCSHelper.xcodeproj \
+            -target NatroLiveActivityExtension \
+            -configuration Release \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings > "$extension_settings"
+          grep -Eq '^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = ru\.natro\.kx11ancshelper\.liveactivity$' "$extension_settings"
+          grep -Eq '^[[:space:]]*MARKETING_VERSION = 60\.0$' "$extension_settings"
+          grep -Eq '^[[:space:]]*CURRENT_PROJECT_VERSION = 60$' "$extension_settings"
+          grep -Eq '^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET = 16\.2$' "$extension_settings"
+
+      - name: Compile Helper v61 Release simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v61/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Release \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperV61Products" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperV61Intermediates" \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify unsigned v61 product
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/KX11ANCSHelperV61Products/Release-iphonesimulator/KX11ANCSHelper.app"
+          test -d "$app"
+          test -x "$app/KX11ANCSHelper"
+          test ! -d "$app/_CodeSignature"
+          test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Info.plist")" = 'ru.natro.kx11ancshelper'
+          test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Info.plist")" = '61.0'
+          test "$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")" = '60'
+          test "$(plutil -extract MinimumOSVersion raw -o - "$app/Info.plist")" = '14.0'
+          extension="$app/PlugIns/NatroLiveActivityExtension.appex"
+          test -d "$extension"
+          test -x "$extension/NatroLiveActivityExtension"
+          test -f "$extension/Monjaro.png"
+          test "$(plutil -extract CFBundleIdentifier raw -o - "$extension/Info.plist")" = 'ru.natro.kx11ancshelper.liveactivity'
+          test "$(plutil -extract CFBundleShortVersionString raw -o - "$extension/Info.plist")" = '61.0'
+          test "$(plutil -extract CFBundleVersion raw -o - "$extension/Info.plist")" = '60'
+          test "$(plutil -extract MinimumOSVersion raw -o - "$extension/Info.plist")" = '16.2'
+          test -f ios/KX11-iPhone-ANCS-Helper-v61/README.md
+          test -f ios/KX11-iPhone-ANCS-Helper-v61/RELEASE.txt
+          test -x ios/KX11-iPhone-ANCS-Helper-v61/verify-v61-contract.sh
+
+      - name: Package exact unsigned app and clean v61 source
+        id: package
+        shell: bash
+        env:
+          HELPER_TREE: ${{ steps.source.outputs.helper_tree }}
+          WIRE_FIXTURE_OBJECT: ${{ steps.source.outputs.wire_fixture_object }}
+          TELEMETRY_DOC_OBJECT: ${{ steps.source.outputs.telemetry_doc_object }}
+          SWITCH_FIXTURE_OBJECT: ${{ steps.source.outputs.switch_fixture_object }}
+        run: |
+          set -euo pipefail
+          products="$RUNNER_TEMP/KX11ANCSHelperV61Products/Release-iphonesimulator"
+          app_archive="$RUNNER_TEMP/KX11-ANCS-Helper-v61-unsigned-simulator.tar.gz"
+          source_archive="$RUNNER_TEMP/KX11-ANCS-Helper-v61-source.zip"
+          staging="$RUNNER_TEMP/KX11-ANCS-Helper-v61-source"
+
+          tar -czf "$app_archive" -C "$products" KX11ANCSHelper.app
+          mkdir -p "$staging"
+          git archive "$GITHUB_SHA" \
+            ios/KX11-iPhone-ANCS-Helper-v61 \
+            docs/ancs-v2-wire-vectors-v52.json \
+            docs/TELEMETRY_REFRESH_V52.md \
+            docs/car-remote-v1-vectors.json \
+            app/src/main/java/dezz/status/widget/phone \
+            app/src/geely/java/dezz/status/widget/car/GeelyPassengerControlIntegration.java \
+            | tar -x -C "$staging"
+          test ! -e "$staging/.git"
+          "$staging/ios/KX11-iPhone-ANCS-Helper-v61/verify-v61-contract.sh"
+          ditto -c -k --sequesterRsrc --keepParent "$staging" "$source_archive"
+
+          APP_SHA=$(shasum -a 256 "$app_archive" | awk '{print $1}')
+          SOURCE_SHA=$(shasum -a 256 "$source_archive" | awk '{print $1}')
+          XCODE_VERSION=$(xcodebuild -version | tr '\n' ' ' | sed 's/ $//')
+          SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          BUILD_ARCH=$(uname -m)
+          jq -n \
+            --arg sourceSha "$GITHUB_SHA" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg wireFixtureObject "$WIRE_FIXTURE_OBJECT" \
+            --arg telemetryDocObject "$TELEMETRY_DOC_OBJECT" \
+            --arg switchFixtureObject "$SWITCH_FIXTURE_OBJECT" \
+            --arg appArchiveSha256 "$APP_SHA" \
+            --arg sourceArchiveSha256 "$SOURCE_SHA" \
+            --arg xcodeVersion "$XCODE_VERSION" \
+            --arg sdkVersion "$SDK_VERSION" \
+            --arg buildArch "$BUILD_ARCH" \
+            '{sourceSha: $sourceSha, helperTree: $helperTree,
+              wireFixtureObject: $wireFixtureObject,
+              telemetryDocObject: $telemetryDocObject,
+              switchFixtureObject: $switchFixtureObject,
+              bundleId: "ru.natro.kx11ancshelper", marketingVersion: "61.0",
+              build: 61, platform: "iphonesimulator", configuration: "Release",
+              deviceInstallable: false, signed: false,
+              xcodeVersion: $xcodeVersion, sdkVersion: $sdkVersion, buildArch: $buildArch,
+              appArchiveSha256: $appArchiveSha256,
+              sourceArchiveSha256: $sourceArchiveSha256}' \
+            > "$RUNNER_TEMP/helper-v61-candidate.json"
+          (cd "$RUNNER_TEMP" && shasum -a 256 \
+            KX11-ANCS-Helper-v61-unsigned-simulator.tar.gz \
+            KX11-ANCS-Helper-v61-source.zip \
+            helper-v61-candidate.json > helper-v61.sha256)
+
+      - name: Upload unsigned app and exact clean-room source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: KX11-ANCS-Helper-v61-unsigned-simulator
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/KX11-ANCS-Helper-v61-unsigned-simulator.tar.gz
+            ${{ runner.temp }}/KX11-ANCS-Helper-v61-source.zip
+            ${{ runner.temp }}/helper-v61-candidate.json
+            ${{ runner.temp }}/helper-v61.sha256

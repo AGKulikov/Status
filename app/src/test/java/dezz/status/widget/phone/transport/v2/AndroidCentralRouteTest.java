@@ -86,6 +86,38 @@ public final class AndroidCentralRouteTest {
         assertFalse(hasEffect(observed, BleRouteEffect.Type.CONNECT_GATT));
     }
 
+    @Test public void enrolledSilentRetainedOwnerEscalatesToFreshEpochWithinOneMinute() {
+        AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 40L));
+        state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
+
+        BleRouteTransition<AndroidCentralRoute.State> firstDeadline =
+                AndroidCentralRoute.deadline(state, state.expected);
+        assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION,
+                firstDeadline.state.phase);
+        BleRouteEffect timer = firstEffect(
+                firstDeadline, BleRouteEffect.Type.ARM_RETRY);
+        assertEquals(AndroidCentralRoute.ENROLLED_WAIT_SYSTEM_RECOVERY_MS,
+                timer.delayMillis);
+
+        BleRouteTransition<AndroidCentralRoute.State> retainedReassert =
+                AndroidCentralRoute.systemConnectionRecoveryElapsed(
+                        firstDeadline.state, firstDeadline.state.expected);
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, retainedReassert.state.phase);
+        assertTrue(hasEffect(retainedReassert, BleRouteEffect.Type.REASSERT_SAME_GATT));
+
+        BleRouteTransition<AndroidCentralRoute.State> secondDeadline =
+                AndroidCentralRoute.deadline(
+                        retainedReassert.state, retainedReassert.state.expected);
+        assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION,
+                secondDeadline.state.phase);
+        BleRouteTransition<AndroidCentralRoute.State> freshEpoch =
+                AndroidCentralRoute.systemConnectionRecoveryElapsed(
+                        secondDeadline.state, secondDeadline.state.expected);
+        assertEquals(AndroidCentralRoute.Phase.RETRY_DRAINING, freshEpoch.state.phase);
+        assertTrue(hasEffect(freshEpoch, BleRouteEffect.Type.CLOSE_GATT));
+        assertTrue(freshEpoch.state.detail.contains("fresh exact epoch"));
+    }
+
     @Test public void exactClassicPresencePromptsRetainedOwnerWithoutWrapperReplacement() {
         AndroidCentralRoute.State state = waitSystemConnection(new BleRouteEpoch(11L, 2L));
         long soleOwner = state.activeOwnerId;
@@ -565,6 +597,13 @@ public final class AndroidCentralRouteTest {
             if (transition.effects.get(index).type == type) return index;
         }
         return -1;
+    }
+
+    private static BleRouteEffect firstEffect(BleRouteTransition<?> transition,
+                                              BleRouteEffect.Type type) {
+        int index = indexOf(transition, type);
+        if (index < 0) throw new AssertionError("Missing effect " + type);
+        return transition.effects.get(index);
     }
 
     private static int countEffects(BleRouteTransition<?> transition,
