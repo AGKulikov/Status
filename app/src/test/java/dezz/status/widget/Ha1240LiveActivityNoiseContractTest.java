@@ -45,8 +45,11 @@ public final class Ha1240LiveActivityNoiseContractTest {
 
     private static Path projectRoot() {
         Path current = Paths.get("").toAbsolutePath().normalize();
-        if (Files.isRegularFile(current.resolve("build.gradle"))) return current;
-        if (Files.isRegularFile(current.resolve("../build.gradle"))) return current.getParent();
+        if (Files.isRegularFile(current.resolve("settings.gradle"))) return current;
+        if (current.getParent() != null
+                && Files.isRegularFile(current.getParent().resolve("settings.gradle"))) {
+            return current.getParent();
+        }
         throw new IllegalStateException("Project root not found from " + current);
     }
 
