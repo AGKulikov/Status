@@ -155,7 +155,6 @@ jobs:
           test -z "$(git status --short --untracked-files=no --ignore-submodules=none)"
 
       - name: Write exact-byte candidate provenance
-        if: github.event_name == 'push'
         shell: bash
         env:
           SOURCE_TREE: ${{ steps.source.outputs.tree }}
@@ -191,7 +190,6 @@ jobs:
             > "$RUNNER_TEMP/ha1242-candidate.json"
 
       - name: Upload exact source snapshot
-        if: github.event_name == 'push'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ha1242-natro-source-bundle
@@ -200,7 +198,6 @@ jobs:
           retention-days: 14
 
       - name: Upload exact unsigned Android candidate and provenance
-        if: github.event_name == 'push'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ha1242-natro-unsigned-release
@@ -212,7 +209,6 @@ jobs:
           retention-days: 14
 
       - name: Pack official Android signing tools
-        if: github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
@@ -226,7 +222,6 @@ jobs:
           cp "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/lib64/libc++.so" "$TOOLS/lib64/"
 
       - name: Upload official Android signing tools
-        if: github.event_name == 'push'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ha1242-android-build-tools
