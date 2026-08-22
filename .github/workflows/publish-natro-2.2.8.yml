@@ -113,13 +113,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title 'Natro 2.2.8 + iPhone Helper 60' \
-            --notes-file release/HA1242-release-notes.md release/*
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --json assets --jq '.assets[].name' \
+              | grep -Fxq 'Natro-2.2.8-signed.apk'
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title 'Natro 2.2.8 + iPhone Helper 60' \
+              --notes-file release/HA1242-release-notes.md release/*
+          fi
 
       - name: Remove temporary transport branch
         if: success()
         shell: bash
         run: gh api --method DELETE \
-          "repos/${GITHUB_REPOSITORY}/git/refs/heads/publish/natro-v2.2.8"
+          "repos/${GITHUB_REPOSITORY}/git/refs/heads/publish/natro-v2.2.8" \
+          || true
