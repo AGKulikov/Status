@@ -114,7 +114,7 @@ jobs:
           test ! -d "$app/_CodeSignature"
           test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Info.plist")" = 'ru.natro.kx11ancshelper'
           test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Info.plist")" = '59.0'
-          test "$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")" = '58'
+          test "$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")" = '59'
           test "$(plutil -extract MinimumOSVersion raw -o - "$app/Info.plist")" = '14.0'
           extension="$app/PlugIns/NatroLiveActivityExtension.appex"
           test -d "$extension"
@@ -122,7 +122,7 @@ jobs:
           test -f "$extension/Monjaro.png"
           test "$(plutil -extract CFBundleIdentifier raw -o - "$extension/Info.plist")" = 'ru.natro.kx11ancshelper.liveactivity'
           test "$(plutil -extract CFBundleShortVersionString raw -o - "$extension/Info.plist")" = '59.0'
-          test "$(plutil -extract CFBundleVersion raw -o - "$extension/Info.plist")" = '58'
+          test "$(plutil -extract CFBundleVersion raw -o - "$extension/Info.plist")" = '59'
           test "$(plutil -extract MinimumOSVersion raw -o - "$extension/Info.plist")" = '16.2'
           test -f ios/KX11-iPhone-ANCS-Helper-v59/README.md
           test -f ios/KX11-iPhone-ANCS-Helper-v59/RELEASE.txt
