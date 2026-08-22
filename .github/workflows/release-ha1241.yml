@@ -101,7 +101,8 @@ jobs:
           test "$SOURCE_SHA" = "$REQUESTED_SHA"
           test "$SOURCE_SHA" = "$TAG_SHA"
           if test "$GITHUB_EVENT_NAME" = 'push' \
-              && test -z "$CALLED_RELEASE_REF"; then
+              && test -z "$CALLED_RELEASE_REF" \
+              && test "$GITHUB_REF" != 'refs/heads/release-resume/natro-v2.2.7'; then
             test "$GITHUB_REF" = "$TAG_REF"
             test "$(git rev-parse "${GITHUB_SHA}^{commit}")" = "$SOURCE_SHA"
           fi
