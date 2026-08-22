@@ -1,8 +1,6 @@
 name: Verify HA1242 Natro 2.2.8 candidate
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 permissions:

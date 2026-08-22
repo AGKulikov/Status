@@ -17,6 +17,9 @@ concurrency:
 
 jobs:
   build:
+    # Natro release branches use their own unsigned/full-suite and signing workflows. This
+    # legacy job requires the stable keystore and only owns the v2.8.2 HA release namespace.
+    if: github.event_name != 'push' || github.ref_name == 'main' || startsWith(github.ref_name, 'rewrite/') || startsWith(github.ref_name, 'release/v2.8.2-ha')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
