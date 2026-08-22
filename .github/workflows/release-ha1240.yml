@@ -124,7 +124,7 @@ jobs:
           grep -Fq 'Package: `ru.natro.statuswidget`' release-manifests/HA1240.md
           grep -Fq 'Release tag: `natro-v2.2.6`' release-manifests/HA1240.md
           PROJECT=ios/KX11-iPhone-ANCS-Helper-v58/KX11ANCSHelper.xcodeproj/project.pbxproj
-          test "$(grep -Fc 'CURRENT_PROJECT_VERSION = 57;' "$PROJECT")" -eq 4
+          test "$(grep -Fc 'CURRENT_PROJECT_VERSION = 58;' "$PROJECT")" -eq 4
           test "$(grep -Fc 'MARKETING_VERSION = 58.0;' "$PROJECT")" -eq 4
           test "$(grep -Fc \
             'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper;' "$PROJECT")" -eq 2
