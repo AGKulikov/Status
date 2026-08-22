@@ -1,0 +1,121 @@
+name: Publish Natro 2.2.8 signed release
+
+on:
+  push:
+    branches: [publish/natro-v2.2.8]
+    paths:
+      - .github/workflows/publish-natro-2.2.8.yml
+      - release-upload/natro-2.2.8/**
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: natro-v2.2.8
+      SOURCE_SHA: 5295ff60216332c4c36430bbc6cfb8a18425ae0c
+      CANDIDATE_RUN: '32563783652'
+      HELPER_RUN: '32562006455'
+      SIGNED_SHA256: 1d36a575ad65c8c8cf7733fdc5b85089dadb9cf4dddbab464ca21cf121a79969
+      STABLE_CERT_SHA256: 6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 1
+
+      - name: Reconstruct exact locally signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cat release-upload/natro-2.2.8/part-* | base64 --decode \
+            > release/Natro-2.2.8-signed.apk
+          test "$(sha256sum release/Natro-2.2.8-signed.apk | awk '{print $1}')" \
+            = "$SIGNED_SHA256"
+
+      - name: Download immutable candidate evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$CANDIDATE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name ha1242-natro-unsigned-release --dir handoff
+          gh run download "$CANDIDATE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name ha1242-android-build-tools --dir tools
+
+      - name: Verify source, APK identity and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=release/Natro-2.2.8-signed.apk
+          git fetch --force --depth=1 origin "$SOURCE_SHA"
+          git archive --format=tar.gz --output=release/Natro-2.2.8-source.tar.gz "$SOURCE_SHA"
+          git bundle create release/Natro-2.2.8-source.bundle "$SOURCE_SHA"
+          git show "$SOURCE_SHA:release-manifests/HA1242.md" > release/HA1242-release-notes.md
+          git show "$SOURCE_SHA:ios/KX11-iPhone-ANCS-Helper-v60/RELEASE.txt" \
+            > release/Helper-60-RELEASE.txt
+          git show "$SOURCE_SHA:tools/KX11_Bluetooth_Collect.sh" \
+            > release/KX11_Bluetooth_Collect.sh
+          test "$(jq -r .sourceTree handoff/ha1242-candidate.json)" \
+            = "$(git rev-parse "${SOURCE_SHA}^{tree}")"
+          test "$(sha256sum handoff/Natro-2.2.8-unsigned.apk | awk '{print $1}')" \
+            = "$(jq -r .android.apkSha256 handoff/ha1242-candidate.json)"
+          chmod +x tools/apksigner tools/zipalign tools/aapt
+          tools/zipalign -c -P 16 -v 4 "$APK" >/dev/null
+          tools/apksigner verify --min-sdk-version 24 --verbose --print-certs "$APK" \
+            | tee release/apk-certificates.txt
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' \
+            release/apk-certificates.txt
+          grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' \
+            release/apk-certificates.txt
+          grep -Fq 'Number of signers: 1' release/apk-certificates.txt
+          grep -Fq "certificate SHA-256 digest: ${STABLE_CERT_SHA256}" \
+            release/apk-certificates.txt
+          tools/aapt dump badging "$APK" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='208021242' versionName='2.2.8'"
+
+      - name: Create immutable tag and release evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            test "$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq .object.sha)" \
+              = "$SOURCE_SHA"
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${TAG}" -f sha="$SOURCE_SHA" >/dev/null
+          fi
+          cat > release/HA1242-VERIFICATION.txt <<EOF
+          Natro 2.2.8 / HA1242
+          Source commit: ${SOURCE_SHA}
+          Candidate CI: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_RUN}
+          Helper Xcode CI: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${HELPER_RUN}
+          APK SHA-256: ${SIGNED_SHA256}
+          Certificate SHA-256: ${STABLE_CERT_SHA256}
+          APK Signature Scheme v2/v3: true/true
+          Package: ru.natro.statuswidget
+          Version name/code: 2.2.8 / 208021242
+          Helper: Natro 60.0 build 60
+          EOF
+          (cd release && sha256sum Natro-2.2.8-signed.apk \
+            Natro-2.2.8-source.tar.gz Natro-2.2.8-source.bundle \
+            KX11_Bluetooth_Collect.sh Helper-60-RELEASE.txt \
+            HA1242-VERIFICATION.txt > SHA256SUMS.txt)
+
+      - name: Publish immutable GitHub release
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title 'Natro 2.2.8 + iPhone Helper 60' \
+            --notes-file release/HA1242-release-notes.md release/*
+
+      - name: Remove temporary transport branch
+        if: success()
+        shell: bash
+        run: gh api --method DELETE \
+          "repos/${GITHUB_REPOSITORY}/git/refs/heads/publish/natro-v2.2.8"
