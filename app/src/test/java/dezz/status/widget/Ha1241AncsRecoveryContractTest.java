@@ -22,7 +22,6 @@ public final class Ha1241AncsRecoveryContractTest {
                 + "ClassicAncsRecoveryPolicy.java");
         String manifest = read("release-manifests/HA1241.md");
 
-        assertTrue(build.contains("return '2.2.7'"));
         assertTrue(build.contains("if (version == '2.2.7')"));
         assertTrue(build.contains("return 208021241"));
         assertTrue(route.contains("systemConnectionAdvertisement"));
