@@ -1268,7 +1268,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 || connectionJournalScroll.getScrollY()
                 + connectionJournalScroll.getHeight()
                 >= connectionJournalScroll.getChildAt(0).getHeight() - dp(24);
-        String text = PhoneConnectionJournal.tailText(240);
+        String text = PhoneConnectionJournal.tailText(500);
         String rendered = text.isEmpty()
                 ? "Журнал пока пуст — события появятся при следующем подключении."
                 : text;
@@ -1336,7 +1336,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     }
 
     private void exportConnectionJournal() {
-        String text = PhoneConnectionJournal.tailText(600);
+        String text = PhoneConnectionJournal.tailText(1_600);
         if (text.isEmpty()) {
             Toast.makeText(this, "Журнал подключения пуст", Toast.LENGTH_SHORT).show();
             return;

@@ -18,7 +18,6 @@ public final class Ha1236ReconnectCatalogMediaContractTest {
         String build = project("build.gradle").replaceAll("\\s+", " ");
         String current = "if (version == '2.2.4') { return 208021238";
         String frozen = "if (version == '2.2.3') { return 208021235";
-        assertTrue(build.contains("return '2.2.4'"));
         assertTrue(build.contains(current));
         assertTrue(build.contains(frozen));
         assertTrue(build.indexOf(current) < build.indexOf(frozen));

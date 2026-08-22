@@ -1,0 +1,11 @@
+{
+  "schema": "natro-release-intent/v1",
+  "appName": "Natro",
+  "tag": "natro-v2.2.5",
+  "versionName": "2.2.5",
+  "versionCode": 208021239,
+  "helperVersion": "57.0",
+  "helperBuild": 57,
+  "publication": "signed-prerelease",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+}

@@ -136,8 +136,8 @@ final class ReleaseIdentityContract {
                 STABLE_CERT_SHA256, yamlScalar(releaseWorkflow, "STABLE_CERT_SHA256"));
         String baseReleaseTag = "natro-v" + versionName;
         String releaseTag = yamlScalar(releaseWorkflow, "RELEASE_TAG");
-        assertTrue("Signed workflow must use the public tag or a monotonic immutable revision",
-                releaseTag.matches(Pattern.quote(baseReleaseTag) + "(?:-r[2-9][0-9]*)?"));
+        assertEquals("Every public release must advance versionName; revision tags are forbidden",
+                baseReleaseTag, releaseTag);
         assertTrue("Release manifest must carry the exact immutable release tag",
                 releaseManifest.contains("Release tag: `" + releaseTag + "`"));
         String publishIntent = read(root.resolve(

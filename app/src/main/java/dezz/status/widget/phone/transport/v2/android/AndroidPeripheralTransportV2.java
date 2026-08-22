@@ -24,6 +24,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
 
+import dezz.status.widget.phone.PhoneConnectionJournal;
+
 import dezz.status.widget.phone.transport.AncsProtocol;
 import dezz.status.widget.phone.transport.v2.AncsConsumerCoreV2;
 import dezz.status.widget.phone.transport.v2.AncsConsumerEffectV2;
@@ -614,9 +616,29 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
     private void apply(BleRouteTransition<AndroidPeripheralRoute.State> transition) {
         assertMain();
         if (transition == null || !transition.accepted) return;
+        AndroidPeripheralRoute.Phase previous = state == null ? null : state.phase;
         state = transition.state;
+        journalTransition(previous, transition);
         publishStatus();
         for (BleRouteEffect effect : transition.effects) execute(effect);
+    }
+
+    private static void journalTransition(
+            AndroidPeripheralRoute.Phase previous,
+            BleRouteTransition<AndroidPeripheralRoute.State> transition) {
+        StringBuilder effects = new StringBuilder();
+        for (BleRouteEffect effect : transition.effects) {
+            if (effects.length() > 0) effects.append(',');
+            effects.append(effect.type);
+            if (effect.delayMillis > 0) effects.append('@').append(effect.delayMillis).append("ms");
+        }
+        AndroidPeripheralRoute.State next = transition.state;
+        PhoneConnectionJournal.append("route-b-step",
+                "phase=" + String.valueOf(previous) + "→" + next.phase
+                        + ", recovery=" + recoveryState(next.phase)
+                        + ", failures=" + next.consecutiveFailures
+                        + ", effects=" + (effects.length() == 0 ? "none" : effects)
+                        + ", detail=" + next.detail);
     }
 
     private void execute(BleRouteEffect effect) {

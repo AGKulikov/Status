@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return '2.2.4'
+    return '2.2.5'
 }
 
 int getVersionCode() {
@@ -32,9 +32,12 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
-    // Revision 3 keeps the public 2.2.4 name while advancing the install code for Helper 56,
-    // two-panel Live Activity, detailed ANCS journals and the capability-gated extended vehicle
-    // catalog. Earlier immutable 2.2.4 tags remain reproducible from their own source commits.
+    // Every public release gets a distinct versionName. 2.2.5 pairs Natro with Helper 57,
+    // replaces the oversized Live Activity state and adds the vehicle control center.
+    if (version == '2.2.5') {
+        return 208021239
+    }
+    // Preserve the immutable 2.2.4-r3 build identity for exact release replay.
     if (version == '2.2.4') {
         return 208021238
     }

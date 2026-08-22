@@ -164,6 +164,11 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".VehicleControlActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".VehicleInfoPanelSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />

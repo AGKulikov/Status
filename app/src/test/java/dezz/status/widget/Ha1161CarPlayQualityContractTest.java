@@ -61,7 +61,7 @@ public final class Ha1161CarPlayQualityContractTest {
         String settings = source("PhoneConnectorSettingsActivity.java");
         assertTrue(media.contains("rejectedArtworkFingerprint"));
         assertTrue(media.contains("keep that fingerprint hidden"));
-        assertTrue(androidJournal.contains("MAX_LINES = 600"));
+        assertTrue(androidJournal.contains("MAX_LINES = 1_600"));
         assertTrue(androidJournal.contains("phone-connection.log"));
         assertTrue(androidJournal.contains("NOTIFICATION_CONTENT"));
         assertTrue(androidJournal.contains("RAW_PROTOCOL_FIELD"));

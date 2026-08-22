@@ -94,6 +94,12 @@ public final class CarRemoteControlRegistryV1 {
         add(wire, control, 57, "vehicle.window_close_rear_left", true, true, false);
         add(wire, control, 58, "vehicle.window_close_rear_right", true, true, false);
         add(wire, control, 59, "vehicle.sunroof_close", true, true, false);
+        add(wire, control, 60, "comfort.reading_lamp_front_left", false, false, false);
+        add(wire, control, 61, "comfort.reading_lamp_front_right", false, false, false);
+        add(wire, control, 62, "comfort.reading_lamp_rear_left", false, false, false);
+        add(wire, control, 63, "comfort.reading_lamp_rear_right", false, false, false);
+        add(wire, control, 64, "comfort.reading_lamps_all", false, false, false);
+        add(wire, control, 65, "comfort.fragrance_level", false, false, false);
         BY_WIRE = Collections.unmodifiableMap(wire);
         BY_CONTROL = Collections.unmodifiableMap(control);
         ALL = Collections.unmodifiableList(new ArrayList<>(wire.values()));

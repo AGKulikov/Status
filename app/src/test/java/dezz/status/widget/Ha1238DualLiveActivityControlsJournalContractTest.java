@@ -17,7 +17,6 @@ public final class Ha1238DualLiveActivityControlsJournalContractTest {
     @Test public void revisionThreeKeepsInstallIdentityAndAdvancesTheCode() throws Exception {
         ReleaseIdentityContract.assertCurrentAtLeast(1238);
         String build = project("build.gradle").replaceAll("\\s+", " ");
-        assertTrue(build.contains("return '2.2.4'"));
         assertTrue(build.contains("if (version == '2.2.4') { return 208021238"));
 
         String manifest = project("release-manifests/HA1238.md");

@@ -136,6 +136,11 @@ public final class SettingsDestinationCatalog {
                 "климат", "информация", "кнопки", "размеры", "позиции кнопок",
                 "столбцы", "все приложения", "скрыть системные", "подложка",
                 "горизонтальный ряд"));
+        values.add(activity("vehicle_control", Group.HOME, "Пульт автомобиля",
+                "Обзор Monjaro и контекстные разделы климата, сидений, автомобиля и комфорта",
+                "vehicle", "dezz.status.widget.VehicleControlActivity",
+                "автомобиль", "пульт", "monjaro", "климат", "сиденья", "обогрев",
+                "вентиляция", "стёкла", "подсветка", "tesla"));
         values.add(activity("panel_floating_climate", Group.PANELS,
                 "Плавающая панель климата",
                 "Отдельные от HOME оформление, состав, положение и резервирование экрана",

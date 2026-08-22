@@ -6,6 +6,9 @@
 package dezz.status.widget.phone;
 
 import android.content.Context;
+import android.os.Build;
+import android.os.Process;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 /**
@@ -35,8 +39,11 @@ import java.util.regex.Pattern;
  */
 public final class PhoneConnectionJournal {
     private static final Object LOCK = new Object();
-    private static final int MAX_LINES = 600;
-    private static final long COMPACT_AT_BYTES = 640_000L;
+    private static final int MAX_LINES = 1_600;
+    private static final long COMPACT_AT_BYTES = 2_000_000L;
+    private static final String SESSION = Integer.toHexString(Process.myPid()) + "-"
+            + Long.toHexString(SystemClock.elapsedRealtime());
+    private static final AtomicLong SEQUENCE = new AtomicLong();
     private static final Pattern MAC = Pattern.compile(
             "(?i)\\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\\b");
     private static final Pattern SECRET = Pattern.compile(
@@ -64,18 +71,23 @@ public final class PhoneConnectionJournal {
     private PhoneConnectionJournal() {}
 
     public static void initialize(@NonNull Context context) {
+        boolean opened = false;
         synchronized (LOCK) {
             appContext = context.getApplicationContext();
             if (loaded) return;
             loaded = true;
             loadLocked();
+            opened = true;
         }
+        if (opened) append("session", "новый процесс Natro; Android=" + Build.VERSION.SDK_INT
+                + "; журнал сохраняет каждую смену reducer/effect");
     }
 
     public static void append(@NonNull String component, @NonNull String message) {
         String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
                 .format(new Date());
-        String line = time + "  [" + sanitize(component) + "]  " + sanitize(message);
+        String line = time + "  [s=" + SESSION + " #" + SEQUENCE.incrementAndGet()
+                + "]  [" + sanitize(component) + "]  " + sanitize(message);
         synchronized (LOCK) {
             addLocked(line);
             revision++;
@@ -102,7 +114,8 @@ public final class PhoneConnectionJournal {
     public static void clear() {
         String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
                 .format(new Date());
-        String line = time + "  [journal]  журнал подключения очищен";
+        String line = time + "  [s=" + SESSION + " #" + SEQUENCE.incrementAndGet()
+                + "]  [journal]  журнал подключения очищен";
         synchronized (LOCK) {
             LINES.clear();
             addLocked(line);

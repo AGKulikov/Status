@@ -25,6 +25,7 @@ import android.os.Looper;
 import android.os.ParcelUuid;
 
 import dezz.status.widget.Preferences;
+import dezz.status.widget.phone.PhoneConnectionJournal;
 import dezz.status.widget.phone.transport.AncsProtocol;
 import dezz.status.widget.phone.PhoneConnectorPolicy;
 import dezz.status.widget.phone.transport.v2.AncsDeliveryTraceV2;
@@ -655,10 +656,30 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void apply(BleRouteTransition<AndroidCentralRoute.State> transition) {
         assertMain();
         if (transition == null || !transition.accepted) return;
+        AndroidCentralRoute.Phase previous = state == null ? null : state.phase;
         state = transition.state;
+        journalTransition(previous, transition);
         publishStatus();
         for (BleRouteEffect effect : transition.effects) execute(effect);
         applySelectedPhonePresenceIfPossible();
+    }
+
+    private static void journalTransition(
+            AndroidCentralRoute.Phase previous,
+            BleRouteTransition<AndroidCentralRoute.State> transition) {
+        StringBuilder effects = new StringBuilder();
+        for (BleRouteEffect effect : transition.effects) {
+            if (effects.length() > 0) effects.append(',');
+            effects.append(effect.type);
+            if (effect.delayMillis > 0) effects.append('@').append(effect.delayMillis).append("ms");
+        }
+        AndroidCentralRoute.State next = transition.state;
+        PhoneConnectionJournal.append("route-a-step",
+                "phase=" + String.valueOf(previous) + "→" + next.phase
+                        + ", recovery=" + recoveryState(next.phase)
+                        + ", failures=" + next.consecutiveFailures
+                        + ", effects=" + (effects.length() == 0 ? "none" : effects)
+                        + ", detail=" + next.detail);
     }
 
     /** Retains a pre-start Classic hint until the sole public wrapper can consume it. */
