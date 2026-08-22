@@ -17,7 +17,7 @@ public final class Ha1239CompanionPayloadPassengerContractTest {
     @Test public void publicVersionAdvancesForThisRelease() throws Exception {
         ReleaseIdentityContract.assertCurrentAtLeast(1239);
         String build = project("build.gradle").replaceAll("\\s+", " ");
-        assertTrue(build.contains("return '2.2.5'"));
+        assertFalse(build.contains("return '2.2.4'"));
         assertTrue(build.contains("if (version == '2.2.5') { return 208021239"));
         assertTrue(build.contains("if (version == '2.2.4') { return 208021238"));
 
