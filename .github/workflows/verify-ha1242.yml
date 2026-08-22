@@ -101,8 +101,12 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
-            clean testGeelyDebugUnitTest
+          if ! ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+              clean testGeelyDebugUnitTest; then
+            find app/build/test-results/testGeelyDebugUnitTest -name '*.xml' -type f \
+              -exec grep -H -A3 '<failure' {} \; || true
+            exit 1
+          fi
 
       - name: Compile and verify exact unsigned geelyRelease APK
         id: unsigned
