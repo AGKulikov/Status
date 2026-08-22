@@ -1,0 +1,36 @@
+name: Export Android build tools for HA1241
+
+on:
+  push:
+    branches:
+      - tools/ha1241
+    paths:
+      - .github/workflows/export-android-build-tools-ha1241.yml
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Package hosted Android build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          BUILD_TOOLS=$(find "$SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d \
+            -printf '%f\n' | sort -V | tail -n 1)
+          test -n "$BUILD_TOOLS"
+          tar -C "$SDK_ROOT/build-tools" -czf android-build-tools-ha1241.tar.gz \
+            "$BUILD_TOOLS/apksigner" \
+            "$BUILD_TOOLS/zipalign" \
+            "$BUILD_TOOLS/lib/apksigner.jar"
+
+      - name: Upload Android build tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-tools-ha1241
+          path: android-build-tools-ha1241.tar.gz
+          if-no-files-found: error
+          retention-days: 1
