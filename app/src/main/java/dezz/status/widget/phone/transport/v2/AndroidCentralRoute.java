@@ -517,6 +517,26 @@ public final class AndroidCentralRoute {
             return BleRouteTransition.ignored(state);
         }
         if (state.phase == Phase.CONNECTING) {
+            // A saved enrolled locator can be stale after iOS rotates its RPA.  Do not spend
+            // the 30/60/120 second public-owner ladder against that silent address: retain the
+            // sole GATT wrapper and let the already-implemented unfiltered exact-identity scan
+            // resolve current presence immediately after the first connect watchdog.
+            if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                    && state.sameOwnerReassertions == 0) {
+                BleRouteToken recovery = nextOperation(token);
+                if (recovery == null) return counterExhausted(state, token, "operation");
+                State blocked = copyWithReassertions(state, Phase.WAIT_SYSTEM_CONNECTION,
+                        recovery, token.ownerId, state.nextOwnerId,
+                        state.consecutiveFailures, SAME_OWNER_REASSERT_MS.length,
+                        "enrolled owner silent; presence scan armed after first watchdog");
+                return BleRouteTransition.accepted(blocked,
+                        op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "connect watchdog"),
+                        op(BleRouteEffect.Type.START_SCAN, recovery,
+                                "unfiltered presence scan after first enrolled deadline; "
+                                        + "retain sole GATT wrapper"),
+                        BleRouteEffect.retry(recovery, WAIT_SYSTEM_RECOVERY_MS,
+                                "autonomous retained-owner recovery; Classic is not required"));
+            }
             if (state.sameOwnerReassertions < SAME_OWNER_REASSERT_MS.length) {
                 BleRouteToken timer = nextOperation(token);
                 if (timer == null) return counterExhausted(state, token, "operation");
@@ -533,7 +553,7 @@ public final class AndroidCentralRoute {
             BleRouteToken recovery = nextOperation(token);
             if (recovery == null) return counterExhausted(state, token, "operation");
             State blocked = copy(state, Phase.WAIT_SYSTEM_CONNECTION, recovery, token.ownerId,
-                    state.nextOwnerId, state.consecutiveFailures + 1,
+                    state.nextOwnerId, state.consecutiveFailures,
                     "sole background owner retained; autonomous same-owner recovery armed");
             List<BleRouteEffect> effects = new ArrayList<>();
             effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, token,

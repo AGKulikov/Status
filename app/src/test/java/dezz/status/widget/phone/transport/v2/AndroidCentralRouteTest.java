@@ -67,15 +67,14 @@ public final class AndroidCentralRouteTest {
         state = AndroidCentralRoute.startupQuietElapsed(
                 state, state.expected, true).state;
         long soleOwner = state.activeOwnerId;
-        for (int attempt = 0; attempt < 3; attempt++) {
-            state = AndroidCentralRoute.deadline(state, state.expected).state;
-            state = AndroidCentralRoute.sameOwnerReassertElapsed(
-                    state, state.expected).state;
-        }
+        int failures = state.consecutiveFailures;
         BleRouteTransition<AndroidCentralRoute.State> exhausted =
                 AndroidCentralRoute.deadline(state, state.expected);
+        assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION,
+                exhausted.state.phase);
         assertTrue(hasEffect(exhausted, BleRouteEffect.Type.START_SCAN));
         assertFalse(hasEffect(exhausted, BleRouteEffect.Type.CLOSE_GATT));
+        assertEquals(failures, exhausted.state.consecutiveFailures);
 
         BleRouteTransition<AndroidCentralRoute.State> observed =
                 AndroidCentralRoute.systemConnectionAdvertisement(

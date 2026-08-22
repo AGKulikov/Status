@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return '2.2.7'
+    return '2.2.8'
 }
 
 int getVersionCode() {
@@ -32,8 +32,8 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
-    // Every public release gets a distinct versionName. 2.2.7 hardens autonomous Route-A
-    // reacquisition while preserving the Helper 58 wire and stable update identity.
+    // Every public release gets a distinct versionName. 2.2.8 pairs the unchanged Android
+    // runtime with Helper 60's accessible Live Activity typography and quieter update cadence.
     if (version == '2.2.5') {
         return 208021239
     }
@@ -42,6 +42,9 @@ int getVersionCode() {
     }
     if (version == '2.2.7') {
         return 208021241
+    }
+    if (version == '2.2.8') {
+        return 208021242
     }
     // Preserve the immutable 2.2.4-r3 build identity for exact release replay.
     if (version == '2.2.4') {
