@@ -4,13 +4,13 @@ import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.Paths;
 import org.junit.Test;
 
 /** Release boundary for Natro 2.2.8 and Helper 60 readable Live Activity controls. */
 public final class Ha1242LiveActivityTypographyContractTest {
     private static String read(String relative) throws Exception {
-        return Files.readString(Path.of(relative), StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(Paths.get(relative)), StandardCharsets.UTF_8);
     }
 
     @Test
