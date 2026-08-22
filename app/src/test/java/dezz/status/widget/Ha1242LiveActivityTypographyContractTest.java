@@ -32,7 +32,8 @@ public final class Ha1242LiveActivityTypographyContractTest {
                 + "KX11ANCSHelper/NatroLiveActivityManager.swift");
         String manifest = read("release-manifests/HA1242.md");
 
-        assertTrue(build.contains("return '2.2.8'"));
+        // The historical release remains reproducible after later public versions become the
+        // default; every release must advance that default instead of freezing it at 2.2.8.
         assertTrue(build.contains("if (version == '2.2.8')"));
         assertTrue(build.contains("return 208021242"));
         assertTrue(widget.contains("size: island ? 12 : 14"));
