@@ -2,7 +2,6 @@ import ActivityKit
 import AppIntents
 import CoreFoundation
 import Foundation
-import Security
 
 enum NatroLivePanel: String, Codable, Hashable, CaseIterable {
     case climate
@@ -778,17 +777,16 @@ enum NatroLiveActivityCommandMailbox {
     private static let nonceKey = "liveCommand.nonce"
 
     private static func defaults() -> UserDefaults {
-        // Checking containerURL is not sufficient: iOS may return a stale URL even when the
-        // development profile did not sign the App Group entitlement, after which CFPrefs opens
-        // an AnyUser domain with a nil container. Inspect the entitlement actually present in the
-        // running code signature before touching the suite at all.
-        guard let task = SecTaskCreateFromSelf(nil),
-              let groups = SecTaskCopyValueForEntitlement(
-                task,
-                "com.apple.security.application-groups" as CFString,
-                nil
-              ) as? [String],
-              groups.contains(suiteName) else { return .standard }
+        // A development profile can leave a stale App Group URL even though the signed process
+        // has no usable container. Do not instantiate the suite until the resolved URL is a real,
+        // writable directory; this avoids CFPrefs opening an AnyUser domain with container=nil.
+        guard let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: suiteName
+              ),
+              FileManager.default.fileExists(atPath: container.path),
+              FileManager.default.isWritableFile(atPath: container.path) else {
+            return .standard
+        }
         return UserDefaults(suiteName: suiteName) ?? .standard
     }
 

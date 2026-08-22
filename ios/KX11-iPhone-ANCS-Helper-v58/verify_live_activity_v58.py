@@ -52,10 +52,10 @@ for entitlement in (
     ROOT / "NatroLiveActivityExtension/NatroLiveActivityExtension.entitlements",
 ):
     assert 'group.ru.natro.kx11ancshelper' in text(entitlement)
-assert 'SecTaskCopyValueForEntitlement(' in shared
-assert '"com.apple.security.application-groups" as CFString' in shared
-assert 'groups.contains(suiteName)' in shared
-assert 'else { return .standard }' in shared
+assert 'forSecurityApplicationGroupIdentifier: suiteName' in shared
+assert 'FileManager.default.fileExists(atPath: container.path)' in shared
+assert 'FileManager.default.isWritableFile(atPath: container.path)' in shared
+assert 'return .standard' in shared
 assert 'NatroLiveActivityCommandMailbox.enqueue(delivered)' in shared
 assert 'CFNotificationCenterGetDarwinNotifyCenter()' in shared
 assert 'consumePendingCommand()' in manager
