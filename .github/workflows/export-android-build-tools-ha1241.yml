@@ -25,7 +25,8 @@ jobs:
           tar -C "$SDK_ROOT/build-tools" -czf android-build-tools-ha1241.tar.gz \
             "$BUILD_TOOLS/apksigner" \
             "$BUILD_TOOLS/zipalign" \
-            "$BUILD_TOOLS/lib/apksigner.jar"
+            "$BUILD_TOOLS/lib/apksigner.jar" \
+            "$BUILD_TOOLS/lib64/libc++.so"
 
       - name: Upload Android build tools
         uses: actions/upload-artifact@v4
