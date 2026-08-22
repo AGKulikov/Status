@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          cat release-upload/natro-2.2.8/part-* | base64 --decode \
+          cat release-upload/natro-2.2.8/part-[0-9][0-9][0-9] | base64 --decode \
             > release/Natro-2.2.8-signed.apk
           test "$(sha256sum release/Natro-2.2.8-signed.apk | awk '{print $1}')" \
             = "$SIGNED_SHA256"
@@ -55,7 +55,9 @@ jobs:
           APK=release/Natro-2.2.8-signed.apk
           git fetch --force --depth=1 origin "$SOURCE_SHA"
           git archive --format=tar.gz --output=release/Natro-2.2.8-source.tar.gz "$SOURCE_SHA"
-          git bundle create release/Natro-2.2.8-source.bundle "$SOURCE_SHA"
+          git update-ref refs/heads/natro-2.2.8-source "$SOURCE_SHA"
+          git bundle create release/Natro-2.2.8-source.bundle \
+            refs/heads/natro-2.2.8-source
           git show "$SOURCE_SHA:release-manifests/HA1242.md" > release/HA1242-release-notes.md
           git show "$SOURCE_SHA:ios/KX11-iPhone-ANCS-Helper-v60/RELEASE.txt" \
             > release/Helper-60-RELEASE.txt
