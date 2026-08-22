@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          cat release-upload/natro-2.2.8/part-[0-9][0-9][0-9] | base64 --decode \
+          cat release-upload/natro-2.2.8-small/part-[0-9][0-9][0-9] | base64 --decode \
             > release/Natro-2.2.8-signed.apk
           test "$(sha256sum release/Natro-2.2.8-signed.apk | awk '{print $1}')" \
             = "$SIGNED_SHA256"
