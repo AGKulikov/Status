@@ -6,6 +6,8 @@ on:
     paths:
       - .github/workflows/publish-natro-2.2.8.yml
       - release-upload/natro-2.2.8/**
+  pull_request:
+    branches: [release/natro-2.2.8-helper60]
 
 permissions:
   actions: read
