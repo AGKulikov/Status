@@ -34,11 +34,13 @@ public final class Ha1241AncsRecoveryContractTest {
         assertTrue(adapter.contains("gatt_cache_refresh guarded=true"));
         assertTrue(policy.contains("DelayJitter"));
         assertTrue(manifest.contains("Android version: `2.2.7`"));
-        assertTrue(manifest.contains("Compatible Helper: build `58`"));
+        assertTrue(manifest.contains("Compatible Helper: build `59`"));
     }
 
     private static String read(String relative) throws Exception {
-        return Files.readString(projectRoot().resolve(relative), StandardCharsets.UTF_8);
+        return new String(
+                Files.readAllBytes(projectRoot().resolve(relative)),
+                StandardCharsets.UTF_8);
     }
 
     private static Path projectRoot() {

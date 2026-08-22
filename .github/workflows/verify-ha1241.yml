@@ -17,7 +17,7 @@ concurrency:
 env:
   VERSION_NAME: '2.2.7'
   VERSION_CODE: '208021241'
-  HELPER_TREE: '94fa788a7f6a8fb56d16e1853e0e5b0ae37f9f13'
+  HELPER_TREE: '6f5fe7a66279d2e829324ed7b1dbcf32e2031768'
   BUILD_TOOLS_VERSION: '36.0.0'
 
 jobs:
@@ -46,17 +46,17 @@ jobs:
           echo "bundle_sha=$(sha256sum "$RUNNER_TEMP/natro-2.2.7-source.bundle" \
             | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           HELPER_ACTUAL_TREE=$(git rev-parse \
-            'HEAD:ios/KX11-iPhone-ANCS-Helper-v58')
+            'HEAD:ios/KX11-iPhone-ANCS-Helper-v59')
           test "$HELPER_ACTUAL_TREE" = "$HELPER_TREE"
           echo "helper_tree=$HELPER_ACTUAL_TREE" >> "$GITHUB_OUTPUT"
 
-      - name: Verify exact paired Helper v58 contract
+      - name: Verify exact paired Helper v59 contract
         shell: bash
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
           set -euo pipefail
-          bash ios/KX11-iPhone-ANCS-Helper-v58/verify-v58-contract.sh
+          bash ios/KX11-iPhone-ANCS-Helper-v59/verify-v59-contract.sh
           test -z "$(git status --short --ignore-submodules=none)"
 
       - name: Verify macOS KX11 Bluetooth collector v2 contract
@@ -177,14 +177,14 @@ jobs:
             --arg unsignedSha256 "$APK_SHA" \
             '{schema: $schema, sourceSha: $sourceSha, sourceTree: $sourceTree,
               sourceBundleSha256: $sourceBundleSha256,
-              helper: {version: "58.0", build: 58, tree: $helperTree},
+              helper: {version: "59.0", build: 59, tree: $helperTree},
               android: {package: $packageName, versionName: $versionName,
                 versionCode: 208021241, minSdk: 28, targetSdk: 28,
                 flavor: "geely", buildType: "release", unsigned: true,
                 apk: "Natro-2.2.7-unsigned.apk", apkSha256: $unsignedSha256,
                 requiredSigningCertificateSha256: $requiredSigningCertificateSha256},
               validation: {unitTask: "testGeelyDebugUnitTest",
-                helperContract: "verify-v58-contract.sh"},
+                helperContract: "verify-v59-contract.sh"},
               github: {runId: $runId, ref: $ref}}' \
             > "$RUNNER_TEMP/ha1241-candidate.json"
 
