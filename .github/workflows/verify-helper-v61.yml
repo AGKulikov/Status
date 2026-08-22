@@ -73,8 +73,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -showBuildSettings > "$settings"
           grep -Eq '^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = ru\.natro\.kx11ancshelper$' "$settings"
-          grep -Eq '^[[:space:]]*MARKETING_VERSION = 60\.0$' "$settings"
-          grep -Eq '^[[:space:]]*CURRENT_PROJECT_VERSION = 60$' "$settings"
+          grep -Eq '^[[:space:]]*MARKETING_VERSION = 61\.0$' "$settings"
+          grep -Eq '^[[:space:]]*CURRENT_PROJECT_VERSION = 61$' "$settings"
           grep -Eq '^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET = 14\.0$' "$settings"
           extension_settings="$RUNNER_TEMP/helper-v61-extension-build-settings.txt"
           xcodebuild \
@@ -85,8 +85,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -showBuildSettings > "$extension_settings"
           grep -Eq '^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = ru\.natro\.kx11ancshelper\.liveactivity$' "$extension_settings"
-          grep -Eq '^[[:space:]]*MARKETING_VERSION = 60\.0$' "$extension_settings"
-          grep -Eq '^[[:space:]]*CURRENT_PROJECT_VERSION = 60$' "$extension_settings"
+          grep -Eq '^[[:space:]]*MARKETING_VERSION = 61\.0$' "$extension_settings"
+          grep -Eq '^[[:space:]]*CURRENT_PROJECT_VERSION = 61$' "$extension_settings"
           grep -Eq '^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET = 16\.2$' "$extension_settings"
 
       - name: Compile Helper v61 Release simulator
@@ -114,7 +114,7 @@ jobs:
           test ! -d "$app/_CodeSignature"
           test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Info.plist")" = 'ru.natro.kx11ancshelper'
           test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Info.plist")" = '61.0'
-          test "$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")" = '60'
+          test "$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")" = '61'
           test "$(plutil -extract MinimumOSVersion raw -o - "$app/Info.plist")" = '14.0'
           extension="$app/PlugIns/NatroLiveActivityExtension.appex"
           test -d "$extension"
@@ -122,7 +122,7 @@ jobs:
           test -f "$extension/Monjaro.png"
           test "$(plutil -extract CFBundleIdentifier raw -o - "$extension/Info.plist")" = 'ru.natro.kx11ancshelper.liveactivity'
           test "$(plutil -extract CFBundleShortVersionString raw -o - "$extension/Info.plist")" = '61.0'
-          test "$(plutil -extract CFBundleVersion raw -o - "$extension/Info.plist")" = '60'
+          test "$(plutil -extract CFBundleVersion raw -o - "$extension/Info.plist")" = '61'
           test "$(plutil -extract MinimumOSVersion raw -o - "$extension/Info.plist")" = '16.2'
           test -f ios/KX11-iPhone-ANCS-Helper-v61/README.md
           test -f ios/KX11-iPhone-ANCS-Helper-v61/RELEASE.txt
