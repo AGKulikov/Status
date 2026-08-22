@@ -1596,7 +1596,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (carRemoteWrites.isEmpty()) return;
         if (pendingGatt != null || !requestTimers.isEmpty()
                 || !controlRetryTimers.isEmpty()) {
-            scheduleCarRemoteDrain(75L);
+            scheduleCarRemoteDrain(12L);
             return;
         }
         byte[] frame = carRemoteWrites.poll();
@@ -1614,7 +1614,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (!started) {
             pendingGatt = null;
             carRemoteWrites.offerFirst(frame);
-            scheduleCarRemoteDrain(150L);
+            scheduleCarRemoteDrain(40L);
             return;
         }
         carRemoteWriteWatchdog = () -> {

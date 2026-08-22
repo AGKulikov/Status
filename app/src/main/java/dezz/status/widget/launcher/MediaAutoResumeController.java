@@ -17,6 +17,12 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+
 import dezz.status.widget.Preferences;
 import dezz.status.widget.StartupWorkCoordinator;
 import dezz.status.widget.phone.PhoneConnectionJournal;
@@ -52,11 +58,28 @@ public final class MediaAutoResumeController {
     private static final String KEY_OBSERVATION_KICK_ELAPSED = "observationKickElapsed";
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
-    private static final int MAX_ATTEMPTS = 6;
+    private static final int MAX_ATTEMPTS = 8;
     private static final long CAPTURE_BURST_COALESCE_MS = 120_000L;
     private static final long[] RETRY_DELAYS_MS = {
-            500L, 1_000L, 2_000L, 4_000L, 8_000L
+            150L, 250L, 400L, 700L, 1_000L, 1_500L, 2_000L
     };
+    /**
+     * AlarmManager remains the durable process-death fallback. This timer is the hot path: it is
+     * not serialized behind WidgetService/startup work and therefore fires at the user-selected
+     * boot boundary even while the launcher is still constructing its UI.
+     */
+    private static final ScheduledExecutorService EXACT_TIMER =
+            Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+                @Override public Thread newThread(@NonNull Runnable runnable) {
+                    Thread thread = new Thread(runnable, "natro-media-resume");
+                    thread.setDaemon(true);
+                    thread.setPriority(Thread.NORM_PRIORITY + 1);
+                    return thread;
+                }
+            });
+    private static final Object EXECUTION_LOCK = new Object();
+    private static final Object TIMER_LOCK = new Object();
+    private static ScheduledFuture<?> inProcessTimer;
 
     private MediaAutoResumeController() {}
 
@@ -120,6 +143,7 @@ public final class MediaAutoResumeController {
                 .commit();
         // A queued retry from the previous standard/QuickBoot lifecycle must never cross the new
         // capture boundary. The token check is the second, callback-time barrier.
+        cancelInProcessTimer();
         cancelAlarm(app);
         Log.i(TAG, "Frozen media history for lifecycle token=" + captureToken
                 + " package=" + history.packageName + " playing=" + history.wasPlaying);
@@ -186,11 +210,18 @@ public final class MediaAutoResumeController {
     }
 
     static void execute(@NonNull Context context, long bootToken, int attempt) {
+        synchronized (EXECUTION_LOCK) {
+            executeSerialized(context, bootToken, attempt);
+        }
+    }
+
+    private static void executeSerialized(@NonNull Context context, long bootToken, int attempt) {
         Context app = applicationContext(context);
         SharedPreferences state = state(app);
         if (state.getBoolean(KEY_COMPLETED, false)
                 || state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE) != bootToken
-                || state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken) {
+                || state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken
+                || state.getInt(KEY_NEXT_ATTEMPT, -1) != attempt) {
             return;
         }
         Preferences preferences = new Preferences(app);
@@ -234,7 +265,8 @@ public final class MediaAutoResumeController {
         state(app).edit()
                 .putLong(KEY_TARGET_ELAPSED, triggerElapsed)
                 .putInt(KEY_NEXT_ATTEMPT, attempt)
-                .apply();
+                .commit();
+        scheduleInProcess(app, bootToken, attempt, delayMillis);
         Intent intent = new Intent(app, MediaAutoResumeReceiver.class)
                 .setAction(ACTION_RESUME)
                 .putExtra(EXTRA_BOOT_TOKEN, bootToken)
@@ -270,6 +302,17 @@ public final class MediaAutoResumeController {
         }
     }
 
+    private static void scheduleInProcess(@NonNull Context app, long bootToken, int attempt,
+                                          long delayMillis) {
+        synchronized (TIMER_LOCK) {
+            if (inProcessTimer != null) inProcessTimer.cancel(false);
+            Context exactApp = applicationContext(app);
+            inProcessTimer = EXACT_TIMER.schedule(
+                    () -> execute(exactApp, bootToken, attempt),
+                    Math.max(0L, delayMillis), TimeUnit.MILLISECONDS);
+        }
+    }
+
     /** Wakes a due plan as soon as the target player exposes its MediaSession after boot. */
     public static void onPlaybackObservation(@NonNull Context context,
                                              @NonNull String packageName,
@@ -302,12 +345,21 @@ public final class MediaAutoResumeController {
 
     private static void complete(@NonNull Context app) {
         state(app).edit().putBoolean(KEY_COMPLETED, true).apply();
+        cancelInProcessTimer();
         cancelAlarm(app);
     }
 
     private static void cancel(@NonNull Context app) {
         state(app).edit().putBoolean(KEY_COMPLETED, true).apply();
+        cancelInProcessTimer();
         cancelAlarm(app);
+    }
+
+    private static void cancelInProcessTimer() {
+        synchronized (TIMER_LOCK) {
+            if (inProcessTimer != null) inProcessTimer.cancel(false);
+            inProcessTimer = null;
+        }
     }
 
     private static void cancelAlarm(@NonNull Context app) {

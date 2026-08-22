@@ -59,7 +59,7 @@ public final class Ha1236ReconnectCatalogMediaContractTest {
         String controller = project("app/src/main/java/dezz/status/widget/phone/"
                 + "CarRemoteControllerV1.java");
         String helper = project("ios/KX11-iPhone-ANCS-Helper-v54/CarRemoteProtocolV1.swift");
-        assertTrue(controller.contains("HELLO_COALESCE_MS = 12_000L"));
+        assertTrue(controller.contains("HELLO_COALESCE_MS = 1_500L"));
         assertTrue(controller.contains("CarControlDescriptor.Kind.ACTION.ordinal() + 1"));
         assertFalse(controller.contains("descriptor == null ? 0"));
         assertTrue(controller.indexOf("Type.SYNC_COMPLETE")

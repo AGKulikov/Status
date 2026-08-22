@@ -300,6 +300,17 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         page.addView(actionButton(getString(R.string.phone_le_enrollment_forget),
                 this::confirmForgetLeEnrollment), topMargin(8));
 
+        page.addView(sectionTitle("Live Activity · APNs"), topMargin(24));
+        TextView apnsHint = secondary(
+                "Push-to-start отправляет магнитола только пока выбранный iPhone подключён "
+                        + "по Bluetooth. Ключ импортируется после установки и не входит в APK.",
+                13);
+        apnsHint.setPadding(dp(8), 0, dp(8), 0);
+        page.addView(apnsHint, topMargin(7));
+        page.addView(actionButton("Настроить защищённый APNs-ключ", () ->
+                startActivity(new Intent(this, LiveActivityApnsSettingsActivity.class))),
+                topMargin(9));
+
         page.addView(sectionTitle(getString(R.string.phone_section_data)), topMargin(24));
         LinearLayout dataRows = column();
         notificationsEnabled = new MaterialSwitch(this);

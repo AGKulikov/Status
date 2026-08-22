@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'natro-v2.2.7'
+    branches:
+      - 'release-resume/natro-v2.2.7'
   workflow_dispatch:
     inputs:
       release_ref:
@@ -32,6 +34,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  REQUESTED_RELEASE_REF: ${{ inputs.release_ref || (github.ref == 'refs/heads/release-resume/natro-v2.2.7' && 'natro-v2.2.7') || github.ref }}
   RELEASE_TAG: 'natro-v2.2.7'
   VERSION_NAME: '2.2.7'
   VERSION_CODE: '208021241'
@@ -65,7 +68,7 @@ jobs:
       - name: Checkout requested tag or full SHA without persisted credentials
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: ${{ inputs.release_ref || github.ref }}
+          ref: ${{ env.REQUESTED_RELEASE_REF }}
           fetch-depth: 0
           submodules: recursive
           persist-credentials: false
@@ -74,7 +77,7 @@ jobs:
         id: identity
         shell: bash
         env:
-          REQUESTED_REF: ${{ inputs.release_ref || github.ref }}
+          REQUESTED_REF: ${{ env.REQUESTED_RELEASE_REF }}
           CALLED_RELEASE_REF: ${{ inputs.release_ref }}
         run: |
           set -euo pipefail
@@ -98,7 +101,8 @@ jobs:
           test "$SOURCE_SHA" = "$REQUESTED_SHA"
           test "$SOURCE_SHA" = "$TAG_SHA"
           if test "$GITHUB_EVENT_NAME" = 'push' \
-              && test -z "$CALLED_RELEASE_REF"; then
+              && test -z "$CALLED_RELEASE_REF" \
+              && test "$GITHUB_REF" != 'refs/heads/release-resume/natro-v2.2.7'; then
             test "$GITHUB_REF" = "$TAG_REF"
             test "$(git rev-parse "${GITHUB_SHA}^{commit}")" = "$SOURCE_SHA"
           fi
@@ -228,7 +232,7 @@ jobs:
         id: handoff
         shell: bash
         env:
-          REQUESTED_REF: ${{ inputs.release_ref || github.ref }}
+          REQUESTED_REF: ${{ env.REQUESTED_RELEASE_REF }}
           SOURCE_SHA: ${{ steps.identity.outputs.source_sha }}
           SOURCE_TREE: ${{ steps.identity.outputs.source_tree }}
           SOURCE_SHORT: ${{ steps.identity.outputs.source_short }}
@@ -412,7 +416,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          HANDOFF_BRANCH: 'agent/natro-2.2.7-helper58'
+          HANDOFF_BRANCH: 'agent/natro-2.2.7-ancs-recovery'
           SIGNING_BUNDLE_SHA256: '4fb34ee8aed62dad3896d7aa6240d4066ec9b6ef3da5459bca9d7d1c4c3b7fc0'
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

@@ -64,6 +64,8 @@ import dezz.status.widget.phone.transport.v2.IphoneTransportRecoveryStateV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportStatusV2;
 import dezz.status.widget.phone.transport.v2.android.AndroidIphoneDualRuntimeV2;
 import dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2;
+import dezz.status.widget.phone.liveactivity.LiveActivityPushCoordinator;
+import dezz.status.widget.phone.liveactivity.LiveActivityPushProtocolV1;
 
 /**
  * Best-effort Android 9 bridge for one explicitly selected, bonded iPhone.
@@ -194,6 +196,7 @@ public final class PhoneConnectorController {
     private final Handler mainHandler;
     private final PhoneTelemetryStore telemetryStore;
     private final CarRemoteControllerV1 carRemote;
+    private final LiveActivityPushCoordinator liveActivityPush;
     private final SecureRandom recoveryJitter = new SecureRandom();
 
     private long generation;
@@ -334,10 +337,12 @@ public final class PhoneConnectorController {
         this.presenceSink = presenceSink == null ? NO_PRESENCE_SINK : presenceSink;
         this.mainHandler = new Handler(Looper.getMainLooper());
         this.telemetryStore = new PhoneTelemetryStore(this.context);
+        this.liveActivityPush = new LiveActivityPushCoordinator(this.context);
         this.carRemote = new CarRemoteControllerV1(this.context, frame -> {
             IphoneDualTransportRuntimeV2 current = ancsRuntimeV2;
             if (current != null) current.sendCarRemoteFrame(frame);
         });
+        this.liveActivityPush.setReadinessListener(carRemote::setLiveActivityProviderReady);
         PhoneConnectionJournal.initialize(this.context);
         PhoneConnectionJournal.append("controller", "контроллер создан; foreground owner готов");
     }
@@ -347,6 +352,8 @@ public final class PhoneConnectorController {
      * generation; callbacks retained by Android from the previous GATT session become no-ops.
      */
     public void reconfigure() {
+        liveActivityPush.credentialsChanged();
+        carRemote.setLiveActivityProviderReady(liveActivityPush.isReady());
         Config next = Config.from(prefs);
         PhoneConnectionJournal.append("controller", "применение настроек: enabled="
                 + next.enabled + ", BLE/ANCS=" + next.transportNeeded()
@@ -623,6 +630,7 @@ public final class PhoneConnectorController {
     }
 
     private void stopLocked(@NonNull String reason) {
+        if (classicProfileConnected()) liveActivityPush.onClassicConnectionChanged(false);
         generation++;
         running = false;
 
@@ -1570,7 +1578,13 @@ public final class PhoneConnectorController {
         @Override public void onCarRemoteFrame(byte[] frame) {
             byte[] exact = frame == null ? null : frame.clone();
             dispatchAncsTransport(token, transportSession, () -> {
-                if (exact != null) carRemote.accept(exact);
+                if (exact == null) return;
+                if (LiveActivityPushProtocolV1.decode(exact) != null) {
+                    liveActivityPush.acceptFrame(exact);
+                    carRemote.setLiveActivityProviderReady(liveActivityPush.isReady());
+                } else {
+                    carRemote.accept(exact);
+                }
             });
         }
 
@@ -2605,6 +2619,10 @@ public final class PhoneConnectorController {
                         SystemClock.elapsedRealtime(),
                         this::jitterRecoveryDelay);
         applyClassicAncsRecoveryTransition(token, transition);
+        if (wasClassicConnected != isClassicConnected) {
+            liveActivityPush.onClassicConnectionChanged(isClassicConnected);
+            carRemote.setLiveActivityProviderReady(liveActivityPush.isReady());
+        }
         if (!wasClassicConnected && isClassicConnected) {
             IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
             if (runtime != null) {

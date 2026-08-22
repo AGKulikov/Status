@@ -1,0 +1,44 @@
+KX11 ANCS Helper v63 — direct APNs lifecycle and low-latency controls
+Bundle ID: ru.natro.kx11ancshelper
+Build: 63
+Marketing version: 63.0
+Minimum iOS: 14.0 (Live Activity requires iOS 16.2; push-to-start requires iOS 17.2)
+Paired runtime: Natro 2.2.10
+Status: source candidate; Apple-SDK CI and physical-device checks are release gates
+
+Implemented in v63 (on top of the v62 compact companion):
+
+- exports ActivityKit push-to-start, per-activity update tokens and the two panel configurations
+  to Natro through the already authenticated, encrypted C5 Bluetooth owner;
+- accepts direct APNs push-to-start from the magnetic head unit, while the .p8 developer key stays
+  on Android in a post-install Android-Keystore-encrypted, no-backup store and never enters source,
+  APK resources, logs or Bluetooth frames;
+- starts APNs Live Activities only on the exact selected phone's Classic HFP/A2DP/MAP/BR-EDR
+  rising edge, and sends immediate APNs end on the falling edge; Helper retains local end as a
+  second, independent safety path;
+- suppresses duplicate foreground Activity.request when Natro reports that its APNs provider was
+  ready before C5 sync, with a two-second local fallback if Apple does not deliver the start;
+- creates locally-started activities with push tokens and observes remotely-started activities so
+  Android receives the exact token required for future end events;
+- restores responsive Live Activity controls: commands are reflected optimistically on tap,
+  failed/time-out commands roll back, repeated temperature taps build on the predicted state,
+  and command-driven ActivityKit updates flush immediately;
+- reduces unsolicited ActivityKit coalescing from three seconds to 500 ms and removes the extra
+  150 ms gap between acknowledged commands in a scenario;
+- retains the bounded App Group command queue and iOS 17 LiveActivityIntent path introduced in
+  v62, so Lock Screen and Dynamic Island buttons still enter the same validated C5 command path;
+- adds a separate CRC-protected ATT20 provisioning magic. Token chunks cannot decode as vehicle
+  commands and are accepted only by the authenticated C5 route generation.
+
+Security and platform boundaries:
+
+- Helper never receives, stores or logs the APNs .p8 key, Team ID JWT or provider credentials;
+- Natro never embeds those credentials in its APK or repository; the user imports .p8 after
+  installation and may remove it at any time;
+- the APNs topic is ru.natro.kx11ancshelper.push-type.liveactivity and the environment must match
+  the provisioning profile (Sandbox for ordinary Xcode development installs);
+- Apple Push Notifications capability and the existing App Group must both be enabled when signing;
+- no signed IPA is produced by this repository; the Xcode project is the deliverable.
+
+Do not call this candidate stable until Apple-SDK CI and the physical iPhone/KX11 acceptance matrix
+pass, including locked-screen start/end, reconnect, force-quit recovery and APNs network failure.

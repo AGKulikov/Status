@@ -1,0 +1,17 @@
+name: Retry exact HA1240 Natro signed prerelease
+
+on:
+  push:
+    branches: ['release-retry/natro-v2.2.6']
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  sign-and-publish:
+    name: Retry build, sign and publish immutable Natro 2.2.6 tag
+    uses: ./.github/workflows/release-ha1240.yml
+    with:
+      release_ref: '0b8d48af82fd4a7ec918bc1fe470ae3babf5a459'
+    secrets: inherit

@@ -34,11 +34,14 @@ final class CarRemoteControllerV1 {
 
     private static final int MAX_COMMANDS_PER_SECOND = 12;
     private static final long RATE_WINDOW_MS = 1_000L;
-    private static final long HELLO_COALESCE_MS = 12_000L;
+    // A torn C5 catalog used to wait 20 seconds: Helper retried at 10 s and Android coalesced that
+    // retry for 12 s. Normal catalog delivery finishes well below this bounded 1.5 s window.
+    private static final long HELLO_COALESCE_MS = 1_500L;
     /** Read-only companion states; intentionally outside the finite command registry. */
     private static final int STATE_CABIN_TEMPERATURE = 0xfc;
     private static final int STATE_OUTDOOR_TEMPERATURE = 0xfd;
     private static final int STATE_ANCS_CONNECTED = 0xfe;
+    private static final int STATE_LIVE_ACTIVITY_PROVIDER_READY = 0xfb;
     private static final String TELEMETRY_CABIN = "ISensor.indoor_temp";
     private static final String TELEMETRY_OUTDOOR = "ISensor.ambient_temp";
 
@@ -62,6 +65,7 @@ final class CarRemoteControllerV1 {
     private long sessionStartedElapsed;
     private int coalescedHellos;
     private boolean ancsReady;
+    private boolean liveActivityProviderReady;
 
     CarRemoteControllerV1(@NonNull Context context, @NonNull Sender sender) {
         this.context = context.getApplicationContext();
@@ -78,6 +82,15 @@ final class CarRemoteControllerV1 {
             boolean changed = ancsReady != ready;
             ancsReady = ready;
             if (changed && sessionOpen) sendAncsState();
+        });
+    }
+
+    /** Lets Helper defer foreground Activity.request while direct APNs push-to-start is ready. */
+    void setLiveActivityProviderReady(boolean ready) {
+        main.post(() -> {
+            boolean changed = liveActivityProviderReady != ready;
+            liveActivityProviderReady = ready;
+            if (changed && sessionOpen) sendLiveActivityProviderState();
         });
     }
 
@@ -187,6 +200,9 @@ final class CarRemoteControllerV1 {
                     exposed, index + 1 < entries.size());
         }
         sendMediaVolumeState();
+        // Provider readiness must precede SYNC_COMPLETE so Helper cannot race a local duplicate
+        // Activity.request against the APNs start already sent for this Classic connection.
+        sendLiveActivityProviderState();
         send(new IphoneCarRemoteProtocolV1.Frame(
                 IphoneCarRemoteProtocolV1.Type.SYNC_COMPLETE, 0, 0, 0, 0,
                 nextOutboundSequence(), 0, 0));
@@ -239,6 +255,14 @@ final class CarRemoteControllerV1 {
                 | IphoneCarRemoteProtocolV1.FLAG_KNOWN
                 | (ancsReady ? IphoneCarRemoteProtocolV1.FLAG_ACTIVE : 0);
         sendCompanionState(STATE_ANCS_CONNECTED, flags, ancsReady ? 1 : 0);
+    }
+
+    private void sendLiveActivityProviderState() {
+        int flags = IphoneCarRemoteProtocolV1.FLAG_AVAILABLE
+                | IphoneCarRemoteProtocolV1.FLAG_KNOWN
+                | (liveActivityProviderReady ? IphoneCarRemoteProtocolV1.FLAG_ACTIVE : 0);
+        sendCompanionState(STATE_LIVE_ACTIVITY_PROVIDER_READY, flags,
+                liveActivityProviderReady ? 1 : 0);
     }
 
     private void sendTelemetry(@NonNull CarIntegration.TelemetryValue value) {

@@ -29,7 +29,7 @@ public final class MediaAutoResumeContractTest {
                 "\"launcherMediaAutoResumeEnabled\", false"));
         assertTrue(controller.contains(
                 "if (!preferences.launcherMediaAutoResumeEnabled.get())"));
-        assertTrue(controller.contains("private static final int MAX_ATTEMPTS = 6"));
+        assertTrue(controller.contains("private static final int MAX_ATTEMPTS = 8"));
         assertTrue(controller.contains("KEY_TARGET_PACKAGE"));
         assertTrue(controller.contains("KEY_BOOT_TOKEN"));
         assertTrue(controller.contains("MediaPlaybackTargetPolicy.shouldAutoResume("));
@@ -37,6 +37,9 @@ public final class MediaAutoResumeContractTest {
         assertTrue(controller.contains("canScheduleExactAlarms"));
         assertTrue(controller.contains("KEY_TARGET_ELAPSED"));
         assertTrue(controller.contains("onPlaybackObservation"));
+        assertTrue(controller.contains("ScheduledExecutorService EXACT_TIMER"));
+        assertTrue(controller.contains("scheduleInProcess(app, bootToken, attempt, delayMillis)"));
+        assertTrue(controller.contains("150L, 250L, 400L, 700L"));
         assertTrue(preferences.contains("\"launcherMediaFixedPlayerEnabled\", false"));
         assertTrue(preferences.contains("\"launcherMediaFixedPlayerPackage\", \"\""));
         assertTrue(boot.contains(

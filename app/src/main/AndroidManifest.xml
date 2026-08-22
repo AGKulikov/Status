@@ -230,6 +230,11 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".LiveActivityApnsSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".PhoneNotificationAutomationSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
