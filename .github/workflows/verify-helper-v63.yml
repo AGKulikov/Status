@@ -73,7 +73,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -showBuildSettings > "$settings"
           grep -Eq '^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = ru\.natro\.kx11ancshelper$' "$settings"
-          grep -Eq '^[[:space:]]*MARKETING_VERSION = 62\.0$' "$settings"
+          grep -Eq '^[[:space:]]*MARKETING_VERSION = 63\.0$' "$settings"
           grep -Eq '^[[:space:]]*CURRENT_PROJECT_VERSION = 63$' "$settings"
           grep -Eq '^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET = 14\.0$' "$settings"
           extension_settings="$RUNNER_TEMP/helper-v63-extension-build-settings.txt"
@@ -85,7 +85,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -showBuildSettings > "$extension_settings"
           grep -Eq '^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = ru\.natro\.kx11ancshelper\.liveactivity$' "$extension_settings"
-          grep -Eq '^[[:space:]]*MARKETING_VERSION = 62\.0$' "$extension_settings"
+          grep -Eq '^[[:space:]]*MARKETING_VERSION = 63\.0$' "$extension_settings"
           grep -Eq '^[[:space:]]*CURRENT_PROJECT_VERSION = 63$' "$extension_settings"
           grep -Eq '^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET = 16\.2$' "$extension_settings"
 
