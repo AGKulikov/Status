@@ -27,7 +27,7 @@ public final class Ha1235AncsActiveRecoveryContractTest {
         assertTrue(build.indexOf(current) < build.indexOf(frozen222));
     }
 
-    @Test public void everyExactEnrolledRetryIsActiveAndKeepsOneSavedOwner()
+    @Test public void enrolledRecoveryStartsDirectThenScansOnlyAfterProvenFailure()
             throws Exception {
         String route = project("app/src/main/java/dezz/status/widget/phone/transport/v2/"
                 + "AndroidCentralRoute.java");
@@ -39,13 +39,18 @@ public final class Ha1235AncsActiveRecoveryContractTest {
                 "private void connectMatchedBootstrap");
 
         assertTrue(direct.contains("autoConnect=false"));
-        assertTrue(direct.contains("every exact active attempt"));
+        assertTrue(direct.contains("autoConnect=false"));
         assertFalse(direct.contains("passiveEnrolledRetry"));
+        assertTrue(route.contains("base.consecutiveFailures >= 1"));
+        assertTrue(route.contains("beginScan(base)"));
+        assertTrue(route.contains("unfiltered scan; accept only stack-resolved exact saved public "));
+        assertTrue(route.contains("identity + bonded facade"));
         assertTrue(selected.contains("adapter.getRemoteDevice(record.leIdentityAddress)"));
         assertTrue(selected.contains("createGattOwner(token, enrolled, false, null)"));
         assertFalse(selected.contains("passiveRetry"));
         assertFalse(selected.contains("startBootstrapScan("));
         assertTrue(platform.contains("second BluetoothGatt wrapper forbidden"));
+        assertTrue(platform.contains("scan_start mode=unfiltered_enrolled_identity"));
     }
 
     @Test public void ancsWaitsBehindOptionalAttInsteadOfReportingFalseRejection()

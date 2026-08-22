@@ -328,16 +328,17 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(changed.contains("acceptStandardBatteryValue(characteristic, value)"));
     }
 
-    @Test public void adapterHasNoNameMatchHiddenCacheRefreshOrTopologyFallback()
+    @Test public void adapterHasNoNameMatchBondMutationOrTopologyFallback()
             throws Exception {
         String source = source();
         assertFalse(source.contains("getName("));
         assertFalse(source.contains("setName("));
-        assertFalse(source.contains("refresh("));
         assertFalse(source.contains("removeBond("));
-        assertFalse(source.contains("getDeclaredMethod("));
-        assertFalse(source.contains("getMethod("));
         assertFalse(source.contains("ANDROID_PERIPHERAL_SERVICE"));
+        assertTrue(source.contains("CACHE_REFRESH_FAILURE_THRESHOLD = 2"));
+        assertTrue(source.contains("Build.VERSION.SDK_INT > Build.VERSION_CODES.P"));
+        assertTrue(source.contains("owner.callbackObserved"));
+        assertTrue(source.contains("gatt_cache_refresh guarded=true"));
     }
 
     @Test public void freezeStopsAcquisitionAndRestorationDrainAllocatesNoGattOwner()
