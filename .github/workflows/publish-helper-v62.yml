@@ -1,0 +1,145 @@
+name: Publish Natro Helper v62
+
+on:
+  push:
+    branches:
+      - release/natro-helper-v62
+    paths:
+      - '.github/workflows/publish-helper-v62.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-natro-helper-v62
+  cancel-in-progress: false
+
+env:
+  SOURCE_SHA: 66b440e6652760b2109bd592a6552e3be6e872f4
+  HELPER_TREE: 2982f3d5b08aea26e39a529f7e8ab8a80b1b6392
+  RELEASE_TAG: natro-helper-v62
+
+jobs:
+  publish:
+    name: Verify, package and publish Helper v62
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Pin exact green source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse "${SOURCE_SHA}^{commit}")" = "$SOURCE_SHA"
+          test "$(git rev-parse "${SOURCE_SHA}:ios/KX11-iPhone-ANCS-Helper-v62")" = "$HELPER_TREE"
+          git checkout --detach "$SOURCE_SHA"
+          test -z "$(git status --short)"
+
+      - name: Replay portable contracts
+        shell: bash
+        run: ios/KX11-iPhone-ANCS-Helper-v62/verify-v62-contract.sh
+
+      - name: Compile app and Live Activity extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v62/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Release \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/NatroHelperV62Products" \
+            OBJROOT="$RUNNER_TEMP/NatroHelperV62Intermediates" \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Package exact source checkpoint
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/KX11-iPhone-ANCS-Helper-v62-source.zip"
+          staging="$RUNNER_TEMP/KX11-iPhone-ANCS-Helper-v62-source"
+          manifest="$RUNNER_TEMP/helper-v62-candidate.json"
+          sums="$RUNNER_TEMP/helper-v62.sha256"
+
+          mkdir -p "$staging"
+          git archive "$SOURCE_SHA" \
+            ios/KX11-iPhone-ANCS-Helper-v62 \
+            docs/ancs-v2-wire-vectors-v52.json \
+            docs/TELEMETRY_REFRESH_V52.md \
+            docs/car-remote-v1-vectors.json \
+            app/src/main/java/dezz/status/widget/phone \
+            app/src/geely/java/dezz/status/widget/car/GeelyPassengerControlIntegration.java \
+            | tar -x -C "$staging"
+          "$staging/ios/KX11-iPhone-ANCS-Helper-v62/verify-v62-contract.sh"
+          ditto -c -k --sequesterRsrc --keepParent "$staging" "$archive"
+
+          archive_sha=$(shasum -a 256 "$archive" | awk '{print $1}')
+          xcode_version=$(xcodebuild -version | tr '\n' ' ' | sed 's/ $//')
+          sdk_version=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          jq -n \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg sourceArchiveSha256 "$archive_sha" \
+            --arg xcodeVersion "$xcode_version" \
+            --arg sdkVersion "$sdk_version" \
+            '{sourceSha: $sourceSha, helperTree: $helperTree,
+              bundleId: "ru.natro.kx11ancshelper", marketingVersion: "62.0", build: 62,
+              signed: false, deviceInstallableArtifact: false,
+              xcodeVersion: $xcodeVersion, sdkVersion: $sdkVersion,
+              sourceArchiveSha256: $sourceArchiveSha256}' > "$manifest"
+          (cd "$RUNNER_TEMP" && shasum -a 256 \
+            KX11-iPhone-ANCS-Helper-v62-source.zip \
+            helper-v62-candidate.json > helper-v62.sha256)
+
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
+          echo "sums=$sums" >> "$GITHUB_OUTPUT"
+          echo "archive_sha=$archive_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Publish public Helper-only release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          MANIFEST: ${{ steps.package.outputs.manifest }}
+          SUMS: ${{ steps.package.outputs.sums }}
+          ARCHIVE_SHA: ${{ steps.package.outputs.archive_sha }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/helper-v62-release.md"
+          cat > "$notes" <<EOF
+          Helper-only source release. Android Natro remains at 2.2.9.
+
+          - Live Activity starts only after the authenticated head unit completes C5 sync.
+          - Both cards end immediately when that Bluetooth route is lost.
+          - Vehicle controls work independently of ANCS notification state.
+          - Interactive taps use a bounded App Group queue; incomplete Xcode profiles get a
+            confirmed app-opening fallback instead of dead buttons.
+
+          The archive was compiled without signing against the Apple simulator SDK with warnings
+          treated as errors. Install on a physical iPhone by opening the Xcode project and signing
+          the app plus extension with the same App Group.
+
+          Source commit: \`$SOURCE_SHA\`
+          Helper tree: \`$HELPER_TREE\`
+          Source ZIP SHA-256: \`$ARCHIVE_SHA\`
+          EOF
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$ARCHIVE" "$MANIFEST" "$SUMS" --clobber
+            gh release edit "$RELEASE_TAG" --title 'Natro Helper v62' --notes-file "$notes"
+          else
+            gh release create "$RELEASE_TAG" \
+              --target "$SOURCE_SHA" \
+              --title 'Natro Helper v62' \
+              --notes-file "$notes" \
+              "$ARCHIVE" "$MANIFEST" "$SUMS"
+          fi
