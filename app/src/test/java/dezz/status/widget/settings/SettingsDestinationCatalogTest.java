@@ -39,7 +39,8 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.PopupSettingsActivity",
             "dezz.status.widget.PresetsActivity",
             "dezz.status.widget.ScenarioSettingsActivity",
-            "dezz.status.widget.SprutHubSettingsActivity"
+            "dezz.status.widget.SprutHubSettingsActivity",
+            "dezz.status.widget.VehicleControlActivity"
     ));
 
     @Test
@@ -113,8 +114,9 @@ public final class SettingsDestinationCatalogTest {
         SettingsDestinationCatalog.Destination launcher =
                 SettingsDestinationCatalog.byId("home_behavior");
         assertNotNull(launcher);
-        assertEquals(1, SettingsDestinationCatalog.forGroup(
+        assertEquals(2, SettingsDestinationCatalog.forGroup(
                 SettingsDestinationCatalog.Group.HOME).size());
+        assertNotNull(SettingsDestinationCatalog.byId("vehicle_control"));
         assertTrue(launcher.subtitle.contains("Один плоский экран"));
         assertTrue(launcher.keywords.contains("размеры"));
         assertTrue(launcher.keywords.contains("позиции кнопок"));

@@ -80,6 +80,9 @@ public final class SettingsBackNavigationContractTest {
                     "back.setOnClickListener(view -> finish())"},
             {"SprutHubSettingsActivity.java", "back.setContentDescription(\"Назад\")",
                     "back.setOnClickListener(v -> finish())"},
+            {"VehicleControlActivity.java",
+                    "back.setImageResource(android.R.drawable.ic_menu_revert)",
+                    "back.setOnClickListener(view -> finish())"},
             {"VisualBrickEditorActivity.java", "back.setContentDescription(\"Назад\")",
                     "back.setOnClickListener(v -> finish())"}
     };
@@ -100,6 +103,7 @@ public final class SettingsBackNavigationContractTest {
             "PresetsActivity.java",
             "ScenarioSettingsActivity.java",
             "SprutHubSettingsActivity.java",
+            "VehicleControlActivity.java",
             "VisualBrickEditorActivity.java"
     };
 

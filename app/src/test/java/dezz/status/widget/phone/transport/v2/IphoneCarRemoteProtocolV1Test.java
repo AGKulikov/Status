@@ -73,7 +73,7 @@ public final class IphoneCarRemoteProtocolV1Test {
     }
 
     @Test public void registryIsFiniteUniqueAndMechanicalEntriesStayConfirmed() {
-        assertEquals(52, CarRemoteControlRegistryV1.all().size());
+        assertEquals(58, CarRemoteControlRegistryV1.all().size());
         Set<Integer> wire = new HashSet<>();
         Set<String> controls = new HashSet<>();
         for (CarRemoteControlRegistryV1.Entry entry : CarRemoteControlRegistryV1.all()) {
