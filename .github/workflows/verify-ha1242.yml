@@ -7,6 +7,12 @@ on:
       - 'build.gradle'
       - 'release-manifests/HA1242.md'
       - '.github/workflows/verify-ha1242.yml'
+  pull_request:
+    paths:
+      - 'app/src/**'
+      - 'build.gradle'
+      - 'release-manifests/HA1242.md'
+      - '.github/workflows/verify-ha1242.yml'
   workflow_dispatch:
 
 permissions:
