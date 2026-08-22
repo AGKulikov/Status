@@ -275,7 +275,9 @@ final class NatroLiveActivityManager: NSObject {
     @objc private func preferencesChanged() {
         syncDemoTransition()
         if runningCount > 0 {
-            replaceActivities(reason: isDemoMode ? "ДЕМО" : "настройки обновлены")
+            if #available(iOS 16.2, *) {
+                replaceActivities(reason: isDemoMode ? "ДЕМО" : "настройки обновлены")
+            }
         } else if isDemoMode {
             _ = ensureRunning(reason: "ДЕМО", force: true)
         } else if NatroLiveActivityPreferences.automaticStart {
