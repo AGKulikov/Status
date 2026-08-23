@@ -22,7 +22,8 @@ final class MediaAutoResumeLifecyclePolicy {
     }
 
     static boolean isUsableBoundary(String action) {
-        return ACTION_BOOT_COMPLETED.equals(action)
+        return ACTION_LOCKED_BOOT_COMPLETED.equals(action)
+                || ACTION_BOOT_COMPLETED.equals(action)
                 || ACTION_QUICKBOOT_POWERON.equals(action);
     }
 
@@ -45,10 +46,9 @@ final class MediaAutoResumeLifecyclePolicy {
         return standardPair || sameLifecycleBurst;
     }
 
-    /** Move the delay anchor once: from an early locked boot to the first usable boundary. */
+    /** The user delay starts at the earliest direct-boot boundary and is never moved later. */
     static boolean shouldMovePlanAnchor(String previousAction, String currentAction) {
-        return ACTION_LOCKED_BOOT_COMPLETED.equals(previousAction)
-                && isUsableBoundary(currentAction);
+        return false;
     }
 
     private static boolean isStandardBootAction(String action) {
