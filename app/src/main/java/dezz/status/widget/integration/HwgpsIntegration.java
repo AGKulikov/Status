@@ -28,6 +28,8 @@ public final class HwgpsIntegration {
     private static final String JOURNAL_COMPONENT = "hwgps.dr";
     private static final int INITIAL_SNAPSHOT_MAX_ATTEMPTS = 3;
     private static final long[] INITIAL_SNAPSHOT_RETRY_DELAYS_MS = {1_500L, 3_000L, 5_000L};
+    /** HWGPS emits a short notFixed edge after many valid DR fixes; it is not a route loss. */
+    private static final long DR_INACTIVE_CONFIRM_MS = 2_500L;
     public static final String PACKAGE_NAME = "org.astpepper.hwgps";
     public static final String FIND_ME_ACTIVITY =
             "org.astpepper.hwgps.FindMeActivity";
@@ -79,6 +81,15 @@ public final class HwgpsIntegration {
                 HwgpsDrStatePolicy.State.UNAVAILABLE;
         private int initialSnapshotAttempts;
         private boolean initialSnapshotResponseSeen;
+        @NonNull private HwgpsDrStatePolicy.State pendingState =
+                HwgpsDrStatePolicy.State.UNAVAILABLE;
+        private final Runnable confirmInactive = () -> {
+            if (!registered || state != HwgpsDrStatePolicy.State.DR_ACTIVE
+                    || pendingState == HwgpsDrStatePolicy.State.DR_ACTIVE) return;
+            HwgpsDrStatePolicy.State confirmed = pendingState;
+            pendingState = HwgpsDrStatePolicy.State.UNAVAILABLE;
+            publish(confirmed);
+        };
         private final Runnable initialSnapshotRetry = () -> {
             if (!registered || initialSnapshotResponseSeen) return;
             if (initialSnapshotAttempts >= INITIAL_SNAPSHOT_MAX_ATTEMPTS) {
@@ -97,9 +108,7 @@ public final class HwgpsIntegration {
                         initialSnapshotResponseSeen = true;
                         mainHandler.removeCallbacks(initialSnapshotRetry);
                     }
-                    DiagnosticJournal.info(JOURNAL_COMPONENT,
-                            "fix broadcast=" + (raw == null ? "<missing>" : raw));
-                    publish(HwgpsDrStatePolicy.classify(raw));
+                    acceptObservedState(HwgpsDrStatePolicy.classify(raw));
                 }
             }
         };
@@ -134,12 +143,30 @@ public final class HwgpsIntegration {
                 catch (RuntimeException ignored) {}
             }
             mainHandler.removeCallbacks(initialSnapshotRetry);
+            mainHandler.removeCallbacks(confirmInactive);
             state = HwgpsDrStatePolicy.State.UNAVAILABLE;
+            pendingState = HwgpsDrStatePolicy.State.UNAVAILABLE;
             initialSnapshotAttempts = 0;
             initialSnapshotResponseSeen = false;
         }
 
         @NonNull public HwgpsDrStatePolicy.State state() { return state; }
+
+        private void acceptObservedState(@NonNull HwgpsDrStatePolicy.State next) {
+            if (next == HwgpsDrStatePolicy.State.DR_ACTIVE) {
+                mainHandler.removeCallbacks(confirmInactive);
+                pendingState = HwgpsDrStatePolicy.State.UNAVAILABLE;
+                publish(next);
+                return;
+            }
+            if (state != HwgpsDrStatePolicy.State.DR_ACTIVE) {
+                publish(next);
+                return;
+            }
+            pendingState = next;
+            mainHandler.removeCallbacks(confirmInactive);
+            mainHandler.postDelayed(confirmInactive, DR_INACTIVE_CONFIRM_MS);
+        }
 
         private void publish(@NonNull HwgpsDrStatePolicy.State next) {
             if (state == next) return;
