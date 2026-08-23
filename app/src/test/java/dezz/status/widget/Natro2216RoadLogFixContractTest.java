@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /** Regression boundary for the ANCS/music/crash evidence captured on 2026-08-23. */
@@ -33,6 +34,15 @@ public final class Natro2216RoadLogFixContractTest {
     }
 
     private static String read(String path) throws Exception {
-        return new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(projectRoot().resolve(path)), StandardCharsets.UTF_8);
+    }
+
+    private static Path projectRoot() {
+        Path current = Paths.get("").toAbsolutePath().normalize();
+        while (current != null && !Files.exists(current.resolve("settings.gradle"))) {
+            current = current.getParent();
+        }
+        if (current == null) throw new IllegalStateException("project root not found");
+        return current;
     }
 }
