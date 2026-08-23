@@ -44,8 +44,13 @@
 
 ## Distribution
 
-- The branch verification workflow compiles Helper with the Apple SDK, builds/tests Natro and,
-  on branch pushes, signs the APK only with the repository-held stable update certificate whose
-  SHA-256 fingerprint is pinned before signing.
+- The branch verification workflow compiles Helper with the Apple SDK and builds/tests Natro.
+  When the complete repository signing-secret set is present, it signs only with the stable update
+  certificate whose SHA-256 fingerprint is pinned before signing. With no repository signing
+  secrets it preserves the verified unsigned handoff for the offline signer; a partial secret set
+  still fails closed.
+- The Android 9 update is v3-signed by exactly one signer, matching the installed stable Natro
+  lineage; the certificate SHA-256 remains
+  `6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75`.
 - No APNs private key, Android keystore, password, enrollment key or device identity is stored in
   the repository or bundled in either application.
