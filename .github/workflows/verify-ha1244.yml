@@ -2,7 +2,7 @@ name: Verify HA1244 Natro 2.2.10 candidate
 
 on:
   push:
-  pull_request:
+    branches: ['release/natro-2.2.10-helper63']
   workflow_dispatch:
 
 permissions:

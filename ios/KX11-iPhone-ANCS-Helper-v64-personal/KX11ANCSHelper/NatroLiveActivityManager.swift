@@ -220,7 +220,7 @@ final class NatroLiveActivityManager: NSObject {
         for panel in missing {
             do {
                 let attributes = attributes(for: panel)
-                let activity = try Activity<NatroLiveActivityAttributes>.request(
+                _ = try Activity<NatroLiveActivityAttributes>.request(
                     attributes: attributes,
                     content: ActivityContent(
                         state: contentState(for: attributes.resolvedControls),
