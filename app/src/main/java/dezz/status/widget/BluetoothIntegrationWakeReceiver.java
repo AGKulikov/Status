@@ -3,9 +3,12 @@ package dezz.status.widget;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+
+import dezz.status.widget.launcher.MediaAutoResumeController;
 
 /**
  * Manifest wake boundary for Bluetooth transitions that happen while the app process is absent.
@@ -15,6 +18,12 @@ public final class BluetoothIntegrationWakeReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent == null || !isWakeAction(intent.getAction())) return;
+        String action = intent.getAction();
+        int profileState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1);
+        if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)
+                || profileState == BluetoothProfile.STATE_CONNECTED) {
+            MediaAutoResumeController.onAudioRouteReady(context, action == null ? "" : action);
+        }
         WidgetServiceWatchdog.arm(context, WidgetServiceWatchdog.BLUETOOTH_WAKE_DELAY_MS);
     }
 
