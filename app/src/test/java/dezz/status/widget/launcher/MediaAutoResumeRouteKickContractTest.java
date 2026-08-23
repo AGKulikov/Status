@@ -7,6 +7,7 @@ import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public final class MediaAutoResumeRouteKickContractTest {
@@ -20,8 +21,17 @@ public final class MediaAutoResumeRouteKickContractTest {
     }
 
     private static String read(String relative) throws Exception {
-        return new String(Files.readAllBytes(Paths.get(
+        return new String(Files.readAllBytes(projectRoot().resolve(
                 "app/src/main/java/dezz/status/widget/" + relative)),
                 StandardCharsets.UTF_8);
+    }
+
+    private static Path projectRoot() {
+        Path current = Paths.get("").toAbsolutePath().normalize();
+        while (current != null && !Files.exists(current.resolve("settings.gradle"))) {
+            current = current.getParent();
+        }
+        if (current == null) throw new IllegalStateException("project root not found");
+        return current;
     }
 }
