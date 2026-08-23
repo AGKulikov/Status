@@ -34,9 +34,11 @@ final class CarRemoteControllerV1 {
 
     private static final int MAX_COMMANDS_PER_SECOND = 12;
     private static final long RATE_WINDOW_MS = 1_000L;
-    // A torn C5 catalog used to wait 20 seconds: Helper retried at 10 s and Android coalesced that
-    // retry for 12 s. Normal catalog delivery finishes well below this bounded 1.5 s window.
-    private static final long HELLO_COALESCE_MS = 1_500L;
+    // One catalog contains dozens of protected ATT writes. During the initial ANCS replay they
+    // can take several seconds to drain, while Helper repeats HELLO every two seconds. Starting a
+    // fresh generation for every repeat filled the protected queue and destabilised the GATT
+    // owner. Keep one bootstrap generation authoritative for a bounded drain window.
+    private static final long HELLO_COALESCE_MS = 12_000L;
     /** Read-only companion states; intentionally outside the finite command registry. */
     private static final int STATE_CABIN_TEMPERATURE = 0xfc;
     private static final int STATE_OUTDOOR_TEMPERATURE = 0xfd;
