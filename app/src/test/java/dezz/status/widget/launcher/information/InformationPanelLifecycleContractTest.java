@@ -17,8 +17,8 @@ public final class InformationPanelLifecycleContractTest {
     @Test public void panelSubscribesWithInitialSnapshotAndReleasesEveryListener()
             throws IOException {
         String source = source("dezz/status/widget/launcher/information/InformationPanelView.java");
-        assertTrue(source.contains("current.addConnectorValueListener(listener)"));
-        assertTrue(source.contains("current.removeConnectorValueListener(listener)"));
+        assertTrue(source.contains("ConnectorValueSubscriptionHub.subscribe(current, listener)"));
+        assertTrue(source.contains("ConnectorValueSubscriptionHub.unsubscribe(current, listener)"));
         assertTrue(source.contains("carIntegration.subscribeTelemetry(ids, vehicleListener)"));
         assertTrue(source.contains("carIntegration.unsubscribeTelemetry(vehicleListener)"));
         assertTrue(source.contains("protected void onDetachedFromWindow()"));
@@ -34,7 +34,7 @@ public final class InformationPanelLifecycleContractTest {
         assertTrue(source.contains("subscribedService != capturedService"));
         int invalidate = source.indexOf("connectorGeneration++;",
                 source.indexOf("private void disconnectConnectorService()"));
-        int remove = source.indexOf("removeConnectorValueListener", invalidate);
+        int remove = source.indexOf("ConnectorValueSubscriptionHub.unsubscribe", invalidate);
         int clear = source.indexOf("connectorValues.clear()", invalidate);
         assertTrue(invalidate >= 0);
         assertTrue(remove > invalidate);
