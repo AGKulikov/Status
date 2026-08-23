@@ -29,7 +29,7 @@ public final class MediaAutoResumeContractTest {
                 "\"launcherMediaAutoResumeEnabled\", false"));
         assertTrue(controller.contains(
                 "if (!preferences.launcherMediaAutoResumeEnabled.get())"));
-        assertTrue(controller.contains("private static final int MAX_ATTEMPTS = 8"));
+        assertTrue(controller.contains("private static final int MAX_ATTEMPTS = 24"));
         assertTrue(controller.contains("KEY_TARGET_PACKAGE"));
         assertTrue(controller.contains("KEY_BOOT_TOKEN"));
         assertTrue(controller.contains("MediaPlaybackTargetPolicy.shouldAutoResume("));
