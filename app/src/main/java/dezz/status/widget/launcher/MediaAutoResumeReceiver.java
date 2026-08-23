@@ -21,8 +21,10 @@ public final class MediaAutoResumeReceiver extends BroadcastReceiver {
                         "action", intent == null ? null : intent.getAction()));
         if (intent == null
                 || !MediaAutoResumeController.ACTION_RESUME.equals(intent.getAction())) return;
-        MediaAutoResumeController.execute(context,
-                intent.getLongExtra(MediaAutoResumeController.EXTRA_BOOT_TOKEN, Long.MIN_VALUE),
-                intent.getIntExtra(MediaAutoResumeController.EXTRA_ATTEMPT, 0));
+        long bootToken = intent.getLongExtra(
+                MediaAutoResumeController.EXTRA_BOOT_TOKEN, Long.MIN_VALUE);
+        int attempt = intent.getIntExtra(MediaAutoResumeController.EXTRA_ATTEMPT, 0);
+        MediaAutoResumeController.recordAlarmDelivery(bootToken, attempt);
+        MediaAutoResumeController.execute(context, bootToken, attempt);
     }
 }

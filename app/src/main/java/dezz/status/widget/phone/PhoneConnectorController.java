@@ -2731,8 +2731,16 @@ public final class PhoneConnectorController {
         Handler handler = worker;
         if (handler == null) return;
         cancelClassicAncsRecoveryWakeup();
+        long armedAt = SystemClock.elapsedRealtime();
+        long delay = Math.max(0L, deadlineMillis - armedAt);
         Runnable wakeup = () -> runIfCurrent(token, () -> {
             classicAncsRecoveryTask = null;
+            long firedAt = SystemClock.elapsedRealtime();
+            PhoneConnectionJournal.append("classic-ancs",
+                    "recovery_timer fired generation=" + timerGeneration
+                            + ", plannedMs=" + delay
+                            + ", actualMs=" + Math.max(0L, firedAt - armedAt)
+                            + ", latenessMs=" + Math.max(0L, firedAt - deadlineMillis));
             ClassicAncsRecoveryPolicy.Transition transition =
                     ClassicAncsRecoveryPolicy.wakeup(
                             classicAncsRecovery,
@@ -2743,9 +2751,13 @@ public final class PhoneConnectorController {
             publishSnapshot(token);
         });
         classicAncsRecoveryTask = wakeup;
-        long delay = Math.max(0L,
-                deadlineMillis - SystemClock.elapsedRealtime());
         handler.postDelayed(wakeup, delay);
+        PhoneConnectionJournal.append("classic-ancs",
+                "recovery_timer armed generation=" + timerGeneration
+                        + ", delayMs=" + delay
+                        + ", command=" + classicAncsRecovery.recoveryCommands
+                        + ", route=" + classicAncsRecovery.route
+                        + ", classic=" + classicAncsRecovery.classicConnected);
     }
 
     private long jitterRecoveryDelay(long baseMillis) {

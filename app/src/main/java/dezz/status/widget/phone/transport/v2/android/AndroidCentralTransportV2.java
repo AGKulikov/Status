@@ -99,7 +99,14 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private static final int ROUTINE_REQUIRED_MTU = 69;
     private static final long TELEMETRY_REFRESH_QUIET_MS = 30_000L;
     private static final long TELEMETRY_REFRESH_RETRY_MS = 5_000L;
-    private static final long CAR_REMOTE_WRITE_TIMEOUT_MS = 5_000L;
+    /**
+     * C5 is an optional bulk channel.  Helper 68 exposes write-without-response so Android 9
+     * never waits for the callback which the ECARX stack occasionally drops.  A short local
+     * settle window preserves the single ATT slot while keeping ANCS strictly higher priority.
+     */
+    private static final long CAR_REMOTE_NO_RESPONSE_SETTLE_MS = 24L;
+    private static final long CAR_REMOTE_INTER_FRAME_MS = 12L;
+    private static final int CAR_REMOTE_REJECT_LIMIT = 5;
     private static final long CAR_REMOTE_BACKOFF_MIN_MS = 2_000L;
     private static final long CAR_REMOTE_BACKOFF_MAX_MS = 30_000L;
     private static final int PLATFORM_DIAGNOSTIC_LIMIT = 256;
@@ -297,9 +304,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private final CarRemoteFrameQueueV1 carRemoteWrites = new CarRemoteFrameQueueV1();
     private Runnable carRemoteSubscribeTimer;
     private Runnable carRemoteDrainTimer;
-    private Runnable carRemoteWriteWatchdog;
+    private Runnable carRemoteWriteSettleTimer;
     private int carRemoteWriteTimeouts;
     private long carRemoteRetryNotBeforeMillis;
+    private long carRemoteNoResponseWrites;
     private Runnable telemetryRefreshTimer;
     private AncsRequestTokenV2 deferredAncsRequest;
     private byte[] deferredAncsValue;
@@ -1171,6 +1179,34 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                         + ", refreshOnClose=" + exact.cacheRefreshRequested);
     }
 
+    private void noteServiceInventory(GattOwner exact, int status,
+                                      IphoneGattInventoryV2 inventory) {
+        if (exact == null) return;
+        boolean helperComplete = inventory != null && inventory.completeHelperV2();
+        boolean ancsComplete = inventory != null && inventory.completeAncs();
+        if (status == BluetoothGatt.GATT_SUCCESS) {
+            // ANCS may legitimately appear later and is covered by Service Changed while this
+            // exact owner stays live. Only an incomplete stable Helper F201 graph is evidence of
+            // the Android 9 cache fault that merits a guarded refresh on owner close.
+            if (helperComplete) {
+                cacheSensitiveFailures = 0;
+            } else {
+                cacheSensitiveFailures = Math.min(
+                        Integer.MAX_VALUE, cacheSensitiveFailures + 1);
+                exact.cacheRefreshRequested =
+                        cacheSensitiveFailures >= CACHE_REFRESH_FAILURE_THRESHOLD;
+            }
+        }
+        reportPlatformDiagnostic(exact.ownerToken,
+                "service_inventory status=" + status
+                        + ", helperComplete=" + helperComplete
+                        + ", ancsComplete=" + ancsComplete
+                        + ", serviceChanged="
+                        + (inventory != null && inventory.serviceChangedIndicatable)
+                        + ", cacheCount=" + cacheSensitiveFailures
+                        + ", refreshOnClose=" + exact.cacheRefreshRequested);
+    }
+
     private void maybeRefreshGattCache(GattOwner exact) {
         if (exact == null || exact.gatt == null || !exact.cacheRefreshRequested
                 || !exact.callbackObserved || Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
@@ -1355,11 +1391,32 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
 
     private void armRouteTimer(BleRouteToken token, long delayMillis) {
         cancelRouteTimer(token);
+        long armedAt = SystemClock.elapsedRealtime();
+        long boundedDelay = Math.max(0L, delayMillis);
+        long deadlineAt = armedAt + boundedDelay;
+        AndroidCentralRoute.State armedState = state;
+        String armedPhase = armedState == null ? "none" : armedState.phase.name();
+        reportPlatformDiagnostic(token,
+                "route_timer_armed phase=" + armedPhase
+                        + ", delayMs=" + boundedDelay
+                        + ", elapsed=" + armedAt);
         Runnable timer = () -> {
             routeTimers.remove(token);
+            long firedAt = SystemClock.elapsedRealtime();
             AndroidCentralRoute.State current = state;
             if (current == null || current.expected == null
-                    || !current.expected.equals(token)) return;
+                    || !current.expected.equals(token)) {
+                reportPlatformDiagnostic(token,
+                        "route_timer_stale armedPhase=" + armedPhase
+                                + ", actualMs=" + Math.max(0L, firedAt - armedAt));
+                return;
+            }
+            reportPlatformDiagnostic(token,
+                    "route_timer_fired armedPhase=" + armedPhase
+                            + ", currentPhase=" + current.phase.name()
+                            + ", plannedMs=" + boundedDelay
+                            + ", actualMs=" + Math.max(0L, firedAt - armedAt)
+                            + ", latenessMs=" + Math.max(0L, firedAt - deadlineAt));
             switch (current.phase) {
                 case STARTUP_QUIET:
                     apply(AndroidCentralRoute.startupQuietElapsed(
@@ -1380,7 +1437,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             }
         };
         routeTimers.put(token, timer);
-        main.postDelayed(timer, delayMillis);
+        main.postDelayed(timer, boundedDelay);
     }
 
     private long jitterRetryDelay(long baseMillis) {
@@ -1533,8 +1590,16 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         BluetoothGattCharacteristic characteristic = characteristic(
                 IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
                 IphoneBleProtocolV2.CAR_REMOTE_CHARACTERISTIC);
-        if (characteristic == null || !writable(characteristic)
+        if (characteristic == null
                 || (!indicatable(characteristic) && !notifiable(characteristic))) return;
+        if (!writableWithoutResponse(characteristic)) {
+            // Helper 67 and older require an acknowledged C5 write.  On this Android 9 stack a
+            // missing optional callback poisons the shared ATT FIFO, so leave C5 off rather than
+            // sacrificing a healthy ANCS owner.  Installing Helper 68 enables the safe path.
+            reportPlatformDiagnostic(token,
+                    "c5_disabled reason=no_write_without_response ancs_preserved=true");
+            return;
+        }
         if (pendingGatt != null) {
             scheduleCarRemoteSubscribe(token, 150L);
             return;
@@ -1560,13 +1625,17 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void clearCarRemoteChannel() {
         if (carRemoteSubscribeTimer != null) main.removeCallbacks(carRemoteSubscribeTimer);
         if (carRemoteDrainTimer != null) main.removeCallbacks(carRemoteDrainTimer);
-        if (carRemoteWriteWatchdog != null) main.removeCallbacks(carRemoteWriteWatchdog);
+        if (carRemoteWriteSettleTimer != null) {
+            main.removeCallbacks(carRemoteWriteSettleTimer);
+        }
         carRemoteSubscribeTimer = null;
         carRemoteDrainTimer = null;
-        carRemoteWriteWatchdog = null;
+        carRemoteWriteSettleTimer = null;
         carRemoteWrites.clear();
         carRemoteCharacteristic = null;
         carRemoteSubscriptionToken = null;
+        carRemoteWriteTimeouts = 0;
+        carRemoteNoResponseWrites = 0L;
         if (pendingGatt != null && (pendingGatt.type == RawOperation.WRITE_CAR_REMOTE
                 || pendingGatt.type == RawOperation.SUBSCRIBE_CAR_REMOTE)) {
             pendingGatt = null;
@@ -1601,7 +1670,13 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         byte[] frame = carRemoteWrites.poll();
         if (frame == null) return;
-        characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+        if (!writableWithoutResponse(characteristic)) {
+            carRemoteWrites.clear();
+            reportPlatformDiagnostic(exactOwner.ownerToken,
+                    "c5_disabled reason=write_without_response_lost ancs_preserved=true");
+            return;
+        }
+        characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
         characteristic.setValue(frame);
         PendingGattOperation pending = new PendingGattOperation(frame, characteristic);
         pendingGatt = pending;
@@ -1613,31 +1688,51 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         if (!started) {
             pendingGatt = null;
+            int rejects = Math.min(Integer.MAX_VALUE, carRemoteWriteTimeouts + 1);
+            carRemoteWriteTimeouts = rejects;
+            if (rejects >= CAR_REMOTE_REJECT_LIMIT) {
+                carRemoteWrites.clear();
+                int shift = Math.max(0, Math.min(3, rejects - CAR_REMOTE_REJECT_LIMIT));
+                long backoff = Math.min(CAR_REMOTE_BACKOFF_MAX_MS,
+                        CAR_REMOTE_BACKOFF_MIN_MS << shift);
+                carRemoteRetryNotBeforeMillis = android.os.SystemClock.elapsedRealtime()
+                        + backoff;
+                reportPlatformDiagnostic(exactOwner.ownerToken,
+                        "c5_quarantined synchronousRejects=" + rejects
+                                + ", backoffMs=" + backoff
+                                + ", ancsPreserved=true");
+                return;
+            }
             carRemoteWrites.offerFirst(frame);
-            scheduleCarRemoteDrain(40L);
+            scheduleCarRemoteDrain(40L * rejects);
             return;
         }
-        carRemoteWriteWatchdog = () -> {
-            carRemoteWriteWatchdog = null;
+        carRemoteWriteSettleTimer = () -> {
+            carRemoteWriteSettleTimer = null;
             if (pendingGatt != pending || owner != exactOwner) return;
-            // Clearing pendingGatt here used to let ANCS overlap an ATT write whose terminal
-            // callback was still unknown.  The next Control Point request was then rejected and
-            // the route fell into a passive reconnect.  Treat the FIFO as poisoned, drain this
-            // registered owner, and suppress optional C5 resubscription for a bounded backoff.
-            carRemoteWrites.clear();
-            int shift = Math.max(0, Math.min(3, carRemoteWriteTimeouts));
-            carRemoteWriteTimeouts = Math.min(Integer.MAX_VALUE,
-                    carRemoteWriteTimeouts + 1);
-            long backoff = Math.min(CAR_REMOTE_BACKOFF_MAX_MS,
-                    CAR_REMOTE_BACKOFF_MIN_MS << shift);
-            carRemoteRetryNotBeforeMillis = android.os.SystemClock.elapsedRealtime() + backoff;
-            reportError(IphoneTransportErrorV2.Kind.GATT,
-                    "C5 response write callback timed out; exact GATT owner reset", true);
-            reportPlatformDiagnostic(exactOwner.ownerToken,
-                    "c5_write_timeout owner_reset=true, backoffMs=" + backoff);
-            resetCurrentOwner("C5 response write callback timed out; ATT queue unproven");
+            // WRITE_TYPE_NO_RESPONSE has no remote acknowledgement to wait for.  Release only
+            // the local pacing slot, then service a deferred ANCS request before the next C5
+            // frame.  A C5 fault can therefore never tear down the exact ANCS GATT owner.
+            pendingGatt = null;
+            carRemoteWriteTimeouts = 0;
+            carRemoteRetryNotBeforeMillis = 0L;
+            carRemoteNoResponseWrites = carRemoteNoResponseWrites == Long.MAX_VALUE
+                    ? 1L : carRemoteNoResponseWrites + 1L;
+            int queued = carRemoteWrites.size();
+            if (carRemoteNoResponseWrites == 1L
+                    || carRemoteNoResponseWrites % 64L == 0L || queued == 0) {
+                reportPlatformDiagnostic(exactOwner.ownerToken,
+                        "c5_no_response_drain writes=" + carRemoteNoResponseWrites
+                                + ", queued=" + queued
+                                + ", settleMs=" + CAR_REMOTE_NO_RESPONSE_SETTLE_MS
+                                + ", ancsPreserved=true");
+            }
+            boolean ancsWaiting = deferredAncsRequest != null;
+            drainDeferredAncsAfterGatt();
+            scheduleCarRemoteDrain(ancsWaiting
+                    ? CAR_REMOTE_NO_RESPONSE_SETTLE_MS : CAR_REMOTE_INTER_FRAME_MS);
         };
-        main.postDelayed(carRemoteWriteWatchdog, CAR_REMOTE_WRITE_TIMEOUT_MS);
+        main.postDelayed(carRemoteWriteSettleTimer, CAR_REMOTE_NO_RESPONSE_SETTLE_MS);
     }
 
     private void cancelTelemetryRefresh() {
@@ -2775,6 +2870,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         noteCacheSensitiveFailure(owner, status, "service_discovery");
         IphoneGattInventoryV2 discovered = status == BluetoothGatt.GATT_SUCCESS
                 ? inventory(callbackGatt) : null;
+        noteServiceInventory(owner, status, discovered);
         AndroidCentralRoute.State current = state;
         if (current != null) {
             apply(AndroidCentralRoute.servicesDiscovered(
@@ -3062,6 +3158,16 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             failRoutineTransport("routine C4 confirm write failed: status=" + status);
             return;
         }
+        if (owner != null && owner.gatt == callbackGatt
+                && characteristic == carRemoteCharacteristic
+                && characteristic.getWriteType()
+                    == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
+            // Some Android stacks still emit a callback for a command write, while others omit
+            // it.  Completion is intentionally governed by the local settle timer; accepting a
+            // late callback here could accidentally complete a newer C5 frame on the same
+            // characteristic object.
+            return;
+        }
         PendingGattOperation pending = pendingGatt;
         if (owner == null || owner.gatt != callbackGatt || pending == null
                 || pending.characteristic != characteristic) return;
@@ -3106,9 +3212,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                                 : ControlTransmitResult.TERMINAL_FAILURE,
                     control);
         } else if (pending.type == RawOperation.WRITE_CAR_REMOTE) {
-            if (carRemoteWriteWatchdog != null) {
-                main.removeCallbacks(carRemoteWriteWatchdog);
-                carRemoteWriteWatchdog = null;
+            if (carRemoteWriteSettleTimer != null) {
+                main.removeCallbacks(carRemoteWriteSettleTimer);
+                carRemoteWriteSettleTimer = null;
             }
             carRemoteWriteTimeouts = 0;
             carRemoteRetryNotBeforeMillis = 0L;
@@ -3231,6 +3337,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         return (characteristic.getProperties()
                 & (BluetoothGattCharacteristic.PROPERTY_WRITE
                     | BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)) != 0;
+    }
+
+    private static boolean writableWithoutResponse(
+            BluetoothGattCharacteristic characteristic) {
+        return characteristic != null && (characteristic.getProperties()
+                & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0;
     }
 
     private static boolean notifiable(BluetoothGattCharacteristic characteristic) {

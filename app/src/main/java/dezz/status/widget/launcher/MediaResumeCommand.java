@@ -32,29 +32,47 @@ final class MediaResumeCommand {
         ALREADY_PLAYING,
         SESSION_COMMAND,
         RECEIVER_COMMAND,
+        DISPATCH_FAILED,
         NO_TARGET
+    }
+
+    /** Diagnostic result used by boot auto-resume without changing normal media controls. */
+    static final class DispatchTrace {
+        @NonNull final Result result;
+        @NonNull final String detail;
+
+        private DispatchTrace(@NonNull Result result, @NonNull String detail) {
+            this.result = result;
+            this.detail = detail;
+        }
     }
 
     private MediaResumeCommand() {}
 
     @NonNull
     static Result play(@NonNull Context context, @NonNull String targetPackage) {
-        return send(context, targetPackage, Command.PLAY);
+        return playWithTrace(context, targetPackage).result;
+    }
+
+    @NonNull
+    static DispatchTrace playWithTrace(@NonNull Context context,
+                                       @NonNull String targetPackage) {
+        return sendWithTrace(context, targetPackage, Command.PLAY);
     }
 
     @NonNull
     static Result playPause(@NonNull Context context, @NonNull String targetPackage) {
-        return send(context, targetPackage, Command.PLAY_PAUSE);
+        return sendWithTrace(context, targetPackage, Command.PLAY_PAUSE).result;
     }
 
     @NonNull
     static Result previous(@NonNull Context context, @NonNull String targetPackage) {
-        return send(context, targetPackage, Command.PREVIOUS);
+        return sendWithTrace(context, targetPackage, Command.PREVIOUS).result;
     }
 
     @NonNull
     static Result next(@NonNull Context context, @NonNull String targetPackage) {
-        return send(context, targetPackage, Command.NEXT);
+        return sendWithTrace(context, targetPackage, Command.NEXT).result;
     }
 
     /** A timeline position has no safe media-button fallback, so require the exact session. */
@@ -89,10 +107,13 @@ final class MediaResumeCommand {
     }
 
     @NonNull
-    private static Result send(@NonNull Context context, @NonNull String targetPackage,
-                               @NonNull Command command) {
+    private static DispatchTrace sendWithTrace(@NonNull Context context,
+                                               @NonNull String targetPackage,
+                                               @NonNull Command command) {
         String target = targetPackage.trim();
-        if (target.isEmpty()) return Result.NO_TARGET;
+        if (target.isEmpty()) return trace(Result.NO_TARGET, "target=empty");
+        String sessionError = "none";
+        int activeSessionCount = -1;
         MediaSessionManager sessions = context.getSystemService(MediaSessionManager.class);
         if (sessions != null) {
             try {
@@ -100,14 +121,22 @@ final class MediaResumeCommand {
                         MediaNotificationListener.class);
                 List<MediaController> controllers = sessions.getActiveSessions(listener);
                 if (controllers == null) controllers = Collections.emptyList();
+                activeSessionCount = controllers.size();
                 for (MediaController controller : controllers) {
                     if (!target.equals(controller.getPackageName())) continue;
                     PlaybackState state = controller.getPlaybackState();
                     boolean playing = state != null
                             && state.getState() == PlaybackState.STATE_PLAYING;
+                    int playbackState = state == null ? -1 : state.getState();
+                    long actions = state == null ? 0L : state.getActions();
                     switch (command) {
                         case PLAY:
-                            if (playing) return Result.ALREADY_PLAYING;
+                            if (playing) {
+                                return trace(Result.ALREADY_PLAYING,
+                                        "route=session, activeSessions=" + activeSessionCount
+                                                + ", playbackState=" + playbackState
+                                                + ", actions=" + actions);
+                            }
                             controller.getTransportControls().play();
                             break;
                         case PLAY_PAUSE:
@@ -121,35 +150,64 @@ final class MediaResumeCommand {
                             controller.getTransportControls().skipToNext();
                             break;
                     }
-                    return Result.SESSION_COMMAND;
+                    return trace(Result.SESSION_COMMAND,
+                            "route=session, activeSessions=" + activeSessionCount
+                                    + ", playbackState=" + playbackState
+                                    + ", actions=" + actions);
                 }
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException failure) {
+                sessionError = failure.getClass().getSimpleName();
                 // Explicit receiver fallback below also works without notification access.
             }
+        } else {
+            sessionError = "manager_unavailable";
         }
 
         PackageManager packages = context.getPackageManager();
         Intent query = new Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(target);
         List<ResolveInfo> receivers;
+        String receiverQueryError = "none";
         try {
             receivers = packages.queryBroadcastReceivers(query, 0);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException failure) {
+            receiverQueryError = failure.getClass().getSimpleName();
             receivers = Collections.emptyList();
         }
         if (receivers == null) receivers = Collections.emptyList();
+        int receiverCount = receivers.size();
         for (ResolveInfo resolved : receivers) {
             if (resolved.activityInfo == null) continue;
-            sendKey(context, new ComponentName(resolved.activityInfo.packageName,
-                    resolved.activityInfo.name), keyCodeWithoutSession(command));
-            return Result.RECEIVER_COMMAND;
+            ComponentName receiver = new ComponentName(resolved.activityInfo.packageName,
+                    resolved.activityInfo.name);
+            String dispatchError = sendKey(context, receiver,
+                    keyCodeWithoutSession(command));
+            return trace(dispatchError.isEmpty()
+                            ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
+                    "route=queried_receiver, activeSessions=" + activeSessionCount
+                            + ", sessionError=" + sessionError
+                            + ", receiverCount=" + receiverCount
+                            + ", receiver=" + receiver.flattenToShortString()
+                            + ", dispatchError=" + emptyAsNone(dispatchError));
         }
 
         ComponentName known = knownReceiver(target);
         if (known != null && isInstalled(packages, target)) {
-            sendKey(context, known, keyCodeWithoutSession(command));
-            return Result.RECEIVER_COMMAND;
+            String dispatchError = sendKey(context, known, keyCodeWithoutSession(command));
+            return trace(dispatchError.isEmpty()
+                            ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
+                    "route=known_receiver, activeSessions=" + activeSessionCount
+                            + ", sessionError=" + sessionError
+                            + ", receiverCount=" + receiverCount
+                            + ", receiverQueryError=" + receiverQueryError
+                            + ", receiver=" + known.flattenToShortString()
+                            + ", dispatchError=" + emptyAsNone(dispatchError));
         }
-        return Result.NO_TARGET;
+        return trace(Result.NO_TARGET,
+                "route=none, activeSessions=" + activeSessionCount
+                        + ", sessionError=" + sessionError
+                        + ", receiverCount=" + receiverCount
+                        + ", receiverQueryError=" + receiverQueryError
+                        + ", knownReceiver=" + (known != null));
     }
 
     /**
@@ -169,8 +227,9 @@ final class MediaResumeCommand {
         }
     }
 
-    private static void sendKey(@NonNull Context context, @NonNull ComponentName receiver,
-                                int keyCode) {
+    @NonNull
+    private static String sendKey(@NonNull Context context, @NonNull ComponentName receiver,
+                                  int keyCode) {
         long now = SystemClock.uptimeMillis();
         Intent down = new Intent(Intent.ACTION_MEDIA_BUTTON)
                 .setComponent(receiver)
@@ -187,7 +246,20 @@ final class MediaResumeCommand {
         try {
             context.sendBroadcast(down);
             context.sendBroadcast(up);
-        } catch (RuntimeException ignored) {}
+            return "";
+        } catch (RuntimeException failure) {
+            return failure.getClass().getSimpleName();
+        }
+    }
+
+    @NonNull
+    private static DispatchTrace trace(@NonNull Result result, @NonNull String detail) {
+        return new DispatchTrace(result, detail);
+    }
+
+    @NonNull
+    private static String emptyAsNone(@NonNull String value) {
+        return value.isEmpty() ? "none" : value;
     }
 
     private static ComponentName knownReceiver(@NonNull String packageName) {
