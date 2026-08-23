@@ -48,7 +48,8 @@ public final class Natro2214AncsDeliveryContractTest {
         for (int depth = 0; depth < 8 && current != null;
              depth++, current = current.getParent()) {
             Path candidate = current.resolve(relative);
-            if (Files.isRegularFile(candidate)) {
+            if (Files.isRegularFile(current.resolve("settings.gradle"))
+                    && Files.isRegularFile(candidate)) {
                 return new String(Files.readAllBytes(candidate), StandardCharsets.UTF_8);
             }
         }
