@@ -237,6 +237,13 @@ public final class PhoneConnectorController {
     private boolean connected;
     /** True from ingress freeze until the rewritten coordinator commits the fresh target. */
     private boolean v2SwitchInProgress;
+    @NonNull private final AncsReadinessGateV2 v2ReadinessGate =
+            new AncsReadinessGateV2();
+    /**
+     * New route READY is deliberately published before the dual-role coordinator commits ACTIVE.
+     * Retain that exact current-slot status so the following ACTIVE callback can open delivery.
+     */
+    @Nullable private IphoneTransportStatusV2 latestV2RouteStatus;
     private int reconnectAttempt;
     private String lastError = "";
     private String lastTypedV2Error = "";
@@ -699,6 +706,8 @@ public final class PhoneConnectorController {
         classicAncsRecovery = ClassicAncsRecoveryPolicy.State.initial();
         ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
         v2SwitchInProgress = false;
+        v2ReadinessGate.reset();
+        latestV2RouteStatus = null;
         enrollmentHfpActive = false;
         enrollmentClassicAddress = "";
         connected = false;
@@ -1631,7 +1640,18 @@ public final class PhoneConnectorController {
                         + redactedDiagnostic(status.detail));
         boolean activePhase = status.switchPhase ==
                 dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.ACTIVE;
+        boolean generationBoundary = status.switchPhase ==
+                dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.FREEZING
+                || status.switchPhase ==
+                dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.FAILED
+                || status.switchPhase ==
+                dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.CLOSED;
+        if (generationBoundary) {
+            v2ReadinessGate.reset();
+            latestV2RouteStatus = null;
+        }
         v2SwitchInProgress = !activePhase;
+        boolean routeDeliveryReady = v2ReadinessGate.onCoordinatorActive(activePhase);
         if (!activePhase) {
             ancsRecoveryRoute = status.switchPhase ==
                     dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.FAILED
@@ -1653,6 +1673,15 @@ public final class PhoneConnectorController {
             ancsStatus = "switching_"
                     + status.switchPhase.name().toLowerCase(Locale.ROOT);
             updateMessageAvailability();
+        }
+        if (routeDeliveryReady && !ancsReady && latestV2RouteStatus != null
+                && latestV2RouteStatus.lifecycle == IphoneTransportLifecycle.READY) {
+            // BoundListener must publish the route's READY first so the coordinator can commit
+            // its target.  Reconcile that retained READY after ACTIVE instead of leaving the
+            // controller gate false until a route status that may never be emitted again.
+            PhoneConnectionJournal.append("ancs-delivery",
+                    "dual ACTIVE accepted retained route READY; delivery enabled");
+            applyV2RouteStatus(token, latestV2RouteStatus);
         }
         if (status.switchPhase !=
                 dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.FAILED) {
@@ -1691,10 +1720,10 @@ public final class PhoneConnectorController {
 
     private void applyV2RouteStatus(long token, @Nullable IphoneTransportStatusV2 status) {
         if (status == null) return;
+        latestV2RouteStatus = status;
         IphoneTransportLifecycle lifecycle = status.lifecycle;
         ancsRecoveryRoute = status.recoveryState;
-        boolean ready = lifecycle == IphoneTransportLifecycle.READY
-                && !v2SwitchInProgress;
+        boolean ready = v2ReadinessGate.onRouteLifecycle(lifecycle);
         boolean linkActive = ready
                 || lifecycle == IphoneTransportLifecycle.AUTHENTICATING
                 || lifecycle == IphoneTransportLifecycle.SUBSCRIBING;
@@ -1886,7 +1915,11 @@ public final class PhoneConnectorController {
             @Nullable String appIdentifier, @Nullable String appName,
             @Nullable String title, @Nullable String message, @Nullable String date,
             long observedAt) {
-        if (!ancsReady || config == null || !config.ancsNeeded()) return;
+        if (!ancsReady || config == null || !config.ancsNeeded()) {
+            PhoneConnectionJournal.append("ancs-delivery",
+                    "decoded item rejected: controller_ready=" + ancsReady);
+            return;
+        }
         if (eventId == dezz.status.widget.phone.transport.AncsProtocol.EVENT_REMOVED) {
             removeAncsNotification(token, uid);
             return;
@@ -1899,12 +1932,17 @@ public final class PhoneConnectorController {
         boolean appleMessage = isAppleMessagesApp(appIdentifier);
         boolean allowed = config.notificationsEnabled
                 || config.messagesEnabled && appleMessage;
-        if (!allowed || !config.allowsNotification(
-                appIdentifier, categoryId)) return;
+        if (!allowed || !config.allowsNotification(appIdentifier, categoryId)) {
+            PhoneConnectionJournal.append("ancs-delivery",
+                    "decoded item filtered; category=" + categoryId);
+            return;
+        }
         long observedAtElapsedMs = observedAt > 0L
                 ? observedAt : SystemClock.elapsedRealtime();
         if (SystemClock.elapsedRealtime() - observedAtElapsedMs
                 > APP_DISPLAY_NAME_WAIT_TIMEOUT_MS) {
+            PhoneConnectionJournal.append("ancs-delivery",
+                    "decoded item expired before presentation; category=" + categoryId);
             Log.w(TAG, "Dropping ANCS notification " + uid
                     + ": transport item exceeded real-time TTL");
             return;
@@ -1931,6 +1969,8 @@ public final class PhoneConnectorController {
         if (hasDisplayName) {
             presentAncsNotification(token, record, true);
         } else {
+            PhoneConnectionJournal.append("ancs-delivery",
+                    "decoded item waiting for app name; category=" + categoryId);
             scheduleUnresolvedNotificationExpiry(token, record);
         }
     }
@@ -1970,6 +2010,8 @@ public final class PhoneConnectorController {
                                          boolean publish) {
         if (record.presented) return;
         record.presented = true;
+        PhoneConnectionJournal.append("ancs-delivery",
+                "notification presented; category=" + record.categoryId);
         lastAppIdentifier = bounded(record.notification.appIdentifier, 512);
         lastAppName = displayNameFor(record.notification.appIdentifier);
         lastAppCategoryId = record.categoryId;
@@ -2770,6 +2812,8 @@ public final class PhoneConnectorController {
         }
         lastTypedV2Error = "";
         lastTypedV2ErrorTransportSession = -1L;
+        v2ReadinessGate.reset();
+        latestV2RouteStatus = null;
         if (previousV2 != null) previousV2.close();
         carRemote.routeUnavailable();
         ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
