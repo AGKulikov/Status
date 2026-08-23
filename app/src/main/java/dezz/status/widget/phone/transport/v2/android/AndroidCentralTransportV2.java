@@ -1974,6 +1974,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                     if (listener != null) listener.onNotificationEvent(effect.event);
                     break;
                 case NOTIFICATION:
+                    if (owner != null) {
+                        reportPlatformDiagnostic(owner.ownerToken,
+                                ancsTrace.decodedNotification());
+                    }
                     if (listener != null) listener.onNotification(effect.notification);
                     break;
                 case APP_NAME:
