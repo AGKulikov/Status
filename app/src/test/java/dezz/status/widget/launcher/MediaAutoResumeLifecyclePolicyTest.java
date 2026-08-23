@@ -7,17 +7,22 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public final class MediaAutoResumeLifecyclePolicyTest {
-    @Test public void coldBootSequenceMovesAnchorOnlyOnce() {
+    @Test public void coldBootSequenceKeepsEarliestAnchor() {
         assertTrue(MediaAutoResumeLifecyclePolicy.shouldCoalesce(
                 MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED,
                 MediaAutoResumeLifecyclePolicy.ACTION_BOOT_COMPLETED,
                 false, 180_000L));
-        assertTrue(MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
+        assertFalse(MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
                 MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED,
                 MediaAutoResumeLifecyclePolicy.ACTION_BOOT_COMPLETED));
         assertFalse(MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
                 MediaAutoResumeLifecyclePolicy.ACTION_BOOT_COMPLETED,
                 MediaAutoResumeLifecyclePolicy.ACTION_QUICKBOOT_POWERON));
+    }
+
+    @Test public void lockedBootIsAnImmediatelyUsableBoundary() {
+        assertTrue(MediaAutoResumeLifecyclePolicy.isUsableBoundary(
+                MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED));
     }
 
     @Test public void ecarxQuickBootBurstNeverRestartsConsumedTimer() {
