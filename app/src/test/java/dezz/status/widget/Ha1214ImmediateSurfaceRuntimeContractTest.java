@@ -45,7 +45,7 @@ public final class Ha1214ImmediateSurfaceRuntimeContractTest {
         assertTrue(visual >= 0 && coordinator > visual);
         String visualAdmission = between(lifecycle,
                 "// Admit the tiny visual surface",
-                "// LOCKED_BOOT/BOOT/QUICKBOOT often arrive");
+                "if (ACTION_QUICKBOOT_POWERON.equals(action)) {");
         assertTrue(visualAdmission.contains("Intent.ACTION_BOOT_COMPLETED.equals(action)"));
         assertTrue(visualAdmission.contains("ACTION_QUICKBOOT_POWERON.equals(action)"));
         assertTrue(visualAdmission.contains("Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)"));

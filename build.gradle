@@ -23,7 +23,9 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return '2.2.11'
+    // Keep the frozen default identity reproducible. New release workflows always pass their
+    // explicit VERSION_NAME/VERSION_CODE pair instead of mutating an older public baseline.
+    return '2.2.10'
 }
 
 int getVersionCode() {

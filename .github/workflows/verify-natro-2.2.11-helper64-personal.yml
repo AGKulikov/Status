@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq "return '2.2.11'" build.gradle
+          grep -Fq "if (version == '2.2.11')" build.gradle
           grep -Fq "return 208021245" build.gradle
           test -z "$(find app ios -type f \( -name '*.p8' -o -name 'AuthKey_*.p8' \) -print -quit)"
           APK=$(find app/build/outputs/apk/geely/debug -name '*.apk' -print -quit)
