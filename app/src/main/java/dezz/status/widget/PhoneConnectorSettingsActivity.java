@@ -1380,10 +1380,10 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_SUBJECT, "Natro — подключение iPhone")
                 .putExtra(Intent.EXTRA_TEXT, "Журнал подключения Natro во вложении")
-                .putExtra(Intent.EXTRA_STREAM, contentUri)
-                .setClipData(ClipData.newUri(
-                        getContentResolver(), exported.getName(), contentUri))
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                .putExtra(Intent.EXTRA_STREAM, contentUri);
+        share.setClipData(ClipData.newUri(
+                getContentResolver(), exported.getName(), contentUri));
+        share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         try {
             startActivity(Intent.createChooser(share, "Экспортировать журнал через…"));
             PhoneConnectionJournal.append("journal-export",
