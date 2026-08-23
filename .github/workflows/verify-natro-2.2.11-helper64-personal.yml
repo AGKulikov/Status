@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   android:
-    name: Android tests and unsigned APK
+    name: Android tests and unsigned release APK
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -33,7 +33,9 @@ jobs:
           java-version: '21'
           cache: gradle
       - name: Test and build
-        run: ./gradlew testGeelyDebugUnitTest assembleGeelyDebug --no-daemon
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
+        run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
       - name: Verify release identity and no embedded APNs private key
         shell: bash
         run: |
@@ -41,16 +43,16 @@ jobs:
           grep -Fq "if (version == '2.2.11')" build.gradle
           grep -Fq "return 208021245" build.gradle
           test -z "$(find app ios -type f \( -name '*.p8' -o -name 'AuthKey_*.p8' \) -print -quit)"
-          APK=$(find app/build/outputs/apk/geely/debug -name '*.apk' -print -quit)
+          APK=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
           test -n "$APK"
-          mv "$APK" "$RUNNER_TEMP/Natro-2.2.11-unsigned-debug.apk"
+          mv "$APK" "$RUNNER_TEMP/Natro-2.2.11-unsigned-release.apk"
       - name: Upload Android candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: Natro-2.2.11-unsigned-debug
+          name: Natro-2.2.11-unsigned-release
           if-no-files-found: error
           retention-days: 14
-          path: ${{ runner.temp }}/Natro-2.2.11-unsigned-debug.apk
+          path: ${{ runner.temp }}/Natro-2.2.11-unsigned-release.apk
 
   helper:
     name: Helper 64 Personal Team Apple-SDK compile
