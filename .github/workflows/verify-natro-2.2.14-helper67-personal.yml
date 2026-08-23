@@ -1,0 +1,92 @@
+name: Verify Natro 2.2.14 and Helper 67 Personal Team
+
+on:
+  push:
+    branches: ['release/natro-2.2.14-helper67-personal']
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'ios/KX11-iPhone-ANCS-Helper-v67-personal/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - '.github/workflows/verify-natro-2.2.14-helper67-personal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android tests and unsigned release APK
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: '2.2.14'
+      VERSION_CODE: '208021248'
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Java 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Test and build
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
+        run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+      - name: Verify release identity and no embedded APNs private key
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "if (version == '2.2.14')" build.gradle
+          grep -Fq "return 208021248" build.gradle
+          test -z "$(find app ios -type f \( -name '*.p8' -o -name 'AuthKey_*.p8' \) -print -quit)"
+          APK=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
+          test -n "$APK"
+          mv "$APK" "$RUNNER_TEMP/Natro-2.2.14-unsigned-release.apk"
+      - name: Upload Android candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Natro-2.2.14-unsigned-release
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/Natro-2.2.14-unsigned-release.apk
+
+  helper:
+    name: Helper 67 Personal Team Apple-SDK compile
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Replay portable contracts
+        run: ios/KX11-iPhone-ANCS-Helper-v67-personal/verify-v67-personal-contract.sh
+      - name: Compile unsigned simulator app and extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v67-personal/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Release \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/Helper67PersonalProducts" \
+            OBJROOT="$RUNNER_TEMP/Helper67PersonalIntermediates" \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+          APP="$RUNNER_TEMP/Helper67PersonalProducts/Release-iphonesimulator/KX11ANCSHelper.app"
+          test -d "$APP/PlugIns/NatroLiveActivityExtension.appex"
+          test "$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Info.plist")" = '67.0'
+          test "$(plutil -extract CFBundleVersion raw -o - "$APP/Info.plist")" = '67'
+          tar -czf "$RUNNER_TEMP/KX11-ANCS-Helper-v67-personal-unsigned-simulator.tar.gz" \
+            -C "$(dirname "$APP")" "$(basename "$APP")"
+      - name: Upload Helper candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: KX11-ANCS-Helper-v67-personal-unsigned-simulator
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/KX11-ANCS-Helper-v67-personal-unsigned-simulator.tar.gz
