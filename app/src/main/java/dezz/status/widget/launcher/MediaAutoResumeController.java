@@ -58,9 +58,9 @@ public final class MediaAutoResumeController {
     private static final String KEY_LAST_COMMAND_ELAPSED = "lastCommandElapsed";
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
-    private static final int MAX_ATTEMPTS = 8;
+    private static final int MAX_ATTEMPTS = 24;
     private static final long[] RETRY_DELAYS_MS = {
-            150L, 250L, 400L, 700L, 1_000L, 1_500L, 2_000L
+            150L, 250L, 400L, 700L, 1_000L, 1_500L, 2_000L, 3_000L, 5_000L
     };
     /**
      * AlarmManager remains the durable process-death fallback. This timer is the hot path: it is
@@ -109,7 +109,7 @@ public final class MediaAutoResumeController {
                     .putLong(KEY_CAPTURE_ELAPSED, now)
                     .putString(KEY_CAPTURE_ACTION, action);
             if (moveAnchor) duplicate.putLong(KEY_PLAN_ANCHOR_ELAPSED, now);
-            duplicate.commit();
+            duplicate.apply();
             PhoneConnectionJournal.append("media-auto-resume",
                     "trace event=lifecycle_coalesced, action=" + action
                             + ", token=" + previousToken
@@ -134,7 +134,7 @@ public final class MediaAutoResumeController {
                 .putLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putLong(KEY_LAST_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putBoolean(KEY_COMPLETED, false)
-                .commit();
+                .apply();
         // A queued retry from the previous standard/QuickBoot lifecycle must never cross the new
         // capture boundary. The token check is the second, callback-time barrier.
         cancelInProcessTimer();
@@ -233,7 +233,7 @@ public final class MediaAutoResumeController {
                 .putLong(KEY_BOOT_TOKEN, captureToken)
                 .putString(KEY_TARGET_PACKAGE, target)
                 .putBoolean(KEY_COMPLETED, false)
-                .commit();
+                .apply();
         int delaySeconds = clamp(preferences.launcherMediaAutoResumeDelaySeconds.get(), 0, 60);
         long planAnchorElapsed = state.getLong(
                 KEY_PLAN_ANCHOR_ELAPSED, SystemClock.elapsedRealtime());
@@ -347,7 +347,7 @@ public final class MediaAutoResumeController {
         state(app).edit()
                 .putLong(KEY_TARGET_ELAPSED, triggerElapsed)
                 .putInt(KEY_NEXT_ATTEMPT, attempt)
-                .commit();
+                .apply();
         scheduleInProcess(app, bootToken, attempt, delayMillis);
         Intent intent = new Intent(app, MediaAutoResumeReceiver.class)
                 .setAction(ACTION_RESUME)
@@ -475,6 +475,27 @@ public final class MediaAutoResumeController {
                 "media_session_ready_kick");
         PhoneConnectionJournal.append("media-auto-resume",
                 "trace event=session_ready_kick, target=" + target
+                        + ", overdueMs=" + Math.max(0L, now - targetElapsed)
+                        + ", elapsed=" + now);
+    }
+
+    /** Re-dispatches a due PLAY as soon as the head unit reports a usable audio/ACL route. */
+    public static void onAudioRouteReady(@NonNull Context context, @NonNull String source) {
+        Context app = applicationContext(context);
+        SharedPreferences state = state(app);
+        if (state.getBoolean(KEY_COMPLETED, true)) return;
+        long now = SystemClock.elapsedRealtime();
+        long targetElapsed = state.getLong(KEY_TARGET_ELAPSED, Long.MAX_VALUE);
+        if (now < targetElapsed) return;
+        long bootToken = state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE);
+        if (bootToken == Long.MIN_VALUE
+                || state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken) return;
+        int attempt = state.getInt(KEY_NEXT_ATTEMPT, 0);
+        if (attempt >= MAX_ATTEMPTS) return;
+        schedule(app, bootToken, attempt, 50L, "audio_route_ready");
+        PhoneConnectionJournal.append("media-auto-resume",
+                "trace event=audio_route_kick, source=" + source
+                        + ", attempt=" + (attempt + 1)
                         + ", overdueMs=" + Math.max(0L, now - targetElapsed)
                         + ", elapsed=" + now);
     }
