@@ -113,6 +113,7 @@ final class MediaResumeCommand {
         String target = targetPackage.trim();
         if (target.isEmpty()) return trace(Result.NO_TARGET, "target=empty");
         String sessionError = "none";
+        String sessionInventory = "[]";
         int activeSessionCount = -1;
         MediaSessionManager sessions = context.getSystemService(MediaSessionManager.class);
         if (sessions != null) {
@@ -122,6 +123,18 @@ final class MediaResumeCommand {
                 List<MediaController> controllers = sessions.getActiveSessions(listener);
                 if (controllers == null) controllers = Collections.emptyList();
                 activeSessionCount = controllers.size();
+                StringBuilder inventory = new StringBuilder("[");
+                int inventoryCount = 0;
+                for (MediaController controller : controllers) {
+                    if (inventoryCount >= 6) break;
+                    PlaybackState itemState = controller.getPlaybackState();
+                    if (inventoryCount++ > 0) inventory.append(';');
+                    inventory.append(controller.getPackageName())
+                            .append(':')
+                            .append(itemState == null ? -1 : itemState.getState());
+                }
+                if (controllers.size() > inventoryCount) inventory.append(";...");
+                sessionInventory = inventory.append(']').toString();
                 for (MediaController controller : controllers) {
                     if (!target.equals(controller.getPackageName())) continue;
                     PlaybackState state = controller.getPlaybackState();
@@ -134,6 +147,7 @@ final class MediaResumeCommand {
                             if (playing) {
                                 return trace(Result.ALREADY_PLAYING,
                                         "route=session, activeSessions=" + activeSessionCount
+                                                + ", sessions=" + sessionInventory
                                                 + ", playbackState=" + playbackState
                                                 + ", actions=" + actions);
                             }
@@ -152,6 +166,7 @@ final class MediaResumeCommand {
                     }
                     return trace(Result.SESSION_COMMAND,
                             "route=session, activeSessions=" + activeSessionCount
+                                    + ", sessions=" + sessionInventory
                                     + ", playbackState=" + playbackState
                                     + ", actions=" + actions);
                 }
@@ -184,6 +199,7 @@ final class MediaResumeCommand {
             return trace(dispatchError.isEmpty()
                             ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
                     "route=queried_receiver, activeSessions=" + activeSessionCount
+                            + ", sessions=" + sessionInventory
                             + ", sessionError=" + sessionError
                             + ", receiverCount=" + receiverCount
                             + ", receiver=" + receiver.flattenToShortString()
@@ -196,6 +212,7 @@ final class MediaResumeCommand {
             return trace(dispatchError.isEmpty()
                             ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
                     "route=known_receiver, activeSessions=" + activeSessionCount
+                            + ", sessions=" + sessionInventory
                             + ", sessionError=" + sessionError
                             + ", receiverCount=" + receiverCount
                             + ", receiverQueryError=" + receiverQueryError
@@ -204,6 +221,7 @@ final class MediaResumeCommand {
         }
         return trace(Result.NO_TARGET,
                 "route=none, activeSessions=" + activeSessionCount
+                        + ", sessions=" + sessionInventory
                         + ", sessionError=" + sessionError
                         + ", receiverCount=" + receiverCount
                         + ", receiverQueryError=" + receiverQueryError

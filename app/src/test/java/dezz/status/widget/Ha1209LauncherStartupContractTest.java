@@ -197,7 +197,7 @@ public final class Ha1209LauncherStartupContractTest {
             throws Exception {
         String receiver = javaSource("BootReceiver.java");
         String media = javaSource("launcher/MediaAutoResumeController.java");
-        assertTrue(receiver.contains("armAtReceiverBoundaryAsync(receiverContext, receivedAction)"));
+        assertTrue(receiver.contains("armAtReceiverBoundary(receiverContext, receivedAction)"));
         assertTrue(receiver.contains("PHASE_MEDIA_PLAN"));
         String capture = between(media, "public static long captureBootHistorySnapshot",
                 "/** Enters the dedicated exact-timer lane");

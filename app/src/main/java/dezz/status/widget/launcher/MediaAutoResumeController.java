@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.StartupWorkCoordinator;
+import dezz.status.widget.launcher.media.MediaAppLauncher;
 import dezz.status.widget.phone.PhoneConnectionJournal;
 
 /**
@@ -56,6 +57,7 @@ public final class MediaAutoResumeController {
     private static final String KEY_OBSERVATION_KICK_ELAPSED = "observationKickElapsed";
     private static final String KEY_FIRST_COMMAND_ELAPSED = "firstCommandElapsed";
     private static final String KEY_LAST_COMMAND_ELAPSED = "lastCommandElapsed";
+    private static final String KEY_WARM_LAUNCH_ELAPSED = "warmLaunchElapsed";
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
     private static final int MAX_ATTEMPTS = 24;
@@ -133,6 +135,7 @@ public final class MediaAutoResumeController {
                 .putLong(KEY_OBSERVATION_KICK_ELAPSED, Long.MIN_VALUE)
                 .putLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putLong(KEY_LAST_COMMAND_ELAPSED, Long.MIN_VALUE)
+                .putLong(KEY_WARM_LAUNCH_ELAPSED, Long.MIN_VALUE)
                 .putBoolean(KEY_COMPLETED, false)
                 .apply();
         // A queued retry from the previous standard/QuickBoot lifecycle must never cross the new
@@ -151,31 +154,35 @@ public final class MediaAutoResumeController {
         return captureToken;
     }
 
-    /** Enters the dedicated exact-timer lane before unrelated startup work can queue ahead of it. */
-    public static void armAtReceiverBoundaryAsync(@NonNull Context context,
-                                                  @NonNull String action) {
+    /**
+     * Captures and arms the absolute deadline directly at the BroadcastReceiver boundary.
+     *
+     * <p>This deliberately does not enqueue behind the command/timer lane. Real KX11 traces
+     * showed that PackageManager work from an older media attempt could occupy that lane for
+     * 5-6 seconds, so a configured three-second delay did not even begin until much later.</p>
+     */
+    public static void armAtReceiverBoundary(@NonNull Context context,
+                                             @NonNull String action) {
         if (!MediaAutoResumeLifecyclePolicy.isLifecycleAction(action)) return;
         Context exactApp = applicationContext(context);
         long receiverAt = SystemClock.elapsedRealtime();
         PhoneConnectionJournal.append("media-auto-resume",
                 "trace event=receiver_boundary_enqueue, action=" + action
                         + ", elapsed=" + receiverAt);
-        EXACT_TIMER.execute(() -> {
-            long dequeuedAt = SystemClock.elapsedRealtime();
-            PhoneConnectionJournal.append("media-auto-resume",
-                    "trace event=receiver_boundary_dequeue, action=" + action
-                            + ", queueWaitMs=" + Math.max(0L, dequeuedAt - receiverAt)
-                            + ", elapsed=" + dequeuedAt);
-            try {
-                captureBootHistorySnapshot(exactApp, action);
-                if (MediaAutoResumeLifecyclePolicy.isUsableBoundary(action)) {
-                    scheduleAfterBoot(exactApp);
-                }
-            } catch (RuntimeException failure) {
-                Log.e(TAG, "Could not arm media resume at lifecycle boundary action="
-                        + action, failure);
+        long enteredAt = SystemClock.elapsedRealtime();
+        PhoneConnectionJournal.append("media-auto-resume",
+                "trace event=receiver_boundary_dequeue, action=" + action
+                        + ", queueWaitMs=" + Math.max(0L, enteredAt - receiverAt)
+                        + ", route=inline, elapsed=" + enteredAt);
+        try {
+            captureBootHistorySnapshot(exactApp, action);
+            if (MediaAutoResumeLifecyclePolicy.isUsableBoundary(action)) {
+                scheduleAfterBoot(exactApp);
             }
-        });
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not arm media resume at lifecycle boundary action="
+                    + action, failure);
+        }
     }
 
     /** Called at the receiver boundary; the delayed media phase may idempotently re-arm it. */
@@ -320,6 +327,35 @@ public final class MediaAutoResumeController {
             Log.i(TAG, "Playback is already active; no duplicate command sent");
             complete(app, "already_playing_at_dispatch");
             return;
+        }
+
+        // A receiver broadcast can be accepted by Android while a force-stopped/hibernated
+        // player silently ignores it. The KX11 Yandex Music build did exactly that for all 24
+        // retries. Wake only the explicitly selected package, at most once per boot plan, then
+        // issue PLAY as soon as its process and MediaSession have had one short turn to appear.
+        long warmLaunchAt = state.getLong(KEY_WARM_LAUNCH_ELAPSED, Long.MIN_VALUE);
+        if (warmLaunchAt == Long.MIN_VALUE
+                && trace.result != MediaResumeCommand.Result.SESSION_COMMAND) {
+            long launchStartedAt = SystemClock.elapsedRealtime();
+            boolean launched = MediaAppLauncher.launchPackage(app, target);
+            long launchFinishedAt = SystemClock.elapsedRealtime();
+            state.edit().putLong(KEY_WARM_LAUNCH_ELAPSED, launchStartedAt).apply();
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=target_warm_launch, token=" + bootToken
+                            + ", target=" + target
+                            + ", launched=" + launched
+                            + ", sourceResult=" + trace.result
+                            + ", durationMs="
+                            + Math.max(0L, launchFinishedAt - launchStartedAt)
+                            + ", sinceCaptureMs=" + elapsedSince(state,
+                            KEY_CAPTURE_ELAPSED, launchStartedAt)
+                            + ", elapsed=" + launchFinishedAt);
+            int nextAttempt = attempt + 1;
+            if (nextAttempt < MAX_ATTEMPTS) {
+                schedule(app, bootToken, nextAttempt, 300L,
+                        launched ? "target_warm_launch" : "target_warm_launch_failed");
+                return;
+            }
         }
 
         int nextAttempt = attempt + 1;

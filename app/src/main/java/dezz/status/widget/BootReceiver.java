@@ -73,7 +73,7 @@ public class BootReceiver extends BroadcastReceiver {
                 ? "" : received.getAction();
         // Admit media to its dedicated exact-timer lane before submitting shared startup work.
         // Putting timer creation there let unrelated restoration postpone seconds by minutes.
-        MediaAutoResumeController.armAtReceiverBoundaryAsync(receiverContext, receivedAction);
+        MediaAutoResumeController.armAtReceiverBoundary(receiverContext, receivedAction);
         PendingResult pending = goAsync();
         try {
             STARTUP_LANE.execute(() -> {

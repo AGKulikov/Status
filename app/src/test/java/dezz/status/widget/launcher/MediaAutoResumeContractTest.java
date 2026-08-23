@@ -70,8 +70,8 @@ public final class MediaAutoResumeContractTest {
                 "dezz/status/widget/launcher/MediaAutoResumeController.java");
 
         assertTrue(boot.contains(
-                "MediaAutoResumeController.armAtReceiverBoundaryAsync(receiverContext, receivedAction)"));
-        assertTrue(boot.indexOf("armAtReceiverBoundaryAsync(receiverContext, receivedAction)")
+                "MediaAutoResumeController.armAtReceiverBoundary(receiverContext, receivedAction)"));
+        assertTrue(boot.indexOf("armAtReceiverBoundary(receiverContext, receivedAction)")
                 < boot.indexOf("STARTUP_LANE.execute"));
         assertTrue(boot.contains("StartupWorkCoordinator.PHASE_MEDIA_PLAN"));
         assertTrue(controller.contains("MediaPlaybackHistoryStore.read(app)"));
