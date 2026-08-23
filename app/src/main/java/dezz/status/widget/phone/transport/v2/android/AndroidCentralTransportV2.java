@@ -24,6 +24,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Build;
 import android.os.ParcelUuid;
+import android.os.SystemClock;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.phone.PhoneConnectionJournal;

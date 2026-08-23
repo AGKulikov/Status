@@ -1592,10 +1592,13 @@ public final class HelperSwitchRuntimeCoordinator {
 
     private func expireRecoveryBackgroundTask() {
         guard recoveryBackgroundTask != .invalid else { return }
+        let duration = Self.elapsed(
+            from: recoveryBackgroundTaskStartedAtMs,
+            to: Self.nowMs()
+        )
         onDiagnosticEvent?(
             "ble_recovery_background expiration phase=\(policy.state.phase.rawValue), " +
-            "durationMs=\(Self.elapsed(from: recoveryBackgroundTaskStartedAtMs, " +
-            "to: Self.nowMs()))"
+            "durationMs=\(duration)"
         )
         endRecoveryBackgroundTask(outcome: "expired")
     }
