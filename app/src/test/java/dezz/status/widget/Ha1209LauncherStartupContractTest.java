@@ -197,10 +197,10 @@ public final class Ha1209LauncherStartupContractTest {
             throws Exception {
         String receiver = javaSource("BootReceiver.java");
         String media = javaSource("launcher/MediaAutoResumeController.java");
-        assertTrue(receiver.contains("captureBootHistorySnapshot(context, action)"));
+        assertTrue(receiver.contains("armAtReceiverBoundaryAsync(receiverContext, receivedAction)"));
         assertTrue(receiver.contains("PHASE_MEDIA_PLAN"));
         String capture = between(media, "public static long captureBootHistorySnapshot",
-                "/** Called from the delayed media lane");
+                "/** Enters the dedicated exact-timer lane");
         assertTrue(capture.contains("MediaPlaybackHistoryStore.read(app)"));
         assertFalse(capture.contains("new Preferences"));
         assertTrue(capture.contains("KEY_CAPTURE_TOKEN"));

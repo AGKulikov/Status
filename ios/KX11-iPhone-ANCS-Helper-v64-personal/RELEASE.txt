@@ -1,0 +1,31 @@
+KX11 ANCS Helper v64 Personal Team — local ActivityKit lifecycle and low-latency controls
+Bundle ID: ru.natro.kx11ancshelper
+Build: 64
+Marketing version: 64.0
+Minimum iOS: 14.0 (Live Activity requires iOS 16.2)
+Paired runtime: Natro 2.2.10
+Status: source candidate; Apple-SDK CI and physical-device checks are release gates
+
+Personal Team differences:
+
+- removes Push Notifications, aps-environment and App Groups from both signed targets;
+- creates strictly local Live Activities with pushType nil;
+- never exports or advertises push-to-start/activity push tokens to Natro;
+- adds separate Shortcuts actions to start and stop both Live Activities;
+- start opens Helper for Apple's required foreground Activity.request path;
+- Lock Screen controls use the URL fallback, open Helper and require command confirmation.
+
+Behavior retained from v63:
+
+- starts both local cards only when the authenticated C5 route to the selected car is connected;
+- ends both cards immediately when that route disconnects;
+- retains 500 ms unsolicited coalescing and immediate command-driven ActivityKit updates;
+- keeps optimistic control state, timeout rollback and accumulated temperature taps;
+- keeps the full Bluetooth vehicle-control and ANCS runtime unchanged.
+
+Apple platform boundary: a Personal Team cannot perform a background-first Live Activity start.
+The Shortcut start action therefore opens Helper; the stop action can end existing cards directly.
+No signed IPA is produced by this repository; the Xcode project is the deliverable.
+
+Do not call this candidate stable until Apple-SDK CI and the physical iPhone/KX11 acceptance
+matrix pass, including Shortcut start/stop, locked-screen controls and Bluetooth reconnect/loss.

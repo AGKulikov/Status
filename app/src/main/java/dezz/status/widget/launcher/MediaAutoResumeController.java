@@ -41,8 +41,6 @@ public final class MediaAutoResumeController {
     public static final String EXTRA_ATTEMPT = "attempt";
 
     private static final String TAG = "MediaAutoResume";
-    private static final String ACTION_QUICKBOOT_POWERON =
-            "android.intent.action.QUICKBOOT_POWERON";
     private static final String PREFS = "launcher_media_auto_resume_state";
     private static final String KEY_CAPTURE_TOKEN = "captureToken";
     private static final String KEY_CAPTURE_ELAPSED = "captureElapsed";
@@ -59,7 +57,6 @@ public final class MediaAutoResumeController {
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
     private static final int MAX_ATTEMPTS = 8;
-    private static final long CAPTURE_BURST_COALESCE_MS = 120_000L;
     private static final long[] RETRY_DELAYS_MS = {
             150L, 250L, 400L, 700L, 1_000L, 1_500L, 2_000L
     };
@@ -86,8 +83,8 @@ public final class MediaAutoResumeController {
     /**
      * Freezes only the tiny device-protected playback edge at the lifecycle boundary. No launcher
      * Preferences migration, PackageManager query or media command is allowed here. LOCKED_BOOT
-     * and BOOT_COMPLETED for one kernel boot share the first snapshot; a later ECARX QuickBoot
-     * receives a new synthetic token even when {@code BOOT_COUNT} did not change.
+     * and BOOT_COMPLETED for one kernel boot share the first snapshot. Repeated ECARX QuickBoot
+     * broadcasts inside one continuous startup burst also share it and cannot reset the timer.
      */
     public static long captureBootHistorySnapshot(@NonNull Context context,
                                                   @NonNull String action) {
@@ -99,32 +96,22 @@ public final class MediaAutoResumeController {
         int previousBootCount = state.getInt(KEY_CAPTURE_BOOT_COUNT, Integer.MIN_VALUE);
         String previousAction = state.getString(KEY_CAPTURE_ACTION, "");
         long delta = previousElapsed == Long.MIN_VALUE ? Long.MAX_VALUE : now - previousElapsed;
-        boolean sameKnownBootCount = bootCount >= 0 && bootCount == previousBootCount;
         boolean differentKnownBootCount = bootCount >= 0 && previousBootCount >= 0
                 && bootCount != previousBootCount;
-        boolean sameStandardBoot = sameKnownBootCount
-                && isStandardBootAction(previousAction) && isStandardBootAction(action);
-        boolean sameLifecycleBurst = delta >= 0L && delta <= CAPTURE_BURST_COALESCE_MS;
         long previousToken = state.getLong(KEY_CAPTURE_TOKEN, 0L);
-        boolean previousPlanConsumed = previousToken != 0L
-                && state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE) == previousToken;
-        boolean duplicateUnconsumedQuickSequence = !differentKnownBootCount
-                && !previousPlanConsumed && sameLifecycleBurst
-                && (Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(previousAction)
-                || ACTION_QUICKBOOT_POWERON.equals(previousAction))
-                && (Intent.ACTION_BOOT_COMPLETED.equals(action)
-                || ACTION_QUICKBOOT_POWERON.equals(action));
-        // BOOT -> QUICK is always a new ECARX lifecycle even with the same kernel BOOT_COUNT.
-        // QUICK -> QUICK is coalesced only until its media plan has consumed the frozen token.
-        if (previousToken != 0L && !differentKnownBootCount
-                && (sameStandardBoot || duplicateUnconsumedQuickSequence)) {
-            if (!Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)) {
-                // Preserve the first pre-OEM snapshot, but define the user delay from the later
-                // usable BOOT/QuickBoot boundary rather than from a potentially minute-old
-                // LOCKED_BOOT event.
-                state.edit().putLong(KEY_PLAN_ANCHOR_ELAPSED, now)
-                        .putString(KEY_CAPTURE_ACTION, action).commit();
-            }
+        if (previousToken != 0L && MediaAutoResumeLifecyclePolicy.shouldCoalesce(
+                previousAction, action, differentKnownBootCount, delta)) {
+            boolean moveAnchor = MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
+                    previousAction, action);
+            SharedPreferences.Editor duplicate = state.edit()
+                    .putLong(KEY_CAPTURE_ELAPSED, now)
+                    .putString(KEY_CAPTURE_ACTION, action);
+            if (moveAnchor) duplicate.putLong(KEY_PLAN_ANCHOR_ELAPSED, now);
+            duplicate.commit();
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "повтор события объединён action=" + action
+                            + ", token=" + previousToken
+                            + ", anchorMoved=" + moveAnchor);
             return previousToken;
         }
 
@@ -153,7 +140,25 @@ public final class MediaAutoResumeController {
         return captureToken;
     }
 
-    /** Called from the delayed media lane, never directly on the boot receiver boundary. */
+    /** Enters the dedicated exact-timer lane before unrelated startup work can queue ahead of it. */
+    public static void armAtReceiverBoundaryAsync(@NonNull Context context,
+                                                  @NonNull String action) {
+        if (!MediaAutoResumeLifecyclePolicy.isLifecycleAction(action)) return;
+        Context exactApp = applicationContext(context);
+        EXACT_TIMER.execute(() -> {
+            try {
+                captureBootHistorySnapshot(exactApp, action);
+                if (MediaAutoResumeLifecyclePolicy.isUsableBoundary(action)) {
+                    scheduleAfterBoot(exactApp);
+                }
+            } catch (RuntimeException failure) {
+                Log.e(TAG, "Could not arm media resume at lifecycle boundary action="
+                        + action, failure);
+            }
+        });
+    }
+
+    /** Called at the receiver boundary; the delayed media phase may idempotently re-arm it. */
     public static void scheduleAfterBoot(@NonNull Context context) {
         Context app = applicationContext(context);
         SharedPreferences state = state(app);
@@ -382,11 +387,6 @@ public final class MediaAutoResumeController {
         } catch (Settings.SettingNotFoundException | RuntimeException ignored) {
             return -1;
         }
-    }
-
-    private static boolean isStandardBootAction(@NonNull String action) {
-        return Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)
-                || Intent.ACTION_BOOT_COMPLETED.equals(action);
     }
 
     @NonNull

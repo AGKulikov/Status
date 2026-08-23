@@ -42,8 +42,9 @@ public final class MediaAutoResumeContractTest {
         assertTrue(controller.contains("150L, 250L, 400L, 700L"));
         assertTrue(preferences.contains("\"launcherMediaFixedPlayerEnabled\", false"));
         assertTrue(preferences.contains("\"launcherMediaFixedPlayerPackage\", \"\""));
-        assertTrue(boot.contains(
-                "if (!Intent.ACTION_MY_PACKAGE_REPLACED.equals(action))"));
+        assertTrue(controller.contains(
+                "if (!MediaAutoResumeLifecyclePolicy.isLifecycleAction(action)) return"));
+        assertFalse(controller.contains("ACTION_MY_PACKAGE_REPLACED"));
         assertTrue(boot.contains("MediaAutoResumeController.scheduleAfterBoot(context)"));
     }
 
@@ -62,13 +63,16 @@ public final class MediaAutoResumeContractTest {
     }
 
     @Test
-    public void lifecycleSnapshotIsFrozenBeforeTheDelayedRelativeMediaLane()
+    public void lifecycleSnapshotIsFrozenBeforeTheSharedStartupLane()
             throws IOException {
         String boot = source("dezz/status/widget/BootReceiver.java");
         String controller = source(
                 "dezz/status/widget/launcher/MediaAutoResumeController.java");
 
-        assertTrue(boot.contains("captureBootHistorySnapshot(context, action)"));
+        assertTrue(boot.contains(
+                "MediaAutoResumeController.armAtReceiverBoundaryAsync(receiverContext, receivedAction)"));
+        assertTrue(boot.indexOf("armAtReceiverBoundaryAsync(receiverContext, receivedAction)")
+                < boot.indexOf("STARTUP_LANE.execute"));
         assertTrue(boot.contains("StartupWorkCoordinator.PHASE_MEDIA_PLAN"));
         assertTrue(controller.contains("MediaPlaybackHistoryStore.read(app)"));
         assertTrue(controller.contains("KEY_CAPTURE_HISTORY_PACKAGE"));
@@ -79,6 +83,8 @@ public final class MediaAutoResumeContractTest {
                 "targetElapsed - SystemClock.elapsedRealtime()"));
         assertTrue(controller.contains(
                 "state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken"));
+        assertTrue(controller.contains("MediaAutoResumeLifecyclePolicy.shouldCoalesce("));
+        assertFalse(controller.contains("previousPlanConsumed"));
 
         int capture = controller.indexOf("public static long captureBootHistorySnapshot");
         int delayed = controller.indexOf("public static void scheduleAfterBoot");

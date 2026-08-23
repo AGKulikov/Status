@@ -69,6 +69,11 @@ public class BootReceiver extends BroadcastReceiver {
         if (app == null) app = context;
         Context receiverContext = app;
         Intent received = intent == null ? null : new Intent(intent);
+        String receivedAction = received == null || received.getAction() == null
+                ? "" : received.getAction();
+        // Admit media to its dedicated exact-timer lane before submitting shared startup work.
+        // Putting timer creation there let unrelated restoration postpone seconds by minutes.
+        MediaAutoResumeController.armAtReceiverBoundaryAsync(receiverContext, receivedAction);
         PendingResult pending = goAsync();
         try {
             STARTUP_LANE.execute(() -> {
@@ -160,17 +165,6 @@ public class BootReceiver extends BroadcastReceiver {
                     || ACTION_QUICKBOOT_POWERON.equals(action)
                     || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
                 WidgetServiceStarter.startVisibleSurfaceImmediatelyWithRetry(context);
-            }
-            // LOCKED_BOOT/BOOT/QUICKBOOT often arrive close together on ECARX. Serialize their
-            // snapshot and generation work off the receiver's main Looper.
-            if (!Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
-                MediaAutoResumeController.captureBootHistorySnapshot(context, action);
-                if (Intent.ACTION_BOOT_COMPLETED.equals(action)
-                        || ACTION_QUICKBOOT_POWERON.equals(action)) {
-                    // Start the user-selected countdown at the usable boot boundary. The
-                    // coordinator's media phase remains an idempotent durable re-arm.
-                    MediaAutoResumeController.scheduleAfterBoot(context);
-                }
             }
             if (ACTION_QUICKBOOT_POWERON.equals(action)) {
                 WidgetService survivingHost = WidgetService.getInstance();
