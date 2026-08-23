@@ -61,7 +61,6 @@ import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarTelemetryDescriptor;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
-import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.launcher.LauncherGlobalElementTag;
 import dezz.status.widget.phone.PhoneIndicatorVisualPolicy;
@@ -102,7 +101,7 @@ public final class InformationPanelView extends FrameLayout {
     private int catalogGeneration;
     private int connectorGeneration;
     @Nullable private WidgetService subscribedService;
-    @Nullable private ConnectorValueRegistry.Listener connectorListener;
+    @Nullable private ConnectorValueSubscriptionHub.Subscriber connectorListener;
     @Nullable private ContentListener contentListener;
 
     private final CarIntegration.TelemetryListener vehicleListener = value -> {
@@ -304,14 +303,14 @@ public final class InformationPanelView extends FrameLayout {
         if (current != null) {
             final int generation = connectorGeneration;
             final WidgetService capturedService = current;
-            ConnectorValueRegistry.Listener listener = changed -> {
+            ConnectorValueSubscriptionHub.Subscriber listener = changed -> {
                 List<ConnectorValue> copy = new ArrayList<>(changed);
                 post(() -> acceptConnectorChanges(
                         copy, generation, capturedService));
             };
             connectorListener = listener;
             List<ConnectorValue> snapshot =
-                    current.addConnectorValueListener(listener);
+                    ConnectorValueSubscriptionHub.subscribe(current, listener);
             for (ConnectorValue value : snapshot) {
                 connectorValues.put(connectorKey(value), value);
             }
@@ -325,11 +324,11 @@ public final class InformationPanelView extends FrameLayout {
         // alone cannot distinguish an old transport session.
         connectorGeneration++;
         WidgetService current = subscribedService;
-        ConnectorValueRegistry.Listener listener = connectorListener;
+        ConnectorValueSubscriptionHub.Subscriber listener = connectorListener;
         subscribedService = null;
         connectorListener = null;
         if (current != null && listener != null) {
-            current.removeConnectorValueListener(listener);
+            ConnectorValueSubscriptionHub.unsubscribe(current, listener);
         }
         connectorValues.clear();
     }
