@@ -200,7 +200,7 @@ public final class Ha1209LauncherStartupContractTest {
         assertTrue(receiver.contains("armAtReceiverBoundary(receiverContext, receivedAction)"));
         assertTrue(receiver.contains("PHASE_MEDIA_PLAN"));
         String capture = between(media, "public static long captureBootHistorySnapshot",
-                "/** Enters the dedicated exact-timer lane");
+                "public static void armAtReceiverBoundary");
         assertTrue(capture.contains("MediaPlaybackHistoryStore.read(app)"));
         assertFalse(capture.contains("new Preferences"));
         assertTrue(capture.contains("KEY_CAPTURE_TOKEN"));
