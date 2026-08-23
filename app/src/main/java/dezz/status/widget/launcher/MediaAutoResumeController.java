@@ -54,6 +54,8 @@ public final class MediaAutoResumeController {
     private static final String KEY_TARGET_ELAPSED = "targetElapsed";
     private static final String KEY_NEXT_ATTEMPT = "nextAttempt";
     private static final String KEY_OBSERVATION_KICK_ELAPSED = "observationKickElapsed";
+    private static final String KEY_FIRST_COMMAND_ELAPSED = "firstCommandElapsed";
+    private static final String KEY_LAST_COMMAND_ELAPSED = "lastCommandElapsed";
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
     private static final int MAX_ATTEMPTS = 8;
@@ -109,9 +111,12 @@ public final class MediaAutoResumeController {
             if (moveAnchor) duplicate.putLong(KEY_PLAN_ANCHOR_ELAPSED, now);
             duplicate.commit();
             PhoneConnectionJournal.append("media-auto-resume",
-                    "повтор события объединён action=" + action
+                    "trace event=lifecycle_coalesced, action=" + action
                             + ", token=" + previousToken
-                            + ", anchorMoved=" + moveAnchor);
+                            + ", previousAction=" + previousAction
+                            + ", sincePreviousMs=" + delta
+                            + ", anchorMoved=" + moveAnchor
+                            + ", elapsed=" + now);
             return previousToken;
         }
 
@@ -126,6 +131,8 @@ public final class MediaAutoResumeController {
                 .putString(KEY_CAPTURE_HISTORY_PACKAGE, history.packageName)
                 .putBoolean(KEY_CAPTURE_HISTORY_WAS_PLAYING, history.wasPlaying)
                 .putLong(KEY_OBSERVATION_KICK_ELAPSED, Long.MIN_VALUE)
+                .putLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE)
+                .putLong(KEY_LAST_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putBoolean(KEY_COMPLETED, false)
                 .commit();
         // A queued retry from the previous standard/QuickBoot lifecycle must never cross the new
@@ -135,8 +142,12 @@ public final class MediaAutoResumeController {
         Log.i(TAG, "Frozen media history for lifecycle token=" + captureToken
                 + " package=" + history.packageName + " playing=" + history.wasPlaying);
         PhoneConnectionJournal.append("media-auto-resume",
-                "снимок загрузки token=" + captureToken
-                        + ", playing=" + history.wasPlaying);
+                "trace event=lifecycle_captured, token=" + captureToken
+                        + ", action=" + action
+                        + ", bootCount=" + bootCount
+                        + ", historyPackage=" + history.packageName
+                        + ", playing=" + history.wasPlaying
+                        + ", elapsed=" + now);
         return captureToken;
     }
 
@@ -145,7 +156,16 @@ public final class MediaAutoResumeController {
                                                   @NonNull String action) {
         if (!MediaAutoResumeLifecyclePolicy.isLifecycleAction(action)) return;
         Context exactApp = applicationContext(context);
+        long receiverAt = SystemClock.elapsedRealtime();
+        PhoneConnectionJournal.append("media-auto-resume",
+                "trace event=receiver_boundary_enqueue, action=" + action
+                        + ", elapsed=" + receiverAt);
         EXACT_TIMER.execute(() -> {
+            long dequeuedAt = SystemClock.elapsedRealtime();
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=receiver_boundary_dequeue, action=" + action
+                            + ", queueWaitMs=" + Math.max(0L, dequeuedAt - receiverAt)
+                            + ", elapsed=" + dequeuedAt);
             try {
                 captureBootHistorySnapshot(exactApp, action);
                 if (MediaAutoResumeLifecyclePolicy.isUsableBoundary(action)) {
@@ -162,6 +182,7 @@ public final class MediaAutoResumeController {
     public static void scheduleAfterBoot(@NonNull Context context) {
         Context app = applicationContext(context);
         SharedPreferences state = state(app);
+        long enteredAt = SystemClock.elapsedRealtime();
         long captureToken = state.getLong(KEY_CAPTURE_TOKEN, 0L);
         if (captureToken == 0L) {
             captureToken = captureBootHistorySnapshot(app, Intent.ACTION_BOOT_COMPLETED);
@@ -173,13 +194,18 @@ public final class MediaAutoResumeController {
                 int nextAttempt = state.getInt(KEY_NEXT_ATTEMPT, 0);
                 if (targetElapsed > 0L) {
                     schedule(app, captureToken, nextAttempt,
-                            Math.max(0L, targetElapsed - SystemClock.elapsedRealtime()));
+                            Math.max(0L, targetElapsed - SystemClock.elapsedRealtime()),
+                            "existing_plan_rearm");
                 }
             }
             return;
         }
         Preferences preferences = new Preferences(app);
         if (!preferences.launcherMediaAutoResumeEnabled.get()) {
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=plan_skipped, reason=disabled, token=" + captureToken
+                            + ", sinceCaptureMs=" + elapsedSince(state,
+                            KEY_CAPTURE_ELAPSED, enteredAt));
             cancel(app);
             return;
         }
@@ -191,6 +217,13 @@ public final class MediaAutoResumeController {
         if (!MediaPlaybackTargetPolicy.shouldAutoResume(fixedPlayer, fixedPackage,
                 frozenHistoryPackage, frozenHistoryWasPlaying)) {
             Log.i(TAG, "Auto-resume skipped: there is no eligible target player");
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=plan_skipped, reason=no_eligible_target, token="
+                            + captureToken + ", fixed=" + fixedPlayer
+                            + ", historyPlaying=" + frozenHistoryWasPlaying
+                            + ", historyPackage=" + frozenHistoryPackage
+                            + ", sinceCaptureMs=" + elapsedSince(state,
+                            KEY_CAPTURE_ELAPSED, enteredAt));
             cancel(app);
             return;
         }
@@ -207,11 +240,18 @@ public final class MediaAutoResumeController {
         long targetElapsed = planAnchorElapsed + Math.max(delaySeconds * 1_000L,
                 StartupWorkCoordinator.mediaAutoResumeMinimumDelayMillis());
         long delayMillis = Math.max(0L, targetElapsed - SystemClock.elapsedRealtime());
-        schedule(app, captureToken, 0, delayMillis);
+        schedule(app, captureToken, 0, delayMillis, "initial_plan");
         Log.i(TAG, "Scheduled auto-resume for " + target
                 + " after " + (delayMillis / 1_000L) + " s");
         PhoneConnectionJournal.append("media-auto-resume",
-                "точный план token=" + captureToken + ", delayMs=" + delayMillis);
+                "trace event=plan_created, token=" + captureToken
+                        + ", target=" + target
+                        + ", configuredDelayMs=" + (delaySeconds * 1_000L)
+                        + ", minimumDelayMs="
+                        + StartupWorkCoordinator.mediaAutoResumeMinimumDelayMillis()
+                        + ", anchorAgeMs=" + Math.max(0L, enteredAt - planAnchorElapsed)
+                        + ", remainingMs=" + delayMillis
+                        + ", targetElapsed=" + targetElapsed);
     }
 
     static void execute(@NonNull Context context, long bootToken, int attempt) {
@@ -223,50 +263,87 @@ public final class MediaAutoResumeController {
     private static void executeSerialized(@NonNull Context context, long bootToken, int attempt) {
         Context app = applicationContext(context);
         SharedPreferences state = state(app);
-        if (state.getBoolean(KEY_COMPLETED, false)
-                || state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE) != bootToken
-                || state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken
-                || state.getInt(KEY_NEXT_ATTEMPT, -1) != attempt) {
+        long executeAt = SystemClock.elapsedRealtime();
+        boolean completed = state.getBoolean(KEY_COMPLETED, false);
+        long plannedBootToken = state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE);
+        long captureToken = state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE);
+        int plannedAttempt = state.getInt(KEY_NEXT_ATTEMPT, -1);
+        if (completed || plannedBootToken != bootToken || captureToken != bootToken
+                || plannedAttempt != attempt) {
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=attempt_rejected, token=" + bootToken
+                            + ", attempt=" + (attempt + 1)
+                            + ", completed=" + completed
+                            + ", plannedToken=" + plannedBootToken
+                            + ", captureToken=" + captureToken
+                            + ", plannedAttempt=" + (plannedAttempt + 1)
+                            + ", elapsed=" + executeAt);
             return;
         }
         Preferences preferences = new Preferences(app);
         if (!preferences.launcherMediaAutoResumeEnabled.get()) {
-            complete(app);
+            complete(app, "disabled_before_dispatch");
             return;
         }
         String target = state.getString(KEY_TARGET_PACKAGE, "").trim();
         if (target.isEmpty()) {
-            complete(app);
+            complete(app, "empty_target_before_dispatch");
             return;
         }
 
-        long planned = state.getLong(KEY_TARGET_ELAPSED, SystemClock.elapsedRealtime());
-        long lateness = Math.max(0L, SystemClock.elapsedRealtime() - planned);
-        MediaResumeCommand.Result result = MediaResumeCommand.play(app, target);
+        long planned = state.getLong(KEY_TARGET_ELAPSED, executeAt);
+        long lateness = Math.max(0L, executeAt - planned);
+        long dispatchStartedAt = SystemClock.elapsedRealtime();
+        MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(app, target);
+        long dispatchFinishedAt = SystemClock.elapsedRealtime();
+        long firstCommandAt = state.getLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE);
+        SharedPreferences.Editor commandTiming = state.edit()
+                .putLong(KEY_LAST_COMMAND_ELAPSED, dispatchFinishedAt);
+        if (firstCommandAt == Long.MIN_VALUE) {
+            commandTiming.putLong(KEY_FIRST_COMMAND_ELAPSED, dispatchStartedAt);
+        }
+        commandTiming.apply();
         PhoneConnectionJournal.append("media-auto-resume",
-                "попытка=" + (attempt + 1) + ", result=" + result
-                        + ", latenessMs=" + lateness);
-        if (result == MediaResumeCommand.Result.ALREADY_PLAYING) {
+                "trace event=command_dispatched, token=" + bootToken
+                        + ", attempt=" + (attempt + 1)
+                        + ", target=" + target
+                        + ", result=" + trace.result
+                        + ", plannedLatenessMs=" + lateness
+                        + ", sinceCaptureMs=" + elapsedSince(state,
+                        KEY_CAPTURE_ELAPSED, dispatchStartedAt)
+                        + ", sincePlanAnchorMs=" + elapsedSince(state,
+                        KEY_PLAN_ANCHOR_ELAPSED, dispatchStartedAt)
+                        + ", dispatchDurationMs="
+                        + Math.max(0L, dispatchFinishedAt - dispatchStartedAt)
+                        + ", " + trace.detail);
+        if (trace.result == MediaResumeCommand.Result.ALREADY_PLAYING) {
             Log.i(TAG, "Playback is already active; no duplicate command sent");
-            complete(app);
+            complete(app, "already_playing_at_dispatch");
             return;
         }
 
         int nextAttempt = attempt + 1;
         if (nextAttempt < MAX_ATTEMPTS) {
             long retryDelay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
-            schedule(app, bootToken, nextAttempt, retryDelay);
+            schedule(app, bootToken, nextAttempt, retryDelay, "command_retry");
             Log.i(TAG, "Media resume attempt " + (attempt + 1) + " for " + target
-                    + " returned " + result + "; retry scheduled");
+                    + " returned " + trace.result + "; retry scheduled");
             return;
         }
-        Log.i(TAG, "Media resume attempts finished for " + target + ": " + result);
-        complete(app);
+        Log.i(TAG, "Media resume attempts finished for " + target + ": " + trace.result);
+        complete(app, "attempt_limit_" + trace.result);
     }
 
     private static void schedule(@NonNull Context app, long bootToken, int attempt,
                                  long delayMillis) {
-        long triggerElapsed = SystemClock.elapsedRealtime() + Math.max(0L, delayMillis);
+        schedule(app, bootToken, attempt, delayMillis, "unspecified");
+    }
+
+    private static void schedule(@NonNull Context app, long bootToken, int attempt,
+                                 long delayMillis, @NonNull String source) {
+        long scheduledAt = SystemClock.elapsedRealtime();
+        long boundedDelay = Math.max(0L, delayMillis);
+        long triggerElapsed = scheduledAt + boundedDelay;
         state(app).edit()
                 .putLong(KEY_TARGET_ELAPSED, triggerElapsed)
                 .putInt(KEY_NEXT_ATTEMPT, attempt)
@@ -281,14 +358,24 @@ public final class MediaAutoResumeController {
         AlarmManager alarms = app.getSystemService(AlarmManager.class);
         if (alarms == null) {
             Log.w(TAG, "AlarmManager unavailable");
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=timer_scheduled, source=" + source
+                            + ", token=" + bootToken + ", attempt=" + (attempt + 1)
+                            + ", delayMs=" + boundedDelay
+                            + ", triggerElapsed=" + triggerElapsed
+                            + ", inProcess=true, alarm=unavailable");
             return;
         }
+        String alarmRoute = "exact";
+        String alarmError = "none";
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                     && !alarms.canScheduleExactAlarms()) {
+                alarmRoute = "inexact_allow_idle_no_permission";
                 alarms.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                         triggerElapsed, pending);
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmRoute = "exact_allow_idle";
                 alarms.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                         triggerElapsed, pending);
             } else {
@@ -296,25 +383,56 @@ public final class MediaAutoResumeController {
                         triggerElapsed, pending);
             }
         } catch (SecurityException exactAlarmDenied) {
+            alarmRoute = "inexact_allow_idle_security_fallback";
             try {
                 alarms.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                         triggerElapsed, pending);
             } catch (RuntimeException fallbackFailure) {
+                alarmRoute = "failed";
+                alarmError = fallbackFailure.getClass().getSimpleName();
                 Log.w(TAG, "Could not schedule media auto-resume fallback", fallbackFailure);
             }
         } catch (RuntimeException failure) {
+            alarmRoute = "failed";
+            alarmError = failure.getClass().getSimpleName();
             Log.w(TAG, "Could not schedule media auto-resume", failure);
         }
+        PhoneConnectionJournal.append("media-auto-resume",
+                "trace event=timer_scheduled, source=" + source
+                        + ", token=" + bootToken + ", attempt=" + (attempt + 1)
+                        + ", delayMs=" + boundedDelay
+                        + ", scheduledElapsed=" + scheduledAt
+                        + ", triggerElapsed=" + triggerElapsed
+                        + ", inProcess=true, alarm=" + alarmRoute
+                        + ", alarmError=" + alarmError);
     }
 
     private static void scheduleInProcess(@NonNull Context app, long bootToken, int attempt,
                                           long delayMillis) {
         synchronized (TIMER_LOCK) {
+            boolean replaced = inProcessTimer != null;
             if (inProcessTimer != null) inProcessTimer.cancel(false);
             Context exactApp = applicationContext(app);
+            long scheduledAt = SystemClock.elapsedRealtime();
+            long triggerElapsed = scheduledAt + Math.max(0L, delayMillis);
             inProcessTimer = EXACT_TIMER.schedule(
-                    () -> execute(exactApp, bootToken, attempt),
+                    () -> {
+                        long deliveredAt = SystemClock.elapsedRealtime();
+                        PhoneConnectionJournal.append("media-auto-resume",
+                                "trace event=in_process_timer_delivery, token=" + bootToken
+                                        + ", attempt=" + (attempt + 1)
+                                        + ", latenessMs="
+                                        + Math.max(0L, deliveredAt - triggerElapsed)
+                                        + ", elapsed=" + deliveredAt);
+                        execute(exactApp, bootToken, attempt);
+                    },
                     Math.max(0L, delayMillis), TimeUnit.MILLISECONDS);
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=in_process_timer_armed, token=" + bootToken
+                            + ", attempt=" + (attempt + 1)
+                            + ", replaced=" + replaced
+                            + ", delayMs=" + Math.max(0L, delayMillis)
+                            + ", triggerElapsed=" + triggerElapsed);
         }
     }
 
@@ -328,9 +446,19 @@ public final class MediaAutoResumeController {
         String target = state.getString(KEY_TARGET_PACKAGE, "").trim();
         if (!target.equals(packageName.trim())) return;
         if (playing) {
+            long observedAt = SystemClock.elapsedRealtime();
             PhoneConnectionJournal.append("media-auto-resume",
-                    "целевая MediaSession уже воспроизводит; план завершён");
-            complete(app);
+                    "trace event=playing_observed, target=" + target
+                            + ", sinceCaptureMs=" + elapsedSince(state,
+                            KEY_CAPTURE_ELAPSED, observedAt)
+                            + ", sincePlanAnchorMs=" + elapsedSince(state,
+                            KEY_PLAN_ANCHOR_ELAPSED, observedAt)
+                            + ", sinceFirstCommandMs=" + elapsedSince(state,
+                            KEY_FIRST_COMMAND_ELAPSED, observedAt)
+                            + ", sinceLastCommandMs=" + elapsedSince(state,
+                            KEY_LAST_COMMAND_ELAPSED, observedAt)
+                            + ", elapsed=" + observedAt);
+            complete(app, "playing_observed");
             return;
         }
         long now = SystemClock.elapsedRealtime();
@@ -343,12 +471,32 @@ public final class MediaAutoResumeController {
         if (bootToken == Long.MIN_VALUE
                 || state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken) return;
         state.edit().putLong(KEY_OBSERVATION_KICK_ELAPSED, now).apply();
-        schedule(app, bootToken, state.getInt(KEY_NEXT_ATTEMPT, 0), 100L);
+        schedule(app, bootToken, state.getInt(KEY_NEXT_ATTEMPT, 0), 100L,
+                "media_session_ready_kick");
         PhoneConnectionJournal.append("media-auto-resume",
-                "MediaSession готова; просроченная попытка ускорена");
+                "trace event=session_ready_kick, target=" + target
+                        + ", overdueMs=" + Math.max(0L, now - targetElapsed)
+                        + ", elapsed=" + now);
     }
 
-    private static void complete(@NonNull Context app) {
+    static void recordAlarmDelivery(long bootToken, int attempt) {
+        long deliveredAt = SystemClock.elapsedRealtime();
+        PhoneConnectionJournal.append("media-auto-resume",
+                "trace event=alarm_delivery, token=" + bootToken
+                        + ", attempt=" + (attempt + 1)
+                        + ", elapsed=" + deliveredAt);
+    }
+
+    private static void complete(@NonNull Context app, @NonNull String reason) {
+        SharedPreferences snapshot = state(app);
+        long completedAt = SystemClock.elapsedRealtime();
+        PhoneConnectionJournal.append("media-auto-resume",
+                "trace event=plan_completed, reason=" + reason
+                        + ", token=" + snapshot.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE)
+                        + ", attempts=" + snapshot.getInt(KEY_NEXT_ATTEMPT, -1)
+                        + ", totalSinceCaptureMs=" + elapsedSince(snapshot,
+                        KEY_CAPTURE_ELAPSED, completedAt)
+                        + ", elapsed=" + completedAt);
         state(app).edit().putBoolean(KEY_COMPLETED, true).apply();
         cancelInProcessTimer();
         cancelAlarm(app);
@@ -403,5 +551,12 @@ public final class MediaAutoResumeController {
 
     private static int clamp(int value, int minimum, int maximum) {
         return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static long elapsedSince(@NonNull SharedPreferences preferences,
+                                     @NonNull String key, long now) {
+        long startedAt = preferences.getLong(key, Long.MIN_VALUE);
+        if (startedAt == Long.MIN_VALUE || now < startedAt) return -1L;
+        return now - startedAt;
     }
 }

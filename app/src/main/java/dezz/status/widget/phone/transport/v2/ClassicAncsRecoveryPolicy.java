@@ -16,11 +16,11 @@ import java.util.Objects;
  */
 public final class ClassicAncsRecoveryPolicy {
     public static final int IMMEDIATE_RECOVERIES = 2;
-    public static final long FIRST_BACKOFF_MS = 30_000L;
-    public static final long MAX_BACKOFF_MS = 300_000L;
+    public static final long FIRST_BACKOFF_MS = 5_000L;
+    public static final long MAX_BACKOFF_MS = 30_000L;
 
     private static final long[] BACKOFF_MS = {
-            FIRST_BACKOFF_MS, 60_000L, 120_000L, MAX_BACKOFF_MS
+            FIRST_BACKOFF_MS, 10_000L, 20_000L, MAX_BACKOFF_MS
     };
 
     /** Injectable decorrelation boundary; production supplies SecureRandom, tests stay exact. */

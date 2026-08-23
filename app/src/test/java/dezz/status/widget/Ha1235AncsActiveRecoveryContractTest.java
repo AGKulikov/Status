@@ -71,24 +71,24 @@ public final class Ha1235AncsActiveRecoveryContractTest {
         assertTrue(platform.contains("drainDeferredAncsAfterGatt()"));
     }
 
-    @Test public void missingC5CallbackResetsOwnerWithoutOverlappingTheAttFifo()
+    @Test public void c5UsesNoResponsePacingAndCanNeverResetTheAncsOwner()
             throws Exception {
         String platform = project("app/src/main/java/dezz/status/widget/phone/transport/v2/"
                 + "android/AndroidCentralTransportV2.java");
-        String watchdog = between(platform, "carRemoteWriteWatchdog = () -> {",
-                "main.postDelayed(carRemoteWriteWatchdog, CAR_REMOTE_WRITE_TIMEOUT_MS)");
-        String completion = between(platform,
-                "} else if (pending.type == RawOperation.WRITE_CAR_REMOTE)",
-                "private void handleCharacteristicChanged");
+        String subscribe = between(platform, "private void subscribeCarRemoteIfPresent",
+                "private void scheduleCarRemoteSubscribe");
+        String drain = between(platform, "private void drainCarRemoteWrites()",
+                "private void cancelTelemetryRefresh()");
 
-        assertTrue(watchdog.contains("pendingGatt != pending || owner != exactOwner"));
-        assertFalse(watchdog.contains("pendingGatt = null"));
-        assertTrue(watchdog.contains("resetCurrentOwner("));
-        assertTrue(watchdog.contains("carRemoteRetryNotBeforeMillis"));
-        assertTrue(watchdog.contains("CAR_REMOTE_BACKOFF_MAX_MS"));
-        assertTrue(completion.contains("drainDeferredAncsAfterGatt()"));
-        assertTrue(completion.indexOf("drainDeferredAncsAfterGatt()")
-                < completion.indexOf("scheduleCarRemoteDrain("));
+        assertTrue(subscribe.contains("writableWithoutResponse(characteristic)"));
+        assertTrue(subscribe.contains("ancs_preserved=true"));
+        assertTrue(drain.contains("WRITE_TYPE_NO_RESPONSE"));
+        assertTrue(drain.contains("CAR_REMOTE_NO_RESPONSE_SETTLE_MS"));
+        assertTrue(drain.contains("drainDeferredAncsAfterGatt()"));
+        assertTrue(drain.indexOf("drainDeferredAncsAfterGatt()")
+                < drain.indexOf("scheduleCarRemoteDrain(",
+                drain.indexOf("drainDeferredAncsAfterGatt()")));
+        assertFalse(drain.contains("resetCurrentOwner("));
     }
 
     private static String between(String source, String start, String end) {
