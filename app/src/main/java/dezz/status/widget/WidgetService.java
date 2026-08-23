@@ -1,7926 +1,4364 @@
-/*
- * Copyright Â© 2025-2026 Dezz (https://github.com/DezzK)
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
-package dezz.status.widget;
-
-import android.annotation.SuppressLint;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.app.Service;
-import android.app.usage.UsageEvents;
-import android.app.usage.UsageStatsManager;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothProfile;
-import android.content.BroadcastReceiver;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
-import android.content.res.ColorStateList;
-import android.content.res.Configuration;
-import android.graphics.Paint;
-import android.graphics.PixelFormat;
-import android.graphics.Rect;
-import android.graphics.Typeface;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
-import android.location.GnssStatus;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
-import android.media.MediaMetadata;
-import android.media.session.MediaController;
-import android.media.session.MediaSessionManager;
-import android.media.session.PlaybackState;
-import android.net.ConnectivityManager;
-import android.net.Network;
-import android.net.NetworkCapabilities;
-import android.net.NetworkRequest;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
-import android.os.Build;
-import android.os.Handler;
-import android.os.IBinder;
-import android.os.Looper;
-import android.os.SystemClock;
-import android.provider.Settings;
-import android.text.TextUtils;
-import android.util.Log;
-import android.util.TypedValue;
-import android.view.Choreographer;
-import android.view.Gravity;
-import android.view.LayoutInflater;
-import android.view.MotionEvent;
-import android.view.View;
-import android.view.ViewConfiguration;
-import android.view.ViewGroup;
-import android.view.WindowManager;
-import android.widget.LinearLayout;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.core.app.NotificationCompat;
-import androidx.core.content.ContextCompat;
-import androidx.core.widget.ImageViewCompat;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.text.SimpleDateFormat;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-
-import dezz.status.widget.car.CarIntegration;
-import dezz.status.widget.car.CarIntegrations;
-import dezz.status.widget.car.CarTelemetryExporter;
-import dezz.status.widget.databinding.OverlayStatusWidgetBinding;
-import dezz.status.widget.diagnostics.DiagnosticJournal;
-import dezz.status.widget.automation.AutomationContract;
-import dezz.status.widget.automation.AutomationState;
-import dezz.status.widget.automation.AutomationStateStore;
-import dezz.status.widget.automation.ScenarioTriggerReceiver;
-import dezz.status.widget.ha.HaBrickConfig;
-import dezz.status.widget.ha.HaBrickConfigStore;
-import dezz.status.widget.integration.ConnectorActionDispatcher;
-import dezz.status.widget.integration.ConnectorType;
-import dezz.status.widget.integration.ConnectorValue;
-import dezz.status.widget.integration.ConnectorValueRegistry;
-import dezz.status.widget.integration.IntentScenarioController;
-import dezz.status.widget.integration.LocalScenarioController;
-import dezz.status.widget.driver.DriverPanelService;
-import dezz.status.widget.hud.HudPresentationService;
-import dezz.status.widget.launcher.LauncherShortcutStore;
-import dezz.status.widget.launcher.MediaPlaybackHistoryStore;
-import dezz.status.widget.launcher.information.StatusBarInformationCatalog;
-import dezz.status.widget.ha.api.HaApiController;
-import dezz.status.widget.ha.api.HaEntityCatalog;
-import dezz.status.widget.ha.api.HaWebSocketConnector;
-import dezz.status.widget.mqtt.MqttController;
-import dezz.status.widget.phone.PhoneAppIconStore;
-import dezz.status.widget.phone.PhoneBluetoothIndicatorPolicy;
-import dezz.status.widget.phone.PhoneConnectorController;
-import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
-import dezz.status.widget.phone.PhoneNotificationAutomation;
-import dezz.status.widget.phone.PhoneNotificationDeferralPolicy;
-import dezz.status.widget.phone.PhoneNotificationDeferralQueue;
-import dezz.status.widget.phone.PhoneNetworkTypePolicy;
-import dezz.status.widget.phone.PhoneNotificationLockPolicy;
-import dezz.status.widget.phone.PhoneStatusBarPolicy;
-import dezz.status.widget.phone.PhoneIndicatorVisualPolicy;
-import dezz.status.widget.phone.PhoneSprutPresenceExporter;
-import dezz.status.widget.popup.PopupOverlayController;
-import dezz.status.widget.popup.PopupOverlayManager;
-import dezz.status.widget.popup.PopupOverlayConfig;
-import dezz.status.widget.popup.PopupOverlayConfigStore;
-import dezz.status.widget.popup.PopupItemConfig;
-import dezz.status.widget.popup.PopupItemConfigStore;
-import dezz.status.widget.sprut.SprutCatalog;
-import dezz.status.widget.sprut.SprutHubController;
-
-public class WidgetService extends Service {
-    /** Same-process, event-driven presentation invalidation for surfaces outside this Service. */
-    public interface AutomationPresentationListener {
-        void onAutomationPresentationChanged(@NonNull String scope,
-                                             @NonNull Set<String> ids);
-    }
-    enum GnssState {
-        OFF, BAD, GOOD
-    }
-
-    enum WiFiState {
-        OFF, NO_INTERNET, LIMITED_INTERNET, INTERNET
-    }
-
-    enum BluetoothState {
-        OFF, NO_DEVICE, CONNECTED
-    }
-
-    // Icon designs: 4 Wi-Fi states, 3 GNSS states, 3 Bluetooth states.
-    private static final int[][] DESIGN_CLASSIC = {
-            {
-                    R.drawable.ic_status_wifi_off,
-                    R.drawable.ic_status_wifi_no_internet,
-                    R.drawable.ic_status_wifi_whitelist,
-                    R.drawable.ic_status_wifi_internet
-            },
-            { R.drawable.ic_status_iphone_gps_off, R.drawable.ic_status_iphone_gps_searching,
-                    R.drawable.ic_status_iphone_gps_active },
-            { R.drawable.ic_status_iphone_bluetooth_off,
-                    R.drawable.ic_status_iphone_bluetooth_outline,
-                    R.drawable.ic_status_iphone_bluetooth_solid }
-    };
-    private static final int[][] DESIGN_SOLID = {
-            {
-                    R.drawable.ic_status_filled_wifi_off,
-                    R.drawable.ic_status_filled_wifi_no_internet,
-                    R.drawable.ic_status_filled_wifi_whitelist,
-                    R.drawable.ic_status_filled_wifi_internet
-            },
-            { R.drawable.ic_status_iphone_gps_off, R.drawable.ic_status_iphone_gps_searching,
-                    R.drawable.ic_status_iphone_gps_active },
-            { R.drawable.ic_status_iphone_bluetooth_off,
-                    R.drawable.ic_status_iphone_bluetooth_outline,
-                    R.drawable.ic_status_iphone_bluetooth_solid }
-    };
-    private static final int[][] DESIGN_BARS = {
-            {
-                    R.drawable.ic_status_bars_wifi_off,
-                    R.drawable.ic_status_bars_wifi_no_internet,
-                    R.drawable.ic_status_bars_wifi_whitelist,
-                    R.drawable.ic_status_bars_wifi_internet
-            },
-            { R.drawable.ic_status_iphone_gps_off, R.drawable.ic_status_iphone_gps_searching,
-                    R.drawable.ic_status_iphone_gps_active },
-            { R.drawable.ic_status_iphone_bluetooth_off,
-                    R.drawable.ic_status_iphone_bluetooth_outline,
-                    R.drawable.ic_status_iphone_bluetooth_solid }
-    };
-    private static final int[][][] ICON_DESIGNS = { DESIGN_CLASSIC, DESIGN_SOLID, DESIGN_BARS };
-
-    private static final int ICON_TYPE_WIFI = 0;
-    private static final int ICON_TYPE_GNSS = 1;
-    private static final int ICON_TYPE_BT = 2;
-
-    private static final int WIDGET_MODE_FLOATING = 0;
-    private static final int WIDGET_MODE_STATUS_BAR = 1;
-
-    // Icon style indices (must match strings.xml/icon_styles array order).
-    private static final int STYLE_MONO = 0;
-    private static final int STYLE_COLOR = 1;
-
-    private static final long INTERNET_PROBE_INTERVAL_MS = 30_000L;
-
-    /** Cross-fade duration for the entire overlay (show/hide / per-app hide). */
-    private static final int OVERLAY_FADE_DURATION_MS = 500;
-    /** Cold attach is a near-immediate reveal; later hide/show keeps the calmer 500 ms. */
-    private static final int INITIAL_OVERLAY_FADE_DURATION_MS = 90;
-    private static final int INITIAL_OVERLAY_FALLBACK_GRACE_MS = 160;
-    private static final long OVERLAY_ATTACH_RETRY_MS = 1_500L;
-    private static final long MAX_OVERLAY_ATTACH_RETRY_MS = 30_000L;
-    /**
-     * Duration of the combined Fade + ChangeBounds transition that handles per-brick
-     * visibility flips. See {@link #beginVisibilityTransition} for the "window-buffer"
-     * trick that makes this transition stay inside a stable window rectangle.
-     */
-    private static final int BRICK_TRANSITION_DURATION_MS = 450;
-    /** Duration of the alpha animation used when a brick is hidden in keeps-space mode. */
-    private static final int BRICK_ALPHA_DURATION_MS = 300;
-
-    private static final String TAG = "WidgetService";
-    private static final int NOTIFICATION_ID = 1001;
-    private static final String CHANNEL_ID = "WidgetServiceChannel";
-    private static final long GNSS_FIX_DEGRADED_AFTER_MS = 5_000L;
-    private static final long GNSS_FIX_OFF_AFTER_MS = 10_000L;
-    private static final long GNSS_LOCATION_INTERVAL_MS = 2_000L;
-    private static final long DATETIME_UPDATE_INTERVAL_MS = 60_000L;
-    private static final long SYSTEM_CONDITION_REFRESH_INTERVAL_MS = 60_000L;
-    /** A real constructor/provider failure gets a bounded retry instead of a tight loop. */
-    private static final long INITIAL_INTEGRATION_RETRY_MS = 650L;
-    /** A one-off vendor/Binder rejection is retried without turning startup into a tight loop. */
-    private static final int MAX_INITIAL_INTEGRATION_STAGE_RETRIES = 2;
-    /** Cadence for advancing the media progress bar while a track is actively playing. 250ms
-     *  is fast enough to look smooth on a thin bar and slow enough to not show up in profilers. */
-    // One repaint per second is visually sufficient for a compact status-row progress line and
-    // halves MediaSession polling/layout invalidation versus HA1048 on low-end head units.
-    private static final long MEDIA_PROGRESS_TICK_MS = 1_000L;
-    /** More than the connector cache, so removing the newest item can never replay an older one. */
-    private static final int MAX_OBSERVED_PHONE_NOTIFICATIONS = 128;
-    /** Burst deliveries are intentionally readable and deterministic, one card per second. */
-    private static final long PHONE_NOTIFICATION_QUEUE_SLOT_MS = 1_000L;
-    /** Gap between the play/pause indicator and the text it precedes, as a fraction of that
-     *  text's size â€” same rationale as the icon's own size: it must track the font sliders. */
-    private static final float STATE_ICON_GAP_RATIO = 0.25f;
-    private static final long FOREGROUND_APP_CHECK_INTERVAL_MS = 2_000L;
-    private static final long FOREGROUND_APP_LOOKBACK_MS = 60_000L;
-    private static final long FOREGROUND_FAILURE_LOG_INTERVAL_MS = 10_000L;
-    /** Longer than two observer refresh periods; prevents a dead Binder from pinning a hide. */
-    private static final long ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS = 6_000L;
-    private static final long ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS = 1_800L;
-    private static final long[] ECARX_NAVIGATOR_OPTIMISTIC_RETRY_OFFSETS_MS = {
-            0L, 120L, 400L, 900L, 1_500L
-    };
-    private static final String GNSSSHARE_CLIENT_PACKAGE = "dezz.gnssshare.client";
-    private static final String GNSSSHARE_SATELLITE_STATUS_ACTION = "dezz.gnssshare.action.SATELLITE_STATUS";
-    /** Satellite count extra. A value of {@code -1} means "no satellite data" (badge hidden). */
-    private static final String GNSSSHARE_EXTRA_SATELLITES_COUNT = "count";
-    /**
-     * Optional positioning-mode extra, treated as a bit mask (absent / 0 = normal satellite
-     * fixing). The two flags are independent â€” dead reckoning and spoofing-detected can each be
-     * set on their own or together (3 = dead reckoning entered because of a detected spoof).
-     */
-    private static final String GNSSSHARE_EXTRA_MODE = "mode";
-    private static final int GNSSSHARE_MODE_DR = 1;     // bit 0: position is dead-reckoned
-    private static final int GNSSSHARE_MODE_SPOOF = 2;  // bit 1: GPS spoofing detected
-    private static final long GNSSSHARE_SATELLITE_STATUS_TIMEOUT_MS = 30_000L;
-
-    private static WidgetService instance;
-    /** Process-wide ownership fence for retained-state workers across service replacement. */
-    private static final AtomicLong STARTUP_STATE_OWNER = new AtomicLong();
-
-    private Preferences prefs;
-    private long startupStateOwnerToken;
-    private AutomationStateStore automationStates;
-    private ConnectorValueRegistry connectorValues;
-    private volatile LocalScenarioController scenarioController;
-    private volatile IntentScenarioController intentScenarioController;
-    /**
-     * Cold explicit commands may reach the foreground service while the post-visible controller
-     * lane is still warming up. Retain only a small in-process queue: every entry keeps the
-     * receiver-time monotonic deadline and is revalidated by IntentScenarioController before use.
-     */
-    private static final int MAX_PENDING_INTENT_SCENARIO_COMMANDS = 16;
-    private static final long TEMPORARY_SCENARIO_HOST_RECHECK_MS = 1_000L;
-    private static final long TEMPORARY_SCENARIO_HOST_MAX_MS = 16_000L;
-    private final ArrayDeque<Intent> pendingIntentScenarioCommands = new ArrayDeque<>();
-    private boolean temporaryScenarioHeadlessHost;
-    private final Runnable explicitScenarioRuntimeOverrideRecheck = () ->
-            reconcileExplicitScenarioRuntimeOverride(false);
-    private final Runnable explicitScenarioRuntimeOverrideExpiry = () ->
-            reconcileExplicitScenarioRuntimeOverride(true);
-    private final Runnable temporaryScenarioHostRecheck = () ->
-            reconcileTemporaryScenarioHeadlessHost(false);
-    private final Runnable temporaryScenarioHostExpiry = () ->
-            reconcileTemporaryScenarioHeadlessHost(true);
-    private volatile ConnectorActionDispatcher actionDispatcher;
-    private HaBrickConfigStore haConfigs;
-    private volatile HaApiController haApiController;
-    private volatile MqttController mqttController;
-    private volatile SprutHubController sprutController;
-    private volatile PhoneConnectorController phoneController;
-    private volatile PhoneSprutPresenceExporter phonePresenceExporter;
-    private volatile PhoneSprutPresenceExporter phoneAncsPresenceExporter;
-    private volatile CarTelemetryExporter carTelemetryExporter;
-    private PopupOverlayManager popupOverlay;
-    /** Parsed only when settings change; connector packets must never reparse the JSON document. */
-    private List<HaBrickConfig> configuredMainBricks = Collections.emptyList();
-    @Nullable private String configuredMainBricksJson;
-    /** Startup worker projections used by the main-only visual/listener pass. */
-    private Set<BrickType> configuredPopupBuiltinTypes = Collections.emptySet();
-    @Nullable private String configuredPopupOverlaysJson;
-    @Nullable private String configuredPopupItemsJson;
-    private Set<BrickType> configuredDriverInformationTypes = Collections.emptySet();
-    @Nullable private String configuredDriverInformationJson;
-    private boolean configuredDriverPanelEnabled;
-    private final Object automationUiLock = new Object();
-    private static final int MAX_AUTOMATION_PRESENTATION_LISTENERS = 8;
-    private final Map<String, Set<String>> pendingAutomationUi = new LinkedHashMap<>();
-    private final CopyOnWriteArrayList<AutomationPresentationListener>
-            automationPresentationListeners =
-            new CopyOnWriteArrayList<>();
-    private boolean automationUiRefreshScheduled;
-    /** Fresh visual-only host is admitted, but controller/vendor work still belongs to host phase. */
-    private boolean automaticRuntimeParked;
-    /** Bounded authenticated command may use runtime without opening the automatic host barrier. */
-    private boolean explicitScenarioRuntimeOverride;
-    private boolean automaticLifecycleQuiet;
-    private boolean automaticSurfaceReconcilePending;
-    /** Only a process surviving QuickBoot needs an immediate WindowManager revalidation. */
-    private boolean automaticSurfaceRevalidationRequired;
-    /** Exact host phase was accepted; resume waits only for its current replacement root. */
-    private boolean automaticHostReleaseAfterVisible;
-    private int automaticLifecycleResumeGeneration;
-    private int automaticLifecycleTeardownStage;
-    private volatile boolean destroyed;
-    private final Runnable automaticLifecycleQuietTeardown =
-            this::runNextAutomaticLifecycleQuietTeardown;
-
-    private void runNextAutomaticLifecycleQuietTeardown() {
-        if (destroyed || !automaticLifecycleQuiet) return;
-        switch (automaticLifecycleTeardownStage++) {
-            case 0:
-                runIntegrationStep("quiet phone", () -> {
-                    if (phoneController != null) phoneController.stop();
-                });
-                break;
-            case 1:
-                runIntegrationStep("quiet MQTT", () -> {
-                    if (mqttController != null) mqttController.pauseForAutomaticLifecycle();
-                });
-                break;
-            case 2:
-                runIntegrationStep("quiet Home Assistant", () -> {
-                    if (haApiController != null) haApiController.pauseForAutomaticLifecycle();
-                });
-                break;
-            case 3:
-                runIntegrationStep("quiet Sprut.hub", () -> {
-                    if (sprutController != null) sprutController.pauseForAutomaticLifecycle();
-                });
-                break;
-            default:
-                return;
-        }
-        mainHandler.post(automaticLifecycleQuietTeardown);
-    }
-    private final Runnable automaticVisualSurfaceRevalidation = () -> {
-        if (destroyed || !automaticSurfaceRevalidationRequired || prefs == null) return;
-        automaticSurfaceRevalidationRequired = false;
-        if (!prefs.widgetEnabled.get() || !Permissions.allPermissionsGranted(this)) return;
-        revalidateStatusOverlayWindowOnly("immediate QuickBoot surface revalidation");
-    };
-    private final Runnable automationUiRefresh = () -> {
-        if (automaticSurfaceRefreshSuppressed()) {
-            synchronized (automationUiLock) {
-                automationUiRefreshScheduled = false;
-            }
-            return;
-        }
-        Map<String, Set<String>> changed = new LinkedHashMap<>();
-        synchronized (automationUiLock) {
-            for (Map.Entry<String, Set<String>> entry : pendingAutomationUi.entrySet()) {
-                changed.put(entry.getKey(), new HashSet<>(entry.getValue()));
-            }
-            pendingAutomationUi.clear();
-            automationUiRefreshScheduled = false;
-        }
-        if (WidgetService.this.destroyed || changed.isEmpty()) return;
-        dispatchAutomationPresentationChanges(changed);
-        boolean affectsStatusRow = changed.containsKey(AutomationContract.SCOPE_MAIN)
-                || changed.containsKey(AutomationContract.SCOPE_BUILTIN);
-        boolean affectsPhoneNotification = false;
-        Set<String> changedPopupItems = changed.get(AutomationContract.SCOPE_POPUP);
-        if (changedPopupItems != null) {
-            for (String id : changedPopupItems) {
-                if (PhoneNotificationAutomation.isFieldAutomationId(id)) {
-                    affectsPhoneNotification = true;
-                    break;
-                }
-            }
-        }
-        if (popupOverlay != null) {
-            for (Map.Entry<String, Set<String>> entry : changed.entrySet()) {
-                for (String id : entry.getValue()) {
-                    popupOverlay.onStateChanged(entry.getKey(), id);
-                }
-            }
-        }
-        if (changed.containsKey(AutomationContract.SCOPE_DRIVER)
-                && prefs != null && prefs.driverPanelEnabled.get()) {
-            DriverPanelService.apply(this);
-        }
-        if (changed.containsKey(AutomationContract.SCOPE_HUD)
-                && (prefs.hudPanelAutostart.get()
-                || HudPresentationService.isRunning(this))) {
-            HudPresentationService.notifyAutomationChanged(this);
-        }
-        // Popup windows have an independent WindowManager lifecycle. A failed/retrying status-row
-        // attachment must not discard their connector updates.
-        if (WidgetService.this.binding == null) return;
-        if (changed.containsKey(AutomationContract.SCOPE_MAIN)) renderHomeAssistantBricks();
-        if (affectsPhoneNotification) refreshActivePhoneNotificationForConditions();
-        // A popup-only temperature/sensor stream must not remeasure and animate the independent
-        // status row. HA1048 did that for every packet even when no status brick had changed.
-        if (affectsStatusRow) applyBrickVisibility(currentBrickSet());
-    };
-    private final AtomicBoolean crossSourceRuleRefreshScheduled = new AtomicBoolean();
-    private final ConnectorValueRegistry.Listener crossSourceRuleListener =
-            changedValues -> scheduleCrossSourceRuleRefresh();
-    /** Latest immutable PHONE snapshot projected into the configurable status-row brick. */
-    private final Map<String, ConnectorValue> phoneStatusValues = new LinkedHashMap<>();
-    @Nullable
-    private PhoneStatusBarPolicy.NotificationPresentation activePhoneNotification;
-    /** Base field selection captured with the active delivery; local conditions refine it. */
-    @NonNull
-    private Set<String> activePhoneNotificationFields = Collections.emptySet();
-    @Nullable
-    private String activePhoneBatteryAlertText;
-    @Nullable
-    private String activePhoneBatteryAlertColor;
-    private boolean phoneLowBatteryAlertLatched;
-    private boolean phoneLowBatteryAlertLatched2;
-    /** Event-derived Android 9 window above the UsageStats foreground task (e.g. 360Â° camera). */
-    private boolean phoneExternalOverlayActive;
-    private final Set<String> observedPhoneNotificationKeys = new LinkedHashSet<>();
-    private final ArrayDeque<QueuedPhoneNotification> queuedPhoneNotifications =
-            new ArrayDeque<>();
-    /** Notifications held only while a configured full-screen app owns the head-unit display. */
-    private final PhoneNotificationDeferralQueue<QueuedPhoneNotification>
-            deferredPhoneNotifications = new PhoneNotificationDeferralQueue<>();
-    private int deferredPhoneNotificationOverflowCount;
-    private long deferredPhoneNotificationOverflowStartedElapsed;
-    private int queuedPhoneNotificationOverflowCount;
-    private boolean phoneNotificationBurstActive;
-    private long activePhoneNotificationExpiresAt;
-    private long activePhonePopupNotificationExpiresAt;
-    private boolean activePhoneLowBatteryPopup;
-    private boolean phoneNotificationPopupConfigured;
-    private int mediaDurationVisibilityBeforePhoneNotification = View.GONE;
-    private int mediaProgressVisibilityBeforePhoneNotification = View.GONE;
-    private final ConnectorValueRegistry.Listener phoneStatusListener =
-            changedValues -> postPhoneValuesChanged(new ArrayList<>(changedValues));
-    private final Runnable phoneNotificationExpiry = new Runnable() {
-        @Override public void run() {
-            if (destroyed || !hasActivePhoneStatusAlert()) return;
-            long remaining = activePhoneNotificationExpiresAt
-                    - android.os.SystemClock.elapsedRealtime();
-            if (remaining > 0L) {
-                mainHandler.postDelayed(this, remaining);
-                return;
-            }
-            clearPhoneStatusNotification(true);
-            if (phoneNotificationBurstActive && !queuedPhoneNotifications.isEmpty()) {
-                mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-                mainHandler.post(phoneNotificationQueueAdvance);
-            }
-            if (binding != null) {
-                updateMediaInfo();
-                applyBrickVisibility(currentBrickSet());
-            }
-            schedulePopupRefresh();
-        }
-    };
-    private final Runnable phonePopupNotificationExpiry = new Runnable() {
-        @Override public void run() {
-            if (destroyed || activePhonePopupNotificationExpiresAt <= 0L) return;
-            long remaining = activePhonePopupNotificationExpiresAt
-                    - android.os.SystemClock.elapsedRealtime();
-            if (remaining > 0L) {
-                mainHandler.postDelayed(this, remaining);
-                return;
-            }
-            clearPhonePopupNotification();
-        }
-    };
-    private final Runnable phoneNotificationQueueAdvance = new Runnable() {
-        @Override public void run() {
-            if (destroyed || !phoneNotificationBurstActive) return;
-            long batteryRemaining = activePhoneLowBatteryRemaining();
-            if (batteryRemaining > 0L) {
-                mainHandler.postDelayed(this, batteryRemaining);
-                return;
-            }
-            QueuedPhoneNotification next = queuedPhoneNotifications.pollFirst();
-            if (next == null) {
-                if (queuedPhoneNotificationOverflowCount <= 0) {
-                    finishPhoneNotificationBurst();
-                    return;
-                }
-                int overflow = queuedPhoneNotificationOverflowCount;
-                queuedPhoneNotificationOverflowCount = 0;
-                next = phoneNotificationOverflowDelivery(overflow);
-            }
-            boolean presented = presentPhoneNotification(next);
-            if (!presented) {
-                if (queuedPhoneNotifications.isEmpty()
-                        && queuedPhoneNotificationOverflowCount <= 0) {
-                    finishPhoneNotificationBurst();
-                }
-                else mainHandler.post(this);
-                return;
-            }
-            if (queuedPhoneNotifications.isEmpty()
-                    && queuedPhoneNotificationOverflowCount <= 0) {
-                releasePhoneNotificationBurstToConfiguredExpiry();
-                return;
-            }
-            long nextSlot = SystemClock.elapsedRealtime()
-                    + PHONE_NOTIFICATION_QUEUE_SLOT_MS;
-            holdPhoneNotificationDestinationsUntil(nextSlot);
-            mainHandler.postDelayed(this, PHONE_NOTIFICATION_QUEUE_SLOT_MS);
-        }
-    };
-    /** Exactly one callback is armed for the oldest (therefore nearest) hold deadline. */
-    private final Runnable phoneNotificationDeferralDeadline =
-            this::reconcileDeferredPhoneNotifications;
-    private final Runnable crossSourceRuleRefresh = () -> {
-        crossSourceRuleRefreshScheduled.set(false);
-        if (destroyed) return;
-        // RuleSet.sourceReference is connector-neutral. Re-project only those explicit
-        // dependencies after any provider update, so an HA value can recolor/hide a Sprut tile
-        // without waiting for the Sprut characteristic itself to change (and vice versa).
-        if (mqttController != null) mqttController.reapplyCrossSourceBindings();
-        if (sprutController != null) sprutController.reapplyCrossSourceBindings();
-        if (haApiController != null) haApiController.reapplyCrossSourceBindings();
-    };
-
-    private void scheduleCrossSourceRuleRefresh() {
-        if (destroyed || !crossSourceRuleRefreshScheduled.compareAndSet(false, true)) return;
-        mainHandler.postDelayed(crossSourceRuleRefresh, 50L);
-    }
-
-    private void refreshActivePhoneNotificationForConditions() {
-        if (binding != null && activePhoneNotification != null) updateMediaInfo();
-    }
-
-    private void postPhoneValuesChanged(@NonNull List<ConnectorValue> immutableCopy) {
-        mainHandler.post(() -> onPhoneValuesChanged(immutableCopy));
-    }
-
-    private WindowManager windowManager;
-    private WindowManager.LayoutParams params;
-
-    private OverlayStatusWidgetBinding binding;
-    private int overlayAttachAttempts;
-    private boolean overlayAttachRetryScheduled;
-    /** Invalidates animator/frame/fallback callbacks retained by an older WindowManager root. */
-    private int overlayAttachGeneration;
-    private int overlayVisibleGeneration = -1;
-    private final Runnable overlayAttachRetry = () -> {
-        overlayAttachRetryScheduled = false;
-        if (destroyed || binding != null || !prefs.widgetEnabled.get()) return;
-        if (!Permissions.allPermissionsGranted(this)) {
-            // Location AppOps are shared with the status row but are not required by the
-            // independently attached driver/HUD surfaces and the phone connector. Keep that host
-            // alive while the status surface waits for permissions to be restored.
-            if (WidgetServiceStarter.requiresHeadlessHost(prefs)) {
-                ensureEnabledRuntime();
-            } else {
-                stopSelf();
-            }
-            return;
-        }
-        createOverlayView();
-    };
-
-    private int initialX;
-    private int initialY;
-    private float initialTouchX;
-    private float initialTouchY;
-    private GnssState gnssState = GnssState.OFF;
-    private WiFiState wifiState = WiFiState.OFF;
-    /** 0 = disconnected, 1..4 = progressively stronger RSSI. */
-    private int wifiSignalLevel;
-    private BluetoothState bluetoothState = BluetoothState.OFF;
-    private final Set<String> btConnectedAddrs = new HashSet<>();
-    /** True while the current direct iPhone transport reports an active ANCS profile. */
-    private boolean phoneAncsReady;
-    private boolean btReceiverRegistered = false;
-    /** Invalidates asynchronous profile snapshots after status tracking is stopped or reseeded. */
-    private int bluetoothTrackingGeneration;
-
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    /** Large retained-state JSON is rewritten off the UI lane at Android background priority. */
-    private final ExecutorService startupStateWorker = Executors.newSingleThreadExecutor(task -> {
-        Thread thread = new Thread(() -> {
-            try {
-                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
-            } catch (RuntimeException ignored) {
-            }
-            task.run();
-        }, "status-startup-state");
-        thread.setDaemon(true);
-        return thread;
-    });
-    /**
-     * Connector startup is deliberately independent from the status-window binding. WindowManager
-     * can transiently reject addView during boot while an already-running connector still needs to
-     * re-read Keystore credentials on USER_UNLOCKED.
-     */
-    private boolean integrationsStarted;
-    private boolean runtimeInitialized;
-    private boolean integrationStartupScheduled;
-    private boolean initialIntegrationStartupInProgress;
-    /** One settings replay retained while the staged boot/unlock controller lane is busy. */
-    private boolean integrationReconfigurePending;
-    private boolean credentialRefreshPending;
-    private boolean credentialRefreshScheduled;
-    private int initialIntegrationStage;
-    private int initialIntegrationStageRetryCount;
-    /** Stage zero owns persistence until its worker result is committed on the main thread. */
-    private boolean startupStateBarrierInFlight;
-    /** Exactly one controller stage may prepare state on the serialized startup worker. */
-    private boolean initialIntegrationWorkerInFlight;
-    /**
-     * A prepared graph is owned here between worker completion and its main-thread publication.
-     * onDestroy atomically takes and cleans it before removing Handler callbacks.
-     */
-    private final AtomicReference<PreparedInitialIntegrationStage>
-            pendingInitialIntegrationStage = new AtomicReference<>();
-    private final Runnable initialIntegrationStageRunner = this::runNextInitialIntegrationStage;
-    @Nullable private DeferredIntegrationStart deferredIntegrationStart;
-
-    /** One attachment-owned Choreographer callback; stale roots cannot borrow a newer token. */
-    private final class DeferredIntegrationStart
-            implements Choreographer.FrameCallback, Runnable {
-        final int attachmentGeneration;
-        @NonNull final View root;
-
-        DeferredIntegrationStart(int attachmentGeneration, @NonNull View root) {
-            this.attachmentGeneration = attachmentGeneration;
-            this.root = root;
-        }
-
-        @Override public void doFrame(long frameTimeNanos) {
-            // Frame callbacks run before traversal. Posting once more lets traversal draw the
-            // fully opaque status row before connector JSON/Keystore work begins.
-            mainHandler.post(this);
-        }
-
-        @Override public void run() {
-            if (deferredIntegrationStart != this) return;
-            deferredIntegrationStart = null;
-            if (!isCurrentOverlayAttachment(attachmentGeneration, root)
-                    || root.getAlpha() < 0.999f) {
-                integrationStartupScheduled = false;
-                return;
-            }
-            StartupPerformanceTrace.mark("overlay_fully_visible");
-            StatusWidgetApplication.notifyFirstUsefulSurface(WidgetService.this);
-            // The surface and controller lanes are independent. A fresh status row is allowed to
-            // draw during boot, but its fully-visible callback must never open the persisted host
-            // generation by itself.
-            if (!explicitScenarioRuntimeOverride
-                    && StartupWorkCoordinator.shouldParkAutomaticRuntime(WidgetService.this)) {
-                automaticRuntimeParked = true;
-                StartupWorkCoordinator.ensureIntegrationHostScheduled(WidgetService.this);
-            }
-            boolean releasedParkedRuntime = false;
-            if (automaticHostReleaseAfterVisible
-                    && !StartupWorkCoordinator.shouldParkAutomaticRuntime(WidgetService.this)) {
-                releasedParkedRuntime = automaticRuntimeParked || automaticLifecycleQuiet;
-                automaticHostReleaseAfterVisible = false;
-                resumeAutomaticLifecycleIntegrationsAfterQuiet();
-            }
-            boolean runtimeParked = automaticRuntimeParked || automaticLifecycleQuiet;
-            if (!runtimeParked && !integrationsStarted
-                    && !initialIntegrationStartupInProgress) {
-                runInitialIntegrationStartup();
-            }
-            if (!runtimeParked && integrationsStarted && binding != null) {
-                applyPreferences(false);
-            }
-            if (!runtimeParked && !automaticHostReleaseAfterVisible
-                    && !releasedParkedRuntime) {
-                finishAutomaticSurfaceReconcileIfReady();
-            }
-        }
-    }
-    /** Re-evaluates TTL/stale rules even when no new packet arrives. */
-    private final Runnable automationFreshnessTick = new Runnable() {
-        @Override public void run() {
-            if (destroyed) return;
-            if (binding != null) {
-                renderHomeAssistantBricks();
-                applyBrickVisibility(currentBrickSet());
-            }
-            applyPopupPreferencesSafely();
-            if (!destroyed) mainHandler.postDelayed(this, 30_000L);
-        }
-    };
-    private final Runnable popupRefresh = this::applyPopupPreferencesSafely;
-    private static final long PHONE_EDITOR_PREVIEW_HANDOFF_MS = 450L;
-    @Nullable private String activePhoneEditorPreviewOverlayId;
-    @Nullable private String pendingPhoneEditorPreviewStopId;
-    private final Runnable phoneEditorPreviewStop = () -> {
-        String requested = pendingPhoneEditorPreviewStopId;
-        pendingPhoneEditorPreviewStopId = null;
-        if (destroyed || requested == null
-                || !requested.equals(activePhoneEditorPreviewOverlayId)) return;
-        if (popupOverlay != null) popupOverlay.stopEditorPreview(requested);
-        activePhoneEditorPreviewOverlayId = null;
-    };
-
-    private void schedulePopupRefresh() {
-        if (destroyed) return;
-        mainHandler.removeCallbacks(popupRefresh);
-        mainHandler.post(popupRefresh);
-    }
-    private LocationManager locationManager = null;
-    private ConnectivityManager connectivityManager = null;
-    private boolean gnssStatusCallbackRegistered;
-    private boolean locationUpdatesRegistered;
-    private boolean networkCallbackRegistered;
-    private boolean wifiRssiReceiverRegistered;
-    private boolean overlayAttached;
-    /** Monotonic timestamp; wall-clock changes must not prolong or expire a GNSS fix. */
-    private long lastLocationUpdateElapsed;
-
-    private GradientDrawable background = null;
-    private int bgColor = -1;
-    private int bgCornerRadius = -1;
-
-    private int touchSlop;
-
-    private SimpleDateFormat timeFormat;
-    private SimpleDateFormat dateFormat;
-    private String currentDateFormatPattern;
-
-    private UsageStatsManager usageStatsManager = null;
-    private Set<String> hiddenInPackages;
-    private String lastForegroundPackage;
-    private long lastForegroundFailureLogElapsed;
-    @Nullable private EcarxNavigatorWindowObserver ecarxNavigatorWindowObserver;
-    /** Independent from StatusBarSurfaceContext's launch/focus/a11y fallback token. */
-    @NonNull private NavigatorWindowSourcePolicy.VendorDecision ecarxNavigatorWindowDecision =
-            NavigatorWindowSourcePolicy.VendorDecision.NONE;
-    private long ecarxNavigatorWindowDecisionAtElapsed = -1L;
-    private final Runnable ecarxNavigatorWindowLeaseExpiry =
-            this::expireEcarxNavigatorWindowLease;
-    private boolean ecarxNavigatorOptimisticConfirmationPending;
-    private long ecarxNavigatorOptimisticStartedAtElapsed = -1L;
-    private int ecarxNavigatorOptimisticRetryIndex;
-    private final Runnable ecarxNavigatorOptimisticRetry =
-            this::runEcarxNavigatorOptimisticRetry;
-    private final Runnable ecarxNavigatorOptimisticExpiry =
-            this::expireEcarxNavigatorOptimisticConfirmation;
-    private boolean overlayHiddenByApp = false;
-
-    /**
-     * Number of in-flight transitions that have widened the WindowManager window to the
-     * screen-width "buffer" so explicit visibility animations can play in a stable rectangle.
-     * Incremented when a transition starts the buffer, decremented when it ends; the window is
-     * restored to WRAP_CONTENT only when the counter reaches zero. Shared between:
-     * <ul>
-     *   <li>{@link #beginVisibilityTransition} (brick show/hide)</li>
-     *   <li>The eager pre-empt in the size-change listener that catches a shrink before the
-     *       window manager applies the new wrap-content bounds.</li>
-     * </ul>
-     */
-    private int pendingBufferedTransitions = 0;
-
-    /**
-     * Closes the buffer opened eagerly by {@code onLayoutChange} when the content shrinks.
-     * Posted with a delay slightly longer than {@link #BRICK_TRANSITION_DURATION_MS}, so the
-     * window cannot remain screen-wide when a size hint is not followed by a visibility
-     * transition.
-     */
-    private final Runnable shrinkBufferSafetyClose = this::endBufferedTransition;
-
-    private Context themedContext;
-    private int appliedThemePref = -1;
-
-    /** Fires when the overlay's position or size changes so the settings UI can stay in sync. */
-    public interface OverlayStateListener {
-        void onOverlayStateChanged(int x, int y, int width, int height);
-    }
-
-    @Nullable private OverlayStateListener overlayStateListener;
-
-    private MediaSessionManager mediaSessionManager;
-    private final List<MediaController> activeMediaControllers = new ArrayList<>();
-    private final MediaController.Callback mediaControllerCallback = new MediaController.Callback() {
-        @Override
-        public void onPlaybackStateChanged(@Nullable PlaybackState state) {
-            updateMediaInfo();
-        }
-
-        @Override
-        public void onMetadataChanged(@Nullable MediaMetadata metadata) {
-            updateMediaInfo();
-        }
-    };
-    private final MediaSessionManager.OnActiveSessionsChangedListener activeSessionsChangedListener =
-            this::rebindMediaControllers;
-
-    private int satellitesCount = -1;
-    private int gnssModeFlags = 0;
-    private long satellitesCountTimestamp = 0;
-    private boolean satelliteReceiverRegistered = false;
-    private final BroadcastReceiver satelliteStatusReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (destroyed || binding == null || prefs == null
-                    || !prefs.widgetEnabled.get()) return;
-            int count = intent.getIntExtra(GNSSSHARE_EXTRA_SATELLITES_COUNT, -1);
-            int mode = intent.getIntExtra(GNSSSHARE_EXTRA_MODE, 0);
-            Log.d(TAG, "GNSS Share satellites count: " + count + ", mode: " + mode);
-            satellitesCount = count;
-            gnssModeFlags = mode;
-            // Monotonic clock (matches the postDelayed reset below), so a boot-time wall-clock
-            // jump from GPS/NTP sync can't prematurely expire or freeze the freshness window.
-            satellitesCountTimestamp = android.os.SystemClock.uptimeMillis();
-            mainHandler.removeCallbacks(satellitesCountResetRunnable);
-            mainHandler.postDelayed(satellitesCountResetRunnable, GNSSSHARE_SATELLITE_STATUS_TIMEOUT_MS);
-            updateGnssStatus();
-        }
-    };
-    private final Runnable satellitesCountResetRunnable = () -> {
-        satellitesCount = -1;
-        gnssModeFlags = 0;
-        updateGnssStatus();
-    };
-
-    private final BroadcastReceiver bluetoothReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (destroyed || binding == null || prefs == null
-                    || !prefs.widgetEnabled.get()) return;
-            String action = intent.getAction();
-            if (action == null) return;
-            if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
-                int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
-                if (state == BluetoothAdapter.STATE_OFF || state == BluetoothAdapter.STATE_TURNING_OFF) {
-                    btConnectedAddrs.clear();
-                } else if (state == BluetoothAdapter.STATE_ON) {
-                    refreshBtConnectedFromProxies();
-                }
-            } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if (device != null && device.getAddress() != null) {
-                    btConnectedAddrs.add(device.getAddress());
-                }
-            } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if (device != null && device.getAddress() != null) {
-                    btConnectedAddrs.remove(device.getAddress());
-                }
-            }
-            updateBluetoothStatus();
-        }
-    };
-
-    private final Runnable updateDateTimeRunnable = new Runnable() {
-        @Override
-        public void run() {
-            updateDateTime();
-            long now = System.currentTimeMillis();
-            long delay = DATETIME_UPDATE_INTERVAL_MS - (now % DATETIME_UPDATE_INTERVAL_MS);
-            mainHandler.postDelayed(this, delay);
-        }
-    };
-    /** Time-range conditions remain live even when the status row has no clock or is disabled. */
-    private final Runnable systemConditionRefresh = new Runnable() {
-        @Override public void run() {
-            if (destroyed || !integrationsStarted) return;
-            if (scenarioController != null) scenarioController.refreshSystemConditions();
-            long now = System.currentTimeMillis();
-            long delay = SYSTEM_CONDITION_REFRESH_INTERVAL_MS
-                    - (now % SYSTEM_CONDITION_REFRESH_INTERVAL_MS);
-            mainHandler.postDelayed(this, delay);
-        }
-    };
-
-    private final Runnable foregroundAppCheckRunnable = new Runnable() {
-        @Override
-        public void run() {
-            safeCheckForegroundApp("poll");
-            if (!destroyed) {
-                mainHandler.postDelayed(this, FOREGROUND_APP_CHECK_INTERVAL_MS);
-            }
-        }
-    };
-
-    private final Runnable updateGnssStatusRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (destroyed || !locationUpdatesRegistered || lastLocationUpdateElapsed <= 0L) {
-                return;
-            }
-            long age = Math.max(0L,
-                    SystemClock.elapsedRealtime() - lastLocationUpdateElapsed);
-            if (age >= GNSS_FIX_OFF_AFTER_MS) {
-                setGnssStatus(GnssState.OFF);
-                return;
-            }
-            if (age >= GNSS_FIX_DEGRADED_AFTER_MS) {
-                setGnssStatus(GnssState.BAD);
-            }
-            long nextBoundary = age < GNSS_FIX_DEGRADED_AFTER_MS
-                    ? GNSS_FIX_DEGRADED_AFTER_MS : GNSS_FIX_OFF_AFTER_MS;
-            mainHandler.postDelayed(this, Math.max(1L, nextBoundary - age));
-        }
-    };
-
-    private final GnssStatus.Callback gnssStatusCallback = new GnssStatus.Callback() {
-        @Override
-        public void onStarted() {
-            Log.d(TAG, "GNSS is started");
-            lastLocationUpdateElapsed = SystemClock.elapsedRealtime();
-            setGnssStatus(GnssState.BAD);
-            scheduleGnssFreshnessDeadline();
-        }
-
-        @Override
-        public void onStopped() {
-            Log.d(TAG, "GNSS is stopped");
-            lastLocationUpdateElapsed = 0L;
-            mainHandler.removeCallbacks(updateGnssStatusRunnable);
-            setGnssStatus(GnssState.OFF);
-        }
-
-        @Override
-        public void onFirstFix(int ttffMillis) {
-            Log.d(TAG, "GNSS has first fix");
-            lastLocationUpdateElapsed = SystemClock.elapsedRealtime();
-            setGnssStatus(GnssState.BAD);
-            scheduleGnssFreshnessDeadline();
-        }
-    };
-
-    private final LocationListener locationListener = new LocationListener() {
-        @Override
-        public void onLocationChanged(@NonNull Location location) {
-            lastLocationUpdateElapsed = SystemClock.elapsedRealtime();
-            if (location.hasAccuracy() && location.getAccuracy() < 20.0) {
-                setGnssStatus(GnssState.GOOD);
-            } else {
-                setGnssStatus(GnssState.BAD);
-            }
-            scheduleGnssFreshnessDeadline();
-        }
-
-        @Override
-        public void onProviderEnabled(@NonNull String provider) {
-            Log.d(TAG, "Provider enabled: " + provider);
-            lastLocationUpdateElapsed = SystemClock.elapsedRealtime();
-            setGnssStatus(GnssState.BAD);
-            scheduleGnssFreshnessDeadline();
-        }
-
-        @Override
-        public void onProviderDisabled(@NonNull String provider) {
-            Log.d(TAG, "Provider disabled: " + provider);
-            lastLocationUpdateElapsed = 0L;
-            mainHandler.removeCallbacks(updateGnssStatusRunnable);
-            setGnssStatus(GnssState.OFF);
-        }
-    };
-
-    private final BroadcastReceiver wifiRssiReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) {
-            if (intent != null && WifiManager.RSSI_CHANGED_ACTION.equals(intent.getAction())) {
-                refreshWifiSignalLevel();
-            }
-        }
-    };
-
-    private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
-        @Override
-        public void onAvailable(@NonNull Network network) {
-            Log.d(TAG, "Wi-Fi is connected");
-            if (wifiState == WiFiState.OFF) {
-                setWifiStatus(WiFiState.NO_INTERNET);
-            }
-            refreshWifiSignalLevel();
-            mainHandler.post(() -> probeReachability());
-        }
-
-        @Override
-        public void onLost(@NonNull Network network) {
-            Log.d(TAG, "Wi-Fi is lost");
-            setWifiStatus(WiFiState.OFF);
-        }
-
-        @Override
-        public void onCapabilitiesChanged(@NonNull Network network, NetworkCapabilities networkCapabilities) {
-            if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                boolean hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
-                Log.d(TAG, "Wi-Fi capabilities changed, has internet = " + hasInternet);
-                if (hasInternet) {
-                    // Network claims Internet capability â€” do our own probe to differentiate
-                    // FULL vs WHITELIST vs NONE.
-                    mainHandler.post(() -> probeReachability());
-                } else {
-                    setWifiStatus(WiFiState.NO_INTERNET);
-                }
-                refreshWifiSignalLevel();
-            } else {
-                setWifiStatus(WiFiState.OFF);
-            }
-        }
-    };
-
-    private final Runnable reachabilityProbeRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (wifiState != WiFiState.OFF) {
-                // Thirty-second safety refresh covers vendor stacks that suppress RSSI broadcasts.
-                refreshWifiSignalLevel();
-                probeReachability();
-            }
-            mainHandler.postDelayed(this, INTERNET_PROBE_INTERVAL_MS);
-        }
-    };
-
-    private ReachabilityChecker reachabilityChecker;
-
-    private void probeReachability() {
-        if (destroyed || binding == null || prefs == null || !prefs.widgetEnabled.get()) return;
-        if (reachabilityChecker == null) {
-            reachabilityChecker = new ReachabilityChecker(mainHandler);
-        }
-        reachabilityChecker.check(reach -> {
-            if (destroyed || binding == null || prefs == null
-                    || !prefs.widgetEnabled.get()) return;
-            if (wifiState == WiFiState.OFF) return;
-            switch (reach) {
-                case FULL -> setWifiStatus(WiFiState.INTERNET);
-                case WHITELIST -> setWifiStatus(WiFiState.LIMITED_INTERNET);
-                case NONE -> setWifiStatus(WiFiState.NO_INTERNET);
-            }
-        });
-    }
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        destroyed = false;
-
-        // startForegroundService() gives us only a few seconds. Promote immediately, before
-        // preferences and connector constructors parse potentially large cached catalogs.
-        createNotificationChannel();
-        startForeground(NOTIFICATION_ID, createNotification());
-        StartupPerformanceTrace.mark("widget_foreground_promoted");
-
-    }
-
-    /**
-     * Builds only the visual shell after admission. Network, Bluetooth and ECARX objects are
-     * created later in independent post-visible stages so the status row never waits for them.
-     */
-    private void initializeRuntime() {
-        if (runtimeInitialized || destroyed) return;
-        runtimeInitialized = true;
-        startupStateOwnerToken = STARTUP_STATE_OWNER.incrementAndGet();
-
-        // The early visual host reads geometry immediately but runs upgrade migrations inside the
-        // background-priority state barrier at the delayed runtime phase.
-        prefs = new Preferences(this, false);
-        automationStates = new AutomationStateStore(this);
-        // Cached values may be rendered in the first frame, but never as current. The persisted
-        // mark-all-stale pass is intentionally delayed until after that frame.
-        automationStates.beginSessionFreshnessBarrier();
-        connectorValues = new ConnectorValueRegistry();
-        connectorValues.addListener(crossSourceRuleListener);
-        connectorValues.addListener(phoneStatusListener);
-        haConfigs = new HaBrickConfigStore(prefs);
-
-        boolean overlayRuntimeAvailable = Permissions.allPermissionsGranted(this);
-        boolean headlessHostRequired = WidgetServiceStarter.requiresHeadlessHost(prefs)
-                || !pendingIntentScenarioCommands.isEmpty();
-        armTemporaryScenarioHeadlessHostIfNeeded(overlayRuntimeAvailable);
-        if (!overlayRuntimeAvailable && !headlessHostRequired) {
-            // Locked boot and a few OEM AppOps implementations can report a temporary denial.
-            // Never turn that transient state into a permanent user preference and never pull
-            // the settings activity over HOME without an explicit user action.
-            Log.w(TAG, "Overlay permissions are not available yet; keeping widget enabled");
-            stopSelf();
-            return;
-        }
-
-        instance = this;
-        touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
-        timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        windowManager = getSystemService(WindowManager.class);
-        ecarxNavigatorWindowObserver = new EcarxNavigatorWindowObserver(
-                this, this::onEcarxNavigatorWindowStateChanged);
-        ecarxNavigatorWindowObserver.start(android.view.Display.DEFAULT_DISPLAY);
-
-        if (prefs.widgetEnabled.get() && overlayRuntimeAvailable) {
-            createOverlayView();
-            // Start the background freshness barrier immediately. Controller stages yield through
-            // the main queue, so WindowManager can still draw without waiting for JSON migration.
-            if (!automaticRuntimeParked && !automaticLifecycleQuiet) {
-                runInitialIntegrationStartup();
-            }
-        } else if (headlessHostRequired) {
-            // No visual frame exists in headless mode, so the same serialized controller lane can
-            // begin immediately. It still creates and starts at most one integration per stage.
-            StatusWidgetApplication.notifyFirstUsefulSurface(this);
-            if (!automaticRuntimeParked && !automaticLifecycleQuiet) {
-                runInitialIntegrationStartup();
-            }
-        } else {
-            stopSelf();
-        }
-    }
-
-    private void ensureMqttRuntimeGraph() {
-        if (mqttController != null) return;
-        mqttController = createMqttController();
-    }
-
-    @NonNull
-    private MqttController createMqttController() {
-        return new MqttController(this, prefs, automationStates, connectorValues,
-                new MqttController.StateListener() {
-                    @Override public void onStateChanged(String scope, String id) {
-                        onAutomationStateChanged(scope, id);
-                    }
-
-                    @Override public void onConnectionChanged(boolean connected, String detail) {
-                        Log.i(TAG, "MQTT " + (connected ? "connected" : "disconnected")
-                                + ": " + detail);
-                    }
-                });
-    }
-
-    private static final class SprutRuntimeGraph {
-        final SprutHubController controller;
-        final PhoneSprutPresenceExporter phonePresence;
-        final PhoneSprutPresenceExporter ancsPresence;
-
-        SprutRuntimeGraph(@NonNull SprutHubController controller,
-                          @NonNull PhoneSprutPresenceExporter phonePresence,
-                          @NonNull PhoneSprutPresenceExporter ancsPresence) {
-            this.controller = controller;
-            this.phonePresence = phonePresence;
-            this.ancsPresence = ancsPresence;
-        }
-    }
-
-    private static final class PhonePresenceRuntimeGraph {
-        final PhoneSprutPresenceExporter phonePresence;
-        final PhoneSprutPresenceExporter ancsPresence;
-
-        PhonePresenceRuntimeGraph(@NonNull PhoneSprutPresenceExporter phonePresence,
-                                  @NonNull PhoneSprutPresenceExporter ancsPresence) {
-            this.phonePresence = phonePresence;
-            this.ancsPresence = ancsPresence;
-        }
-    }
-
-    private void ensureSprutRuntimeGraph() {
-        if (sprutController != null && phonePresenceExporter != null
-                && phoneAncsPresenceExporter != null) return;
-        if (sprutController != null || phonePresenceExporter != null
-                || phoneAncsPresenceExporter != null) {
-            // Heal a constructor failure from an earlier attempt as one bundle; no callback may
-            // observe a controller without both exact-device presence projections.
-            if (phonePresenceExporter != null) phonePresenceExporter.stop();
-            if (phoneAncsPresenceExporter != null) phoneAncsPresenceExporter.stop();
-            if (sprutController != null) sprutController.stop();
-            sprutController = null;
-            phonePresenceExporter = null;
-            phoneAncsPresenceExporter = null;
-        }
-        publishSprutRuntimeGraph(createSprutRuntimeGraph());
-    }
-
-    @NonNull
-    private SprutRuntimeGraph createSprutRuntimeGraph() {
-        SprutHubController nextController = new SprutHubController(
-                this, prefs, automationStates, connectorValues,
-                new SprutHubController.Listener() {
-                    @Override public void onStateChanged(@NonNull String scope,
-                                                         @NonNull String id) {
-                        onAutomationStateChanged(scope, id);
-                    }
-
-                    @Override public void onConnectionChanged(
-                            @NonNull SprutHubController.State state, @NonNull String detail) {
-                        Log.i(TAG, "Sprut.hub " + state + ": " + detail);
-                        if (carTelemetryExporter != null) {
-                            carTelemetryExporter.onSprutConnectionChanged(state);
-                        }
-                        if (phonePresenceExporter != null) {
-                            phonePresenceExporter.onSprutConnectionChanged(state);
-                        }
-                        if (phoneAncsPresenceExporter != null) {
-                            phoneAncsPresenceExporter.onSprutConnectionChanged(state);
-                        }
-                    }
-
-                    @Override public void onCatalogChanged(@NonNull SprutCatalog catalog) {
-                        Log.i(TAG, "Sprut.hub catalog: " + catalog.accessories().size()
-                                + " devices, " + catalog.characteristics().size()
-                                + " characteristics");
-                        if (carTelemetryExporter != null) {
-                            carTelemetryExporter.onSprutCatalogChanged();
-                        }
-                        if (phonePresenceExporter != null) {
-                            phonePresenceExporter.onSprutCatalogChanged();
-                        }
-                        if (phoneAncsPresenceExporter != null) {
-                            phoneAncsPresenceExporter.onSprutCatalogChanged();
-                        }
-                    }
-
-                    @Override public void onCharacteristicChanged(
-                            @NonNull dezz.status.widget.sprut.SprutPath path) {
-                        if (carTelemetryExporter != null) {
-                            carTelemetryExporter.onSprutCharacteristicChanged(path);
-                        }
-                        if (phonePresenceExporter != null) {
-                            phonePresenceExporter.onSprutCharacteristicChanged(path);
-                        }
-                        if (phoneAncsPresenceExporter != null) {
-                            phoneAncsPresenceExporter.onSprutCharacteristicChanged(path);
-                        }
-                    }
-                });
-        PhoneSprutPresenceExporter nextPresence = null;
-        PhoneSprutPresenceExporter nextAncsPresence = null;
-        try {
-            nextPresence = new PhoneSprutPresenceExporter(
-                    prefs, nextController, mainHandler);
-            nextAncsPresence = new PhoneSprutPresenceExporter(
-                    prefs, nextController, mainHandler,
-                    PhoneSprutPresenceExporter.Signal.ANCS);
-            return new SprutRuntimeGraph(nextController, nextPresence, nextAncsPresence);
-        } catch (RuntimeException failure) {
-            try { if (nextAncsPresence != null) nextAncsPresence.stop(); }
-            catch (RuntimeException ignored) { }
-            try { if (nextPresence != null) nextPresence.stop(); }
-            catch (RuntimeException ignored) { }
-            try { nextController.stop(); } catch (RuntimeException ignored) { }
-            throw failure;
-        }
-    }
-
-    /** Main-thread publication keeps callbacks from observing a partial three-object graph. */
-    private void publishSprutRuntimeGraph(@NonNull SprutRuntimeGraph graph) {
-        sprutController = graph.controller;
-        phonePresenceExporter = graph.phonePresence;
-        phoneAncsPresenceExporter = graph.ancsPresence;
-    }
-
-    private void discardSprutRuntimeGraph(@NonNull SprutRuntimeGraph graph) {
-        try { if (graph.ancsPresence != null) graph.ancsPresence.stop(); }
-        catch (RuntimeException ignored) { }
-        try { if (graph.phonePresence != null) graph.phonePresence.stop(); }
-        catch (RuntimeException ignored) { }
-        try { if (graph.controller != null) graph.controller.stop(); }
-        catch (RuntimeException ignored) { }
-    }
-
-    @NonNull
-    private PhonePresenceRuntimeGraph createPhonePresenceRuntimeGraph(
-            @NonNull SprutHubController controller) {
-        PhoneSprutPresenceExporter phone = null;
-        try {
-            phone = new PhoneSprutPresenceExporter(prefs, controller, mainHandler);
-            PhoneSprutPresenceExporter ancs = new PhoneSprutPresenceExporter(
-                    prefs, controller, mainHandler, PhoneSprutPresenceExporter.Signal.ANCS);
-            return new PhonePresenceRuntimeGraph(phone, ancs);
-        } catch (RuntimeException failure) {
-            if (phone != null) {
-                try { phone.stop(); } catch (RuntimeException ignored) { }
-            }
-            throw failure;
-        }
-    }
-
-    private void discardPhonePresenceRuntimeGraph(
-            @NonNull PhonePresenceRuntimeGraph graph) {
-        try { graph.ancsPresence.stop(); } catch (RuntimeException ignored) { }
-        try { graph.phonePresence.stop(); } catch (RuntimeException ignored) { }
-    }
-
-    private void ensurePhoneRuntimeGraph() {
-        if (phoneController != null) return;
-        phoneController = createPhoneController();
-    }
-
-    @NonNull
-    private PhoneConnectorController createPhoneController() {
-        return new PhoneConnectorController(this, prefs, connectorValues,
-                new PhoneConnectorController.PresenceSink() {
-                    @Override public void onPhoneConnectionChanged(boolean connected) {
-                        PhoneSprutPresenceExporter exporter = phonePresenceExporter;
-                        if (exporter != null) exporter.onPhoneConnectionChanged(connected);
-                    }
-
-                    @Override public void onAncsConnectionChanged(boolean connected) {
-                        PhoneSprutPresenceExporter exporter = phoneAncsPresenceExporter;
-                        if (exporter != null) exporter.onPhoneConnectionChanged(connected);
-                    }
-                });
-    }
-
-    private static final class CarRuntimeGraph {
-        final CarIntegration car;
-        final CarTelemetryExporter exporter;
-
-        CarRuntimeGraph(@NonNull CarIntegration car, @NonNull CarTelemetryExporter exporter) {
-            this.car = car;
-            this.exporter = exporter;
-        }
-    }
-
-    private void ensureCarRuntimeGraph() {
-        if (carTelemetryExporter != null) return;
-        ensureSprutRuntimeGraph();
-        publishCarRuntimeGraph(createCarRuntimeGraph(sprutController));
-    }
-
-    @NonNull
-    private CarRuntimeGraph createCarRuntimeGraph(@NonNull SprutHubController sprut) {
-        CarIntegration car = CarIntegrations.get(this);
-        return new CarRuntimeGraph(car,
-                new CarTelemetryExporter(prefs, car, sprut, mainHandler));
-    }
-
-    /** Vendor availability callbacks and service field publication remain main-thread-owned. */
-    private void publishCarRuntimeGraph(@NonNull CarRuntimeGraph graph) {
-        boolean replacingPublishedGraph = carTelemetryExporter != null;
-        try {
-            // Re-evaluate placeholders when the asynchronous vendor capability answer arrives.
-            graph.car.setAvailabilityChangedListener(() -> mainHandler.post(() -> {
-                if (!destroyed && binding != null) refreshCarStatusSurface();
-            }));
-            carTelemetryExporter = graph.exporter;
-        } catch (RuntimeException failure) {
-            try { graph.exporter.stop(); } catch (RuntimeException ignored) { }
-            // With a current graph, the old callback is still valid. The vendor setter may throw
-            // either before or after accepting the identical service-level callback, so clearing
-            // it here would break the live graph that remains authoritative.
-            if (!replacingPublishedGraph) {
-                try { graph.car.setAvailabilityChangedListener(null); }
-                catch (RuntimeException ignored) { }
-            }
-            throw failure;
-        }
-    }
-
-    private void discardCarRuntimeGraph(@NonNull CarRuntimeGraph graph) {
-        try { graph.exporter.stop(); } catch (RuntimeException ignored) { }
-    }
-
-    private void ensureHomeAssistantRuntimeGraph() {
-        if (haApiController != null) return;
-        haApiController = createHomeAssistantController();
-    }
-
-    @NonNull
-    private HaApiController createHomeAssistantController() {
-        return new HaApiController(this, prefs, automationStates, connectorValues,
-                new HaApiController.Listener() {
-                    @Override public void onStateChanged(@NonNull String scope,
-                                                         @NonNull String id) {
-                        onAutomationStateChanged(scope, id);
-                    }
-
-                    @Override public void onConnectionChanged(
-                            @NonNull HaWebSocketConnector.ConnectionState state,
-                            @NonNull String detail) {
-                        Log.i(TAG, "Home Assistant " + state + ": " + detail);
-                    }
-
-                    @Override public void onCatalogChanged(@NonNull HaEntityCatalog catalog) {
-                        Log.i(TAG, "Home Assistant catalog: " + catalog.size() + " entities");
-                    }
-                });
-    }
-
-    private static final class ScenarioRuntimeGraph {
-        final ConnectorActionDispatcher dispatcher;
-        final LocalScenarioController controller;
-
-        ScenarioRuntimeGraph(@NonNull ConnectorActionDispatcher dispatcher,
-                             @NonNull LocalScenarioController controller) {
-            this.dispatcher = dispatcher;
-            this.controller = controller;
-        }
-    }
-
-    private void ensureScenarioRuntimeGraph() {
-        if (scenarioController != null) return;
-        ensureMqttRuntimeGraph();
-        ensureSprutRuntimeGraph();
-        ensureHomeAssistantRuntimeGraph();
-        publishScenarioRuntimeGraph(createScenarioRuntimeGraph(
-                mqttController, sprutController, haApiController));
-        ensurePopupOverlayManager();
-    }
-
-    @NonNull
-    private ScenarioRuntimeGraph createScenarioRuntimeGraph(
-            @NonNull MqttController mqtt, @NonNull SprutHubController sprut,
-            @NonNull HaApiController homeAssistant) {
-        ConnectorActionDispatcher dispatcher = new ConnectorActionDispatcher(
-                mqtt, sprut, homeAssistant);
-        LocalScenarioController controller = new LocalScenarioController(
-                this, prefs, automationStates, connectorValues,
-                CarIntegrations.get(this), this::onScenarioTargetsChanged);
-        return new ScenarioRuntimeGraph(dispatcher, controller);
-    }
-
-    private void publishScenarioRuntimeGraph(@NonNull ScenarioRuntimeGraph graph) {
-        actionDispatcher = graph.dispatcher;
-        scenarioController = graph.controller;
-    }
-
-    private void ensureIntentScenarioRuntimeGraph() {
-        if (intentScenarioController != null) return;
-        ensureScenarioRuntimeGraph();
-        intentScenarioController = createIntentScenarioController(actionDispatcher);
-    }
-
-    @NonNull
-    private IntentScenarioController createIntentScenarioController(
-            @NonNull ConnectorActionDispatcher dispatcher) {
-        return new IntentScenarioController(this, prefs, dispatcher);
-    }
-
-    private void onScenarioTargetsChanged(@NonNull Set<String> targets) {
-        // Initial startup performs one consolidated render after all providers and scenarios are
-        // configured. Credential-only refresh follows the same coalescing rule.
-        if (automaticSurfaceRefreshSuppressed()) {
-            synchronized (automationUiLock) {
-                for (String target : targets) {
-                    int divider = target.indexOf('|');
-                    if (divider <= 0 || divider >= target.length() - 1) continue;
-                    pendingAutomationUi.computeIfAbsent(target.substring(0, divider),
-                            ignored -> new HashSet<>()).add(target.substring(divider + 1));
-                }
-            }
-            return;
-        }
-        mainHandler.post(() -> {
-            if (destroyed) return;
-            dispatchAutomationPresentationTargets(targets);
-            if (binding != null) renderHomeAssistantBricks();
-            applyPopupPreferencesSafely();
-            boolean phoneFieldsChanged = false;
-            boolean driverTargetsChanged = false;
-            for (String target : targets) {
-                if (target.startsWith(AutomationContract.SCOPE_POPUP + "|")
-                        && PhoneNotificationAutomation.isFieldAutomationId(
-                        target.substring(target.indexOf('|') + 1))) {
-                    phoneFieldsChanged = true;
-                }
-                if (target.startsWith(AutomationContract.SCOPE_DRIVER + "|")) {
-                    driverTargetsChanged = true;
-                }
-                if (target.startsWith(AutomationContract.SCOPE_HUD + "|")
-                        && (prefs.hudPanelAutostart.get()
-                        || HudPresentationService.isRunning(this))) {
-                    HudPresentationService.notifyAutomationChanged(this);
-                }
-            }
-            if (driverTargetsChanged) DriverPanelService.apply(this);
-            if (binding != null) {
-                if (phoneFieldsChanged && activePhoneNotification != null) updateMediaInfo();
-                applyBrickVisibility(currentBrickSet());
-            }
-        });
-    }
-
-    private static final class PreparedInitialIntegrationStage {
-        final int stage;
-        @NonNull final String name;
-        final boolean succeeded;
-        @NonNull final Runnable publication;
-        @NonNull final Runnable cleanup;
-        private boolean published;
-
-        PreparedInitialIntegrationStage(int stage, @NonNull String name, boolean succeeded,
-                                        @NonNull Runnable publication,
-                                        @NonNull Runnable cleanup) {
-            this.stage = stage;
-            this.name = name;
-            this.succeeded = succeeded;
-            this.publication = publication;
-            this.cleanup = cleanup;
-        }
-
-        void publish() {
-            publication.run();
-            published = true;
-        }
-
-        void discard() {
-            if (!published) cleanup.run();
-        }
-    }
-
-    /** Starts every enabled integration immediately; persistence and controllers run off-main. */
-    private void runInitialIntegrationStartup() {
-        if (destroyed || automaticRuntimeParked || automaticLifecycleQuiet
-                || integrationsStarted || initialIntegrationStartupInProgress) return;
-        integrationStartupScheduled = true;
-        initialIntegrationStartupInProgress = true;
-        initialIntegrationStage = 0;
-        initialIntegrationStageRetryCount = 0;
-        mainHandler.removeCallbacks(initialIntegrationStageRunner);
-        mainHandler.post(initialIntegrationStageRunner);
-    }
-
-    private void runNextInitialIntegrationStage() {
-        if (destroyed || !initialIntegrationStartupInProgress
-                || initialIntegrationWorkerInFlight) return;
-        if (automaticRuntimeParked || automaticLifecycleQuiet) {
-            // Keep the exact stage parked. The host-phase generation will resume it; no polling
-            // and no transport/vendor construction is allowed inside the QuickBoot quiet lane.
-            mainHandler.removeCallbacks(initialIntegrationStageRunner);
-            return;
-        }
-        StartupPerformanceTrace.mark("integration_stage_" + initialIntegrationStage);
-        switch (initialIntegrationStage) {
-            case 0:
-                // Persist the session barrier before any connector is allowed to publish fresh.
-                runCachedStateFreshnessBarrier();
-                return;
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-            case 6:
-            case 7:
-            case 8:
-            case 9:
-                submitInitialIntegrationWorkerStage(initialIntegrationStage);
-                return;
-            default:
-                finishInitialIntegrationStartup();
-                return;
-        }
-    }
-
-    /**
-     * Submits the current stage now to the one background-priority startup lane. The worker may
-     * parse preferences, touch journals and start transport-owned threads, but it never publishes
-     * a service field or invokes view/system-listener code. Publication is one fenced main task.
-     */
-    private void submitInitialIntegrationWorkerStage(int stage) {
-        initialIntegrationWorkerInFlight = true;
-        final long ownerToken = startupStateOwnerToken;
-        try {
-            startupStateWorker.execute(() -> {
-                PreparedInitialIntegrationStage workerResult;
-                try {
-                    workerResult = prepareInitialIntegrationWorkerStage(stage);
-                } catch (RuntimeException failure) {
-                    // An unexpected parser/controller exception must still reach the main
-                    // completion path so initialIntegrationWorkerInFlight is always released.
-                    workerResult = failedInitialIntegrationStage(
-                            stage, "integration stage " + stage, failure);
-                }
-                final PreparedInitialIntegrationStage prepared = workerResult;
-                if (!ownsStartupState(ownerToken)) {
-                    discardPreparedInitialIntegrationStage(prepared);
-                    return;
-                }
-                if (!pendingInitialIntegrationStage.compareAndSet(null, prepared)) {
-                    discardPreparedInitialIntegrationStage(prepared);
-                    mainHandler.post(() -> completeInitialIntegrationWorkerStage(
-                            ownerToken, stage, null));
-                    return;
-                }
-                if (!ownsStartupState(ownerToken)) {
-                    if (pendingInitialIntegrationStage.compareAndSet(prepared, null)) {
-                        discardPreparedInitialIntegrationStage(prepared);
-                    }
-                    return;
-                }
-                mainHandler.post(() -> completeInitialIntegrationWorkerStage(
-                        ownerToken, stage, prepared));
-            });
-        } catch (RuntimeException rejected) {
-            initialIntegrationWorkerInFlight = false;
-            Log.e(TAG, "Could not schedule integration stage " + stage, rejected);
-            advanceInitialIntegrationStage(false);
-        }
-    }
-
-    /** Main-thread owner/stage fence and the only publication point for prepared controllers. */
-    private void completeInitialIntegrationWorkerStage(long ownerToken, int stage,
-                                                       @Nullable
-                                                       PreparedInitialIntegrationStage prepared) {
-        if (prepared != null
-                && !pendingInitialIntegrationStage.compareAndSet(prepared, null)) return;
-        initialIntegrationWorkerInFlight = false;
-        if (prepared == null) {
-            if (!destroyed && initialIntegrationStartupInProgress
-                    && initialIntegrationStage == stage) {
-                advanceInitialIntegrationStage(false);
-            }
-            return;
-        }
-        if (!ownsStartupState(ownerToken) || startupStateOwnerToken != ownerToken
-                || prepared.stage != stage || !initialIntegrationStartupInProgress
-                || initialIntegrationStage != stage
-                || automaticRuntimeParked || automaticLifecycleQuiet) {
-            discardPreparedInitialIntegrationStage(prepared);
-            // QuickBoot may resume and rewind to stage one while this older stage is still on the
-            // worker. Its already-posted runner observes inFlight and returns; hand ownership back
-            // here once the stale result is discarded or the rewound lane would remain stranded.
-            if (ownsStartupState(ownerToken) && startupStateOwnerToken == ownerToken
-                    && initialIntegrationStartupInProgress
-                    && !automaticRuntimeParked && !automaticLifecycleQuiet) {
-                mainHandler.post(initialIntegrationStageRunner);
-            }
-            return;
-        }
-        boolean stageSucceeded = prepared.succeeded
-                && runIntegrationStep(prepared.name + " publication", prepared::publish);
-        if (!stageSucceeded) discardPreparedInitialIntegrationStage(prepared);
-        advanceInitialIntegrationStage(stageSucceeded);
-    }
-
-    private void advanceInitialIntegrationStage(boolean stageSucceeded) {
-        if (!stageSucceeded
-                && initialIntegrationStageRetryCount
-                < MAX_INITIAL_INTEGRATION_STAGE_RETRIES) {
-            initialIntegrationStageRetryCount++;
-            mainHandler.postDelayed(initialIntegrationStageRunner,
-                    INITIAL_INTEGRATION_RETRY_MS);
-            return;
-        }
-        initialIntegrationStageRetryCount = 0;
-        initialIntegrationStage++;
-        mainHandler.post(initialIntegrationStageRunner);
-    }
-
-    private void discardPreparedInitialIntegrationStage(
-            @NonNull PreparedInitialIntegrationStage prepared) {
-        runCleanupStep(prepared.name + " unpublished startup", prepared::discard);
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage prepareInitialIntegrationWorkerStage(int stage) {
-        switch (stage) {
-            case 1:
-                return preparePhonePresenceStage(stage);
-            case 2:
-                return preparePhoneStage(stage);
-            case 3:
-                return prepareStatusSurfaceStage(stage);
-            case 4:
-                return prepareCarTelemetryStage(stage);
-            case 5:
-                return prepareMqttStage(stage);
-            case 6:
-                return prepareHomeAssistantStage(stage);
-            case 7:
-                return prepareSprutStage(stage);
-            case 8:
-                return prepareVisualScenarioStage(stage);
-            case 9:
-                return prepareIntentScenarioStage(stage);
-            default:
-                return failedInitialIntegrationStage(stage, "unknown integration stage");
-        }
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage preparePhonePresenceStage(int stage) {
-        SprutHubController currentController = sprutController;
-        PhoneSprutPresenceExporter currentPhone = phonePresenceExporter;
-        PhoneSprutPresenceExporter currentAncs = phoneAncsPresenceExporter;
-        if (currentController != null && currentPhone != null && currentAncs != null) {
-            PhonePresenceRuntimeGraph next = createPhonePresenceRuntimeGraph(currentController);
-            return successfulInitialIntegrationStage(stage, "phone presence", () -> {
-                if (sprutController != currentController
-                        || phonePresenceExporter != currentPhone
-                        || phoneAncsPresenceExporter != currentAncs) {
-                    throw new IllegalStateException(
-                            "Sprut presence graph changed before replacement");
-                }
-                // Both fallible reloads finish before either authoritative field changes.
-                next.phonePresence.reconfigure();
-                next.ancsPresence.reconfigure();
-                phonePresenceExporter = next.phonePresence;
-                phoneAncsPresenceExporter = next.ancsPresence;
-                runCleanupStep("replaced phone presence", currentPhone::stop);
-                runCleanupStep("replaced phone ANCS presence", currentAncs::stop);
-            }, () -> discardPhonePresenceRuntimeGraph(next));
-        }
-        if (currentController != null || currentPhone != null || currentAncs != null) {
-            return failedInitialIntegrationStage(stage, "phone presence partial graph");
-        }
-
-        SprutRuntimeGraph next = null;
-        try {
-            next = createSprutRuntimeGraph();
-            SprutRuntimeGraph prepared = next;
-            return successfulInitialIntegrationStage(stage, "phone presence", () -> {
-                if (sprutController != null || phonePresenceExporter != null
-                        || phoneAncsPresenceExporter != null) {
-                    throw new IllegalStateException("Sprut graph changed before publication");
-                }
-                // Do not leave service fields pointing at a stopped bundle if either reload fails.
-                prepared.phonePresence.reconfigure();
-                prepared.ancsPresence.reconfigure();
-                publishSprutRuntimeGraph(prepared);
-            }, () -> discardSprutRuntimeGraph(prepared));
-        } catch (RuntimeException failure) {
-            if (next != null) discardSprutRuntimeGraph(next);
-            return failedInitialIntegrationStage(stage, "phone presence", failure);
-        }
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage preparePhoneStage(int stage) {
-        PhoneConnectorController current = phoneController;
-        if (current != null) {
-            return successfulInitialIntegrationStage(stage, "phone", () -> {
-                if (phoneController != current) {
-                    throw new IllegalStateException("Phone graph changed before reconfigure");
-                }
-                current.reconfigure();
-            }, () -> { });
-        }
-        PhoneConnectorController next = null;
-        try {
-            next = createPhoneController();
-            next.reconfigure();
-            PhoneConnectorController prepared = next;
-            return successfulInitialIntegrationStage(stage, "phone", () -> {
-                if (phoneController != null) {
-                    throw new IllegalStateException("Phone graph changed before publication");
-                }
-                phoneController = prepared;
-            }, prepared::stop);
-        } catch (RuntimeException failure) {
-            if (next != null) {
-                try { next.stop(); } catch (RuntimeException ignored) { }
-            }
-            return failedInitialIntegrationStage(stage, "phone", failure);
-        }
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage prepareStatusSurfaceStage(int stage) {
-        boolean phonePopupReady = phoneNotificationPopupConfigured;
-        if (!phonePopupReady && (prefs.phonePopupNotificationsEnabled.get()
-                || prefs.phoneLowBatteryAlertEnabled.get())) {
-            try {
-                PhoneNotificationAutomation.ensureConfigured(prefs);
-                phonePopupReady = true;
-            } catch (JSONException | RuntimeException failure) {
-                Log.e(TAG, "Could not configure phone notification popup", failure);
-            }
-        }
-        Set<BrickType> popupTypes = immutableBrickTypes(loadPopupBuiltinTypes());
-        String popupOverlaysJson = prefs.popupOverlaysJson.get();
-        String popupItemsJson = prefs.popupItemsJson.get();
-        Set<BrickType> driverTypes = immutableBrickTypes(loadDriverInformationBrickTypes());
-        String driverInformationJson = prefs.activeDriverPanelProfile().shortcutsJson.get();
-        boolean driverPanelEnabled = prefs.driverPanelEnabled.get();
-        boolean preparedPhonePopup = phonePopupReady;
-        return successfulInitialIntegrationStage(stage, "status surface runtime", () -> {
-            phoneNotificationPopupConfigured = preparedPhonePopup;
-            configuredPopupBuiltinTypes = popupTypes;
-            configuredPopupOverlaysJson = popupOverlaysJson;
-            configuredPopupItemsJson = popupItemsJson;
-            configuredDriverInformationTypes = driverTypes;
-            configuredDriverInformationJson = driverInformationJson;
-            configuredDriverPanelEnabled = driverPanelEnabled;
-            if (binding != null) {
-                runIntegrationStep("status surface runtime main", () -> applyPreferences(false));
-            }
-        }, () -> { });
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage prepareCarTelemetryStage(int stage) {
-        CarTelemetryExporter current = carTelemetryExporter;
-        SprutHubController sprut = sprutController;
-        if (sprut == null) {
-            return failedInitialIntegrationStage(stage, "car telemetry missing Sprut graph");
-        }
-        CarRuntimeGraph next = null;
-        try {
-            next = createCarRuntimeGraph(sprut);
-            CarRuntimeGraph prepared = next;
-            return successfulInitialIntegrationStage(stage, "car telemetry", () -> {
-                if (carTelemetryExporter != current) {
-                    throw new IllegalStateException("Car graph changed before publication");
-                }
-                // Parse and subscribe on the main thread, but do not replace the authoritative
-                // field/listener until the complete reconfigure succeeds. A retry therefore sees
-                // either the previous live exporter or a fully configured replacement.
-                prepared.exporter.reconfigure();
-                if (carTelemetryExporter != current) {
-                    throw new IllegalStateException("Car graph changed during reconfigure");
-                }
-                publishCarRuntimeGraph(prepared);
-                if (current != null) {
-                    runCleanupStep("replaced car telemetry", current::stop);
-                }
-                runIntegrationStep("car telemetry surface", this::refreshCarStatusSurface);
-            }, () -> discardCarRuntimeGraph(prepared));
-        } catch (RuntimeException failure) {
-            if (next != null) discardCarRuntimeGraph(next);
-            return failedInitialIntegrationStage(stage, "car telemetry", failure);
-        }
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage prepareMqttStage(int stage) {
-        MqttController current = mqttController;
-        if (current != null) {
-            return successfulInitialIntegrationStage(stage, "MQTT", () -> {
-                if (mqttController != current) {
-                    throw new IllegalStateException("MQTT graph changed before reconfigure");
-                }
-                current.reconfigure();
-            }, () -> { });
-        }
-        MqttController next = null;
-        try {
-            next = createMqttController();
-            next.reconfigure();
-            MqttController prepared = next;
-            return successfulInitialIntegrationStage(stage, "MQTT", () -> {
-                if (mqttController != null) {
-                    throw new IllegalStateException("MQTT graph changed before publication");
-                }
-                mqttController = prepared;
-            }, prepared::stop);
-        } catch (RuntimeException failure) {
-            if (next != null) {
-                try { next.stop(); } catch (RuntimeException ignored) { }
-            }
-            return failedInitialIntegrationStage(stage, "MQTT", failure);
-        }
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage prepareHomeAssistantStage(int stage) {
-        HaApiController current = haApiController;
-        if (current != null) {
-            return successfulInitialIntegrationStage(stage, "Home Assistant", () -> {
-                if (haApiController != current) {
-                    throw new IllegalStateException("HA graph changed before reconfigure");
-                }
-                current.reconfigure();
-            }, () -> { });
-        }
-        HaApiController next = null;
-        try {
-            next = createHomeAssistantController();
-            next.reconfigure();
-            HaApiController prepared = next;
-            return successfulInitialIntegrationStage(stage, "Home Assistant", () -> {
-                if (haApiController != null) {
-                    throw new IllegalStateException("HA graph changed before publication");
-                }
-                haApiController = prepared;
-            }, prepared::stop);
-        } catch (RuntimeException failure) {
-            if (next != null) {
-                try { next.stop(); } catch (RuntimeException ignored) { }
-            }
-            return failedInitialIntegrationStage(stage, "Home Assistant", failure);
-        }
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage prepareSprutStage(int stage) {
-        SprutHubController current = sprutController;
-        if (current == null || phonePresenceExporter == null
-                || phoneAncsPresenceExporter == null) {
-            return failedInitialIntegrationStage(stage, "Sprut.hub missing runtime graph");
-        }
-        return successfulInitialIntegrationStage(stage, "Sprut.hub", () -> {
-            if (sprutController != current) {
-                throw new IllegalStateException("Sprut graph changed before reconfigure");
-            }
-            current.reconfigure();
-        }, () -> { });
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage prepareVisualScenarioStage(int stage) {
-        LocalScenarioController current = scenarioController;
-        if (current != null && actionDispatcher != null) {
-            ConnectorActionDispatcher currentDispatcher = actionDispatcher;
-            return successfulInitialIntegrationStage(stage, "visual scenarios", () -> {
-                if (scenarioController != current || actionDispatcher != currentDispatcher) {
-                    throw new IllegalStateException(
-                            "Scenario graph changed before reconfigure");
-                }
-                current.reconfigure();
-            }, () -> { });
-        }
-        if (current != null || actionDispatcher != null || mqttController == null
-                || sprutController == null || haApiController == null) {
-            return failedInitialIntegrationStage(stage, "visual scenario partial graph");
-        }
-        ScenarioRuntimeGraph next = null;
-        try {
-            next = createScenarioRuntimeGraph(
-                    mqttController, sprutController, haApiController);
-            ScenarioRuntimeGraph prepared = next;
-            return successfulInitialIntegrationStage(stage, "visual scenarios", () -> {
-                if (scenarioController != null || actionDispatcher != null) {
-                    throw new IllegalStateException("Scenario graph changed before publication");
-                }
-                prepared.controller.reconfigure();
-                publishScenarioRuntimeGraph(prepared);
-            }, prepared.controller::destroy);
-        } catch (RuntimeException failure) {
-            if (next != null) {
-                try { next.controller.destroy(); } catch (RuntimeException ignored) { }
-            }
-            return failedInitialIntegrationStage(stage, "visual scenarios", failure);
-        }
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage prepareIntentScenarioStage(int stage) {
-        IntentScenarioController current = intentScenarioController;
-        if (current != null) {
-            return successfulInitialIntegrationStage(stage, "intent scenarios",
-                    () -> publishIntentScenarioStage(current, false), () -> { });
-        }
-        ConnectorActionDispatcher dispatcher = actionDispatcher;
-        if (dispatcher == null) {
-            return failedInitialIntegrationStage(stage, "intent scenario missing dispatcher");
-        }
-        IntentScenarioController next = null;
-        try {
-            next = createIntentScenarioController(dispatcher);
-            IntentScenarioController prepared = next;
-            return successfulInitialIntegrationStage(stage, "intent scenarios",
-                    () -> publishIntentScenarioStage(prepared, true), prepared::destroy);
-        } catch (RuntimeException failure) {
-            if (next != null) {
-                try { next.destroy(); } catch (RuntimeException ignored) { }
-            }
-            return failedInitialIntegrationStage(stage, "intent scenarios", failure);
-        }
-    }
-
-    /**
-     * Main-publication-only boundary for IntentScenarioController maps, Handler retries and the
-     * dynamic receiver. A stale worker result is destroyed without ever entering this method.
-     */
-    private void publishIntentScenarioStage(@NonNull IntentScenarioController controller,
-                                            boolean publishNewController) {
-        if (publishNewController) {
-            if (intentScenarioController != null) {
-                throw new IllegalStateException("Intent graph changed before publication");
-            }
-            // Publish before receiver registration so even an immediate main-loop broadcast can
-            // resolve the controller through the service's authoritative field.
-            intentScenarioController = controller;
-        } else if (intentScenarioController != controller) {
-            throw new IllegalStateException("Intent graph changed before reconfigure");
-        }
-        try {
-            controller.reconfigure();
-        } catch (RuntimeException failure) {
-            if (publishNewController && intentScenarioController == controller) {
-                intentScenarioController = null;
-                controller.destroy();
-            }
-            throw failure;
-        }
-        runIntegrationStep("pending intent scenarios",
-                () -> drainPendingIntentScenarioCommands(false));
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage successfulInitialIntegrationStage(
-            int stage, @NonNull String name, @NonNull Runnable publication,
-            @NonNull Runnable cleanup) {
-        return new PreparedInitialIntegrationStage(
-                stage, name, true, publication, cleanup);
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage failedInitialIntegrationStage(
-            int stage, @NonNull String name) {
-        Log.e(TAG, "Could not configure " + name);
-        return new PreparedInitialIntegrationStage(
-                stage, name, false, () -> { }, () -> { });
-    }
-
-    @NonNull
-    private PreparedInitialIntegrationStage failedInitialIntegrationStage(
-            int stage, @NonNull String name, @NonNull RuntimeException failure) {
-        Log.e(TAG, "Could not configure " + name, failure);
-        return new PreparedInitialIntegrationStage(
-                stage, name, false, () -> { }, () -> { });
-    }
-
-    private void runCachedStateFreshnessBarrier() {
-        // Reserve the next state before dispatch so settings callbacks cannot start a parallel
-        // lane while the worker owns the retained JSON document.
-        startupStateBarrierInFlight = true;
-        initialIntegrationStage = 1;
-        final long ownerToken = startupStateOwnerToken;
-        try {
-            startupStateWorker.execute(() -> {
-                List<HaBrickConfig> loadedMainBricks = Collections.emptyList();
-                String loadedMainJson = "[]";
-                try {
-                    // Both documents can be large after long use. Parse/rewrite them at Android's
-                    // background priority while the already-attached shell remains responsive.
-                    prefs.completeDeferredStartupMigrations();
-                    loadedMainJson = prefs.haMainBricksJson.get();
-                    loadedMainBricks = haConfigs.loadMain(loadedMainJson);
-                    if (!automationStates.markAllStaleIf(
-                            () -> ownsStartupState(ownerToken))) return;
-                    if (!ownsStartupState(ownerToken)) return;
-                    clearRetainedPhonePopupStateForStartup(ownerToken);
-                } catch (RuntimeException failure) {
-                    // Leave the session projection fail-closed/stale if persistence is malformed.
-                    Log.e(TAG, "Could not persist cached-state freshness barrier", failure);
-                }
-                List<HaBrickConfig> immutableMainBricks = Collections.unmodifiableList(
-                        new ArrayList<>(loadedMainBricks));
-                String immutableMainJson = loadedMainJson;
-                mainHandler.post(() -> {
-                    startupStateBarrierInFlight = false;
-                    if (destroyed || !initialIntegrationStartupInProgress) return;
-                    configuredMainBricks = immutableMainBricks;
-                    configuredMainBricksJson = immutableMainJson;
-                    StartupPerformanceTrace.mark("cached_state_ready");
-                    if (automaticRuntimeParked || automaticLifecycleQuiet) return;
-                    mainHandler.post(initialIntegrationStageRunner);
-                });
-            });
-        } catch (RuntimeException rejected) {
-            startupStateBarrierInFlight = false;
-            Log.e(TAG, "Could not schedule cached-state freshness barrier", rejected);
-            mainHandler.post(initialIntegrationStageRunner);
-        }
-    }
-
-    private boolean ownsStartupState(long token) {
-        return token != 0L && STARTUP_STATE_OWNER.get() == token && !destroyed
-                && !Thread.currentThread().isInterrupted();
-    }
-
-    /** Worker-only startup cleanup; popup windows/controllers do not exist at this point. */
-    private void clearRetainedPhonePopupStateForStartup(long ownerToken) {
-        if (automationStates == null) return;
-        try {
-            long now = System.currentTimeMillis();
-            for (String overlayId : new String[]{
-                    PhoneNotificationAutomation.OVERLAY_ID,
-                    PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID}) {
-                if (!automationStates.applyIf(() -> ownsStartupState(ownerToken),
-                        AutomationContract.SCOPE_OVERLAY, overlayId,
-                        new JSONObject().put("visible", false).put("fresh", false)
-                                .put("updated_at", now))) return;
-            }
-            for (String automationId : PhoneNotificationAutomation.fieldAutomationIds()) {
-                if (!automationStates.applyIf(() -> ownsStartupState(ownerToken),
-                        AutomationContract.SCOPE_POPUP, automationId,
-                        new JSONObject().put("text", "").put("visible", false)
-                                .put("fresh", false).put("updated_at", now))) return;
-            }
-        } catch (JSONException | RuntimeException failure) {
-            Log.w(TAG, "Could not clear retained phone popup state", failure);
-        }
-    }
-
-    private void finishInitialIntegrationStartup() {
-        initialIntegrationStartupInProgress = false;
-        integrationStartupScheduled = false;
-        integrationsStarted = true;
-        StartupPerformanceTrace.mark("integrations_ready");
-        // Diagnostics/privileged ECARX policy is nonvisual. Keep it out of every connector stage
-        // instead of letting an independent 1.5-second timer collide with Phone/Car/MQTT startup.
-        StatusWidgetApplication.resumeSurfaceOwnedInitialization(this);
-        // A constructor failure in stage 8 must not strand a still-valid explicit command. The
-        // on-demand retry remains serialized on the service main looper and executes at most once.
-        drainPendingIntentScenarioCommands();
-        if (binding != null) {
-            runIntegrationStep("initial status-row projection", () -> {
-                renderHomeAssistantBricks();
-                applyBrickVisibility(currentBrickSet());
-            });
-        }
-        applyPopupPreferencesSafely();
-        // Scenario callbacks are deliberately coalesced while integrations start. Rebuild the
-        // driver rail once after that consolidated evaluation so boot-time visibility/action
-        // overrides are already reflected in its very first stable configuration.
-        automaticSurfaceReconcilePending = false;
-        if (prefs.driverPanelEnabled.get()) DriverPanelService.apply(this);
-        if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
-            mainHandler.post(() -> {
-                if (!destroyed && prefs != null && prefs.hudPanelEnabled.get()) {
-                    HudPresentationService.notifyAutomationChanged(this);
-                }
-            });
-        }
-        synchronized (automationUiLock) {
-            // Driver/HUD are reconciled exactly once above from the final startup state.
-            pendingAutomationUi.remove(AutomationContract.SCOPE_DRIVER);
-            pendingAutomationUi.remove(AutomationContract.SCOPE_HUD);
-        }
-        schedulePendingAutomationUiRefresh();
-        mainHandler.removeCallbacks(automationFreshnessTick);
-        mainHandler.postDelayed(automationFreshnessTick, 30_000L);
-        mainHandler.removeCallbacks(systemConditionRefresh);
-        long now = System.currentTimeMillis();
-        mainHandler.postDelayed(systemConditionRefresh,
-                SYSTEM_CONDITION_REFRESH_INTERVAL_MS
-                        - (now % SYSTEM_CONDITION_REFRESH_INTERVAL_MS));
-        if (credentialRefreshPending) {
-            credentialRefreshPending = false;
-            mainHandler.post(this::reconfigureCredentialBackedIntegrationsAfterUnlock);
-        } else {
-            schedulePendingIntegrationReconfigure();
-        }
-    }
-
-    private void scheduleInitialIntegrationStartupAfterFrame() {
-        if (destroyed || binding == null || !overlayAttached) return;
-        if (integrationsStarted && !automaticRuntimeParked && !automaticLifecycleQuiet
-                && !automaticSurfaceReconcilePending) return;
-        View root = binding.getRoot();
-        int generation = overlayAttachGeneration;
-        if (root.getAlpha() < 0.999f
-                || !isCurrentOverlayAttachment(generation, root)) return;
-        DeferredIntegrationStart existing = deferredIntegrationStart;
-        if (integrationStartupScheduled && existing != null
-                && existing.attachmentGeneration == generation && existing.root == root) return;
-        cancelDeferredIntegrationStart();
-        integrationStartupScheduled = true;
-        DeferredIntegrationStart next = new DeferredIntegrationStart(generation, root);
-        deferredIntegrationStart = next;
-        try {
-            Choreographer.getInstance().postFrameCallback(next);
-        } catch (RuntimeException failure) {
-            // Choreographer should always be available on the service main Looper. A broken OEM
-            // implementation must not leave all connectors permanently stopped, however.
-            Log.w(TAG, "Could not defer integrations to the first frame", failure);
-            mainHandler.post(next);
-        }
-    }
-
-    private void cancelDeferredIntegrationStart() {
-        DeferredIntegrationStart pending = deferredIntegrationStart;
-        deferredIntegrationStart = null;
-        if (pending != null) {
-            mainHandler.removeCallbacks(pending);
-            try {
-                Choreographer.getInstance().removeFrameCallback(pending);
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "Could not remove deferred integration startup", failure);
-            }
-        }
-        if (!initialIntegrationStartupInProgress && !integrationsStarted) {
-            integrationStartupScheduled = false;
-        }
-    }
-
-    private boolean isCurrentOverlayAttachment(int generation, @NonNull View root) {
-        return !destroyed && generation == overlayAttachGeneration && overlayAttached
-                && binding != null && binding.getRoot() == root && root.isAttachedToWindow();
-    }
-
-    /** Reconfigures each independent integration without letting one bad provider block the rest. */
-    private void reconfigureIntegrationControllers() {
-        runIntegrationStep("MQTT", () -> {
-            ensureMqttRuntimeGraph();
-            mqttController.reconfigure();
-        });
-        // Load the exact selected-address boundary before the phone transport can emit its
-        // current state. A device change therefore clears the old Sprut switch first.
-        runIntegrationStep("phone presence", () -> {
-            ensureSprutRuntimeGraph();
-            phonePresenceExporter.reconfigure();
-            phoneAncsPresenceExporter.reconfigure();
-        });
-        runIntegrationStep("phone", () -> {
-            ensurePhoneRuntimeGraph();
-            phoneController.reconfigure();
-        });
-        runIntegrationStep("car telemetry", () -> {
-            ensureCarRuntimeGraph();
-            carTelemetryExporter.reconfigure();
-        });
-        runIntegrationStep("Sprut.hub", () -> {
-            ensureSprutRuntimeGraph();
-            sprutController.reconfigure();
-        });
-        runIntegrationStep("Home Assistant", () -> {
-            ensureHomeAssistantRuntimeGraph();
-            haApiController.reconfigure();
-        });
-        runIntegrationStep("visual scenarios", () -> {
-            ensureScenarioRuntimeGraph();
-            scenarioController.reconfigure();
-        });
-        runIntegrationStep("intent scenarios", () -> {
-            ensureIntentScenarioRuntimeGraph();
-            intentScenarioController.reconfigure();
-        });
-    }
-
-    private boolean runIntegrationStep(@NonNull String name, @NonNull Runnable step) {
-        try {
-            step.run();
-            return true;
-        } catch (RuntimeException failure) {
-            Log.e(TAG, "Could not configure " + name, failure);
-            return false;
-        }
-    }
-
-    private void runCleanupStep(@NonNull String name, @NonNull Runnable step) {
-        try {
-            step.run();
-        } catch (RuntimeException failure) {
-            Log.w(TAG, "Could not completely stop " + name, failure);
-        }
-    }
-
-    private void applyPopupPreferencesSafely() {
-        if (prefs == null || !Settings.canDrawOverlays(this)) return;
-        ensurePopupOverlayManager();
-        if (popupOverlay == null) return;
-        try {
-            popupOverlay.applyPreferences();
-        } catch (RuntimeException failure) {
-            Log.e(TAG, "Could not apply popup overlays", failure);
-        }
-    }
-
-    private void ensurePopupOverlayManager() {
-        if (popupOverlay != null || prefs == null || !Settings.canDrawOverlays(this)
-                || automationStates == null
-                || actionDispatcher == null) return;
-        popupOverlay = new PopupOverlayManager(this, prefs, automationStates,
-                actionDispatcher, this::popupBuiltinValue);
-    }
-
-    private void ensurePhoneNotificationPopupConfigured() {
-        if (phoneNotificationPopupConfigured || prefs == null) return;
-        try {
-            PhoneNotificationAutomation.ensureConfigured(prefs);
-            phoneNotificationPopupConfigured = true;
-        } catch (JSONException | RuntimeException failure) {
-            Log.e(TAG, "Could not configure phone notification popup", failure);
-        }
-    }
-
-    @Override
-    public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
-        dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
-                getClass().getName(), intent == null ? null : intent.getAction(), startId);
-        boolean explicitScenarioCommand = !destroyed && intent != null
-                && ScenarioTriggerReceiver.ACTION_EXECUTE_RULE.equals(intent.getAction());
-        // Queue before visual/headless admission. An explicit, already-authenticated user command
-        // is allowed to keep a temporary headless host even when overlay AppOps are unavailable.
-        if (explicitScenarioCommand) enqueueIntentScenarioCommand(intent);
-        if (!runtimeInitialized) {
-            boolean deferredStickyRestart = intent == null
-                    && StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this);
-            boolean stickyVisualSurface = deferredStickyRestart
-                    && StartupWorkCoordinator.isUserUnlocked(this)
-                    && WidgetServiceStarter.canStartVisualSurfaceWhileRuntimeParked(
-                    Preferences.isStatusWidgetEnabledForVisualBootstrap(this),
-                    Permissions.allPermissionsGranted(this));
-            if (deferredStickyRestart && !stickyVisualSurface) {
-                StartupWorkCoordinator.ensureIntegrationHostScheduled(this);
-                stopForeground(true);
-                stopSelf(startId);
-                return START_NOT_STICKY;
-            }
-            boolean visualSurfaceOnly = intent != null
-                    && WidgetServiceStarter.ACTION_START_VISIBLE_SURFACE.equals(
-                    intent.getAction());
-            automaticRuntimeParked = (visualSurfaceOnly || stickyVisualSurface)
-                    && StartupWorkCoordinator.shouldParkAutomaticRuntime(this);
-            if (automaticRuntimeParked) {
-                StartupWorkCoordinator.ensureIntegrationHostScheduled(this);
-                StartupPerformanceTrace.mark("integration_runtime_parked");
-            }
-            initializeRuntime();
-        }
-        if (!runtimeInitialized || prefs == null) return START_NOT_STICKY;
-        if (explicitScenarioCommand) {
-            // Explicit, authenticated user work is not an automatic boot reconnect. It may open
-            // the runtime lane for its original bounded command deadline.
-            explicitScenarioRuntimeOverride = true;
-            mainHandler.removeCallbacks(explicitScenarioRuntimeOverrideRecheck);
-            mainHandler.removeCallbacks(explicitScenarioRuntimeOverrideExpiry);
-            mainHandler.postDelayed(explicitScenarioRuntimeOverrideExpiry,
-                    TEMPORARY_SCENARIO_HOST_MAX_MS);
-            automaticHostReleaseAfterVisible = false;
-            mainHandler.removeCallbacks(automaticLifecycleQuietTeardown);
-            if (automaticRuntimeParked || automaticLifecycleQuiet) {
-                // Reuse the serialized reconnect lane. The command controller retries against its
-                // absolute 15-second deadline while MQTT/HA/Sprut become authoritative again.
-                resumeAutomaticLifecycleIntegrationsAfterQuiet();
-            }
-            armTemporaryScenarioHeadlessHostIfNeeded(
-                    Permissions.allPermissionsGranted(this));
-        }
-        if (!destroyed && prefs != null
-                && ((prefs.widgetEnabled.get() && binding == null
-                && !overlayAttachRetryScheduled
-                && Permissions.allPermissionsGranted(this))
-                || (!prefs.widgetEnabled.get()
-                && (binding != null || popupOverlay != null)))) {
-            applyPreferences(false);
-        }
-        if (explicitScenarioCommand) {
-            if (integrationsStarted) {
-                drainPendingIntentScenarioCommands();
-            } else if (!initialIntegrationStartupInProgress) {
-                // A visible or rejected overlay must not hold an explicit physical command behind
-                // WindowManager/host retries. This is bounded user work, not automatic boot work.
-                runInitialIntegrationStartup();
-            }
-        }
-        // A sticky restart restores the long-lived widget/connectors but carries no old command.
-        // Re-delivering a TOGGLE after process death would be unsafe, so null intents do nothing.
-        return START_STICKY;
-    }
-
-    private void enqueueIntentScenarioCommand(@NonNull Intent command) {
-        if (pendingIntentScenarioCommands.size() >= MAX_PENDING_INTENT_SCENARIO_COMMANDS) {
-            // Fail closed under a broadcast storm. Dropping the new command is safer than
-            // evicting an older TOGGLE whose execution state is not yet known.
-            Log.w(TAG, "Ignored Intent scenario command while startup queue is full");
-            return;
-        }
-        pendingIntentScenarioCommands.addLast(new Intent(command));
-    }
-
-    /** Re-arms the bounded host even when a command reaches an already initialized service. */
-    private void armTemporaryScenarioHeadlessHostIfNeeded(boolean overlayRuntimeAvailable) {
-        if (prefs == null || pendingIntentScenarioCommands.isEmpty()
-                || WidgetServiceStarter.requiresHeadlessHost(prefs)
-                || (prefs.widgetEnabled.get() && overlayRuntimeAvailable)) return;
-        temporaryScenarioHeadlessHost = true;
-        mainHandler.removeCallbacks(temporaryScenarioHostExpiry);
-        mainHandler.postDelayed(temporaryScenarioHostExpiry,
-                TEMPORARY_SCENARIO_HOST_MAX_MS);
-    }
-
-    private void drainPendingIntentScenarioCommands() {
-        drainPendingIntentScenarioCommands(true);
-    }
-
-    /**
-     * Startup stage nine has just loaded the current rules on the worker, so its main publication
-     * must not parse the same JSON once per queued command. Other callers retain the strict
-     * reload-before-lookup boundary used after settings edits.
-     */
-    private void drainPendingIntentScenarioCommands(boolean reloadRules) {
-        if (destroyed || pendingIntentScenarioCommands.isEmpty()) return;
-        if (intentScenarioController == null) {
-            if (!reloadRules) return;
-            if (!integrationsStarted) return;
-            runIntegrationStep("intent scenarios on demand", () -> {
-                ensureIntentScenarioRuntimeGraph();
-                intentScenarioController.reconfigure();
-            });
-            if (intentScenarioController == null) return;
-        }
-        Intent command;
-        while ((command = pendingIntentScenarioCommands.pollFirst()) != null) {
-            // Reload before lookup so a broadcast accepted from the latest device-protected
-            // preferences cannot execute an older in-memory target after a settings edit.
-            if (reloadRules) intentScenarioController.reconfigure();
-            intentScenarioController.triggerRuleId(
-                    command.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_ID),
-                    command.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN),
-                    command.getStringExtra(ScenarioTriggerReceiver.EXTRA_RULE_FINGERPRINT),
-                    command.getLongExtra(ScenarioTriggerReceiver.EXTRA_DEADLINE_ELAPSED, 0L));
-        }
-        reconcileExplicitScenarioRuntimeOverride(false);
-        reconcileTemporaryScenarioHeadlessHost(false);
-    }
-
-    /**
-     * Keeps the bounded runtime override until the accepted physical command has either completed
-     * or reached its original monotonic deadline. Draining the service queue is not completion:
-     * IntentScenarioController may still be waiting for a connector snapshot or acknowledgement.
-     */
-    private void reconcileExplicitScenarioRuntimeOverride(boolean force) {
-        mainHandler.removeCallbacks(explicitScenarioRuntimeOverrideRecheck);
-        if (!explicitScenarioRuntimeOverride || destroyed) return;
-        boolean executionPending = !pendingIntentScenarioCommands.isEmpty()
-                || (intentScenarioController != null
-                && intentScenarioController.hasPendingExecutions());
-        if (!force && executionPending) {
-            mainHandler.postDelayed(explicitScenarioRuntimeOverrideRecheck,
-                    TEMPORARY_SCENARIO_HOST_RECHECK_MS);
-            return;
-        }
-        explicitScenarioRuntimeOverride = false;
-        mainHandler.removeCallbacks(explicitScenarioRuntimeOverrideExpiry);
-        if (StartupWorkCoordinator.shouldParkAutomaticRuntime(this)) {
-            automaticRuntimeParked = true;
-            StartupWorkCoordinator.ensureIntegrationHostScheduled(this);
-        }
-    }
-
-    private void reconcileTemporaryScenarioHeadlessHost(boolean force) {
-        mainHandler.removeCallbacks(temporaryScenarioHostRecheck);
-        if (!temporaryScenarioHeadlessHost || destroyed || prefs == null) return;
-        boolean executionPending = intentScenarioController != null
-                && intentScenarioController.hasPendingExecutions();
-        if (!force && (!pendingIntentScenarioCommands.isEmpty() || executionPending)) {
-            mainHandler.postDelayed(temporaryScenarioHostRecheck,
-                    TEMPORARY_SCENARIO_HOST_RECHECK_MS);
-            return;
-        }
-        temporaryScenarioHeadlessHost = false;
-        reconcileExplicitScenarioRuntimeOverride(force);
-        pendingIntentScenarioCommands.clear();
-        mainHandler.removeCallbacks(temporaryScenarioHostExpiry);
-        boolean persistentSurfaceHost = prefs.widgetEnabled.get()
-                && Permissions.allPermissionsGranted(this);
-        if (binding == null && !persistentSurfaceHost
-                && !WidgetServiceStarter.requiresHeadlessHost(prefs)) {
-            Log.i(TAG, "Stopping temporary scenario host after command deadline/completion");
-            stopSelf();
-        }
-    }
-
-    private void createOverlayView() {
-        if (destroyed || binding != null || prefs == null || !prefs.widgetEnabled.get()
-                || overlayAttachRetryScheduled
-                || !Permissions.allPermissionsGranted(this)) return;
-        // Create the overlay view
-        LayoutInflater layoutInflater = LayoutInflater.from(this);
-        binding = OverlayStatusWidgetBinding.inflate(layoutInflater);
-        final int attachmentGeneration = ++overlayAttachGeneration;
-        final View attachmentRoot = binding.getRoot();
-        // Start invisible â€” the addView() below makes the window appear instantly; we then
-        // fade the content in to match the symmetric fade-out the overlay does elsewhere.
-        binding.getRoot().setAlpha(0f);
-        binding.getRoot().setVisibility(View.VISIBLE);
-        // Listen on the INNER container, not the outer FrameLayout. During a visibility
-        // transition we pre-expand the *window* (root) to screenWidth as a buffer for
-        // TransitionManager; if we listened on the root we'd see that buffer expand as a
-        // huge layout change and shove overlayX by hundreds of pixels (and persist it).
-        // The inner container's bounds are what TransitionManager animates smoothly.
-        binding.overlayContainer.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-            updateBackground();
-            // Right-edge anchoring: when the widget content changes its measured width, shift the
-            // window's left edge by the same amount so the right edge stays put. Done in a single
-            // updateViewLayout to avoid the "shrink then slide" two-phase animation that
-            // Gravity.RIGHT produces.
-            if (params == null) return;
-            int oldWidth = oldRight - oldLeft;
-            int newWidth = right - left;
-            boolean nonStatusBar = prefs.widgetMode.get() != WIDGET_MODE_STATUS_BAR;
-            if (nonStatusBar
-                    && prefs.widgetAlignRight.get() && oldWidth > 0 && newWidth > 0 && newWidth != oldWidth) {
-                params.x += oldWidth - newWidth;
-                try {
-                    windowManager.updateViewLayout(binding.getRoot(), params);
-                } catch (Exception ignored) {
-                }
-                prefs.overlayX.set(params.x);
-            }
-            notifyOverlayState();
-        });
-
-        // Synchronous "size about to change" hook. It fires from onMeasure before ViewRootImpl
-        // pushes new wrap-content dimensions to WindowManager. Catching it mid-measure lets our
-        // updateViewLayout(screenWidth) win the race, so an explicit visibility transition never
-        // snaps below the children that are about to animate.
-        binding.overlayContainer.setSizeChangeHint((oldW, newW, oldH, newH) -> {
-            if (params == null) return;
-            if (prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR) return;
-            if (newW >= oldW) return;   // grow path already works
-            if (pendingBufferedTransitions > 0) return;   // some transition already buffering
-            beginBufferedTransition(true);
-            mainHandler.removeCallbacks(shrinkBufferSafetyClose);
-            mainHandler.postDelayed(shrinkBufferSafetyClose,
-                    BRICK_TRANSITION_DURATION_MS + 200);
-        });
-
-        // Never install an always-on LayoutTransition. A marquee invalidates once per display
-        // frame and several Android 9 ECARX builds misclassify that invalidation as a bounds
-        // change, making every sibling Settings/app icon visibly twitch. Show/hide remains
-        // handled by the explicit buffered transition below.
-        binding.overlayContainer.setLayoutTransition(null);
-
-        // Set up drag listener (just registers a touch listener on the root view â€” safe to do
-        // before addView since the listener captures touches once attached).
-        setupDragListener();
-
-        // Build the WindowManager params, then normalize every layout-affecting preference before
-        // addView. The XML intentionally uses conspicuous 100sp preview sizes for time and status
-        // icons; attaching that raw tree lets some Android 9 vendor WindowManagers retain the
-        // oversized first measurement until a later MediaSession requestLayout. That is why the
-        // row used to look tall after boot and suddenly become normal when the first song arrived.
-        // applyBrickVisibility/applyBrickTarget explicitly suppress transitions while detached,
-        // so this preflight cannot strand the buffered-transition counter.
-        boolean statusBar = prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR;
-        params = new WindowManager.LayoutParams(
-                statusBar
-                        ? WindowManager.LayoutParams.MATCH_PARENT
-                        : WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS |
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                ,
-                PixelFormat.TRANSLUCENT
-        );
-        params.gravity = Gravity.TOP | Gravity.LEFT;
-        params.x = statusBar ? 0 : prefs.overlayX.get();
-        params.y = statusBar ? 0 : prefs.overlayY.get();
-        params.windowAnimations = 0;
-
-        overlayAttached = false;
-        prepareOverlayGeometryBeforeAttach();
-        try {
-            windowManager.addView(attachmentRoot, params);
-        } catch (Exception e) {
-            Log.e(TAG, "Could not attach status overlay (attempt "
-                    + (overlayAttachAttempts + 1) + ")", e);
-            // Some vendor WindowManager implementations can throw after accepting the view.
-            // Remove that partial attachment before dropping our reference and retrying.
-            removeStatusOverlaySafely("failed attach");
-            binding = null;
-            params = null;
-            overlayAttachAttempts++;
-            if (!destroyed && prefs.widgetEnabled.get()) {
-                mainHandler.removeCallbacks(overlayAttachRetry);
-                long delay = Math.min(MAX_OVERLAY_ATTACH_RETRY_MS,
-                        OVERLAY_ATTACH_RETRY_MS * Math.max(1, overlayAttachAttempts));
-                overlayAttachRetryScheduled = true;
-                mainHandler.postDelayed(overlayAttachRetry, delay);
-            }
-            // A transient status-row rejection must not freeze live smart-home state on the
-            // independently attached driver rail while we wait for WindowManager's retry.
-            if (WidgetServiceStarter.requiresHeadlessHost(prefs)
-                    && !integrationsStarted) {
-                runInitialIntegrationStartup();
-            }
-            return;
-        }
-
-        overlayAttached = true;
-        if (ecarxNavigatorWindowObserver != null) {
-            ecarxNavigatorWindowObserver.setTargetDisplayId(currentOverlayDisplayId());
-            ecarxNavigatorWindowObserver.refresh("status-overlay-attached");
-        }
-        mainHandler.removeCallbacks(overlayAttachRetry);
-        overlayAttachRetryScheduled = false;
-        overlayAttachAttempts = 0;
-        if (integrationsStarted && !automaticRuntimeParked && !automaticLifecycleQuiet) {
-            // A later user-driven reattach reuses the live graph and needs its listeners now.
-            applyPreferences(false);
-        }
-
-        updateWifiStatus();
-        updateGnssStatus();
-
-        // Fade in the geometry-only shell. Controller construction and system listener
-        // registration begin only after the row is fully visible.
-        attachmentRoot.animate()
-                .alpha(1f)
-                .setDuration(INITIAL_OVERLAY_FADE_DURATION_MS)
-                .withEndAction(() -> completeInitialOverlayVisibility(
-                        attachmentGeneration, attachmentRoot, false))
-                .start();
-        if (integrationsStarted && !automaticRuntimeParked && !automaticLifecycleQuiet) {
-            // Dynamic headless -> status-row attach reuses the already-running connectors, but
-            // popup windows still need to be recreated for the newly enabled status surface.
-            applyPopupPreferencesSafely();
-        }
-        if (!integrationsStarted || automaticRuntimeParked || automaticLifecycleQuiet
-                || automaticSurfaceReconcilePending) {
-            // OEM animators have occasionally missed an end callback after a SurfaceFlinger
-            // restart. This bounded idempotent fallback preserves headless/connectivity startup.
-            mainHandler.postDelayed(() -> completeInitialOverlayVisibility(
-                            attachmentGeneration, attachmentRoot, true),
-                    INITIAL_OVERLAY_FADE_DURATION_MS + INITIAL_OVERLAY_FALLBACK_GRACE_MS);
-        }
-    }
-
-    private void completeInitialOverlayVisibility(int generation, @NonNull View root,
-                                                  boolean animatorFallback) {
-        if (!isCurrentOverlayAttachment(generation, root)) return;
-        if (animatorFallback && root.getAlpha() < 0.999f) {
-            root.animate().cancel();
-            root.setAlpha(1f);
-        }
-        if (root.getAlpha() < 0.999f || overlayVisibleGeneration == generation) return;
-        overlayVisibleGeneration = generation;
-        if (!integrationsStarted || automaticRuntimeParked || automaticLifecycleQuiet
-                || automaticSurfaceReconcilePending) {
-            scheduleInitialIntegrationStartupAfterFrame();
-        }
-    }
-
-    /**
-     * Applies only values that can affect the overlay's first measurement.
-     *
-     * <p>This deliberately runs before {@link WindowManager#addView(View,
-     * ViewGroup.LayoutParams)} and does not start listeners/integrations. The normal
-     * {@link #applyPreferences(boolean)} pass runs in its own post-visible stage and remains the
-     * single owner of those lifecycle side effects.</p>
-     */
-    private void prepareOverlayGeometryBeforeAttach() {
-        // HA descriptors were loaded once by the visual shell before inflation. Re-reading them
-        // here used to parse the same JSON three times before the first visible frame.
-        updateThemedContext();
-        updateDateTime();
-
-        List<BrickType> bricks = BrickType.parseOrder(prefs.brickOrder.get());
-        Set<BrickType> bricksSet = EnumSet.noneOf(BrickType.class);
-        bricksSet.addAll(bricks);
-
-        // No child transition may start against a tree that WindowManager does not own yet.
-        binding.overlayContainer.setLayoutTransition(null);
-        reorderBricks(bricks);
-        applyTimeBrickSettings();
-        applyDateBrickSettings();
-        applyMediaBrickSettings();
-        applyWifiBrickSettings();
-        applyGpsBrickSettings();
-        applyBluetoothBrickSettings();
-        applyPhoneCellularBrickSettings();
-        applyPhoneBatteryBrickSettings();
-        applyPhoneNetworkTypeBrickSettings();
-        applyIndoorTempBrickSettings();
-        applyOutdoorTempBrickSettings();
-        renderHomeAssistantBricks(true);
-        renderPhoneStatusBricks(true);
-        updatePhoneIndicators();
-        applyBrickVisibility(bricksSet);
-
-        binding.overlayContainer.setPadding(
-                prefs.paddingLeft.get(),
-                prefs.paddingTop.get(),
-                prefs.paddingRight.get(),
-                prefs.paddingBottom.get());
-        int verticalPadding = binding.overlayContainer.getPaddingTop()
-                + binding.overlayContainer.getPaddingBottom();
-        binding.overlayContainer.setMinimumHeight(
-                computeMinWidgetHeight(bricksSet) + verticalPadding);
-    }
-
-    private void removeStatusOverlaySafely(@NonNull String reason) {
-        overlayAttachGeneration++;
-        overlayVisibleGeneration = -1;
-        cancelDeferredIntegrationStart();
-        if (binding == null || windowManager == null) {
-            overlayAttached = false;
-            return;
-        }
-        View root = binding.getRoot();
-        root.animate().cancel();
-        if (!overlayAttached && !root.isAttachedToWindow()) return;
-        try {
-            windowManager.removeView(root);
-        } catch (RuntimeException failure) {
-            Log.w(TAG, "Status overlay was already detached during " + reason, failure);
-        } finally {
-            overlayAttached = false;
-        }
-    }
-
-    /**
-     * Replaces only the WindowManager root after SurfaceFlinger/QuickBoot ownership changes.
-     * Location, connectivity, media and vehicle subscriptions stay intact; tearing those down
-     * here would both create an early Binder burst and require a second full runtime startup.
-     */
-    private void revalidateStatusOverlayWindowOnly(@NonNull String reason) {
-        mainHandler.removeCallbacks(overlayAttachRetry);
-        overlayAttachRetryScheduled = false;
-        overlayAttachAttempts = 0;
-        if (binding != null) {
-            binding.getRoot().animate().cancel();
-            binding.overlayContainer.setLayoutTransition(null);
-        }
-        pendingBufferedTransitions = 0;
-        removeStatusOverlaySafely(reason);
-        binding = null;
-        params = null;
-        createOverlayView();
-    }
-
-    /**
-     * Stops every listener and delayed task owned exclusively by the status-row surface while
-     * leaving HA/MQTT/Sprut, phone, scenarios and the driver rail alive.
-     *
-     * <p>The driver panel can be enabled without the status row. Merely removing the WindowManager
-     * view is not enough: queued clock/GNSS/Wi-Fi/media callbacks still render into {@link #binding}
-     * and would either crash after it is cleared or briefly recreate stale work when the row is
-     * enabled again. Keep this teardown symmetrical with the tracking section in
-     * {@link #applyPreferences(boolean)}.</p>
-     */
-    private void detachStatusSurfaceRuntime(@NonNull String reason) {
-        mainHandler.removeCallbacks(overlayAttachRetry);
-        overlayAttachRetryScheduled = false;
-        // A later explicit enable starts a fresh retry sequence. Otherwise a previous transient
-        // WindowManager outage could make the first new retry wait the old 30-second maximum.
-        overlayAttachAttempts = 0;
-        mainHandler.removeCallbacks(updateDateTimeRunnable);
-        mainHandler.removeCallbacks(foregroundAppCheckRunnable);
-        mainHandler.removeCallbacks(updateGnssStatusRunnable);
-        mainHandler.removeCallbacks(reachabilityProbeRunnable);
-        mainHandler.removeCallbacks(satellitesCountResetRunnable);
-        mainHandler.removeCallbacks(mediaProgressTick);
-        mainHandler.removeCallbacks(shrinkBufferSafetyClose);
-        mainHandler.removeCallbacks(popupRefresh);
-
-        stopLocationTracking();
-        stopConnectivityTracking();
-        unregisterSatelliteStatusReceiver();
-        unregisterBluetoothReceiver();
-        runCleanupStep("status media tracking", this::disableMediaTracking);
-
-        if (reachabilityChecker != null) {
-            ReachabilityChecker checker = reachabilityChecker;
-            reachabilityChecker = null;
-            runCleanupStep("status reachability checker", checker::shutdown);
-        }
-
-        if (carTelemetryExporter != null) {
-            runCleanupStep("status car sensor subscriptions", () -> {
-                CarIntegration car = CarIntegrations.get(this);
-                car.unsubscribe(BrickType.INDOOR_TEMP);
-                car.unsubscribe(BrickType.OUTDOOR_TEMP);
-            });
-        }
-
-        if (popupOverlay != null) {
-            runCleanupStep("popup overlays", popupOverlay::destroy);
-            popupOverlay = null;
-        }
-
-        if (binding != null) {
-            binding.getRoot().animate().cancel();
-            binding.overlayContainer.setLayoutTransition(null);
-        }
-        pendingBufferedTransitions = 0;
-        if (!phoneNotificationForegroundTrackingNeeded()) {
-            usageStatsManager = null;
-            lastForegroundPackage = null;
-        }
-        overlayHiddenByApp = false;
-        wifiState = WiFiState.OFF;
-        gnssState = GnssState.OFF;
-        lastLocationUpdateElapsed = 0L;
-        btConnectedAddrs.clear();
-        bluetoothState = BluetoothState.OFF;
-        phoneAncsReady = false;
-        lastMediaSubtitle = null;
-        removeStatusOverlaySafely(reason);
-        binding = null;
-        params = null;
-        // Notification deferral is independent from the optional status-row surface. Reconcile
-        // its event/poll path after binding becomes null instead of silently losing foreground.
-        if (phoneNotificationForegroundTrackingNeeded()) updateForegroundAppTracking();
-    }
-
-    @Override
-    public void onConfigurationChanged(@NonNull Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        // Re-create date/time formatters so a locale change is reflected.
-        timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        currentDateFormatPattern = null;
-        // If the user is in "follow system" mode, the system uiMode flip means the cached
-        // themedContext now points at the wrong configuration â€” invalidate so the next
-        // applyPreferences() rebuilds it.
-        themedContext = null;
-        appliedThemePref = -1;
-
-        if (binding != null) {
-            removeStatusOverlaySafely("configuration change");
-            binding = null;
-            params = null;
-            createOverlayView();
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    public void applyPreferences() {
-        applyPreferences(true);
-    }
-
-    /**
-     * Wakes the already-running shared host after a driver-panel enable without reloading every
-     * connector on each geometry slider change.
-     *
-     * <p>This also resumes a status attach that was paused by a temporary permission denial. It
-     * deliberately leaves an existing attach retry alone so repeated settings events cannot bypass
-     * its bounded backoff.</p>
-     */
-    void ensureEnabledRuntime() {
-        if (destroyed || prefs == null) return;
-        if (automaticRuntimeParked || automaticLifecycleQuiet) return;
-        if (WidgetServiceStarter.requiresHeadlessHost(prefs)
-                && !integrationsStarted) {
-            runInitialIntegrationStartup();
-        }
-        if (prefs.widgetEnabled.get() && binding == null && !overlayAttachRetryScheduled
-                && Permissions.allPermissionsGranted(this)) {
-            createOverlayView();
-        }
-    }
-
-    /**
-     * Idempotent visual-only wake used by HOME/boot while controller work may still be parked.
-     * It deliberately does not call applyPreferences or construct a headless runtime graph.
-     */
-    void ensureAutomaticVisualSurface() {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(this::ensureAutomaticVisualSurface);
-            return;
-        }
-        if (destroyed || prefs == null || !prefs.widgetEnabled.get()
-                || binding != null || overlayAttachRetryScheduled
-                || !Permissions.allPermissionsGranted(this)) return;
-        createOverlayView();
-    }
-
-    /** Reattaches only the WindowManager root after QuickBoot; live connectors stay untouched. */
-    public void revalidateAutomaticVisualSurfaceAfterQuickBoot() {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(this::revalidateAutomaticVisualSurfaceAfterQuickBoot);
-            return;
-        }
-        if (destroyed || prefs == null || !prefs.widgetEnabled.get()
-                || !Permissions.allPermissionsGranted(this)) return;
-        automaticSurfaceRevalidationRequired = false;
-        revalidateStatusOverlayWindowOnly("immediate QuickBoot surface revalidation");
-    }
-
-    /**
-     * QuickBoot can preserve this integration host while WindowManager/HUD processes are
-     * recreated. Reconcile automatic surfaces after the quiet lane without reconnecting any
-     * transport or replaying the full controller graph.
-     */
-    public void reconcileAutomaticLifecycleSurfaces() {
-        if (destroyed || prefs == null) return;
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(this::reconcileAutomaticLifecycleSurfaces);
-            return;
-        }
-        automaticSurfaceReconcilePending = true;
-        if (automaticSurfaceRevalidationRequired && prefs.widgetEnabled.get()) {
-            automaticSurfaceRevalidationRequired = false;
-            revalidateStatusOverlayWindowOnly("deferred QuickBoot surface revalidation");
-        }
-        boolean waitsForVisibleSurface = prefs.widgetEnabled.get()
-                && Permissions.allPermissionsGranted(this);
-        if (waitsForVisibleSurface) {
-            // Persist the accepted host handoff before addView: a synchronous OEM WindowManager
-            // rejection may clear binding, but a later bounded retry must still release this
-            // exact parked runtime after its real frame.
-            automaticHostReleaseAfterVisible = true;
-            if (binding == null) createOverlayView();
-            boolean surfaceReady = binding != null && overlayAttached
-                    && overlayVisibleGeneration == overlayAttachGeneration
-                    && binding.getRoot().getAlpha() >= 0.999f;
-            if (binding != null && !surfaceReady) {
-                // This flag is minted only by an accepted host-generation callback. The visible
-                // callback may therefore release the parked graph, but can never open the host
-                // barrier on its own.
-                automaticHostReleaseAfterVisible = true;
-                scheduleInitialIntegrationStartupAfterFrame();
-                return;
-            }
-            if (surfaceReady) {
-                boolean releasedParkedRuntime = automaticRuntimeParked
-                        || automaticLifecycleQuiet;
-                automaticHostReleaseAfterVisible = false;
-                resumeAutomaticLifecycleIntegrationsAfterQuiet();
-                if (!releasedParkedRuntime) finishAutomaticSurfaceReconcileIfReady();
-                return;
-            }
-            if (!WidgetServiceStarter.requiresHeadlessHost(prefs)) return;
-            automaticHostReleaseAfterVisible = false;
-        }
-        boolean releasedParkedRuntime = automaticRuntimeParked || automaticLifecycleQuiet;
-        resumeAutomaticLifecycleIntegrationsAfterQuiet();
-        if (!releasedParkedRuntime) finishAutomaticSurfaceReconcileIfReady();
-    }
-
-    private void finishAutomaticSurfaceReconcileIfReady() {
-        if (!automaticSurfaceReconcilePending || automaticRuntimeParked
-                || automaticLifecycleQuiet
-                || initialIntegrationStartupInProgress || !integrationsStarted) return;
-        automaticSurfaceReconcilePending = false;
-        if (prefs.driverPanelEnabled.get()) {
-            runIntegrationStep("automatic Driver surface reconcile",
-                    () -> DriverPanelService.apply(this));
-        }
-        if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
-            mainHandler.post(() -> {
-                if (!destroyed && prefs != null && prefs.hudPanelEnabled.get()
-                        && prefs.hudPanelAutostart.get()) {
-                    runIntegrationStep("automatic HUD surface reconcile",
-                            () -> HudPresentationService.reconcileAutomaticLifecycle(this));
-                }
-            });
-        }
-        schedulePendingAutomationUiRefresh();
-    }
-
-    /**
-     * QuickBoot may preserve this process while every radio/vendor service underneath it flaps.
-     * Park only reconnecting transports immediately; the FGS notification and cached UI remain.
-     */
-    public void enterAutomaticLifecycleQuiet() {
-        enterAutomaticLifecycleQuiet(false);
-    }
-
-    public void enterAutomaticLifecycleQuiet(boolean revalidateVisualSurfaceImmediately) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            enterAutomaticLifecycleQuietOnMain(revalidateVisualSurfaceImmediately);
-        } else {
-            mainHandler.post(() -> enterAutomaticLifecycleQuietOnMain(
-                    revalidateVisualSurfaceImmediately));
-        }
-    }
-
-    private void enterAutomaticLifecycleQuietOnMain(
-            boolean revalidateVisualSurfaceImmediately) {
-        if (destroyed || !runtimeInitialized) return;
-        if (!automaticLifecycleQuiet) {
-            automaticLifecycleQuiet = true;
-            automaticLifecycleResumeGeneration++;
-            mainHandler.removeCallbacks(initialIntegrationStageRunner);
-            cancelDeferredIntegrationStart();
-            automaticHostReleaseAfterVisible = false;
-        }
-        if (revalidateVisualSurfaceImmediately && binding != null) {
-            automaticSurfaceRevalidationRequired = true;
-            mainHandler.removeCallbacks(automaticVisualSurfaceRevalidation);
-            mainHandler.post(automaticVisualSurfaceRevalidation);
-        }
-        // The BroadcastReceiver-visible fence above is synchronous. Socket/Binder teardown is
-        // deliberately posted so QuickBoot's main-thread broadcast can return immediately.
-        mainHandler.removeCallbacks(automaticLifecycleQuietTeardown);
-        automaticLifecycleTeardownStage = 0;
-        mainHandler.post(automaticLifecycleQuietTeardown);
-    }
-
-    public void resumeAutomaticLifecycleIntegrationsAfterQuiet() {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(this::resumeAutomaticLifecycleIntegrationsAfterQuiet);
-            return;
-        }
-        if (destroyed || (!explicitScenarioRuntimeOverride
-                && StartupWorkCoordinator.shouldParkAutomaticRuntime(this))) return;
-        boolean hadParkedRuntime = automaticRuntimeParked || automaticLifecycleQuiet;
-        if (!hadParkedRuntime) return;
-        mainHandler.removeCallbacks(automaticLifecycleQuietTeardown);
-        automaticRuntimeParked = false;
-        automaticLifecycleQuiet = false;
-        automaticHostReleaseAfterVisible = false;
-        int generation = ++automaticLifecycleResumeGeneration;
-        if (initialIntegrationStartupInProgress) {
-            // Stage zero is a one-time persistence barrier. Every later partially-started graph is
-            // replayed from stage one so stopped transports regain a fresh serialized session.
-            if (initialIntegrationStage > 1) initialIntegrationStage = 1;
-            initialIntegrationStageRetryCount = 0;
-            mainHandler.removeCallbacks(initialIntegrationStageRunner);
-            // Stage zero's background persistence barrier owns progression until its result is
-            // committed. Its completion callback will resume this exact lane once quiet opens.
-            if (!startupStateBarrierInFlight) mainHandler.post(initialIntegrationStageRunner);
-            return;
-        }
-        if (!integrationsStarted) {
-            runInitialIntegrationStartup();
-            return;
-        }
-        credentialRefreshPending = false;
-        Runnable[] stages = new Runnable[] {
-                () -> { ensurePhoneRuntimeGraph(); phoneController.reconfigure(); },
-                () -> { ensureMqttRuntimeGraph(); mqttController.reconfigure(); },
-                () -> { ensureHomeAssistantRuntimeGraph(); haApiController.reconfigure(); },
-                () -> { ensureSprutRuntimeGraph(); sprutController.reconfigure(); }
-        };
-        for (int index = 0; index < stages.length; index++) {
-            final int stage = index;
-            mainHandler.post(() -> {
-                if (destroyed || automaticRuntimeParked || automaticLifecycleQuiet
-                        || generation != automaticLifecycleResumeGeneration) return;
-                runIntegrationStep("automatic lifecycle resume " + stage, stages[stage]);
-                if (stage == stages.length - 1) {
-                    schedulePendingAutomationUiRefresh();
-                    finishAutomaticSurfaceReconcileIfReady();
-                }
-            });
-        }
-    }
-
-    /**
-     * Re-opens only Keystore-backed transports after USER_UNLOCKED.
-     *
-     * <p>Driver/HUD/Climate and status-window geometry belong to the already coalesced boot
-     * generation and must not be rebuilt merely because credentials became readable.</p>
-     */
-    public void reconfigureCredentialBackedIntegrationsAfterUnlock() {
-        if (destroyed || prefs == null) return;
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(this::reconfigureCredentialBackedIntegrationsAfterUnlock);
-            return;
-        }
-        if (initialIntegrationStartupInProgress) {
-            credentialRefreshPending = true;
-            return;
-        }
-        if (!integrationsStarted) {
-            runInitialIntegrationStartup();
-            return;
-        }
-        if (automaticRuntimeParked || automaticLifecycleQuiet) {
-            // The staged lifecycle resume includes every Keystore-backed transport and Phone;
-            // do not schedule a second overlapping MQTT/HA/Sprut pass for the same unlock edge.
-            credentialRefreshPending = true;
-            return;
-        }
-        if (credentialRefreshScheduled) return;
-        credentialRefreshScheduled = true;
-        runIntegrationStep("MQTT unlock", () -> {
-            ensureMqttRuntimeGraph();
-            mqttController.reconfigure();
-        });
-        mainHandler.post(() -> {
-            if (destroyed) return;
-            runIntegrationStep("Home Assistant unlock", () -> {
-                ensureHomeAssistantRuntimeGraph();
-                haApiController.reconfigure();
-            });
-            mainHandler.post(() -> {
-                if (destroyed) return;
-                runIntegrationStep("Sprut.hub unlock", () -> {
-                    ensureSprutRuntimeGraph();
-                    sprutController.reconfigure();
-                });
-                credentialRefreshScheduled = false;
-                schedulePendingIntegrationReconfigure();
-                schedulePendingAutomationUiRefresh();
-            });
-        });
-    }
-
-    /** Queues a fresh direct handshake for the explicit test button in Phone settings. */
-    public boolean reconnectPhoneForDiagnostics() {
-        PhoneConnectorController controller = phoneController;
-        return controller != null && controller.reconnectForDiagnostics();
-    }
-
-    public boolean beginPhoneLeEnrollment(
-            @NonNull PhoneConnectorController.LeEnrollmentListener listener) {
-        PhoneConnectorController controller = phoneController;
-        return controller != null && controller.beginSecureLeEnrollment(listener);
-    }
-
-    public boolean confirmPhoneLeEnrollmentSas(boolean matches) {
-        PhoneConnectorController controller = phoneController;
-        return controller != null && controller.confirmSecureLeEnrollmentSas(matches);
-    }
-
-    public void cancelPhoneLeEnrollment() {
-        PhoneConnectorController controller = phoneController;
-        if (controller != null) controller.cancelSecureLeEnrollment();
-    }
-
-    public boolean forgetPhoneLeEnrollment() {
-        PhoneConnectorController controller = phoneController;
-        return controller != null && controller.forgetSecureLeEnrollment();
-    }
-
-    @SuppressLint("MissingPermission")
-    private void applyPreferences(boolean reconfigureIntegrations) {
-        if (destroyed || prefs == null) return;
-        if (reconfigureIntegrations
-                && (initialIntegrationStartupInProgress || credentialRefreshScheduled)) {
-            integrationReconfigurePending = true;
-            reconfigureIntegrations = false;
-        }
-        if (prefs.phonePopupNotificationsEnabled.get()) {
-            ensurePhoneNotificationPopupConfigured();
-        }
-
-        // Refresh hide targets before a disabled status surface detaches. Foreground ownership is
-        // shared with popup notification deferral and must reflect the just-saved preferences
-        // even when no status-row View will be recreated in this pass.
-        hiddenInPackages = prefs.hideInPackages.get();
-        rebuildEffectiveHideLists();
-
-        boolean statusSurfaceEnabled = prefs.widgetEnabled.get();
-        if (!statusSurfaceEnabled) {
-            detachStatusSurfaceRuntime("status row disabled");
-        }
-        if (!WidgetServiceStarter.requiresIntegrationHost(prefs)) {
-            stopSelf();
-            return;
-        }
-        if (statusSurfaceEnabled && binding == null) {
-            ensurePopupOverlayManager();
-            createOverlayView();
-            if (reconfigureIntegrations) {
-                if (integrationsStarted) {
-                    reconfigureIntegrationControllers();
-                } else if (binding == null) {
-                    runInitialIntegrationStartup();
-                }
-                if (integrationsStarted) applyPopupPreferencesSafely();
-            }
-            return;
-        }
-
-        boolean popupAppliedByStartup = false;
-        if (reconfigureIntegrations) {
-            if (integrationsStarted) {
-                reconfigureIntegrationControllers();
-            } else if (binding == null) {
-                // USER_UNLOCKED can arrive while WindowManager is still rejecting the status
-                // window. Credentials must nevertheless be re-read now; a later successful
-                // attach uses the already-running authoritative connector sessions.
-                runInitialIntegrationStartup();
-                popupAppliedByStartup = integrationsStarted;
-            } else {
-                // Normal cold start: preserve the first-frame guarantee. The deferred startup
-                // reads current preferences, so no separate pre-frame reconfigure is required.
-                scheduleInitialIntegrationStartupAfterFrame();
-            }
-        }
-
-        if (reconfigureIntegrations && !popupAppliedByStartup && integrationsStarted) {
-            applyPopupPreferencesSafely();
-        }
-        if (!prefs.phoneStatusBarNotificationsEnabled.get()
-                && !prefs.phonePopupNotificationsEnabled.get()) {
-            cancelPhoneNotificationQueue();
-        }
-        if (!prefs.phonePopupNotificationsEnabled.get()) {
-            clearPhonePopupNotification();
-        } else if (integrationsStarted) {
-            // The reserved overlay can be created by this preference pass after the manager's
-            // previous catalog snapshot. Reconcile its state owner before an event arrives.
-            applyPopupPreferencesSafely();
-        }
-        // A settings edit can remove the active blocker or shorten the wait. Reconcile even when
-        // the optional status-row surface is disabled; popup-only delivery still owns this queue.
-        safeUpdateForegroundAppTracking("phone notification preferences applied");
-        reconcileDeferredPhoneNotifications();
-        phoneLowBatteryAlertLatched = prefs.phoneLowBatteryAlertEnabled.get()
-                && prefs.phoneLowBatteryAlertLatched.get();
-        phoneLowBatteryAlertLatched2 = prefs.phoneLowBatteryAlertEnabled.get()
-                && prefs.phoneLowBatteryAlertLatched2.get();
-        if (!prefs.phoneLowBatteryAlertEnabled.get()) {
-            if (prefs.phoneLowBatteryAlertLatched.get()) {
-                prefs.phoneLowBatteryAlertLatched.set(false);
-            }
-            if (prefs.phoneLowBatteryAlertLatched2.get()) {
-                prefs.phoneLowBatteryAlertLatched2.set(false);
-            }
-        }
-        // Re-evaluate a freshly edited threshold even when only the phone popup is enabled and
-        // the status-row View is deliberately detached. Delivery routing below remains governed
-        // by the ordinary row/popup/lock/foreground switches.
-        ConnectorValue currentPhoneBattery = phoneStatusValues.get("battery.level");
-        if (currentPhoneBattery != null) {
-            handlePhoneLowBatteryAlert(currentPhoneBattery);
-        }
-        if (binding == null) return;
-        boolean activePhoneAlertDisabled = activePhoneBatteryAlertText != null
-                ? !prefs.phoneLowBatteryAlertEnabled.get()
-                || !prefs.phoneStatusBarNotificationsEnabled.get()
-                : activePhoneNotification != null
-                && !prefs.phoneStatusBarNotificationsEnabled.get();
-        if (activePhoneAlertDisabled) {
-            clearPhoneStatusNotification(true);
-        }
-        // The cold pass was parsed on startupStateWorker. Reparse here only after a real settings
-        // edit changed the immutable preference snapshot; stage 3 must not repeat large JSON on
-        // the main looper merely to register status listeners.
-        if (haConfigs != null) {
-            String currentMainJson = prefs.haMainBricksJson.get();
-            if (!Objects.equals(currentMainJson, configuredMainBricksJson)) {
-                configuredMainBricks = haConfigs.loadMain(currentMainJson);
-                configuredMainBricksJson = currentMainJson;
-            }
-        }
-        safeUpdateForegroundAppTracking("status preferences applied");
-        updateThemedContext();
-        updateBackground();
-        updateDateTime();
-
-        List<BrickType> bricks = BrickType.parseOrder(prefs.brickOrder.get());
-        Set<BrickType> bricksSet = EnumSet.noneOf(BrickType.class);
-        bricksSet.addAll(bricks);
-        Set<BrickType> trackingSet = EnumSet.noneOf(BrickType.class);
-        trackingSet.addAll(bricksSet);
-        trackingSet.addAll(popupBuiltinTypes());
-        trackingSet.addAll(driverInformationBrickTypes());
-
-        // Keep implicit child transitions disabled in every mode. Only explicit visibility
-        // changes are animated; ordinary text and icon frames must never move their siblings.
-        binding.overlayContainer.setLayoutTransition(null);
-
-        // Reorder children of the root LinearLayout to match brickOrder. Hidden bricks are
-        // appended at the end with View.GONE â€” kept attached so we don't need to re-bind state.
-        reorderBricks(bricks);
-
-        // Apply each brick's settings (size/font, outline, margins) â€” independent of visibility.
-        applyTimeBrickSettings();
-        applyDateBrickSettings();
-        applyMediaBrickSettings();
-        applyWifiBrickSettings();
-        applyGpsBrickSettings();
-        applyBluetoothBrickSettings();
-        applyPhoneCellularBrickSettings();
-        applyPhoneBatteryBrickSettings();
-        applyPhoneNetworkTypeBrickSettings();
-        applyIndoorTempBrickSettings();
-        applyOutdoorTempBrickSettings();
-        renderHomeAssistantBricks(true);
-        renderPhoneStatusBricks(true);
-        updatePhoneIndicators();
-
-        applyBrickVisibility(bricksSet);
-        applyOverlayPosition();
-
-        // Re-apply icon style for the current state â€” icon style and outline may have changed.
-        updateWifiStatus();
-        updateGnssStatus();
-        updateBluetoothStatus();
-
-        // User-controllable global padding around the widget content (four independent sides).
-        // Was previously auto-computed as half of the largest brick dimension â€” many users found
-        // it too wide on small head units, so it's now explicit prefs. Slight outline clipping
-        // at thin paddings is acceptable.
-        // Padding goes on the INNER container â€” that's the view with the rounded background.
-        // Putting it on the outer FrameLayout instead leaves a transparent gutter around the
-        // background rect (visible at non-zero padding) and shifts the background's rounded
-        // corners outside the touchable area.
-        binding.overlayContainer.setPadding(
-                prefs.paddingLeft.get(),
-                prefs.paddingTop.get(),
-                prefs.paddingRight.get(),
-                prefs.paddingBottom.get());
-
-        // Lock the widget height to the tallest brick that's in the user's chosen order â€”
-        // including bricks currently hidden per-app. Otherwise hiding e.g. a big Time brick
-        // would let the row shrink vertically and the remaining icons would re-center up,
-        // breaking alignment with the device status bar that users carefully tune.
-        // {@code setMinimumHeight} compares against the view's *total* measured height (content
-        // plus padding), so we add the vertical padding here â€” otherwise when the tallest brick
-        // is visible the view measures to {@code maxBrick + padding} and when it's hidden it
-        // collapses to {@code minHeight = maxBrick} (without padding), shrinking by the padding
-        // amount on every hide.
-        int verticalPadding = binding.overlayContainer.getPaddingTop()
-                + binding.overlayContainer.getPaddingBottom();
-        binding.overlayContainer.setMinimumHeight(
-                computeMinWidgetHeight(bricksSet) + verticalPadding);
-
-        mainHandler.removeCallbacks(updateDateTimeRunnable);
-        if (trackingSet.contains(BrickType.TIME) || trackingSet.contains(BrickType.DATE)) {
-            long now = System.currentTimeMillis();
-            long delay = DATETIME_UPDATE_INTERVAL_MS - (now % DATETIME_UPDATE_INTERVAL_MS);
-            mainHandler.postDelayed(updateDateTimeRunnable, delay);
-        }
-
-        if (trackingSet.contains(BrickType.WIFI)) {
-            ensureConnectivityTracking();
-            updateWifiStatus();
-        } else {
-            stopConnectivityTracking();
-        }
-
-        if (trackingSet.contains(BrickType.GPS)) {
-            ensureLocationTracking();
-            if (prefs.gps.showSatelliteBadge.get()) {
-                registerSatelliteStatusReceiver();
-            } else {
-                unregisterSatelliteStatusReceiver();
-            }
-            updateGnssStatus();
-        } else {
-            unregisterSatelliteStatusReceiver();
-            stopLocationTracking();
-        }
-
-        if (trackingSet.contains(BrickType.BLUETOOTH)) {
-            registerBluetoothReceiver();
-            refreshBtConnectedFromProxies();
-        } else {
-            unregisterBluetoothReceiver();
-            btConnectedAddrs.clear();
-        }
-        updateBluetoothStatus();
-
-        if (trackingSet.contains(BrickType.MEDIA) && Permissions.isNotificationAccessGranted(this)) {
-            enableMediaTracking();
-        } else {
-            disableMediaTracking();
-            if (isPhoneNotificationActive()) {
-                renderPhoneStatusNotification();
-            } else {
-                binding.mediaContainer.setVisibility(View.GONE);
-            }
-        }
-
-        // Car temperature bricks â€” one subscription per brick through the flavor's
-        // CarIntegration; the callback lands on the main thread per its contract.
-        updateCarTempSubscription(BrickType.INDOOR_TEMP, trackingSet, binding.indoorTempText);
-        updateCarTempSubscription(BrickType.OUTDOOR_TEMP, trackingSet, binding.outdoorTempText);
-    }
-
-    private void ensureConnectivityTracking() {
-        if (connectivityManager == null) {
-            try {
-                connectivityManager = getSystemService(ConnectivityManager.class);
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "ConnectivityManager is unavailable", failure);
-            }
-        }
-        ConnectivityManager manager = connectivityManager;
-        if (manager == null) return;
-
-        boolean wifiPresent = false;
-        try {
-            for (Network network : manager.getAllNetworks()) {
-                NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
-                if (capabilities != null
-                        && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    setWifiStatus(WiFiState.NO_INTERNET);
-                    wifiPresent = true;
-                    break;
-                }
-            }
-        } catch (RuntimeException failure) {
-            Log.w(TAG, "Could not inspect active Wi-Fi networks", failure);
-        }
-
-        if (!networkCallbackRegistered) {
-            try {
-                NetworkRequest request = new NetworkRequest.Builder()
-                        .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                        .build();
-                // Deliver callbacks on the main thread: they touch overlay views and theme state.
-                manager.registerNetworkCallback(request, networkCallback, mainHandler);
-                networkCallbackRegistered = true;
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "Could not register Wi-Fi network callback", failure);
-            }
-        }
-
-        if (wifiPresent) {
-            probeReachability();
-        } else {
-            // The status surface may have been disabled while Wi-Fi disconnected. Start every
-            // reattach from the fresh ConnectivityManager snapshot, not its previous badge.
-            setWifiStatus(WiFiState.OFF);
-        }
-        mainHandler.removeCallbacks(reachabilityProbeRunnable);
-        mainHandler.postDelayed(reachabilityProbeRunnable, INTERNET_PROBE_INTERVAL_MS);
-        refreshWifiSignalLevel();
-        if (!wifiRssiReceiverRegistered) {
-            try {
-                registerReceiver(wifiRssiReceiver,
-                        new IntentFilter(WifiManager.RSSI_CHANGED_ACTION));
-                wifiRssiReceiverRegistered = true;
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "Could not register Wi-Fi RSSI receiver", failure);
-            }
-        }
-    }
-
-    private void stopConnectivityTracking() {
-        mainHandler.removeCallbacks(reachabilityProbeRunnable);
-        if (wifiRssiReceiverRegistered) {
-            try {
-                unregisterReceiver(wifiRssiReceiver);
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "Wi-Fi RSSI receiver was already unregistered", failure);
-            }
-            wifiRssiReceiverRegistered = false;
-        }
-        ConnectivityManager manager = connectivityManager;
-        if (manager != null && networkCallbackRegistered) {
-            try {
-                manager.unregisterNetworkCallback(networkCallback);
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "Wi-Fi network callback was already unregistered", failure);
-            }
-        }
-        networkCallbackRegistered = false;
-        connectivityManager = null;
-        wifiSignalLevel = 0;
-    }
-
-    @SuppressLint("MissingPermission")
-    private void ensureLocationTracking() {
-        if (locationManager == null) {
-            try {
-                locationManager = getSystemService(LocationManager.class);
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "LocationManager is unavailable", failure);
-            }
-        }
-        LocationManager manager = locationManager;
-        if (manager == null) return;
-
-        if (!gnssStatusCallbackRegistered) {
-            try {
-                gnssStatusCallbackRegistered = manager.registerGnssStatusCallback(
-                        gnssStatusCallback, mainHandler);
-                if (!gnssStatusCallbackRegistered) {
-                    Log.w(TAG, "GNSS status callback registration was rejected");
-                }
-            } catch (RuntimeException failure) {
-                gnssStatusCallbackRegistered = false;
-                Log.w(TAG, "Could not register GNSS status callback", failure);
-            }
-        }
-
-        if (!locationUpdatesRegistered) {
-            try {
-                manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
-                        GNSS_LOCATION_INTERVAL_MS, 0, locationListener,
-                        Looper.getMainLooper());
-                locationUpdatesRegistered = true;
-            } catch (RuntimeException failure) {
-                locationUpdatesRegistered = false;
-                Log.w(TAG, "Could not request GPS location updates", failure);
-            }
-        }
-
-        scheduleGnssFreshnessDeadline();
-    }
-
-    private void scheduleGnssFreshnessDeadline() {
-        mainHandler.removeCallbacks(updateGnssStatusRunnable);
-        if (!locationUpdatesRegistered || lastLocationUpdateElapsed <= 0L) return;
-        long age = Math.max(0L,
-                SystemClock.elapsedRealtime() - lastLocationUpdateElapsed);
-        if (age >= GNSS_FIX_OFF_AFTER_MS) {
-            mainHandler.post(updateGnssStatusRunnable);
-        } else {
-            long boundary = age < GNSS_FIX_DEGRADED_AFTER_MS
-                    ? GNSS_FIX_DEGRADED_AFTER_MS : GNSS_FIX_OFF_AFTER_MS;
-            mainHandler.postDelayed(updateGnssStatusRunnable,
-                    Math.max(1L, boundary - age));
-        }
-    }
-
-    private void stopLocationTracking() {
-        mainHandler.removeCallbacks(updateGnssStatusRunnable);
-        LocationManager manager = locationManager;
-        if (manager != null && locationUpdatesRegistered) {
-            try {
-                manager.removeUpdates(locationListener);
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "GPS location updates were already removed", failure);
-            }
-        }
-        if (manager != null && gnssStatusCallbackRegistered) {
-            try {
-                manager.unregisterGnssStatusCallback(gnssStatusCallback);
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "GNSS status callback was already unregistered", failure);
-            }
-        }
-        locationUpdatesRegistered = false;
-        gnssStatusCallbackRegistered = false;
-        lastLocationUpdateElapsed = 0L;
-        locationManager = null;
-    }
-
-    /** Applies only floating-window geometry/visibility. Used by live popup sliders so changing
-     * a pixel value does not re-scan every connector binding on every touch sample. */
-    public void applyPopupPreferences() {
-        if (destroyed || popupOverlay == null) return;
-        applyPopupPreferencesSafely();
-    }
-
-    /** Applies a popup tile's rules/action/style live from in-memory connector snapshots. This
-     * deliberately does not call connector reconfigure(), so an offline connector is not
-     * restarted and a large Sprut catalog is not fetched while the user drags a slider. */
-    public void applyPopupItemPreferences() {
-        if (destroyed || popupOverlay == null) return;
-        if (mqttController != null) mqttController.reapplyPopupBindings();
-        if (sprutController != null) sprutController.reapplyPopupBindings();
-        if (haApiController != null) haApiController.reapplyPopupBindings();
-        applyPopupPreferencesSafely();
-    }
-
-    /** Starts or hands off the non-persistent WYSIWYG phone-notification preview. */
-    public void startPhoneNotificationEditorPreview(@NonNull String overlayId) {
-        if (!PhoneNotificationAutomation.isNotificationOverlayId(overlayId)) return;
-        mainHandler.post(() -> {
-            if (destroyed) return;
-            mainHandler.removeCallbacks(phoneEditorPreviewStop);
-            pendingPhoneEditorPreviewStopId = null;
-            ensurePhoneNotificationPopupConfigured();
-            ensurePopupOverlayManager();
-            if (popupOverlay == null) return;
-            activePhoneEditorPreviewOverlayId = overlayId;
-            popupOverlay.startEditorPreview(overlayId);
-        });
-    }
-
-    /**
-     * Delayed release lets PopupSettingsActivity hand the same preview to the precise tile editor
-     * without a visible hide/show flash. Leaving settings altogether still removes it promptly.
-     */
-    public void schedulePhoneNotificationEditorPreviewStop(@NonNull String overlayId) {
-        if (!PhoneNotificationAutomation.isNotificationOverlayId(overlayId)) return;
-        mainHandler.post(() -> {
-            if (destroyed || !overlayId.equals(activePhoneEditorPreviewOverlayId)) return;
-            pendingPhoneEditorPreviewStopId = overlayId;
-            mainHandler.removeCallbacks(phoneEditorPreviewStop);
-            mainHandler.postDelayed(phoneEditorPreviewStop,
-                    PHONE_EDITOR_PREVIEW_HANDOFF_MS);
-        });
-    }
-
-    /** Live main-row appearance/rule update without restarting an offline connector. */
-    public void applyMainItemPreferences() {
-        if (destroyed || binding == null) return;
-        if (mqttController != null) mqttController.reapplyMainBindings();
-        if (sprutController != null) sprutController.reapplyMainBindings();
-        if (haApiController != null) haApiController.reapplyMainBindings();
-        applyPreferences(false);
-    }
-
-    private Set<BrickType> popupBuiltinTypes() {
-        String overlaysJson = prefs.popupOverlaysJson.get();
-        String itemsJson = prefs.popupItemsJson.get();
-        if (Objects.equals(overlaysJson, configuredPopupOverlaysJson)
-                && Objects.equals(itemsJson, configuredPopupItemsJson)) {
-            return configuredPopupBuiltinTypes;
-        }
-        Set<BrickType> result = immutableBrickTypes(loadPopupBuiltinTypes());
-        // A legacy load may persist its projection, so capture the post-load documents.
-        configuredPopupOverlaysJson = prefs.popupOverlaysJson.get();
-        configuredPopupItemsJson = prefs.popupItemsJson.get();
-        configuredPopupBuiltinTypes = result;
-        return result;
-    }
-
-    @NonNull
-    private Set<BrickType> loadPopupBuiltinTypes() {
-        Set<BrickType> result = EnumSet.noneOf(BrickType.class);
-        Set<String> enabledOverlays = new HashSet<>();
-        for (PopupOverlayConfig overlay : new PopupOverlayConfigStore(prefs).load()) {
-            if (overlay.enabled) enabledOverlays.add(overlay.id);
-        }
-        if (enabledOverlays.isEmpty()) return result;
-        for (PopupItemConfig item : new PopupItemConfigStore(prefs).load()) {
-            if (!item.enabled || !enabledOverlays.contains(item.overlayId)
-                    || !PopupItemConfig.TYPE_BUILTIN.equals(item.type)) continue;
-            for (BrickType type : BrickType.values()) {
-                if (type.automationId().equals(item.builtinId)) result.add(type);
-            }
-        }
-        return result;
-    }
-
-    @NonNull
-    private static Set<BrickType> immutableBrickTypes(@NonNull Set<BrickType> source) {
-        Set<BrickType> copy = EnumSet.noneOf(BrickType.class);
-        copy.addAll(source);
-        return Collections.unmodifiableSet(copy);
-    }
-
-    private boolean isPopupBuiltinRequested(BrickType type) {
-        return popupBuiltinTypes().contains(type);
-    }
-
-    /** Adds only the delayed ECARX-backed temperature portion to an already visible row. */
-    private void refreshCarStatusSurface() {
-        if (binding == null || carTelemetryExporter == null) return;
-        Set<BrickType> visible = currentBrickSet();
-        Set<BrickType> tracking = EnumSet.noneOf(BrickType.class);
-        tracking.addAll(visible);
-        tracking.addAll(popupBuiltinTypes());
-        tracking.addAll(driverInformationBrickTypes());
-        updateCarTempSubscription(BrickType.INDOOR_TEMP, tracking, binding.indoorTempText);
-        updateCarTempSubscription(BrickType.OUTDOOR_TEMP, tracking, binding.outdoorTempText);
-        applyBrickVisibility(visible);
-        int verticalPadding = binding.overlayContainer.getPaddingTop()
-                + binding.overlayContainer.getPaddingBottom();
-        binding.overlayContainer.setMinimumHeight(
-                computeMinWidgetHeight(visible) + verticalPadding);
-    }
-
-    private void updateCarTempSubscription(BrickType type, Set<BrickType> bricksSet,
-                                           OutlineTextView target) {
-        if (carTelemetryExporter == null) {
-            // The visual shell reserves configured geometry without touching the ECARX Binder.
-            if (bricksSet.contains(type) && target.getText().length() == 0) {
-                target.setText(TEMP_PLACEHOLDER);
-            }
-            return;
-        }
-        CarIntegration car = CarIntegrations.get(this);
-        if (bricksSet.contains(type)) {
-            // Subscribe regardless of isBrickSupported(): right after boot the vendor service
-            // may not have connected yet and support reads as "unknown/error" â€” but the SDK
-            // queues listener registrations locally, so subscribing now means data starts
-            // flowing the moment the service comes up. Visibility is gated separately in
-            // applyBrickVisibility, and the availability-changed callback re-runs
-            // applyPreferences when the support answer flips.
-            if (target.getText().length() == 0) {
-                // Placeholder until the first value arrives, so the brick occupies its slot
-                // instead of rendering as a zero-width hole.
-                target.setText(TEMP_PLACEHOLDER);
-            }
-            car.subscribe(type, (brickType, value) -> {
-                if (binding == null) return;
-                // The rolling ambient filter may intentionally republish its current median
-                // while sub-second raw packets are discarded. Avoid turning those identical
-                // values into needless status-row measure/layout passes.
-                setTextIfChanged(target, formatTemperature(value));
-                schedulePopupRefresh();
-            });
-        } else {
-            car.unsubscribe(type);
-            // Reset so a re-added brick starts from the placeholder, not a stale reading.
-            target.setText(TEMP_PLACEHOLDER);
-        }
-    }
-
-    /** Last rendered media subtitle â€” used to distinguish a real track change from the
-     *  once-a-second metadata republishes some players emit (see updateMediaInfo). */
-    @Nullable
-    private String lastMediaSubtitle = null;
-
-    /** Shown while a subscribed temperature brick has not yet received a plausible value. */
-    private static final String TEMP_PLACEHOLDER = "--Â°";
-
-    /** {@code TextView.setText} drops the layout and forces a relayout even for identical text â€”
-     *  callers on hot paths (per-second player callbacks) must skip unchanged values. */
-    private static void setTextIfChanged(android.widget.TextView view, CharSequence text) {
-        if (!TextUtils.equals(view.getText(), text)) {
-            view.setText(text);
-        }
-    }
-
-    private static String formatTemperature(float celsius) {
-        // Integer rounding via Math.round avoids "%.0f"-style "-0Â°" for readings in (-0.5, 0).
-        return Math.round(celsius) + "Â°";
-    }
-
-    private void reorderBricks(List<BrickType> bricks) {
-        // Adding/removing a brick changes child order/membership of the root.
-        // applyBrickVisibility() (called right after this from applyPreferences) drives the
-        // per-brick fade + width animation that gives us the "dynamic island" feel; we
-        // just rearrange children here.
-        if (prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR) {
-            reorderForStatusBar(bricks);
-        } else {
-            reorderForFloating(bricks);
-        }
-    }
-
-    private void reorderForFloating(List<BrickType> bricks) {
-        LinearLayout root = binding.overlayContainer;
-        // Status-bar group containers and spacers are hidden in floating mode and emptied so
-        // bricks live as direct children of the root again.
-        binding.startGroup.removeAllViews();
-        binding.centerGroup.removeAllViews();
-        binding.endGroup.removeAllViews();
-        binding.startGroup.setVisibility(View.GONE);
-        binding.centerGroup.setVisibility(View.GONE);
-        binding.endGroup.setVisibility(View.GONE);
-        binding.startCenterSpacer.setVisibility(View.GONE);
-        binding.centerEndSpacer.setVisibility(View.GONE);
-
-        List<View> expected = new ArrayList<>();
-        // Re-include the (empty) groups + spacers so their visibility=GONE keeps them out of
-        // measure but the views remain attached to the same root for next switch.
-        expected.add(binding.startGroup);
-        expected.add(binding.startCenterSpacer);
-        expected.add(binding.centerGroup);
-        expected.add(binding.centerEndSpacer);
-        expected.add(binding.endGroup);
-        for (BrickType type : bricks) {
-            View v = viewForBrick(type);
-            if (v != null) expected.add(v);
-        }
-        for (BrickType type : BrickType.values()) {
-            if (!bricks.contains(type)) {
-                View v = viewForBrick(type);
-                if (v != null) expected.add(v);
-            }
-        }
-        applyChildOrder(root, expected);
-    }
-
-    private void reorderForStatusBar(List<BrickType> bricks) {
-        LinearLayout root = binding.overlayContainer;
-        // Detach bricks from wherever they currently sit (root or any group).
-        binding.startGroup.removeAllViews();
-        binding.centerGroup.removeAllViews();
-        binding.endGroup.removeAllViews();
-
-        // Root order: startGroup, spacer, centerGroup, spacer, endGroup. Hidden bricks dangle off
-        // the root after these so they remain attached but invisible.
-        List<View> rootChildren = new ArrayList<>();
-        rootChildren.add(binding.startGroup);
-        rootChildren.add(binding.startCenterSpacer);
-        rootChildren.add(binding.centerGroup);
-        rootChildren.add(binding.centerEndSpacer);
-        rootChildren.add(binding.endGroup);
-        for (BrickType type : BrickType.values()) {
-            if (!bricks.contains(type)) {
-                View v = viewForBrick(type);
-                if (v != null) rootChildren.add(v);
-            }
-        }
-        applyChildOrder(root, rootChildren);
-
-        // Distribute visible bricks into the proper alignment group.
-        for (BrickType type : bricks) {
-            View v = viewForBrick(type);
-            if (v == null) continue;
-            int alignment = clampAlignment(prefs.statusAlignmentFor(type).get());
-            LinearLayout target = (alignment == 1) ? binding.centerGroup
-                    : (alignment == 2) ? binding.endGroup
-                    : binding.startGroup;
-            target.addView(v);
-        }
-
-        binding.startGroup.setVisibility(View.VISIBLE);
-        binding.centerGroup.setVisibility(View.VISIBLE);
-        binding.endGroup.setVisibility(View.VISIBLE);
-        binding.startCenterSpacer.setVisibility(View.VISIBLE);
-        binding.centerEndSpacer.setVisibility(View.VISIBLE);
-    }
-
-    private static void applyChildOrder(ViewGroup parent, List<View> expected) {
-        boolean inOrder = parent.getChildCount() == expected.size();
-        if (inOrder) {
-            for (int i = 0; i < expected.size(); i++) {
-                if (parent.getChildAt(i) != expected.get(i)) {
-                    inOrder = false;
-                    break;
-                }
-            }
-        }
-        if (inOrder) return;
-        parent.removeAllViews();
-        for (View v : expected) {
-            ViewGroup p = (ViewGroup) v.getParent();
-            if (p != null) p.removeView(v);
-            parent.addView(v);
-        }
-    }
-
-    private static int clampAlignment(int v) {
-        return v < 0 ? 0 : (v > 2 ? 2 : v);
-    }
-
-    @Nullable
-    private View viewForBrick(BrickType type) {
-        switch (type) {
-            case TIME:
-                return binding.timeText;
-            case DATE:
-                return binding.dateText;
-            case MEDIA:
-                return binding.mediaContainer;
-            case WIFI:
-                return binding.wifiStatusIcon;
-            case GPS:
-                return binding.gnssStatusIcon;
-            case BLUETOOTH:
-                return binding.bluetoothStatusIcon;
-            case INDOOR_TEMP:
-                return binding.indoorTempText;
-            case OUTDOOR_TEMP:
-                return binding.outdoorTempText;
-            case HOME_ASSISTANT:
-                return binding.homeAssistantContainer;
-            case PHONE_STATUS:
-                return binding.phoneStatusContainer;
-            case PHONE_CELLULAR:
-                return binding.phoneCellularContainer;
-            case PHONE_BATTERY:
-                return binding.phoneBatteryStatusIcon;
-            case PHONE_NETWORK_TYPE:
-                return binding.phoneNetworkTypeText;
-            default:
-                return null;
-        }
-    }
-
-    private void applyTimeBrickSettings() {
-        applySingleLineTextBrick(binding.timeText, prefs.time);
-    }
-
-    private void applyIndoorTempBrickSettings() {
-        applySingleLineTextBrick(binding.indoorTempText, prefs.indoorTemp);
-    }
-
-    private void applyOutdoorTempBrickSettings() {
-        applySingleLineTextBrick(binding.outdoorTempText, prefs.outdoorTemp);
-    }
-
-    /** Reconciles the dynamic smart-home row without reallocating every tile on each packet. */
-    private void renderHomeAssistantBricks() {
-        renderHomeAssistantBricks(false);
-    }
-
-    private void renderHomeAssistantBricks(boolean forceStyle) {
-        if (binding == null || automationStates == null || haConfigs == null) return;
-        LinearLayout container = binding.homeAssistantContainer;
-        Map<String, MarqueeOutlineTextView> existing = new LinkedHashMap<>();
-        for (int index = 0; index < container.getChildCount(); index++) {
-            View child = container.getChildAt(index);
-            Object tag = child.getTag();
-            if (child instanceof MarqueeOutlineTextView && tag instanceof String) {
-                existing.put((String) tag, (MarqueeOutlineTextView) child);
-            }
-        }
-        List<MarqueeOutlineTextView> desired = new ArrayList<>();
-        long now = System.currentTimeMillis();
-        for (HaBrickConfig config : configuredMainBricks) {
-            if (!config.enabled) continue;
-            AutomationState state = automationStates.get(AutomationContract.SCOPE_MAIN, config.id);
-            if (!state.visible) continue;
-
-            boolean hiddenByOwnAppList = matchesForegroundContext(config.hideInPackages);
-            boolean hiddenByGroupList = config.inheritGroupHide
-                    && isBrickHiddenByApp(BrickType.HOME_ASSISTANT);
-            if ((hiddenByOwnAppList || hiddenByGroupList) && !config.hideKeepsSpace) continue;
-
-            boolean stale = state.present
-                    && state.isStale(now, config.staleAfterSeconds * 1000L);
-            String text;
-            String color;
-            if (!state.present) {
-                text = config.pendingText;
-                color = config.pendingColor;
-            } else if (stale) {
-                text = config.staleText;
-                color = config.staleColor;
-            } else if (state.text == null) {
-                text = config.defaultText;
-                color = config.defaultColor;
-            } else if (TextUtils.isEmpty(state.text)) {
-                text = config.emptyText;
-                color = TextUtils.isEmpty(state.color) ? config.emptyColor : state.color;
-            } else {
-                text = state.text;
-                color = TextUtils.isEmpty(state.color) ? config.defaultColor : state.color;
-            }
-            if (config.collapseWhenEmpty && TextUtils.isEmpty(text)) continue;
-            // A transparent value selected by a value rule means "hide this brick", not
-            // "reserve its margins for invisible text". Keep this renderer-side guard for
-            // retained states written by older builds before connectors recompute visibility.
-            if (AutomationState.isFullyTransparentColor(color)) continue;
-
-            MarqueeOutlineTextView view = existing.remove(config.id);
-            boolean created = view == null;
-            if (created) {
-                view = new MarqueeOutlineTextView(
-                        themedContext != null ? themedContext : this);
-                view.setTag(config.id);
-                view.setIncludeFontPadding(false);
-                view.setSingleLine(true);
-            }
-            if (created || forceStyle) {
-                view.setTextSize(TypedValue.COMPLEX_UNIT_PX, config.fontSize);
-                view.setTypeface(Fonts.resolve(this, config.fontFamily,
-                        config.bold, config.italic));
-                int outlineBase = AutomationState.parseColor(
-                        config.outlineColor, 0xFF000000);
-                view.setOutlineColor((outlineBase & 0x00FFFFFF)
-                        | (config.outlineAlpha << 24));
-                view.setOutlineWidth(config.outlineWidth);
-                view.setTranslationY(config.adjustY);
-                view.setPadding(config.paddingLeft, config.paddingTop,
-                        config.paddingRight, config.paddingBottom);
-                if (config.maxWidth > 0) view.setMaxWidth(config.maxWidth);
-                else view.setMaxWidth(Integer.MAX_VALUE);
-                view.setMarqueeEnabled(config.marquee);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT);
-                lp.gravity = Gravity.CENTER_VERTICAL;
-                lp.setMarginStart(config.marginStart);
-                lp.setMarginEnd(config.marginEnd);
-                view.setLayoutParams(lp);
-            }
-            int textColor = AutomationState.parseColor(color, 0xFFFFFFFF);
-            if (view.getCurrentTextColor() != textColor) view.setTextColor(textColor);
-            float alpha = (hiddenByOwnAppList || hiddenByGroupList)
-                    ? 0f : config.contentAlpha / 255f;
-            if (view.getAlpha() != alpha) view.setAlpha(alpha);
-            view.setMarqueeText(text);
-            desired.add(view);
-        }
-        // Remove hidden/deleted bricks, then move only children whose configured order changed.
-        for (MarqueeOutlineTextView obsolete : existing.values()) {
-            container.removeView(obsolete);
-        }
-        for (int index = 0; index < desired.size(); index++) {
-            MarqueeOutlineTextView view = desired.get(index);
-            if (index < container.getChildCount() && container.getChildAt(index) == view) continue;
-            ViewGroup.LayoutParams layout = view.getLayoutParams();
-            if (view.getParent() == container) container.removeView(view);
-            if (layout == null) {
-                layout = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT);
-            }
-            container.addView(view, index, layout);
-        }
-        if (forceStyle) {
-            applyHorizontalMargins(container, prefs.homeAssistant.marginStart.get(),
-                    prefs.homeAssistant.marginEnd.get());
-            container.setTranslationY(prefs.homeAssistant.adjustY.get());
-            container.setAlpha(prefs.homeAssistant.contentAlpha.get() / 255f);
-        }
-    }
-
-    /** Applies one immutable PHONE registry burst on the main thread. */
-    private void onPhoneValuesChanged(@NonNull List<ConnectorValue> changedValues) {
-        if (destroyed || prefs == null) return;
-        boolean previousAncsReady = phoneAncsReady;
-        ConnectorValue latestNotification = null;
-        ConnectorValue notificationItems = null;
-        ConnectorValue batteryLevel = null;
-        boolean phoneValueChanged = false;
-        boolean sessionEnded = false;
-        for (ConnectorValue value : changedValues) {
-            if (value == null || value.connectorType != ConnectorType.PHONE) continue;
-            phoneStatusValues.put(value.resourceId, value);
-            phoneValueChanged = true;
-            if ("connected".equals(value.resourceId)
-                    && Boolean.FALSE.equals(value.rawValue)) {
-                sessionEnded = true;
-            }
-            if ("profiles.ancs".equals(value.resourceId)) {
-                phoneAncsReady = value.fresh && value.available && value.readable
-                        && Boolean.TRUE.equals(value.rawValue);
-            }
-            if ("notifications.latest".equals(value.resourceId)) {
-                latestNotification = value;
-            } else if ("notifications.items".equals(value.resourceId)) {
-                notificationItems = value;
-            } else if ("battery.level".equals(value.resourceId)) {
-                batteryLevel = value;
-            }
-        }
-        if (!phoneValueChanged) return;
-        suppressPhoneNotificationsUnlessLockAllows();
-        if (sessionEnded) {
-            phoneAncsReady = false;
-            observedPhoneNotificationKeys.clear();
-            cancelPhoneNotificationQueue();
-            clearPhonePopupNotification();
-            if (activePhoneBatteryAlertText != null) {
-                clearPhoneStatusNotification(true);
-            }
-        }
-
-        if (!sessionEnded && latestNotification != null
-                && phoneNotificationForegroundTrackingNeeded()
-                && lastForegroundPackage == null) {
-            // Accessibility seeds event-driven state immediately. Usage access is the explicit
-            // Android 9 fallback; sample before enqueueing so the first delivery cannot slip
-            // past the selected full-screen blocker before its normal fallback cadence.
-            safeCheckForegroundApp("phone notification arrival");
-        }
-        if (latestNotification != null) {
-            // Observe the delivery even while status-row notifications are disabled. Enabling
-            // the preference later must not replay whatever happened to be the last phone item.
-            String latestKey = PhoneStatusBarPolicy.notificationKey(
-                    latestNotification.rawValue);
-            boolean latestIsNew = latestKey != null
-                    && !observedPhoneNotificationKeys.contains(latestKey);
-            rememberPhoneNotificationItems(notificationItems);
-            rememberPhoneNotificationKey(latestKey);
-            if (latestIsNew && phoneNotificationAllowedByLockState()) {
-                if (prefs.phoneStatusBarNotificationsEnabled.get()
-                        || prefs.phonePopupNotificationsEnabled.get()) {
-                    Set<String> selected = PhoneStatusBarPolicy.parseIds(
-                            prefs.phoneStatusBarNotificationFields.get(),
-                            PhoneStatusBarPolicy.notificationFieldIds());
-                    PhoneStatusBarPolicy.NotificationPresentation presentation =
-                            PhoneStatusBarPolicy.notification(latestNotification, selected);
-                    if (presentation != null) {
-                        enqueuePhoneNotification(presentation, selected);
-                    }
-                }
-            }
-        }
-        if (!sessionEnded && batteryLevel != null) {
-            handlePhoneLowBatteryAlert(batteryLevel);
-        }
-
-        if (binding != null) {
-            renderPhoneStatusBricks();
-            updatePhoneIndicators();
-            applyBrickVisibility(currentBrickSet());
-            updateBluetoothStatus();
-        }
-        if (previousAncsReady != phoneAncsReady && prefs.driverPanelEnabled.get()) {
-            // ANCS-gated information rows are structural: rebuilding only on the actual profile
-            // transition lets controls reclaim the row's height and avoids polling the rail.
-            if (automaticSurfaceRefreshSuppressed()) {
-                onAutomationStateChanged(AutomationContract.SCOPE_DRIVER,
-                        "builtin.phone_ancs_ready");
-            } else {
-                DriverPanelService.apply(this);
-            }
-        }
-        schedulePopupRefresh();
-    }
-
-    private void rememberPhoneNotificationItems(@Nullable ConnectorValue value) {
-        if (value == null || !(value.rawValue instanceof List<?>)) return;
-        for (Object item : (List<?>) value.rawValue) {
-            rememberPhoneNotificationKey(PhoneStatusBarPolicy.notificationKey(item));
-        }
-    }
-
-    private void rememberPhoneNotificationKey(@Nullable String key) {
-        if (TextUtils.isEmpty(key)) return;
-        observedPhoneNotificationKeys.add(key);
-        while (observedPhoneNotificationKeys.size() > MAX_OBSERVED_PHONE_NOTIFICATIONS) {
-            java.util.Iterator<String> oldest = observedPhoneNotificationKeys.iterator();
-            if (!oldest.hasNext()) break;
-            oldest.next();
-            oldest.remove();
-        }
-    }
-
-    /**
-     * Keeps the visible card stable. The first newcomer waits one second; every later delivery is
-     * retained in arrival order and receives its own one-second slot.
-     */
-    private void enqueuePhoneNotification(
-            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
-            @NonNull Set<String> selectedFields) {
-        if (!phoneNotificationAllowedByLockState()) return;
-        QueuedPhoneNotification delivery = new QueuedPhoneNotification(
-                presentation, selectedFields);
-        enqueuePhoneDelivery(delivery);
-    }
-
-    /** Low-battery events use exactly the same lock, overlay-delay and destination queue. */
-    private void enqueuePhoneLowBatteryAlert(int level, @NonNull String color) {
-        if (prefs == null || !phoneNotificationAllowedByLockState()
-                || (!prefs.phoneStatusBarNotificationsEnabled.get()
-                && !prefs.phonePopupNotificationsEnabled.get())) return;
-        enqueuePhoneDelivery(QueuedPhoneNotification.lowBattery(level, color));
-    }
-
-    private void enqueuePhoneDelivery(@NonNull QueuedPhoneNotification delivery) {
-        if (phoneNotificationBlockedByForeground()) {
-            long now = SystemClock.elapsedRealtime();
-            if (!deferredPhoneNotifications.offer(delivery, now)) {
-                if (deferredPhoneNotificationOverflowCount == 0) {
-                    deferredPhoneNotificationOverflowStartedElapsed = now;
-                }
-                deferredPhoneNotificationOverflowCount = saturatingIncrement(
-                        deferredPhoneNotificationOverflowCount);
-            }
-            schedulePhoneNotificationDeferralDeadline();
-            return;
-        }
-        // A missed/coalesced foreground callback must not let a newcomer overtake older held
-        // notifications. Release those first, then append this delivery to the normal sequencer.
-        if (!deferredPhoneNotifications.isEmpty()
-                || deferredPhoneNotificationOverflowCount > 0) {
-            releaseAllDeferredPhoneNotifications();
-        }
-        enqueuePhoneNotificationNow(delivery);
-    }
-
-    /** Enters the existing one-second sequencer without re-applying foreground deferral. */
-    private void enqueuePhoneNotificationNow(@NonNull QueuedPhoneNotification delivery) {
-        long batteryRemaining = activePhoneLowBatteryRemaining();
-        if (batteryRemaining > 0L) {
-            appendQueuedPhoneNotification(delivery);
-            phoneNotificationBurstActive = true;
-            mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-            mainHandler.postDelayed(phoneNotificationQueueAdvance, batteryRemaining);
-            return;
-        }
-        if (phoneNotificationBurstActive) {
-            appendQueuedPhoneNotification(delivery);
-            return;
-        }
-        if (hasActiveRoutinePhoneNotificationDestination()) {
-            appendQueuedPhoneNotification(delivery);
-            phoneNotificationBurstActive = true;
-            long delay = PHONE_NOTIFICATION_QUEUE_SLOT_MS;
-            holdPhoneNotificationDestinationsUntil(
-                    SystemClock.elapsedRealtime() + delay);
-            mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-            mainHandler.postDelayed(phoneNotificationQueueAdvance, delay);
-            return;
-        }
-        presentPhoneNotification(delivery);
-    }
-
-    private void appendQueuedPhoneNotification(@NonNull QueuedPhoneNotification delivery) {
-        if (queuedPhoneNotifications.size() >= PhoneNotificationDeferralQueue.MAX_ITEMS) {
-            queuedPhoneNotificationOverflowCount = saturatingIncrement(
-                    queuedPhoneNotificationOverflowCount);
-            return;
-        }
-        queuedPhoneNotifications.addLast(delivery);
-    }
-
-    private boolean phoneNotificationForegroundTrackingNeeded() {
-        return prefs != null && prefs.phoneNotificationDelayInAppsEnabled.get()
-                && (prefs.phoneNotificationDelayForExternalOverlays.get()
-                || !prefs.phoneNotificationDelayInPackages.get().isEmpty());
-    }
-
-    private boolean phoneNotificationBlockedByForeground() {
-        if (prefs == null || !prefs.phoneNotificationDelayInAppsEnabled.get()) return false;
-        if (prefs.phoneNotificationDelayForExternalOverlays.get()
-                && phoneExternalOverlayActive) return true;
-        if (prefs.phoneNotificationDelayInPackages.get().isEmpty()) return false;
-        // Foreground identity can be briefly unknown while Accessibility reconnects, before the
-        // first UsageStats sample, or after its permission is revoked. Showing immediately would
-        // defeat the feature exactly for full-screen camera applications. Hold conservatively;
-        // each delivery still has its configured monotonic maximum-wait deadline.
-        if (lastForegroundPackage == null) return true;
-        return PhoneNotificationDeferralPolicy.isBlocking(true,
-                prefs.phoneNotificationDelayInPackages.get(), lastForegroundPackage);
-    }
-
-    /** Called by the shared event-driven foreground tracker only when its package really changes. */
-    private void onPhoneNotificationForegroundChanged() {
-        reconcileDeferredPhoneNotifications();
-    }
-
-    /**
-     * Releases every due item while blocked, or the whole ordered queue as soon as the blocker
-     * leaves. The next callback always targets the oldest item's exact monotonic deadline.
-     */
-    private void reconcileDeferredPhoneNotifications() {
-        mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
-        if ((deferredPhoneNotifications.isEmpty()
-                && deferredPhoneNotificationOverflowCount <= 0) || prefs == null) return;
-        if (!phoneNotificationAllowedByLockState()
-                || (!prefs.phoneStatusBarNotificationsEnabled.get()
-                && !prefs.phonePopupNotificationsEnabled.get())) {
-            deferredPhoneNotifications.clear();
-            deferredPhoneNotificationOverflowCount = 0;
-            deferredPhoneNotificationOverflowStartedElapsed = 0L;
-            return;
-        }
-        if (!phoneNotificationBlockedByForeground()) {
-            releaseAllDeferredPhoneNotifications();
-            return;
-        }
-        long now = SystemClock.elapsedRealtime();
-        int seconds = prefs.phoneNotificationDelayMaxWaitSeconds.get();
-        for (QueuedPhoneNotification delivery
-                : deferredPhoneNotifications.drainDue(now, seconds)) {
-            enqueuePhoneNotificationNow(delivery);
-        }
-        if (deferredPhoneNotificationOverflowCount > 0
-                && now >= PhoneNotificationDeferralPolicy.deadline(
-                deferredPhoneNotificationOverflowStartedElapsed, seconds)) {
-            releaseDeferredPhoneNotificationOverflow();
-        }
-        schedulePhoneNotificationDeferralDeadline();
-    }
-
-    private void releaseAllDeferredPhoneNotifications() {
-        mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
-        for (QueuedPhoneNotification delivery : deferredPhoneNotifications.drainAll()) {
-            enqueuePhoneNotificationNow(delivery);
-        }
-        releaseDeferredPhoneNotificationOverflow();
-    }
-
-    private void releaseDeferredPhoneNotificationOverflow() {
-        if (deferredPhoneNotificationOverflowCount <= 0) return;
-        int overflow = deferredPhoneNotificationOverflowCount;
-        deferredPhoneNotificationOverflowCount = 0;
-        deferredPhoneNotificationOverflowStartedElapsed = 0L;
-        enqueuePhoneNotificationNow(phoneNotificationOverflowDelivery(overflow));
-    }
-
-    private void schedulePhoneNotificationDeferralDeadline() {
-        mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
-        if (prefs == null || !phoneNotificationBlockedByForeground()) return;
-        long deadline = deferredPhoneNotifications.nextDeadline(
-                prefs.phoneNotificationDelayMaxWaitSeconds.get());
-        if (deferredPhoneNotificationOverflowCount > 0) {
-            long overflowDeadline = PhoneNotificationDeferralPolicy.deadline(
-                    deferredPhoneNotificationOverflowStartedElapsed,
-                    prefs.phoneNotificationDelayMaxWaitSeconds.get());
-            deadline = deadline < 0L ? overflowDeadline : Math.min(deadline, overflowDeadline);
-        }
-        if (deadline < 0L) return;
-        long remaining = Math.max(1L, deadline - SystemClock.elapsedRealtime());
-        mainHandler.postDelayed(phoneNotificationDeferralDeadline, remaining);
-    }
-
-    private boolean presentPhoneNotification(@NonNull QueuedPhoneNotification delivery) {
-        if (prefs == null || !phoneNotificationAllowedByLockState()) return false;
-        if (delivery.lowBatteryLevel != null) {
-            int level = delivery.lowBatteryLevel;
-            boolean presentedInStatusRow = prefs.phoneStatusBarNotificationsEnabled.get()
-                    && showPhoneLowBatteryStatus(level, delivery.lowBatteryColor);
-            boolean presentedInPopup = prefs.phonePopupNotificationsEnabled.get()
-                    && showPhoneLowBatteryPopup(level);
-            if (binding != null) {
-                updateMediaInfo();
-                applyBrickVisibility(currentBrickSet());
-            }
-            schedulePopupRefresh();
-            return presentedInStatusRow || presentedInPopup;
-        }
-        updatePhoneNotificationFieldStates(delivery.presentation, delivery.selectedFields);
-        boolean presentedInStatusRow = prefs.phoneStatusBarNotificationsEnabled.get()
-                && showPhoneStatusNotification(
-                delivery.presentation, delivery.selectedFields);
-        boolean presentedInPopup = prefs.phonePopupNotificationsEnabled.get()
-                && showPhonePopupNotification(delivery.presentation);
-        if (!presentedInStatusRow && !presentedInPopup) {
-            clearPhoneNotificationFieldsIfInactive();
-        }
-        if (binding != null) {
-            updateMediaInfo();
-            applyBrickVisibility(currentBrickSet());
-        }
-        schedulePopupRefresh();
-        return presentedInStatusRow || presentedInPopup;
-    }
-
-    private boolean hasActiveRoutinePhoneNotificationDestination() {
-        long now = SystemClock.elapsedRealtime();
-        boolean statusActive = activePhoneNotification != null
-                && activePhoneNotificationExpiresAt > now;
-        boolean popupActive = activePhonePopupNotificationExpiresAt > now;
-        return statusActive || popupActive;
-    }
-
-    /** Normal configured expiry is suspended while the one-second burst clock owns the card. */
-    private void holdPhoneNotificationDestinationsUntil(long elapsedDeadline) {
-        long guardedDeadline = elapsedDeadline + 100L;
-        if (activePhoneNotification != null) {
-            activePhoneNotificationExpiresAt = Math.max(
-                    activePhoneNotificationExpiresAt, guardedDeadline);
-            mainHandler.removeCallbacks(phoneNotificationExpiry);
-        }
-        if (activePhonePopupNotificationExpiresAt > 0L) {
-            activePhonePopupNotificationExpiresAt = Math.max(
-                    activePhonePopupNotificationExpiresAt, guardedDeadline);
-            mainHandler.removeCallbacks(phonePopupNotificationExpiry);
-        }
-    }
-
-    private void finishPhoneNotificationBurst() {
-        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-        queuedPhoneNotifications.clear();
-        queuedPhoneNotificationOverflowCount = 0;
-        phoneNotificationBurstActive = false;
-        if (activePhoneNotification != null) clearPhoneStatusNotification(true);
-        if (activePhonePopupNotificationExpiresAt > 0L) clearPhonePopupNotification();
-        if (binding != null) {
-            updateMediaInfo();
-            applyBrickVisibility(currentBrickSet());
-        }
-        schedulePopupRefresh();
-    }
-
-    /** The last item keeps the normal configured timer set by showPhone*Notification(). */
-    private void releasePhoneNotificationBurstToConfiguredExpiry() {
-        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-        queuedPhoneNotifications.clear();
-        queuedPhoneNotificationOverflowCount = 0;
-        phoneNotificationBurstActive = false;
-    }
-
-    private boolean phoneNotificationAllowedByLockState() {
-        return prefs != null && PhoneNotificationLockPolicy.mayPresent(
-                prefs.phoneNotificationsOnlyWhenLocked.get(),
-                phoneBoolean("device.locked"));
-    }
-
-    private void suppressPhoneNotificationsUnlessLockAllows() {
-        if (prefs == null || phoneNotificationAllowedByLockState()) return;
-        cancelPhoneNotificationQueue();
-        if (hasActivePhoneStatusAlert()) clearPhoneStatusNotification(true);
-        if (activePhonePopupNotificationExpiresAt > 0L) clearPhonePopupNotification();
-    }
-
-    private void cancelPhoneNotificationQueue() {
-        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-        mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
-        queuedPhoneNotifications.clear();
-        deferredPhoneNotifications.clear();
-        queuedPhoneNotificationOverflowCount = 0;
-        deferredPhoneNotificationOverflowCount = 0;
-        deferredPhoneNotificationOverflowStartedElapsed = 0L;
-        phoneNotificationBurstActive = false;
-    }
-
-    @NonNull
-    private static QueuedPhoneNotification phoneNotificationOverflowDelivery(int count) {
-        return new QueuedPhoneNotification(
-                PhoneStatusBarPolicy.overflowSummary(count, System.currentTimeMillis()),
-                new LinkedHashSet<>(PhoneStatusBarPolicy.notificationFieldIds()));
-    }
-
-    private static int saturatingIncrement(int value) {
-        return value == Integer.MAX_VALUE ? value : value + 1;
-    }
-
-    private long activePhoneLowBatteryRemaining() {
-        if (activePhoneBatteryAlertText == null) return 0L;
-        return Math.max(0L, activePhoneNotificationExpiresAt
-                - SystemClock.elapsedRealtime());
-    }
-
-    private static final class QueuedPhoneNotification {
-        @Nullable final PhoneStatusBarPolicy.NotificationPresentation presentation;
-        @NonNull final Set<String> selectedFields;
-        @Nullable final Integer lowBatteryLevel;
-        @NonNull final String lowBatteryColor;
-
-        QueuedPhoneNotification(
-                @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
-                @NonNull Set<String> selectedFields) {
-            this.presentation = presentation;
-            this.selectedFields = Collections.unmodifiableSet(
-                    new LinkedHashSet<>(selectedFields));
-            this.lowBatteryLevel = null;
-            this.lowBatteryColor = "";
-        }
-
-        private QueuedPhoneNotification(int level, @NonNull String color) {
-            this.presentation = null;
-            this.selectedFields = Collections.emptySet();
-            this.lowBatteryLevel = Math.max(0, Math.min(100, level));
-            this.lowBatteryColor = color;
-        }
-
-        static QueuedPhoneNotification lowBattery(int level, @NonNull String color) {
-            return new QueuedPhoneNotification(level, color);
-        }
-    }
-
-    /** Reconciles the selectable scalar iPhone values without owning another BLE connection. */
-    private void renderPhoneStatusBricks() {
-        renderPhoneStatusBricks(false);
-    }
-
-    private void renderPhoneStatusBricks(boolean forceStyle) {
-        if (binding == null || prefs == null) return;
-        LinearLayout container = binding.phoneStatusContainer;
-        Set<String> selected = PhoneStatusBarPolicy.parseIds(
-                prefs.phoneStatusBarItems.get(), PhoneStatusBarPolicy.statusIds());
-
-        Map<String, OutlineTextView> existing = new LinkedHashMap<>();
-        for (int index = 0; index < container.getChildCount(); index++) {
-            View child = container.getChildAt(index);
-            Object tag = child.getTag();
-            if (child instanceof OutlineTextView && tag instanceof String) {
-                existing.put((String) tag, (OutlineTextView) child);
-            }
-        }
-
-        List<OutlineTextView> desired = new ArrayList<>();
-        for (PhoneStatusBarPolicy.StatusItem item : PhoneStatusBarPolicy.statusItems()) {
-            if (!selected.contains(item.id)) continue;
-            String value = PhoneStatusBarPolicy.display(
-                    item, phoneStatusValues.get(item.resourceId));
-            if (TextUtils.isEmpty(value)) continue;
-
-            OutlineTextView view = existing.remove(item.id);
-            boolean created = view == null;
-            if (created) {
-                view = new OutlineTextView(themedContext != null ? themedContext : this);
-                view.setTag(item.id);
-                view.setSingleLine(true);
-                view.setIncludeFontPadding(false);
-                view.setContentDescription(item.label);
-                LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT);
-                layout.gravity = Gravity.CENTER_VERTICAL;
-                view.setLayoutParams(layout);
-            }
-            if (created || forceStyle) applyPhoneStatusTextStyle(view);
-            String rendered = desired.isEmpty() ? value : " Â· " + value;
-            setTextIfChanged(view, rendered);
-            desired.add(view);
-        }
-
-        for (OutlineTextView obsolete : existing.values()) {
-            container.removeView(obsolete);
-        }
-        for (int index = 0; index < desired.size(); index++) {
-            OutlineTextView view = desired.get(index);
-            if (index < container.getChildCount() && container.getChildAt(index) == view) continue;
-            ViewGroup.LayoutParams layout = view.getLayoutParams();
-            if (view.getParent() == container) container.removeView(view);
-            container.addView(view, index, layout);
-        }
-        if (forceStyle) {
-            applyHorizontalMargins(container, prefs.phoneStatus.marginStart.get(),
-                    prefs.phoneStatus.marginEnd.get());
-            container.setTranslationY(prefs.phoneStatus.adjustY.get());
-            container.setAlpha(prefs.phoneStatus.contentAlpha.get() / 255f);
-        }
-    }
-
-    private void updatePhoneIndicators() {
-        if (binding == null || prefs == null) return;
-
-        Integer signal = phonePercent("network.signal");
-        OutlineImageView cellular = binding.phoneCellularStatusIcon;
-        cellular.setImageResource(R.drawable.ic_status_iphone_cellular_level);
-        cellular.setImageLevel(cellularBars(signal) * 2500);
-        cellular.setDrawIcon(true);
-        ImageViewCompat.setImageTintList(cellular, null);
-        applyConfiguredIconOutline(cellular, prefs.phoneCellular);
-        cellular.setBadgeText(null, 0, 0);
-        cellular.setBadgeDrawable(null);
-        String operator = phoneText("network.operator");
-        binding.phoneCellularOperatorText.setText(operator);
-        binding.phoneCellularOperatorText.setVisibility(
-                operator.isEmpty() ? View.GONE : View.VISIBLE);
-        String networkType = phoneNetworkType();
-        binding.phoneCellularNetworkTypeText.setText(networkType);
-        binding.phoneCellularNetworkTypeText.setVisibility(
-                prefs.phoneCellular.showNetworkType.get() && !networkType.isEmpty()
-                        ? View.VISIBLE : View.GONE);
-        applyPhoneCellularInternalSpacing();
-        binding.phoneNetworkTypeText.setText(networkType);
-
-        Integer battery = phonePercent("battery.level");
-        OutlineImageView batteryIcon = binding.phoneBatteryStatusIcon;
-        batteryIcon.setImageResource(R.drawable.ic_status_iphone_battery);
-        batteryIcon.setImageLevel(battery == null ? 0 : battery * 100);
-        batteryIcon.setDrawIcon(true);
-        boolean charging = phoneChargingNow();
-        int batteryColor = phoneBatteryColor(battery, charging);
-        ImageViewCompat.setImageTintList(batteryIcon, ColorStateList.valueOf(batteryColor));
-        batteryIcon.setBatteryPercent(
-                prefs.phoneBattery.showPercentage.get() ? battery : null, batteryColor);
-        batteryIcon.setBatteryCharging(charging);
-        applyConfiguredIconOutline(batteryIcon, prefs.phoneBattery);
-        batteryIcon.setBadgeText(null, 0, 0);
-        batteryIcon.setBadgeDrawable(null);
-    }
-
-    @Nullable
-    private Integer phonePercent(@NonNull String resourceId) {
-        return PhoneStatusBarPolicy.percentValue(resourceId, phoneStatusValues.get(resourceId));
-    }
-
-    @Nullable
-    private Boolean phoneBoolean(@NonNull String resourceId) {
-        return PhoneStatusBarPolicy.booleanValue(resourceId, phoneStatusValues.get(resourceId));
-    }
-
-    @NonNull
-    private String phoneText(@NonNull String resourceId) {
-        String value = PhoneStatusBarPolicy.textValue(
-                resourceId, phoneStatusValues.get(resourceId));
-        return value == null ? "" : value;
-    }
-
-    private int phoneBatteryColor(@Nullable Integer battery, boolean charging) {
-        Context context = themedContext != null ? themedContext : this;
-        return battery != null && battery <= 10
-                ? ContextCompat.getColor(context, R.color.iphone_battery_critical)
-                : battery != null && battery <= 20
-                ? ContextCompat.getColor(context, R.color.iphone_battery_low)
-                : charging
-                ? ContextCompat.getColor(context, R.color.iphone_battery_charging)
-                : ContextCompat.getColor(context, android.R.color.white);
-    }
-
-    private void applyPhoneCellularInternalSpacing() {
-        if (binding == null || prefs == null) return;
-        int iconSize = Math.max(1, prefs.phoneCellular.size.get());
-        boolean typeVisible = binding.phoneCellularNetworkTypeText.getVisibility()
-                == View.VISIBLE;
-        boolean operatorVisible = binding.phoneCellularOperatorText.getVisibility()
-                == View.VISIBLE;
-        ViewGroup.MarginLayoutParams typeParams =
-                (ViewGroup.MarginLayoutParams) binding.phoneCellularNetworkTypeText
-                        .getLayoutParams();
-        typeParams.setMarginStart(typeVisible
-                ? PhoneIndicatorVisualPolicy.cellularIconTextGapPx(iconSize) : 0);
-        binding.phoneCellularNetworkTypeText.setLayoutParams(typeParams);
-        ViewGroup.MarginLayoutParams operatorParams =
-                (ViewGroup.MarginLayoutParams) binding.phoneCellularOperatorText
-                        .getLayoutParams();
-        operatorParams.setMarginStart(!operatorVisible ? 0
-                : typeVisible ? PhoneIndicatorVisualPolicy.cellularTextGapPx(iconSize)
-                : PhoneIndicatorVisualPolicy.cellularIconTextGapPx(iconSize));
-        binding.phoneCellularOperatorText.setLayoutParams(operatorParams);
-    }
-
-    private boolean phoneChargingNow() {
-        return Boolean.TRUE.equals(phoneBoolean("battery.charging"))
-                || Boolean.TRUE.equals(phoneBoolean("battery.external_power"));
-    }
-
-    @NonNull
-    private String phoneNetworkType() {
-        return PhoneNetworkTypePolicy.display(phoneText("network.type"));
-    }
-
-    private static int cellularBars(@Nullable Integer percent) {
-        if (percent == null || percent <= 0) return 0;
-        if (percent <= 25) return 1;
-        if (percent <= 50) return 2;
-        if (percent <= 75) return 3;
-        return 4;
-    }
-
-    private void applyPhoneStatusTextStyle(@NonNull OutlineTextView view) {
-        view.setTextColor(ContextCompat.getColor(themedContext, R.color.text_primary));
-        view.setOutlineColor(textOutlineColor(prefs.phoneStatus.outlineAlpha.get()));
-        view.setOutlineWidth(prefs.phoneStatus.outlineWidth.get());
-        view.setTypeface(Fonts.resolve(this, prefs.phoneStatus.fontFamily.get(),
-                prefs.phoneStatus.fontBold.get(), prefs.phoneStatus.fontItalic.get()));
-        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, prefs.phoneStatus.fontSize.get());
-    }
-
-    private boolean hasVisiblePhoneStatusValues() {
-        if (binding == null) return false;
-        for (int index = 0; index < binding.phoneStatusContainer.getChildCount(); index++) {
-            View child = binding.phoneStatusContainer.getChildAt(index);
-            if (child.getVisibility() == View.VISIBLE
-                    && child instanceof android.widget.TextView
-                    && !TextUtils.isEmpty(((android.widget.TextView) child).getText())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @NonNull
-    private String joinedVisibleText(@NonNull LinearLayout container) {
-        StringBuilder result = new StringBuilder();
-        for (int index = 0; index < container.getChildCount(); index++) {
-            View child = container.getChildAt(index);
-            if (child.getVisibility() != View.VISIBLE
-                    || !(child instanceof android.widget.TextView)) continue;
-            CharSequence text = ((android.widget.TextView) child).getText();
-            if (TextUtils.isEmpty(text)) continue;
-            result.append(text);
-        }
-        return result.toString();
-    }
-
-    @NonNull
-    private OutlineTextView firstPhoneStatusTextView() {
-        if (binding != null) {
-            for (int index = 0; index < binding.phoneStatusContainer.getChildCount(); index++) {
-                View child = binding.phoneStatusContainer.getChildAt(index);
-                if (child instanceof OutlineTextView) return (OutlineTextView) child;
-            }
-        }
-        return binding.timeText;
-    }
-
-    private void applyDateBrickSettings() {
-        applySingleLineTextBrick(binding.dateText, prefs.date);
-        switch (prefs.date.alignment.get()) {
-            case 1:
-                binding.dateText.setGravity(Gravity.CENTER_HORIZONTAL);
-                break;
-            case 2:
-                binding.dateText.setGravity(Gravity.END);
-                break;
-            default:
-                binding.dateText.setGravity(Gravity.START);
-                break;
-        }
-    }
-
-    private void applyMediaBrickSettings() {
-        int textColor = ContextCompat.getColor(themedContext, R.color.text_primary);
-
-        // Source line: independent font, opacity, outline.
-        Typeface sourceTypeface = Fonts.resolve(this, prefs.media.sourceFontFamily.get(),
-                prefs.media.sourceFontBold.get(), prefs.media.sourceFontItalic.get());
-        binding.mediaAppText.setOutlineColor(textOutlineColor(prefs.media.sourceOutlineAlpha.get()));
-        binding.mediaAppText.setOutlineWidth(prefs.media.sourceOutlineWidth.get());
-        binding.mediaAppText.setTextColor(textColor);
-        binding.mediaAppText.setTypeface(sourceTypeface);
-        binding.mediaAppText.setTextSize(TypedValue.COMPLEX_UNIT_PX, prefs.media.sourceFontSize.get());
-        binding.mediaAppText.setAlpha(prefs.media.sourceContentAlpha.get() / 255f);
-
-        // Title line: existing media.* font + opacity + outline (TextBrickPrefs inherited).
-        Typeface titleTypeface = Fonts.resolve(this, prefs.media.fontFamily.get(),
-                prefs.media.fontBold.get(), prefs.media.fontItalic.get());
-        binding.mediaTitleText.setOutlineColor(textOutlineColor(prefs.media.outlineAlpha.get()));
-        binding.mediaTitleText.setOutlineWidth(prefs.media.outlineWidth.get());
-        binding.mediaTitleText.setTextColor(textColor);
-        binding.mediaTitleText.setTypeface(titleTypeface);
-        binding.mediaTitleText.setTextSize(TypedValue.COMPLEX_UNIT_PX, prefs.media.fontSize.get());
-        binding.mediaTitleText.setAlpha(prefs.media.contentAlpha.get() / 255f);
-
-        // Source line is always static + ellipsized; only the title scrolls. Source is short
-        // and a constant moving marquee on it would be more distracting than helpful.
-        binding.mediaAppText.setMarqueeEnabled(false);
-        binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
-
-        applyMediaStateIcon(textColor);
-        applyMediaLineStructure();
-
-        // Duration text â€” independent font size / alpha / outline so the user can dial it down
-        // (typically the duration is rendered smaller and dimmer than the track subtitle).
-        binding.mediaDurationText.setTypeface(titleTypeface);
-        binding.mediaDurationText.setTextSize(TypedValue.COMPLEX_UNIT_PX, prefs.media.durationFontSize.get());
-        binding.mediaDurationText.setTextColor(textColor);
-        binding.mediaDurationText.setOutlineColor(textOutlineColor(prefs.media.durationOutlineAlpha.get()));
-        binding.mediaDurationText.setOutlineWidth(prefs.media.durationOutlineWidth.get());
-        binding.mediaDurationText.setAlpha(prefs.media.durationContentAlpha.get() / 255f);
-        // An empty TextView still contributes its font line-box to the title row even though it
-        // draws no characters. Before the first MediaSession callback that made the status row
-        // measure against the (often larger) duration font, then shrink as soon as
-        // updateMediaInfo() finally honoured "show duration = off". Keep an empty field gone;
-        // an active track with a known duration is left alone and updateMediaInfo() remains the
-        // sole place that promotes the field back to VISIBLE.
-        if (!prefs.media.showDuration.get()
-                || TextUtils.isEmpty(binding.mediaDurationText.getText())) {
-            binding.mediaDurationText.setVisibility(View.GONE);
-        }
-        if (!prefs.media.progressBarEnabled.get() || lastMediaSubtitle == null) {
-            binding.mediaProgressBar.setVisibility(View.GONE);
-        }
-
-        applyHorizontalMargins(binding.mediaContainer, prefs.media.marginStart.get(), prefs.media.marginEnd.get());
-        binding.mediaContainer.setTranslationY(prefs.media.adjustY.get());
-        // Container alpha back to full â€” per-line alpha is set above so the two values don't
-        // multiply through the parent.
-        binding.mediaContainer.setAlpha(1f);
-        applyMediaMaxWidth(binding.mediaAppText);
-        applyMediaMaxWidth(binding.mediaTitleText);
-        // Alignment applies to the two ROWS â€” they, not the text views, are the children of the
-        // vertical container, and layout_gravity on a child of a horizontal LinearLayout only
-        // ever moves it vertically.
-        applyMediaChildAlignment(binding.mediaSourceRow, prefs.media.sourceAlignment.get());
-        applyMediaChildAlignment(binding.mediaTitleRow, prefs.media.alignment.get());
-        applyMediaChildAlignment(binding.mediaProgressBar, prefs.media.alignment.get());
-    }
-
-    /**
-     * Applies the configured one-line/two-line structure before any MediaSession exists.
-     *
-     * <p>The XML source row is visible by default. Previously it was hidden only from
-     * {@link #updateMediaInfo()} after the first controller callback. With "show source" disabled,
-     * a cold-start widget therefore measured one empty source line too many until playback began,
-     * which made the whole status row temporarily taller. Keep this layout decision independent
-     * of media availability and remove the inter-line gap when there is only one line.</p>
-     */
-    private void applyMediaLineStructure() {
-        boolean showSource = prefs.media.showSource.get();
-        int sourceVisibility = showSource ? View.VISIBLE : View.GONE;
-        if (binding.mediaSourceRow.getVisibility() != sourceVisibility) {
-            binding.mediaSourceRow.setVisibility(sourceVisibility);
-        }
-
-        LinearLayout.LayoutParams titleLp =
-                (LinearLayout.LayoutParams) binding.mediaTitleRow.getLayoutParams();
-        int topMargin = showSource ? prefs.media.lineGap.get() : 0;
-        if (titleLp.topMargin != topMargin) {
-            titleLp.topMargin = topMargin;
-            binding.mediaTitleRow.setLayoutParams(titleLp);
-        }
-    }
-
-    /**
-     * Playback-state indicator. It lives at the head of the source row â€” "â–¶ Spotify" reads as one
-     * statement â€” but the source line is optional, so when it's off the enabled icon is
-     * re-parented to the head of the title row instead of vanishing with its host. The icon has an
-     * independent visibility preference; when shown it takes the size, outline and opacity of the
-     * line it sits on and flips colour with the widget theme like the text around it.
-     */
-    private void applyMediaStateIcon(int textColor) {
-        boolean onSourceRow = prefs.media.showSource.get();
-        LinearLayout host = onSourceRow ? binding.mediaSourceRow : binding.mediaTitleRow;
-        ViewGroup parent = (ViewGroup) binding.mediaStateIcon.getParent();
-        if (parent != host) {
-            if (parent != null) parent.removeView(binding.mediaStateIcon);
-            host.addView(binding.mediaStateIcon, 0);
-        }
-        binding.mediaStateIcon.setVisibility(
-                prefs.media.showPlaybackStateIcon.get() ? View.VISIBLE : View.GONE);
-
-        int fontSize = onSourceRow ? prefs.media.sourceFontSize.get() : prefs.media.fontSize.get();
-        int outlineAlpha = onSourceRow
-                ? prefs.media.sourceOutlineAlpha.get() : prefs.media.outlineAlpha.get();
-        int outlineWidth = onSourceRow
-                ? prefs.media.sourceOutlineWidth.get() : prefs.media.outlineWidth.get();
-        int contentAlpha = onSourceRow
-                ? prefs.media.sourceContentAlpha.get() : prefs.media.contentAlpha.get();
-        binding.mediaStateIcon.setTextSizePx(fontSize);
-        binding.mediaStateIcon.setIconColor(textColor);
-        binding.mediaStateIcon.setOutlineColor(textOutlineColor(outlineAlpha));
-        binding.mediaStateIcon.setOutlineWidth(outlineWidth);
-        binding.mediaStateIcon.setAlpha(contentAlpha / 255f);
-
-        // Gap to the text scales with that text too â€” a fixed one would glue the icon to a 60px
-        // source line and strand it next to a 12px one.
-        LinearLayout.LayoutParams lp =
-                (LinearLayout.LayoutParams) binding.mediaStateIcon.getLayoutParams();
-        int gap = Math.round(fontSize * STATE_ICON_GAP_RATIO);
-        if (lp.getMarginEnd() != gap) {
-            lp.setMarginEnd(gap);
-            binding.mediaStateIcon.setLayoutParams(lp);
-        }
-    }
-
-    /**
-     * Horizontal alignment of a single line within the vertical media container.
-     * Container is wrap_content (sized to the wider of the two children), so the narrower
-     * child shifts within that band via its own {@code layout_gravity}.
-     */
-    private static void applyMediaChildAlignment(View view, int alignment) {
-        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) view.getLayoutParams();
-        int gravity;
-        switch (alignment) {
-            case 1: gravity = Gravity.CENTER_HORIZONTAL; break;
-            case 2: gravity = Gravity.END; break;
-            default: gravity = Gravity.START; break;
-        }
-        lp.gravity = gravity;
-        view.setLayoutParams(lp);
-    }
-
-    private void applyMediaMaxWidth(MarqueeOutlineTextView view) {
-        // The view itself toggles between WRAP_CONTENT (text fits) and a fixed maxWidth
-        // (overflow + scrolling). All we need here is to tell it the upper bound.
-        view.setMaxWidth(prefs.media.maxWidth.get());
-    }
-
-    private void applyWifiBrickSettings() {
-        ViewGroup.LayoutParams ip = binding.wifiStatusIcon.getLayoutParams();
-        ip.width = prefs.wifi.size.get();
-        ip.height = prefs.wifi.size.get();
-        binding.wifiStatusIcon.setLayoutParams(ip);
-        applyHorizontalMargins(binding.wifiStatusIcon, prefs.wifi.marginStart.get(), prefs.wifi.marginEnd.get());
-        binding.wifiStatusIcon.setTranslationY(prefs.wifi.adjustY.get());
-        binding.wifiStatusIcon.setAlpha(prefs.wifi.contentAlpha.get() / 255f);
-    }
-
-    private void applyGpsBrickSettings() {
-        ViewGroup.LayoutParams ip = binding.gnssStatusIcon.getLayoutParams();
-        ip.width = prefs.gps.size.get();
-        ip.height = prefs.gps.size.get();
-        binding.gnssStatusIcon.setLayoutParams(ip);
-        applyHorizontalMargins(binding.gnssStatusIcon, prefs.gps.marginStart.get(), prefs.gps.marginEnd.get());
-        binding.gnssStatusIcon.setTranslationY(prefs.gps.adjustY.get());
-        binding.gnssStatusIcon.setAlpha(prefs.gps.contentAlpha.get() / 255f);
-    }
-
-    private void applyBluetoothBrickSettings() {
-        ViewGroup.LayoutParams ip = binding.bluetoothStatusIcon.getLayoutParams();
-        ip.width = prefs.bluetooth.size.get();
-        ip.height = prefs.bluetooth.size.get();
-        binding.bluetoothStatusIcon.setLayoutParams(ip);
-        applyHorizontalMargins(binding.bluetoothStatusIcon,
-                prefs.bluetooth.marginStart.get(), prefs.bluetooth.marginEnd.get());
-        binding.bluetoothStatusIcon.setTranslationY(prefs.bluetooth.adjustY.get());
-        binding.bluetoothStatusIcon.setAlpha(prefs.bluetooth.contentAlpha.get() / 255f);
-    }
-
-    private void applyPhoneCellularBrickSettings() {
-        ViewGroup.LayoutParams layout = binding.phoneCellularStatusIcon.getLayoutParams();
-        layout.width = Math.round(prefs.phoneCellular.size.get() * 1.17f);
-        layout.height = prefs.phoneCellular.size.get();
-        binding.phoneCellularStatusIcon.setLayoutParams(layout);
-        binding.phoneCellularOperatorText.setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                Math.max(12, Math.round(prefs.phoneCellular.size.get() * .42f)));
-        binding.phoneCellularOperatorText.setTextColor(
-                ContextCompat.getColor(themedContext, R.color.text_primary));
-        binding.phoneCellularOperatorText.setOutlineColor(
-                textOutlineColor(prefs.phoneCellular.outlineAlpha.get()));
-        binding.phoneCellularOperatorText.setOutlineWidth(
-                prefs.phoneCellular.outlineWidth.get());
-        binding.phoneCellularNetworkTypeText.setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                Math.max(12, Math.round(prefs.phoneCellular.size.get() * .42f)));
-        binding.phoneCellularNetworkTypeText.setTextColor(
-                ContextCompat.getColor(themedContext, R.color.text_primary));
-        binding.phoneCellularNetworkTypeText.setOutlineColor(
-                textOutlineColor(prefs.phoneCellular.outlineAlpha.get()));
-        binding.phoneCellularNetworkTypeText.setOutlineWidth(
-                prefs.phoneCellular.outlineWidth.get());
-        int textEdgeReserve = PhoneIndicatorVisualPolicy.cellularTextEdgeReservePx(
-                prefs.phoneCellular.size.get(), prefs.phoneCellular.outlineWidth.get());
-        binding.phoneCellularNetworkTypeText.setPadding(
-                textEdgeReserve, 0, textEdgeReserve, 0);
-        binding.phoneCellularOperatorText.setPadding(
-                textEdgeReserve, 0, textEdgeReserve, 0);
-        applyPhoneCellularInternalSpacing();
-        applyHorizontalMargins(binding.phoneCellularContainer,
-                prefs.phoneCellular.marginStart.get(), prefs.phoneCellular.marginEnd.get());
-        binding.phoneCellularContainer.setTranslationY(prefs.phoneCellular.adjustY.get());
-        binding.phoneCellularContainer.setAlpha(prefs.phoneCellular.contentAlpha.get() / 255f);
-    }
-
-    private void applyPhoneBatteryBrickSettings() {
-        ViewGroup.LayoutParams layout = binding.phoneBatteryStatusIcon.getLayoutParams();
-        layout.width = Math.round(prefs.phoneBattery.size.get() * 1.6f);
-        layout.height = prefs.phoneBattery.size.get();
-        binding.phoneBatteryStatusIcon.setLayoutParams(layout);
-        applyHorizontalMargins(binding.phoneBatteryStatusIcon,
-                prefs.phoneBattery.marginStart.get(), prefs.phoneBattery.marginEnd.get());
-        binding.phoneBatteryStatusIcon.setTranslationY(prefs.phoneBattery.adjustY.get());
-        binding.phoneBatteryStatusIcon.setAlpha(prefs.phoneBattery.contentAlpha.get() / 255f);
-    }
-
-    private void applyPhoneNetworkTypeBrickSettings() {
-        applySingleLineTextBrick(binding.phoneNetworkTypeText, prefs.phoneNetworkType);
-    }
-
-    private void applySingleLineTextBrick(OutlineTextView view, Preferences.TextBrickPrefs p) {
-        view.setTextColor(ContextCompat.getColor(themedContext, R.color.text_primary));
-        view.setOutlineColor(textOutlineColor(p.outlineAlpha.get()));
-        view.setOutlineWidth(p.outlineWidth.get());
-        view.setTypeface(Fonts.resolve(this, p.fontFamily.get(), p.fontBold.get(), p.fontItalic.get()));
-        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, p.fontSize.get());
-        view.setTranslationY(p.adjustY.get());
-        view.setAlpha(p.contentAlpha.get() / 255f);
-        applyHorizontalMargins(view, p.marginStart.get(), p.marginEnd.get());
-    }
-
-    private int textOutlineColor(int alpha) {
-        return (ContextCompat.getColor(themedContext, R.color.text_outline) & 0x00FFFFFF) | (alpha << 24);
-    }
-
-    /**
-     * Rebuilds {@link #themedContext} so theme-dependent colour lookups respect the user's
-     * "Widget theme" preference. Pref values: 0 = follow system, 1 = always light, 2 = always
-     * dark, 3 = inverse of system. Cached so we don't allocate a new Context on every
-     * {@code applyPreferences()}; {@code onConfigurationChanged} invalidates the cache so the
-     * inverse mode picks up system theme changes too.
-     */
-    private void updateThemedContext() {
-        int pref = prefs.widgetTheme.get();
-        if (themedContext != null && pref == appliedThemePref) return;
-        if (pref == 0) {
-            themedContext = this;
-        } else {
-            int uiMode;
-            if (pref == 1) {
-                uiMode = Configuration.UI_MODE_NIGHT_NO;
-            } else if (pref == 2) {
-                uiMode = Configuration.UI_MODE_NIGHT_YES;
-            } else {
-                int systemNight = getResources().getConfiguration().uiMode
-                        & Configuration.UI_MODE_NIGHT_MASK;
-                uiMode = (systemNight == Configuration.UI_MODE_NIGHT_YES)
-                        ? Configuration.UI_MODE_NIGHT_NO
-                        : Configuration.UI_MODE_NIGHT_YES;
-            }
-            Configuration cfg = new Configuration(getResources().getConfiguration());
-            cfg.uiMode = (cfg.uiMode & ~Configuration.UI_MODE_NIGHT_MASK) | uiMode;
-            themedContext = createConfigurationContext(cfg);
-        }
-        appliedThemePref = pref;
-    }
-
-    private static void applyHorizontalMargins(View view, int start, int end) {
-        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) view.getLayoutParams();
-        lp.setMarginStart(start);
-        lp.setMarginEnd(end);
-        view.setLayoutParams(lp);
-    }
-
-    private final EnumMap<BrickType, Set<String>> effectiveHideLists = new EnumMap<>(BrickType.class);
-
-    private void rebuildEffectiveHideLists() {
-        effectiveHideLists.clear();
-        for (BrickType type : BrickType.values()) {
-            BrickType source = prefs.effectiveHideSourceFor(type);
-            effectiveHideLists.put(type, prefs.hideListFor(source).get());
-        }
-    }
-
-    private boolean isBrickHiddenByApp(BrickType type) {
-        Set<String> list = effectiveHideLists.get(type);
-        return matchesForegroundContext(list);
-    }
-
-    private boolean isLauncherHomeTopSurface() {
-        // This process-local lifecycle token comes from LauncherActivity itself. On the target
-        // Android 9 head unit only one Activity is resumed at a time, so waiting for a second
-        // accessibility/UsageStats package sample merely leaves the freshly resumed HOME visible
-        // with stale rules for one foreground-tracker pass.
-        return StatusBarSurfaceContext.isLauncherHomeForeground();
-    }
-
-    private boolean matchesForegroundContext(@Nullable Set<String> targets) {
-        boolean navigatorWindow = effectiveNavigatorWindowForeground();
-        return StatusBarSurfaceContext.matches(
-                targets, lastForegroundPackage,
-                navigatorWindow ? false : isLauncherHomeTopSurface(), navigatorWindow);
-    }
-
-    private boolean anyBrickNeedsPackageTracking() {
-        for (Set<String> s : effectiveHideLists.values()) {
-            if (StatusBarSurfaceContext.requiresPackageTracking(s)) return true;
-        }
-        for (HaBrickConfig config : configuredMainBricks) {
-            if (StatusBarSurfaceContext.requiresPackageTracking(config.hideInPackages)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void applyBrickVisibility(Set<BrickType> bricksSet) {
-        if (binding == null) return;
-        boolean dateActive = bricksSet.contains(BrickType.DATE)
-                && (prefs.date.showDate.get() || prefs.date.showDayOfWeek.get());
-        // Car bricks only render when the vehicle supports the sensor â€” a preset imported from
-        // another car may list them in brickOrder, and an unsupported sensor would otherwise
-        // leave a permanently frozen placeholder brick in the row.
-        // Before the delayed ECARX stage, reserve configured temperature slots using placeholders.
-        // The later capability callback collapses unsupported sensors without blocking first draw.
-        CarIntegration car = carTelemetryExporter == null ? null : CarIntegrations.get(this);
-        boolean indoorTempActive = bricksSet.contains(BrickType.INDOOR_TEMP)
-                && (car == null || car.isBrickSupported(BrickType.INDOOR_TEMP));
-        boolean outdoorTempActive = bricksSet.contains(BrickType.OUTDOOR_TEMP)
-                && (car == null || car.isBrickSupported(BrickType.OUTDOOR_TEMP));
-        boolean homeAssistantActive = bricksSet.contains(BrickType.HOME_ASSISTANT)
-                && binding.homeAssistantContainer.getChildCount() > 0;
-        boolean phoneStatusActive = bricksSet.contains(BrickType.PHONE_STATUS)
-                && hasVisiblePhoneStatusValues();
-        boolean phoneCellularActive = bricksSet.contains(BrickType.PHONE_CELLULAR)
-                && (phonePercent("network.signal") != null
-                || !phoneText("network.operator").isEmpty()
-                || prefs.phoneCellular.showNetworkType.get()
-                && !phoneNetworkType().isEmpty());
-        boolean phoneBatteryActive = bricksSet.contains(BrickType.PHONE_BATTERY)
-                && phonePercent("battery.level") != null;
-        boolean phoneNetworkTypeActive = bricksSet.contains(BrickType.PHONE_NETWORK_TYPE)
-                && !phoneNetworkType().isEmpty();
-        BrickTarget[] targets = {
-                resolveTarget(BrickType.TIME, bricksSet.contains(BrickType.TIME),
-                        binding.timeText, prefs.time.contentAlpha.get()),
-                resolveTarget(BrickType.DATE, dateActive,
-                        binding.dateText, prefs.date.contentAlpha.get()),
-                resolveTarget(BrickType.WIFI, bricksSet.contains(BrickType.WIFI),
-                        binding.wifiStatusIcon, prefs.wifi.contentAlpha.get()),
-                resolveTarget(BrickType.GPS, bricksSet.contains(BrickType.GPS),
-                        binding.gnssStatusIcon, prefs.gps.contentAlpha.get()),
-                resolveTarget(BrickType.BLUETOOTH, bricksSet.contains(BrickType.BLUETOOTH),
-                        binding.bluetoothStatusIcon, prefs.bluetooth.contentAlpha.get()),
-                resolveTarget(BrickType.INDOOR_TEMP, indoorTempActive,
-                        binding.indoorTempText, prefs.indoorTemp.contentAlpha.get()),
-                resolveTarget(BrickType.OUTDOOR_TEMP, outdoorTempActive,
-                        binding.outdoorTempText, prefs.outdoorTemp.contentAlpha.get()),
-                resolveTarget(BrickType.HOME_ASSISTANT, homeAssistantActive,
-                        binding.homeAssistantContainer, prefs.homeAssistant.contentAlpha.get()),
-                resolveTarget(BrickType.PHONE_STATUS, phoneStatusActive,
-                        binding.phoneStatusContainer, prefs.phoneStatus.contentAlpha.get()),
-                resolveTarget(BrickType.PHONE_CELLULAR, phoneCellularActive,
-                        binding.phoneCellularContainer, prefs.phoneCellular.contentAlpha.get()),
-                resolveTarget(BrickType.PHONE_BATTERY, phoneBatteryActive,
-                        binding.phoneBatteryStatusIcon, prefs.phoneBattery.contentAlpha.get()),
-                resolveTarget(BrickType.PHONE_NETWORK_TYPE, phoneNetworkTypeActive,
-                        binding.phoneNetworkTypeText, prefs.phoneNetworkType.contentAlpha.get()),
-        };
-
-        // Media has the extra session gate, so we build its BrickTarget here. In particular, the
-        // deferred post-boot integration refresh must not make an empty mediaContainer visible
-        // after enableMediaTracking already hid it: only real active media may occupy the row.
-        boolean phoneNotificationActive = isPhoneNotificationActive();
-        MediaController mediaController = pickActiveMediaController();
-        boolean mediaSessionActive = StatusMediaVisibilityPolicy.hasVisibleContent(
-                phoneNotificationActive,
-                mediaController != null,
-                isActuallyPlaying(mediaController),
-                prefs.media.onlyWhilePlaying.get());
-        boolean mediaShouldBeGone = !bricksSet.contains(BrickType.MEDIA)
-                || !isRemotelyVisible(BrickType.MEDIA) || !mediaSessionActive;
-        boolean mediaHiddenByApp = !mediaShouldBeGone
-                && isBrickHiddenByApp(BrickType.MEDIA);
-        BrickTarget mediaTarget;
-        if (mediaShouldBeGone) {
-            mediaTarget = new BrickTarget(binding.mediaContainer, View.GONE, 1f);
-        } else if (mediaHiddenByApp) {
-            if (prefs.hideKeepsSpaceFor(BrickType.MEDIA).get()) {
-                mediaTarget = new BrickTarget(binding.mediaContainer, View.VISIBLE, 0f);
-            } else {
-                mediaTarget = new BrickTarget(binding.mediaContainer, View.GONE, 1f);
-            }
-        } else {
-            mediaTarget = new BrickTarget(binding.mediaContainer, View.VISIBLE,
-                    prefs.media.contentAlpha.get() / 255f);
-        }
-
-        // Categorise the changes. Visibility flips (VISIBLEâ†”GONE) get the TransitionManager +
-        // window-buffer treatment; pure alpha changes (keep-space mode where the brick stays
-        // in the layout) just get a plain alpha animation.
-        java.util.List<BrickTarget> visibilityFlips = new java.util.ArrayList<>();
-        java.util.List<BrickTarget> alphaOnly = new java.util.ArrayList<>();
-        boolean expanding = false;
-        for (BrickTarget t : targets) {
-            if (t.view.getVisibility() != t.visibility) {
-                visibilityFlips.add(t);
-                if (t.visibility == View.VISIBLE) expanding = true;
-            } else if (t.visibility == View.VISIBLE) {
-                alphaOnly.add(t);
-            }
-        }
-        // Media too.
-        if (mediaTarget.view.getVisibility() != mediaTarget.visibility) {
-            visibilityFlips.add(mediaTarget);
-            if (mediaTarget.visibility == View.VISIBLE) expanding = true;
-        }
-        boolean refreshVisibleMedia = mediaTarget.visibility == View.VISIBLE
-                && !mediaShouldBeGone && !mediaHiddenByApp;
-
-        if (!visibilityFlips.isEmpty() && overlayAttached) {
-            // Scene root for TransitionManager is the INNER container â€” the outer FrameLayout
-            // gets resized to a screen-width buffer via WindowManager, and we want the
-            // transition to play inside the stable inner LinearLayout, not chase the buffer.
-            beginVisibilityTransition(binding.overlayContainer, expanding);
-        }
-
-        // Apply all targets. For visibility flips Fade transition handles the alpha animation;
-        // for alpha-only ones we run an explicit ViewPropertyAnimator.
-        for (BrickTarget t : targets) {
-            applyBrickTarget(t, overlayAttached && visibilityFlips.contains(t));
-        }
-        applyBrickTarget(mediaTarget,
-                overlayAttached && visibilityFlips.contains(mediaTarget));
-        // Populate the media rows on the very frame in which the brick becomes visible. The old
-        // path refreshed only VISIBLEâ†’VISIBLE; GONEâ†’VISIBLE exposed the XML bootstrap state
-        // (state icon plus an empty-but-measurable duration TextView) until the next player
-        // callback. Depending on when Yandex Music published metadata, that could last seconds
-        // after boot and then visibly change the status-row height.
-        if (refreshVisibleMedia) {
-            updateMediaInfo();
-        }
-
-        // Per-brick alpha not covered by the Fade transition (keep-space VISIBLEâ†’VISIBLE).
-        // The bricks in alphaOnly might still want a visible-alpha update if contentAlpha
-        // pref changed â€” handled by applyXxxBrickSettings setAlpha which runs before this.
-    }
-
-    /** Snapshot of the desired end state for a brick view. */
-    private static final class BrickTarget {
-        final View view;
-        final int visibility;
-        /** Target alpha when {@link #visibility} is {@code VISIBLE}; ignored otherwise. */
-        final float visibleAlpha;
-        BrickTarget(View view, int visibility, float visibleAlpha) {
-            this.view = view;
-            this.visibility = visibility;
-            this.visibleAlpha = visibleAlpha;
-        }
-    }
-
-    /**
-     * Decide the final view state for a brick. {@code activeInLayout=false} (brick not in
-     * the layout / Date with both flags off) â†’ {@code GONE}, hard collapse. Otherwise honour
-     * {@link Preferences#hideKeepsSpaceFor}: if true, render an INVISIBLE-equivalent (VISIBLE
-     * view, alpha animated to 0); if false, plain GONE.
-     */
-    private BrickTarget resolveTarget(BrickType type, boolean activeInLayout, View view,
-                                      int contentAlphaPref) {
-        float baseAlpha = contentAlphaPref / 255f;
-        if (!activeInLayout || !isRemotelyVisible(type)) {
-            return new BrickTarget(view, View.GONE, baseAlpha);
-        }
-        // HA children independently choose whether to inherit the group's app list; their
-        // renderer has already removed or made transparent the matching children.
-        if (type != BrickType.HOME_ASSISTANT && isBrickHiddenByApp(type)) {
-            if (prefs.hideKeepsSpaceFor(type).get()) {
-                // VISIBLE-with-alpha-0 replaces the old INVISIBLE constant â€” same effect on
-                // layout (space preserved) but animatable.
-                return new BrickTarget(view, View.VISIBLE, 0f);
-            }
-            return new BrickTarget(view, View.GONE, baseAlpha);
-        }
-        return new BrickTarget(view, View.VISIBLE, baseAlpha);
-    }
-
-    private boolean isRemotelyVisible(BrickType type) {
-        return automationStates == null || automationStates
-                .get(AutomationContract.SCOPE_BUILTIN, type.automationId()).visible;
-    }
-
-    /** Called after either an exported Broadcast or MQTT packet has been persisted. */
-    public void onAutomationStateChanged(String scope, String id) {
-        if (destroyed) return;
-        if (scenarioController != null) {
-            scenarioController.refreshSystemConditions();
-        }
-        synchronized (automationUiLock) {
-            pendingAutomationUi.computeIfAbsent(scope, ignored -> new HashSet<>()).add(id);
-        }
-        schedulePendingAutomationUiRefresh();
-    }
-
-    private void dispatchAutomationPresentationTargets(@NonNull Set<String> targets) {
-        Map<String, Set<String>> grouped = new LinkedHashMap<>();
-        for (String target : targets) {
-            int divider = target.indexOf('|');
-            if (divider <= 0 || divider >= target.length() - 1) continue;
-            grouped.computeIfAbsent(target.substring(0, divider), ignored -> new HashSet<>())
-                    .add(target.substring(divider + 1));
-        }
-        dispatchAutomationPresentationChanges(grouped);
-    }
-
-    private void dispatchAutomationPresentationChanges(
-            @NonNull Map<String, Set<String>> changed) {
-        if (automationPresentationListeners.isEmpty()) return;
-        for (Map.Entry<String, Set<String>> entry : changed.entrySet()) {
-            Set<String> ids = Collections.unmodifiableSet(new LinkedHashSet<>(entry.getValue()));
-            for (AutomationPresentationListener listener : automationPresentationListeners) {
-                try {
-                    listener.onAutomationPresentationChanged(entry.getKey(), ids);
-                } catch (RuntimeException failure) {
-                    Log.w(TAG, "Automation presentation listener failed", failure);
-                }
-            }
-        }
-    }
-
-    private boolean automaticSurfaceRefreshSuppressed() {
-        return initialIntegrationStartupInProgress || credentialRefreshScheduled
-                || automaticRuntimeParked || automaticLifecycleQuiet
-                || StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this);
-    }
-
-    private void schedulePendingIntegrationReconfigure() {
-        if (!integrationReconfigurePending || automaticSurfaceRefreshSuppressed()
-                || destroyed) return;
-        integrationReconfigurePending = false;
-        mainHandler.post(() -> {
-            if (!destroyed) applyPreferences(true);
-        });
-    }
-
-    private void schedulePendingAutomationUiRefresh() {
-        synchronized (automationUiLock) {
-            if (pendingAutomationUi.isEmpty() || automationUiRefreshScheduled
-                    || automaticSurfaceRefreshSuppressed()) return;
-            automationUiRefreshScheduled = true;
-        }
-        // One rendered frame per connector burst instead of rebuilding the row once per entity.
-        mainHandler.postDelayed(automationUiRefresh, 32L);
-    }
-
-    /** Read-only snapshots let the second overlay reuse original brick data without duplicating
-     * notification, eCarX, GNSS or connectivity listeners. Called only on the main thread. */
-    @Nullable
-    private PopupOverlayController.BuiltinValue popupBuiltinValue(@NonNull String id) {
-        if (binding == null) return null;
-        switch (id) {
-            case "builtin.time":
-                return new PopupOverlayController.BuiltinValue(timeFormat.format(new Date()),
-                        "#FFFFFFFF", null, true);
-            case "builtin.date":
-                return new PopupOverlayController.BuiltinValue(String.valueOf(binding.dateText.getText()),
-                        "#FFFFFFFF", null, true);
-            case "builtin.media":
-                return new PopupOverlayController.BuiltinValue(lastMediaSubtitle,
-                        "#FFFFFFFF", null, !isEmpty(lastMediaSubtitle));
-            case "builtin.wifi":
-                return new PopupOverlayController.BuiltinValue("", "#FFFFFFFF", "wifi",
-                        true);
-            case "builtin.gps":
-                return new PopupOverlayController.BuiltinValue("", "#FFFFFFFF", "gps",
-                        true);
-            case "builtin.bluetooth":
-                return new PopupOverlayController.BuiltinValue("", "#FFFFFFFF", "bluetooth",
-                        true);
-            case "builtin.indoor_temp":
-                return popupTextValue(binding.indoorTempText, "temperature", true);
-            case "builtin.outdoor_temp":
-                return popupTextValue(binding.outdoorTempText, "temperature", true);
-            case "builtin.home_assistant":
-                StringBuilder text = new StringBuilder();
-                for (int i = 0; i < binding.homeAssistantContainer.getChildCount(); i++) {
-                    View child = binding.homeAssistantContainer.getChildAt(i);
-                    if (!(child instanceof android.widget.TextView)
-                            || child.getVisibility() != View.VISIBLE) continue;
-                    if (text.length() > 0) text.append(' ');
-                    text.append(((android.widget.TextView) child).getText());
-                }
-                return new PopupOverlayController.BuiltinValue(text.toString(), "#FFFFFFFF", null,
-                        binding.homeAssistantContainer.getVisibility() == View.VISIBLE);
-            case "builtin.phone_status":
-                return new PopupOverlayController.BuiltinValue(
-                        joinedVisibleText(binding.phoneStatusContainer), "#FFFFFFFF",
-                        "phone", binding.phoneStatusContainer.getVisibility() == View.VISIBLE);
-            case "builtin.phone_cellular":
-                Integer signal = phonePercent("network.signal");
-                String operator = phoneText("network.operator");
-                return new PopupOverlayController.BuiltinValue(
-                        !operator.isEmpty() ? operator : signal == null ? "" : signal + "%",
-                        "#FFFFFFFF",
-                        "phone", signal != null || !operator.isEmpty());
-            case "builtin.phone_battery":
-                Integer battery = phonePercent("battery.level");
-                return new PopupOverlayController.BuiltinValue(
-                        battery == null ? "" : battery + "%", "#FFFFFFFF",
-                        "battery", battery != null);
-            default:
-                return null;
-        }
-    }
-
-    private static PopupOverlayController.BuiltinValue popupTextValue(
-            android.widget.TextView view, @Nullable String iconId, boolean visible) {
-        return new PopupOverlayController.BuiltinValue(String.valueOf(view.getText()),
-                String.format(Locale.ROOT, "#%08X", view.getCurrentTextColor()), iconId,
-                visible);
-    }
-
-    /**
-     * Applies a brick's target state. For visibility flips the heavy lifting is done by the
-     * {@code TransitionManager} scene set up by {@link #beginVisibilityTransition} â€” we
-     * just toggle {@code setVisibility} and the Fade transition cross-fades alpha while
-     * ChangeBounds slides siblings into place. For alpha-only changes (keep-space hide)
-     * we animate alpha explicitly.
-     */
-    private void applyBrickTarget(BrickTarget target, boolean handledByTransition) {
-        if (!overlayAttached) {
-            // Pre-addView geometry normalization must be synchronous and final: animators on a
-            // detached tree can preserve the XML alpha/visibility into its first attached frame.
-            target.view.animate().cancel();
-            target.view.setVisibility(target.visibility);
-            if (target.visibility == View.VISIBLE) {
-                target.view.setAlpha(target.visibleAlpha);
-            }
-            return;
-        }
-        if (target.visibility == View.GONE) {
-            target.view.animate().cancel();
-            target.view.setVisibility(View.GONE);
-            return;
-        }
-        target.view.setVisibility(View.VISIBLE);
-        if (handledByTransition) {
-            // Fade transition animates the alpha for us; make sure the final value is the
-            // brick's contentAlpha pref (not 1.0 from Fade's default).
-            target.view.setAlpha(target.visibleAlpha);
-        } else {
-            target.view.animate().cancel();
-            target.view.animate()
-                    .alpha(target.visibleAlpha)
-                    .setDuration(BRICK_ALPHA_DURATION_MS)
-                    .start();
-        }
-    }
-
-    /**
-     * Runs the "buffer window" animation. Trick: before triggering the
-     * scene change we either expand the window to screen width (when something is about to
-     * appear) or pin it to its current width (when something is about to disappear). With
-     * the window's outer rectangle frozen the children's Fade + ChangeBounds animations
-     * play cleanly inside it; the listener restores the window to WRAP_CONTENT after the
-     * transition so it snaps to the new natural size in one go. This sidesteps the
-     * per-frame {@code updateViewLayout} approach that was visually broken on real hardware.
-     */
-    private void beginVisibilityTransition(ViewGroup sceneRoot, boolean expanding) {
-        if (binding == null) return;
-        beginBufferedTransition(expanding);
-
-        android.transition.TransitionSet tx = new android.transition.TransitionSet();
-        tx.addTransition(new android.transition.ChangeBounds());
-        tx.addTransition(new android.transition.Fade());
-        tx.setOrdering(android.transition.TransitionSet.ORDERING_TOGETHER);
-        tx.setDuration(BRICK_TRANSITION_DURATION_MS);
-        tx.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
-        // Listener can leak the buffer counter if TransitionManager decides nothing
-        // animatable changed and never fires the lifecycle callbacks â€” known foot-gun.
-        // Guard with a single-shot close flag and a safety runnable that runs unconditionally
-        // after slightly longer than the transition's own duration. Whichever fires first
-        // closes the buffer; the other becomes a no-op.
-        final boolean[] closed = {false};
-        Runnable closeOnce = () -> {
-            if (closed[0]) return;
-            closed[0] = true;
-            endBufferedTransition();
-        };
-        tx.addListener(new android.transition.Transition.TransitionListener() {
-            @Override public void onTransitionStart(android.transition.Transition t) {}
-            @Override public void onTransitionEnd(android.transition.Transition t) {
-                closeOnce.run();
-            }
-            @Override public void onTransitionCancel(android.transition.Transition t) {
-                closeOnce.run();
-            }
-            @Override public void onTransitionPause(android.transition.Transition t) {}
-            @Override public void onTransitionResume(android.transition.Transition t) {}
-        });
-        android.transition.TransitionManager.beginDelayedTransition(sceneRoot, tx);
-        mainHandler.postDelayed(closeOnce, BRICK_TRANSITION_DURATION_MS + 500);
-    }
-
-    /**
-     * Open a window-buffered transition: if no other buffered transition is in flight, pre-resize
-     * the WindowManager window to either screen width ({@code expanding}) or its current width
-     * (shrinking), so the animation that follows plays inside a stable rectangle instead of
-     * fighting wrap-content. Idempotent under nesting: re-entrant callers just bump the counter.
-     */
-    private void beginBufferedTransition(boolean expanding) {
-        if (binding == null) return;
-        if (pendingBufferedTransitions++ == 0) {
-            if (params != null && prefs.widgetMode.get() != WIDGET_MODE_STATUS_BAR) {
-                int oldWidth = params.width;
-                if (expanding) {
-                    params.width = getResources().getDisplayMetrics().widthPixels;
-                } else {
-                    int currentWidth = binding.getRoot().getWidth();
-                    if (currentWidth > 0) params.width = currentWidth;
-                }
-                try {
-                    windowManager.updateViewLayout(binding.getRoot(), params);
-                } catch (Exception ignored) {
-                    params.width = oldWidth;
-                }
-            }
-        }
-    }
-
-    /** Closes a transition opened by {@link #beginBufferedTransition}. When the last in-flight
-     *  transition ends, restores the window to WRAP_CONTENT so it snaps to natural size. */
-    private void endBufferedTransition() {
-        if (pendingBufferedTransitions <= 0) return;
-        if (--pendingBufferedTransitions == 0) {
-            restoreWindowToWrapContent();
-        }
-    }
-
-    private void restoreWindowToWrapContent() {
-        if (params == null || binding == null) return;
-        if (prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR) {
-            params.width = WindowManager.LayoutParams.MATCH_PARENT;
-        } else {
-            params.width = WindowManager.LayoutParams.WRAP_CONTENT;
-        }
-        try {
-            windowManager.updateViewLayout(binding.getRoot(), params);
-        } catch (Exception ignored) {}
-    }
-
-    private Set<BrickType> currentBrickSet() {
-        Set<BrickType> set = EnumSet.noneOf(BrickType.class);
-        set.addAll(BrickType.parseOrder(prefs.brickOrder.get()));
-        return set;
-    }
-
-    @NonNull
-    private Set<BrickType> driverInformationBrickTypes() {
-        boolean enabled = prefs != null && prefs.driverPanelEnabled.get();
-        String json = prefs == null ? ""
-                : prefs.activeDriverPanelProfile().shortcutsJson.get();
-        if (configuredDriverInformationJson != null
-                && enabled == configuredDriverPanelEnabled
-                && Objects.equals(json, configuredDriverInformationJson)) {
-            return configuredDriverInformationTypes;
-        }
-        Set<BrickType> result = immutableBrickTypes(loadDriverInformationBrickTypes());
-        configuredDriverPanelEnabled = enabled;
-        configuredDriverInformationJson = prefs == null ? ""
-                : prefs.activeDriverPanelProfile().shortcutsJson.get();
-        configuredDriverInformationTypes = result;
-        return result;
-    }
-
-    @NonNull
-    private Set<BrickType> loadDriverInformationBrickTypes() {
-        Set<BrickType> result = EnumSet.noneOf(BrickType.class);
-        if (prefs == null || !prefs.driverPanelEnabled.get()) return result;
-        for (LauncherShortcutStore.Shortcut shortcut :
-                LauncherShortcutStore.forDriverPanel(prefs).all()) {
-            if (!shortcut.enabled || shortcut.kind != LauncherShortcutStore.Kind.INFO) continue;
-            BrickType type = StatusBarInformationCatalog.typeForTarget(shortcut.target);
-            if (type != null) result.add(type);
-        }
-        return result;
-    }
-
-    /**
-     * Computes the tallest brick height (in pixels) over all bricks currently in
-     * {@code brickOrder}, regardless of per-app visibility. Used as the widget's minimum height so
-     * a brick disappearing on a particular app doesn't shrink the row.
-     *
-     * Text bricks use {@link Paint#getFontMetrics()} on a copy of the TextView's paint at the
-     * given pixel size â€” this matches exactly the height the TextView itself would measure for a
-     * single line (with {@code includeFontPadding=true}, the default).
-     */
-    private int computeMinWidgetHeight(Set<BrickType> bricks) {
-        int h = 0;
-        if (bricks.contains(BrickType.TIME)) {
-            h = Math.max(h, textLineHeight(binding.timeText, prefs.time.fontSize.get()));
-        }
-        if (bricks.contains(BrickType.DATE)) {
-            // Two lines when day-of-week + date are both shown and not collapsed into one line.
-            int lines = (prefs.date.showDate.get() && prefs.date.showDayOfWeek.get()
-                    && !prefs.date.oneLineLayout.get()) ? 2 : 1;
-            h = Math.max(h, textLineHeight(binding.dateText, prefs.date.fontSize.get()) * lines);
-        }
-        if (bricks.contains(BrickType.MEDIA)) {
-            // Reserve the complete configured media geometry even before the first track
-            // arrives. Duration and progress are metadata-dependent children: if they are not
-            // included in this floor, the WindowManager's WRAP_CONTENT status window can change
-            // height when the first MediaSession snapshot populates them.
-            int titleHeight = textLineHeight(binding.mediaTitleText, prefs.media.fontSize.get());
-            int titleRowHeight = titleHeight;
-            if (prefs.media.showDuration.get()) {
-                titleRowHeight = Math.max(titleRowHeight, textLineHeight(
-                        binding.mediaDurationText, prefs.media.durationFontSize.get()));
-            }
-            int mediaHeight = titleRowHeight;
-            if (prefs.media.showSource.get()) {
-                int sourceHeight = textLineHeight(binding.mediaAppText,
-                        prefs.media.sourceFontSize.get());
-                mediaHeight = sourceHeight + titleRowHeight + prefs.media.lineGap.get();
-            }
-            if (prefs.media.progressBarEnabled.get()) {
-                ViewGroup.LayoutParams raw = binding.mediaProgressBar.getLayoutParams();
-                int progressHeight = Math.max(0, raw.height);
-                if (raw instanceof ViewGroup.MarginLayoutParams) {
-                    ViewGroup.MarginLayoutParams margins = (ViewGroup.MarginLayoutParams) raw;
-                    progressHeight += Math.max(0, margins.topMargin)
-                            + Math.max(0, margins.bottomMargin);
-                }
-                mediaHeight += progressHeight;
-            }
-            h = Math.max(h, mediaHeight);
-        }
-        if (bricks.contains(BrickType.WIFI)) {
-            h = Math.max(h, prefs.wifi.size.get());
-        }
-        if (bricks.contains(BrickType.GPS)) {
-            h = Math.max(h, prefs.gps.size.get());
-        }
-        if (bricks.contains(BrickType.BLUETOOTH)) {
-            h = Math.max(h, prefs.bluetooth.size.get());
-        }
-        if (bricks.contains(BrickType.PHONE_CELLULAR)) {
-            h = Math.max(h, prefs.phoneCellular.size.get());
-        }
-        if (bricks.contains(BrickType.PHONE_BATTERY)) {
-            h = Math.max(h, prefs.phoneBattery.size.get());
-        }
-        if (bricks.contains(BrickType.PHONE_NETWORK_TYPE)) {
-            h = Math.max(h, textLineHeight(
-                    binding.phoneNetworkTypeText, prefs.phoneNetworkType.fontSize.get()));
-        }
-        // Car bricks only contribute to the height floor when the vehicle actually renders them
-        // (same isBrickSupported gate as applyBrickVisibility) â€” otherwise a preset from another
-        // car would inflate the widget height for bricks that never appear.
-        CarIntegration car = carTelemetryExporter == null ? null : CarIntegrations.get(this);
-        if (bricks.contains(BrickType.INDOOR_TEMP)
-                && (car == null || car.isBrickSupported(BrickType.INDOOR_TEMP))) {
-            h = Math.max(h, textLineHeight(binding.indoorTempText, prefs.indoorTemp.fontSize.get()));
-        }
-        if (bricks.contains(BrickType.OUTDOOR_TEMP)
-                && (car == null || car.isBrickSupported(BrickType.OUTDOOR_TEMP))) {
-            h = Math.max(h, textLineHeight(binding.outdoorTempText, prefs.outdoorTemp.fontSize.get()));
-        }
-        if (bricks.contains(BrickType.HOME_ASSISTANT)) {
-            for (int i = 0; i < binding.homeAssistantContainer.getChildCount(); i++) {
-                View child = binding.homeAssistantContainer.getChildAt(i);
-                if (child instanceof OutlineTextView) {
-                    OutlineTextView text = (OutlineTextView) child;
-                    h = Math.max(h, textLineHeight(text, Math.round(text.getTextSize()))
-                            + text.getPaddingTop() + text.getPaddingBottom());
-                }
-            }
-        }
-        if (bricks.contains(BrickType.PHONE_STATUS)) {
-            h = Math.max(h, textLineHeight(
-                    firstPhoneStatusTextView(), prefs.phoneStatus.fontSize.get()));
-        }
-        return h;
-    }
-
-    private static int textLineHeight(OutlineTextView view, int fontSizePx) {
-        // Copy so we don't mutate the live drawing paint. The copy preserves typeface, which is
-        // crucial because Roboto Condensed Medium has different metrics from the default.
-        Paint p = new Paint(view.getPaint());
-        p.setTextSize(fontSizePx);
-        Paint.FontMetrics fm = p.getFontMetrics();
-        // All text TextViews in the widget have includeFontPadding=false â€” layout bounds use
-        // ascent/descent (just the glyph metrics, no extra accent/descender reserve).
-        return (int) Math.ceil(fm.descent - fm.ascent);
-    }
-
-    public void setOverlayStateListener(@Nullable OverlayStateListener listener) {
-        this.overlayStateListener = listener;
-        if (listener != null) {
-            notifyOverlayState();
-        }
-    }
-
-    private void notifyOverlayState() {
-        if (overlayStateListener == null || params == null || binding == null) return;
-        overlayStateListener.onOverlayStateChanged(
-                params.x, params.y,
-                binding.getRoot().getWidth(),
-                binding.getRoot().getHeight());
-    }
-
-    /**
-     * Pushes the saved widget position and mode-specific window params into the WindowManager.
-     * Called from {@link #applyPreferences()} so the position sliders / mode switcher in
-     * settings affect the widget live. Skipped when the widget isn't drawn yet.
-     */
-    private void applyOverlayPosition() {
-        if (params == null || binding == null || windowManager == null) return;
-        boolean statusBar = prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR;
-        int newWidth = statusBar
-                ? WindowManager.LayoutParams.MATCH_PARENT
-                : WindowManager.LayoutParams.WRAP_CONTENT;
-        // During a buffered transition the window is intentionally pinned wider than
-        // wrap_content so children can animate without being clipped. Overwriting
-        // params.width here would snap the window mid-animation and also strand the
-        // TransitionManager listener (no scene change â†’ no onTransitionEnd â†’ counter
-        // leak). The buffer closer will restore wrap_content when it ends.
-        if (pendingBufferedTransitions > 0 && !statusBar) {
-            newWidth = params.width;
-        }
-        int newX = statusBar ? 0 : prefs.overlayX.get();
-        int newY = statusBar ? 0 : prefs.overlayY.get();
-        if (params.x == newX && params.y == newY && params.width == newWidth) return;
-        params.x = newX;
-        params.y = newY;
-        params.width = newWidth;
-        try {
-            windowManager.updateViewLayout(binding.getRoot(), params);
-        } catch (Exception ignored) {
-        }
-    }
-
-    private void enableMediaTracking() {
-        if (mediaSessionManager != null) {
-            // applyBrickVisibility() runs before this method and may have made the configured
-            // media brick VISIBLE. Reconcile it even when tracking was already registered:
-            // without an active controller the empty container must return to GONE immediately,
-            // rather than occupying a blank row until the first MediaSession callback.
-            updateMediaInfo();
-            return;
-        }
-        mediaSessionManager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
-        if (mediaSessionManager == null) return;
-        ComponentName component = new ComponentName(this, MediaNotificationListener.class);
-        try {
-            mediaSessionManager.addOnActiveSessionsChangedListener(activeSessionsChangedListener, component, mainHandler);
-            rebindMediaControllers(mediaSessionManager.getActiveSessions(component));
-        } catch (SecurityException e) {
-            Log.w(TAG, "Notification access not granted; media tracking disabled", e);
-            mediaSessionManager = null;
-        }
-    }
-
-    private void disableMediaTracking() {
-        if (mediaSessionManager == null) return;
-        try {
-            mediaSessionManager.removeOnActiveSessionsChangedListener(activeSessionsChangedListener);
-        } catch (Exception ignored) {
-        }
-        for (MediaController c : activeMediaControllers) {
-            c.unregisterCallback(mediaControllerCallback);
-        }
-        activeMediaControllers.clear();
-        mediaSessionManager = null;
-    }
-
-    private void rebindMediaControllers(@Nullable List<MediaController> controllers) {
-        for (MediaController c : activeMediaControllers) {
-            c.unregisterCallback(mediaControllerCallback);
-        }
-        activeMediaControllers.clear();
-        if (controllers != null) {
-            for (MediaController c : controllers) {
-                activeMediaControllers.add(c);
-                c.registerCallback(mediaControllerCallback, mainHandler);
-            }
-        }
-        updateMediaInfo();
-    }
-
-    private void handlePhoneLowBatteryAlert(@NonNull ConnectorValue value) {
-        if (prefs == null || !value.fresh || !value.available || !value.readable
-                || !(value.rawValue instanceof Number)) return;
-        int level = ((Number) value.rawValue).intValue();
-        if (level < 0 || level > 100) return;
-        PhoneLowBatteryAlertPolicy.Result result = PhoneLowBatteryAlertPolicy.evaluate(
-                prefs.phoneLowBatteryAlertEnabled.get(),
-                prefs.phoneLowBatteryAlertThreshold.get(),
-                phoneLowBatteryAlertLatched, level);
-        if (phoneLowBatteryAlertLatched != result.latched) {
-            prefs.phoneLowBatteryAlertLatched.set(result.latched);
-        }
-        phoneLowBatteryAlertLatched = result.latched;
-        PhoneLowBatteryAlertPolicy.Result result2 = PhoneLowBatteryAlertPolicy.evaluate(
-                prefs.phoneLowBatteryAlertEnabled.get(),
-                prefs.phoneLowBatteryAlertThreshold2.get(),
-                phoneLowBatteryAlertLatched2, level);
-        if (phoneLowBatteryAlertLatched2 != result2.latched) {
-            prefs.phoneLowBatteryAlertLatched2.set(result2.latched);
-        }
-        phoneLowBatteryAlertLatched2 = result2.latched;
-
-        // A single exact sample may cross both thresholds; preserve the configured order.
-        if (result.trigger) {
-            enqueuePhoneLowBatteryAlert(level, prefs.phoneLowBatteryAlertColor.get());
-        }
-        if (result2.trigger) {
-            enqueuePhoneLowBatteryAlert(level, prefs.phoneLowBatteryAlertColor2.get());
-        }
-    }
-
-    /**
-     * Publishes the three fields before either destination renders. Local scenarios therefore
-     * resolve the exact same application/topic/text visibility for the status row and popup.
-     */
-    private void updatePhoneNotificationFieldStates(
-            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
-            @NonNull Set<String> selectedFields) {
-        if (automationStates == null || prefs == null) return;
-        int seconds = Math.max(1, Math.min(120,
-                prefs.phoneStatusBarNotificationSeconds.get()));
-        long now = System.currentTimeMillis();
-        long expiresAt = now + seconds * 1_000L;
-        try {
-            for (String fieldId : PhoneStatusBarPolicy.notificationFieldIds()) {
-                String automationId =
-                        PhoneNotificationAutomation.automationIdForField(fieldId);
-                String text = PhoneStatusBarPolicy.notificationFieldText(
-                        presentation, fieldId);
-                boolean visible = selectedFields.contains(fieldId) && !text.isEmpty();
-                JSONObject patch = new JSONObject()
-                        .put("text", text)
-                        .put("visible", visible)
-                        .put("fresh", true)
-                        .put("source", "phone")
-                        .put("updated_at", now)
-                        .put("expires_at", expiresAt);
-                if (PhoneStatusBarPolicy.FIELD_APPLICATION.equals(fieldId)) {
-                    patch.put("icon", presentation.iconCached
-                            && !presentation.appIdentifier.isEmpty()
-                            ? "phone-app:" + presentation.appIdentifier
-                            : "");
-                }
-                automationStates.apply(AutomationContract.SCOPE_POPUP, automationId,
-                        patch);
-                onAutomationStateChanged(AutomationContract.SCOPE_POPUP, automationId);
-            }
-        } catch (JSONException | RuntimeException failure) {
-            Log.e(TAG, "Could not publish phone notification fields", failure);
-        }
-    }
-
-    private boolean showPhoneStatusNotification(
-            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
-            @NonNull Set<String> selectedFields) {
-        // A low-battery warning is rarer and safety-relevant; keep it visible for its full
-        // configured interval instead of letting a routine ANCS event replace it.
-        if (activePhoneBatteryAlertText != null && isPhoneNotificationActive()) return false;
-        boolean replacingPresentation = hasActivePhoneStatusAlert();
-        if (!replacingPresentation && binding != null) {
-            mediaDurationVisibilityBeforePhoneNotification =
-                    binding.mediaDurationText.getVisibility();
-            mediaProgressVisibilityBeforePhoneNotification =
-                    binding.mediaProgressBar.getVisibility();
-        }
-        if (binding != null) {
-            // A second notification can have identical text. Force a fresh marquee cycle for
-            // the new delivery instead of continuing halfway through the previous one.
-            binding.mediaTitleText.setMarqueeText("");
-        }
-        activePhoneNotification = presentation;
-        activePhoneNotificationFields = Collections.unmodifiableSet(
-                new LinkedHashSet<>(selectedFields));
-        activePhoneBatteryAlertText = null;
-        activePhoneBatteryAlertColor = null;
-        schedulePhoneStatusAlert();
-        return true;
-    }
-
-    /** Opens the reserved window in place; its three field states were already replaced above. */
-    private boolean showPhonePopupNotification(
-            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation) {
-        if (automationStates == null || prefs == null) return false;
-        try {
-            ensurePhoneNotificationPopupConfigured();
-            if (!phoneNotificationPopupConfigured) return false;
-            applyPopupPreferencesSafely();
-            int seconds = Math.max(1, Math.min(120,
-                    prefs.phoneStatusBarNotificationSeconds.get()));
-            long now = System.currentTimeMillis();
-            long expiresAt = now + seconds * 1_000L;
-            JSONObject overlay = new JSONObject()
-                    .put("visible", true)
-                    .put("fresh", true)
-                    .put("source", "phone")
-                    .put("updated_at", now)
-                    .put("expires_at", expiresAt);
-            boolean useIconLayout = presentation.iconCached
-                    && !presentation.appIdentifier.isEmpty()
-                    && PhoneAppIconStore.get(this).hasIcon(presentation.appIdentifier);
-            String shownOverlay = useIconLayout
-                    ? PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID
-                    : PhoneNotificationAutomation.OVERLAY_ID;
-            String hiddenOverlay = useIconLayout
-                    ? PhoneNotificationAutomation.OVERLAY_ID
-                    : PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID;
-            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
-                    hiddenOverlay,
-                    new JSONObject().put("visible", false).put("fresh", false)
-                            .put("updated_at", now));
-            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY, hiddenOverlay);
-            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
-                    shownOverlay, overlay);
-            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
-                    shownOverlay);
-            activePhonePopupNotificationExpiresAt =
-                    android.os.SystemClock.elapsedRealtime() + seconds * 1_000L;
-            activePhoneLowBatteryPopup = false;
-            mainHandler.removeCallbacks(phonePopupNotificationExpiry);
-            mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
-            return true;
-        } catch (JSONException | RuntimeException failure) {
-            Log.e(TAG, "Could not present phone notification popup", failure);
-            return false;
-        }
-    }
-
-    private void clearPhonePopupNotification() {
-        mainHandler.removeCallbacks(phonePopupNotificationExpiry);
-        activePhonePopupNotificationExpiresAt = 0L;
-        activePhoneLowBatteryPopup = false;
-        if (automationStates == null) return;
-        try {
-            long now = System.currentTimeMillis();
-            for (String overlayId : new String[]{
-                    PhoneNotificationAutomation.OVERLAY_ID,
-                    PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID}) {
-                automationStates.apply(AutomationContract.SCOPE_OVERLAY,
-                        overlayId,
-                        new JSONObject().put("visible", false).put("fresh", false)
-                                .put("updated_at", now));
-                onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY, overlayId);
-            }
-            clearPhoneNotificationFieldsIfInactive();
-        } catch (JSONException | RuntimeException failure) {
-            Log.w(TAG, "Could not clear phone notification popup", failure);
-        }
-    }
-
-    /**
-     * Clears shared field state only after both destinations have finished. This keeps status-row
-     * conditions working when the popup is disabled, and popup conditions working when the main
-     * status surface is disabled.
-     */
-    private void clearPhoneNotificationFieldsIfInactive() {
-        if (automationStates == null) return;
-        long elapsed = android.os.SystemClock.elapsedRealtime();
-        boolean statusStillUsesFields = activePhoneNotification != null
-                && prefs != null
-                && prefs.phoneStatusBarNotificationsEnabled.get()
-                && elapsed < activePhoneNotificationExpiresAt;
-        boolean popupStillUsesFields = activePhonePopupNotificationExpiresAt > 0L
-                && elapsed < activePhonePopupNotificationExpiresAt;
-        if (statusStillUsesFields || popupStillUsesFields) return;
-        try {
-            long now = System.currentTimeMillis();
-            for (String automationId : PhoneNotificationAutomation.fieldAutomationIds()) {
-                automationStates.apply(AutomationContract.SCOPE_POPUP, automationId,
-                        new JSONObject().put("text", "").put("visible", false)
-                                .put("fresh", false).put("updated_at", now));
-                onAutomationStateChanged(AutomationContract.SCOPE_POPUP, automationId);
-            }
-        } catch (JSONException | RuntimeException failure) {
-            Log.w(TAG, "Could not clear phone notification fields", failure);
-        }
-    }
-
-    private boolean showPhoneLowBatteryStatus(int level, @NonNull String color) {
-        boolean replacingPresentation = hasActivePhoneStatusAlert();
-        if (!replacingPresentation && binding != null) {
-            mediaDurationVisibilityBeforePhoneNotification =
-                    binding.mediaDurationText.getVisibility();
-            mediaProgressVisibilityBeforePhoneNotification =
-                    binding.mediaProgressBar.getVisibility();
-        }
-        if (binding != null) binding.mediaTitleText.setMarqueeText("");
-        activePhoneNotification = null;
-        activePhoneNotificationFields = Collections.emptySet();
-        activePhoneBatteryAlertText =
-                getString(R.string.phone_low_battery_alert_text, level);
-        activePhoneBatteryAlertColor = color;
-        clearPhoneNotificationFieldsIfInactive();
-        schedulePhoneStatusAlert();
-        if (phoneNotificationBurstActive && !queuedPhoneNotifications.isEmpty()) {
-            mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-            mainHandler.postDelayed(phoneNotificationQueueAdvance,
-                    activePhoneLowBatteryRemaining());
-        }
-        return true;
-    }
-
-    /**
-     * Publishes the low-battery warning into the configured icon notification card. The caller
-     * applies the same popup destination switch used by ordinary ANCS notifications.
-     */
-    private boolean showPhoneLowBatteryPopup(int level) {
-        if (automationStates == null || prefs == null) return false;
-        try {
-            ensurePhoneNotificationPopupConfigured();
-            if (!phoneNotificationPopupConfigured) return false;
-            applyPopupPreferencesSafely();
-            int seconds = Math.max(1, Math.min(120,
-                    prefs.phoneStatusBarNotificationSeconds.get()));
-            long now = System.currentTimeMillis();
-            long expiresAt = now + seconds * 1_000L;
-            String[] text = new String[]{
-                    getString(R.string.phone_low_battery_popup_application),
-                    getString(R.string.phone_low_battery_popup_title),
-                    getString(R.string.phone_low_battery_popup_body, level)
-            };
-            String[] ids = new String[]{
-                    PhoneNotificationAutomation.APPLICATION_AUTOMATION_ID,
-                    PhoneNotificationAutomation.TOPIC_AUTOMATION_ID,
-                    PhoneNotificationAutomation.TEXT_AUTOMATION_ID
-            };
-            for (int index = 0; index < ids.length; index++) {
-                JSONObject field = new JSONObject()
-                        .put("text", text[index])
-                        .put("visible", true)
-                        .put("fresh", true)
-                        .put("source", "phone-low-battery")
-                        .put("updated_at", now)
-                        .put("expires_at", expiresAt);
-                if (index == 0) {
-                    field.put("icon", PhoneNotificationAutomation.LOW_BATTERY_ICON_ID);
-                }
-                automationStates.apply(AutomationContract.SCOPE_POPUP, ids[index], field);
-                onAutomationStateChanged(AutomationContract.SCOPE_POPUP, ids[index]);
-            }
-            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
-                    PhoneNotificationAutomation.OVERLAY_ID,
-                    new JSONObject().put("visible", false).put("fresh", false)
-                            .put("updated_at", now));
-            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
-                    PhoneNotificationAutomation.OVERLAY_ID);
-            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
-                    PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID,
-                    new JSONObject().put("visible", true).put("fresh", true)
-                            .put("source", "phone-low-battery")
-                            .put("updated_at", now).put("expires_at", expiresAt));
-            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
-                    PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID);
-            activePhonePopupNotificationExpiresAt =
-                    SystemClock.elapsedRealtime() + seconds * 1_000L;
-            activePhoneLowBatteryPopup = true;
-            mainHandler.removeCallbacks(phonePopupNotificationExpiry);
-            mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
-            schedulePopupRefresh();
-            return true;
-        } catch (JSONException | RuntimeException failure) {
-            Log.e(TAG, "Could not present low-phone-battery popup", failure);
-            return false;
-        }
-    }
-
-    private void schedulePhoneStatusAlert() {
-        int seconds = Math.max(1, Math.min(120,
-                prefs.phoneStatusBarNotificationSeconds.get()));
-        activePhoneNotificationExpiresAt = android.os.SystemClock.elapsedRealtime()
-                + seconds * 1_000L;
-        mainHandler.removeCallbacks(phoneNotificationExpiry);
-        mainHandler.postDelayed(phoneNotificationExpiry, seconds * 1_000L);
-        if (binding != null) updateMediaInfo();
-    }
-
-    private boolean hasActivePhoneStatusAlert() {
-        return activePhoneNotification != null
-                || !TextUtils.isEmpty(activePhoneBatteryAlertText);
-    }
-
-    private boolean isPhoneNotificationActive() {
-        if (!hasActivePhoneStatusAlert() || prefs == null) return false;
-        if (android.os.SystemClock.elapsedRealtime()
-                >= activePhoneNotificationExpiresAt) return false;
-        if (activePhoneBatteryAlertText != null) {
-            return prefs.phoneLowBatteryAlertEnabled.get()
-                    && prefs.phoneStatusBarNotificationsEnabled.get();
-        }
-        return prefs.phoneStatusBarNotificationsEnabled.get()
-                && !activePhoneNotificationText().isEmpty();
-    }
-
-    private void clearPhoneStatusNotification(boolean restoreMediaVisibility) {
-        mainHandler.removeCallbacks(phoneNotificationExpiry);
-        activePhoneNotification = null;
-        activePhoneNotificationFields = Collections.emptySet();
-        activePhoneBatteryAlertText = null;
-        activePhoneBatteryAlertColor = null;
-        activePhoneNotificationExpiresAt = 0L;
-        if (binding != null) {
-            // Clearing the alert must also stop the custom marquee when MEDIA is disabled or
-            // removed. In that path updateMediaInfo() is intentionally not called.
-            binding.mediaAppText.setMarqueeText("");
-            binding.mediaTitleText.setMarqueeText("");
-            binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
-            binding.mediaTitleText.setTextColor(
-                    ContextCompat.getColor(themedContext == null ? this : themedContext,
-                            R.color.text_primary));
-        }
-        if (restoreMediaVisibility && binding != null) {
-            binding.mediaDurationText.setVisibility(
-                    mediaDurationVisibilityBeforePhoneNotification);
-            binding.mediaProgressBar.setVisibility(
-                    mediaProgressVisibilityBeforePhoneNotification);
-        }
-        clearPhoneNotificationFieldsIfInactive();
-    }
-
-    @NonNull
-    private String activePhoneNotificationText() {
-        if (!TextUtils.isEmpty(activePhoneBatteryAlertText)) {
-            return activePhoneBatteryAlertText;
-        }
-        PhoneStatusBarPolicy.NotificationPresentation presentation =
-                activePhoneNotification;
-        if (presentation == null) return "";
-        Set<String> visibleFields = new LinkedHashSet<>();
-        for (String fieldId : activePhoneNotificationFields) {
-            String value = PhoneStatusBarPolicy.notificationFieldText(
-                    presentation, fieldId);
-            if (value.isEmpty()) continue;
-            String automationId =
-                    PhoneNotificationAutomation.automationIdForField(fieldId);
-            boolean visible = automationStates == null
-                    || automationStates.effectiveVisibility(
-                    AutomationContract.SCOPE_POPUP, automationId, true);
-            if (visible) visibleFields.add(fieldId);
-        }
-        return PhoneStatusBarPolicy.notificationText(presentation, visibleFields);
-    }
-
-    /**
-     * Temporarily reuses the configured Now Playing geometry. This is presentation-only:
-     * MediaSession callbacks and playback continue while the ANCS text occupies the rows.
-     */
-    private void renderPhoneStatusNotification() {
-        if (binding == null || !isPhoneNotificationActive()) return;
-
-        stopMediaProgressTicker();
-        binding.mediaStateIcon.setVisibility(View.GONE);
-        binding.mediaDurationText.setVisibility(View.GONE);
-        binding.mediaProgressBar.setVisibility(View.GONE);
-
-        binding.mediaSourceRow.setVisibility(View.GONE);
-        binding.mediaTitleRow.setVisibility(View.VISIBLE);
-        binding.mediaAppText.setMarqueeText("");
-        binding.mediaTitleText.setMarqueeEnabled(true);
-        int defaultColor = ContextCompat.getColor(
-                themedContext == null ? this : themedContext, R.color.text_primary);
-        String configuredColor = activePhoneBatteryAlertText != null
-                ? (TextUtils.isEmpty(activePhoneBatteryAlertColor)
-                ? prefs.phoneLowBatteryAlertColor.get() : activePhoneBatteryAlertColor)
-                : prefs.phoneStatusBarNotificationColor.get();
-        binding.mediaTitleText.setTextColor(
-                AutomationState.parseColor(configuredColor, defaultColor));
-        binding.mediaTitleText.setMarqueeText(activePhoneNotificationText());
-
-        LinearLayout.LayoutParams titleLayout =
-                (LinearLayout.LayoutParams) binding.mediaTitleRow.getLayoutParams();
-        if (titleLayout.topMargin != 0) {
-            titleLayout.topMargin = 0;
-            binding.mediaTitleRow.setLayoutParams(titleLayout);
-        }
-
-        // Visibility remains solely owned by applyBrickVisibility(). In particular, the
-        // notification may not bypass remote visibility or the current app's hide rule.
-        schedulePopupRefresh();
-    }
-
-    private void updateMediaInfo() {
-        if (binding == null) return;
-        if (isPhoneNotificationActive()) {
-            renderPhoneStatusNotification();
-            return;
-        }
-        // Restore every view property temporarily changed by the ANCS presentation before
-        // rendering the current MediaSession snapshot.
-        binding.mediaStateIcon.setVisibility(
-                prefs.media.showPlaybackStateIcon.get() ? View.VISIBLE : View.GONE);
-        binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
-        boolean mainMediaRequested = currentBrickSet().contains(BrickType.MEDIA)
-                && isRemotelyVisible(BrickType.MEDIA);
-        boolean mainMediaHidden = mainMediaRequested && isBrickHiddenByApp(BrickType.MEDIA);
-        boolean popupMediaRequested = isPopupBuiltinRequested(BrickType.MEDIA);
-        boolean driverMediaRequested =
-                driverInformationBrickTypes().contains(BrickType.MEDIA);
-        MediaController playing = pickActiveMediaController();
-        PlaybackState playbackState = playing == null ? null : playing.getPlaybackState();
-        boolean musicPresentationVisible = StatusMediaVisibilityPolicy.hasVisibleContent(
-                false,
-                playing != null,
-                isActuallyPlaying(playbackState),
-                prefs.media.onlyWhilePlaying.get());
-        boolean mainMediaKeepsSpace = musicPresentationVisible && mainMediaHidden
-                && prefs.hideKeepsSpaceFor(BrickType.MEDIA).get();
-        boolean mainMediaVisible = musicPresentationVisible
-                && mainMediaRequested && !mainMediaHidden;
-        if (!mainMediaVisible && !mainMediaKeepsSpace
-                && !popupMediaRequested && !driverMediaRequested) {
-            binding.mediaContainer.setVisibility(View.GONE);
-            stopMediaProgressTicker();
-            binding.mediaAppText.setMarqueeText("");
-            binding.mediaTitleText.setMarqueeText("");
-            lastMediaSubtitle = null;
-            schedulePopupRefresh();
-            return;
-        }
-        if (playing == null) {
-            binding.mediaContainer.setVisibility(View.GONE);
-            stopMediaProgressTicker();
-            binding.mediaAppText.setMarqueeText("");
-            binding.mediaTitleText.setMarqueeText("");
-            lastMediaSubtitle = null;
-            schedulePopupRefresh();
-            return;
-        }
-        MediaMetadata metadata = playing.getMetadata();
-        String title = pickMediaTitle(metadata);
-        String artist = metadata != null ? metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) : null;
-        if (isUnknownArtistPlaceholder(artist)) {
-            // Some players (notably stock Android Music) fill the artist field with a literal
-            // "Unknown artist" / "ÐÐµÐ¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ð¹ Ð¸ÑÐ¿Ð¾Ð»Ð½Ð¸Ñ‚ÐµÐ»ÑŒ" string when the tag is missing.
-            // Treat that as no artist so the subtitle falls back to the title alone.
-            artist = null;
-        }
-        String subtitle;
-        boolean titleFirst = prefs.media.titleFirst.get();
-        String first = titleFirst ? title : artist;
-        String second = titleFirst ? artist : title;
-        if (!isEmpty(first) && !isEmpty(second)) {
-            subtitle = first + " â€” " + second;
-        } else if (!isEmpty(title)) {
-            subtitle = title;
-        } else if (!isEmpty(artist)) {
-            subtitle = artist;
-        } else {
-            // Something is playing but the player exposes no metadata at all â€” at least show a
-            // placeholder so the user can see that media playback is active.
-            subtitle = getString(R.string.media_unknown_track);
-        }
-        if (playbackState != null
-                && (playbackState.getState() == PlaybackState.STATE_PLAYING
-                || playbackState.getState() == PlaybackState.STATE_PAUSED)) {
-            MediaPlaybackHistoryStore.record(this, playing.getPackageName(),
-                    playbackState.getState() == PlaybackState.STATE_PLAYING);
-        }
-        // Pause shape only for an actual PAUSED; transient states (buffering / seeking) keep the
-        // play shape so the icon doesn't flicker every time the user scrubs.
-        // Players republish PlaybackState continuously (Yandex Music every second), and
-        // TextView.setText unconditionally drops its layout and requests a full re-layout even
-        // for identical text. On OEM head units that per-second layout storm makes the whole
-        // title row visibly jitter while the marquee scrolls â€” so every setter here must be
-        // a no-op when the value didn't actually change (MediaStateIconView.setPaused is).
-        binding.mediaStateIcon.setPaused(playbackState != null
-                && playbackState.getState() == PlaybackState.STATE_PAUSED);
-        binding.mediaAppText.setMarqueeText(getAppLabel(playing.getPackageName()));
-        // Reconcile the row structure too: settings may have changed while a controller callback
-        // was queued. The same method already ran during applyPreferences(), so playback starting
-        // cannot be the first event that establishes the configured widget height.
-        applyMediaLineStructure();
-        binding.mediaTitleText.setMarqueeText(subtitle);
-        syncMediaProgressWidth();
-
-        // Duration: format ms â†’ "M:SS" / "H:MM:SS". Hidden when the user opted out or the
-        // player doesn't expose a positive duration (live streams, podcast pre-buffer).
-        long durationMs = metadata != null
-                ? metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)
-                : 0L;
-        // Track identity: duration/progress visibility may only COLLAPSE on a real track
-        // change. Players republish metadata continuously (Yandex Music: every second) and
-        // the duration is transiently absent in some republishes â€” hiding on those blips
-        // collapsed the row height once a second, which read as the whole widget "regrouping"
-        // while the marquee scrolls.
-        boolean trackChanged = !TextUtils.equals(subtitle, lastMediaSubtitle);
-        lastMediaSubtitle = subtitle;
-
-        if (!prefs.media.showDuration.get()) {
-            binding.mediaDurationText.setVisibility(View.GONE);
-        } else if (durationMs > 0L) {
-            // Leading space gives the gap between title and duration without an extra layout
-            // margin pref â€” scales naturally with the duration font size.
-            setTextIfChanged(binding.mediaDurationText, " " + formatTrackDuration(durationMs));
-            binding.mediaDurationText.setVisibility(View.VISIBLE);
-        } else if (trackChanged) {
-            // New track with no usable duration (live stream) â€” hide for real.
-            binding.mediaDurationText.setVisibility(View.GONE);
-        }
-        // else: transient blip on the same track â€” keep the last shown value.
-
-        // Progress bar visibility is decided here ONLY (updateMediaProgress never touches it â€”
-        // see the comment there). Same blip-tolerant policy as the duration text.
-        if (!prefs.media.progressBarEnabled.get()) {
-            binding.mediaProgressBar.setVisibility(View.GONE);
-        } else if (durationMs > 0L) {
-            if (binding.mediaProgressBar.getVisibility() != View.VISIBLE) {
-                binding.mediaProgressBar.setColor(
-                        ContextCompat.getColor(themedContext != null ? themedContext : this,
-                                R.color.text_primary));
-                binding.mediaProgressBar.setVisibility(View.VISIBLE);
-            }
-        } else if (trackChanged) {
-            binding.mediaProgressBar.setVisibility(View.GONE);
-        }
-
-        if (mainMediaKeepsSpace && !mainMediaVisible) {
-            // A session can begin while the current foreground app is excluded. In that case
-            // applyBrickVisibility previously saw no active controller and left the view GONE
-            // with normal alpha; establish the keep-space alpha before revealing its layout.
-            binding.mediaContainer.setAlpha(0f);
-        }
-        binding.mediaContainer.setVisibility(
-                mainMediaVisible || mainMediaKeepsSpace ? View.VISIBLE : View.GONE);
-
-        updateMediaProgress(playing);
-        schedulePopupRefresh();
-    }
-
-    /**
-     * Keep the timeline under the actually rendered title, not under the whole title row.
-     * The row may additionally contain duration and the play indicator, while marquee mode keeps
-     * a second internal copy of the text. Neither must make the line longer than the visible song.
-     */
-    private void syncMediaProgressWidth() {
-        if (binding == null) return;
-        binding.mediaTitleText.post(() -> {
-            if (binding == null) return;
-            CharSequence source = binding.mediaTitleText.getMarqueeSourceText();
-            float measured = binding.mediaTitleText.getPaint()
-                    .measureText(source, 0, source.length());
-            int viewportWidth = binding.mediaTitleText.getWidth();
-            int targetWidth = MediaProgressWidthPolicy.width(
-                    measured,
-                    binding.mediaTitleText.getCompoundPaddingLeft(),
-                    binding.mediaTitleText.getCompoundPaddingRight(),
-                    viewportWidth);
-            int leadingMargin = MediaProgressWidthPolicy.leadingMargin(
-                    binding.mediaTitleText.getLeft(), binding.mediaTitleRow.getPaddingLeft());
-            LinearLayout.LayoutParams params =
-                    (LinearLayout.LayoutParams) binding.mediaProgressBar.getLayoutParams();
-            if (params.width != targetWidth || params.getMarginStart() != leadingMargin) {
-                params.width = targetWidth;
-                params.setMarginStart(leadingMargin);
-                binding.mediaProgressBar.setLayoutParams(params);
-            }
-        });
-    }
-
-    /**
-     * Format a positive duration in milliseconds as {@code M:SS} (under an hour) or
-     * {@code H:MM:SS} (one hour or longer). Locale-independent â€” uses the same digit forms
-     * everywhere because the duration is displayed alongside the marquee subtitle, where
-     * regional digit substitutions would look out of place.
-     */
-    private static String formatTrackDuration(long ms) {
-        long totalSeconds = ms / 1000L;
-        long hours = totalSeconds / 3600L;
-        long minutes = (totalSeconds % 3600L) / 60L;
-        long seconds = totalSeconds % 60L;
-        if (hours > 0) {
-            return String.format(java.util.Locale.ROOT, "%d:%02d:%02d", hours, minutes, seconds);
-        }
-        return String.format(java.util.Locale.ROOT, "%d:%02d", minutes, seconds);
-    }
-
-    /**
-     * Snap the progress bar to the current playback position and arm/disarm the periodic ticker.
-     * Called both from {@link #updateMediaInfo} (state/metadata flips) and from
-     * {@link #mediaProgressTick} (once per second while playing) to advance the bar smoothly.
-     */
-    private void updateMediaProgress(@Nullable MediaController playing) {
-        if (binding == null) return;
-        // Visibility policy: this method NEVER changes the bar's visibility. Flipping
-        // GONE/VISIBLE changes the media container's height and relayouts the whole brick
-        // row â€” and players like Yandex Music republish state/metadata every second, with
-        // the duration transiently missing, which turned that flip into a once-a-second
-        // visible "regroup" of the row while the marquee scrolls. Visibility is decided
-        // solely in updateMediaInfo (real track/state changes); here we only advance the
-        // fill fraction â€” a pure repaint.
-        if (!prefs.media.progressBarEnabled.get() || playing == null
-                || binding.mediaProgressBar.getVisibility() != View.VISIBLE) {
-            stopMediaProgressTicker();
-            return;
-        }
-        MediaMetadata metadata = playing.getMetadata();
-        long duration = metadata != null
-                ? metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)
-                : 0L;
-        PlaybackState state = playing.getPlaybackState();
-        if (duration <= 0L || state == null) {
-            // Timeline transiently unavailable (metadata republish in flight) â€” keep the last
-            // rendered fill and let the next tick catch up rather than touching layout.
-            return;
-        }
-        long now = android.os.SystemClock.elapsedRealtime();
-        long lastUpdate = state.getLastPositionUpdateTime();
-        long basePosition = state.getPosition();
-        // PlaybackState.getPosition() returns the position as of getLastPositionUpdateTime();
-        // for the *current* moment we extrapolate with the reported playback speed (typically 1.0).
-        long actualPosition = basePosition
-                + (long) ((now - lastUpdate) * state.getPlaybackSpeed());
-        if (actualPosition < 0L) actualPosition = 0L;
-        if (actualPosition > duration) actualPosition = duration;
-
-        binding.mediaProgressBar.setProgress((float) actualPosition / (float) duration);
-
-        if (state.getState() == PlaybackState.STATE_PLAYING) {
-            // Re-arm â€” the new postDelayed replaces any previously queued one, idempotent.
-            mainHandler.removeCallbacks(mediaProgressTick);
-            mainHandler.postDelayed(mediaProgressTick, MEDIA_PROGRESS_TICK_MS);
-        } else {
-            stopMediaProgressTicker();
-        }
-    }
-
-    private void stopMediaProgressTicker() {
-        mainHandler.removeCallbacks(mediaProgressTick);
-    }
-
-    private final Runnable mediaProgressTick = () -> updateMediaProgress(pickActiveMediaController());
-
-    /**
-     * Best-effort extraction of a track title from the media metadata. Falls back through several
-     * standard keys, then to the file name parsed out of the media URI, so we still show something
-     * useful for players that don't populate {@link MediaMetadata#METADATA_KEY_TITLE}.
-     */
-    @Nullable
-    private static String pickMediaTitle(@Nullable MediaMetadata metadata) {
-        if (metadata == null) return null;
-        String[] keys = {
-                MediaMetadata.METADATA_KEY_TITLE,
-                MediaMetadata.METADATA_KEY_DISPLAY_TITLE,
-                MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE,
-                MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION,
-        };
-        for (String key : keys) {
-            String value = metadata.getString(key);
-            if (!isEmpty(value)) return value;
-        }
-        String uriFilename = filenameFromUri(metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_URI));
-        if (!isEmpty(uriFilename)) return uriFilename;
-        return filenameFromUri(metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID));
-    }
-
-    /**
-     * Recognise the literal "Unknown artist" / "ÐÐµÐ¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ð¹ Ð¸ÑÐ¿Ð¾Ð»Ð½Ð¸Ñ‚ÐµÐ»ÑŒ" placeholders that
-     * some players write into the artist field when the tag is missing â€” case-insensitive
-     * and whitespace-tolerant.
-     */
-    private static boolean isUnknownArtistPlaceholder(@Nullable String s) {
-        if (s == null) return false;
-        String trimmed = s.trim();
-        return trimmed.equalsIgnoreCase("unknown artist")
-                || trimmed.equalsIgnoreCase("Ð½ÐµÐ¸Ð·Ð²ÐµÑÑ‚Ð½Ñ‹Ð¹ Ð¸ÑÐ¿Ð¾Ð»Ð½Ð¸Ñ‚ÐµÐ»ÑŒ");
-    }
-
-    @Nullable
-    private static String filenameFromUri(@Nullable String raw) {
-        if (isEmpty(raw)) return null;
-        String last = null;
-        try {
-            android.net.Uri uri = android.net.Uri.parse(raw);
-            last = uri.getLastPathSegment();
-        } catch (Exception ignored) {
-        }
-        if (isEmpty(last)) {
-            int slash = Math.max(raw.lastIndexOf('/'), raw.lastIndexOf('\\'));
-            last = (slash >= 0 && slash < raw.length() - 1) ? raw.substring(slash + 1) : raw;
-        }
-        if (isEmpty(last)) return null;
-        int dot = last.lastIndexOf('.');
-        if (dot > 0) {
-            last = last.substring(0, dot);
-        }
-        return android.net.Uri.decode(last);
-    }
-
-    @Nullable
-    private MediaController pickActiveMediaController() {
-        // Prefer a controller that is currently playing. If none is playing, fall back to any
-        // controller in a transient "media is loaded and the user is doing something with it"
-        // state â€” paused, buffering, fast-forwarding, rewinding, skipping. Keeping the brick
-        // visible across these short-lived transitions avoids a VISIBLEâ†’GONEâ†’VISIBLE blink
-        // (which would re-layout the title text from zero size and reset the marquee scroll)
-        // every time the user seeks or the player briefly buffers.
-        MediaController fallback = null;
-        for (MediaController c : activeMediaControllers) {
-            PlaybackState s = c.getPlaybackState();
-            if (s == null) continue;
-            int state = s.getState();
-            if (state == PlaybackState.STATE_PLAYING) {
-                return c;
-            }
-            if (fallback == null && isMediaActiveState(state)) {
-                fallback = c;
-            }
-        }
-        return fallback;
-    }
-
-    private static boolean isMediaActiveState(int state) {
-        switch (state) {
-            case PlaybackState.STATE_PAUSED:
-            case PlaybackState.STATE_BUFFERING:
-            case PlaybackState.STATE_FAST_FORWARDING:
-            case PlaybackState.STATE_REWINDING:
-            case PlaybackState.STATE_SKIPPING_TO_NEXT:
-            case PlaybackState.STATE_SKIPPING_TO_PREVIOUS:
-            case PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM:
-            case PlaybackState.STATE_CONNECTING:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private static boolean isActuallyPlaying(@Nullable MediaController controller) {
-        return controller != null && isActuallyPlaying(controller.getPlaybackState());
-    }
-
-    private static boolean isActuallyPlaying(@Nullable PlaybackState state) {
-        return state != null && state.getState() == PlaybackState.STATE_PLAYING;
-    }
-
-    private String getAppLabel(String pkg) {
-        try {
-            PackageManager pm = getPackageManager();
-            ApplicationInfo info = pm.getApplicationInfo(pkg, 0);
-            CharSequence label = pm.getApplicationLabel(info);
-            return label != null ? label.toString() : pkg;
-        } catch (Exception e) {
-            return pkg;
-        }
-    }
-
-    private static boolean isEmpty(@Nullable String s) {
-        return s == null || s.isEmpty();
-    }
-
-    private void registerSatelliteStatusReceiver() {
-        if (satelliteReceiverRegistered) return;
-        IntentFilter filter = new IntentFilter(GNSSSHARE_SATELLITE_STATUS_ACTION);
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(satelliteStatusReceiver, filter, RECEIVER_NOT_EXPORTED);
-            } else {
-                registerReceiver(satelliteStatusReceiver, filter);
-            }
-            satelliteReceiverRegistered = true;
-        } catch (RuntimeException failure) {
-            satelliteReceiverRegistered = false;
-            Log.w(TAG, "Could not register satellite status receiver", failure);
-        }
-    }
-
-    private void unregisterSatelliteStatusReceiver() {
-        if (!satelliteReceiverRegistered) return;
-        try {
-            unregisterReceiver(satelliteStatusReceiver);
-        } catch (RuntimeException failure) {
-            Log.w(TAG, "Satellite status receiver was already unregistered", failure);
-        }
-        satelliteReceiverRegistered = false;
-        mainHandler.removeCallbacks(satellitesCountResetRunnable);
-        satellitesCount = -1;
-        gnssModeFlags = 0;
-    }
-
-    private void registerBluetoothReceiver() {
-        if (btReceiverRegistered) return;
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
-        filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
-        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        try {
-            registerReceiver(bluetoothReceiver, filter);
-            btReceiverRegistered = true;
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to register Bluetooth receiver", t);
-        }
-    }
-
-    private void unregisterBluetoothReceiver() {
-        // Profile-proxy callbacks can outlive this receiver. Invalidate them before clearing the
-        // status surface so a late callback cannot repopulate a stale connected-device set.
-        bluetoothTrackingGeneration++;
-        if (!btReceiverRegistered) return;
-        try {
-            unregisterReceiver(bluetoothReceiver);
-        } catch (RuntimeException failure) {
-            Log.w(TAG, "Bluetooth receiver was already unregistered", failure);
-        }
-        btReceiverRegistered = false;
-    }
-
-    @Nullable
-    private static BluetoothAdapter getBluetoothAdapter() {
-        try {
-            return BluetoothAdapter.getDefaultAdapter();
-        } catch (Throwable t) {
-            return null;
-        }
-    }
-
-    /**
-     * Seed the connected-device set from whatever the system can synchronously tell us, with
-     * an async profile-proxy refresh on top.
-     * <p>
-     * The synchronous path iterates {@link BluetoothAdapter#getBondedDevices()} and reflects on
-     * the hidden {@code BluetoothDevice.isConnected()} method â€” this works on AOSP and the
-     * typical car-HU ROMs derived from it, returns instantly, and crucially covers the
-     * "brick was just added, BT is already on and the device is paired" case that pure
-     * profile-proxy seeding misses.
-     * <p>
-     * The async path keeps querying HEADSET / A2DP proxies as a safety net for OEM ROMs where
-     * the reflection trick is unavailable, and for unbonded but momentarily connected devices.
-     * ACL_CONNECTED / ACL_DISCONNECTED broadcasts (registered separately) handle live updates
-     * once the receiver is in place.
-     */
-    private void refreshBtConnectedFromProxies() {
-        final int generation = ++bluetoothTrackingGeneration;
-        btConnectedAddrs.clear();
-        BluetoothAdapter adapter = getBluetoothAdapter();
-        if (adapter == null) return;
-        try {
-            if (!adapter.isEnabled()) {
-                btConnectedAddrs.clear();
-                return;
-            }
-        } catch (Throwable t) {
-            return;
-        }
-
-        seedConnectedFromBondedDevices(adapter);
-
-        BluetoothProfile.ServiceListener listener = new BluetoothProfile.ServiceListener() {
-            @Override
-            public void onServiceConnected(int profile, BluetoothProfile proxy) {
-                boolean current = generation == bluetoothTrackingGeneration
-                        && binding != null && prefs != null && prefs.widgetEnabled.get();
-                if (current) {
-                    try {
-                        for (BluetoothDevice d : proxy.getConnectedDevices()) {
-                            if (d != null && d.getAddress() != null) {
-                                btConnectedAddrs.add(d.getAddress());
-                            }
-                        }
-                    } catch (Throwable ignored) {
-                    }
-                }
-                try {
-                    adapter.closeProfileProxy(profile, proxy);
-                } catch (Throwable ignored) {
-                }
-                if (current) updateBluetoothStatus();
-            }
-
-            @Override
-            public void onServiceDisconnected(int profile) {
-            }
-        };
-        try {
-            adapter.getProfileProxy(this, listener, BluetoothProfile.HEADSET);
-            adapter.getProfileProxy(this, listener, BluetoothProfile.A2DP);
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to query Bluetooth profile proxies", t);
-        }
-    }
-
-    /**
-     * Synchronously populate {@link #btConnectedAddrs} from bonded devices via the hidden
-     * {@code BluetoothDevice.isConnected()} method. Safe to call repeatedly â€” the set is a
-     * union, so a stale entry would only be cleared by the ACL_DISCONNECTED broadcast or by
-     * a full Bluetooth-off transition.
-     */
-    private void seedConnectedFromBondedDevices(BluetoothAdapter adapter) {
-        java.lang.reflect.Method isConnected;
-        try {
-            isConnected = BluetoothDevice.class.getMethod("isConnected");
-        } catch (NoSuchMethodException nsm) {
-            return;
-        } catch (Throwable t) {
-            return;
-        }
-        Set<BluetoothDevice> bonded;
-        try {
-            bonded = adapter.getBondedDevices();
-        } catch (Throwable t) {
-            return;
-        }
-        if (bonded == null) return;
-        for (BluetoothDevice device : bonded) {
-            if (device == null || device.getAddress() == null) continue;
-            try {
-                Object result = isConnected.invoke(device);
-                if (result instanceof Boolean && (Boolean) result) {
-                    btConnectedAddrs.add(device.getAddress());
-                }
-            } catch (Throwable ignored) {
-            }
-        }
-    }
-
-    private void updateBluetoothStatus() {
-        BluetoothAdapter adapter = getBluetoothAdapter();
-        boolean enabled;
-        try {
-            enabled = adapter != null && adapter.isEnabled();
-        } catch (Throwable t) {
-            enabled = false;
-        }
-        BluetoothState newState;
-        if (!enabled) {
-            newState = BluetoothState.OFF;
-            btConnectedAddrs.clear();
-        } else if (btConnectedAddrs.isEmpty()) {
-            newState = BluetoothState.NO_DEVICE;
-        } else {
-            newState = BluetoothState.CONNECTED;
-        }
-        bluetoothState = newState;
-        if (binding != null) {
-            updateIconStatus(ICON_TYPE_BT, binding.bluetoothStatusIcon, bluetoothState.ordinal());
-            PhoneBluetoothIndicatorPolicy.Appearance phoneAppearance =
-                    PhoneBluetoothIndicatorPolicy.resolve(
-                            bluetoothState == BluetoothState.CONNECTED,
-                            hasSelectedPhoneConfiguration(),
-                            isPhoneNotificationPathAvailable());
-            if (phoneAppearance != PhoneBluetoothIndicatorPolicy.Appearance.DEFAULT) {
-                // One flat SF-style rune and one tint. ANCS readiness is intentionally not
-                // encoded by a separately coloured body/outline anymore.
-                binding.bluetoothStatusIcon.setImageResource(
-                        R.drawable.ic_status_iphone_bluetooth_solid);
-                binding.bluetoothStatusIcon.setDrawIcon(true);
-                Context context = themedContext == null ? this : themedContext;
-                ImageViewCompat.setImageTintList(binding.bluetoothStatusIcon,
-                        ColorStateList.valueOf(ContextCompat.getColor(
-                                context, R.color.status_bluetooth)));
-                binding.bluetoothStatusIcon.setOutlineWidth(0);
-            }
-        }
-        schedulePopupRefresh();
-    }
-
-    private boolean isPhoneConnectorLinkPresent() {
-        ConnectorValue connected = phoneStatusValues.get("connected");
-        return connected != null && connected.fresh && connected.available
-                && connected.readable && Boolean.TRUE.equals(connected.rawValue);
-    }
-
-    private boolean hasSelectedPhoneConfiguration() {
-        return prefs != null && !prefs.phoneDeviceAddress.get().trim().isEmpty();
-    }
-
-    /** A live ANCS subscription and a currently readable notification feed are both required. */
-    private boolean isPhoneNotificationPathAvailable() {
-        ConnectorValue profile = phoneStatusValues.get("profiles.ancs");
-        boolean profileActive = profile != null && profile.fresh && profile.available
-                && profile.readable && Boolean.TRUE.equals(profile.rawValue);
-        ConnectorValue notifications = phoneStatusValues.get("notifications.items");
-        boolean feedActive = notifications != null && notifications.fresh
-                && notifications.available && notifications.readable;
-        return phoneAncsReady && profileActive && feedActive;
-    }
-
-    private void updateForegroundAppTracking() {
-        boolean phoneTrackingNeeded = phoneNotificationForegroundTrackingNeeded();
-        phoneExternalOverlayActive = phoneTrackingNeeded
-                && WidgetAccessibilityService.hasMaterialExternalOverlay();
-        boolean surfaceVisibilityNeeded = StatusBarSurfaceContext.requiresPackageTracking(
-                hiddenInPackages) || anyBrickNeedsPackageTracking();
-        if (binding == null && !phoneTrackingNeeded && !surfaceVisibilityNeeded) {
-            mainHandler.removeCallbacks(foregroundAppCheckRunnable);
-            usageStatsManager = null;
-            lastForegroundPackage = null;
-            return;
-        }
-        boolean needTracking = surfaceVisibilityNeeded || phoneTrackingNeeded;
-        boolean accessibilityActive = WidgetAccessibilityService.getInstance() != null;
-        boolean usageGranted = Permissions.isUsageAccessGranted(this);
-        // Two paths to the foreground package:
-        //   - AccessibilityService (preferred): per-display data, multi-display safe.
-        //   - UsageStatsManager (fallback): global, single foreground across all displays.
-        // We only poll when neither path is being driven by events: the accessibility service
-        // pushes via {@link #onForegroundDisplayMapUpdated()}, no polling needed.
-        boolean shouldPoll = needTracking && !accessibilityActive && usageGranted;
-        if (needTracking && (accessibilityActive || usageGranted)) {
-            if (usageGranted && usageStatsManager == null) {
-                usageStatsManager = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
-            }
-            mainHandler.removeCallbacks(foregroundAppCheckRunnable);
-            if (shouldPoll) {
-                mainHandler.post(foregroundAppCheckRunnable);
-            }
-            // If accessibility just connected, recompute once now â€” we won't get an event
-            // until something actually changes on a display.
-            if (accessibilityActive) {
-                safeCheckForegroundApp("tracking path changed");
-            }
-        } else {
-            mainHandler.removeCallbacks(foregroundAppCheckRunnable);
-            usageStatsManager = null;
-            String fallbackPackage = StatusBarSurfaceContext.isLauncherHomeForeground()
-                    ? getPackageName() : null;
-            boolean packageChanged = !Objects.equals(
-                    lastForegroundPackage, fallbackPackage);
-            lastForegroundPackage = fallbackPackage;
-            // A synthetic HOME-only rule is fully event-driven and deliberately requires no
-            // package tracker, but it still owns current visibility during initial service bind.
-            applyOverlayVisibility(matchesForegroundContext(hiddenInPackages));
-            if (packageChanged) onPhoneNotificationForegroundChanged();
-        }
-    }
-
-    /**
-     * Called by {@link WidgetAccessibilityService} when the per-display foreground map changes.
-     * Recomputes visibility based on the package on <i>our</i> display.
-     */
-    public void onForegroundDisplayMapUpdated() {
-        if (ecarxNavigatorWindowObserver != null) {
-            ecarxNavigatorWindowObserver.refresh("accessibility-display-map");
-        }
-        mainHandler.post(() -> safeCheckForegroundApp("display map update"));
-    }
-
-    /** Event-driven signal for an application window above the foreground task. */
-    public void onExternalOverlayWindowStateChanged(boolean active) {
-        mainHandler.post(() -> {
-            if (destroyed || phoneExternalOverlayActive == active) return;
-            phoneExternalOverlayActive = active;
-            onPhoneNotificationForegroundChanged();
-        });
-    }
-
-    /** Event-driven lifecycle update for non-package targets such as our HOME Activity. */
-    public void onForegroundSurfaceContextChanged() {
-        boolean beganOptimisticConfirmation = false;
-        NavigatorWindowSourcePolicy.OptimisticAction optimisticAction =
-                NavigatorWindowSourcePolicy.optimisticActionAfterSurfaceChange(
-                        ecarxNavigatorOptimisticConfirmationPending,
-                        StatusBarSurfaceContext.isNavigatorWindowForeground(),
-                        StatusBarSurfaceContext.isNavigatorWindowOptimistic());
-        switch (optimisticAction) {
-            case START_OR_RESTART:
-                // A fresh successful startActivity hand-off owns a fresh bounded grace. The
-                // following exact TransparentSplash a11y event converts the fallback token but
-                // deliberately leaves this independent vendor confirmation running.
-                beginEcarxNavigatorOptimisticConfirmation();
-                beganOptimisticConfirmation = true;
-                break;
-            case CANCEL:
-                cancelEcarxNavigatorOptimisticConfirmation();
-                break;
-            case KEEP:
-            case IDLE:
-            default:
-                break;
-        }
-        if (!beganOptimisticConfirmation && ecarxNavigatorWindowObserver != null) {
-            // The app-owned launch/focus token is intentionally optimistic. Reconcile it with the
-            // real vendor frame after every transition, even on firmware that omits callbacks.
-            ecarxNavigatorWindowObserver.refresh("surface-context");
-        }
-        recomputeForegroundSurfacePresentation();
-    }
-
-    /** Applies both root and per-element rules without recursively requesting another snapshot. */
-    private void recomputeForegroundSurfacePresentation() {
-        Runnable update = () -> {
-            boolean packageChanged = false;
-            if (StatusBarSurfaceContext.isLauncherHomeForeground()
-                    && !effectiveNavigatorWindowForeground()) {
-                // API 28 deliberately ignores our own accessibility events. Replace a closed
-                // freeform Navigator's stale package immediately when HOME regains focus.
-                packageChanged = !getPackageName().equals(lastForegroundPackage);
-                lastForegroundPackage = getPackageName();
-            }
-            applyOverlayVisibility(matchesForegroundContext(hiddenInPackages));
-            if (packageChanged) onPhoneNotificationForegroundChanged();
-            if (binding != null) {
-                renderHomeAssistantBricks();
-                applyBrickVisibility(currentBrickSet());
-            }
-        };
-        // Launcher lifecycle callbacks already run on main. Applying inline avoids a one-loop
-        // flash of stale visibility while preserving a safe path for any future non-UI caller.
-        if (Looper.myLooper() == Looper.getMainLooper()) update.run();
-        else mainHandler.post(update);
-    }
-
-    /**
-     * Called by {@link WidgetAccessibilityService} when its connection state flips â€” connect
-     * or disconnect. Re-evaluates which foreground-tracking pipeline to use (accessibility
-     * push vs. UsageStats poll).
-     */
-    public void onForegroundTrackingPathChanged() {
-        mainHandler.post(() -> safeUpdateForegroundAppTracking("accessibility state"));
-    }
-
-    /** Vendor geometry is authoritative when available; UNKNOWN preserves the safe fallback. */
-    private void onEcarxNavigatorWindowStateChanged(
-            @NonNull NavigatorWindowFramePolicy.Result result) {
-        if (destroyed) return;
-        NavigatorWindowSourcePolicy.VendorDecision decision =
-                NavigatorWindowSourcePolicy.decisionFor(
-                        result, ecarxNavigatorOptimisticConfirmationPending,
-                        ecarxNavigatorWindowDecision);
-        mainHandler.removeCallbacks(ecarxNavigatorWindowLeaseExpiry);
-        if (decision == NavigatorWindowSourcePolicy.VendorDecision.NONE) {
-            ecarxNavigatorWindowDecision = decision;
-            ecarxNavigatorWindowDecisionAtElapsed = -1L;
-            recomputeForegroundSurfacePresentation();
-            return;
-        }
-
-        cancelEcarxNavigatorOptimisticConfirmation();
-        ecarxNavigatorWindowDecision = decision;
-        ecarxNavigatorWindowDecisionAtElapsed = SystemClock.elapsedRealtime();
-        mainHandler.postDelayed(ecarxNavigatorWindowLeaseExpiry,
-                ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS + 1L);
-
-        // startActivity's optimistic token led us here, but it must not outlive the independent
-        // vendor lease. Transfer ownership by consuming only the pre-existing fallback assertion;
-        // a later accessibility/lifecycle event remains free to publish a fresh fallback.
-        StatusBarSurfaceContext.consumeNavigatorWindowFallback();
-        recomputeForegroundSurfacePresentation();
-    }
-
-    private void beginEcarxNavigatorOptimisticConfirmation() {
-        ecarxNavigatorOptimisticConfirmationPending = true;
-        ecarxNavigatorOptimisticStartedAtElapsed = SystemClock.elapsedRealtime();
-        ecarxNavigatorOptimisticRetryIndex = 0;
-        mainHandler.removeCallbacks(ecarxNavigatorOptimisticRetry);
-        mainHandler.removeCallbacks(ecarxNavigatorOptimisticExpiry);
-        mainHandler.removeCallbacks(ecarxNavigatorWindowLeaseExpiry);
-        ecarxNavigatorWindowDecision = NavigatorWindowSourcePolicy.VendorDecision.NONE;
-        ecarxNavigatorWindowDecisionAtElapsed = -1L;
-        mainHandler.post(ecarxNavigatorOptimisticRetry);
-        mainHandler.postDelayed(ecarxNavigatorOptimisticExpiry,
-                ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS + 1L);
-    }
-
-    private void runEcarxNavigatorOptimisticRetry() {
-        if (destroyed || !ecarxNavigatorOptimisticConfirmationPending) return;
-        long age = SystemClock.elapsedRealtime() - ecarxNavigatorOptimisticStartedAtElapsed;
-        if (age < 0L || age > ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS) return;
-        if (ecarxNavigatorOptimisticRetryIndex
-                >= ECARX_NAVIGATOR_OPTIMISTIC_RETRY_OFFSETS_MS.length) return;
-        int attempt = ecarxNavigatorOptimisticRetryIndex++;
-        if (ecarxNavigatorWindowObserver != null) {
-            ecarxNavigatorWindowObserver.refresh("optimistic-confirmation-" + attempt);
-        }
-        if (ecarxNavigatorOptimisticRetryIndex
-                < ECARX_NAVIGATOR_OPTIMISTIC_RETRY_OFFSETS_MS.length) {
-            long nextOffset = ECARX_NAVIGATOR_OPTIMISTIC_RETRY_OFFSETS_MS[
-                    ecarxNavigatorOptimisticRetryIndex];
-            mainHandler.postDelayed(ecarxNavigatorOptimisticRetry,
-                    Math.max(1L, nextOffset - age));
-        }
-    }
-
-    private void cancelEcarxNavigatorOptimisticConfirmation() {
-        ecarxNavigatorOptimisticConfirmationPending = false;
-        ecarxNavigatorOptimisticStartedAtElapsed = -1L;
-        ecarxNavigatorOptimisticRetryIndex = 0;
-        mainHandler.removeCallbacks(ecarxNavigatorOptimisticRetry);
-        mainHandler.removeCallbacks(ecarxNavigatorOptimisticExpiry);
-    }
-
-    private void expireEcarxNavigatorOptimisticConfirmation() {
-        if (destroyed || !ecarxNavigatorOptimisticConfirmationPending) return;
-        long age = SystemClock.elapsedRealtime() - ecarxNavigatorOptimisticStartedAtElapsed;
-        if (age >= 0L && age <= ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS) {
-            mainHandler.postDelayed(ecarxNavigatorOptimisticExpiry,
-                    ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS - age + 1L);
-            return;
-        }
-        cancelEcarxNavigatorOptimisticConfirmation();
-        boolean consumedLaunchAssertion =
-                StatusBarSurfaceContext.consumeNavigatorWindowOptimistic();
-        if (!consumedLaunchAssertion
-                && StatusBarSurfaceContext.isNavigatorWindowForeground()
-                && ecarxNavigatorWindowObserver != null) {
-            // TransparentSplash a11y may already have converted the launch marker into an exact
-            // fallback assertion. At the end of the vendor grace, actively re-query once more so
-            // two confirmed ABSENT samples can bound that fallback too; UNKNOWN still fails back
-            // to the exact accessibility evidence.
-            ecarxNavigatorWindowObserver.refresh("optimistic-expiry");
-        }
-        try {
-            DiagnosticJournal.warn("navigator-window", "optimistic confirmation expired");
-        } catch (RuntimeException | LinkageError ignored) {}
-        recomputeForegroundSurfacePresentation();
-    }
-
-    private boolean effectiveNavigatorWindowForeground() {
-        return NavigatorWindowSourcePolicy.effectiveWindow(
-                StatusBarSurfaceContext.isNavigatorWindowForeground(),
-                ecarxNavigatorWindowDecision, ecarxNavigatorWindowDecisionAtElapsed,
-                SystemClock.elapsedRealtime(), ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS);
-    }
-
-    private boolean hasLiveEcarxNavigatorWindowConfirmation() {
-        return ecarxNavigatorWindowDecision
-                == NavigatorWindowSourcePolicy.VendorDecision.WINDOWED
-                && NavigatorWindowSourcePolicy.isLive(
-                        ecarxNavigatorWindowDecision, ecarxNavigatorWindowDecisionAtElapsed,
-                        SystemClock.elapsedRealtime(), ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS);
-    }
-
-    /** Active expiry is required: with a dead Binder there may be no event to trigger a lazy read. */
-    private void expireEcarxNavigatorWindowLease() {
-        if (destroyed || ecarxNavigatorWindowDecision
-                == NavigatorWindowSourcePolicy.VendorDecision.NONE) return;
-        long now = SystemClock.elapsedRealtime();
-        long age = now - ecarxNavigatorWindowDecisionAtElapsed;
-        if (age >= 0L && age <= ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS) {
-            mainHandler.postDelayed(ecarxNavigatorWindowLeaseExpiry,
-                    ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS - age + 1L);
-            return;
-        }
-        ecarxNavigatorWindowDecision = NavigatorWindowSourcePolicy.VendorDecision.NONE;
-        ecarxNavigatorWindowDecisionAtElapsed = -1L;
-        try {
-            DiagnosticJournal.warn("navigator-window", "vendor confirmation lease expired");
-        } catch (RuntimeException | LinkageError ignored) {}
-        recomputeForegroundSurfacePresentation();
-    }
-
-    private void safeCheckForegroundApp(@NonNull String operation) {
-        try {
-            checkForegroundApp();
-        } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
-            reportForegroundFailure(operation, failure);
-        }
-    }
-
-    private void safeUpdateForegroundAppTracking(@NonNull String operation) {
-        try {
-            updateForegroundAppTracking();
-        } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
-            reportForegroundFailure(operation, failure);
-        }
-    }
-
-    private void reportForegroundFailure(@NonNull String operation,
-                                         @NonNull Throwable failure) {
-        if (failure instanceof OutOfMemoryError) return;
-        long now = SystemClock.elapsedRealtime();
-        if (lastForegroundFailureLogElapsed != 0L
-                && now - lastForegroundFailureLogElapsed < FOREGROUND_FAILURE_LOG_INTERVAL_MS) {
-            return;
-        }
-        lastForegroundFailureLogElapsed = now;
-        String detail = operation + " rejected " + failure.getClass().getSimpleName();
-        try { Log.w(TAG, detail); }
-        catch (RuntimeException | LinkageError ignored) {}
-        try { DiagnosticJournal.warn("navigator-foreground", detail); }
-        catch (RuntimeException | LinkageError ignored) {}
-    }
-
-    private void checkForegroundApp() {
-        if (!StatusBarSurfaceContext.requiresPackageTracking(hiddenInPackages)
-                && !anyBrickNeedsPackageTracking()
-                && !phoneNotificationForegroundTrackingNeeded()) return;
-
-        WidgetAccessibilityService a11y = WidgetAccessibilityService.getInstance();
-        String latestPackage;
-        if (a11y != null) {
-            // Display-aware: look up the foreground package on our overlay's display only.
-            // If the accessibility framework hasn't reported anything for that display yet,
-            // fall through to the UsageStats path so we're not blind on first start.
-            int myDisplayId = currentOverlayDisplayId();
-            latestPackage = a11y.getForegroundPackageOnDisplay(myDisplayId);
-            if (latestPackage == null && usageStatsManager != null
-                    && Permissions.isUsageAccessGranted(this)) {
-                latestPackage = latestPackageFromUsageStats();
-            }
-        } else {
-            // Global path â€” works on single-display devices.
-            if (usageStatsManager == null) return;
-            if (!Permissions.isUsageAccessGranted(this)) {
-                updateForegroundAppTracking();
-                return;
-            }
-            latestPackage = latestPackageFromUsageStats();
-        }
-        if (latestPackage == null) return;
-        if (StatusBarSurfaceContext.isNavigatorWindowForeground()
-                && !hasLiveEcarxNavigatorWindowConfirmation()
-                && !ecarxNavigatorOptimisticConfirmationPending
-                && !StatusBarSurfaceContext.isYandexPackage(latestPackage)) {
-            // UsageStats has no Activity class and may lag behind a slow freeform hand-off, so it
-            // cannot cancel the independent launch grace. Once that grace has ended it can still
-            // prove that the floating surface is no longer topmost and prevent a fallback token
-            // from leaking into the next ordinary application.
-            StatusBarSurfaceContext.setNavigatorWindowForeground(false);
-        }
-
-        boolean changed = !latestPackage.equals(lastForegroundPackage);
-        lastForegroundPackage = latestPackage;
-        applyOverlayVisibility(matchesForegroundContext(hiddenInPackages));
-        if (changed) {
-            onPhoneNotificationForegroundChanged();
-            if (binding != null) {
-                renderHomeAssistantBricks();
-                applyBrickVisibility(currentBrickSet());
-            }
-        }
-    }
-
-    /** Display ID our overlay's window is attached to. Defaults to {@code DEFAULT_DISPLAY}
-     *  if we can't determine it (single-display devices or pre-attach). */
-    private int currentOverlayDisplayId() {
-        if (binding == null) return android.view.Display.DEFAULT_DISPLAY;
-        android.view.Display display = binding.getRoot().getDisplay();
-        return display != null ? display.getDisplayId() : android.view.Display.DEFAULT_DISPLAY;
-    }
-
-    /** Extracts the most recent foreground package from {@link UsageStatsManager}. Null if
-     *  nothing was reported in the lookback window. */
-    @Nullable
-    private String latestPackageFromUsageStats() {
-        if (usageStatsManager == null) return null;
-        long now = System.currentTimeMillis();
-        UsageEvents events = usageStatsManager.queryEvents(now - FOREGROUND_APP_LOOKBACK_MS, now);
-        UsageEvents.Event event = new UsageEvents.Event();
-        String latest = lastForegroundPackage;
-        long latestTimestamp = 0;
-        while (events.getNextEvent(event)) {
-            int type = event.getEventType();
-            if (type == UsageEvents.Event.MOVE_TO_FOREGROUND
-                    || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                            && type == UsageEvents.Event.ACTIVITY_RESUMED)) {
-                if (event.getTimeStamp() >= latestTimestamp) {
-                    latestTimestamp = event.getTimeStamp();
-                    latest = event.getPackageName();
-                }
-            }
-        }
-        return latest;
-    }
-
-    private void applyOverlayVisibility(boolean hide) {
-        if (overlayHiddenByApp == hide) {
-            return;
-        }
-        overlayHiddenByApp = hide;
-        if (binding == null) return;
-        View root = binding.getRoot();
-        root.animate().cancel();
-        if (hide) {
-            // Animate to fully transparent, then collapse so the window stops occupying space.
-            root.animate()
-                    .alpha(0f)
-                    .setDuration(OVERLAY_FADE_DURATION_MS)
-                    .withEndAction(() -> {
-                        if (overlayHiddenByApp) root.setVisibility(View.GONE);
-                    })
-                    .start();
-        } else {
-            // The animate().cancel() above leaves alpha at whatever it was mid-animation;
-            // start the fade-in from the current value to its target of 1f.
-            root.setVisibility(View.VISIBLE);
-            root.animate()
-                    .alpha(1f)
-                    .setDuration(OVERLAY_FADE_DURATION_MS)
-                    .start();
-        }
-    }
-
-    private void updateBackground() {
-        if (binding == null) {
-            return;
-        }
-        if (themedContext == null) {
-            updateThemedContext();
-        }
-        // Read from the inner container, which is where the background drawable lives and what
-        // TransitionManager animates. Reading from getRoot() would, during a visibility
-        // transition, briefly return the screen-width window buffer and cap maxRadius too high.
-        int width = binding.overlayContainer.getWidth();
-        int height = binding.overlayContainer.getHeight();
-        if (width == 0 || height == 0) {
-            return;
-        }
-        int maxRadius = Math.min(width, height) / 2;
-        int backgroundCornerRadius = (prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR)
-                ? 0
-                : maxRadius * prefs.backgroundCornerRadius.get() / 100;
-        int backgroundColor = ContextCompat.getColor(themedContext, R.color.widget_background) & 0x00FFFFFF | (prefs.backgroundAlpha.get() << 24);
-        binding.overlayContainer.setBackground(getBackground(backgroundColor, backgroundCornerRadius));
-    }
-
-    private Drawable getBackground(int color, int cornerRadius) {
-        if (this.background == null || color != this.bgColor || cornerRadius != this.bgCornerRadius) {
-            this.background = new GradientDrawable();
-            this.background.setColor(color);
-            this.background.setCornerRadius(cornerRadius);
-            this.bgColor = color;
-            this.bgCornerRadius = cornerRadius;
-        }
-
-        return this.background;
-    }
-
-    private void updateDateTime() {
-        if (binding == null) return;
-        Set<BrickType> bricks = EnumSet.noneOf(BrickType.class);
-        bricks.addAll(BrickType.parseOrder(prefs.brickOrder.get()));
-        boolean showTime = bricks.contains(BrickType.TIME) || isPopupBuiltinRequested(BrickType.TIME);
-        boolean dateBrickActive = bricks.contains(BrickType.DATE)
-                || isPopupBuiltinRequested(BrickType.DATE);
-        boolean showDate = dateBrickActive && prefs.date.showDate.get();
-        boolean showDayOfTheWeek = dateBrickActive && prefs.date.showDayOfWeek.get();
-
-        if (!showTime && !showDate && !showDayOfTheWeek) {
-            return;
-        }
-
-        boolean showFullDayAndMonth = prefs.date.showFullName.get();
-
-        String divider = (showDate && showDayOfTheWeek) ? (prefs.date.oneLineLayout.get() ? "," : " \n") : "";
-        String dayOfTheWeekFormatStr = showFullDayAndMonth ? "EEEE" : "EEE";
-        String dateFormatStr = showFullDayAndMonth ? "d MMMM" : "d MMM";
-
-        // We add spaces at the start/end to avoid outline cropping by canvas which is not ready for the outline
-        String dayPart = showDayOfTheWeek ? " " + dayOfTheWeekFormatStr : "";
-        String datePart = showDate ? " " + dateFormatStr : "";
-        String fullFormatStr = prefs.date.dateBeforeDayOfWeek.get()
-                ? datePart + (showDate && showDayOfTheWeek ? divider : "") + dayPart + " "
-                : dayPart + (showDate && showDayOfTheWeek ? divider : "") + datePart + " ";
-
-        if (!fullFormatStr.equals(currentDateFormatPattern)) {
-            dateFormat = new SimpleDateFormat(fullFormatStr, Locale.getDefault());
-            currentDateFormatPattern = fullFormatStr;
-        }
-
-        Date now = new Date();
-        if (showTime) {
-            String timeStr = timeFormat.format(now);
-            if (!timeStr.contentEquals(binding.timeText.getText())) {
-                binding.timeText.setText(timeStr);
-            }
-        }
-        if (showDate || showDayOfTheWeek) {
-            String dateStr = dateFormat.format(now);
-            if (!dateStr.contentEquals(binding.dateText.getText())) {
-                binding.dateText.setText(dateStr);
-            }
-        }
-        schedulePopupRefresh();
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
-    private void setupDragListener() {
-        binding.getRoot().setOnTouchListener((v, event) -> {
-            WindowManager.LayoutParams params = (WindowManager.LayoutParams) binding.getRoot().getLayoutParams();
-
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    initialX = params.x;
-                    initialY = params.y;
-                    initialTouchX = event.getRawX();
-                    initialTouchY = event.getRawY();
-                    return true;
-
-                case MotionEvent.ACTION_MOVE:
-                    if (prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR) {
-                        // Pinned to (0, 0) full-width â€” drag is disabled, but consume the event so
-                        // ACTION_UP still arrives for click handling.
-                        return true;
-                    }
-                    params.x = initialX + (int) (event.getRawX() - initialTouchX);
-                    params.y = initialY + (int) (event.getRawY() - initialTouchY);
-                    windowManager.updateViewLayout(binding.getRoot(), params);
-                    notifyOverlayState();
-                    return true;
-
-                case MotionEvent.ACTION_UP:
-                    if (prefs.widgetMode.get() != WIDGET_MODE_STATUS_BAR) {
-                        savePosition();
-                    }
-
-                    // Handle click
-                    if (Math.abs(event.getRawX() - initialTouchX) < touchSlop && Math.abs(event.getRawY() - initialTouchY) < touchSlop) {
-                        if (binding.wifiStatusIcon.getVisibility() == View.VISIBLE &&
-                                getBounds(binding.wifiStatusIcon).contains((int) event.getX(), (int) event.getY())) {
-                            Intent intent = new Intent(Settings.ACTION_WIFI_SETTINGS);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            safeStartActivity(intent);
-                            return true;
-                        }
-                        if (binding.gnssStatusIcon.getVisibility() == View.VISIBLE &&
-                                getBounds(binding.gnssStatusIcon).contains((int) event.getX(), (int) event.getY())) {
-                            Intent intent = getPackageManager().getLaunchIntentForPackage(GNSSSHARE_CLIENT_PACKAGE);
-                            if (intent == null) {
-                                intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                            }
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            safeStartActivity(intent);
-                            return true;
-                        }
-
-                        startMainActivity();
-                    }
-                    return true;
-            }
-            return false;
-        });
-    }
-
-    private void startMainActivity() {
-        Intent startIntent = new Intent(WidgetService.this, MainActivity.class);
-        startIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-        safeStartActivity(startIntent);
-    }
-
-    /**
-     * Some car head units don't ship the system Wi-Fi / location / app-info activities at all,
-     * so launching them from the overlay throws ActivityNotFoundException and tears down the
-     * service process. Swallow the failure â€” the icon tap is non-essential.
-     */
-    private void safeStartActivity(Intent intent) {
-        try {
-            startActivity(intent);
-        } catch (Throwable t) {
-            Log.w(TAG, "startActivity failed for " + intent.getAction(), t);
-        }
-    }
-
-    private void setWifiStatus(WiFiState newState) {
-        if (destroyed || binding == null || prefs == null || !prefs.widgetEnabled.get()) return;
-        if (wifiState == newState) return;
-        wifiState = newState;
-        if (newState == WiFiState.OFF) wifiSignalLevel = 0;
-        else wifiSignalLevel = readWifiSignalLevel();
-        updateWifiStatus();
-    }
-
-    private void updateWifiStatus() {
-        if (binding != null) {
-            OutlineImageView icon = binding.wifiStatusIcon;
-            icon.setImageResource(R.drawable.ic_status_iphone_wifi_level);
-            icon.setImageLevel(wifiSignalLevel * 2500);
-            icon.setDrawIcon(true);
-            ImageViewCompat.setImageTintList(icon, null);
-            applyConfiguredIconOutline(icon, prefs.wifi);
-            icon.setBadgeText(null, 0, 0);
-            if (wifiState == WiFiState.LIMITED_INTERNET) {
-                Drawable flag = ContextCompat.getDrawable(this, R.drawable.ic_badge_ru_flag);
-                icon.setBadgeDrawable(flag == null ? null : flag.mutate());
-            } else {
-                icon.setBadgeDrawable(null);
-            }
-        }
-        schedulePopupRefresh();
-    }
-
-    private void refreshWifiSignalLevel() {
-        int next = wifiState == WiFiState.OFF ? 0 : readWifiSignalLevel();
-        if (next == wifiSignalLevel) return;
-        wifiSignalLevel = next;
-        updateWifiStatus();
-    }
-
-    private int readWifiSignalLevel() {
-        try {
-            WifiManager manager = (WifiManager) getApplicationContext()
-                    .getSystemService(Context.WIFI_SERVICE);
-            WifiInfo info = manager == null ? null : manager.getConnectionInfo();
-            if (info == null || info.getNetworkId() < 0) return 0;
-            return Math.max(1, Math.min(4,
-                    WifiManager.calculateSignalLevel(info.getRssi(), 4) + 1));
-        } catch (RuntimeException unavailable) {
-            Log.w(TAG, "Could not read Wi-Fi RSSI", unavailable);
-            return wifiState == WiFiState.OFF ? 0 : 1;
-        }
-    }
-
-    private void setGnssStatus(GnssState newState) {
-        if (destroyed || binding == null || prefs == null || !prefs.widgetEnabled.get()) return;
-        if (gnssState == newState) {
-            return;
-        }
-        gnssState = newState;
-        updateGnssStatus();
-    }
-
-    private void updateGnssStatus() {
-        if (binding != null) {
-            updateIconStatus(ICON_TYPE_GNSS, binding.gnssStatusIcon, gnssState.ordinal());
-        }
-        schedulePopupRefresh();
-    }
-
-    private void updateIconStatus(int iconType, OutlineImageView icon, int state) {
-        int designIdx = Math.min(Math.max(0, prefs.iconDesign.get()), ICON_DESIGNS.length - 1);
-        int[][] design = ICON_DESIGNS[designIdx];
-        int stateIdx = Math.min(Math.max(0, state), design[iconType].length - 1);
-        icon.setImageResource(design[iconType][stateIdx]);
-        icon.setDrawIcon(true);
-
-        int iconStyle = Math.min(Math.max(0, prefs.iconStyle.get()), 1);
-        int[] colorRes;
-        Preferences.IconBrickPrefs iconPrefs;
-        switch (iconType) {
-            case ICON_TYPE_GNSS:
-                colorRes = GNSS_STATE_COLOR_RES;
-                iconPrefs = prefs.gps;
-                break;
-            case ICON_TYPE_BT:
-                colorRes = BT_STATE_COLOR_RES;
-                iconPrefs = prefs.bluetooth;
-                break;
-            case ICON_TYPE_WIFI:
-            default:
-                colorRes = WIFI_STATE_COLOR_RES;
-                iconPrefs = prefs.wifi;
-                break;
-        }
-        // themedContext is momentarily null between onConfigurationChanged (which invalidates it)
-        // and the next applyPreferences that rebuilds it. A status update landing in that window
-        // must not crash, so fall back to the service context (matches the guard at getOutlineColor).
-        Context ctx = themedContext != null ? themedContext : this;
-        int tint = (iconStyle == STYLE_COLOR)
-                ? ContextCompat.getColor(ctx, colorRes[stateIdx])
-                : ContextCompat.getColor(ctx, R.color.text_primary);
-        // Skip the no-op tint set: applyImageTint invalidates the drawable unconditionally,
-        // and this runs on every periodic status broadcast.
-        ColorStateList currentTint = ImageViewCompat.getImageTintList(icon);
-        if (currentTint == null || currentTint.getDefaultColor() != tint) {
-            ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(tint));
-        }
-
-        applyConfiguredIconOutline(icon, iconPrefs);
-
-        // Whitelist (Russian-only internet) â€” overlay a small flag badge regardless of style.
-        if (iconType == ICON_TYPE_WIFI && stateIdx == WiFiState.LIMITED_INTERNET.ordinal()) {
-            Drawable flag = ContextCompat.getDrawable(this, R.drawable.ic_badge_ru_flag);
-            // mutate() ensures setBounds() doesn't affect a shared cached instance.
-            icon.setBadgeDrawable(flag != null ? flag.mutate() : null);
-        } else {
-            icon.setBadgeDrawable(null);
-        }
-
-        // Text badge: GNSS satellite count / DR / spoof marker for GPS, connected-device count
-        // for Bluetooth.
-        String badgeText = null;
-        int badgeBg = 0;
-        // Foreground defaults to the widget text colour (flips with the theme, pairs with the
-        // style-driven backgrounds below); the coloured GNSS markers override it to a fixed dark
-        // ink so the label stays legible on their amber / red pills (white on amber is ~1.9:1).
-        int badgeFg = ContextCompat.getColor(ctx, R.color.text_outline) | 0xFF000000;
-        // Default badge background follows the icon's own colouring; the GNSS markers override it
-        // below with a fixed semantic colour so the meaning reads the same in both icon styles.
-        int styleBg = (iconStyle == STYLE_COLOR)
-                ? ContextCompat.getColor(ctx, colorRes[stateIdx])
-                : ContextCompat.getColor(ctx, R.color.text_primary);
-        if (iconType == ICON_TYPE_GNSS && prefs.gps.showSatelliteBadge.get()
-                && android.os.SystemClock.uptimeMillis() - satellitesCountTimestamp < GNSSSHARE_SATELLITE_STATUS_TIMEOUT_MS) {
-            // Two independent flags: dead reckoning drives the text, spoofing drives the colour,
-            // so both read off the same pill (e.g. "DR" on red = fell back to DR because of a spoof).
-            boolean deadReckoning = (gnssModeFlags & GNSSSHARE_MODE_DR) != 0;
-            boolean spoofDetected = (gnssModeFlags & GNSSSHARE_MODE_SPOOF) != 0;
-            if (deadReckoning) {
-                badgeText = getString(R.string.gnss_dr_badge);
-            } else if (spoofDetected) {
-                // Spoofing but still on GPS: show the marker, not the count â€” the count is
-                // untrustworthy under a spoof and may be absent (some clients report -1).
-                badgeText = getString(R.string.gnss_spoof_badge);
-            } else if (satellitesCount > 0) {
-                badgeText = String.valueOf(satellitesCount);
-            }
-            if (badgeText != null) {
-                if (spoofDetected) {
-                    // Spoofing detected â€” red, whether we're on DR or still on GPS.
-                    badgeBg = ContextCompat.getColor(ctx, R.color.status_error);
-                    badgeFg = ContextCompat.getColor(ctx, R.color.status_badge_text);
-                } else if (deadReckoning) {
-                    // Dead reckoning without a spoof â€” amber (degraded, not an attack).
-                    badgeBg = ContextCompat.getColor(ctx, R.color.status_warning);
-                    badgeFg = ContextCompat.getColor(ctx, R.color.status_badge_text);
-                } else {
-                    badgeBg = styleBg;
-                }
-            }
-        } else if (iconType == ICON_TYPE_BT && prefs.bluetooth.showDeviceCountBadge.get()
-                && bluetoothState == BluetoothState.CONNECTED && !btConnectedAddrs.isEmpty()) {
-            badgeText = String.valueOf(btConnectedAddrs.size());
-            badgeBg = styleBg;
-        }
-        if (badgeText != null) {
-            icon.setBadgeText(badgeText, badgeBg, badgeFg);
-        } else {
-            icon.setBadgeText(null, 0, 0);
-        }
-    }
-
-    private void applyConfiguredIconOutline(@NonNull OutlineImageView icon,
-                                            @NonNull Preferences.IconBrickPrefs iconPrefs) {
-        Context context = themedContext != null ? themedContext : this;
-        int outlineAlpha = Math.max(0, Math.min(255, iconPrefs.outlineAlpha.get()));
-        if (outlineAlpha <= 0) {
-            icon.setOutlineWidth(0);
-            return;
-        }
-        int haloColor = (ContextCompat.getColor(context, R.color.text_outline) & 0x00FFFFFF)
-                | (outlineAlpha << 24);
-        icon.setOutlineColor(haloColor);
-        icon.setOutlineWidth(iconPrefs.outlineWidth.get());
-    }
-
-    // Wi-Fi state colours by ordinal (OFF, NO_INTERNET, LIMITED_INTERNET, INTERNET).
-    private static final int[] WIFI_STATE_COLOR_RES = {
-            R.color.status_off,
-            R.color.status_error,
-            R.color.status_warning,
-            R.color.status_ok
-    };
-    // GNSS state colours by ordinal (OFF, BAD, GOOD).
-    private static final int[] GNSS_STATE_COLOR_RES = {
-            R.color.status_off,
-            R.color.status_warning,
-            R.color.status_ok
-    };
-    // Bluetooth state colours by ordinal (OFF, NO_DEVICE, CONNECTED).
-    private static final int[] BT_STATE_COLOR_RES = {
-            R.color.status_off,
-            R.color.status_off,
-            R.color.status_bluetooth
-    };
-
-    private void createNotificationChannel() {
-        NotificationChannel serviceChannel = new NotificationChannel(CHANNEL_ID, getString(R.string.notification_channel_title), NotificationManager.IMPORTANCE_LOW);
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        if (manager != null) {
-            manager.createNotificationChannel(serviceChannel);
-        }
-    }
-
-    private Notification createNotification() {
-        Intent notificationIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-
-        return new NotificationCompat.Builder(this, CHANNEL_ID).setContentTitle(getString(R.string.app_name)).setContentText(getString(R.string.notification_content)).setSmallIcon(R.drawable.ic_status_iphone_gps_active).setContentIntent(pendingIntent).setOngoing(true).build();
-    }
-
-    private void savePosition() {
-        if (params != null) {
-            prefs.overlayX.set(params.x);
-            prefs.overlayY.set(params.y);
-        }
-    }
-
-
-    @Override
-    public void onDestroy() {
-        destroyed = true;
-        instance = null;
-        automationPresentationListeners.clear();
-        // A first-useful-surface event may have been waiting solely for this host's readiness.
-        // Once the host is gone, let Application finish its immediate event-driven initialization.
-        StatusWidgetApplication.resumeSurfaceOwnedInitialization(this);
-        long ownerToken = startupStateOwnerToken;
-        if (ownerToken != 0L) {
-            STARTUP_STATE_OWNER.compareAndSet(ownerToken, ownerToken + 1L);
-            startupStateOwnerToken = 0L;
-        }
-        if (!runtimeInitialized) {
-            stopForeground(true);
-            super.onDestroy();
-            return;
-        }
-        if (ecarxNavigatorWindowObserver != null) {
-            ecarxNavigatorWindowObserver.stop();
-            ecarxNavigatorWindowObserver = null;
-        }
-        mainHandler.removeCallbacks(ecarxNavigatorWindowLeaseExpiry);
-        cancelEcarxNavigatorOptimisticConfirmation();
-        ecarxNavigatorWindowDecision = NavigatorWindowSourcePolicy.VendorDecision.NONE;
-        ecarxNavigatorWindowDecisionAtElapsed = -1L;
-        integrationStartupScheduled = false;
-        cancelDeferredIntegrationStart();
-        startupStateWorker.shutdownNow();
-        initialIntegrationWorkerInFlight = false;
-        PreparedInitialIntegrationStage unpublished =
-                pendingInitialIntegrationStage.getAndSet(null);
-        if (unpublished != null) discardPreparedInitialIntegrationStage(unpublished);
-
-        mainHandler.removeCallbacksAndMessages(null);
-
-        // Unregister derived listeners first. Connector shutdown emits synchronous stale events;
-        // with the guards above and no scenario/popup listeners left, none can recreate a window.
-        if (connectorValues != null) {
-            connectorValues.removeListener(phoneStatusListener);
-            connectorValues.removeListener(crossSourceRuleListener);
-        }
-        phoneStatusValues.clear();
-        observedPhoneNotificationKeys.clear();
-        queuedPhoneNotifications.clear();
-        deferredPhoneNotifications.clear();
-        queuedPhoneNotificationOverflowCount = 0;
-        deferredPhoneNotificationOverflowCount = 0;
-        deferredPhoneNotificationOverflowStartedElapsed = 0L;
-        pendingIntentScenarioCommands.clear();
-        phoneNotificationBurstActive = false;
-        phoneAncsReady = false;
-        activePhoneNotification = null;
-        activePhoneNotificationFields = Collections.emptySet();
-        activePhoneBatteryAlertText = null;
-        activePhoneBatteryAlertColor = null;
-        phoneLowBatteryAlertLatched = false;
-        phoneLowBatteryAlertLatched2 = false;
-        phoneExternalOverlayActive = false;
-        activePhoneNotificationExpiresAt = 0L;
-        activePhonePopupNotificationExpiresAt = 0L;
-        activePhoneLowBatteryPopup = false;
-        phoneNotificationPopupConfigured = false;
-        crossSourceRuleRefreshScheduled.set(false);
-        synchronized (automationUiLock) {
-            pendingAutomationUi.clear();
-            automationUiRefreshScheduled = false;
-        }
-        if (intentScenarioController != null) {
-            runCleanupStep("intent scenarios", intentScenarioController::destroy);
-        }
-        intentScenarioController = null;
-        if (scenarioController != null) {
-            runCleanupStep("visual scenarios", scenarioController::destroy);
-        }
-        scenarioController = null;
-        if (popupOverlay != null) runCleanupStep("popup overlays", popupOverlay::destroy);
-        popupOverlay = null;
-        // Keep Sprut alive until both the exact-device disconnect callback and the exporter's
-        // final compensating OFF have been submitted.
-        if (phoneController != null) {
-            runCleanupStep("phone", phoneController::stop);
-        }
-        phoneController = null;
-        if (phonePresenceExporter != null) {
-            runCleanupStep("phone presence", phonePresenceExporter::stop);
-        }
-        phonePresenceExporter = null;
-        if (phoneAncsPresenceExporter != null) {
-            runCleanupStep("phone ANCS presence", phoneAncsPresenceExporter::stop);
-        }
-        phoneAncsPresenceExporter = null;
-        boolean carRuntimeWasInitialized = carTelemetryExporter != null;
-        if (carRuntimeWasInitialized) {
-            runCleanupStep("car telemetry", carTelemetryExporter::stop);
-        }
-        carTelemetryExporter = null;
-        if (mqttController != null) runCleanupStep("MQTT", mqttController::stop);
-        mqttController = null;
-        if (sprutController != null) runCleanupStep("Sprut.hub", sprutController::stop);
-        sprutController = null;
-        if (haApiController != null) {
-            runCleanupStep("Home Assistant", haApiController::stop);
-        }
-        haApiController = null;
-        actionDispatcher = null;
-        mainHandler.removeCallbacksAndMessages(null);
-
-        removeStatusOverlaySafely("service shutdown");
-        binding = null;
-        params = null;
-
-        stopLocationTracking();
-        stopConnectivityTracking();
-
-        if (reachabilityChecker != null) {
-            ReachabilityChecker checker = reachabilityChecker;
-            reachabilityChecker = null;
-            runCleanupStep("reachability checker", checker::shutdown);
-        }
-
-        unregisterSatelliteStatusReceiver();
-        unregisterBluetoothReceiver();
-        runCleanupStep("media tracking", this::disableMediaTracking);
-        // Drop car sensor subscriptions but keep the process-wide integration alive â€” the
-        // settings UI may still query isBrickSupported after the overlay service stops.
-        if (carRuntimeWasInitialized) {
-            runCleanupStep("car sensor subscriptions", () -> {
-                CarIntegration car = CarIntegrations.get(this);
-                car.setAvailabilityChangedListener(null);
-                car.unsubscribe(BrickType.INDOOR_TEMP);
-                car.unsubscribe(BrickType.OUTDOOR_TEMP);
-            });
-        }
-        super.onDestroy();
-    }
-
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    public static WidgetService getInstance() {
-        return instance;
-    }
-
-    public static boolean isRunning() {
-        return instance != null;
-    }
-
-    boolean isIntegrationRuntimeReadyForApplication() {
-        return !destroyed && integrationsStarted;
-    }
-
-    /** Current live ANCS subscription, used by driver rows that explicitly opt into this gate. */
-    public boolean isPhoneAncsReady() {
-        return !destroyed && phoneAncsReady;
-    }
-
-    /**
-     * Read-only same-process geometry for HOME safe-area calculation.
-     *
-     * <p>The returned value is the actual measured top-row window, not a duplicated estimate
-     * from font/icon settings. Zero means that no status-bar-mode overlay currently occupies the
-     * top edge.</p>
-     */
-    public int getStatusBarOverlayHeight() {
-        if (destroyed || prefs == null || !prefs.widgetEnabled.get()
-                || prefs.widgetMode.get() != WIDGET_MODE_STATUS_BAR || binding == null) {
-            return 0;
-        }
-        View root = binding.getRoot();
-        return Math.max(root.getHeight(), root.getMeasuredHeight());
-    }
-
-    /**
-     * Current status-bar brick presentation for same-process secondary surfaces.
-     *
-     * <p>This is deliberately a read-only snapshot: the driver panel reuses the exact selected
-     * icon family, semantic state colour, outline and badge without registering a second set of
-     * Bluetooth, GNSS, connectivity, media or vehicle listeners.</p>
-     */
-    @Nullable
-    public StatusBrickSnapshot statusBrickSnapshot(@NonNull BrickType type) {
-        if (destroyed || prefs == null || binding == null) return null;
-        String text = "";
-        int iconResource = 0;
-        int iconTint = ContextCompat.getColor(
-                themedContext != null ? themedContext : this, R.color.text_primary);
-        int iconLevel = 10000;
-        Integer batteryPercent = null;
-        boolean batteryCharging = false;
-        Integer cellularSignalPercent = null;
-        String cellularOperator = "";
-        String cellularNetworkType = "";
-        int outlineColor = ContextCompat.getColor(
-                themedContext != null ? themedContext : this, R.color.text_outline);
-        int outlineWidth = 0;
-        String badgeText = null;
-        int badgeBackground = 0;
-        int badgeForeground = ContextCompat.getColor(
-                themedContext != null ? themedContext : this, R.color.text_outline)
-                | 0xFF000000;
-        int badgeDrawableResource = 0;
-        boolean known = true;
-        boolean active = true;
-
-        int iconType = -1;
-        int state = 0;
-        Preferences.IconBrickPrefs iconPrefs = null;
-        switch (type) {
-            case TIME:
-                text = timeFormat.format(new Date());
-                break;
-            case DATE:
-                text = String.valueOf(binding.dateText.getText());
-                known = !text.trim().isEmpty();
-                break;
-            case MEDIA:
-                text = lastMediaSubtitle == null ? "" : lastMediaSubtitle;
-                known = !text.isEmpty();
-                active = known;
-                break;
-            case WIFI:
-                iconResource = R.drawable.ic_status_iphone_wifi_level;
-                iconTint = 0; // Preserve per-arc gray/green vector colors.
-                iconLevel = wifiSignalLevel * 2500;
-                iconPrefs = prefs.wifi;
-                active = wifiState == WiFiState.INTERNET
-                        || wifiState == WiFiState.LIMITED_INTERNET;
-                switch (wifiState) {
-                    case INTERNET: text = "Ð˜Ð½Ñ‚ÐµÑ€Ð½ÐµÑ‚"; break;
-                    case LIMITED_INTERNET: text = "ÐžÐ³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð½Ð°Ñ ÑÐµÑ‚ÑŒ"; break;
-                    case NO_INTERNET: text = "Ð‘ÐµÐ· Ð¸Ð½Ñ‚ÐµÑ€Ð½ÐµÑ‚Ð°"; break;
-                    case OFF:
-                    default: text = "Wiâ€‘Fi Ð²Ñ‹ÐºÐ»ÑŽÑ‡ÐµÐ½"; break;
-                }
-                break;
-            case GPS:
-                iconType = ICON_TYPE_GNSS;
-                state = gnssState.ordinal();
-                iconPrefs = prefs.gps;
-                active = gnssState == GnssState.GOOD;
-                text = gnssState == GnssState.GOOD ? "GPS"
-                        : gnssState == GnssState.BAD ? "ÐÐµÑ‚ Ñ„Ð¸ÐºÑÐ°Ñ†Ð¸Ð¸" : "GPS Ð²Ñ‹ÐºÐ»ÑŽÑ‡ÐµÐ½";
-                break;
-            case BLUETOOTH:
-                iconType = ICON_TYPE_BT;
-                state = bluetoothState.ordinal();
-                iconPrefs = prefs.bluetooth;
-                active = bluetoothState == BluetoothState.CONNECTED;
-                text = bluetoothState == BluetoothState.CONNECTED
-                        ? "ÐŸÐ¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¾" : bluetoothState == BluetoothState.NO_DEVICE
-                        ? "ÐÐµÑ‚ ÑƒÑÑ‚Ñ€Ð¾Ð¹ÑÑ‚Ð²" : "Bluetooth Ð²Ñ‹ÐºÐ»ÑŽÑ‡ÐµÐ½";
-                break;
-            case INDOOR_TEMP:
-                text = String.valueOf(binding.indoorTempText.getText());
-                known = !text.isEmpty() && !TEMP_PLACEHOLDER.equals(text);
-                active = known;
-                break;
-            case OUTDOOR_TEMP:
-                text = String.valueOf(binding.outdoorTempText.getText());
-                known = !text.isEmpty() && !TEMP_PLACEHOLDER.equals(text);
-                active = known;
-                break;
-            case PHONE_STATUS:
-                text = joinedVisibleText(binding.phoneStatusContainer);
-                known = !text.isEmpty();
-                active = known;
-                break;
-            case PHONE_CELLULAR:
-                Integer signal = phonePercent("network.signal");
-                String operator = phoneText("network.operator");
-                String rawCellularType = phoneNetworkType();
-                String cellularType = prefs.phoneCellular.showNetworkType.get()
-                        ? rawCellularType : "";
-                cellularSignalPercent = signal;
-                cellularOperator = operator;
-                cellularNetworkType = rawCellularType;
-                known = signal != null || !operator.isEmpty() || !cellularType.isEmpty();
-                active = !operator.isEmpty() || !cellularType.isEmpty()
-                        || signal != null && signal > 0;
-                text = !cellularType.isEmpty() && !operator.isEmpty()
-                        ? cellularType + " Â· " + operator
-                        : !cellularType.isEmpty() ? cellularType
-                        : !operator.isEmpty() ? operator : known ? signal + "%" : "";
-                iconResource = R.drawable.ic_status_iphone_cellular_level;
-                iconTint = 0; // Active/inactive bars carry their own colors.
-                iconLevel = cellularBars(signal) * 2500;
-                iconPrefs = prefs.phoneCellular;
-                break;
-            case PHONE_BATTERY:
-                Integer battery = phonePercent("battery.level");
-                known = battery != null;
-                active = known;
-                text = known ? battery + "%" : "";
-                iconResource = R.drawable.ic_status_iphone_battery;
-                iconLevel = battery == null ? 0 : battery * 100;
-                iconPrefs = prefs.phoneBattery;
-                batteryCharging = phoneChargingNow();
-                iconTint = phoneBatteryColor(battery, batteryCharging);
-                batteryPercent = prefs.phoneBattery.showPercentage.get() ? battery : null;
-                break;
-            case PHONE_NETWORK_TYPE:
-                text = phoneNetworkType();
-                known = !text.isEmpty();
-                active = known;
-                break;
-            default:
-                return null;
-        }
-
-        if (iconType >= 0 && iconPrefs != null) {
-            int designIndex = Math.min(Math.max(0, prefs.iconDesign.get()),
-                    ICON_DESIGNS.length - 1);
-            int[][] design = ICON_DESIGNS[designIndex];
-            state = Math.min(Math.max(0, state), design[iconType].length - 1);
-            iconResource = design[iconType][state];
-            int[] colorResources = iconType == ICON_TYPE_WIFI ? WIFI_STATE_COLOR_RES
-                    : iconType == ICON_TYPE_GNSS ? GNSS_STATE_COLOR_RES : BT_STATE_COLOR_RES;
-            if (Math.min(Math.max(0, prefs.iconStyle.get()), 1) == STYLE_COLOR) {
-                iconTint = ContextCompat.getColor(
-                        themedContext != null ? themedContext : this, colorResources[state]);
-            }
-            int outlineAlpha = iconPrefs.outlineAlpha.get();
-            outlineWidth = outlineAlpha <= 0 ? 0 : iconPrefs.outlineWidth.get();
-            outlineColor = (outlineColor & 0x00FFFFFF)
-                    | (Math.min(255, Math.max(0, outlineAlpha)) << 24);
-            int styleBackground = iconTint;
-
-            if (iconType == ICON_TYPE_WIFI
-                    && state == WiFiState.LIMITED_INTERNET.ordinal()) {
-                badgeDrawableResource = R.drawable.ic_badge_ru_flag;
-            } else if (iconType == ICON_TYPE_GNSS && prefs.gps.showSatelliteBadge.get()
-                    && android.os.SystemClock.uptimeMillis() - satellitesCountTimestamp
-                    < GNSSSHARE_SATELLITE_STATUS_TIMEOUT_MS) {
-                boolean deadReckoning = (gnssModeFlags & GNSSSHARE_MODE_DR) != 0;
-                boolean spoofDetected = (gnssModeFlags & GNSSSHARE_MODE_SPOOF) != 0;
-                if (deadReckoning) badgeText = getString(R.string.gnss_dr_badge);
-                else if (spoofDetected) badgeText = getString(R.string.gnss_spoof_badge);
-                else if (satellitesCount > 0) badgeText = String.valueOf(satellitesCount);
-                if (badgeText != null) {
-                    if (spoofDetected) {
-                        badgeBackground = ContextCompat.getColor(this, R.color.status_error);
-                        badgeForeground = ContextCompat.getColor(
-                                this, R.color.status_badge_text);
-                    } else if (deadReckoning) {
-                        badgeBackground = ContextCompat.getColor(this, R.color.status_warning);
-                        badgeForeground = ContextCompat.getColor(
-                                this, R.color.status_badge_text);
-                    } else {
-                        badgeBackground = styleBackground;
-                    }
-                }
-            } else if (iconType == ICON_TYPE_BT
-                    && prefs.bluetooth.showDeviceCountBadge.get()
-                    && bluetoothState == BluetoothState.CONNECTED
-                    && !btConnectedAddrs.isEmpty()) {
-                badgeText = String.valueOf(btConnectedAddrs.size());
-                badgeBackground = styleBackground;
-            }
-            if (iconType == ICON_TYPE_BT) {
-                PhoneBluetoothIndicatorPolicy.Appearance appearance =
-                        PhoneBluetoothIndicatorPolicy.resolve(
-                                bluetoothState == BluetoothState.CONNECTED,
-                                hasSelectedPhoneConfiguration(),
-                                isPhoneNotificationPathAvailable());
-                if (appearance != PhoneBluetoothIndicatorPolicy.Appearance.DEFAULT) {
-                    iconResource = R.drawable.ic_status_iphone_bluetooth_solid;
-                    iconTint = ContextCompat.getColor(
-                            themedContext != null ? themedContext : this,
-                            R.color.status_bluetooth);
-                    outlineWidth = 0;
-                }
-            }
-        } else if (iconResource != 0 && iconPrefs != null) {
-            int outlineAlpha = Math.max(0, Math.min(255, iconPrefs.outlineAlpha.get()));
-            outlineWidth = outlineAlpha <= 0 ? 0 : iconPrefs.outlineWidth.get();
-            outlineColor = (outlineColor & 0x00FFFFFF) | (outlineAlpha << 24);
-            if (type == BrickType.WIFI && wifiState == WiFiState.LIMITED_INTERNET) {
-                badgeDrawableResource = R.drawable.ic_badge_ru_flag;
-            }
-        }
-        return new StatusBrickSnapshot(text, iconResource, iconTint, iconLevel, batteryPercent,
-                batteryCharging, cellularSignalPercent, cellularOperator, cellularNetworkType,
-                outlineColor, outlineWidth, badgeText, badgeBackground, badgeForeground,
-                badgeDrawableResource, known, active);
-    }
-
-    /** Immutable read-only connector snapshot for settings/catalog pickers. */
-    @NonNull
-    public List<ConnectorValue> connectorValueSnapshot() {
-        ConnectorValueRegistry current = connectorValues;
-        return current == null ? java.util.Collections.emptyList() : current.snapshot();
-    }
-
-    /**
-     * Subscribes a same-process HOME surface to raw HA/MQTT/Sprut value changes.
-     *
-     * <p>The returned initial snapshot closes the first-launch race: the connector may have
-     * completed synchronization before LauncherActivity obtained the service singleton.</p>
-     */
-    @NonNull
-    public List<ConnectorValue> addConnectorValueListener(
-            @NonNull ConnectorValueRegistry.Listener listener) {
-        ConnectorValueRegistry current = connectorValues;
-        if (current == null) return java.util.Collections.emptyList();
-        // Subscribe before reading: an update racing this snapshot is either already included or
-        // arrives through the listener immediately afterwards, never lost between the two steps.
-        current.addListener(listener);
-        return current.snapshot();
-    }
-
-    public void removeConnectorValueListener(
-            @NonNull ConnectorValueRegistry.Listener listener) {
-        ConnectorValueRegistry current = connectorValues;
-        if (current != null) current.removeListener(listener);
-    }
-
-    /** Registers a same-process visual surface for already-coalesced automation invalidations. */
-    public void addAutomationPresentationListener(
-            @NonNull AutomationPresentationListener listener) {
-        synchronized (automationPresentationListeners) {
-            if (automationPresentationListeners.contains(listener)) return;
-            if (automationPresentationListeners.size()
-                    >= MAX_AUTOMATION_PRESENTATION_LISTENERS) {
-                throw new IllegalStateException("Too many automation presentation listeners");
-            }
-            automationPresentationListeners.add(listener);
-        }
-    }
-
-    public void removeAutomationPresentationListener(
-            @NonNull AutomationPresentationListener listener) {
-        automationPresentationListeners.remove(listener);
-    }
-
-    /** Complete scenario/broadcast presentation state for one external HUD element. */
-    @NonNull
-    public AutomationState hudAutomationState(@NonNull String automationId) {
-        AutomationStateStore current = automationStates;
-        return current == null ? AutomationState.missing() : current.get(
-                AutomationContract.SCOPE_HUD, automationId);
-    }
-
-    /** Scenario-resolved visibility for one driver-panel shortcut. */
-    public boolean driverShortcutVisible(@NonNull String shortcutId, boolean defaultValue) {
-        AutomationStateStore current = automationStates;
-        return current == null ? defaultValue : current.effectiveVisibility(
-                AutomationContract.SCOPE_DRIVER, shortcutId, defaultValue);
-    }
-
-    /** Scenario-resolved interaction gate for one driver-panel shortcut. */
-    public boolean driverShortcutActionEnabled(@NonNull String shortcutId,
-                                               boolean defaultValue) {
-        AutomationStateStore current = automationStates;
-        return current == null ? defaultValue : current.effectiveActionEnabled(
-                AutomationContract.SCOPE_DRIVER, shortcutId, defaultValue);
-    }
-
-    /** Complete effective driver style, including the in-memory scenario precedence layer. */
-    @NonNull
-    public AutomationState driverAutomationState(@NonNull String targetId) {
-        AutomationStateStore current = automationStates;
-        return current == null ? AutomationState.missing() : current.get(
-                AutomationContract.SCOPE_DRIVER, targetId);
-    }
-
-    /** Complete effective HOME shortcut style, including the in-memory scenario layer. */
-    @NonNull
-    public AutomationState launcherAutomationState(@NonNull String targetId) {
-        AutomationStateStore current = automationStates;
-        return current == null ? AutomationState.missing() : current.get(
-                AutomationContract.SCOPE_LAUNCHER, targetId);
-    }
-
-    /** Explicit automation decision for one transient Favorites panel; null preserves manual UI. */
-    @Nullable
-    public Boolean driverFavoritePanelVisibility(@NonNull String panelId) {
-        AutomationStateStore current = automationStates;
-        return current == null ? null : current.explicitVisibility(
-                AutomationContract.SCOPE_DRIVER, panelId);
-    }
-
-    private static Rect getBounds(View view) {
-        return new Rect(view.getLeft(), view.getTop(), view.getRight(), view.getBottom());
-    }
-}
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×o|ëDèµ©hºÚn¶X§zÍKÊ‚ˆ
+ˆÛÜ\šYÚ0ªHŒKLŒˆ^žˆ
+Î‹ËÙÚ]X‹˜ÛÛKÑ^ž’ÊBˆ
+‚ˆ
+ˆ\È›ÙÜ˜[H\Èœ™YHÛÙØ\™Nˆ[ÝHØ[ˆ™Y\ÝšX]H][™ÛÜˆ[ÙYžBˆ
+ˆ][™\ˆH\›\ÈÙˆHÓ•HÙ[™\˜[X›XÈXÙ[œÙH\ÈX›\ÚYžBˆ
+ˆHœ™YHÛÙØ\™H›Ý[™][Û‹Z]\ˆ™\œÚ[ÛˆÈÙˆHXÙ[œÙKÜ‚ˆ
+ˆ
+][Ý\ˆÜ[ÛŠH[žH]\ˆ™\œÚ[Û‹‚ˆ
+‚ˆ
+ˆ\È›ÙÜ˜[H\È\ÝšX]Y[ˆHÜH]]Ú[™H\ÙY[ˆ
+ˆ]ÒUÕUS–HÐT”S•NÈÚ]Ý]]™[ˆH[\YYØ\œ˜[HÙ‚ˆ
+ˆQTÒS•P’SUHÜˆ’U‘TÔÈ“ÔˆHT•PÕSTˆT”ÔÑKˆÙYHBˆ
+ˆÓ•HÙ[™\˜[X›XÈXÙ[œÙH›Üˆ[Ü™H]Z[Ë‚ˆ
+‚ˆ
+ˆ[ÝHÚÝ[]™H™XÙZ]™YHÛÜHÙˆHÓ•HÙ[™\˜[X›XÈXÙ[œÙBˆ
+ˆ[Û™ÈÚ]\È›ÙÜ˜[KˆYˆ›ÝÙYHÎ‹ËÝÝÝË™ÛK›Ü™ËÛXÙ[œÙ\ËÏ‹‚ˆ
+‹Â‚œXÚØYÙH^ž‹œÝ]\ËÚYÙ]Â‚š[\Ü[™›ÚY˜[››Ý][Û‹”Ý\™\ÜÓ[Âš[\Ü[™›ÚY˜\“›ÝYšXØ][ÛŽÂš[\Ü[™›ÚY˜\“›ÝYšXØ][ÛÚ[›™[Âš[\Ü[™›ÚY˜\“›ÝYšXØ][Û“X[˜YÙ\ŽÂš[\Ü[™›ÚY˜\”[™[™Ò[[Âš[\Ü[™›ÚY˜\”Ù\šXÙNÂš[\Ü[™›ÚY˜\\ØYÙK•\ØYÙQ]™[ÎÂš[\Ü[™›ÚY˜\\ØYÙK•\ØYÙTÝ]ÓX[˜YÙ\ŽÂš[\Ü[™›ÚY˜›Y]ÛÝ›Y]ÛÝY\\ŽÂš[\Ü[™›ÚY˜›Y]ÛÝ›Y]ÛÝ]šXÙNÂš[\Ü[™›ÚY˜›Y]ÛÝ›Y]ÛÝ›Ùš[NÂš[\Ü[™›ÚY˜ÛÛ[œ›ØYØ\Ý™XÙZ]™\ŽÂš[\Ü[™›ÚY˜ÛÛ[ÛÛ\Û™[˜[YNÂš[\Ü[™›ÚY˜ÛÛ[ÛÛ^Âš[\Ü[™›ÚY˜ÛÛ[’[[Âš[\Ü[™›ÚY˜ÛÛ[’[[š[\ŽÂš[\Ü[™›ÚY˜ÛÛ[œK\XØ][Û’[™›ÎÂš[\Ü[™›ÚY˜ÛÛ[œK”XÚØYÙSX[˜YÙ\ŽÂš[\Ü[™›ÚY˜ÛÛ[œ™\ËÛÛÜ”Ý]S\ÝÂš[\Ü[™›ÚY˜ÛÛ[œ™\ËÛÛ™šYÝ\˜][ÛŽÂš[\Ü[™›ÚY™Ü˜\XÜË”Z[Âš[\Ü[™›ÚY™Ü˜\XÜË”^[›Ü›X]Âš[\Ü[™›ÚY™Ü˜\XÜË”™XÝÂš[\Ü[™›ÚY™Ü˜\XÜË•\Y˜XÙNÂš[\Ü[™›ÚY™Ü˜\XÜË™˜]ØX›K‘˜]ØX›NÂš[\Ü[™›ÚY™Ü˜\XÜË™˜]ØX›K‘Ü˜YY[˜]ØX›NÂš[\Ü[™›ÚY›ØØ][Û‹‘ÛœÜÔÝ]\ÎÂš[\Ü[™›ÚY›ØØ][Û‹“ØØ][ÛŽÂš[\Ü[™›ÚY›ØØ][Û‹“ØØ][Û“\Ý[™\ŽÂš[\Ü[™›ÚY›ØØ][Û‹“ØØ][Û“X[˜YÙ\ŽÂš[\Ü[™›ÚY›YYXK“YYXSY]Y]NÂš[\Ü[™›ÚY›YYXKœÙ\ÜÚ[Û‹“YYXPÛÛ›Û\ŽÂš[\Ü[™›ÚY›YYXKœÙ\ÜÚ[Û‹“YYXTÙ\ÜÚ[Û“X[˜YÙ\ŽÂš[\Ü[™›ÚY›YYXKœÙ\ÜÚ[Û‹”^X˜XÚÔÝ]NÂš[\Ü[™›ÚY›™]ÛÛ›™XÝ]š]SX[˜YÙ\ŽÂš[\Ü[™›ÚY›™]“™]ÛÜšÎÂš[\Ü[™›ÚY›™]“™]ÛÜšÐØ\Xš[]Y\ÎÂš[\Ü[™›ÚY›™]“™]ÛÜšÔ™\]Y\ÝÂš[\Ü[™›ÚY›™]ÚYšK•ÚYšR[™›ÎÂš[\Ü[™›ÚY›™]ÚYšK•ÚYšSX[˜YÙ\ŽÂš[\Ü[™›ÚY›ÜËZ[Âš[\Ü[™›ÚY›ÜË’[™\ŽÂš[\Ü[™›ÚY›ÜË’Pš[™\ŽÂš[\Ü[™›ÚY›ÜË“ÛÜ\ŽÂš[\Ü[™›ÚY›ÜË”Þ\Ý[PÛØÚÎÂš[\Ü[™›ÚYœ›ÝšY\‹”Ù][™ÜÎÂš[\Ü[™›ÚY^•^][ÎÂš[\Ü[™›ÚY][“ÙÎÂš[\Ü[™›ÚY][•\Y˜[YNÂš[\Ü[™›ÚYšY]ËÚÜ™[ÙÜ˜\\ŽÂš[\Ü[™›ÚYšY]Ë‘Ü˜]š]NÂš[\Ü[™›ÚYšY]Ë“^[Ý][™›]\ŽÂš[\Ü[™›ÚYšY]Ë“[Ý[Û‘]™[Âš[\Ü[™›ÚYšY]Ë•šY]ÎÂš[\Ü[™›ÚYšY]Ë•šY]ÐÛÛ™šYÝ\˜][ÛŽÂš[\Ü[™›ÚYšY]Ë•šY]ÑÜ›Ý\Âš[\Ü[™›ÚYšY]Ë•Ú[™ÝÓX[˜YÙ\ŽÂš[\Ü[™›ÚYÚYÙ]“[™X\“^[Ý]Â‚š[\Ü[™›ÚY˜[››Ý][Û‹“›Û“[Âš[\Ü[™›ÚY˜[››Ý][Û‹“[X›NÂš[\Ü[™›ÚY˜ÛÜ™K˜\“›ÝYšXØ][ÛÛÛ\]Âš[\Ü[™›ÚY˜ÛÜ™K˜ÛÛ[ÛÛ^ÛÛ\]Âš[\Ü[™›ÚY˜ÛÜ™KÚYÙ]’[XYÙUšY]ÐÛÛ\]Â‚š[\ÜÜ™ËšœÛÛ‹’”ÓÓ‘^Ù\[ÛŽÂš[\ÜÜ™ËšœÛÛ‹’”ÓÓ“Øš™XÝÂ‚š[\Ü˜]˜K›™]’T“ÛÛ›™XÝ[ÛŽÂš[\Ü˜]˜K›™]•T“Âš[\Ü˜]˜K^”Ú[\Q]Q›Ü›X]Âš[\Ü˜]˜K][\œ˜^Q\]YNÂš[\Ü˜]˜K][\œ˜^S\ÝÂš[\Ü˜]˜K][ÛÛXÝ[ÛœÎÂš[\Ü˜]˜K][‘]NÂš[\Ü˜]˜K][‘[[SX\Âš[\Ü˜]˜K][‘[[TÙ]Âš[\Ü˜]˜K][’\ÚÙ]Âš[\Ü˜]˜K][“[šÙY\ÚX\Âš[\Ü˜]˜K][“[šÙY\ÚÙ]Âš[\Ü˜]˜K][“\ÝÂš[\Ü˜]˜K][“ØØ[NÂš[\Ü˜]˜K][“X\Âš[\Ü˜]˜K][“Øš™XÝÎÂš[\Ü˜]˜K][”Ù]Âš[\Ü˜]˜K][˜ÛÛ˜Ý\œ™[‘^XÝ]Ü”Ù\šXÙNÂš[\Ü˜]˜K][˜ÛÛ˜Ý\œ™[‘^XÝ]ÜœÎÂš[\Ü˜]˜K][˜ÛÛ˜Ý\œ™[ÛÜSÛ•Üš]P\œ˜^S\ÝÂš[\Ü˜]˜K][˜ÛÛ˜Ý\œ™[˜]ÛZXË]ÛZXÐ›ÛÛX[ŽÂš[\Ü˜]˜K][˜ÛÛ˜Ý\œ™[˜]ÛZXË]ÛZXÓÛ™ÎÂš[\Ü˜]˜K][˜ÛÛ˜Ý\œ™[˜]ÛZXË]ÛZXÔ™Y™\™[˜ÙNÂ‚š[\Ü^ž‹œÝ]\ËÚYÙ]˜Ø\‹Ø\’[YÜ˜][ÛŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]˜Ø\‹Ø\’[YÜ˜][ÛœÎÂš[\Ü^ž‹œÝ]\ËÚYÙ]˜Ø\‹Ø\•[[Y]žQ^Ü\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]™]Xš[™[™Ë“Ý™\›^TÝ]\ÕÚYÙ]š[™[™ÎÂš[\Ü^ž‹œÝ]\ËÚYÙ]™XYÛ›ÜÝXÜË‘XYÛ›ÜÝXÒ›Ý\›˜[Âš[\Ü^ž‹œÝ]\ËÚYÙ]˜]]ÛX][Û‹]]ÛX][ÛÛÛ˜XÝÂš[\Ü^ž‹œÝ]\ËÚYÙ]˜]]ÛX][Û‹]]ÛX][Û”Ý]NÂš[\Ü^ž‹œÝ]\ËÚYÙ]˜]]ÛX][Û‹]]ÛX][Û”Ý]TÝÜ™NÂš[\Ü^ž‹œÝ]\ËÚYÙ]˜]]ÛX][Û‹”ØÙ[˜\š[ÕšYÙÙ\”™XÙZ]™\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]šK’PœšXÚÐÛÛ™šYÎÂš[\Ü^ž‹œÝ]\ËÚYÙ]šK’PœšXÚÐÛÛ™šYÔÝÜ™NÂš[\Ü^ž‹œÝ]\ËÚYÙ]š[YÜ˜][Û‹ÛÛ›™XÝÜXÝ[Û‘\Ü]Ú\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]š[YÜ˜][Û‹ÛÛ›™XÝÜ•\NÂš[\Ü^ž‹œÝ]\ËÚYÙ]š[YÜ˜][Û‹ÛÛ›™XÝÜ•˜[YNÂš[\Ü^ž‹œÝ]\ËÚYÙ]š[YÜ˜][Û‹ÛÛ›™XÝÜ•˜[YT™YÚ\ÝžNÂš[\Ü^ž‹œÝ]\ËÚYÙ]š[YÜ˜][Û‹’[[ØÙ[˜\š[ÐÛÛ›Û\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]š[YÜ˜][Û‹“ØØ[ØÙ[˜\š[ÐÛÛ›Û\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]™š]™\‹‘š]™\”[™[Ù\šXÙNÂš[\Ü^ž‹œÝ]\ËÚYÙ]šY’Y™\Ù[][Û”Ù\šXÙNÂš[\Ü^ž‹œÝ]\ËÚYÙ]›][˜Ú\‹“][˜Ú\”ÚÜÝ]ÝÜ™NÂš[\Ü^ž‹œÝ]\ËÚYÙ]›][˜Ú\‹“YYXT^X˜XÚÒ\ÝÜžTÝÜ™NÂš[\Ü^ž‹œÝ]\ËÚYÙ]›][˜Ú\‹š[™›Ü›X][Û‹”Ý]\Ð˜\’[™›Ü›X][ÛØ][ÙÎÂš[\Ü^ž‹œÝ]\ËÚYÙ]šK˜\K’P\PÛÛ›Û\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]šK˜\K’Q[]PØ][ÙÎÂš[\Ü^ž‹œÝ]\ËÚYÙ]šK˜\K’UÙX”ÛØÚÙ]ÛÛ›™XÝÜŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]›\]“\]ÛÛ›Û\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™P\XÛÛ”ÝÜ™NÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™P›Y]ÛÝ[™XØ]Ü”ÛXÞNÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™PÛÛ›™XÝÜÛÛ›Û\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™SÝÐ˜]\žP[\ÛXÞNÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™S›ÝYšXØ][Û]]ÛX][ÛŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™S›ÝYšXØ][Û‘Y™\œ˜[ÛXÞNÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™S›ÝYšXØ][Û‘Y™\œ˜[]Y]YNÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™S™]ÛÜšÕ\TÛXÞNÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™S›ÝYšXØ][Û“ØÚÔÛXÞNÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™TÝ]\Ð˜\”ÛXÞNÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™R[™XØ]Ü•š\ÝX[ÛXÞNÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÛ™K”Û™TÜ]™\Ù[˜ÙQ^Ü\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÜ\”Ü\Ý™\›^PÛÛ›Û\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÜ\”Ü\Ý™\›^SX[˜YÙ\ŽÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÜ\”Ü\Ý™\›^PÛÛ™šYÎÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÜ\”Ü\Ý™\›^PÛÛ™šYÔÝÜ™NÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÜ\”Ü\][PÛÛ™šYÎÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÜ\”Ü\][PÛÛ™šYÔÝÜ™NÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÜ]”Ü]Ø][ÙÎÂš[\Ü^ž‹œÝ]\ËÚYÙ]œÜ]”Ü]XÛÛ›Û\ŽÂ‚œX›XÈÛ\ÜÈÚYÙ]Ù\šXÙH^[™ÈÙ\šXÙHÂˆÊŠˆØ[YK\›ØÙ\ÜË]™[Yš]™[ˆ™\Ù[][Ûˆ[˜[Y][Ûˆ›ÜˆÝ\™˜XÙ\ÈÝ]ÚYH\ÈÙ\šXÙKˆ
+‹ÂˆX›XÈ[\™˜XÙH]]ÛX][Û”™\Ù[][Û“\Ý[™\ˆÂˆ›ÚYÛ]]ÛX][Û”™\Ù[][ÛÚ[™ÙY
+›Û“[Ýš[™ÈØÛÜKˆ›Û“[Ù]Ýš[™ÏˆYÊNÂˆBˆ[[HÛœÜÔÝ]HÂˆÑ‘‹QÓÓÑˆB‚ˆ[[HÚQšTÝ]HÂˆÑ‘‹“×ÒS•T“‘USRUQÒS•T“‘US•T“‘UˆB‚ˆ[[H›Y]ÛÝÝ]HÂˆÑ‘‹“×ÑU’PÑKÓÓ“‘PÕQˆB‚ˆËÈXÛÛˆ\ÚYÛœÎˆÚKQšHÝ]\ËÈÓ”ÔÈÝ]\ËÈ›Y]ÛÝÝ]\Ë‚ˆš]˜]HÝ]XÈš[˜[[×V×HTÒQÓ—ÐÓTÔÒPÈHÂˆÂˆ‹™˜]ØX›KšX×ÜÝ]\×ÝÚYšWÛÙ™‹ˆ‹™˜]ØX›KšX×ÜÝ]\×ÝÚYšWÛ›×Ú[\›™]ˆ‹™˜]ØX›KšX×ÜÝ]\×ÝÚYšWÝÚ][\Ýˆ‹™˜]ØX›KšX×ÜÝ]\×ÝÚYšWÚ[\›™]ˆKˆÈ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ÛÙ™‹‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ÜÙX\˜Ú[™Ëˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ØXÝ]™HKˆÈ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÛÙ™‹ˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÛÝ][™Kˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÜÛÛYBˆNÂˆš]˜]HÝ]XÈš[˜[[×V×HTÒQÓ—ÔÓÓQHÂˆÂˆ‹™˜]ØX›KšX×ÜÝ]\×Ùš[YÝÚYšWÛÙ™‹ˆ‹™˜]ØX›KšX×ÜÝ]\×Ùš[YÝÚYšWÛ›×Ú[\›™]ˆ‹™˜]ØX›KšX×ÜÝ]\×Ùš[YÝÚYšWÝÚ][\Ýˆ‹™˜]ØX›KšX×ÜÝ]\×Ùš[YÝÚYšWÚ[\›™]ˆKˆÈ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ÛÙ™‹‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ÜÙX\˜Ú[™Ëˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ØXÝ]™HKˆÈ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÛÙ™‹ˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÛÝ][™Kˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÜÛÛYBˆNÂˆš]˜]HÝ]XÈš[˜[[×V×HTÒQÓ—ÐT”ÈHÂˆÂˆ‹™˜]ØX›KšX×ÜÝ]\×Ø˜\œ×ÝÚYšWÛÙ™‹ˆ‹™˜]ØX›KšX×ÜÝ]\×Ø˜\œ×ÝÚYšWÛ›×Ú[\›™]ˆ‹™˜]ØX›KšX×ÜÝ]\×Ø˜\œ×ÝÚYšWÝÚ][\Ýˆ‹™˜]ØX›KšX×ÜÝ]\×Ø˜\œ×ÝÚYšWÚ[\›™]ˆKˆÈ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ÛÙ™‹‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ÜÙX\˜Ú[™Ëˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ØXÝ]™HKˆÈ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÛÙ™‹ˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÛÝ][™Kˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÜÛÛYBˆNÂˆš]˜]HÝ]XÈš[˜[[×V×V×HPÓÓ—ÑTÒQÓ”ÈHÈTÒQÓ—ÐÓTÔÒPËTÒQÓ—ÔÓÓQTÒQÓ—ÐT”ÈNÂ‚ˆš]˜]HÝ]XÈš[˜[[PÓÓ—ÕTWÕÒQ’HHÂˆš]˜]HÝ]XÈš[˜[[PÓÓ—ÕTWÑÓ”ÔÈHNÂˆš]˜]HÝ]XÈš[˜[[PÓÓ—ÕTWÐ•HŽÂ‚ˆš]˜]HÝ]XÈš[˜[[ÒQÑUÓSÑWÑ“ÐUS‘ÈHÂˆš]˜]HÝ]XÈš[˜[[ÒQÑUÓSÑWÔÕUT×ÐTˆHNÂ‚ˆËÈXÛÛˆÝ[H[™XÙ\È
+]\ÝX]ÚÝš[™ÜËž[ÚXÛÛ—ÜÝ[\È\œ˜^HÜ™\ŠK‚ˆš]˜]HÝ]XÈš[˜[[ÕSWÓSÓ“ÈHÂˆš]˜]HÝ]XÈš[˜[[ÕSWÐÓÓÔˆHNÂ‚ˆš]˜]HÝ]XÈš[˜[Û™ÈS•T“‘UÔ“Ð‘WÒS•T•SÓTÈHÌÌÂ‚ˆÊŠˆÜ›ÜÜËY˜YH\˜][Ûˆ›ÜˆH[\™HÝ™\›^H
+ÚÝËÚYHÈ\‹X\YJKˆ
+‹Âˆš]˜]HÝ]XÈš[˜[[Õ‘T“VWÑQWÑTUSÓ—ÓTÈHLÂˆÊŠˆÛÛ]XÚ\ÈH™X\‹Z[[YYX]H™]™X[È]\ˆYKÜÚÝÈÙY\ÈHØ[Y\ˆL\Ëˆ
+‹Âˆš]˜]HÝ]XÈš[˜[[S’UPSÓÕ‘T“VWÑQWÑTUSÓ—ÓTÈHLÂˆš]˜]HÝ]XÈš[˜[[S’UPSÓÕ‘T“VWÑSPÒ×ÑÔPÑWÓTÈHMŒÂˆš]˜]HÝ]XÈš[˜[Û™ÈÕ‘T“VWÐUPÒÔ‘U–WÓTÈHWÍLÂˆš]˜]HÝ]XÈš[˜[Û™ÈPVÓÕ‘T“VWÐUPÒÔ‘U–WÓTÈHÌÌÂˆÊŠ‚ˆ
+ˆ\˜][ÛˆÙˆHÛÛXš[™Y˜YH
+ÈÚ[™ÙP›Ý[™È˜[œÚ][Ûˆ][™\È\‹XœšXÚÂˆ
+ˆš\ÚXš[]H›\ËˆÙYHÐ[šÈØ™YÚ[•š\ÚXš[]U˜[œÚ][ÛŸH›ÜˆHÚ[™ÝËXY™™\ˆ‚ˆ
+ˆšXÚÈ]XZÙ\È\È˜[œÚ][ÛˆÝ^H[œÚYHHÝX›HÚ[™ÝÈ™XÝ[™ÛK‚ˆ
+‹Âˆš]˜]HÝ]XÈš[˜[[”’PÒ×ÕS”ÒUSÓ—ÑTUSÓ—ÓTÈHLÂˆÊŠˆ\˜][ÛˆÙˆH[H[š[X][Ûˆ\ÙYÚ[ˆHœšXÚÈ\ÈY[ˆ[ˆÙY\Ë\ÜXÙH[ÙKˆ
+‹Âˆš]˜]HÝ]XÈš[˜[[”’PÒ×ÐSWÑTUSÓ—ÓTÈHÌÂ‚ˆš]˜]HÝ]XÈš[˜[Ýš[™ÈQÈH•ÚYÙ]Ù\šXÙHŽÂˆš]˜]HÝ]XÈš[˜[[“ÕQ’PÐUSÓ—ÒQHLNÂˆš]˜]HÝ]XÈš[˜[Ýš[™ÈÒS“‘SÒQH•ÚYÙ]Ù\šXÙPÚ[›™[ŽÂˆš]˜]HÝ]XÈš[˜[Û™ÈÓ”Ô×Ñ’VÑQÔQQÐQ•T—ÓTÈHWÌÂˆš]˜]HÝ]XÈš[˜[Û™ÈÓ”Ô×Ñ’VÓÑ‘—ÐQ•T—ÓTÈHLÌÂˆš]˜]HÝ]XÈš[˜[Û™ÈÓ”Ô×ÓÐÐUSÓ—ÒS•T•SÓTÈH—ÌÂˆš]˜]HÝ]XÈš[˜[Û™ÈUUSQWÕTUWÒS•T•SÓTÈHŒÌÂˆš]˜]HÝ]XÈš[˜[Û™ÈÖTÕSWÐÓÓ‘USÓ—Ô‘Q”‘TÒÒS•T•SÓTÈHŒÌÂˆÊŠˆ[Ý™\ÈH›ØÙ\ÜËZ[™\[™[XY[X[ˆ[\›H™Y›Ü™H]Èš[™K\ÙXÛÛ™XY[™Kˆ
+‹Âˆš]˜]HÝ]XÈš[˜[Û™ÈÑT•’PÑWÕÐUÒÑ×ÒPT•‘PUÓTÈH×ÌÂˆÊŠˆH™X[ÛÛœÝXÝÜ‹Ü›ÝšY\ˆ˜Z[\™HÙ]ÈH›Ý[™Y™]žH[œÝXYÙˆHYÚÛÜˆ
+‹Âˆš]˜]HÝ]XÈš[˜[Û™ÈS’UPSÒS•QÔUSÓ—Ô‘U–WÓTÈHLÂˆÊŠˆHÛ™K[Ù™ˆ™[™Ü‹Ðš[™\ˆ™Z™XÝ[Ûˆ\È™]šYYÚ]Ý]\›š[™ÈÝ\\[ÈHYÚÛÜˆ
+‹Âˆš]˜]HÝ]XÈš[˜[[PVÒS’UPSÒS•QÔUSÓ—ÔÕQÑWÔ‘U’QTÈHŽÂˆÊŠˆØY[˜ÙH›ÜˆY˜[˜Ú[™ÈHYYXH›ÙÜ™\ÜÈ˜\ˆÚ[HH˜XÚÈ\ÈXÝ]™[H^Z[™ËˆL\Âˆ
+ˆ\È˜\Ý[›ÝYÚÈÛÚÈÛ[ÛÝÛˆH[ˆ˜\ˆ[™ÛÝÈ[›ÝYÚÈ›ÝÚÝÈ\[ˆ›Ùš[\œËˆ
+‹ÂˆËÈÛ™H™\Z[\ˆÙXÛÛ™\Èš\ÝX[HÝY™šXÚY[›ÜˆHÛÛ\XÝÝ]\Ë\›ÝÈ›ÙÜ™\ÜÈ[™H[™ˆËÈ[™\ÈYYXTÙ\ÜÚ[ÛˆÛ[™ËÛ^[Ý][˜[Y][Ûˆ™\œÝ\ÈLLÛˆÝËY[™XY[š]Ë‚ˆš]˜]HÝ]XÈš[˜[Û™ÈQQPWÔ“ÑÔ‘TÔ×ÕPÒ×ÓTÈHWÌÂˆÊŠˆ[Ü™H[ˆHÛÛ›™XÝÜˆØXÚKÛÈ™[[Ýš[™ÈH™]Ù\Ý][HØ[ˆ™]™\ˆ™\^H[ˆÛ\ˆÛ™Kˆ
+‹Âˆš]˜]HÝ]XÈš[˜[[PVÓÐ”ÑT•‘QÔÓ‘WÓ“ÕQ’PÐUSÓ”ÈHLŽÂˆÊŠˆ\œÝ[]™\šY\È\™H[[[Û˜[H™XYX›H[™]\›Z[š\ÝXËÛ™HØ\™\ˆÙXÛÛ™ˆ
+‹Âˆš]˜]HÝ]XÈš[˜[Û™ÈÓ‘WÓ“ÕQ’PÐUSÓ—ÔUQUQWÔÓÕÓTÈHWÌÂˆÊŠˆØ\™]ÙY[ˆH^KÜ]\ÙH[™XØ]Üˆ[™H^]™XÙY\Ë\ÈHœ˜XÝ[ÛˆÙˆ]ˆ
+ˆ^	ÜÈÚ^™H8 %Ø[YH˜][Û˜[H\ÈHXÛÛ‰ÜÈÝÛˆÚ^™Nˆ]]\Ý˜XÚÈH›ÛÛY\œËˆ
+‹Âˆš]˜]HÝ]XÈš[˜[›Ø]ÕUWÒPÓÓ—ÑÐTÔUSÈHŒYŽÂˆš]˜]HÝ]XÈš[˜[Û™È“Ô‘QÔ“ÕS‘ÐTÐÒPÒ×ÒS•T•SÓTÈH—ÌÂˆš]˜]HÝ]XÈš[˜[Û™È“Ô‘QÔ“ÕS‘ÐTÓÓÒÐPÒ×ÓTÈHŒÌÂˆš]˜]HÝ]XÈš[˜[Û™È“Ô‘QÔ“ÕS‘ÑRST‘WÓÑ×ÒS•T•SÓTÈHLÌÂˆÊŠˆÛ™Ù\ˆ[ˆÛÈØœÙ\™\ˆ™Yœ™\Ú\š[ÙÎÈ™]™[ÈHXYš[™\ˆœ›ÛH[›š[™ÈHYKˆ
+‹Âˆš]˜]HÝ]XÈš[˜[Û™ÈPÐT–ÓU’QÐUÔ—ÐÓÓ‘’T“PUSÓ—ÓPTÑWÓTÈH—ÌÂˆš]˜]HÝ]XÈš[˜[Û™ÈPÐT–ÓU’QÐUÔ—ÓÔSRTÕP×ÑÔPÑWÓTÈHWÎÂˆš]˜]HÝ]XÈš[˜[Û™Ö×HPÐT–ÓU’QÐUÔ—ÓÔSRTÕP×Ô‘U–WÓÑ‘”ÑU×ÓTÈHÂˆLŒLWÍLˆNÂˆš]˜]HÝ]XÈš[˜[Ýš[™ÈÓ”ÔÔÒT‘WÐÓQS•ÔPÒÐQÑHH™^ž‹™ÛœÜÜÚ\™K˜ÛY[ŽÂˆš]˜]HÝ]XÈš[˜[Ýš[™ÈÓ”ÔÔÒT‘WÔÐUSUWÔÕUT×ÐPÕSÓˆH™^ž‹™ÛœÜÜÚ\™K˜XÝ[Û‹”ÐUSUWÔÕUTÈŽÂˆÊŠˆØ][]HÛÝ[^˜KˆH˜[YHÙˆÐÛÙHL_HYX[œÈ››ÈØ][]H]Hˆ
+˜YÙHY[ŠKˆ
+‹Âˆš]˜]HÝ]XÈš[˜[Ýš[™ÈÓ”ÔÔÒT‘WÑVWÔÐUSUT×ÐÓÕS•H˜ÛÝ[ŽÂˆÊŠ‚ˆ
+ˆÜ[Û˜[ÜÚ][Ûš[™Ë[[ÙH^˜K™X]Y\ÈHš]X\ÚÈ
+XœÙ[ÈH›Ü›X[Ø][]Bˆ
+ˆš^[™ÊKˆHÛÈ›YÜÈ\™H[™\[™[8 %XY™XÚÛÛš[™È[™ÜÛÙš[™ËY]XÝYØ[ˆXXÚ™Bˆ
+ˆÙ]ÛˆZ\ˆÝÛˆÜˆÙÙ]\ˆ
+ÈHXY™XÚÛÛš[™È[\™Y™XØ]\ÙHÙˆH]XÝYÜÛÙŠK‚ˆ
+‹Âˆš]˜]HÝ]XÈš[˜[Ýš[™ÈÓ”ÔÔÒT‘WÑVWÓSÑHH›[ÙHŽÂˆš]˜]HÝ]XÈš[˜[[Ó”ÔÔÒT‘WÓSÑWÑˆHNÈËÈš]ˆÜÚ][Ûˆ\ÈXY\™XÚÛÛ™Yˆš]˜]HÝ]XÈš[˜[[Ó”ÔÔÒT‘WÓSÑWÔÔÓÑˆHŽÈËÈš]NˆÔÈÜÛÙš[™È]XÝYˆš]˜]HÝ]XÈš[˜[Û™ÈÓ”ÔÔÒT‘WÔÐUSUWÔÕUT×ÕSQSÕUÓTÈHÌÌÂ‚ˆš]˜]HÝ]XÈÚYÙ]Ù\šXÙH[œÝ[˜ÙNÂˆÊŠˆ›ØÙ\ÜË]ÚYHÝÛ™\œÚ\™[˜ÙH›Üˆ™]Z[™Y\Ý]HÛÜšÙ\œÈXÜ›ÜÜÈÙ\šXÙH™\XÙ[Y[ˆ
+‹Âˆš]˜]HÝ]XÈš[˜[]ÛZXÓÛ™ÈÕT•TÔÕUWÓÕÓ‘TˆH™]È]ÛZXÓÛ™Ê
+NÂ‚ˆš]˜]H™Y™\™[˜Ù\È™YœÎÂˆš]˜]HÛ™ÈÝ\\Ý]SÝÛ™\•ÚÙ[ŽÂˆš]˜]H]]ÛX][Û”Ý]TÝÜ™H]]ÛX][Û”Ý]\ÎÂˆš]˜]HÛÛ›™XÝÜ•˜[YT™YÚ\ÝžHÛÛ›™XÝÜ•˜[Y\ÎÂˆš]˜]H›Û][HØØ[ØÙ[˜\š[ÐÛÛ›Û\ˆØÙ[˜\š[ÐÛÛ›Û\ŽÂˆš]˜]H›Û][H[[ØÙ[˜\š[ÐÛÛ›Û\ˆ[[ØÙ[˜\š[ÐÛÛ›Û\ŽÂˆÊŠ‚ˆ
+ˆÛÛ^XÚ]ÛÛ[X[™ÈX^H™XXÚH›Ü™YÜ›Ý[™Ù\šXÙHÚ[HHÜÝ]š\ÚX›HÛÛ›Û\‚ˆ
+ˆ[™H\ÈÝ[Ø\›Z[™È\ˆ™]Z[ˆÛ›HHÛX[[‹\›ØÙ\ÜÈ]Y]YNˆ]™\žH[žHÙY\ÈBˆ
+ˆ™XÙZ]™\‹][YH[Û›ÝÛšXÈXY[™H[™\È™]˜[Y]YžH[[ØÙ[˜\š[ÐÛÛ›Û\ˆ™Y›Ü™H\ÙK‚ˆ
+‹Âˆš]˜]HÝ]XÈš[˜[[PVÔS‘S‘×ÒS•S•ÔÐÑST’S×ÐÓÓSPS‘ÈHMŽÂˆš]˜]HÝ]XÈš[˜[Û™ÈSTÔT–WÔÐÑST’S×ÒÔÕÔ‘PÒPÒ×ÓTÈHWÌÂˆš]˜]HÝ]XÈš[˜[Û™ÈSTÔT–WÔÐÑST’S×ÒÔÕÓPVÓTÈHM—ÌÂˆš]˜]Hš[˜[\œ˜^Q\]YO[[ˆ[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™ÈH™]È\œ˜^Q\]YOŠ
+NÂˆš]˜]H›ÛÛX[ˆ[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝÂˆš]˜]Hš[˜[[›˜X›H^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYT™XÚXÚÈH
+
+HO‚ˆ™XÛÛ˜Ú[Q^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYJ˜[ÙJNÂˆš]˜]Hš[˜[[›˜X›H^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYQ^\žHH
+
+HO‚ˆ™XÛÛ˜Ú[Q^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYJYJNÂˆš]˜]Hš[˜[[›˜X›H[\Ü˜\žTØÙ[˜\š[ÒÜÝ™XÚXÚÈH
+
+HO‚ˆ™XÛÛ˜Ú[U[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝ
+˜[ÙJNÂˆš]˜]Hš[˜[[›˜X›H[\Ü˜\žTØÙ[˜\š[ÒÜÝ^\žHH
+
+HO‚ˆ™XÛÛ˜Ú[U[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝ
+YJNÂˆš]˜]H›Û][HÛÛ›™XÝÜXÝ[Û‘\Ü]Ú\ˆXÝ[Û‘\Ü]Ú\ŽÂˆš]˜]HPœšXÚÐÛÛ™šYÔÝÜ™HPÛÛ™šYÜÎÂˆš]˜]H›Û][HP\PÛÛ›Û\ˆP\PÛÛ›Û\ŽÂˆš]˜]H›Û][H\]ÛÛ›Û\ˆ\]ÛÛ›Û\ŽÂˆš]˜]H›Û][HÜ]XÛÛ›Û\ˆÜ]ÛÛ›Û\ŽÂˆš]˜]H›Û][HÛ™PÛÛ›™XÝÜÛÛ›Û\ˆÛ™PÛÛ›Û\ŽÂˆš]˜]H›Û][HÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆÛ™T™\Ù[˜ÙQ^Ü\ŽÂˆš]˜]H›Û][HÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ŽÂˆš]˜]H›Û][HØ\•[[Y]žQ^Ü\ˆØ\•[[Y]žQ^Ü\ŽÂˆš]˜]HÜ\Ý™\›^SX[˜YÙ\ˆÜ\Ý™\›^NÂˆÊŠˆ\œÙYÛ›HÚ[ˆÙ][™ÜÈÚ[™ÙNÈÛÛ›™XÝÜˆXÚÙ]È]\Ý™]™\ˆ™\\œÙHH”ÓÓˆØÝ[Y[ˆ
+‹Âˆš]˜]H\ÝPœšXÚÐÛÛ™šYÏˆÛÛ™šYÝ\™YXZ[œšXÚÜÈHÛÛXÝ[ÛœË™[\S\Ý
+
+NÂˆ[X›Hš]˜]HÝš[™ÈÛÛ™šYÝ\™YXZ[œšXÚÜÒœÛÛŽÂˆÊŠˆÝ\\ÛÜšÙ\ˆ›Ú™XÝ[ÛœÈ\ÙYžHHXZ[‹[Û›Hš\ÝX[Û\Ý[™\ˆ\ÜËˆ
+‹Âˆš]˜]HÙ]œšXÚÕ\OˆÛÛ™šYÝ\™YÜ\Z[[•\\ÈHÛÛXÝ[ÛœË™[\TÙ]
+
+NÂˆ[X›Hš]˜]HÝš[™ÈÛÛ™šYÝ\™YÜ\Ý™\›^\ÒœÛÛŽÂˆ[X›Hš]˜]HÝš[™ÈÛÛ™šYÝ\™YÜ\][\ÒœÛÛŽÂˆš]˜]HÙ]œšXÚÕ\OˆÛÛ™šYÝ\™Yš]™\’[™›Ü›X][Û•\\ÈHÛÛXÝ[ÛœË™[\TÙ]
+
+NÂˆ[X›Hš]˜]HÝš[™ÈÛÛ™šYÝ\™Yš]™\’[™›Ü›X][Û’œÛÛŽÂˆš]˜]H›ÛÛX[ˆÛÛ™šYÝ\™Yš]™\”[™[[˜X›YÂˆš]˜]Hš[˜[Øš™XÝ]]ÛX][Û•ZSØÚÈH™]ÈØš™XÝ
+
+NÂˆš]˜]HÝ]XÈš[˜[[PVÐUUÓPUSÓ—Ô‘TÑS•USÓ—ÓTÕS‘T”ÈHÂˆš]˜]Hš[˜[X\Ýš[™ËÙ]Ýš[™Ïˆ[™[™Ð]]ÛX][Û•ZHH™]È[šÙY\ÚX\Š
+NÂˆš]˜]Hš[˜[ÛÜSÛ•Üš]P\œ˜^S\Ý]]ÛX][Û”™\Ù[][Û“\Ý[™\‚ˆ]]ÛX][Û”™\Ù[][Û“\Ý[™\œÈBˆ™]ÈÛÜSÛ•Üš]P\œ˜^S\ÝŠ
+NÂˆš]˜]H›ÛÛX[ˆ]]ÛX][Û•ZT™Yœ™\ÚØÚY[YÂˆÊŠˆœ™\Úš\ÝX[[Û›HÜÝ\ÈYZ]Y]ÛÛ›Û\‹Ý™[™ÜˆÛÜšÈÝ[™[Û™ÜÈÈÜÝ\ÙKˆ
+‹Âˆš]˜]H›ÛÛX[ˆ]]ÛX]XÔ[[YT\šÙYÂˆÊŠˆ›Ý[™Y]][XØ]YÛÛ[X[™X^H\ÙH[[YHÚ]Ý]Ü[š[™ÈH]]ÛX]XÈÜÝ˜\œšY\‹ˆ
+‹Âˆš]˜]H›ÛÛX[ˆ^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYNÂˆš]˜]H›ÛÛX[ˆ]]ÛX]XÓY™XÞXÛT]ZY]Âˆš]˜]H›ÛÛX[ˆ]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[T[™[™ÎÂˆÊŠˆÛ›HH›ØÙ\ÜÈÝ\š]š[™È]ZXÚÐ›ÛÝ™YYÈ[ˆ[[YYX]HÚ[™ÝÓX[˜YÙ\ˆ™]˜[Y][Û‹ˆ
+‹Âˆš]˜]H›ÛÛX[ˆ]]ÛX]XÔÝ\™˜XÙT™]˜[Y][Û”™\]Z\™YÂˆÊŠˆ^XÝÜÝ\ÙHØ\ÈXØÙ\YÈ™\Ý[YHØZ]ÈÛ›H›Üˆ]ÈÝ\œ™[™\XÙ[Y[›ÛÝˆ
+‹Âˆš]˜]H›ÛÛX[ˆ]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›NÂˆš]˜]H[]]ÛX]XÓY™XÞXÛT™\Ý[YQÙ[™\˜][ÛŽÂˆš]˜]H[]]ÛX]XÓY™XÞXÛUX\™ÝÛ”ÝYÙNÂˆš]˜]H›Û][H›ÛÛX[ˆ\Ý›ÞYYÂˆš]˜]Hš[˜[[›˜X›H]]ÛX]XÓY™XÞXÛT]ZY]X\™ÝÛˆBˆ\ÎŽœ[“™^]]ÛX]XÓY™XÞXÛT]ZY]X\™ÝÛŽÂ‚ˆš]˜]H›ÚY[“™^]]ÛX]XÓY™XÞXÛT]ZY]X\™ÝÛŠ
+HÂˆYˆ
+\Ý›ÞYYX]]ÛX]XÓY™XÞXÛT]ZY]
+H™]\›ŽÂˆÝÚ]Ú
+]]ÛX]XÓY™XÞXÛUX\™ÝÛ”ÝYÙJÊÊHÂˆØ\ÙH‚ˆ[’[YÜ˜][Û”Ý\
+œ]ZY]Û™H‹
+
+HOˆÂˆYˆ
+Û™PÛÛ›Û\ˆOH[
+HÛ™PÛÛ›Û\‹œÝÜ
+
+NÂˆJNÂˆœ™XZÎÂˆØ\ÙHN‚ˆ[’[YÜ˜][Û”Ý\
+œ]ZY]TU‹
+
+HOˆÂˆYˆ
+\]ÛÛ›Û\ˆOH[
+H\]ÛÛ›Û\‹œ]\ÙQ›Ü]]ÛX]XÓY™XÞXÛJ
+NÂˆJNÂˆœ™XZÎÂˆØ\ÙHŽ‚ˆ[’[YÜ˜][Û”Ý\
+œ]ZY]ÛYH\ÜÚ\Ý[‹
+
+HOˆÂˆYˆ
+P\PÛÛ›Û\ˆOH[
+HP\PÛÛ›Û\‹œ]\ÙQ›Ü]]ÛX]XÓY™XÞXÛJ
+NÂˆJNÂˆœ™XZÎÂˆØ\ÙHÎ‚ˆ[’[YÜ˜][Û”Ý\
+œ]ZY]Ü]šXˆ‹
+
+HOˆÂˆYˆ
+Ü]ÛÛ›Û\ˆOH[
+HÜ]ÛÛ›Û\‹œ]\ÙQ›Ü]]ÛX]XÓY™XÞXÛJ
+NÂˆJNÂˆœ™XZÎÂˆY˜][‚ˆ™]\›ŽÂˆBˆXZ[’[™\‹œÜÝ
+]]ÛX]XÓY™XÞXÛT]ZY]X\™ÝÛŠNÂˆBˆš]˜]Hš[˜[[›˜X›H]]ÛX]XÕš\ÝX[Ý\™˜XÙT™]˜[Y][ÛˆH
+
+HOˆÂˆYˆ
+\Ý›ÞYYX]]ÛX]XÔÝ\™˜XÙT™]˜[Y][Û”™\]Z\™Y™YœÈOH[
+H™]\›ŽÂˆ]]ÛX]XÔÝ\™˜XÙT™]˜[Y][Û”™\]Z\™YH˜[ÙNÂˆYˆ
+\™YœËÚYÙ][˜X›Y™Ù]
+
+HT\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊJH™]\›ŽÂˆ™]˜[Y]TÝ]\ÓÝ™\›^UÚ[™ÝÓÛ›Jš[[YYX]H]ZXÚÐ›ÛÝÝ\™˜XÙH™]˜[Y][ÛˆŠNÂˆNÂˆš]˜]Hš[˜[[›˜X›H]]ÛX][Û•ZT™Yœ™\ÚH
+
+HOˆÂˆYˆ
+]]ÛX]XÔÝ\™˜XÙT™Yœ™\ÚÝ\™\ÜÙY
+
+JHÂˆÞ[˜Ú›Ûš^™Y
+]]ÛX][Û•ZSØÚÊHÂˆ]]ÛX][Û•ZT™Yœ™\ÚØÚY[YH˜[ÙNÂˆBˆ™]\›ŽÂˆBˆX\Ýš[™ËÙ]Ýš[™ÏˆÚ[™ÙYH™]È[šÙY\ÚX\Š
+NÂˆÞ[˜Ú›Ûš^™Y
+]]ÛX][Û•ZSØÚÊHÂˆ›Üˆ
+X\‘[žOÝš[™ËÙ]Ýš[™Ïˆ[žHˆ[™[™Ð]]ÛX][Û•ZK™[žTÙ]
+
+JHÂˆÚ[™ÙYœ]
+[žK™Ù]Ù^J
+K™]È\ÚÙ]Š[žK™Ù]˜[YJ
+JJNÂˆBˆ[™[™Ð]]ÛX][Û•ZK˜ÛX\Š
+NÂˆ]]ÛX][Û•ZT™Yœ™\ÚØÚY[YH˜[ÙNÂˆBˆYˆ
+ÚYÙ]Ù\šXÙK\Ë™\Ý›ÞYYÚ[™ÙYš\Ñ[\J
+JH™]\›ŽÂˆ\Ü]Ú]]ÛX][Û”™\Ù[][ÛÚ[™Ù\ÊÚ[™ÙY
+NÂˆ›ÛÛX[ˆY™™XÝÔÝ]\Ô›ÝÈHÚ[™ÙY˜ÛÛZ[œÒÙ^J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓPRSŠBˆÚ[™ÙY˜ÛÛZ[œÒÙ^J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÐ•RSSŠNÂˆ›ÛÛX[ˆY™™XÝÔÛ™S›ÝYšXØ][ÛˆH˜[ÙNÂˆÙ]Ýš[™ÏˆÚ[™ÙYÜ\][\ÈHÚ[™ÙY™Ù]
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔT
+NÂˆYˆ
+Ú[™ÙYÜ\][\ÈOH[
+HÂˆ›Üˆ
+Ýš[™ÈYˆÚ[™ÙYÜ\][\ÊHÂˆYˆ
+Û™S›ÝYšXØ][Û]]ÛX][Û‹š\ÑšY[]]ÛX][Û’Y
+Y
+JHÂˆY™™XÝÔÛ™S›ÝYšXØ][ÛˆHYNÂˆœ™XZÎÂˆBˆBˆBˆYˆ
+Ü\Ý™\›^HOH[
+HÂˆ›Üˆ
+X\‘[žOÝš[™ËÙ]Ýš[™Ïˆ[žHˆÚ[™ÙY™[žTÙ]
+
+JHÂˆ›Üˆ
+Ýš[™ÈYˆ[žK™Ù]˜[YJ
+JHÂˆÜ\Ý™\›^K›Û”Ý]PÚ[™ÙY
+[žK™Ù]Ù^J
+KY
+NÂˆBˆBˆBˆYˆ
+Ú[™ÙY˜ÛÛZ[œÒÙ^J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÑ’U‘TŠBˆ	‰ˆ™YœÈOH[	‰ˆ™YœË™š]™\”[™[[˜X›Y™Ù]
+
+JHÂˆš]™\”[™[Ù\šXÙK˜\J\ÊNÂˆBˆYˆ
+Ú[™ÙY˜ÛÛZ[œÒÙ^J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÒQ
+Bˆ	‰ˆ
+™YœËšY[™[]]ÜÝ\™Ù]
+
+BˆY™\Ù[][Û”Ù\šXÙKš\Ô[›š[™Ê\ÊJJHÂˆY™\Ù[][Û”Ù\šXÙK››ÝYžP]]ÛX][ÛÚ[™ÙY
+\ÊNÂˆBˆËÈÜ\Ú[™ÝÜÈ]™H[ˆ[™\[™[Ú[™ÝÓX[˜YÙ\ˆY™XÞXÛKˆH˜Z[YÜ™]žZ[™ÈÝ]\Ë\›ÝÂˆËÈ]XÚY[]\Ý›Ý\ØØ\™Z\ˆÛÛ›™XÝÜˆ\]\Ë‚ˆYˆ
+ÚYÙ]Ù\šXÙK\Ë˜š[™[™ÈOH[
+H™]\›ŽÂˆYˆ
+Ú[™ÙY˜ÛÛZ[œÒÙ^J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓPRSŠJH™[™\’ÛYP\ÜÚ\Ý[œšXÚÜÊ
+NÂˆYˆ
+Y™™XÝÔÛ™S›ÝYšXØ][ÛŠH™Yœ™\ÚXÝ]™TÛ™S›ÝYšXØ][Û‘›ÜÛÛ™][ÛœÊ
+NÂˆËÈHÜ\[Û›H[\\˜]\™KÜÙ[œÛÜˆÝ™X[H]\Ý›Ý™[YX\Ý\™H[™[š[X]HH[™\[™[ˆËÈÝ]\È›ÝËˆLLY]›Üˆ]™\žHXÚÙ]]™[ˆÚ[ˆ›ÈÝ]\ÈœšXÚÈYÚ[™ÙY‚ˆYˆ
+Y™™XÝÔÝ]\Ô›ÝÊH\PœšXÚÕš\ÚXš[]JÝ\œ™[œšXÚÔÙ]
+
+JNÂˆNÂˆš]˜]Hš[˜[]ÛZXÐ›ÛÛX[ˆÜ›ÜÜÔÛÝ\˜ÙT[T™Yœ™\ÚØÚY[YH™]È]ÛZXÐ›ÛÛX[Š
+NÂˆš]˜]Hš[˜[ÛÛ›™XÝÜ•˜[YT™YÚ\ÝžK“\Ý[™\ˆÜ›ÜÜÔÛÝ\˜ÙT[S\Ý[™\ˆBˆÚ[™ÙY˜[Y\ÈOˆØÚY[PÜ›ÜÜÔÛÝ\˜ÙT[T™Yœ™\Ú
+
+NÂˆÊŠˆ]\Ý[[]]X›HÓ‘HÛ˜\ÚÝ›Ú™XÝY[ÈHÛÛ™šYÝ\˜X›HÝ]\Ë\›ÝÈœšXÚËˆ
+‹Âˆš]˜]Hš[˜[X\Ýš[™ËÛÛ›™XÝÜ•˜[YOˆÛ™TÝ]\Õ˜[Y\ÈH™]È[šÙY\ÚX\Š
+NÂˆ[X›Bˆš]˜]HÛ™TÝ]\Ð˜\”ÛXÞK“›ÝYšXØ][Û”™\Ù[][ÛˆXÝ]™TÛ™S›ÝYšXØ][ÛŽÂˆÊŠˆ˜\ÙHšY[Ù[XÝ[ÛˆØ\\™YÚ]HXÝ]™H[]™\žNÈØØ[ÛÛ™][ÛœÈ™Yš[™H]ˆ
+‹Âˆ›Û“[ˆš]˜]HÙ]Ýš[™ÏˆXÝ]™TÛ™S›ÝYšXØ][Û‘šY[ÈHÛÛXÝ[ÛœË™[\TÙ]
+
+NÂˆ[X›Bˆš]˜]HÝš[™ÈXÝ]™TÛ™P˜]\žP[\^Âˆ[X›Bˆš]˜]HÝš[™ÈXÝ]™TÛ™P˜]\žP[\ÛÛÜŽÂˆš]˜]H›ÛÛX[ˆÛ™SÝÐ˜]\žP[\]ÚYÂˆš]˜]H›ÛÛX[ˆÛ™SÝÐ˜]\žP[\]ÚYŽÂˆÊŠˆ]™[Y\š]™Y[™›ÚYHÚ[™ÝÈX›Ý™HH\ØYÙTÝ]È›Ü™YÜ›Ý[™\ÚÈ
+K™ËˆÍŒ0¬Ø[Y\˜JKˆ
+‹Âˆš]˜]H›ÛÛX[ˆÛ™Q^\›˜[Ý™\›^PXÝ]™NÂˆš]˜]Hš[˜[Ù]Ýš[™ÏˆØœÙ\™YÛ™S›ÝYšXØ][Û’Ù^\ÈH™]È[šÙY\ÚÙ]Š
+NÂˆš]˜]Hš[˜[\œ˜^Q\]YO]Y]YYÛ™S›ÝYšXØ][Ûˆ]Y]YYÛ™S›ÝYšXØ][ÛœÈBˆ™]È\œ˜^Q\]YOŠ
+NÂˆÊŠˆ›ÝYšXØ][ÛœÈ[Û›HÚ[HHÛÛ™šYÝ\™Y[\ØÜ™Y[ˆ\ÝÛœÈHXY][š]\Ü^Kˆ
+‹Âˆš]˜]Hš[˜[Û™S›ÝYšXØ][Û‘Y™\œ˜[]Y]YO]Y]YYÛ™S›ÝYšXØ][Û‚ˆY™\œ™YÛ™S›ÝYšXØ][ÛœÈH™]ÈÛ™S›ÝYšXØ][Û‘Y™\œ˜[]Y]YOŠ
+NÂˆš]˜]H[Y™\œ™YÛ™S›ÝYšXØ][Û“Ý™\™›ÝÐÛÝ[Âˆš]˜]HÛ™ÈY™\œ™YÛ™S›ÝYšXØ][Û“Ý™\™›ÝÔÝ\Y[\ÙYÂˆš]˜]H[]Y]YYÛ™S›ÝYšXØ][Û“Ý™\™›ÝÐÛÝ[Âˆš]˜]H›ÛÛX[ˆÛ™S›ÝYšXØ][Û\œÝXÝ]™NÂˆš]˜]HÛ™ÈXÝ]™TÛ™S›ÝYšXØ][Û‘^\™\Ð]Âˆš]˜]HÛ™ÈXÝ]™TÛ™TÜ\›ÝYšXØ][Û‘^\™\Ð]Âˆš]˜]H›ÛÛX[ˆXÝ]™TÛ™SÝÐ˜]\žTÜ\Âˆš]˜]H›ÛÛX[ˆÛ™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™YÂˆš]˜]H[YYXQ\˜][Û•š\ÚXš[]P™Y›Ü™TÛ™S›ÝYšXØ][ÛˆHšY]Ë‘ÓÓ‘NÂˆš]˜]H[YYXT›ÙÜ™\ÜÕš\ÚXš[]P™Y›Ü™TÛ™S›ÝYšXØ][ÛˆHšY]Ë‘ÓÓ‘NÂˆš]˜]Hš[˜[ÛÛ›™XÝÜ•˜[YT™YÚ\ÝžK“\Ý[™\ˆÛ™TÝ]\Ó\Ý[™\ˆBˆÚ[™ÙY˜[Y\ÈOˆÜÝÛ™U˜[Y\ÐÚ[™ÙY
+™]È\œ˜^S\ÝŠÚ[™ÙY˜[Y\ÊJNÂˆš]˜]Hš[˜[[›˜X›HÛ™S›ÝYšXØ][Û‘^\žHH™]È[›˜X›J
+HÂˆÝ™\œšYHX›XÈ›ÚY[Š
+HÂˆYˆ
+\Ý›ÞYYZ\ÐXÝ]™TÛ™TÝ]\Ð[\
+
+JH™]\›ŽÂˆÛ™È™[XZ[š[™ÈHXÝ]™TÛ™S›ÝYšXØ][Û‘^\™\Ð]ˆH[™›ÚY›ÜË”Þ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆYˆ
+™[XZ[š[™Èˆ
+HÂˆXZ[’[™\‹œÜÝ[^YY
+\Ë™[XZ[š[™ÊNÂˆ™]\›ŽÂˆBˆÛX\”Û™TÝ]\Ó›ÝYšXØ][ÛŠYJNÂˆYˆ
+Û™S›ÝYšXØ][Û\œÝXÝ]™H	‰ˆ\]Y]YYÛ™S›ÝYšXØ][ÛœËš\Ñ[\J
+JHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÛ™S›ÝYšXØ][Û”]Y]YPY˜[˜ÙJNÂˆXZ[’[™\‹œÜÝ
+Û™S›ÝYšXØ][Û”]Y]YPY˜[˜ÙJNÂˆBˆYˆ
+š[™[™ÈOH[
+HÂˆ\]SYYXR[™›Ê
+NÂˆ\PœšXÚÕš\ÚXš[]JÝ\œ™[œšXÚÔÙ]
+
+JNÂˆBˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆBˆNÂˆš]˜]Hš[˜[[›˜X›HÛ™TÜ\›ÝYšXØ][Û‘^\žHH™]È[›˜X›J
+HÂˆÝ™\œšYHX›XÈ›ÚY[Š
+HÂˆYˆ
+\Ý›ÞYYXÝ]™TÛ™TÜ\›ÝYšXØ][Û‘^\™\Ð]H
+H™]\›ŽÂˆÛ™È™[XZ[š[™ÈHXÝ]™TÛ™TÜ\›ÝYšXØ][Û‘^\™\Ð]ˆH[™›ÚY›ÜË”Þ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆYˆ
+™[XZ[š[™Èˆ
+HÂˆXZ[’[™\‹œÜÝ[^YY
+\Ë™[XZ[š[™ÊNÂˆ™]\›ŽÂˆBˆÛX\”Û™TÜ\›ÝYšXØ][ÛŠ
+NÂˆBˆNÂˆš]˜]Hš[˜[[›˜X›HÛ™S›ÝYšXØ][Û”]Y]YPY˜[˜ÙHH™]È[›˜X›J
+HÂˆÝ™\œšYHX›XÈ›ÚY[Š
+HÂˆYˆ
+\Ý›ÞYY\Û™S›ÝYšXØ][Û\œÝXÝ]™JH™]\›ŽÂˆÛ™È˜]\žT™[XZ[š[™ÈHXÝ]™TÛ™SÝÐ˜]\žT™[XZ[š[™Ê
+NÂˆYˆ
+˜]\žT™[XZ[š[™Èˆ
+HÂˆXZ[’[™\‹œÜÝ[^YY
+\Ë˜]\žT™[XZ[š[™ÊNÂˆ™]\›ŽÂˆBˆ]Y]YYÛ™S›ÝYšXØ][Ûˆ™^H]Y]YYÛ™S›ÝYšXØ][ÛœËœÛš\œÝ
+
+NÂˆYˆ
+™^OH[
+HÂˆYˆ
+]Y]YYÛ™S›ÝYšXØ][Û“Ý™\™›ÝÐÛÝ[H
+HÂˆš[š\ÚÛ™S›ÝYšXØ][Û\œÝ
+
+NÂˆ™]\›ŽÂˆBˆ[Ý™\™›ÝÈH]Y]YYÛ™S›ÝYšXØ][Û“Ý™\™›ÝÐÛÝ[Âˆ]Y]YYÛ™S›ÝYšXØ][Û“Ý™\™›ÝÐÛÝ[HÂˆ™^HÛ™S›ÝYšXØ][Û“Ý™\™›ÝÑ[]™\žJÝ™\™›ÝÊNÂˆBˆ›ÛÛX[ˆ™\Ù[YH™\Ù[Û™S›ÝYšXØ][ÛŠ™^
+NÂˆYˆ
+\™\Ù[Y
+HÂˆYˆ
+]Y]YYÛ™S›ÝYšXØ][ÛœËš\Ñ[\J
+Bˆ	‰ˆ]Y]YYÛ™S›ÝYšXØ][Û“Ý™\™›ÝÐÛÝ[H
+HÂˆš[š\ÚÛ™S›ÝYšXØ][Û\œÝ
+
+NÂˆBˆ[ÙHXZ[’[™\‹œÜÝ
+\ÊNÂˆ™]\›ŽÂˆBˆYˆ
+]Y]YYÛ™S›ÝYšXØ][ÛœËš\Ñ[\J
+Bˆ	‰ˆ]Y]YYÛ™S›ÝYšXØ][Û“Ý™\™›ÝÐÛÝ[H
+HÂˆ™[X\ÙTÛ™S›ÝYšXØ][Û\œÝÐÛÛ™šYÝ\™Y^\žJ
+NÂˆ™]\›ŽÂˆBˆÛ™È™^ÛÝHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+Bˆ
+ÈÓ‘WÓ“ÕQ’PÐUSÓ—ÔUQUQWÔÓÕÓTÎÂˆÛÛ™S›ÝYšXØ][Û‘\Ý[˜][ÛœÕ[[
+™^ÛÝ
+NÂˆXZ[’[™\‹œÜÝ[^YY
+\ËÓ‘WÓ“ÕQ’PÐUSÓ—ÔUQUQWÔÓÕÓTÊNÂˆBˆNÂˆÊŠˆ^XÝHÛ™HØ[˜XÚÈ\È\›YY›ÜˆHÛ\Ý
+\™Y›Ü™H™X\™\Ý
+HÛXY[™Kˆ
+‹Âˆš]˜]Hš[˜[[›˜X›HÛ™S›ÝYšXØ][Û‘Y™\œ˜[XY[™HBˆ\ÎŽœ™XÛÛ˜Ú[QY™\œ™YÛ™S›ÝYšXØ][ÛœÎÂˆš]˜]Hš[˜[[›˜X›HÜ›ÜÜÔÛÝ\˜ÙT[T™Yœ™\ÚH
+
+HOˆÂˆÜ›ÜÜÔÛÝ\˜ÙT[T™Yœ™\ÚØÚY[YœÙ]
+˜[ÙJNÂˆYˆ
+\Ý›ÞYY
+H™]\›ŽÂˆËÈ[TÙ]œÛÝ\˜ÙT™Y™\™[˜ÙH\ÈÛÛ›™XÝÜ‹[™]]˜[ˆ™K\›Ú™XÝÛ›HÜÙH^XÚ]ˆËÈ\[™[˜ÚY\ÈY\ˆ[žH›ÝšY\ˆ\]KÛÈ[ˆH˜[YHØ[ˆ™XÛÛÜ‹ÚYHHÜ][BˆËÈÚ]Ý]ØZ][™È›ÜˆHÜ]Ú\˜XÝ\š\ÝXÈ]Ù[ˆÈÚ[™ÙH
+[™šXÙH™\œØJK‚ˆYˆ
+\]ÛÛ›Û\ˆOH[
+H\]ÛÛ›Û\‹œ™X\PÜ›ÜÜÔÛÝ\˜ÙPš[™[™ÜÊ
+NÂˆYˆ
+Ü]ÛÛ›Û\ˆOH[
+HÜ]ÛÛ›Û\‹œ™X\PÜ›ÜÜÔÛÝ\˜ÙPš[™[™ÜÊ
+NÂˆYˆ
+P\PÛÛ›Û\ˆOH[
+HP\PÛÛ›Û\‹œ™X\PÜ›ÜÜÔÛÝ\˜ÙPš[™[™ÜÊ
+NÂˆNÂ‚ˆš]˜]H›ÚYØÚY[PÜ›ÜÜÔÛÝ\˜ÙT[T™Yœ™\Ú
+
+HÂˆYˆ
+\Ý›ÞYYXÜ›ÜÜÔÛÝ\˜ÙT[T™Yœ™\ÚØÚY[Y˜ÛÛ\\™P[™Ù]
+˜[ÙKYJJH™]\›ŽÂˆXZ[’[™\‹œÜÝ[^YY
+Ü›ÜÜÔÛÝ\˜ÙT[T™Yœ™\ÚL
+NÂˆB‚ˆš]˜]H›ÚY™Yœ™\ÚXÝ]™TÛ™S›ÝYšXØ][Û‘›ÜÛÛ™][ÛœÊ
+HÂˆYˆ
+š[™[™ÈOH[	‰ˆXÝ]™TÛ™S›ÝYšXØ][ÛˆOH[
+H\]SYYXR[™›Ê
+NÂˆB‚ˆš]˜]H›ÚYÜÝÛ™U˜[Y\ÐÚ[™ÙY
+›Û“[\ÝÛÛ›™XÝÜ•˜[YOˆ[[]]X›PÛÜJHÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆÛ”Û™U˜[Y\ÐÚ[™ÙY
+[[]]X›PÛÜJJNÂˆB‚ˆš]˜]HÚ[™ÝÓX[˜YÙ\ˆÚ[™ÝÓX[˜YÙ\ŽÂˆš]˜]HÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\È\˜[\ÎÂ‚ˆš]˜]HÝ™\›^TÝ]\ÕÚYÙ]š[™[™Èš[™[™ÎÂˆš]˜]H[Ý™\›^P]XÚ][\ÎÂˆš]˜]H›ÛÛX[ˆÝ™\›^P]XÚ™]žTØÚY[YÂˆÊŠˆ[˜[Y]\È[š[X]Ü‹Ùœ˜[YKÙ˜[˜XÚÈØ[˜XÚÜÈ™]Z[™YžH[ˆÛ\ˆÚ[™ÝÓX[˜YÙ\ˆ›ÛÝˆ
+‹Âˆš]˜]H[Ý™\›^P]XÚÙ[™\˜][ÛŽÂˆš]˜]H[Ý™\›^Uš\ÚX›QÙ[™\˜][ÛˆHLNÂˆš]˜]Hš[˜[[›˜X›HÝ™\›^P]XÚ™]žHH
+
+HOˆÂˆÝ™\›^P]XÚ™]žTØÚY[YH˜[ÙNÂˆYˆ
+\Ý›ÞYYš[™[™ÈOH[\™YœËÚYÙ][˜X›Y™Ù]
+
+JH™]\›ŽÂˆYˆ
+T\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊJHÂˆËÈØØ][Ûˆ\ÜÈ\™HÚ\™YÚ]HÝ]\È›ÝÈ]\™H›Ý™\]Z\™YžHBˆËÈ[™\[™[H]XÚYš]™\‹ÒQÝ\™˜XÙ\È[™HÛ™HÛÛ›™XÝÜ‹ˆÙY\]ÜÝˆËÈ[]™HÚ[HHÝ]\ÈÝ\™˜XÙHØZ]È›Üˆ\›Z\ÜÚ[ÛœÈÈ™H™\ÝÜ™Y‚ˆYˆ
+ÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\ÒXY\ÜÒÜÝ
+™YœÊJHÂˆ[œÝ\™Q[˜X›Y[[YJ
+NÂˆH[ÙHÂˆÝÜÙ[Š
+NÂˆBˆ™]\›ŽÂˆBˆÜ™X]SÝ™\›^UšY]Ê
+NÂˆNÂ‚ˆš]˜]H[[š]X[Âˆš]˜]H[[š]X[NÂˆš]˜]H›Ø][š]X[ÝXÚÂˆš]˜]H›Ø][š]X[ÝXÚNÂˆš]˜]HÛœÜÔÝ]HÛœÜÔÝ]HHÛœÜÔÝ]K“Ñ‘ŽÂˆš]˜]HÚQšTÝ]HÚYšTÝ]HHÚQšTÝ]K“Ñ‘ŽÂˆÊŠˆH\ØÛÛ›™XÝYK‹H›ÙÜ™\ÜÚ]™[HÝ›Û™Ù\ˆ”ÔÒKˆ
+‹Âˆš]˜]H[ÚYšTÚYÛ˜[]™[Âˆš]˜]H›Y]ÛÝÝ]H›Y]ÛÝÝ]HH›Y]ÛÝÝ]K“Ñ‘ŽÂˆš]˜]Hš[˜[Ù]Ýš[™ÏˆÛÛ›™XÝYYœÈH™]È\ÚÙ]Š
+NÂˆÊŠˆYHÚ[HHÝ\œ™[\™XÝTÛ™H˜[œÜÜ™\ÜÈ[ˆXÝ]™HSÔÈ›Ùš[Kˆ
+‹Âˆš]˜]H›ÛÛX[ˆÛ™P[˜ÜÔ™XYNÂˆš]˜]H›ÛÛX[ˆ™XÙZ]™\”™YÚ\Ý\™YH˜[ÙNÂˆÊŠˆ[˜[Y]\È\Þ[˜Ú›Û›Ý\È›Ùš[HÛ˜\ÚÝÈY\ˆÝ]\È˜XÚÚ[™È\ÈÝÜYÜˆ™\ÙYYYˆ
+‹Âˆš]˜]H[›Y]ÛÝ˜XÚÚ[™ÑÙ[™\˜][ÛŽÂ‚ˆš]˜]Hš[˜[[™\ˆXZ[’[™\ˆH™]È[™\ŠÛÜ\‹™Ù]XZ[“ÛÜ\Š
+JNÂˆš]˜]Hš[˜[[›˜X›HÙ\šXÙUØ]ÚÙÒX\™X]H™]È[›˜X›J
+HÂˆÝ™\œšYHX›XÈ›ÚY[Š
+HÂˆYˆ
+\Ý›ÞYY™YœÈOH[ˆUÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\Ð]]ÛX]XÒ[YÜ˜][Û’ÜÝ
+™YœÊJHÂˆÚYÙ]Ù\šXÙUØ]ÚÙË˜Ø[˜Ù[
+ÚYÙ]Ù\šXÙK\ÊNÂˆ™]\›ŽÂˆBˆÚYÙ]Ù\šXÙUØ]ÚÙË˜\›JÚYÙ]Ù\šXÙK\ÊNÂˆXZ[’[™\‹œÜÝ[^YY
+\ËÑT•’PÑWÕÐUÒÑ×ÒPT•‘PUÓTÊNÂˆBˆNÂˆÊŠˆ\™ÙH™]Z[™Y\Ý]H”ÓÓˆ\È™]Üš][ˆÙ™ˆHRH[™H][™›ÚY˜XÚÙÜ›Ý[™š[Üš]Kˆ
+‹Âˆš]˜]Hš[˜[^XÝ]Ü”Ù\šXÙHÝ\\Ý]UÛÜšÙ\ˆH^XÝ]ÜœË›™]ÔÚ[™ÛU™XY^XÝ]ÜŠ\ÚÈOˆÂˆ™XY™XYH™]È™XY
+
+
+HOˆÂˆžHÂˆ[™›ÚY›ÜË”›ØÙ\ÜËœÙ]™XYš[Üš]J[™›ÚY›ÜË”›ØÙ\ÜË•‘PQÔ’SÔ’UWÐPÒÑÔ“ÕS‘
+NÂˆHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÂˆBˆ\ÚËœ[Š
+NÂˆKœÝ]\Ë\Ý\\\Ý]HŠNÂˆ™XYœÙ]Y[[ÛŠYJNÂˆ™]\›ˆ™XYÂˆJNÂˆÊŠ‚ˆ
+ˆÛÛ›™XÝÜˆÝ\\\È[X™\˜][H[™\[™[œ›ÛHHÝ]\Ë]Ú[™ÝÈš[™[™ËˆÚ[™ÝÓX[˜YÙ\‚ˆ
+ˆØ[ˆ˜[œÚY[H™Z™XÝYšY]È\š[™È›ÛÝÚ[H[ˆ[™XYK\[›š[™ÈÛÛ›™XÝÜˆÝ[™YYÈÂˆ
+ˆ™K\™XYÙ^\ÝÜ™HÜ™Y[X[ÈÛˆTÑT—ÕS“ÐÒÑQ‚ˆ
+‹Âˆš]˜]H›ÛÛX[ˆ[YÜ˜][ÛœÔÝ\YÂˆš]˜]H›ÛÛX[ˆ[[YR[š]X[^™YÂˆš]˜]H›ÛÛX[ˆ[YÜ˜][Û”Ý\\ØÚY[YÂˆš]˜]H›ÛÛX[ˆ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÎÂˆÊŠˆÛ™HÙ][™ÜÈ™\^H™]Z[™YÚ[HHÝYÙY›ÛÝÝ[›ØÚÈÛÛ›Û\ˆ[™H\È\ÞKˆ
+‹Âˆš]˜]H›ÛÛX[ˆ[YÜ˜][Û”™XÛÛ™šYÝ\™T[™[™ÎÂˆš]˜]H›ÛÛX[ˆÜ™Y[X[™Yœ™\Ú[™[™ÎÂˆš]˜]H›ÛÛX[ˆÜ™Y[X[™Yœ™\ÚØÚY[YÂˆš]˜]H[[š]X[[YÜ˜][Û”ÝYÙNÂˆš]˜]H[[š]X[[YÜ˜][Û”ÝYÙT™]žPÛÝ[ÂˆÊŠˆÝYÙH™\›ÈÝÛœÈ\œÚ\Ý[˜ÙH[[]ÈÛÜšÙ\ˆ™\Ý[\ÈÛÛ[Z]YÛˆHXZ[ˆ™XYˆ
+‹Âˆš]˜]H›ÛÛX[ˆÝ\\Ý]P˜\œšY\’[‘›YÚÂˆÊŠˆ^XÝHÛ™HÛÛ›Û\ˆÝYÙHX^H™\\™HÝ]HÛˆHÙ\šX[^™YÝ\\ÛÜšÙ\‹ˆ
+‹Âˆš]˜]H›ÛÛX[ˆ[š]X[[YÜ˜][Û•ÛÜšÙ\’[‘›YÚÂˆÊŠ‚ˆ
+ˆH™\\™YÜ˜\\ÈÝÛ™Y\™H™]ÙY[ˆÛÜšÙ\ˆÛÛ\][Ûˆ[™]ÈXZ[‹]™XYX›XØ][Û‹‚ˆ
+ˆÛ‘\Ý›ÞH]ÛZXØ[HZÙ\È[™ÛX[œÈ]™Y›Ü™H™[[Ýš[™È[™\ˆØ[˜XÚÜË‚ˆ
+‹Âˆš]˜]Hš[˜[]ÛZXÔ™Y™\™[˜ÙO™\\™Y[š]X[[YÜ˜][Û”ÝYÙO‚ˆ[™[™Ò[š]X[[YÜ˜][Û”ÝYÙHH™]È]ÛZXÔ™Y™\™[˜ÙOŠ
+NÂˆš]˜]Hš[˜[[›˜X›H[š]X[[YÜ˜][Û”ÝYÙT[›™\ˆH\ÎŽœ[“™^[š]X[[YÜ˜][Û”ÝYÙNÂˆ[X›Hš]˜]HY™\œ™Y[YÜ˜][Û”Ý\Y™\œ™Y[YÜ˜][Û”Ý\Â‚ˆÊŠˆÛ™H]XÚY[[ÝÛ™YÚÜ™[ÙÜ˜\\ˆØ[˜XÚÎÈÝ[H›ÛÝÈØ[››Ý›Üœ›ÝÈH™]Ù\ˆÚÙ[‹ˆ
+‹Âˆš]˜]Hš[˜[Û\ÜÈY™\œ™Y[YÜ˜][Û”Ý\ˆ[\[Y[ÈÚÜ™[ÙÜ˜\\‹‘œ˜[YPØ[˜XÚË[›˜X›HÂˆš[˜[[]XÚY[Ù[™\˜][ÛŽÂˆ›Û“[š[˜[šY]È›ÛÝÂ‚ˆY™\œ™Y[YÜ˜][Û”Ý\
+[]XÚY[Ù[™\˜][Û‹›Û“[šY]È›ÛÝ
+HÂˆ\Ë˜]XÚY[Ù[™\˜][ÛˆH]XÚY[Ù[™\˜][ÛŽÂˆ\Ëœ›ÛÝH›ÛÝÂˆB‚ˆÝ™\œšYHX›XÈ›ÚYÑœ˜[YJÛ™Èœ˜[YU[YS˜[›ÜÊHÂˆËÈœ˜[YHØ[˜XÚÜÈ[ˆ™Y›Ü™H˜]™\œØ[ˆÜÝ[™ÈÛ˜ÙH[Ü™H]È˜]™\œØ[˜]ÈBˆËÈ[HÜ\]YHÝ]\È›ÝÈ™Y›Ü™HÛÛ›™XÝÜˆ”ÓÓ‹ÒÙ^\ÝÜ™HÛÜšÈ™YÚ[œË‚ˆXZ[’[™\‹œÜÝ
+\ÊNÂˆB‚ˆÝ™\œšYHX›XÈ›ÚY[Š
+HÂˆYˆ
+Y™\œ™Y[YÜ˜][Û”Ý\OH\ÊH™]\›ŽÂˆY™\œ™Y[YÜ˜][Û”Ý\H[ÂˆYˆ
+Z\ÐÝ\œ™[Ý™\›^P]XÚY[
+]XÚY[Ù[™\˜][Û‹›ÛÝ
+Bˆ›ÛÝ™Ù][J
+HŽNNYŠHÂˆ[YÜ˜][Û”Ý\\ØÚY[YH˜[ÙNÂˆ™]\›ŽÂˆBˆÝ\\\™›Ü›X[˜ÙU˜XÙK›X\šÊ›Ý™\›^WÙ[WÝš\ÚX›HŠNÂˆÝ]\ÕÚYÙ]\XØ][Û‹››ÝYžQš\œÝ\ÙY[Ý\™˜XÙJÚYÙ]Ù\šXÙK\ÊNÂˆËÈHÝ\™˜XÙH[™ÛÛ›Û\ˆ[™\È\™H[™\[™[ˆHœ™\ÚÝ]\È›ÝÈ\È[ÝÙYÂˆËÈ˜]È\š[™È›ÛÝ]]È[K]š\ÚX›HØ[˜XÚÈ]\Ý™]™\ˆÜ[ˆH\œÚ\ÝYÜÝˆËÈÙ[™\˜][ÛˆžH]Ù[‹‚ˆYˆ
+Y^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYBˆ	‰ˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹œÚÝ[\šÐ]]ÛX]XÔ[[YJÚYÙ]Ù\šXÙK\ÊJHÂˆ]]ÛX]XÔ[[YT\šÙYHYNÂˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹™[œÝ\™R[YÜ˜][Û’ÜÝØÚY[Y
+ÚYÙ]Ù\šXÙK\ÊNÂˆBˆ›ÛÛX[ˆ™[X\ÙY\šÙY[[YHH˜[ÙNÂˆYˆ
+]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›Bˆ	‰ˆTÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹œÚÝ[\šÐ]]ÛX]XÔ[[YJÚYÙ]Ù\šXÙK\ÊJHÂˆ™[X\ÙY\šÙY[[YHH]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]Âˆ]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›HH˜[ÙNÂˆ™\Ý[YP]]ÛX]XÓY™XÞXÛR[YÜ˜][ÛœÐY\”]ZY]
+
+NÂˆBˆ›ÛÛX[ˆ[[YT\šÙYH]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]ÂˆYˆ
+\[[YT\šÙY	‰ˆZ[YÜ˜][ÛœÔÝ\Yˆ	‰ˆZ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÊHÂˆ[’[š]X[[YÜ˜][Û”Ý\\
+
+NÂˆBˆYˆ
+\[[YT\šÙY	‰ˆ[YÜ˜][ÛœÔÝ\Y	‰ˆš[™[™ÈOH[
+HÂˆ\T™Y™\™[˜Ù\Ê˜[ÙJNÂˆBˆYˆ
+\[[YT\šÙY	‰ˆX]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›Bˆ	‰ˆ\™[X\ÙY\šÙY[[YJHÂˆš[š\Ú]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[RY”™XYJ
+NÂˆBˆBˆBˆÊŠˆ™KY]˜[X]\ÈÜÝ[H[\È]™[ˆÚ[ˆ›È™]ÈXÚÙ]\œš]™\Ëˆ
+‹Âˆš]˜]Hš[˜[[›˜X›H]]ÛX][Û‘œ™\Ú™\ÜÕXÚÈH™]È[›˜X›J
+HÂˆÝ™\œšYHX›XÈ›ÚY[Š
+HÂˆYˆ
+\Ý›ÞYY
+H™]\›ŽÂˆYˆ
+š[™[™ÈOH[
+HÂˆ™[™\’ÛYP\ÜÚ\Ý[œšXÚÜÊ
+NÂˆ\PœšXÚÕš\ÚXš[]JÝ\œ™[œšXÚÔÙ]
+
+JNÂˆBˆ\TÜ\™Y™\™[˜Ù\ÔØY™[J
+NÂˆYˆ
+Y\Ý›ÞYY
+HXZ[’[™\‹œÜÝ[^YY
+\ËÌÌ
+NÂˆBˆNÂˆš]˜]Hš[˜[[›˜X›HÜ\™Yœ™\ÚH\ÎŽ˜\TÜ\™Y™\™[˜Ù\ÔØY™[NÂˆš]˜]HÝ]XÈš[˜[Û™ÈÓ‘WÑQUÔ—Ô‘U’QU×ÒS‘Ñ‘—ÓTÈHLÂˆ[X›Hš]˜]HÝš[™ÈXÝ]™TÛ™QY]Ü”™]šY]ÓÝ™\›^RYÂˆ[X›Hš]˜]HÝš[™È[™[™ÔÛ™QY]Ü”™]šY]ÔÝÜYÂˆš]˜]Hš[˜[[›˜X›HÛ™QY]Ü”™]šY]ÔÝÜH
+
+HOˆÂˆÝš[™È™\]Y\ÝYH[™[™ÔÛ™QY]Ü”™]šY]ÔÝÜYÂˆ[™[™ÔÛ™QY]Ü”™]šY]ÔÝÜYH[ÂˆYˆ
+\Ý›ÞYY™\]Y\ÝYOH[ˆ\™\]Y\ÝY™\]X[ÊXÝ]™TÛ™QY]Ü”™]šY]ÓÝ™\›^RY
+JH™]\›ŽÂˆYˆ
+Ü\Ý™\›^HOH[
+HÜ\Ý™\›^KœÝÜY]Ü”™]šY]Ê™\]Y\ÝY
+NÂˆXÝ]™TÛ™QY]Ü”™]šY]ÓÝ™\›^RYH[ÂˆNÂ‚ˆš]˜]H›ÚYØÚY[TÜ\™Yœ™\Ú
+
+HÂˆYˆ
+\Ý›ÞYY
+H™]\›ŽÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÜ\™Yœ™\Ú
+NÂˆXZ[’[™\‹œÜÝ
+Ü\™Yœ™\Ú
+NÂˆBˆš]˜]HØØ][Û“X[˜YÙ\ˆØØ][Û“X[˜YÙ\ˆH[Âˆš]˜]HÛÛ›™XÝ]š]SX[˜YÙ\ˆÛÛ›™XÝ]š]SX[˜YÙ\ˆH[Âˆš]˜]H›ÛÛX[ˆÛœÜÔÝ]\ÐØ[˜XÚÔ™YÚ\Ý\™YÂˆš]˜]H›ÛÛX[ˆØØ][Û•\]\Ô™YÚ\Ý\™YÂˆš]˜]H›ÛÛX[ˆ™]ÛÜšÐØ[˜XÚÔ™YÚ\Ý\™YÂˆš]˜]H›ÛÛX[ˆÚYšTœÜÚT™XÙZ]™\”™YÚ\Ý\™YÂˆš]˜]H›ÛÛX[ˆÝ™\›^P]XÚYÂˆÊŠˆ[Û›ÝÛšXÈ[Y\Ý[\ÈØ[XÛØÚÈÚ[™Ù\È]\Ý›Ý›ÛÛ™ÈÜˆ^\™HHÓ”ÔÈš^ˆ
+‹Âˆš]˜]HÛ™È\ÝØØ][Û•\]Q[\ÙYÂ‚ˆš]˜]HÜ˜YY[˜]ØX›H˜XÚÙÜ›Ý[™H[Âˆš]˜]H[™ÐÛÛÜˆHLNÂˆš]˜]H[™ÐÛÜ›™\”˜Y]\ÈHLNÂ‚ˆš]˜]H[ÝXÚÛÜÂ‚ˆš]˜]HÚ[\Q]Q›Ü›X][YQ›Ü›X]Âˆš]˜]HÚ[\Q]Q›Ü›X]]Q›Ü›X]Âˆš]˜]HÝš[™ÈÝ\œ™[]Q›Ü›X]]\›ŽÂ‚ˆš]˜]H\ØYÙTÝ]ÓX[˜YÙ\ˆ\ØYÙTÝ]ÓX[˜YÙ\ˆH[Âˆš]˜]HÙ]Ýš[™ÏˆY[’[”XÚØYÙ\ÎÂˆš]˜]HÝš[™È\Ý›Ü™YÜ›Ý[™XÚØYÙNÂˆš]˜]HÛ™È\Ý›Ü™YÜ›Ý[™˜Z[\™SÙÑ[\ÙYÂˆ[X›Hš]˜]HXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ŽÂˆÊŠˆ[™\[™[œ›ÛHÝ]\Ð˜\”Ý\™˜XÙPÛÛ^	ÜÈ][˜ÚÙ›ØÝ\ËØLL^H˜[˜XÚÈÚÙ[‹ˆ
+‹Âˆ›Û“[š]˜]H˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK•™[™Ü‘XÚ\Ú[ÛˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[ÛˆBˆ˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK•™[™Ü‘XÚ\Ú[Û‹““Ó‘NÂˆš]˜]HÛ™ÈXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û][\ÙYHLSÂˆš]˜]Hš[˜[[›˜X›HXØ\ž˜]šYØ]Ü•Ú[™ÝÓX\ÙQ^\žHBˆ\ÎŽ™^\™QXØ\ž˜]šYØ]Ü•Ú[™ÝÓX\ÙNÂˆš]˜]H›ÛÛX[ˆXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][Û”[™[™ÎÂˆš]˜]HÛ™ÈXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔÝ\Y][\ÙYHLSÂˆš]˜]H[XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žR[™^Âˆš]˜]Hš[˜[[›˜X›HXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žHBˆ\ÎŽœ[‘XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žNÂˆš]˜]Hš[˜[[›˜X›HXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÑ^\žHBˆ\ÎŽ™^\™QXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][ÛŽÂˆš]˜]H›ÛÛX[ˆÝ™\›^RY[žP\H˜[ÙNÂ‚ˆÊŠ‚ˆ
+ˆ[X™\ˆÙˆ[‹Y›YÚ˜[œÚ][ÛœÈ]]™HÚY[™YHÚ[™ÝÓX[˜YÙ\ˆÚ[™ÝÈÈBˆ
+ˆØÜ™Y[‹]ÚY˜Y™™\ˆˆÛÈ^XÚ]š\ÚXš[]H[š[X][ÛœÈØ[ˆ^H[ˆHÝX›H™XÝ[™ÛK‚ˆ
+ˆ[˜Ü™[Y[YÚ[ˆH˜[œÚ][ÛˆÝ\ÈHY™™\‹XÜ™[Y[YÚ[ˆ][™ÎÈHÚ[™ÝÈ\Âˆ
+ˆ™\ÝÜ™YÈÔTÐÓÓ•S•Û›HÚ[ˆHÛÝ[\ˆ™XXÚ\È™\›ËˆÚ\™Y™]ÙY[Ž‚ˆ
+ˆ[‚ˆ
+ˆOžÐ[šÈØ™YÚ[•š\ÚXš[]U˜[œÚ][ÛŸH
+œšXÚÈÚÝËÚYJOÛO‚ˆ
+ˆO•HXYÙ\ˆ™KY[\[ˆHÚ^™KXÚ[™ÙH\Ý[™\ˆ]Ø]Ú\ÈHÚš[šÈ™Y›Ü™HBˆ
+ˆÚ[™ÝÈX[˜YÙ\ˆ\Y\ÈH™]ÈÜ˜\XÛÛ[›Ý[™ËÛO‚ˆ
+ˆÝ[‚ˆ
+‹Âˆš]˜]H[[™[™ÐY™™\™Y˜[œÚ][ÛœÈHÂ‚ˆÊŠ‚ˆ
+ˆÛÜÙ\ÈHY™™\ˆÜ[™YXYÙ\›HžHÐÛÙHÛ“^[Ý]Ú[™Ù_HÚ[ˆHÛÛ[Úš[šÜË‚ˆ
+ˆÜÝYÚ]H[^HÛYÚHÛ™Ù\ˆ[ˆÐ[šÈÐ”’PÒ×ÕS”ÒUSÓ—ÑTUSÓ—ÓTßKÛÈBˆ
+ˆÚ[™ÝÈØ[››Ý™[XZ[ˆØÜ™Y[‹]ÚYHÚ[ˆHÚ^™H[\È›Ý›ÛÝÙYžHHš\ÚXš[]Bˆ
+ˆ˜[œÚ][Û‹‚ˆ
+‹Âˆš]˜]Hš[˜[[›˜X›HÚš[šÐY™™\”ØY™]PÛÜÙHH\ÎŽ™[™Y™™\™Y˜[œÚ][ÛŽÂ‚ˆš]˜]HÛÛ^[YYÛÛ^Âˆš]˜]H[\YY[YT™YˆHLNÂ‚ˆÊŠˆš\™\ÈÚ[ˆHÝ™\›^IÜÈÜÚ][ÛˆÜˆÚ^™HÚ[™Ù\ÈÛÈHÙ][™ÜÈRHØ[ˆÝ^H[ˆÞ[˜Ëˆ
+‹ÂˆX›XÈ[\™˜XÙHÝ™\›^TÝ]S\Ý[™\ˆÂˆ›ÚYÛ“Ý™\›^TÝ]PÚ[™ÙY
+[[K[ÚY[ZYÚ
+NÂˆB‚ˆ[X›Hš]˜]HÝ™\›^TÝ]S\Ý[™\ˆÝ™\›^TÝ]S\Ý[™\ŽÂ‚ˆš]˜]HYYXTÙ\ÜÚ[Û“X[˜YÙ\ˆYYXTÙ\ÜÚ[Û“X[˜YÙ\ŽÂˆš]˜]Hš[˜[\ÝYYXPÛÛ›Û\ˆXÝ]™SYYXPÛÛ›Û\œÈH™]È\œ˜^S\ÝŠ
+NÂˆš]˜]Hš[˜[YYXPÛÛ›Û\‹Ø[˜XÚÈYYXPÛÛ›Û\Ø[˜XÚÈH™]ÈYYXPÛÛ›Û\‹Ø[˜XÚÊ
+HÂˆÝ™\œšYBˆX›XÈ›ÚYÛ”^X˜XÚÔÝ]PÚ[™ÙY
+[X›H^X˜XÚÔÝ]HÝ]JHÂˆ\]SYYXR[™›Ê
+NÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛ“Y]Y]PÚ[™ÙY
+[X›HYYXSY]Y]HY]Y]JHÂˆ\]SYYXR[™›Ê
+NÂˆBˆNÂˆš]˜]Hš[˜[YYXTÙ\ÜÚ[Û“X[˜YÙ\‹“ÛXÝ]™TÙ\ÜÚ[ÛœÐÚ[™ÙY\Ý[™\ˆXÝ]™TÙ\ÜÚ[ÛœÐÚ[™ÙY\Ý[™\ˆBˆ\ÎŽœ™Xš[™YYXPÛÛ›Û\œÎÂ‚ˆš]˜]H[Ø][]\ÐÛÝ[HLNÂˆš]˜]H[ÛœÜÓ[ÙQ›YÜÈHÂˆš]˜]HÛ™ÈØ][]\ÐÛÝ[[Y\Ý[\HÂˆš]˜]H›ÛÛX[ˆØ][]T™XÙZ]™\”™YÚ\Ý\™YH˜[ÙNÂˆš]˜]Hš[˜[œ›ØYØ\Ý™XÙZ]™\ˆØ][]TÝ]\Ô™XÙZ]™\ˆH™]Èœ›ØYØ\Ý™XÙZ]™\Š
+HÂˆÝ™\œšYBˆX›XÈ›ÚYÛ”™XÙZ]™JÛÛ^ÛÛ^[[[[
+HÂˆYˆ
+\Ý›ÞYYš[™[™ÈOH[™YœÈOH[ˆ\™YœËÚYÙ][˜X›Y™Ù]
+
+JH™]\›ŽÂˆ[ÛÝ[H[[™Ù][^˜JÓ”ÔÔÒT‘WÑVWÔÐUSUT×ÐÓÕS•LJNÂˆ[[ÙHH[[™Ù][^˜JÓ”ÔÔÒT‘WÑVWÓSÑK
+NÂˆÙË™
+QË‘Ó”ÔÈÚ\™HØ][]\ÈÛÝ[ˆˆ
+ÈÛÝ[
+È‹[ÙNˆˆ
+È[ÙJNÂˆØ][]\ÐÛÝ[HÛÝ[ÂˆÛœÜÓ[ÙQ›YÜÈH[ÙNÂˆËÈ[Û›ÝÛšXÈÛØÚÈ
+X]Ú\ÈHÜÝ[^YY™\Ù]™[ÝÊKÛÈH›ÛÝ][YHØ[XÛØÚÂˆËÈ[\œ›ÛHÔËÓ•Þ[˜ÈØ[‰Ý™[X]\™[H^\™HÜˆœ™Y^™HHœ™\Ú™\ÜÈÚ[™ÝË‚ˆØ][]\ÐÛÝ[[Y\Ý[\H[™›ÚY›ÜË”Þ\Ý[PÛØÚË\[YSZ[\Ê
+NÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊØ][]\ÐÛÝ[™\Ù][›˜X›JNÂˆXZ[’[™\‹œÜÝ[^YY
+Ø][]\ÐÛÝ[™\Ù][›˜X›KÓ”ÔÔÒT‘WÔÐUSUWÔÕUT×ÕSQSÕUÓTÊNÂˆ\]QÛœÜÔÝ]\Ê
+NÂˆBˆNÂˆš]˜]Hš[˜[[›˜X›HØ][]\ÐÛÝ[™\Ù][›˜X›HH
+
+HOˆÂˆØ][]\ÐÛÝ[HLNÂˆÛœÜÓ[ÙQ›YÜÈHÂˆ\]QÛœÜÔÝ]\Ê
+NÂˆNÂ‚ˆš]˜]Hš[˜[œ›ØYØ\Ý™XÙZ]™\ˆ›Y]ÛÝ™XÙZ]™\ˆH™]Èœ›ØYØ\Ý™XÙZ]™\Š
+HÂˆÝ™\œšYBˆX›XÈ›ÚYÛ”™XÙZ]™JÛÛ^ÛÛ^[[[[
+HÂˆYˆ
+\Ý›ÞYYš[™[™ÈOH[™YœÈOH[ˆ\™YœËÚYÙ][˜X›Y™Ù]
+
+JH™]\›ŽÂˆÝš[™ÈXÝ[ÛˆH[[™Ù]XÝ[ÛŠ
+NÂˆYˆ
+XÝ[ÛˆOH[
+H™]\›ŽÂˆYˆ
+›Y]ÛÝY\\‹PÕSÓ—ÔÕUWÐÒS‘ÑQ™\]X[ÊXÝ[ÛŠJHÂˆ[Ý]HH[[™Ù][^˜J›Y]ÛÝY\\‹‘VWÔÕUK›Y]ÛÝY\\‹‘T”“ÔŠNÂˆYˆ
+Ý]HOH›Y]ÛÝY\\‹”ÕUWÓÑ‘ˆÝ]HOH›Y]ÛÝY\\‹”ÕUWÕT“’S‘×ÓÑ‘ŠHÂˆÛÛ›™XÝYYœË˜ÛX\Š
+NÂˆH[ÙHYˆ
+Ý]HOH›Y]ÛÝY\\‹”ÕUWÓÓŠHÂˆ™Yœ™\ÚÛÛ›™XÝYœ›ÛT›ÞY\Ê
+NÂˆBˆH[ÙHYˆ
+›Y]ÛÝ]šXÙKPÕSÓ—ÐPÓÐÓÓ“‘PÕQ™\]X[ÊXÝ[ÛŠJHÂˆ›Y]ÛÝ]šXÙH]šXÙHH[[™Ù]\˜Ù[X›Q^˜J›Y]ÛÝ]šXÙK‘VWÑU’PÑJNÂˆYˆ
+]šXÙHOH[	‰ˆ]šXÙK™Ù]Y™\ÜÊ
+HOH[
+HÂˆÛÛ›™XÝYYœË˜Y
+]šXÙK™Ù]Y™\ÜÊ
+JNÂˆBˆH[ÙHYˆ
+›Y]ÛÝ]šXÙKPÕSÓ—ÐPÓÑTÐÓÓ“‘PÕQ™\]X[ÊXÝ[ÛŠJHÂˆ›Y]ÛÝ]šXÙH]šXÙHH[[™Ù]\˜Ù[X›Q^˜J›Y]ÛÝ]šXÙK‘VWÑU’PÑJNÂˆYˆ
+]šXÙHOH[	‰ˆ]šXÙK™Ù]Y™\ÜÊ
+HOH[
+HÂˆÛÛ›™XÝYYœËœ™[[Ý™J]šXÙK™Ù]Y™\ÜÊ
+JNÂˆBˆBˆ\]P›Y]ÛÝÝ]\Ê
+NÂˆBˆNÂ‚ˆš]˜]Hš[˜[[›˜X›H\]Q]U[YT[›˜X›HH™]È[›˜X›J
+HÂˆÝ™\œšYBˆX›XÈ›ÚY[Š
+HÂˆ\]Q]U[YJ
+NÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆÛ™È[^HHUUSQWÕTUWÒS•T•SÓTÈH
+›ÝÈ	HUUSQWÕTUWÒS•T•SÓTÊNÂˆXZ[’[™\‹œÜÝ[^YY
+\Ë[^JNÂˆBˆNÂˆÊŠˆ[YK\˜[™ÙHÛÛ™][ÛœÈ™[XZ[ˆ]™H]™[ˆÚ[ˆHÝ]\È›ÝÈ\È›ÈÛØÚÈÜˆ\È\ØX›Yˆ
+‹Âˆš]˜]Hš[˜[[›˜X›HÞ\Ý[PÛÛ™][Û”™Yœ™\ÚH™]È[›˜X›J
+HÂˆÝ™\œšYHX›XÈ›ÚY[Š
+HÂˆYˆ
+\Ý›ÞYYZ[YÜ˜][ÛœÔÝ\Y
+H™]\›ŽÂˆYˆ
+ØÙ[˜\š[ÐÛÛ›Û\ˆOH[
+HØÙ[˜\š[ÐÛÛ›Û\‹œ™Yœ™\ÚÞ\Ý[PÛÛ™][ÛœÊ
+NÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆÛ™È[^HHÖTÕSWÐÓÓ‘USÓ—Ô‘Q”‘TÒÒS•T•SÓTÂˆH
+›ÝÈ	HÖTÕSWÐÓÓ‘USÓ—Ô‘Q”‘TÒÒS•T•SÓTÊNÂˆXZ[’[™\‹œÜÝ[^YY
+\Ë[^JNÂˆBˆNÂ‚ˆš]˜]Hš[˜[[›˜X›H›Ü™YÜ›Ý[™\ÚXÚÔ[›˜X›HH™]È[›˜X›J
+HÂˆÝ™\œšYBˆX›XÈ›ÚY[Š
+HÂˆØY™PÚXÚÑ›Ü™YÜ›Ý[™\
+œÛŠNÂˆYˆ
+Y\Ý›ÞYY
+HÂˆXZ[’[™\‹œÜÝ[^YY
+\Ë“Ô‘QÔ“ÕS‘ÐTÐÒPÒ×ÒS•T•SÓTÊNÂˆBˆBˆNÂ‚ˆš]˜]Hš[˜[[›˜X›H\]QÛœÜÔÝ]\Ô[›˜X›HH™]È[›˜X›J
+HÂˆÝ™\œšYBˆX›XÈ›ÚY[Š
+HÂˆYˆ
+\Ý›ÞYY[ØØ][Û•\]\Ô™YÚ\Ý\™Y\ÝØØ][Û•\]Q[\ÙYH
+HÂˆ™]\›ŽÂˆBˆÛ™ÈYÙHHX]›X^
+ˆÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+HH\ÝØØ][Û•\]Q[\ÙY
+NÂˆYˆ
+YÙHHÓ”Ô×Ñ’VÓÑ‘—ÐQ•T—ÓTÊHÂˆÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]K“Ñ‘ŠNÂˆ™]\›ŽÂˆBˆYˆ
+YÙHHÓ”Ô×Ñ’VÑQÔQQÐQ•T—ÓTÊHÂˆÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]KQ
+NÂˆBˆÛ™È™^›Ý[™\žHHYÙHÓ”Ô×Ñ’VÑQÔQQÐQ•T—ÓTÂˆÈÓ”Ô×Ñ’VÑQÔQQÐQ•T—ÓTÈˆÓ”Ô×Ñ’VÓÑ‘—ÐQ•T—ÓTÎÂˆXZ[’[™\‹œÜÝ[^YY
+\ËX]›X^
+S™^›Ý[™\žHHYÙJJNÂˆBˆNÂ‚ˆš]˜]Hš[˜[ÛœÜÔÝ]\ËØ[˜XÚÈÛœÜÔÝ]\ÐØ[˜XÚÈH™]ÈÛœÜÔÝ]\ËØ[˜XÚÊ
+HÂˆÝ™\œšYBˆX›XÈ›ÚYÛ”Ý\Y
+
+HÂˆÙË™
+QË‘Ó”ÔÈ\ÈÝ\YŠNÂˆ\ÝØØ][Û•\]Q[\ÙYHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]KQ
+NÂˆØÚY[QÛœÜÑœ™\Ú™\ÜÑXY[™J
+NÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛ”ÝÜY
+
+HÂˆÙË™
+QË‘Ó”ÔÈ\ÈÝÜYŠNÂˆ\ÝØØ][Û•\]Q[\ÙYHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ\]QÛœÜÔÝ]\Ô[›˜X›JNÂˆÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]K“Ñ‘ŠNÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛ‘š\œÝš^
+[™“Z[\ÊHÂˆÙË™
+QË‘Ó”ÔÈ\Èš\œÝš^ŠNÂˆ\ÝØØ][Û•\]Q[\ÙYHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]KQ
+NÂˆØÚY[QÛœÜÑœ™\Ú™\ÜÑXY[™J
+NÂˆBˆNÂ‚ˆš]˜]Hš[˜[ØØ][Û“\Ý[™\ˆØØ][Û“\Ý[™\ˆH™]ÈØØ][Û“\Ý[™\Š
+HÂˆÝ™\œšYBˆX›XÈ›ÚYÛ“ØØ][ÛÚ[™ÙY
+›Û“[ØØ][ÛˆØØ][ÛŠHÂˆ\ÝØØ][Û•\]Q[\ÙYHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆYˆ
+ØØ][Û‹š\ÐXØÝ\˜XÞJ
+H	‰ˆØØ][Û‹™Ù]XØÝ\˜XÞJ
+HŒŒ
+HÂˆÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]K‘ÓÓÑ
+NÂˆH[ÙHÂˆÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]KQ
+NÂˆBˆØÚY[QÛœÜÑœ™\Ú™\ÜÑXY[™J
+NÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛ”›ÝšY\‘[˜X›Y
+›Û“[Ýš[™È›ÝšY\ŠHÂˆÙË™
+QË”›ÝšY\ˆ[˜X›Yˆˆ
+È›ÝšY\ŠNÂˆ\ÝØØ][Û•\]Q[\ÙYHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]KQ
+NÂˆØÚY[QÛœÜÑœ™\Ú™\ÜÑXY[™J
+NÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛ”›ÝšY\‘\ØX›Y
+›Û“[Ýš[™È›ÝšY\ŠHÂˆÙË™
+QË”›ÝšY\ˆ\ØX›Yˆˆ
+È›ÝšY\ŠNÂˆ\ÝØØ][Û•\]Q[\ÙYHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ\]QÛœÜÔÝ]\Ô[›˜X›JNÂˆÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]K“Ñ‘ŠNÂˆBˆNÂ‚ˆš]˜]Hš[˜[œ›ØYØ\Ý™XÙZ]™\ˆÚYšTœÜÚT™XÙZ]™\ˆH™]Èœ›ØYØ\Ý™XÙZ]™\Š
+HÂˆÝ™\œšYHX›XÈ›ÚYÛ”™XÙZ]™JÛÛ^ÛÛ^[[[[
+HÂˆYˆ
+[[OH[	‰ˆÚYšSX[˜YÙ\‹””ÔÒWÐÒS‘ÑQÐPÕSÓ‹™\]X[Ê[[™Ù]XÝ[ÛŠ
+JJHÂˆ™Yœ™\ÚÚYšTÚYÛ˜[]™[
+
+NÂˆBˆBˆNÂ‚ˆš]˜]Hš[˜[ÛÛ›™XÝ]š]SX[˜YÙ\‹“™]ÛÜšÐØ[˜XÚÈ™]ÛÜšÐØ[˜XÚÈH™]ÈÛÛ›™XÝ]š]SX[˜YÙ\‹“™]ÛÜšÐØ[˜XÚÊ
+HÂˆÝ™\œšYBˆX›XÈ›ÚYÛ]˜Z[X›J›Û“[™]ÛÜšÈ™]ÛÜšÊHÂˆÙË™
+QË•ÚKQšH\ÈÛÛ›™XÝYŠNÂˆYˆ
+ÚYšTÝ]HOHÚQšTÝ]K“Ñ‘ŠHÂˆÙ]ÚYšTÝ]\ÊÚQšTÝ]K““×ÒS•T“‘U
+NÂˆBˆ™Yœ™\ÚÚYšTÚYÛ˜[]™[
+
+NÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆ›Ø™T™XXÚXš[]J
+JNÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛ“ÜÝ
+›Û“[™]ÛÜšÈ™]ÛÜšÊHÂˆÙË™
+QË•ÚKQšH\ÈÜÝŠNÂˆÙ]ÚYšTÝ]\ÊÚQšTÝ]K“Ñ‘ŠNÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛØ\Xš[]Y\ÐÚ[™ÙY
+›Û“[™]ÛÜšÈ™]ÛÜšË™]ÛÜšÐØ\Xš[]Y\È™]ÛÜšÐØ\Xš[]Y\ÊHÂˆYˆ
+™]ÛÜšÐØ\Xš[]Y\Ëš\Õ˜[œÜÜ
+™]ÛÜšÐØ\Xš[]Y\Ë•S”ÔÔ•ÕÒQ’JJHÂˆ›ÛÛX[ˆ\Ò[\›™]H™]ÛÜšÐØ\Xš[]Y\Ëš\ÐØ\Xš[]J™]ÛÜšÐØ\Xš[]Y\Ë“‘UÐÐTP’SUWÒS•T“‘U
+NÂˆÙË™
+QË•ÚKQšHØ\Xš[]Y\ÈÚ[™ÙY\È[\›™]Hˆ
+È\Ò[\›™]
+NÂˆYˆ
+\Ò[\›™]
+HÂˆËÈ™]ÛÜšÈÛZ[\È[\›™]Ø\Xš[]H8 %ÈÝ\ˆÝÛˆ›Ø™HÈY™™\™[X]BˆËÈ•SœÈÒUSTÕœÈ“Ó‘K‚ˆXZ[’[™\‹œÜÝ
+
+
+HOˆ›Ø™T™XXÚXš[]J
+JNÂˆH[ÙHÂˆÙ]ÚYšTÝ]\ÊÚQšTÝ]K““×ÒS•T“‘U
+NÂˆBˆ™Yœ™\ÚÚYšTÚYÛ˜[]™[
+
+NÂˆH[ÙHÂˆÙ]ÚYšTÝ]\ÊÚQšTÝ]K“Ñ‘ŠNÂˆBˆBˆNÂ‚ˆš]˜]Hš[˜[[›˜X›H™XXÚXš[]T›Ø™T[›˜X›HH™]È[›˜X›J
+HÂˆÝ™\œšYBˆX›XÈ›ÚY[Š
+HÂˆYˆ
+ÚYšTÝ]HOHÚQšTÝ]K“Ñ‘ŠHÂˆËÈ\K\ÙXÛÛ™ØY™]H™Yœ™\ÚÛÝ™\œÈ™[™ÜˆÝXÚÜÈ]Ý\™\ÜÈ”ÔÒHœ›ØYØ\ÝË‚ˆ™Yœ™\ÚÚYšTÚYÛ˜[]™[
+
+NÂˆ›Ø™T™XXÚXš[]J
+NÂˆBˆXZ[’[™\‹œÜÝ[^YY
+\ËS•T“‘UÔ“Ð‘WÒS•T•SÓTÊNÂˆBˆNÂ‚ˆš]˜]H™XXÚXš[]PÚXÚÙ\ˆ™XXÚXš[]PÚXÚÙ\ŽÂ‚ˆš]˜]H›ÚY›Ø™T™XXÚXš[]J
+HÂˆYˆ
+\Ý›ÞYYš[™[™ÈOH[™YœÈOH[\™YœËÚYÙ][˜X›Y™Ù]
+
+JH™]\›ŽÂˆYˆ
+™XXÚXš[]PÚXÚÙ\ˆOH[
+HÂˆ™XXÚXš[]PÚXÚÙ\ˆH™]È™XXÚXš[]PÚXÚÙ\ŠXZ[’[™\ŠNÂˆBˆ™XXÚXš[]PÚXÚÙ\‹˜ÚXÚÊ™XXÚOˆÂˆYˆ
+\Ý›ÞYYš[™[™ÈOH[™YœÈOH[ˆ\™YœËÚYÙ][˜X›Y™Ù]
+
+JH™]\›ŽÂˆYˆ
+ÚYšTÝ]HOHÚQšTÝ]K“Ñ‘ŠH™]\›ŽÂˆÝÚ]Ú
+™XXÚ
+HÂˆØ\ÙH•SOˆÙ]ÚYšTÝ]\ÊÚQšTÝ]K’S•T“‘U
+NÂˆØ\ÙHÒUSTÕOˆÙ]ÚYšTÝ]\ÊÚQšTÝ]K“SRUQÒS•T“‘U
+NÂˆØ\ÙH“Ó‘HOˆÙ]ÚYšTÝ]\ÊÚQšTÝ]K““×ÒS•T“‘U
+NÂˆBˆJNÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛÜ™X]J
+HÂˆÝ\\‹›ÛÜ™X]J
+NÂˆ\Ý›ÞYYH˜[ÙNÂ‚ˆËÈÝ\›Ü™YÜ›Ý[™Ù\šXÙJ
+HÚ]™\È\ÈÛ›HH™]ÈÙXÛÛ™Ëˆ›Û[ÝH[[YYX][K™Y›Ü™BˆËÈ™Y™\™[˜Ù\È[™ÛÛ›™XÝÜˆÛÛœÝXÝÜœÈ\œÙHÝ[X[H\™ÙHØXÚYØ][ÙÜË‚ˆÜ™X]S›ÝYšXØ][ÛÚ[›™[
+
+NÂˆÝ\›Ü™YÜ›Ý[™
+“ÕQ’PÐUSÓ—ÒQÜ™X]S›ÝYšXØ][ÛŠ
+JNÂˆÝ\\\™›Ü›X[˜ÙU˜XÙK›X\šÊÚYÙ]Ù›Ü™YÜ›Ý[™Ü›Û[ÝYŠNÂ‚ˆB‚ˆÊŠ‚ˆ
+ˆZ[ÈÛ›HHš\ÝX[Ú[Y\ˆYZ\ÜÚ[Û‹ˆ™]ÛÜšË›Y]ÛÝ[™PÐT–Øš™XÝÈ\™Bˆ
+ˆÜ™X]Y]\ˆ[ˆ[™\[™[ÜÝ]š\ÚX›HÝYÙ\ÈÛÈHÝ]\È›ÝÈ™]™\ˆØZ]È›Üˆ[K‚ˆ
+‹Âˆš]˜]H›ÚY[š]X[^™T[[YJ
+HÂˆYˆ
+[[YR[š]X[^™Y\Ý›ÞYY
+H™]\›ŽÂˆ[[YR[š]X[^™YHYNÂˆÝ\\Ý]SÝÛ™\•ÚÙ[ˆHÕT•TÔÕUWÓÕÓ‘T‹š[˜Ü™[Y[[™Ù]
+
+NÂ‚ˆËÈHX\›Hš\ÝX[ÜÝ™XYÈÙ[ÛY]žH[[YYX][H][œÈ\Ü˜YHZYÜ˜][ÛœÈ[œÚYHBˆËÈ˜XÚÙÜ›Ý[™\š[Üš]HÝ]H˜\œšY\ˆ]H[^YY[[YH\ÙK‚ˆ™YœÈH™]È™Y™\™[˜Ù\Ê\Ë˜[ÙJNÂˆ]]ÛX][Û”Ý]\ÈH™]È]]ÛX][Û”Ý]TÝÜ™J\ÊNÂˆËÈØXÚY˜[Y\ÈX^H™H™[™\™Y[ˆHš\œÝœ˜[YK]™]™\ˆ\ÈÝ\œ™[ˆH\œÚ\ÝYˆËÈX\šËX[\Ý[H\ÜÈ\È[[[Û˜[H[^YY[[Y\ˆ]œ˜[YK‚ˆ]]ÛX][Û”Ý]\Ë˜™YÚ[”Ù\ÜÚ[Û‘œ™\Ú™\ÜÐ˜\œšY\Š
+NÂˆÛÛ›™XÝÜ•˜[Y\ÈH™]ÈÛÛ›™XÝÜ•˜[YT™YÚ\ÝžJ
+NÂˆÛÛ›™XÝÜ•˜[Y\Ë˜Y\Ý[™\ŠÜ›ÜÜÔÛÝ\˜ÙT[S\Ý[™\ŠNÂˆÛÛ›™XÝÜ•˜[Y\Ë˜Y\Ý[™\ŠÛ™TÝ]\Ó\Ý[™\ŠNÂˆPÛÛ™šYÜÈH™]ÈPœšXÚÐÛÛ™šYÔÝÜ™J™YœÊNÂ‚ˆ›ÛÛX[ˆÝ™\›^T[[YP]˜Z[X›HH\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊNÂˆ›ÛÛX[ˆXY\ÜÒÜÝ™\]Z\™YHÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\ÒXY\ÜÒÜÝ
+™YœÊBˆ\[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ëš\Ñ[\J
+NÂˆ\›U[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝY“™YYY
+Ý™\›^T[[YP]˜Z[X›JNÂˆYˆ
+[Ý™\›^T[[YP]˜Z[X›H	‰ˆZXY\ÜÒÜÝ™\]Z\™Y
+HÂˆËÈØÚÙY›ÛÝ[™H™]ÈÑSH\ÜÈ[\[Y[][ÛœÈØ[ˆ™\ÜH[\Ü˜\žH[šX[‚ˆËÈ™]™\ˆ\›ˆ]˜[œÚY[Ý]H[ÈH\›X[™[\Ù\ˆ™Y™\™[˜ÙH[™™]™\ˆ[ˆËÈHÙ][™ÜÈXÝ]š]HÝ™\ˆÓQHÚ]Ý][ˆ^XÚ]\Ù\ˆXÝ[Û‹‚ˆÙËÊQË“Ý™\›^H\›Z\ÜÚ[ÛœÈ\™H›Ý]˜Z[X›HY]ÈÙY\[™ÈÚYÙ][˜X›YŠNÂˆÝÜÙ[Š
+NÂˆ™]\›ŽÂˆB‚ˆ[œÝ[˜ÙHH\ÎÂˆ™Yœ™\ÚÙ\šXÙUØ]ÚÙÊ
+NÂˆÝXÚÛÜHšY]ÐÛÛ™šYÝ\˜][Û‹™Ù]
+\ÊK™Ù]ØØ[YÝXÚÛÜ
+
+NÂˆ[YQ›Ü›X]H™]ÈÚ[\Q]Q›Ü›X]
+’›[H‹ØØ[K™Ù]Y˜][
+
+JNÂˆÚ[™ÝÓX[˜YÙ\ˆHÙ]Þ\Ý[TÙ\šXÙJÚ[™ÝÓX[˜YÙ\‹˜Û\ÜÊNÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ˆH™]ÈXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\Šˆ\Ë\ÎŽ›Û‘XØ\ž˜]šYØ]Ü•Ú[™ÝÔÝ]PÚ[™ÙY
+NÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\‹œÝ\
+[™›ÚYšY]Ë‘\Ü^K‘QUSÑTÔVJNÂ‚ˆYˆ
+™YœËÚYÙ][˜X›Y™Ù]
+
+H	‰ˆÝ™\›^T[[YP]˜Z[X›JHÂˆÜ™X]SÝ™\›^UšY]Ê
+NÂˆËÈÝ\H˜XÚÙÜ›Ý[™œ™\Ú™\ÜÈ˜\œšY\ˆ[[YYX][KˆÛÛ›Û\ˆÝYÙ\ÈZY[›ÝYÚˆËÈHXZ[ˆ]Y]YKÛÈÚ[™ÝÓX[˜YÙ\ˆØ[ˆÝ[˜]ÈÚ]Ý]ØZ][™È›Üˆ”ÓÓˆZYÜ˜][Û‹‚ˆYˆ
+X]]ÛX]XÔ[[YT\šÙY	‰ˆX]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆ[’[š]X[[YÜ˜][Û”Ý\\
+
+NÂˆBˆH[ÙHYˆ
+XY\ÜÒÜÝ™\]Z\™Y
+HÂˆËÈ›Èš\ÝX[œ˜[YH^\ÝÈ[ˆXY\ÜÈ[ÙKÛÈHØ[YHÙ\šX[^™YÛÛ›Û\ˆ[™HØ[‚ˆËÈ™YÚ[ˆ[[YYX][Kˆ]Ý[Ü™X]\È[™Ý\È][ÜÝÛ™H[YÜ˜][Ûˆ\ˆÝYÙK‚ˆÝ]\ÕÚYÙ]\XØ][Û‹››ÝYžQš\œÝ\ÙY[Ý\™˜XÙJ\ÊNÂˆYˆ
+X]]ÛX]XÔ[[YT\šÙY	‰ˆX]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆ[’[š]X[[YÜ˜][Û”Ý\\
+
+NÂˆBˆH[ÙHÂˆÝÜÙ[Š
+NÂˆBˆB‚ˆš]˜]H›ÚY[œÝ\™S\][[YQÜ˜\
+
+HÂˆYˆ
+\]ÛÛ›Û\ˆOH[
+H™]\›ŽÂˆ\]ÛÛ›Û\ˆHÜ™X]S\]ÛÛ›Û\Š
+NÂˆB‚ˆ›Û“[ˆš]˜]H\]ÛÛ›Û\ˆÜ™X]S\]ÛÛ›Û\Š
+HÂˆ™]\›ˆ™]È\]ÛÛ›Û\Š\Ë™YœË]]ÛX][Û”Ý]\ËÛÛ›™XÝÜ•˜[Y\Ëˆ™]È\]ÛÛ›Û\‹”Ý]S\Ý[™\Š
+HÂˆÝ™\œšYHX›XÈ›ÚYÛ”Ý]PÚ[™ÙY
+Ýš[™ÈØÛÜKÝš[™ÈY
+HÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+ØÛÜKY
+NÂˆB‚ˆÝ™\œšYHX›XÈ›ÚYÛÛÛ›™XÝ[ÛÚ[™ÙY
+›ÛÛX[ˆÛÛ›™XÝYÝš[™È]Z[
+HÂˆÙËšJQË“TUˆ
+È
+ÛÛ›™XÝYÈ˜ÛÛ›™XÝYˆˆ™\ØÛÛ›™XÝYŠBˆ
+ÈŽˆˆ
+È]Z[
+NÂˆBˆJNÂˆB‚ˆš]˜]HÝ]XÈš[˜[Û\ÜÈÜ][[YQÜ˜\Âˆš[˜[Ü]XÛÛ›Û\ˆÛÛ›Û\ŽÂˆš[˜[Û™TÜ]™\Ù[˜ÙQ^Ü\ˆÛ™T™\Ù[˜ÙNÂˆš[˜[Û™TÜ]™\Ù[˜ÙQ^Ü\ˆ[˜ÜÔ™\Ù[˜ÙNÂ‚ˆÜ][[YQÜ˜\
+›Û“[Ü]XÛÛ›Û\ˆÛÛ›Û\‹ˆ›Û“[Û™TÜ]™\Ù[˜ÙQ^Ü\ˆÛ™T™\Ù[˜ÙKˆ›Û“[Û™TÜ]™\Ù[˜ÙQ^Ü\ˆ[˜ÜÔ™\Ù[˜ÙJHÂˆ\Ë˜ÛÛ›Û\ˆHÛÛ›Û\ŽÂˆ\ËœÛ™T™\Ù[˜ÙHHÛ™T™\Ù[˜ÙNÂˆ\Ë˜[˜ÜÔ™\Ù[˜ÙHH[˜ÜÔ™\Ù[˜ÙNÂˆBˆB‚ˆš]˜]HÝ]XÈš[˜[Û\ÜÈÛ™T™\Ù[˜ÙT[[YQÜ˜\Âˆš[˜[Û™TÜ]™\Ù[˜ÙQ^Ü\ˆÛ™T™\Ù[˜ÙNÂˆš[˜[Û™TÜ]™\Ù[˜ÙQ^Ü\ˆ[˜ÜÔ™\Ù[˜ÙNÂ‚ˆÛ™T™\Ù[˜ÙT[[YQÜ˜\
+›Û“[Û™TÜ]™\Ù[˜ÙQ^Ü\ˆÛ™T™\Ù[˜ÙKˆ›Û“[Û™TÜ]™\Ù[˜ÙQ^Ü\ˆ[˜ÜÔ™\Ù[˜ÙJHÂˆ\ËœÛ™T™\Ù[˜ÙHHÛ™T™\Ù[˜ÙNÂˆ\Ë˜[˜ÜÔ™\Ù[˜ÙHH[˜ÜÔ™\Ù[˜ÙNÂˆBˆB‚ˆš]˜]H›ÚY[œÝ\™TÜ][[YQÜ˜\
+
+HÂˆYˆ
+Ü]ÛÛ›Û\ˆOH[	‰ˆÛ™T™\Ù[˜ÙQ^Ü\ˆOH[ˆ	‰ˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOH[
+H™]\›ŽÂˆYˆ
+Ü]ÛÛ›Û\ˆOH[Û™T™\Ù[˜ÙQ^Ü\ˆOH[ˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆËÈX[HÛÛœÝXÝÜˆ˜Z[\™Hœ›ÛH[ˆX\›Y\ˆ][\\ÈÛ™H[™NÈ›ÈØ[˜XÚÈX^BˆËÈØœÙ\™HHÛÛ›Û\ˆÚ]Ý]›Ý^XÝY]šXÙH™\Ù[˜ÙH›Ú™XÝ[ÛœË‚ˆYˆ
+Û™T™\Ù[˜ÙQ^Ü\ˆOH[
+HÛ™T™\Ù[˜ÙQ^Ü\‹œÝÜ
+
+NÂˆYˆ
+Û™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOH[
+HÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\‹œÝÜ
+
+NÂˆYˆ
+Ü]ÛÛ›Û\ˆOH[
+HÜ]ÛÛ›Û\‹œÝÜ
+
+NÂˆÜ]ÛÛ›Û\ˆH[ÂˆÛ™T™\Ù[˜ÙQ^Ü\ˆH[ÂˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆH[ÂˆBˆX›\ÚÜ][[YQÜ˜\
+Ü™X]TÜ][[YQÜ˜\
+
+JNÂˆB‚ˆ›Û“[ˆš]˜]HÜ][[YQÜ˜\Ü™X]TÜ][[YQÜ˜\
+
+HÂˆÜ]XÛÛ›Û\ˆ™^ÛÛ›Û\ˆH™]ÈÜ]XÛÛ›Û\Šˆ\Ë™YœË]]ÛX][Û”Ý]\ËÛÛ›™XÝÜ•˜[Y\Ëˆ™]ÈÜ]XÛÛ›Û\‹“\Ý[™\Š
+HÂˆÝ™\œšYHX›XÈ›ÚYÛ”Ý]PÚ[™ÙY
+›Û“[Ýš[™ÈØÛÜKˆ›Û“[Ýš[™ÈY
+HÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+ØÛÜKY
+NÂˆB‚ˆÝ™\œšYHX›XÈ›ÚYÛÛÛ›™XÝ[ÛÚ[™ÙY
+ˆ›Û“[Ü]XÛÛ›Û\‹”Ý]HÝ]K›Û“[Ýš[™È]Z[
+HÂˆÙËšJQË”Ü]šXˆˆ
+ÈÝ]H
+ÈŽˆˆ
+È]Z[
+NÂˆYˆ
+Ø\•[[Y]žQ^Ü\ˆOH[
+HÂˆØ\•[[Y]žQ^Ü\‹›Û”Ü]ÛÛ›™XÝ[ÛÚ[™ÙY
+Ý]JNÂˆBˆYˆ
+Û™T™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆÛ™T™\Ù[˜ÙQ^Ü\‹›Û”Ü]ÛÛ›™XÝ[ÛÚ[™ÙY
+Ý]JNÂˆBˆYˆ
+Û™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\‹›Û”Ü]ÛÛ›™XÝ[ÛÚ[™ÙY
+Ý]JNÂˆBˆB‚ˆÝ™\œšYHX›XÈ›ÚYÛØ][ÙÐÚ[™ÙY
+›Û“[Ü]Ø][ÙÈØ][ÙÊHÂˆÙËšJQË”Ü]šXˆØ][ÙÎˆˆ
+ÈØ][ÙË˜XØÙ\ÜÛÜšY\Ê
+KœÚ^™J
+Bˆ
+Èˆ]šXÙ\Ëˆ
+ÈØ][ÙË˜Ú\˜XÝ\š\ÝXÜÊ
+KœÚ^™J
+Bˆ
+ÈˆÚ\˜XÝ\š\ÝXÜÈŠNÂˆYˆ
+Ø\•[[Y]žQ^Ü\ˆOH[
+HÂˆØ\•[[Y]žQ^Ü\‹›Û”Ü]Ø][ÙÐÚ[™ÙY
+
+NÂˆBˆYˆ
+Û™T™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆÛ™T™\Ù[˜ÙQ^Ü\‹›Û”Ü]Ø][ÙÐÚ[™ÙY
+
+NÂˆBˆYˆ
+Û™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\‹›Û”Ü]Ø][ÙÐÚ[™ÙY
+
+NÂˆBˆB‚ˆÝ™\œšYHX›XÈ›ÚYÛÚ\˜XÝ\š\ÝXÐÚ[™ÙY
+ˆ›Û“[^ž‹œÝ]\ËÚYÙ]œÜ]”Ü]]]
+HÂˆYˆ
+Ø\•[[Y]žQ^Ü\ˆOH[
+HÂˆØ\•[[Y]žQ^Ü\‹›Û”Ü]Ú\˜XÝ\š\ÝXÐÚ[™ÙY
+]
+NÂˆBˆYˆ
+Û™T™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆÛ™T™\Ù[˜ÙQ^Ü\‹›Û”Ü]Ú\˜XÝ\š\ÝXÐÚ[™ÙY
+]
+NÂˆBˆYˆ
+Û™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\‹›Û”Ü]Ú\˜XÝ\š\ÝXÐÚ[™ÙY
+]
+NÂˆBˆBˆJNÂˆÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆ™^™\Ù[˜ÙHH[ÂˆÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆ™^[˜ÜÔ™\Ù[˜ÙHH[ÂˆžHÂˆ™^™\Ù[˜ÙHH™]ÈÛ™TÜ]™\Ù[˜ÙQ^Ü\Šˆ™YœË™^ÛÛ›Û\‹XZ[’[™\ŠNÂˆ™^[˜ÜÔ™\Ù[˜ÙHH™]ÈÛ™TÜ]™\Ù[˜ÙQ^Ü\Šˆ™YœË™^ÛÛ›Û\‹XZ[’[™\‹ˆÛ™TÜ]™\Ù[˜ÙQ^Ü\‹”ÚYÛ˜[SÔÊNÂˆ™]\›ˆ™]ÈÜ][[YQÜ˜\
+™^ÛÛ›Û\‹™^™\Ù[˜ÙK™^[˜ÜÔ™\Ù[˜ÙJNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆžHÈYˆ
+™^[˜ÜÔ™\Ù[˜ÙHOH[
+H™^[˜ÜÔ™\Ù[˜ÙKœÝÜ
+
+NÈBˆØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆžHÈYˆ
+™^™\Ù[˜ÙHOH[
+H™^™\Ù[˜ÙKœÝÜ
+
+NÈBˆØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆžHÈ™^ÛÛ›Û\‹œÝÜ
+
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆ›ÝÈ˜Z[\™NÂˆBˆB‚ˆÊŠˆXZ[‹]™XYX›XØ][ÛˆÙY\ÈØ[˜XÚÜÈœ›ÛHØœÙ\š[™ÈH\X[™YK[Øš™XÝÜ˜\ˆ
+‹Âˆš]˜]H›ÚYX›\ÚÜ][[YQÜ˜\
+›Û“[Ü][[YQÜ˜\Ü˜\
+HÂˆÜ]ÛÛ›Û\ˆHÜ˜\˜ÛÛ›Û\ŽÂˆÛ™T™\Ù[˜ÙQ^Ü\ˆHÜ˜\œÛ™T™\Ù[˜ÙNÂˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆHÜ˜\˜[˜ÜÔ™\Ù[˜ÙNÂˆB‚ˆš]˜]H›ÚY\ØØ\™Ü][[YQÜ˜\
+›Û“[Ü][[YQÜ˜\Ü˜\
+HÂˆžHÈYˆ
+Ü˜\˜[˜ÜÔ™\Ù[˜ÙHOH[
+HÜ˜\˜[˜ÜÔ™\Ù[˜ÙKœÝÜ
+
+NÈBˆØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆžHÈYˆ
+Ü˜\œÛ™T™\Ù[˜ÙHOH[
+HÜ˜\œÛ™T™\Ù[˜ÙKœÝÜ
+
+NÈBˆØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆžHÈYˆ
+Ü˜\˜ÛÛ›Û\ˆOH[
+HÜ˜\˜ÛÛ›Û\‹œÝÜ
+
+NÈBˆØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆB‚ˆ›Û“[ˆš]˜]HÛ™T™\Ù[˜ÙT[[YQÜ˜\Ü™X]TÛ™T™\Ù[˜ÙT[[YQÜ˜\
+ˆ›Û“[Ü]XÛÛ›Û\ˆÛÛ›Û\ŠHÂˆÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆÛ™HH[ÂˆžHÂˆÛ™HH™]ÈÛ™TÜ]™\Ù[˜ÙQ^Ü\Š™YœËÛÛ›Û\‹XZ[’[™\ŠNÂˆÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆ[˜ÜÈH™]ÈÛ™TÜ]™\Ù[˜ÙQ^Ü\Šˆ™YœËÛÛ›Û\‹XZ[’[™\‹Û™TÜ]™\Ù[˜ÙQ^Ü\‹”ÚYÛ˜[SÔÊNÂˆ™]\›ˆ™]ÈÛ™T™\Ù[˜ÙT[[YQÜ˜\
+Û™K[˜ÜÊNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆYˆ
+Û™HOH[
+HÂˆžHÈÛ™KœÝÜ
+
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆBˆ›ÝÈ˜Z[\™NÂˆBˆB‚ˆš]˜]H›ÚY\ØØ\™Û™T™\Ù[˜ÙT[[YQÜ˜\
+ˆ›Û“[Û™T™\Ù[˜ÙT[[YQÜ˜\Ü˜\
+HÂˆžHÈÜ˜\˜[˜ÜÔ™\Ù[˜ÙKœÝÜ
+
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆžHÈÜ˜\œÛ™T™\Ù[˜ÙKœÝÜ
+
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆB‚ˆš]˜]H›ÚY[œÝ\™TÛ™T[[YQÜ˜\
+
+HÂˆYˆ
+Û™PÛÛ›Û\ˆOH[
+H™]\›ŽÂˆÛ™PÛÛ›Û\ˆHÜ™X]TÛ™PÛÛ›Û\Š
+NÂˆB‚ˆ›Û“[ˆš]˜]HÛ™PÛÛ›™XÝÜÛÛ›Û\ˆÜ™X]TÛ™PÛÛ›Û\Š
+HÂˆ™]\›ˆ™]ÈÛ™PÛÛ›™XÝÜÛÛ›Û\Š\Ë™YœËÛÛ›™XÝÜ•˜[Y\Ëˆ™]ÈÛ™PÛÛ›™XÝÜÛÛ›Û\‹”™\Ù[˜ÙTÚ[šÊ
+HÂˆÝ™\œšYHX›XÈ›ÚYÛ”Û™PÛÛ›™XÝ[ÛÚ[™ÙY
+›ÛÛX[ˆÛÛ›™XÝY
+HÂˆÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆ^Ü\ˆHÛ™T™\Ù[˜ÙQ^Ü\ŽÂˆYˆ
+^Ü\ˆOH[
+H^Ü\‹›Û”Û™PÛÛ›™XÝ[ÛÚ[™ÙY
+ÛÛ›™XÝY
+NÂˆB‚ˆÝ™\œšYHX›XÈ›ÚYÛ[˜ÜÐÛÛ›™XÝ[ÛÚ[™ÙY
+›ÛÛX[ˆÛÛ›™XÝY
+HÂˆÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆ^Ü\ˆHÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ŽÂˆYˆ
+^Ü\ˆOH[
+H^Ü\‹›Û”Û™PÛÛ›™XÝ[ÛÚ[™ÙY
+ÛÛ›™XÝY
+NÂˆBˆJNÂˆB‚ˆš]˜]HÝ]XÈš[˜[Û\ÜÈØ\”[[YQÜ˜\Âˆš[˜[Ø\’[YÜ˜][ÛˆØ\ŽÂˆš[˜[Ø\•[[Y]žQ^Ü\ˆ^Ü\ŽÂ‚ˆØ\”[[YQÜ˜\
+›Û“[Ø\’[YÜ˜][ÛˆØ\‹›Û“[Ø\•[[Y]žQ^Ü\ˆ^Ü\ŠHÂˆ\Ë˜Ø\ˆHØ\ŽÂˆ\Ë™^Ü\ˆH^Ü\ŽÂˆBˆB‚ˆš]˜]H›ÚY[œÝ\™PØ\”[[YQÜ˜\
+
+HÂˆYˆ
+Ø\•[[Y]žQ^Ü\ˆOH[
+H™]\›ŽÂˆ[œÝ\™TÜ][[YQÜ˜\
+
+NÂˆX›\ÚØ\”[[YQÜ˜\
+Ü™X]PØ\”[[YQÜ˜\
+Ü]ÛÛ›Û\ŠJNÂˆB‚ˆ›Û“[ˆš]˜]HØ\”[[YQÜ˜\Ü™X]PØ\”[[YQÜ˜\
+›Û“[Ü]XÛÛ›Û\ˆÜ]
+HÂˆØ\’[YÜ˜][ÛˆØ\ˆHØ\’[YÜ˜][ÛœË™Ù]
+\ÊNÂˆ™]\›ˆ™]ÈØ\”[[YQÜ˜\
+Ø\‹ˆ™]ÈØ\•[[Y]žQ^Ü\Š™YœËØ\‹Ü]XZ[’[™\ŠJNÂˆB‚ˆÊŠˆ™[™Üˆ]˜Z[Xš[]HØ[˜XÚÜÈ[™Ù\šXÙHšY[X›XØ][Ûˆ™[XZ[ˆXZ[‹]™XY[ÝÛ™Yˆ
+‹Âˆš]˜]H›ÚYX›\ÚØ\”[[YQÜ˜\
+›Û“[Ø\”[[YQÜ˜\Ü˜\
+HÂˆ›ÛÛX[ˆ™\XÚ[™ÔX›\ÚYÜ˜\HØ\•[[Y]žQ^Ü\ˆOH[ÂˆžHÂˆËÈ™KY]˜[X]HXÙZÛ\œÈÚ[ˆH\Þ[˜Ú›Û›Ý\È™[™ÜˆØ\Xš[]H[œÝÙ\ˆ\œš]™\Ë‚ˆÜ˜\˜Ø\‹œÙ]]˜Z[Xš[]PÚ[™ÙY\Ý[™\Š
+
+HOˆXZ[’[™\‹œÜÝ
+
+
+HOˆÂˆYˆ
+Y\Ý›ÞYY	‰ˆš[™[™ÈOH[
+H™Yœ™\ÚØ\”Ý]\ÔÝ\™˜XÙJ
+NÂˆJJNÂˆØ\•[[Y]žQ^Ü\ˆHÜ˜\™^Ü\ŽÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆžHÈÜ˜\™^Ü\‹œÝÜ
+
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆËÈÚ]HÝ\œ™[Ü˜\HÛØ[˜XÚÈ\ÈÝ[˜[YˆH™[™ÜˆÙ]\ˆX^H›ÝÂˆËÈZ]\ˆ™Y›Ü™HÜˆY\ˆXØÙ\[™ÈHY[XØ[Ù\šXÙK[]™[Ø[˜XÚËÛÈÛX\š[™ÂˆËÈ]\™HÛÝ[œ™XZÈH]™HÜ˜\]™[XZ[œÈ]]Üš]]]™K‚ˆYˆ
+\™\XÚ[™ÔX›\ÚYÜ˜\
+HÂˆžHÈÜ˜\˜Ø\‹œÙ]]˜Z[Xš[]PÚ[™ÙY\Ý[™\Š[
+NÈBˆØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆBˆ›ÝÈ˜Z[\™NÂˆBˆB‚ˆš]˜]H›ÚY\ØØ\™Ø\”[[YQÜ˜\
+›Û“[Ø\”[[YQÜ˜\Ü˜\
+HÂˆžHÈÜ˜\™^Ü\‹œÝÜ
+
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆB‚ˆš]˜]H›ÚY[œÝ\™RÛYP\ÜÚ\Ý[[[YQÜ˜\
+
+HÂˆYˆ
+P\PÛÛ›Û\ˆOH[
+H™]\›ŽÂˆP\PÛÛ›Û\ˆHÜ™X]RÛYP\ÜÚ\Ý[ÛÛ›Û\Š
+NÂˆB‚ˆ›Û“[ˆš]˜]HP\PÛÛ›Û\ˆÜ™X]RÛYP\ÜÚ\Ý[ÛÛ›Û\Š
+HÂˆ™]\›ˆ™]ÈP\PÛÛ›Û\Š\Ë™YœË]]ÛX][Û”Ý]\ËÛÛ›™XÝÜ•˜[Y\Ëˆ™]ÈP\PÛÛ›Û\‹“\Ý[™\Š
+HÂˆÝ™\œšYHX›XÈ›ÚYÛ”Ý]PÚ[™ÙY
+›Û“[Ýš[™ÈØÛÜKˆ›Û“[Ýš[™ÈY
+HÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+ØÛÜKY
+NÂˆB‚ˆÝ™\œšYHX›XÈ›ÚYÛÛÛ›™XÝ[ÛÚ[™ÙY
+ˆ›Û“[UÙX”ÛØÚÙ]ÛÛ›™XÝÜ‹ÛÛ›™XÝ[Û”Ý]HÝ]Kˆ›Û“[Ýš[™È]Z[
+HÂˆÙËšJQË’ÛYH\ÜÚ\Ý[ˆ
+ÈÝ]H
+ÈŽˆˆ
+È]Z[
+NÂˆB‚ˆÝ™\œšYHX›XÈ›ÚYÛØ][ÙÐÚ[™ÙY
+›Û“[Q[]PØ][ÙÈØ][ÙÊHÂˆÙËšJQË’ÛYH\ÜÚ\Ý[Ø][ÙÎˆˆ
+ÈØ][ÙËœÚ^™J
+H
+Èˆ[]Y\ÈŠNÂˆBˆJNÂˆB‚ˆš]˜]HÝ]XÈš[˜[Û\ÜÈØÙ[˜\š[Ô[[YQÜ˜\Âˆš[˜[ÛÛ›™XÝÜXÝ[Û‘\Ü]Ú\ˆ\Ü]Ú\ŽÂˆš[˜[ØØ[ØÙ[˜\š[ÐÛÛ›Û\ˆÛÛ›Û\ŽÂ‚ˆØÙ[˜\š[Ô[[YQÜ˜\
+›Û“[ÛÛ›™XÝÜXÝ[Û‘\Ü]Ú\ˆ\Ü]Ú\‹ˆ›Û“[ØØ[ØÙ[˜\š[ÐÛÛ›Û\ˆÛÛ›Û\ŠHÂˆ\Ë™\Ü]Ú\ˆH\Ü]Ú\ŽÂˆ\Ë˜ÛÛ›Û\ˆHÛÛ›Û\ŽÂˆBˆB‚ˆš]˜]H›ÚY[œÝ\™TØÙ[˜\š[Ô[[YQÜ˜\
+
+HÂˆYˆ
+ØÙ[˜\š[ÐÛÛ›Û\ˆOH[
+H™]\›ŽÂˆ[œÝ\™S\][[YQÜ˜\
+
+NÂˆ[œÝ\™TÜ][[YQÜ˜\
+
+NÂˆ[œÝ\™RÛYP\ÜÚ\Ý[[[YQÜ˜\
+
+NÂˆX›\ÚØÙ[˜\š[Ô[[YQÜ˜\
+Ü™X]TØÙ[˜\š[Ô[[YQÜ˜\
+ˆ\]ÛÛ›Û\‹Ü]ÛÛ›Û\‹P\PÛÛ›Û\ŠJNÂˆ[œÝ\™TÜ\Ý™\›^SX[˜YÙ\Š
+NÂˆB‚ˆ›Û“[ˆš]˜]HØÙ[˜\š[Ô[[YQÜ˜\Ü™X]TØÙ[˜\š[Ô[[YQÜ˜\
+ˆ›Û“[\]ÛÛ›Û\ˆ\]›Û“[Ü]XÛÛ›Û\ˆÜ]ˆ›Û“[P\PÛÛ›Û\ˆÛYP\ÜÚ\Ý[
+HÂˆÛÛ›™XÝÜXÝ[Û‘\Ü]Ú\ˆ\Ü]Ú\ˆH™]ÈÛÛ›™XÝÜXÝ[Û‘\Ü]Ú\Šˆ\]Ü]ÛYP\ÜÚ\Ý[
+NÂˆØØ[ØÙ[˜\š[ÐÛÛ›Û\ˆÛÛ›Û\ˆH™]ÈØØ[ØÙ[˜\š[ÐÛÛ›Û\Šˆ\Ë™YœË]]ÛX][Û”Ý]\ËÛÛ›™XÝÜ•˜[Y\ËˆØ\’[YÜ˜][ÛœË™Ù]
+\ÊK\ÎŽ›Û”ØÙ[˜\š[Õ\™Ù]ÐÚ[™ÙY
+NÂˆ™]\›ˆ™]ÈØÙ[˜\š[Ô[[YQÜ˜\
+\Ü]Ú\‹ÛÛ›Û\ŠNÂˆB‚ˆš]˜]H›ÚYX›\ÚØÙ[˜\š[Ô[[YQÜ˜\
+›Û“[ØÙ[˜\š[Ô[[YQÜ˜\Ü˜\
+HÂˆXÝ[Û‘\Ü]Ú\ˆHÜ˜\™\Ü]Ú\ŽÂˆØÙ[˜\š[ÐÛÛ›Û\ˆHÜ˜\˜ÛÛ›Û\ŽÂˆB‚ˆš]˜]H›ÚY[œÝ\™R[[ØÙ[˜\š[Ô[[YQÜ˜\
+
+HÂˆYˆ
+[[ØÙ[˜\š[ÐÛÛ›Û\ˆOH[
+H™]\›ŽÂˆ[œÝ\™TØÙ[˜\š[Ô[[YQÜ˜\
+
+NÂˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆHÜ™X]R[[ØÙ[˜\š[ÐÛÛ›Û\ŠXÝ[Û‘\Ü]Ú\ŠNÂˆB‚ˆ›Û“[ˆš]˜]H[[ØÙ[˜\š[ÐÛÛ›Û\ˆÜ™X]R[[ØÙ[˜\š[ÐÛÛ›Û\Šˆ›Û“[ÛÛ›™XÝÜXÝ[Û‘\Ü]Ú\ˆ\Ü]Ú\ŠHÂˆ™]\›ˆ™]È[[ØÙ[˜\š[ÐÛÛ›Û\Š\Ë™YœË\Ü]Ú\ŠNÂˆB‚ˆš]˜]H›ÚYÛ”ØÙ[˜\š[Õ\™Ù]ÐÚ[™ÙY
+›Û“[Ù]Ýš[™Ïˆ\™Ù]ÊHÂˆËÈ[š]X[Ý\\\™›Ü›\ÈÛ™HÛÛœÛÛY]Y™[™\ˆY\ˆ[›ÝšY\œÈ[™ØÙ[˜\š[ÜÈ\™BˆËÈÛÛ™šYÝ\™YˆÜ™Y[X[[Û›H™Yœ™\Ú›ÛÝÜÈHØ[YHÛØ[\ØÚ[™È[K‚ˆYˆ
+]]ÛX]XÔÝ\™˜XÙT™Yœ™\ÚÝ\™\ÜÙY
+
+JHÂˆÞ[˜Ú›Ûš^™Y
+]]ÛX][Û•ZSØÚÊHÂˆ›Üˆ
+Ýš[™È\™Ù]ˆ\™Ù]ÊHÂˆ[]šY\ˆH\™Ù]š[™^ÙŠ	ß	ÊNÂˆYˆ
+]šY\ˆH]šY\ˆH\™Ù]›[™Ý
+
+HHJHÛÛ[YNÂˆ[™[™Ð]]ÛX][Û•ZK˜ÛÛ\]RYXœÙ[
+\™Ù]œÝXœÝš[™Ê]šY\ŠKˆYÛ›Ü™YOˆ™]È\ÚÙ]Š
+JK˜Y
+\™Ù]œÝXœÝš[™Ê]šY\ˆ
+ÈJJNÂˆBˆBˆ™]\›ŽÂˆBˆXZ[’[™\‹œÜÝ
+
+
+HOˆÂˆYˆ
+\Ý›ÞYY
+H™]\›ŽÂˆ\Ü]Ú]]ÛX][Û”™\Ù[][Û•\™Ù]Ê\™Ù]ÊNÂˆYˆ
+š[™[™ÈOH[
+H™[™\’ÛYP\ÜÚ\Ý[œšXÚÜÊ
+NÂˆ\TÜ\™Y™\™[˜Ù\ÔØY™[J
+NÂˆ›ÛÛX[ˆÛ™QšY[ÐÚ[™ÙYH˜[ÙNÂˆ›ÛÛX[ˆš]™\•\™Ù]ÐÚ[™ÙYH˜[ÙNÂˆ›Üˆ
+Ýš[™È\™Ù]ˆ\™Ù]ÊHÂˆYˆ
+\™Ù]œÝ\ÕÚ]
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔT
+ÈŸŠBˆ	‰ˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹š\ÑšY[]]ÛX][Û’Y
+ˆ\™Ù]œÝXœÝš[™Ê\™Ù]š[™^ÙŠ	ß	ÊH
+ÈJJJHÂˆÛ™QšY[ÐÚ[™ÙYHYNÂˆBˆYˆ
+\™Ù]œÝ\ÕÚ]
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÑ’U‘Tˆ
+ÈŸŠJHÂˆš]™\•\™Ù]ÐÚ[™ÙYHYNÂˆBˆYˆ
+\™Ù]œÝ\ÕÚ]
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÒQ
+ÈŸŠBˆ	‰ˆ
+™YœËšY[™[]]ÜÝ\™Ù]
+
+BˆY™\Ù[][Û”Ù\šXÙKš\Ô[›š[™Ê\ÊJJHÂˆY™\Ù[][Û”Ù\šXÙK››ÝYžP]]ÛX][ÛÚ[™ÙY
+\ÊNÂˆBˆBˆYˆ
+š]™\•\™Ù]ÐÚ[™ÙY
+Hš]™\”[™[Ù\šXÙK˜\J\ÊNÂˆYˆ
+š[™[™ÈOH[
+HÂˆYˆ
+Û™QšY[ÐÚ[™ÙY	‰ˆXÝ]™TÛ™S›ÝYšXØ][ÛˆOH[
+H\]SYYXR[™›Ê
+NÂˆ\PœšXÚÕš\ÚXš[]JÝ\œ™[œšXÚÔÙ]
+
+JNÂˆBˆJNÂˆB‚ˆš]˜]HÝ]XÈš[˜[Û\ÜÈ™\\™Y[š]X[[YÜ˜][Û”ÝYÙHÂˆš[˜[[ÝYÙNÂˆ›Û“[š[˜[Ýš[™È˜[YNÂˆš[˜[›ÛÛX[ˆÝXØÙYYYÂˆ›Û“[š[˜[[›˜X›HX›XØ][ÛŽÂˆ›Û“[š[˜[[›˜X›HÛX[\Âˆš]˜]H›ÛÛX[ˆX›\ÚYÂ‚ˆ™\\™Y[š]X[[YÜ˜][Û”ÝYÙJ[ÝYÙK›Û“[Ýš[™È˜[YK›ÛÛX[ˆÝXØÙYYYˆ›Û“[[›˜X›HX›XØ][Û‹ˆ›Û“[[›˜X›HÛX[\
+HÂˆ\ËœÝYÙHHÝYÙNÂˆ\Ë›˜[YHH˜[YNÂˆ\ËœÝXØÙYYYHÝXØÙYYYÂˆ\ËœX›XØ][ÛˆHX›XØ][ÛŽÂˆ\Ë˜ÛX[\HÛX[\ÂˆB‚ˆ›ÚYX›\Ú
+
+HÂˆX›XØ][Û‹œ[Š
+NÂˆX›\ÚYHYNÂˆB‚ˆ›ÚY\ØØ\™
+
+HÂˆYˆ
+\X›\ÚY
+HÛX[\œ[Š
+NÂˆBˆB‚ˆÊŠˆÝ\È]™\žH[˜X›Y[YÜ˜][Ûˆ[[YYX][NÈ\œÚ\Ý[˜ÙH[™ÛÛ›Û\œÈ[ˆÙ™‹[XZ[‹ˆ
+‹Âˆš]˜]H›ÚY[’[š]X[[YÜ˜][Û”Ý\\
+
+HÂˆYˆ
+\Ý›ÞYY]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]ˆ[YÜ˜][ÛœÔÝ\Y[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÊH™]\›ŽÂˆ[YÜ˜][Û”Ý\\ØÚY[YHYNÂˆ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÈHYNÂˆ[š]X[[YÜ˜][Û”ÝYÙHHÂˆ[š]X[[YÜ˜][Û”ÝYÙT™]žPÛÝ[HÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆXZ[’[™\‹œÜÝ
+[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆB‚ˆš]˜]H›ÚY[“™^[š]X[[YÜ˜][Û”ÝYÙJ
+HÂˆYˆ
+\Ý›ÞYYZ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÂˆ[š]X[[YÜ˜][Û•ÛÜšÙ\’[‘›YÚ
+H™]\›ŽÂˆYˆ
+]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆËÈÙY\H^XÝÝYÙH\šÙYˆHÜÝ\\ÙHÙ[™\˜][ÛˆÚ[™\Ý[YH]È›ÈÛ[™ÂˆËÈ[™›È˜[œÜÜÝ™[™ÜˆÛÛœÝXÝ[Ûˆ\È[ÝÙY[œÚYHH]ZXÚÐ›ÛÝ]ZY][™K‚ˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆ™]\›ŽÂˆBˆÝ\\\™›Ü›X[˜ÙU˜XÙK›X\šÊš[YÜ˜][Û—ÜÝYÙWÈˆ
+È[š]X[[YÜ˜][Û”ÝYÙJNÂˆÝÚ]Ú
+[š]X[[YÜ˜][Û”ÝYÙJHÂˆØ\ÙH‚ˆËÈ\œÚ\ÝHÙ\ÜÚ[Ûˆ˜\œšY\ˆ™Y›Ü™H[žHÛÛ›™XÝÜˆ\È[ÝÙYÈX›\Úœ™\Ú‚ˆ[ØXÚYÝ]Qœ™\Ú™\ÜÐ˜\œšY\Š
+NÂˆ™]\›ŽÂˆØ\ÙHN‚ˆØ\ÙHŽ‚ˆØ\ÙHÎ‚ˆØ\ÙH‚ˆØ\ÙHN‚ˆØ\ÙHŽ‚ˆØ\ÙHÎ‚ˆØ\ÙH‚ˆØ\ÙHN‚ˆÝX›Z][š]X[[YÜ˜][Û•ÛÜšÙ\”ÝYÙJ[š]X[[YÜ˜][Û”ÝYÙJNÂˆ™]\›ŽÂˆY˜][‚ˆš[š\Ú[š]X[[YÜ˜][Û”Ý\\
+
+NÂˆ™]\›ŽÂˆBˆB‚ˆÊŠ‚ˆ
+ˆÝX›Z]ÈHÝ\œ™[ÝYÙH›ÝÈÈHÛ™H˜XÚÙÜ›Ý[™\š[Üš]HÝ\\[™KˆHÛÜšÙ\ˆX^Bˆ
+ˆ\œÙH™Y™\™[˜Ù\ËÝXÚ›Ý\›˜[È[™Ý\˜[œÜÜ[ÝÛ™Y™XYË]]™]™\ˆX›\Ú\Âˆ
+ˆHÙ\šXÙHšY[Üˆ[›ÚÙ\ÈšY]ËÜÞ\Ý[K[\Ý[™\ˆÛÙKˆX›XØ][Ûˆ\ÈÛ™H™[˜ÙYXZ[ˆ\ÚË‚ˆ
+‹Âˆš]˜]H›ÚYÝX›Z][š]X[[YÜ˜][Û•ÛÜšÙ\”ÝYÙJ[ÝYÙJHÂˆ[š]X[[YÜ˜][Û•ÛÜšÙ\’[‘›YÚHYNÂˆš[˜[Û™ÈÝÛ™\•ÚÙ[ˆHÝ\\Ý]SÝÛ™\•ÚÙ[ŽÂˆžHÂˆÝ\\Ý]UÛÜšÙ\‹™^XÝ]J
+
+HOˆÂˆ™\\™Y[š]X[[YÜ˜][Û”ÝYÙHÛÜšÙ\”™\Ý[ÂˆžHÂˆÛÜšÙ\”™\Ý[H™\\™R[š]X[[YÜ˜][Û•ÛÜšÙ\”ÝYÙJÝYÙJNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆËÈ[ˆ[™^XÝY\œÙ\‹ØÛÛ›Û\ˆ^Ù\[Ûˆ]\ÝÝ[™XXÚHXZ[‚ˆËÈÛÛ\][Ûˆ]ÛÈ[š]X[[YÜ˜][Û•ÛÜšÙ\’[‘›YÚ\È[Ø^\È™[X\ÙY‚ˆÛÜšÙ\”™\Ý[H˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJˆÝYÙKš[YÜ˜][ÛˆÝYÙHˆ
+ÈÝYÙK˜Z[\™JNÂˆBˆš[˜[™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™YHÛÜšÙ\”™\Ý[ÂˆYˆ
+[ÝÛœÔÝ\\Ý]JÝÛ™\•ÚÙ[ŠJHÂˆ\ØØ\™™\\™Y[š]X[[YÜ˜][Û”ÝYÙJ™\\™Y
+NÂˆ™]\›ŽÂˆBˆYˆ
+\[™[™Ò[š]X[[YÜ˜][Û”ÝYÙK˜ÛÛ\\™P[™Ù]
+[™\\™Y
+JHÂˆ\ØØ\™™\\™Y[š]X[[YÜ˜][Û”ÝYÙJ™\\™Y
+NÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆÛÛ\]R[š]X[[YÜ˜][Û•ÛÜšÙ\”ÝYÙJˆÝÛ™\•ÚÙ[‹ÝYÙK[
+JNÂˆ™]\›ŽÂˆBˆYˆ
+[ÝÛœÔÝ\\Ý]JÝÛ™\•ÚÙ[ŠJHÂˆYˆ
+[™[™Ò[š]X[[YÜ˜][Û”ÝYÙK˜ÛÛ\\™P[™Ù]
+™\\™Y[
+JHÂˆ\ØØ\™™\\™Y[š]X[[YÜ˜][Û”ÝYÙJ™\\™Y
+NÂˆBˆ™]\›ŽÂˆBˆXZ[’[™\‹œÜÝ
+
+
+HOˆÛÛ\]R[š]X[[YÜ˜][Û•ÛÜšÙ\”ÝYÙJˆÝÛ™\•ÚÙ[‹ÝYÙK™\\™Y
+JNÂˆJNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ™Z™XÝY
+HÂˆ[š]X[[YÜ˜][Û•ÛÜšÙ\’[‘›YÚH˜[ÙNÂˆÙË™JQËÛÝ[›ÝØÚY[H[YÜ˜][ÛˆÝYÙHˆ
+ÈÝYÙK™Z™XÝY
+NÂˆY˜[˜ÙR[š]X[[YÜ˜][Û”ÝYÙJ˜[ÙJNÂˆBˆB‚ˆÊŠˆXZ[‹]™XYÝÛ™\‹ÜÝYÙH™[˜ÙH[™HÛ›HX›XØ][ÛˆÚ[›Üˆ™\\™YÛÛ›Û\œËˆ
+‹Âˆš]˜]H›ÚYÛÛ\]R[š]X[[YÜ˜][Û•ÛÜšÙ\”ÝYÙJÛ™ÈÝÛ™\•ÚÙ[‹[ÝYÙKˆ[X›Bˆ™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™Y
+HÂˆYˆ
+™\\™YOH[ˆ	‰ˆ\[™[™Ò[š]X[[YÜ˜][Û”ÝYÙK˜ÛÛ\\™P[™Ù]
+™\\™Y[
+JH™]\›ŽÂˆ[š]X[[YÜ˜][Û•ÛÜšÙ\’[‘›YÚH˜[ÙNÂˆYˆ
+™\\™YOH[
+HÂˆYˆ
+Y\Ý›ÞYY	‰ˆ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÂˆ	‰ˆ[š]X[[YÜ˜][Û”ÝYÙHOHÝYÙJHÂˆY˜[˜ÙR[š]X[[YÜ˜][Û”ÝYÙJ˜[ÙJNÂˆBˆ™]\›ŽÂˆBˆYˆ
+[ÝÛœÔÝ\\Ý]JÝÛ™\•ÚÙ[ŠHÝ\\Ý]SÝÛ™\•ÚÙ[ˆOHÝÛ™\•ÚÙ[‚ˆ™\\™YœÝYÙHOHÝYÙHZ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÂˆ[š]X[[YÜ˜][Û”ÝYÙHOHÝYÙBˆ]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆ\ØØ\™™\\™Y[š]X[[YÜ˜][Û”ÝYÙJ™\\™Y
+NÂˆËÈ]ZXÚÐ›ÛÝX^H™\Ý[YH[™™]Ú[™ÈÝYÙHÛ™HÚ[H\ÈÛ\ˆÝYÙH\ÈÝ[ÛˆBˆËÈÛÜšÙ\‹ˆ]È[™XYK\ÜÝY[›™\ˆØœÙ\™\È[‘›YÚ[™™]\›œÎÈ[™ÝÛ™\œÚ\˜XÚÂˆËÈ\™HÛ˜ÙHHÝ[H™\Ý[\È\ØØ\™YÜˆH™]ÛÝ[™[™HÛÝ[™[XZ[ˆÝ˜[™Y‚ˆYˆ
+ÝÛœÔÝ\\Ý]JÝÛ™\•ÚÙ[ŠH	‰ˆÝ\\Ý]SÝÛ™\•ÚÙ[ˆOHÝÛ™\•ÚÙ[‚ˆ	‰ˆ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÂˆ	‰ˆX]]ÛX]XÔ[[YT\šÙY	‰ˆX]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆXZ[’[™\‹œÜÝ
+[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆBˆ™]\›ŽÂˆBˆ›ÛÛX[ˆÝYÙTÝXØÙYYYH™\\™YœÝXØÙYYYˆ	‰ˆ[’[YÜ˜][Û”Ý\
+™\\™Y›˜[YH
+ÈˆX›XØ][Ûˆ‹™\\™YŽœX›\Ú
+NÂˆYˆ
+\ÝYÙTÝXØÙYYY
+H\ØØ\™™\\™Y[š]X[[YÜ˜][Û”ÝYÙJ™\\™Y
+NÂˆY˜[˜ÙR[š]X[[YÜ˜][Û”ÝYÙJÝYÙTÝXØÙYYY
+NÂˆB‚ˆš]˜]H›ÚYY˜[˜ÙR[š]X[[YÜ˜][Û”ÝYÙJ›ÛÛX[ˆÝYÙTÝXØÙYYY
+HÂˆYˆ
+\ÝYÙTÝXØÙYYYˆ	‰ˆ[š]X[[YÜ˜][Û”ÝYÙT™]žPÛÝ[ˆPVÒS’UPSÒS•QÔUSÓ—ÔÕQÑWÔ‘U’QTÊHÂˆ[š]X[[YÜ˜][Û”ÝYÙT™]žPÛÝ[
+ÊÎÂˆXZ[’[™\‹œÜÝ[^YY
+[š]X[[YÜ˜][Û”ÝYÙT[›™\‹ˆS’UPSÒS•QÔUSÓ—Ô‘U–WÓTÊNÂˆ™]\›ŽÂˆBˆ[š]X[[YÜ˜][Û”ÝYÙT™]žPÛÝ[HÂˆ[š]X[[YÜ˜][Û”ÝYÙJÊÎÂˆXZ[’[™\‹œÜÝ
+[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆB‚ˆš]˜]H›ÚY\ØØ\™™\\™Y[š]X[[YÜ˜][Û”ÝYÙJˆ›Û“[™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™Y
+HÂˆ[ÛX[\Ý\
+™\\™Y›˜[YH
+Èˆ[œX›\ÚYÝ\\‹™\\™YŽ™\ØØ\™
+NÂˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™R[š]X[[YÜ˜][Û•ÛÜšÙ\”ÝYÙJ[ÝYÙJHÂˆÝÚ]Ú
+ÝYÙJHÂˆØ\ÙHN‚ˆ™]\›ˆ™\\™TÛ™T™\Ù[˜ÙTÝYÙJÝYÙJNÂˆØ\ÙHŽ‚ˆ™]\›ˆ™\\™TÛ™TÝYÙJÝYÙJNÂˆØ\ÙHÎ‚ˆ™]\›ˆ™\\™TÝ]\ÔÝ\™˜XÙTÝYÙJÝYÙJNÂˆØ\ÙH‚ˆ™]\›ˆ™\\™PØ\•[[Y]žTÝYÙJÝYÙJNÂˆØ\ÙHN‚ˆ™]\›ˆ™\\™S\]ÝYÙJÝYÙJNÂˆØ\ÙHŽ‚ˆ™]\›ˆ™\\™RÛYP\ÜÚ\Ý[ÝYÙJÝYÙJNÂˆØ\ÙHÎ‚ˆ™]\›ˆ™\\™TÜ]ÝYÙJÝYÙJNÂˆØ\ÙH‚ˆ™]\›ˆ™\\™Uš\ÝX[ØÙ[˜\š[ÔÝYÙJÝYÙJNÂˆØ\ÙHN‚ˆ™]\›ˆ™\\™R[[ØÙ[˜\š[ÔÝYÙJÝYÙJNÂˆY˜][‚ˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙK[šÛ›ÝÛˆ[YÜ˜][ÛˆÝYÙHŠNÂˆBˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™TÛ™T™\Ù[˜ÙTÝYÙJ[ÝYÙJHÂˆÜ]XÛÛ›Û\ˆÝ\œ™[ÛÛ›Û\ˆHÜ]ÛÛ›Û\ŽÂˆÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆÝ\œ™[Û™HHÛ™T™\Ù[˜ÙQ^Ü\ŽÂˆÛ™TÜ]™\Ù[˜ÙQ^Ü\ˆÝ\œ™[[˜ÜÈHÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ŽÂˆYˆ
+Ý\œ™[ÛÛ›Û\ˆOH[	‰ˆÝ\œ™[Û™HOH[	‰ˆÝ\œ™[[˜ÜÈOH[
+HÂˆÛ™T™\Ù[˜ÙT[[YQÜ˜\™^HÜ™X]TÛ™T™\Ù[˜ÙT[[YQÜ˜\
+Ý\œ™[ÛÛ›Û\ŠNÂˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙKœÛ™H™\Ù[˜ÙH‹
+
+HOˆÂˆYˆ
+Ü]ÛÛ›Û\ˆOHÝ\œ™[ÛÛ›Û\‚ˆÛ™T™\Ù[˜ÙQ^Ü\ˆOHÝ\œ™[Û™BˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOHÝ\œ™[[˜ÜÊHÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠˆ”Ü]™\Ù[˜ÙHÜ˜\Ú[™ÙY™Y›Ü™H™\XÙ[Y[ŠNÂˆBˆËÈ›Ý˜[X›H™[ØYÈš[š\Ú™Y›Ü™HZ]\ˆ]]Üš]]]™HšY[Ú[™Ù\Ë‚ˆ™^œÛ™T™\Ù[˜ÙKœ™XÛÛ™šYÝ\™J
+NÂˆ™^˜[˜ÜÔ™\Ù[˜ÙKœ™XÛÛ™šYÝ\™J
+NÂˆÛ™T™\Ù[˜ÙQ^Ü\ˆH™^œÛ™T™\Ù[˜ÙNÂˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆH™^˜[˜ÜÔ™\Ù[˜ÙNÂˆ[ÛX[\Ý\
+œ™\XÙYÛ™H™\Ù[˜ÙH‹Ý\œ™[Û™NŽœÝÜ
+NÂˆ[ÛX[\Ý\
+œ™\XÙYÛ™HSÔÈ™\Ù[˜ÙH‹Ý\œ™[[˜ÜÎŽœÝÜ
+NÂˆK
+
+HOˆ\ØØ\™Û™T™\Ù[˜ÙT[[YQÜ˜\
+™^
+JNÂˆBˆYˆ
+Ý\œ™[ÛÛ›Û\ˆOH[Ý\œ™[Û™HOH[Ý\œ™[[˜ÜÈOH[
+HÂˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙKœÛ™H™\Ù[˜ÙH\X[Ü˜\ŠNÂˆB‚ˆÜ][[YQÜ˜\™^H[ÂˆžHÂˆ™^HÜ™X]TÜ][[YQÜ˜\
+
+NÂˆÜ][[YQÜ˜\™\\™YH™^Âˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙKœÛ™H™\Ù[˜ÙH‹
+
+HOˆÂˆYˆ
+Ü]ÛÛ›Û\ˆOH[Û™T™\Ù[˜ÙQ^Ü\ˆOH[ˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ”Ü]Ü˜\Ú[™ÙY™Y›Ü™HX›XØ][ÛˆŠNÂˆBˆËÈÈ›ÝX]™HÙ\šXÙHšY[ÈÚ[[™È]HÝÜY[™HYˆZ]\ˆ™[ØY˜Z[Ë‚ˆ™\\™YœÛ™T™\Ù[˜ÙKœ™XÛÛ™šYÝ\™J
+NÂˆ™\\™Y˜[˜ÜÔ™\Ù[˜ÙKœ™XÛÛ™šYÝ\™J
+NÂˆX›\ÚÜ][[YQÜ˜\
+™\\™Y
+NÂˆK
+
+HOˆ\ØØ\™Ü][[YQÜ˜\
+™\\™Y
+JNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆYˆ
+™^OH[
+H\ØØ\™Ü][[YQÜ˜\
+™^
+NÂˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙKœÛ™H™\Ù[˜ÙH‹˜Z[\™JNÂˆBˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™TÛ™TÝYÙJ[ÝYÙJHÂˆÛ™PÛÛ›™XÝÜÛÛ›Û\ˆÝ\œ™[HÛ™PÛÛ›Û\ŽÂˆYˆ
+Ý\œ™[OH[
+HÂˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙKœÛ™H‹
+
+HOˆÂˆYˆ
+Û™PÛÛ›Û\ˆOHÝ\œ™[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ”Û™HÜ˜\Ú[™ÙY™Y›Ü™H™XÛÛ™šYÝ\™HŠNÂˆBˆÝ\œ™[œ™XÛÛ™šYÝ\™J
+NÂˆK
+
+HOˆÈJNÂˆBˆÛ™PÛÛ›™XÝÜÛÛ›Û\ˆ™^H[ÂˆžHÂˆ™^HÜ™X]TÛ™PÛÛ›Û\Š
+NÂˆ™^œ™XÛÛ™šYÝ\™J
+NÂˆÛ™PÛÛ›™XÝÜÛÛ›Û\ˆ™\\™YH™^Âˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙKœÛ™H‹
+
+HOˆÂˆYˆ
+Û™PÛÛ›Û\ˆOH[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ”Û™HÜ˜\Ú[™ÙY™Y›Ü™HX›XØ][ÛˆŠNÂˆBˆÛ™PÛÛ›Û\ˆH™\\™YÂˆK™\\™YŽœÝÜ
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆYˆ
+™^OH[
+HÂˆžHÈ™^œÝÜ
+
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆBˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙKœÛ™H‹˜Z[\™JNÂˆBˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™TÝ]\ÔÝ\™˜XÙTÝYÙJ[ÝYÙJHÂˆ›ÛÛX[ˆÛ™TÜ\™XYHHÛ™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™YÂˆYˆ
+\Û™TÜ\™XYH	‰ˆ
+™YœËœÛ™TÜ\›ÝYšXØ][ÛœÑ[˜X›Y™Ù]
+
+Bˆ™YœËœÛ™SÝÐ˜]\žP[\[˜X›Y™Ù]
+
+JJHÂˆžHÂˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹™[œÝ\™PÛÛ™šYÝ\™Y
+™YœÊNÂˆÛ™TÜ\™XYHHYNÂˆHØ]Ú
+”ÓÓ‘^Ù\[Ûˆ[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙË™JQËÛÝ[›ÝÛÛ™šYÝ\™HÛ™H›ÝYšXØ][ÛˆÜ\‹˜Z[\™JNÂˆBˆBˆÙ]œšXÚÕ\OˆÜ\\\ÈH[[]]X›PœšXÚÕ\\ÊØYÜ\Z[[•\\Ê
+JNÂˆÝš[™ÈÜ\Ý™\›^\ÒœÛÛˆH™YœËœÜ\Ý™\›^\ÒœÛÛ‹™Ù]
+
+NÂˆÝš[™ÈÜ\][\ÒœÛÛˆH™YœËœÜ\][\ÒœÛÛ‹™Ù]
+
+NÂˆÙ]œšXÚÕ\Oˆš]™\•\\ÈH[[]]X›PœšXÚÕ\\ÊØYš]™\’[™›Ü›X][ÛœšXÚÕ\\Ê
+JNÂˆÝš[™Èš]™\’[™›Ü›X][Û’œÛÛˆH™YœË˜XÝ]™Qš]™\”[™[›Ùš[J
+KœÚÜÝ]ÒœÛÛ‹™Ù]
+
+NÂˆ›ÛÛX[ˆš]™\”[™[[˜X›YH™YœË™š]™\”[™[[˜X›Y™Ù]
+
+NÂˆ›ÛÛX[ˆ™\\™YÛ™TÜ\HÛ™TÜ\™XYNÂˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙKœÝ]\ÈÝ\™˜XÙH[[YH‹
+
+HOˆÂˆÛ™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™YH™\\™YÛ™TÜ\ÂˆÛÛ™šYÝ\™YÜ\Z[[•\\ÈHÜ\\\ÎÂˆÛÛ™šYÝ\™YÜ\Ý™\›^\ÒœÛÛˆHÜ\Ý™\›^\ÒœÛÛŽÂˆÛÛ™šYÝ\™YÜ\][\ÒœÛÛˆHÜ\][\ÒœÛÛŽÂˆÛÛ™šYÝ\™Yš]™\’[™›Ü›X][Û•\\ÈHš]™\•\\ÎÂˆÛÛ™šYÝ\™Yš]™\’[™›Ü›X][Û’œÛÛˆHš]™\’[™›Ü›X][Û’œÛÛŽÂˆÛÛ™šYÝ\™Yš]™\”[™[[˜X›YHš]™\”[™[[˜X›YÂˆYˆ
+š[™[™ÈOH[
+HÂˆ[’[YÜ˜][Û”Ý\
+œÝ]\ÈÝ\™˜XÙH[[YHXZ[ˆ‹
+
+HOˆ\T™Y™\™[˜Ù\Ê˜[ÙJJNÂˆBˆK
+
+HOˆÈJNÂˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™PØ\•[[Y]žTÝYÙJ[ÝYÙJHÂˆØ\•[[Y]žQ^Ü\ˆÝ\œ™[HØ\•[[Y]žQ^Ü\ŽÂˆÜ]XÛÛ›Û\ˆÜ]HÜ]ÛÛ›Û\ŽÂˆYˆ
+Ü]OH[
+HÂˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙK˜Ø\ˆ[[Y]žHZ\ÜÚ[™ÈÜ]Ü˜\ŠNÂˆBˆØ\”[[YQÜ˜\™^H[ÂˆžHÂˆ™^HÜ™X]PØ\”[[YQÜ˜\
+Ü]
+NÂˆØ\”[[YQÜ˜\™\\™YH™^Âˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙK˜Ø\ˆ[[Y]žH‹
+
+HOˆÂˆYˆ
+Ø\•[[Y]žQ^Ü\ˆOHÝ\œ™[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠØ\ˆÜ˜\Ú[™ÙY™Y›Ü™HX›XØ][ÛˆŠNÂˆBˆËÈ\œÙH[™ÝXœØÜšX™HÛˆHXZ[ˆ™XY]È›Ý™\XÙHH]]Üš]]]™BˆËÈšY[Û\Ý[™\ˆ[[HÛÛ\]H™XÛÛ™šYÝ\™HÝXØÙYYËˆH™]žH\™Y›Ü™HÙY\ÂˆËÈZ]\ˆH™]š[Ý\È]™H^Ü\ˆÜˆH[HÛÛ™šYÝ\™Y™\XÙ[Y[‚ˆ™\\™Y™^Ü\‹œ™XÛÛ™šYÝ\™J
+NÂˆYˆ
+Ø\•[[Y]žQ^Ü\ˆOHÝ\œ™[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠØ\ˆÜ˜\Ú[™ÙY\š[™È™XÛÛ™šYÝ\™HŠNÂˆBˆX›\ÚØ\”[[YQÜ˜\
+™\\™Y
+NÂˆYˆ
+Ý\œ™[OH[
+HÂˆ[ÛX[\Ý\
+œ™\XÙYØ\ˆ[[Y]žH‹Ý\œ™[ŽœÝÜ
+NÂˆBˆ[’[YÜ˜][Û”Ý\
+˜Ø\ˆ[[Y]žHÝ\™˜XÙH‹\ÎŽœ™Yœ™\ÚØ\”Ý]\ÔÝ\™˜XÙJNÂˆK
+
+HOˆ\ØØ\™Ø\”[[YQÜ˜\
+™\\™Y
+JNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆYˆ
+™^OH[
+H\ØØ\™Ø\”[[YQÜ˜\
+™^
+NÂˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙK˜Ø\ˆ[[Y]žH‹˜Z[\™JNÂˆBˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™S\]ÝYÙJ[ÝYÙJHÂˆ\]ÛÛ›Û\ˆÝ\œ™[H\]ÛÛ›Û\ŽÂˆYˆ
+Ý\œ™[OH[
+HÂˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙK“TU‹
+
+HOˆÂˆYˆ
+\]ÛÛ›Û\ˆOHÝ\œ™[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ“TUÜ˜\Ú[™ÙY™Y›Ü™H™XÛÛ™šYÝ\™HŠNÂˆBˆÝ\œ™[œ™XÛÛ™šYÝ\™J
+NÂˆK
+
+HOˆÈJNÂˆBˆ\]ÛÛ›Û\ˆ™^H[ÂˆžHÂˆ™^HÜ™X]S\]ÛÛ›Û\Š
+NÂˆ™^œ™XÛÛ™šYÝ\™J
+NÂˆ\]ÛÛ›Û\ˆ™\\™YH™^Âˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙK“TU‹
+
+HOˆÂˆYˆ
+\]ÛÛ›Û\ˆOH[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ“TUÜ˜\Ú[™ÙY™Y›Ü™HX›XØ][ÛˆŠNÂˆBˆ\]ÛÛ›Û\ˆH™\\™YÂˆK™\\™YŽœÝÜ
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆYˆ
+™^OH[
+HÂˆžHÈ™^œÝÜ
+
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆBˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙK“TU‹˜Z[\™JNÂˆBˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™RÛYP\ÜÚ\Ý[ÝYÙJ[ÝYÙJHÂˆP\PÛÛ›Û\ˆÝ\œ™[HP\PÛÛ›Û\ŽÂˆYˆ
+Ý\œ™[OH[
+HÂˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙK’ÛYH\ÜÚ\Ý[‹
+
+HOˆÂˆYˆ
+P\PÛÛ›Û\ˆOHÝ\œ™[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ’HÜ˜\Ú[™ÙY™Y›Ü™H™XÛÛ™šYÝ\™HŠNÂˆBˆÝ\œ™[œ™XÛÛ™šYÝ\™J
+NÂˆK
+
+HOˆÈJNÂˆBˆP\PÛÛ›Û\ˆ™^H[ÂˆžHÂˆ™^HÜ™X]RÛYP\ÜÚ\Ý[ÛÛ›Û\Š
+NÂˆ™^œ™XÛÛ™šYÝ\™J
+NÂˆP\PÛÛ›Û\ˆ™\\™YH™^Âˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙK’ÛYH\ÜÚ\Ý[‹
+
+HOˆÂˆYˆ
+P\PÛÛ›Û\ˆOH[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ’HÜ˜\Ú[™ÙY™Y›Ü™HX›XØ][ÛˆŠNÂˆBˆP\PÛÛ›Û\ˆH™\\™YÂˆK™\\™YŽœÝÜ
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆYˆ
+™^OH[
+HÂˆžHÈ™^œÝÜ
+
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆBˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙK’ÛYH\ÜÚ\Ý[‹˜Z[\™JNÂˆBˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™TÜ]ÝYÙJ[ÝYÙJHÂˆÜ]XÛÛ›Û\ˆÝ\œ™[HÜ]ÛÛ›Û\ŽÂˆYˆ
+Ý\œ™[OH[Û™T™\Ù[˜ÙQ^Ü\ˆOH[ˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙK”Ü]šXˆZ\ÜÚ[™È[[YHÜ˜\ŠNÂˆBˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙK”Ü]šXˆ‹
+
+HOˆÂˆYˆ
+Ü]ÛÛ›Û\ˆOHÝ\œ™[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ”Ü]Ü˜\Ú[™ÙY™Y›Ü™H™XÛÛ™šYÝ\™HŠNÂˆBˆÝ\œ™[œ™XÛÛ™šYÝ\™J
+NÂˆK
+
+HOˆÈJNÂˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™Uš\ÝX[ØÙ[˜\š[ÔÝYÙJ[ÝYÙJHÂˆØØ[ØÙ[˜\š[ÐÛÛ›Û\ˆÝ\œ™[HØÙ[˜\š[ÐÛÛ›Û\ŽÂˆYˆ
+Ý\œ™[OH[	‰ˆXÝ[Û‘\Ü]Ú\ˆOH[
+HÂˆÛÛ›™XÝÜXÝ[Û‘\Ü]Ú\ˆÝ\œ™[\Ü]Ú\ˆHXÝ[Û‘\Ü]Ú\ŽÂˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙKš\ÝX[ØÙ[˜\š[ÜÈ‹
+
+HOˆÂˆYˆ
+ØÙ[˜\š[ÐÛÛ›Û\ˆOHÝ\œ™[XÝ[Û‘\Ü]Ú\ˆOHÝ\œ™[\Ü]Ú\ŠHÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠˆ”ØÙ[˜\š[ÈÜ˜\Ú[™ÙY™Y›Ü™H™XÛÛ™šYÝ\™HŠNÂˆBˆÝ\œ™[œ™XÛÛ™šYÝ\™J
+NÂˆK
+
+HOˆÈJNÂˆBˆYˆ
+Ý\œ™[OH[XÝ[Û‘\Ü]Ú\ˆOH[\]ÛÛ›Û\ˆOH[ˆÜ]ÛÛ›Û\ˆOH[P\PÛÛ›Û\ˆOH[
+HÂˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙKš\ÝX[ØÙ[˜\š[È\X[Ü˜\ŠNÂˆBˆØÙ[˜\š[Ô[[YQÜ˜\™^H[ÂˆžHÂˆ™^HÜ™X]TØÙ[˜\š[Ô[[YQÜ˜\
+ˆ\]ÛÛ›Û\‹Ü]ÛÛ›Û\‹P\PÛÛ›Û\ŠNÂˆØÙ[˜\š[Ô[[YQÜ˜\™\\™YH™^Âˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙKš\ÝX[ØÙ[˜\š[ÜÈ‹
+
+HOˆÂˆYˆ
+ØÙ[˜\š[ÐÛÛ›Û\ˆOH[XÝ[Û‘\Ü]Ú\ˆOH[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ”ØÙ[˜\š[ÈÜ˜\Ú[™ÙY™Y›Ü™HX›XØ][ÛˆŠNÂˆBˆ™\\™Y˜ÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆX›\ÚØÙ[˜\š[Ô[[YQÜ˜\
+™\\™Y
+NÂˆK™\\™Y˜ÛÛ›Û\ŽŽ™\Ý›ÞJNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆYˆ
+™^OH[
+HÂˆžHÈ™^˜ÛÛ›Û\‹™\Ý›ÞJ
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆBˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙKš\ÝX[ØÙ[˜\š[ÜÈ‹˜Z[\™JNÂˆBˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH™\\™R[[ØÙ[˜\š[ÔÝYÙJ[ÝYÙJHÂˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆÝ\œ™[H[[ØÙ[˜\š[ÐÛÛ›Û\ŽÂˆYˆ
+Ý\œ™[OH[
+HÂˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙKš[[ØÙ[˜\š[ÜÈ‹ˆ
+
+HOˆX›\Ú[[ØÙ[˜\š[ÔÝYÙJÝ\œ™[˜[ÙJK
+
+HOˆÈJNÂˆBˆÛÛ›™XÝÜXÝ[Û‘\Ü]Ú\ˆ\Ü]Ú\ˆHXÝ[Û‘\Ü]Ú\ŽÂˆYˆ
+\Ü]Ú\ˆOH[
+HÂˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙKš[[ØÙ[˜\š[ÈZ\ÜÚ[™È\Ü]Ú\ˆŠNÂˆBˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆ™^H[ÂˆžHÂˆ™^HÜ™X]R[[ØÙ[˜\š[ÐÛÛ›Û\Š\Ü]Ú\ŠNÂˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆ™\\™YH™^Âˆ™]\›ˆÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJÝYÙKš[[ØÙ[˜\š[ÜÈ‹ˆ
+
+HOˆX›\Ú[[ØÙ[˜\š[ÔÝYÙJ™\\™YYJK™\\™YŽ™\Ý›ÞJNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆYˆ
+™^OH[
+HÂˆžHÈ™^™\Ý›ÞJ
+NÈHØ]Ú
+[[YQ^Ù\[ÛˆYÛ›Ü™Y
+HÈBˆBˆ™]\›ˆ˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJÝYÙKš[[ØÙ[˜\š[ÜÈ‹˜Z[\™JNÂˆBˆB‚ˆÊŠ‚ˆ
+ˆXZ[‹\X›XØ][Û‹[Û›H›Ý[™\žH›Üˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆX\Ë[™\ˆ™]šY\È[™Bˆ
+ˆ[˜[ZXÈ™XÙZ]™\‹ˆHÝ[HÛÜšÙ\ˆ™\Ý[\È\Ý›ÞYYÚ]Ý]]™\ˆ[\š[™È\ÈY]Ù‚ˆ
+‹Âˆš]˜]H›ÚYX›\Ú[[ØÙ[˜\š[ÔÝYÙJ›Û“[[[ØÙ[˜\š[ÐÛÛ›Û\ˆÛÛ›Û\‹ˆ›ÛÛX[ˆX›\Ú™]ÐÛÛ›Û\ŠHÂˆYˆ
+X›\Ú™]ÐÛÛ›Û\ŠHÂˆYˆ
+[[ØÙ[˜\š[ÐÛÛ›Û\ˆOH[
+HÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ’[[Ü˜\Ú[™ÙY™Y›Ü™HX›XØ][ÛˆŠNÂˆBˆËÈX›\Ú™Y›Ü™H™XÙZ]™\ˆ™YÚ\Ý˜][ÛˆÛÈ]™[ˆ[ˆ[[YYX]HXZ[‹[ÛÜœ›ØYØ\ÝØ[‚ˆËÈ™\ÛÛ™HHÛÛ›Û\ˆ›ÝYÚHÙ\šXÙIÜÈ]]Üš]]]™HšY[‚ˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆHÛÛ›Û\ŽÂˆH[ÙHYˆ
+[[ØÙ[˜\š[ÐÛÛ›Û\ˆOHÛÛ›Û\ŠHÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ’[[Ü˜\Ú[™ÙY™Y›Ü™H™XÛÛ™šYÝ\™HŠNÂˆBˆžHÂˆÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆYˆ
+X›\Ú™]ÐÛÛ›Û\ˆ	‰ˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆOHÛÛ›Û\ŠHÂˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆH[ÂˆÛÛ›Û\‹™\Ý›ÞJ
+NÂˆBˆ›ÝÈ˜Z[\™NÂˆBˆ[’[YÜ˜][Û”Ý\
+œ[™[™È[[ØÙ[˜\š[ÜÈ‹ˆ
+
+HOˆ˜Z[”[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ê˜[ÙJJNÂˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙHÝXØÙ\ÜÙ[[š]X[[YÜ˜][Û”ÝYÙJˆ[ÝYÙK›Û“[Ýš[™È˜[YK›Û“[[›˜X›HX›XØ][Û‹ˆ›Û“[[›˜X›HÛX[\
+HÂˆ™]\›ˆ™]È™\\™Y[š]X[[YÜ˜][Û”ÝYÙJˆÝYÙK˜[YKYKX›XØ][Û‹ÛX[\
+NÂˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJˆ[ÝYÙK›Û“[Ýš[™È˜[YJHÂˆÙË™JQËÛÝ[›ÝÛÛ™šYÝ\™Hˆ
+È˜[YJNÂˆ™]\›ˆ™]È™\\™Y[š]X[[YÜ˜][Û”ÝYÙJˆÝYÙK˜[YK˜[ÙK
+
+HOˆÈK
+
+HOˆÈJNÂˆB‚ˆ›Û“[ˆš]˜]H™\\™Y[š]X[[YÜ˜][Û”ÝYÙH˜Z[Y[š]X[[YÜ˜][Û”ÝYÙJˆ[ÝYÙK›Û“[Ýš[™È˜[YK›Û“[[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙË™JQËÛÝ[›ÝÛÛ™šYÝ\™Hˆ
+È˜[YK˜Z[\™JNÂˆ™]\›ˆ™]È™\\™Y[š]X[[YÜ˜][Û”ÝYÙJˆÝYÙK˜[YK˜[ÙK
+
+HOˆÈK
+
+HOˆÈJNÂˆB‚ˆš]˜]H›ÚY[ØXÚYÝ]Qœ™\Ú™\ÜÐ˜\œšY\Š
+HÂˆËÈ™\Ù\™HH™^Ý]H™Y›Ü™H\Ü]ÚÛÈÙ][™ÜÈØ[˜XÚÜÈØ[››ÝÝ\H\˜[[ˆËÈ[™HÚ[HHÛÜšÙ\ˆÝÛœÈH™]Z[™Y”ÓÓˆØÝ[Y[‚ˆÝ\\Ý]P˜\œšY\’[‘›YÚHYNÂˆ[š]X[[YÜ˜][Û”ÝYÙHHNÂˆš[˜[Û™ÈÝÛ™\•ÚÙ[ˆHÝ\\Ý]SÝÛ™\•ÚÙ[ŽÂˆžHÂˆÝ\\Ý]UÛÜšÙ\‹™^XÝ]J
+
+HOˆÂˆ\ÝPœšXÚÐÛÛ™šYÏˆØYYXZ[œšXÚÜÈHÛÛXÝ[ÛœË™[\S\Ý
+
+NÂˆÝš[™ÈØYYXZ[’œÛÛˆH–×HŽÂˆžHÂˆËÈ›ÝØÝ[Y[ÈØ[ˆ™H\™ÙHY\ˆÛ™È\ÙKˆ\œÙKÜ™]Üš]H[H][™›ÚY	ÜÂˆËÈ˜XÚÙÜ›Ý[™š[Üš]HÚ[HH[™XYKX]XÚYÚ[™[XZ[œÈ™\ÜÛœÚ]™K‚ˆ™YœË˜ÛÛ\]QY™\œ™YÝ\\ZYÜ˜][ÛœÊ
+NÂˆØYYXZ[’œÛÛˆH™YœËšSXZ[œšXÚÜÒœÛÛ‹™Ù]
+
+NÂˆØYYXZ[œšXÚÜÈHPÛÛ™šYÜË›ØYXZ[ŠØYYXZ[’œÛÛŠNÂˆYˆ
+X]]ÛX][Û”Ý]\Ë›X\šÐ[Ý[RYŠˆ
+
+HOˆÝÛœÔÝ\\Ý]JÝÛ™\•ÚÙ[ŠJJH™]\›ŽÂˆYˆ
+[ÝÛœÔÝ\\Ý]JÝÛ™\•ÚÙ[ŠJH™]\›ŽÂˆÛX\”™]Z[™YÛ™TÜ\Ý]Q›Ü”Ý\\
+ÝÛ™\•ÚÙ[ŠNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆËÈX]™HHÙ\ÜÚ[Ûˆ›Ú™XÝ[Ûˆ˜Z[XÛÜÙYÜÝ[HYˆ\œÚ\Ý[˜ÙH\ÈX[›Ü›YY‚ˆÙË™JQËÛÝ[›Ý\œÚ\ÝØXÚY\Ý]Hœ™\Ú™\ÜÈ˜\œšY\ˆ‹˜Z[\™JNÂˆBˆ\ÝPœšXÚÐÛÛ™šYÏˆ[[]]X›SXZ[œšXÚÜÈHÛÛXÝ[ÛœË[›[ÙYšXX›S\Ý
+ˆ™]È\œ˜^S\ÝŠØYYXZ[œšXÚÜÊJNÂˆÝš[™È[[]]X›SXZ[’œÛÛˆHØYYXZ[’œÛÛŽÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆÂˆÝ\\Ý]P˜\œšY\’[‘›YÚH˜[ÙNÂˆYˆ
+\Ý›ÞYYZ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÊH™]\›ŽÂˆÛÛ™šYÝ\™YXZ[œšXÚÜÈH[[]]X›SXZ[œšXÚÜÎÂˆÛÛ™šYÝ\™YXZ[œšXÚÜÒœÛÛˆH[[]]X›SXZ[’œÛÛŽÂˆÝ\\\™›Ü›X[˜ÙU˜XÙK›X\šÊ˜ØXÚYÜÝ]WÜ™XYHŠNÂˆYˆ
+]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]
+H™]\›ŽÂˆXZ[’[™\‹œÜÝ
+[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆJNÂˆJNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ™Z™XÝY
+HÂˆÝ\\Ý]P˜\œšY\’[‘›YÚH˜[ÙNÂˆÙË™JQËÛÝ[›ÝØÚY[HØXÚY\Ý]Hœ™\Ú™\ÜÈ˜\œšY\ˆ‹™Z™XÝY
+NÂˆXZ[’[™\‹œÜÝ
+[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆBˆB‚ˆš]˜]H›ÛÛX[ˆÝÛœÔÝ\\Ý]JÛ™ÈÚÙ[ŠHÂˆ™]\›ˆÚÙ[ˆOH	‰ˆÕT•TÔÕUWÓÕÓ‘T‹™Ù]
+
+HOHÚÙ[ˆ	‰ˆY\Ý›ÞYYˆ	‰ˆU™XY˜Ý\œ™[™XY
+
+Kš\Ò[\œ\Y
+
+NÂˆB‚ˆÊŠˆÛÜšÙ\‹[Û›HÝ\\ÛX[\ÈÜ\Ú[™ÝÜËØÛÛ›Û\œÈÈ›Ý^\Ý]\ÈÚ[ˆ
+‹Âˆš]˜]H›ÚYÛX\”™]Z[™YÛ™TÜ\Ý]Q›Ü”Ý\\
+Û™ÈÝÛ™\•ÚÙ[ŠHÂˆYˆ
+]]ÛX][Û”Ý]\ÈOH[
+H™]\›ŽÂˆžHÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆ›Üˆ
+Ýš[™ÈÝ™\›^RYˆ™]ÈÝš[™Ö×^ÂˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÒQˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÕÒUÒPÓÓ—ÒQJHÂˆYˆ
+X]]ÛX][Û”Ý]\Ë˜\RYŠ
+
+HOˆÝÛœÔÝ\\Ý]JÝÛ™\•ÚÙ[ŠKˆ]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKÝ™\›^RYˆ™]È”ÓÓ“Øš™XÝ
+
+Kœ]
+š\ÚX›H‹˜[ÙJKœ]
+™œ™\Ú‹˜[ÙJBˆœ]
+\]YØ]‹›ÝÊJJH™]\›ŽÂˆBˆ›Üˆ
+Ýš[™È]]ÛX][Û’YˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹™šY[]]ÛX][Û’YÊ
+JHÂˆYˆ
+X]]ÛX][Û”Ý]\Ë˜\RYŠ
+
+HOˆÝÛœÔÝ\\Ý]JÝÛ™\•ÚÙ[ŠKˆ]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔT]]ÛX][Û’Yˆ™]È”ÓÓ“Øš™XÝ
+
+Kœ]
+^‹ˆŠKœ]
+š\ÚX›H‹˜[ÙJBˆœ]
+™œ™\Ú‹˜[ÙJKœ]
+\]YØ]‹›ÝÊJJH™]\›ŽÂˆBˆHØ]Ú
+”ÓÓ‘^Ù\[Ûˆ[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙËÊQËÛÝ[›ÝÛX\ˆ™]Z[™YÛ™HÜ\Ý]H‹˜Z[\™JNÂˆBˆB‚ˆš]˜]H›ÚYš[š\Ú[š]X[[YÜ˜][Û”Ý\\
+
+HÂˆ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÈH˜[ÙNÂˆ[YÜ˜][Û”Ý\\ØÚY[YH˜[ÙNÂˆ[YÜ˜][ÛœÔÝ\YHYNÂˆÝ\\\™›Ü›X[˜ÙU˜XÙK›X\šÊš[YÜ˜][Ûœ×Ü™XYHŠNÂˆËÈXYÛ›ÜÝXÜËÜš]š[YÙYPÐT–ÛXÞH\È›Ûš\ÝX[ˆÙY\]Ý]Ùˆ]™\žHÛÛ›™XÝÜˆÝYÙBˆËÈ[œÝXYÙˆ][™È[ˆ[™\[™[KK\ÙXÛÛ™[Y\ˆÛÛYHÚ]Û™KÐØ\‹ÓTUÝ\\‚ˆÝ]\ÕÚYÙ]\XØ][Û‹œ™\Ý[YTÝ\™˜XÙSÝÛ™Y[š]X[^˜][ÛŠ\ÊNÂˆËÈHÛÛœÝXÝÜˆ˜Z[\™H[ˆÝYÙH]\Ý›ÝÝ˜[™HÝ[]˜[Y^XÚ]ÛÛ[X[™ˆBˆËÈÛ‹Y[X[™™]žH™[XZ[œÈÙ\šX[^™YÛˆHÙ\šXÙHXZ[ˆÛÜ\ˆ[™^XÝ]\È][ÜÝÛ˜ÙK‚ˆ˜Z[”[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ê
+NÂˆYˆ
+š[™[™ÈOH[
+HÂˆ[’[YÜ˜][Û”Ý\
+š[š]X[Ý]\Ë\›ÝÈ›Ú™XÝ[Ûˆ‹
+
+HOˆÂˆ™[™\’ÛYP\ÜÚ\Ý[œšXÚÜÊ
+NÂˆ\PœšXÚÕš\ÚXš[]JÝ\œ™[œšXÚÔÙ]
+
+JNÂˆJNÂˆBˆ\TÜ\™Y™\™[˜Ù\ÔØY™[J
+NÂˆËÈØÙ[˜\š[ÈØ[˜XÚÜÈ\™H[X™\˜][HÛØ[\ØÙYÚ[H[YÜ˜][ÛœÈÝ\ˆ™XZ[BˆËÈš]™\ˆ˜Z[Û˜ÙHY\ˆ]ÛÛœÛÛY]Y]˜[X][ÛˆÛÈ›ÛÝ][YHš\ÚXš[]KØXÝ[Û‚ˆËÈÝ™\œšY\È\™H[™XYH™Y›XÝY[ˆ]È™\žHš\œÝÝX›HÛÛ™šYÝ\˜][Û‹‚ˆ]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[T[™[™ÈH˜[ÙNÂˆYˆ
+™YœË™š]™\”[™[[˜X›Y™Ù]
+
+JHš]™\”[™[Ù\šXÙK˜\J\ÊNÂˆYˆ
+™YœËšY[™[[˜X›Y™Ù]
+
+H	‰ˆ™YœËšY[™[]]ÜÝ\™Ù]
+
+JHÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆÂˆYˆ
+Y\Ý›ÞYY	‰ˆ™YœÈOH[	‰ˆ™YœËšY[™[[˜X›Y™Ù]
+
+JHÂˆY™\Ù[][Û”Ù\šXÙK››ÝYžP]]ÛX][ÛÚ[™ÙY
+\ÊNÂˆBˆJNÂˆBˆÞ[˜Ú›Ûš^™Y
+]]ÛX][Û•ZSØÚÊHÂˆËÈš]™\‹ÒQ\™H™XÛÛ˜Ú[Y^XÝHÛ˜ÙHX›Ý™Hœ›ÛHHš[˜[Ý\\Ý]K‚ˆ[™[™Ð]]ÛX][Û•ZKœ™[[Ý™J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÑ’U‘TŠNÂˆ[™[™Ð]]ÛX][Û•ZKœ™[[Ý™J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÒQ
+NÂˆBˆØÚY[T[™[™Ð]]ÛX][Û•ZT™Yœ™\Ú
+
+NÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ]]ÛX][Û‘œ™\Ú™\ÜÕXÚÊNÂˆXZ[’[™\‹œÜÝ[^YY
+]]ÛX][Û‘œ™\Ú™\ÜÕXÚËÌÌ
+NÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÞ\Ý[PÛÛ™][Û”™Yœ™\Ú
+NÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆXZ[’[™\‹œÜÝ[^YY
+Þ\Ý[PÛÛ™][Û”™Yœ™\ÚˆÖTÕSWÐÓÓ‘USÓ—Ô‘Q”‘TÒÒS•T•SÓTÂˆH
+›ÝÈ	HÖTÕSWÐÓÓ‘USÓ—Ô‘Q”‘TÒÒS•T•SÓTÊJNÂˆYˆ
+Ü™Y[X[™Yœ™\Ú[™[™ÊHÂˆÜ™Y[X[™Yœ™\Ú[™[™ÈH˜[ÙNÂˆXZ[’[™\‹œÜÝ
+\ÎŽœ™XÛÛ™šYÝ\™PÜ™Y[X[˜XÚÙY[YÜ˜][ÛœÐY\•[›ØÚÊNÂˆH[ÙHÂˆØÚY[T[™[™Ò[YÜ˜][Û”™XÛÛ™šYÝ\™J
+NÂˆBˆB‚ˆš]˜]H›ÚYØÚY[R[š]X[[YÜ˜][Û”Ý\\Y\‘œ˜[YJ
+HÂˆYˆ
+\Ý›ÞYYš[™[™ÈOH[[Ý™\›^P]XÚY
+H™]\›ŽÂˆYˆ
+[YÜ˜][ÛœÔÝ\Y	‰ˆX]]ÛX]XÔ[[YT\šÙY	‰ˆX]]ÛX]XÓY™XÞXÛT]ZY]ˆ	‰ˆX]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[T[™[™ÊH™]\›ŽÂˆšY]È›ÛÝHš[™[™Ë™Ù]›ÛÝ
+
+NÂˆ[Ù[™\˜][ÛˆHÝ™\›^P]XÚÙ[™\˜][ÛŽÂˆYˆ
+›ÛÝ™Ù][J
+HŽNNY‚ˆZ\ÐÝ\œ™[Ý™\›^P]XÚY[
+Ù[™\˜][Û‹›ÛÝ
+JH™]\›ŽÂˆY™\œ™Y[YÜ˜][Û”Ý\^\Ý[™ÈHY™\œ™Y[YÜ˜][Û”Ý\ÂˆYˆ
+[YÜ˜][Û”Ý\\ØÚY[Y	‰ˆ^\Ý[™ÈOH[ˆ	‰ˆ^\Ý[™Ë˜]XÚY[Ù[™\˜][ÛˆOHÙ[™\˜][Ûˆ	‰ˆ^\Ý[™Ëœ›ÛÝOH›ÛÝ
+H™]\›ŽÂˆØ[˜Ù[Y™\œ™Y[YÜ˜][Û”Ý\
+
+NÂˆ[YÜ˜][Û”Ý\\ØÚY[YHYNÂˆY™\œ™Y[YÜ˜][Û”Ý\™^H™]ÈY™\œ™Y[YÜ˜][Û”Ý\
+Ù[™\˜][Û‹›ÛÝ
+NÂˆY™\œ™Y[YÜ˜][Û”Ý\H™^ÂˆžHÂˆÚÜ™[ÙÜ˜\\‹™Ù][œÝ[˜ÙJ
+KœÜÝœ˜[YPØ[˜XÚÊ™^
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆËÈÚÜ™[ÙÜ˜\\ˆÚÝ[[Ø^\È™H]˜Z[X›HÛˆHÙ\šXÙHXZ[ˆÛÜ\‹ˆHœ›ÚÙ[ˆÑSBˆËÈ[\[Y[][Ûˆ]\Ý›ÝX]™H[ÛÛ›™XÝÜœÈ\›X[™[HÝÜYÝÙ]™\‹‚ˆÙËÊQËÛÝ[›ÝY™\ˆ[YÜ˜][ÛœÈÈHš\œÝœ˜[YH‹˜Z[\™JNÂˆXZ[’[™\‹œÜÝ
+™^
+NÂˆBˆB‚ˆš]˜]H›ÚYØ[˜Ù[Y™\œ™Y[YÜ˜][Û”Ý\
+
+HÂˆY™\œ™Y[YÜ˜][Û”Ý\[™[™ÈHY™\œ™Y[YÜ˜][Û”Ý\ÂˆY™\œ™Y[YÜ˜][Û”Ý\H[ÂˆYˆ
+[™[™ÈOH[
+HÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ[™[™ÊNÂˆžHÂˆÚÜ™[ÙÜ˜\\‹™Ù][œÝ[˜ÙJ
+Kœ™[[Ý™Qœ˜[YPØ[˜XÚÊ[™[™ÊNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙËÊQËÛÝ[›Ý™[[Ý™HY™\œ™Y[YÜ˜][ÛˆÝ\\‹˜Z[\™JNÂˆBˆBˆYˆ
+Z[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÈ	‰ˆZ[YÜ˜][ÛœÔÝ\Y
+HÂˆ[YÜ˜][Û”Ý\\ØÚY[YH˜[ÙNÂˆBˆB‚ˆš]˜]H›ÛÛX[ˆ\ÐÝ\œ™[Ý™\›^P]XÚY[
+[Ù[™\˜][Û‹›Û“[šY]È›ÛÝ
+HÂˆ™]\›ˆY\Ý›ÞYY	‰ˆÙ[™\˜][ÛˆOHÝ™\›^P]XÚÙ[™\˜][Ûˆ	‰ˆÝ™\›^P]XÚYˆ	‰ˆš[™[™ÈOH[	‰ˆš[™[™Ë™Ù]›ÛÝ
+
+HOH›ÛÝ	‰ˆ›ÛÝš\Ð]XÚYÕÚ[™ÝÊ
+NÂˆB‚ˆÊŠˆ™XÛÛ™šYÝ\™\ÈXXÚ[™\[™[[YÜ˜][ÛˆÚ]Ý]][™ÈÛ™H˜Y›ÝšY\ˆ›ØÚÈH™\Ýˆ
+‹Âˆš]˜]H›ÚY™XÛÛ™šYÝ\™R[YÜ˜][ÛÛÛ›Û\œÊ
+HÂˆ[’[YÜ˜][Û”Ý\
+“TU‹
+
+HOˆÂˆ[œÝ\™S\][[YQÜ˜\
+
+NÂˆ\]ÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆJNÂˆËÈØYH^XÝÙ[XÝYXY™\ÜÈ›Ý[™\žH™Y›Ü™HHÛ™H˜[œÜÜØ[ˆ[Z]]ÂˆËÈÝ\œ™[Ý]KˆH]šXÙHÚ[™ÙH\™Y›Ü™HÛX\œÈHÛÜ]ÝÚ]Úš\œÝ‚ˆ[’[YÜ˜][Û”Ý\
+œÛ™H™\Ù[˜ÙH‹
+
+HOˆÂˆ[œÝ\™TÜ][[YQÜ˜\
+
+NÂˆÛ™T™\Ù[˜ÙQ^Ü\‹œ™XÛÛ™šYÝ\™J
+NÂˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\‹œ™XÛÛ™šYÝ\™J
+NÂˆJNÂˆ[’[YÜ˜][Û”Ý\
+œÛ™H‹
+
+HOˆÂˆ[œÝ\™TÛ™T[[YQÜ˜\
+
+NÂˆÛ™PÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆJNÂˆ[’[YÜ˜][Û”Ý\
+˜Ø\ˆ[[Y]žH‹
+
+HOˆÂˆ[œÝ\™PØ\”[[YQÜ˜\
+
+NÂˆØ\•[[Y]žQ^Ü\‹œ™XÛÛ™šYÝ\™J
+NÂˆJNÂˆ[’[YÜ˜][Û”Ý\
+”Ü]šXˆ‹
+
+HOˆÂˆ[œÝ\™TÜ][[YQÜ˜\
+
+NÂˆÜ]ÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆJNÂˆ[’[YÜ˜][Û”Ý\
+’ÛYH\ÜÚ\Ý[‹
+
+HOˆÂˆ[œÝ\™RÛYP\ÜÚ\Ý[[[YQÜ˜\
+
+NÂˆP\PÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆJNÂˆ[’[YÜ˜][Û”Ý\
+š\ÝX[ØÙ[˜\š[ÜÈ‹
+
+HOˆÂˆ[œÝ\™TØÙ[˜\š[Ô[[YQÜ˜\
+
+NÂˆØÙ[˜\š[ÐÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆJNÂˆ[’[YÜ˜][Û”Ý\
+š[[ØÙ[˜\š[ÜÈ‹
+
+HOˆÂˆ[œÝ\™R[[ØÙ[˜\š[Ô[[YQÜ˜\
+
+NÂˆ[[ØÙ[˜\š[ÐÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆJNÂˆB‚ˆš]˜]H›ÛÛX[ˆ[’[YÜ˜][Û”Ý\
+›Û“[Ýš[™È˜[YK›Û“[[›˜X›HÝ\
+HÂˆžHÂˆÝ\œ[Š
+NÂˆ™]\›ˆYNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙË™JQËÛÝ[›ÝÛÛ™šYÝ\™Hˆ
+È˜[YK˜Z[\™JNÂˆ™]\›ˆ˜[ÙNÂˆBˆB‚ˆš]˜]H›ÚY[ÛX[\Ý\
+›Û“[Ýš[™È˜[YK›Û“[[›˜X›HÝ\
+HÂˆžHÂˆÝ\œ[Š
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙËÊQËÛÝ[›ÝÛÛ\][HÝÜˆ
+È˜[YK˜Z[\™JNÂˆBˆB‚ˆš]˜]H›ÚY\TÜ\™Y™\™[˜Ù\ÔØY™[J
+HÂˆYˆ
+™YœÈOH[TÙ][™ÜË˜Ø[‘˜]ÓÝ™\›^\Ê\ÊJH™]\›ŽÂˆ[œÝ\™TÜ\Ý™\›^SX[˜YÙ\Š
+NÂˆYˆ
+Ü\Ý™\›^HOH[
+H™]\›ŽÂˆžHÂˆÜ\Ý™\›^K˜\T™Y™\™[˜Ù\Ê
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙË™JQËÛÝ[›Ý\HÜ\Ý™\›^\È‹˜Z[\™JNÂˆBˆB‚ˆš]˜]H›ÚY[œÝ\™TÜ\Ý™\›^SX[˜YÙ\Š
+HÂˆYˆ
+Ü\Ý™\›^HOH[™YœÈOH[TÙ][™ÜË˜Ø[‘˜]ÓÝ™\›^\Ê\ÊBˆ]]ÛX][Û”Ý]\ÈOH[ˆXÝ[Û‘\Ü]Ú\ˆOH[
+H™]\›ŽÂˆÜ\Ý™\›^HH™]ÈÜ\Ý™\›^SX[˜YÙ\Š\Ë™YœË]]ÛX][Û”Ý]\ËˆXÝ[Û‘\Ü]Ú\‹\ÎŽœÜ\Z[[•˜[YJNÂˆB‚ˆš]˜]H›ÚY[œÝ\™TÛ™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™Y
+
+HÂˆYˆ
+Û™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™Y™YœÈOH[
+H™]\›ŽÂˆžHÂˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹™[œÝ\™PÛÛ™šYÝ\™Y
+™YœÊNÂˆÛ™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™YHYNÂˆHØ]Ú
+”ÓÓ‘^Ù\[Ûˆ[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙË™JQËÛÝ[›ÝÛÛ™šYÝ\™HÛ™H›ÝYšXØ][ÛˆÜ\‹˜Z[\™JNÂˆBˆB‚ˆÝ™\œšYBˆX›XÈ[Û”Ý\ÛÛ[X[™
+[X›H[[[[[›YÜË[Ý\Y
+HÂˆ^ž‹œÝ]\ËÚYÙ]™XYÛ›ÜÝXÜËXÝ[Û”™XÛÜ™\‹œ™XÛÜ™Ù\šXÙR[[
+ˆÙ]Û\ÜÊ
+K™Ù]˜[YJ
+K[[OH[È[ˆ[[™Ù]XÝ[ÛŠ
+KÝ\Y
+NÂˆ›ÛÛX[ˆ^XÚ]ØÙ[˜\š[ÐÛÛ[X[™HY\Ý›ÞYY	‰ˆ[[OH[ˆ	‰ˆØÙ[˜\š[ÕšYÙÙ\”™XÙZ]™\‹PÕSÓ—ÑVPÕUWÔ•SK™\]X[Ê[[™Ù]XÝ[ÛŠ
+JNÂˆËÈ]Y]YH™Y›Ü™Hš\ÝX[ÚXY\ÜÈYZ\ÜÚ[Û‹ˆ[ˆ^XÚ][™XYKX]][XØ]Y\Ù\ˆÛÛ[X[™ˆËÈ\È[ÝÙYÈÙY\H[\Ü˜\žHXY\ÜÈÜÝ]™[ˆÚ[ˆÝ™\›^H\ÜÈ\™H[˜]˜Z[X›K‚ˆYˆ
+^XÚ]ØÙ[˜\š[ÐÛÛ[X[™
+H[œ]Y]YR[[ØÙ[˜\š[ÐÛÛ[X[™
+[[
+NÂˆYˆ
+\[[YR[š]X[^™Y
+HÂˆ›ÛÛX[ˆY™\œ™YÝXÚÞT™\Ý\H[[OH[ˆ	‰ˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹œÚÝ[Y™\]]ÛX]XÔÝXÚÞT™\Ý\
+\ÊNÂˆ›ÛÛX[ˆÝXÚÞUš\ÝX[Ý\™˜XÙHHY™\œ™YÝXÚÞT™\Ý\ˆ	‰ˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹š\Õ\Ù\•[›ØÚÙY
+\ÊBˆ	‰ˆÚYÙ]Ù\šXÙTÝ\\‹˜Ø[”Ý\š\ÝX[Ý\™˜XÙUÚ[T[[YT\šÙY
+ˆ™Y™\™[˜Ù\Ëš\ÔÝ]\ÕÚYÙ][˜X›Y›Ü•š\ÝX[›ÛÝÝ˜\
+\ÊKˆ\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊJNÂˆYˆ
+Y™\œ™YÝXÚÞT™\Ý\	‰ˆ\ÝXÚÞUš\ÝX[Ý\™˜XÙJHÂˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹™[œÝ\™R[YÜ˜][Û’ÜÝØÚY[Y
+\ÊNÂˆÝÜ›Ü™YÜ›Ý[™
+YJNÂˆÝÜÙ[ŠÝ\Y
+NÂˆ™]\›ˆÕT•Ó“ÕÔÕPÒÖNÂˆBˆ›ÛÛX[ˆš\ÝX[Ý\™˜XÙSÛ›HH[[OH[ˆ	‰ˆÚYÙ]Ù\šXÙTÝ\\‹PÕSÓ—ÔÕT•Õ’TÒP“WÔÕT‘PÑK™\]X[Êˆ[[™Ù]XÝ[ÛŠ
+JNÂˆ]]ÛX]XÔ[[YT\šÙYH
+š\ÝX[Ý\™˜XÙSÛ›HÝXÚÞUš\ÝX[Ý\™˜XÙJBˆ	‰ˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹œÚÝ[\šÐ]]ÛX]XÔ[[YJ\ÊNÂˆYˆ
+]]ÛX]XÔ[[YT\šÙY
+HÂˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹™[œÝ\™R[YÜ˜][Û’ÜÝØÚY[Y
+\ÊNÂˆÝ\\\™›Ü›X[˜ÙU˜XÙK›X\šÊš[YÜ˜][Û—Ü[[YWÜ\šÙYŠNÂˆBˆ[š]X[^™T[[YJ
+NÂˆBˆYˆ
+\[[YR[š]X[^™Y™YœÈOH[
+H™]\›ˆÕT•Ó“ÕÔÕPÒÖNÂˆYˆ
+^XÚ]ØÙ[˜\š[ÐÛÛ[X[™
+HÂˆËÈ^XÚ]]][XØ]Y\Ù\ˆÛÜšÈ\È›Ý[ˆ]]ÛX]XÈ›ÛÝ™XÛÛ›™XÝˆ]X^HÜ[‚ˆËÈH[[YH[™H›Üˆ]ÈÜšYÚ[˜[›Ý[™YÛÛ[X[™XY[™K‚ˆ^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYHHYNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYT™XÚXÚÊNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYQ^\žJNÂˆXZ[’[™\‹œÜÝ[^YY
+^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYQ^\žKˆSTÔT–WÔÐÑST’S×ÒÔÕÓPVÓTÊNÂˆ]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›HH˜[ÙNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ]]ÛX]XÓY™XÞXÛT]ZY]X\™ÝÛŠNÂˆYˆ
+]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆËÈ™]\ÙHHÙ\šX[^™Y™XÛÛ›™XÝ[™KˆHÛÛ[X[™ÛÛ›Û\ˆ™]šY\ÈYØZ[œÝ]ÂˆËÈXœÛÛ]HMK\ÙXÛÛ™XY[™HÚ[HTUÒKÔÜ]™XÛÛYH]]Üš]]]™HYØZ[‹‚ˆ™\Ý[YP]]ÛX]XÓY™XÞXÛR[YÜ˜][ÛœÐY\”]ZY]
+
+NÂˆBˆ\›U[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝY“™YYY
+ˆ\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊJNÂˆBˆYˆ
+Y\Ý›ÞYY	‰ˆ™YœÈOH[ˆ	‰ˆ
+
+™YœËÚYÙ][˜X›Y™Ù]
+
+H	‰ˆš[™[™ÈOH[ˆ	‰ˆ[Ý™\›^P]XÚ™]žTØÚY[Yˆ	‰ˆ\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊJBˆ
+\™YœËÚYÙ][˜X›Y™Ù]
+
+Bˆ	‰ˆ
+š[™[™ÈOH[Ü\Ý™\›^HOH[
+JJJHÂˆ\T™Y™\™[˜Ù\Ê˜[ÙJNÂˆBˆYˆ
+^XÚ]ØÙ[˜\š[ÐÛÛ[X[™
+HÂˆYˆ
+[YÜ˜][ÛœÔÝ\Y
+HÂˆ˜Z[”[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ê
+NÂˆH[ÙHYˆ
+Z[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÊHÂˆËÈHš\ÚX›HÜˆ™Z™XÝYÝ™\›^H]\Ý›ÝÛ[ˆ^XÚ]\ÚXØ[ÛÛ[X[™™Z[™ˆËÈÚ[™ÝÓX[˜YÙ\‹ÚÜÝ™]šY\Ëˆ\È\È›Ý[™Y\Ù\ˆÛÜšË›Ý]]ÛX]XÈ›ÛÝÛÜšË‚ˆ[’[š]X[[YÜ˜][Û”Ý\\
+
+NÂˆBˆBˆËÈHÝXÚÞH™\Ý\™\ÝÜ™\ÈHÛ™Ë[]™YÚYÙ]ØÛÛ›™XÝÜœÈ]Ø\œšY\È›ÈÛÛÛ[X[™‚ˆËÈ™KY[]™\š[™ÈHÑÑÓHY\ˆ›ØÙ\ÜÈX]ÛÝ[™H[œØY™KÛÈ[[[ÈÈ›Ý[™Ë‚ˆ™]\›ˆÕT•ÔÕPÒÖNÂˆB‚ˆš]˜]H›ÚY[œ]Y]YR[[ØÙ[˜\š[ÐÛÛ[X[™
+›Û“[[[ÛÛ[X[™
+HÂˆYˆ
+[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™ËœÚ^™J
+HHPVÔS‘S‘×ÒS•S•ÔÐÑST’S×ÐÓÓSPS‘ÊHÂˆËÈ˜Z[ÛÜÙY[™\ˆHœ›ØYØ\ÝÝÜ›Kˆ›Ü[™ÈH™]ÈÛÛ[X[™\ÈØY™\ˆ[‚ˆËÈ]šXÝ[™È[ˆÛ\ˆÑÑÓHÚÜÙH^XÝ][ÛˆÝ]H\È›ÝY]Û›ÝÛ‹‚ˆÙËÊQË’YÛ›Ü™Y[[ØÙ[˜\š[ÈÛÛ[X[™Ú[HÝ\\]Y]YH\È[ŠNÂˆ™]\›ŽÂˆBˆ[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ë˜Y\Ý
+™]È[[
+ÛÛ[X[™
+JNÂˆB‚ˆÊŠˆ™KX\›\ÈH›Ý[™YÜÝ]™[ˆÚ[ˆHÛÛ[X[™™XXÚ\È[ˆ[™XYH[š]X[^™YÙ\šXÙKˆ
+‹Âˆš]˜]H›ÚY\›U[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝY“™YYY
+›ÛÛX[ˆÝ™\›^T[[YP]˜Z[X›JHÂˆYˆ
+™YœÈOH[[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ëš\Ñ[\J
+BˆÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\ÒXY\ÜÒÜÝ
+™YœÊBˆ
+™YœËÚYÙ][˜X›Y™Ù]
+
+H	‰ˆÝ™\›^T[[YP]˜Z[X›JJH™]\›ŽÂˆ[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝHYNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ[\Ü˜\žTØÙ[˜\š[ÒÜÝ^\žJNÂˆXZ[’[™\‹œÜÝ[^YY
+[\Ü˜\žTØÙ[˜\š[ÒÜÝ^\žKˆSTÔT–WÔÐÑST’S×ÒÔÕÓPVÓTÊNÂˆB‚ˆš]˜]H›ÚY˜Z[”[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ê
+HÂˆ˜Z[”[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™ÊYJNÂˆB‚ˆÊŠ‚ˆ
+ˆÝ\\ÝYÙHš[™H\È\ÝØYYHÝ\œ™[[\ÈÛˆHÛÜšÙ\‹ÛÈ]ÈXZ[ˆX›XØ][Û‚ˆ
+ˆ]\Ý›Ý\œÙHHØ[YH”ÓÓˆÛ˜ÙH\ˆ]Y]YYÛÛ[X[™ˆÝ\ˆØ[\œÈ™]Z[ˆHÝšXÝˆ
+ˆ™[ØYX™Y›Ü™K[ÛÚÝ\›Ý[™\žH\ÙYY\ˆÙ][™ÜÈY]Ë‚ˆ
+‹Âˆš]˜]H›ÚY˜Z[”[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ê›ÛÛX[ˆ™[ØY[\ÊHÂˆYˆ
+\Ý›ÞYY[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ëš\Ñ[\J
+JH™]\›ŽÂˆYˆ
+[[ØÙ[˜\š[ÐÛÛ›Û\ˆOH[
+HÂˆYˆ
+\™[ØY[\ÊH™]\›ŽÂˆYˆ
+Z[YÜ˜][ÛœÔÝ\Y
+H™]\›ŽÂˆ[’[YÜ˜][Û”Ý\
+š[[ØÙ[˜\š[ÜÈÛˆ[X[™‹
+
+HOˆÂˆ[œÝ\™R[[ØÙ[˜\š[Ô[[YQÜ˜\
+
+NÂˆ[[ØÙ[˜\š[ÐÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆJNÂˆYˆ
+[[ØÙ[˜\š[ÐÛÛ›Û\ˆOH[
+H™]\›ŽÂˆBˆ[[ÛÛ[X[™ÂˆÚ[H
+
+ÛÛ[X[™H[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™ËœÛš\œÝ
+
+JHOH[
+HÂˆËÈ™[ØY™Y›Ü™HÛÚÝ\ÛÈHœ›ØYØ\ÝXØÙ\Yœ›ÛHH]\Ý]šXÙK\›ÝXÝYˆËÈ™Y™\™[˜Ù\ÈØ[››Ý^XÝ]H[ˆÛ\ˆ[‹[Y[[ÜžH\™Ù]Y\ˆHÙ][™ÜÈY]‚ˆYˆ
+™[ØY[\ÊH[[ØÙ[˜\š[ÐÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÂˆ[[ØÙ[˜\š[ÐÛÛ›Û\‹šYÙÙ\”[RY
+ˆÛÛ[X[™™Ù]Ýš[™Ñ^˜JØÙ[˜\š[ÕšYÙÙ\”™XÙZ]™\‹‘VWÕ’QÑÑT—ÒQ
+KˆÛÛ[X[™™Ù]Ýš[™Ñ^˜JØÙ[˜\š[ÕšYÙÙ\”™XÙZ]™\‹‘VWÕ’QÑÑT—ÕÒÑSŠKˆÛÛ[X[™™Ù]Ýš[™Ñ^˜JØÙ[˜\š[ÕšYÙÙ\”™XÙZ]™\‹‘VWÔ•SWÑ’S‘ÑT”’S•
+KˆÛÛ[X[™™Ù]Û™Ñ^˜JØÙ[˜\š[ÕšYÙÙ\”™XÙZ]™\‹‘VWÑPQS‘WÑSTÑQ
+JNÂˆBˆ™XÛÛ˜Ú[Q^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYJ˜[ÙJNÂˆ™XÛÛ˜Ú[U[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝ
+˜[ÙJNÂˆB‚ˆÊŠ‚ˆ
+ˆÙY\ÈH›Ý[™Y[[YHÝ™\œšYH[[HXØÙ\Y\ÚXØ[ÛÛ[X[™\ÈZ]\ˆÛÛ\]Yˆ
+ˆÜˆ™XXÚY]ÈÜšYÚ[˜[[Û›ÝÛšXÈXY[™Kˆ˜Z[š[™ÈHÙ\šXÙH]Y]YH\È›ÝÛÛ\][ÛŽ‚ˆ
+ˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆX^HÝ[™HØZ][™È›ÜˆHÛÛ›™XÝÜˆÛ˜\ÚÝÜˆXÚÛ›ÝÛYÙ[Y[‚ˆ
+‹Âˆš]˜]H›ÚY™XÛÛ˜Ú[Q^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYJ›ÛÛX[ˆ›Ü˜ÙJHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYT™XÚXÚÊNÂˆYˆ
+Y^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYH\Ý›ÞYY
+H™]\›ŽÂˆ›ÛÛX[ˆ^XÝ][Û”[™[™ÈH\[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ëš\Ñ[\J
+Bˆ
+[[ØÙ[˜\š[ÐÛÛ›Û\ˆOH[ˆ	‰ˆ[[ØÙ[˜\š[ÐÛÛ›Û\‹š\Ô[™[™Ñ^XÝ][ÛœÊ
+JNÂˆYˆ
+Y›Ü˜ÙH	‰ˆ^XÝ][Û”[™[™ÊHÂˆXZ[’[™\‹œÜÝ[^YY
+^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYT™XÚXÚËˆSTÔT–WÔÐÑST’S×ÒÔÕÔ‘PÒPÒ×ÓTÊNÂˆ™]\›ŽÂˆBˆ^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYHH˜[ÙNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYQ^\žJNÂˆYˆ
+Ý\\ÛÜšÐÛÛÜ™[˜]Ü‹œÚÝ[\šÐ]]ÛX]XÔ[[YJ\ÊJHÂˆ]]ÛX]XÔ[[YT\šÙYHYNÂˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹™[œÝ\™R[YÜ˜][Û’ÜÝØÚY[Y
+\ÊNÂˆBˆB‚ˆš]˜]H›ÚY™XÛÛ˜Ú[U[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝ
+›ÛÛX[ˆ›Ü˜ÙJHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ[\Ü˜\žTØÙ[˜\š[ÒÜÝ™XÚXÚÊNÂˆYˆ
+][\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝ\Ý›ÞYY™YœÈOH[
+H™]\›ŽÂˆ›ÛÛX[ˆ^XÝ][Û”[™[™ÈH[[ØÙ[˜\š[ÐÛÛ›Û\ˆOH[ˆ	‰ˆ[[ØÙ[˜\š[ÐÛÛ›Û\‹š\Ô[™[™Ñ^XÝ][ÛœÊ
+NÂˆYˆ
+Y›Ü˜ÙH	‰ˆ
+\[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ëš\Ñ[\J
+H^XÝ][Û”[™[™ÊJHÂˆXZ[’[™\‹œÜÝ[^YY
+[\Ü˜\žTØÙ[˜\š[ÒÜÝ™XÚXÚËˆSTÔT–WÔÐÑST’S×ÒÔÕÔ‘PÒPÒ×ÓTÊNÂˆ™]\›ŽÂˆBˆ[\Ü˜\žTØÙ[˜\š[ÒXY\ÜÒÜÝH˜[ÙNÂˆ™XÛÛ˜Ú[Q^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYJ›Ü˜ÙJNÂˆ[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ë˜ÛX\Š
+NÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ[\Ü˜\žTØÙ[˜\š[ÒÜÝ^\žJNÂˆ›ÛÛX[ˆ\œÚ\Ý[Ý\™˜XÙRÜÝH™YœËÚYÙ][˜X›Y™Ù]
+
+Bˆ	‰ˆ\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊNÂˆYˆ
+š[™[™ÈOH[	‰ˆ\\œÚ\Ý[Ý\™˜XÙRÜÝˆ	‰ˆUÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\ÒXY\ÜÒÜÝ
+™YœÊJHÂˆÙËšJQË”ÝÜ[™È[\Ü˜\žHØÙ[˜\š[ÈÜÝY\ˆÛÛ[X[™XY[™KØÛÛ\][ÛˆŠNÂˆÝÜÙ[Š
+NÂˆBˆB‚ˆš]˜]H›ÚYÜ™X]SÝ™\›^UšY]Ê
+HÂˆYˆ
+\Ý›ÞYYš[™[™ÈOH[™YœÈOH[\™YœËÚYÙ][˜X›Y™Ù]
+
+BˆÝ™\›^P]XÚ™]žTØÚY[YˆT\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊJH™]\›ŽÂˆËÈÜ™X]HHÝ™\›^HšY]Âˆ^[Ý][™›]\ˆ^[Ý][™›]\ˆH^[Ý][™›]\‹™œ›ÛJ\ÊNÂˆš[™[™ÈHÝ™\›^TÝ]\ÕÚYÙ]š[™[™Ëš[™›]J^[Ý][™›]\ŠNÂˆš[˜[[]XÚY[Ù[™\˜][ÛˆH
+ÊÛÝ™\›^P]XÚÙ[™\˜][ÛŽÂˆš[˜[šY]È]XÚY[›ÛÝHš[™[™Ë™Ù]›ÛÝ
+
+NÂˆËÈÝ\[š\ÚX›H8 %HYšY]Ê
+H™[ÝÈXZÙ\ÈHÚ[™ÝÈ\X\ˆ[œÝ[NÈÙH[‚ˆËÈ˜YHHÛÛ[[ˆÈX]ÚHÞ[[Y]šXÈ˜YK[Ý]HÝ™\›^HÙ\È[Ù]Ú\™K‚ˆš[™[™Ë™Ù]›ÛÝ
+
+KœÙ][JŠNÂˆš[™[™Ë™Ù]›ÛÝ
+
+KœÙ]š\ÚXš[]JšY]Ë•’TÒP“JNÂˆËÈ\Ý[ˆÛˆHS“‘TˆÛÛZ[™\‹›ÝHÝ]\ˆœ˜[YS^[Ý]ˆ\š[™ÈHš\ÚXš[]BˆËÈ˜[œÚ][ÛˆÙH™KY^[™H
+Ú[™ÝÊˆ
+›ÛÝ
+HÈØÜ™Y[•ÚY\ÈHY™™\ˆ›Ü‚ˆËÈ˜[œÚ][Û“X[˜YÙ\ŽÈYˆÙH\Ý[™YÛˆH›ÛÝÙIÙÙYH]Y™™\ˆ^[™\ÈBˆËÈYÙH^[Ý]Ú[™ÙH[™ÚÝ™HÝ™\›^VžH[™™YÈÙˆ^[È
+[™\œÚ\Ý]
+K‚ˆËÈH[›™\ˆÛÛZ[™\‰ÜÈ›Ý[™È\™HÚ]˜[œÚ][Û“X[˜YÙ\ˆ[š[X]\ÈÛ[ÛÝK‚ˆš[™[™Ë›Ý™\›^PÛÛZ[™\‹˜YÛ“^[Ý]Ú[™ÙS\Ý[™\Š
+‹YÜšYÚ›ÝÛKÛYÛÜÛšYÚÛ›ÝÛJHOˆÂˆ\]P˜XÚÙÜ›Ý[™
+
+NÂˆËÈšYÚYYÙH[˜ÚÜš[™ÎˆÚ[ˆHÚYÙ]ÛÛ[Ú[™Ù\È]ÈYX\Ý\™YÚYÚYBˆËÈÚ[™ÝÉÜÈYYÙHžHHØ[YH[[Ý[ÛÈHšYÚYÙHÝ^\È]ˆÛ™H[ˆHÚ[™ÛBˆËÈ\]UšY]Ó^[Ý]È]›ÚYHœÚš[šÈ[ˆÛYHˆÛË\\ÙH[š[X][Ûˆ]ˆËÈÜ˜]š]K”’QÒ›ÙXÙ\Ë‚ˆYˆ
+\˜[\ÈOH[
+H™]\›ŽÂˆ[ÛÚYHÛšYÚHÛYÂˆ[™]ÕÚYHšYÚHYÂˆ›ÛÛX[ˆ›Û”Ý]\Ð˜\ˆH™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTŽÂˆYˆ
+›Û”Ý]\Ð˜\‚ˆ	‰ˆ™YœËÚYÙ][YÛ”šYÚ™Ù]
+
+H	‰ˆÛÚYˆ	‰ˆ™]ÕÚYˆ	‰ˆ™]ÕÚYOHÛÚY
+HÂˆ\˜[\Ëž
+ÏHÛÚYH™]ÕÚYÂˆžHÂˆÚ[™ÝÓX[˜YÙ\‹\]UšY]Ó^[Ý]
+š[™[™Ë™Ù]›ÛÝ
+
+K\˜[\ÊNÂˆHØ]Ú
+^Ù\[ÛˆYÛ›Ü™Y
+HÂˆBˆ™YœË›Ý™\›^VœÙ]
+\˜[\Ëž
+NÂˆBˆ›ÝYžSÝ™\›^TÝ]J
+NÂˆJNÂ‚ˆËÈÞ[˜Ú›Û›Ý\ÈœÚ^™HX›Ý]ÈÚ[™ÙHˆÛÚËˆ]š\™\Èœ›ÛHÛ“YX\Ý\™H™Y›Ü™HšY]Ô›ÛÝ[\ˆËÈ\Ú\È™]ÈÜ˜\XÛÛ[[Y[œÚ[ÛœÈÈÚ[™ÝÓX[˜YÙ\‹ˆØ]Ú[™È]ZY[YX\Ý\™H]ÈÝ\‚ˆËÈ\]UšY]Ó^[Ý]
+ØÜ™Y[•ÚY
+HÚ[ˆH˜XÙKÛÈ[ˆ^XÚ]š\ÚXš[]H˜[œÚ][Ûˆ™]™\‚ˆËÈÛ˜\È™[ÝÈHÚ[™[ˆ]\™HX›Ý]È[š[X]K‚ˆš[™[™Ë›Ý™\›^PÛÛZ[™\‹œÙ]Ú^™PÚ[™ÙR[
+
+ÛË™]ÕËÛ™]Ò
+HOˆÂˆYˆ
+\˜[\ÈOH[
+H™]\›ŽÂˆYˆ
+™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTŠH™]\›ŽÂˆYˆ
+™]ÕÈHÛÊH™]\›ŽÈËÈÜ›ÝÈ][™XYHÛÜšÜÂˆYˆ
+[™[™ÐY™™\™Y˜[œÚ][ÛœÈˆ
+H™]\›ŽÈËÈÛÛYH˜[œÚ][Ûˆ[™XYHY™™\š[™Âˆ™YÚ[Y™™\™Y˜[œÚ][ÛŠYJNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÚš[šÐY™™\”ØY™]PÛÜÙJNÂˆXZ[’[™\‹œÜÝ[^YY
+Úš[šÐY™™\”ØY™]PÛÜÙKˆ”’PÒ×ÕS”ÒUSÓ—ÑTUSÓ—ÓTÈ
+ÈŒ
+NÂˆJNÂ‚ˆËÈ™]™\ˆ[œÝ[[ˆ[Ø^\Ë[Ûˆ^[Ý]˜[œÚ][Û‹ˆHX\œ]YYH[˜[Y]\ÈÛ˜ÙH\ˆ\Ü^BˆËÈœ˜[YH[™Ù]™\˜[[™›ÚYHPÐT–Z[ÈZ\ØÛ\ÜÚYžH][˜[Y][Ûˆ\ÈH›Ý[™ÂˆËÈÚ[™ÙKXZÚ[™È]™\žHÚX›[™ÈÙ][™ÜËØ\XÛÛˆš\ÚX›HÚ]ÚˆÚÝËÚYH™[XZ[œÂˆËÈ[™YžHH^XÚ]Y™™\™Y˜[œÚ][Ûˆ™[ÝË‚ˆš[™[™Ë›Ý™\›^PÛÛZ[™\‹œÙ]^[Ý]˜[œÚ][ÛŠ[
+NÂ‚ˆËÈÙ]\˜YÈ\Ý[™\ˆ
+\Ý™YÚ\Ý\œÈHÝXÚ\Ý[™\ˆÛˆH›ÛÝšY]È8 %ØY™HÈÂˆËÈ™Y›Ü™HYšY]ÈÚ[˜ÙHH\Ý[™\ˆØ\\™\ÈÝXÚ\ÈÛ˜ÙH]XÚY
+K‚ˆÙ]\˜YÓ\Ý[™\Š
+NÂ‚ˆËÈZ[HÚ[™ÝÓX[˜YÙ\ˆ\˜[\Ë[ˆ›Ü›X[^™H]™\žH^[Ý]XY™™XÝ[™È™Y™\™[˜ÙH™Y›Ü™BˆËÈYšY]ËˆHS[[[Û˜[H\Ù\ÈÛÛœÜXÝ[Ý\ÈLÜ™]šY]ÈÚ^™\È›Üˆ[YH[™Ý]\ÂˆËÈXÛÛœÎÈ]XÚ[™È]˜]È™YH]ÈÛÛYH[™›ÚYH™[™ÜˆÚ[™ÝÓX[˜YÙ\œÈ™]Z[ˆBˆËÈÝ™\œÚ^™Yš\œÝYX\Ý\™[Y[[[H]\ˆYYXTÙ\ÜÚ[Ûˆ™\]Y\Ý^[Ý]ˆ]\ÈÚHBˆËÈ›ÝÈ\ÙYÈÛÚÈ[Y\ˆ›ÛÝ[™ÝY[›H™XÛÛYH›Ü›X[Ú[ˆHš\œÝÛÛ™È\œš]™Y‚ˆËÈ\PœšXÚÕš\ÚXš[]KØ\PœšXÚÕ\™Ù]^XÚ]HÝ\™\ÜÈ˜[œÚ][ÛœÈÚ[H]XÚYˆËÈÛÈ\È™Y›YÚØ[››ÝÝ˜[™HY™™\™Y]˜[œÚ][ÛˆÛÝ[\‹‚ˆ›ÛÛX[ˆÝ]\Ð˜\ˆH™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTŽÂˆ\˜[\ÈH™]ÈÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\ÊˆÝ]\Ð˜\‚ˆÈÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë“PUÒÔT‘S•ˆˆÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë•ÔTÐÓÓ•S•ˆÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë•ÔTÐÓÓ•S•ˆÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë•TWÐTPÐUSÓ—ÓÕ‘T“VKˆÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë‘“Q×Ó“ÕÑ“ÐÕTÐP“HˆÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë‘“Q×ÓVSÕUÓ“×ÓSRUÈˆÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë‘“Q×ÓVSÕUÒS—ÔÐÔ‘QS‚ˆˆ^[›Ü›X]•S”ÓPÑS•ˆ
+NÂˆ\˜[\Ë™Ü˜]š]HHÜ˜]š]K•ÔÜ˜]š]K“Q•Âˆ\˜[\ËžHÝ]\Ð˜\ˆÈˆ™YœË›Ý™\›^V™Ù]
+
+NÂˆ\˜[\ËžHHÝ]\Ð˜\ˆÈˆ™YœË›Ý™\›^VK™Ù]
+
+NÂˆ\˜[\ËÚ[™ÝÐ[š[X][ÛœÈHÂ‚ˆÝ™\›^P]XÚYH˜[ÙNÂˆ™\\™SÝ™\›^QÙ[ÛY]žP™Y›Ü™P]XÚ
+
+NÂˆžHÂˆÚ[™ÝÓX[˜YÙ\‹˜YšY]Ê]XÚY[›ÛÝ\˜[\ÊNÂˆHØ]Ú
+^Ù\[ÛˆJHÂˆÙË™JQËÛÝ[›Ý]XÚÝ]\ÈÝ™\›^H
+][\‚ˆ
+È
+Ý™\›^P]XÚ][\È
+ÈJH
+ÈŠH‹JNÂˆËÈÛÛYH™[™ÜˆÚ[™ÝÓX[˜YÙ\ˆ[\[Y[][ÛœÈØ[ˆ›ÝÈY\ˆXØÙ\[™ÈHšY]Ë‚ˆËÈ™[[Ý™H]\X[]XÚY[™Y›Ü™H›Ü[™ÈÝ\ˆ™Y™\™[˜ÙH[™™]žZ[™Ë‚ˆ™[[Ý™TÝ]\ÓÝ™\›^TØY™[J™˜Z[Y]XÚŠNÂˆš[™[™ÈH[Âˆ\˜[\ÈH[ÂˆÝ™\›^P]XÚ][\ÊÊÎÂˆYˆ
+Y\Ý›ÞYY	‰ˆ™YœËÚYÙ][˜X›Y™Ù]
+
+JHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÝ™\›^P]XÚ™]žJNÂˆÛ™È[^HHX]›Z[ŠPVÓÕ‘T“VWÐUPÒÔ‘U–WÓTËˆÕ‘T“VWÐUPÒÔ‘U–WÓTÈ
+ˆX]›X^
+KÝ™\›^P]XÚ][\ÊJNÂˆÝ™\›^P]XÚ™]žTØÚY[YHYNÂˆXZ[’[™\‹œÜÝ[^YY
+Ý™\›^P]XÚ™]žK[^JNÂˆBˆËÈH˜[œÚY[Ý]\Ë\›ÝÈ™Z™XÝ[Ûˆ]\Ý›Ýœ™Y^™H]™HÛX\ZÛYHÝ]HÛˆBˆËÈ[™\[™[H]XÚYš]™\ˆ˜Z[Ú[HÙHØZ]›ÜˆÚ[™ÝÓX[˜YÙ\‰ÜÈ™]žK‚ˆYˆ
+ÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\ÒXY\ÜÒÜÝ
+™YœÊBˆ	‰ˆZ[YÜ˜][ÛœÔÝ\Y
+HÂˆ[’[š]X[[YÜ˜][Û”Ý\\
+
+NÂˆBˆ™]\›ŽÂˆB‚ˆÝ™\›^P]XÚYHYNÂˆYˆ
+XØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ˆOH[
+HÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\‹œÙ]\™Ù]\Ü^RY
+Ý\œ™[Ý™\›^Q\Ü^RY
+
+JNÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\‹œ™Yœ™\Ú
+œÝ]\Ë[Ý™\›^KX]XÚYŠNÂˆBˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÝ™\›^P]XÚ™]žJNÂˆÝ™\›^P]XÚ™]žTØÚY[YH˜[ÙNÂˆÝ™\›^P]XÚ][\ÈHÂˆYˆ
+[YÜ˜][ÛœÔÝ\Y	‰ˆX]]ÛX]XÔ[[YT\šÙY	‰ˆX]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆËÈH]\ˆ\Ù\‹Yš]™[ˆ™X]XÚ™]\Ù\ÈH]™HÜ˜\[™™YYÈ]È\Ý[™\œÈ›ÝË‚ˆ\T™Y™\™[˜Ù\Ê˜[ÙJNÂˆB‚ˆ\]UÚYšTÝ]\Ê
+NÂˆ\]QÛœÜÔÝ]\Ê
+NÂ‚ˆËÈ˜YH[ˆHÙ[ÛY]žK[Û›HÚ[ˆÛÛ›Û\ˆÛÛœÝXÝ[Ûˆ[™Þ\Ý[H\Ý[™\‚ˆËÈ™YÚ\Ý˜][Ûˆ™YÚ[ˆÛ›HY\ˆH›ÝÈ\È[Hš\ÚX›K‚ˆ]XÚY[›ÛÝ˜[š[X]J
+Bˆ˜[JYŠBˆœÙ]\˜][ÛŠS’UPSÓÕ‘T“VWÑQWÑTUSÓ—ÓTÊBˆÚ][™XÝ[ÛŠ
+
+HOˆÛÛ\]R[š]X[Ý™\›^Uš\ÚXš[]Jˆ]XÚY[Ù[™\˜][Û‹]XÚY[›ÛÝ˜[ÙJJBˆœÝ\
+
+NÂˆYˆ
+[YÜ˜][ÛœÔÝ\Y	‰ˆX]]ÛX]XÔ[[YT\šÙY	‰ˆX]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆËÈ[˜[ZXÈXY\ÜÈOˆÝ]\Ë\›ÝÈ]XÚ™]\Ù\ÈH[™XYK\[›š[™ÈÛÛ›™XÝÜœË]ˆËÈÜ\Ú[™ÝÜÈÝ[™YYÈ™H™XÜ™X]Y›ÜˆH™]ÛH[˜X›YÝ]\ÈÝ\™˜XÙK‚ˆ\TÜ\™Y™\™[˜Ù\ÔØY™[J
+NÂˆBˆYˆ
+Z[YÜ˜][ÛœÔÝ\Y]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]ˆ]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[T[™[™ÊHÂˆËÈÑSH[š[X]ÜœÈ]™HØØØ\Ú[Û˜[HZ\ÜÙY[ˆ[™Ø[˜XÚÈY\ˆHÝ\™˜XÙQ›[™Ù\‚ˆËÈ™\Ý\ˆ\È›Ý[™YY[\Ý[˜[˜XÚÈ™\Ù\™\ÈXY\ÜËØÛÛ›™XÝ]š]HÝ\\‚ˆXZ[’[™\‹œÜÝ[^YY
+
+
+HOˆÛÛ\]R[š]X[Ý™\›^Uš\ÚXš[]Jˆ]XÚY[Ù[™\˜][Û‹]XÚY[›ÛÝYJKˆS’UPSÓÕ‘T“VWÑQWÑTUSÓ—ÓTÈ
+ÈS’UPSÓÕ‘T“VWÑSPÒ×ÑÔPÑWÓTÊNÂˆBˆB‚ˆš]˜]H›ÚYÛÛ\]R[š]X[Ý™\›^Uš\ÚXš[]J[Ù[™\˜][Û‹›Û“[šY]È›ÛÝˆ›ÛÛX[ˆ[š[X]Ü‘˜[˜XÚÊHÂˆYˆ
+Z\ÐÝ\œ™[Ý™\›^P]XÚY[
+Ù[™\˜][Û‹›ÛÝ
+JH™]\›ŽÂˆYˆ
+[š[X]Ü‘˜[˜XÚÈ	‰ˆ›ÛÝ™Ù][J
+HŽNNYŠHÂˆ›ÛÝ˜[š[X]J
+K˜Ø[˜Ù[
+
+NÂˆ›ÛÝœÙ][JYŠNÂˆBˆYˆ
+›ÛÝ™Ù][J
+HŽNNYˆÝ™\›^Uš\ÚX›QÙ[™\˜][ÛˆOHÙ[™\˜][ÛŠH™]\›ŽÂˆÝ™\›^Uš\ÚX›QÙ[™\˜][ÛˆHÙ[™\˜][ÛŽÂˆYˆ
+Z[YÜ˜][ÛœÔÝ\Y]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]ˆ]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[T[™[™ÊHÂˆØÚY[R[š]X[[YÜ˜][Û”Ý\\Y\‘œ˜[YJ
+NÂˆBˆB‚ˆÊŠ‚ˆ
+ˆ\Y\ÈÛ›H˜[Y\È]Ø[ˆY™™XÝHÝ™\›^IÜÈš\œÝYX\Ý\™[Y[‚ˆ
+‚ˆ
+ˆ•\È[X™\˜][H[œÈ™Y›Ü™HÐ[šÈÚ[™ÝÓX[˜YÙ\ˆØYšY]ÊšY]Ëˆ
+ˆšY]ÑÜ›Ý\“^[Ý]\˜[\Ê_H[™Ù\È›ÝÝ\\Ý[™\œËÚ[YÜ˜][ÛœËˆH›Ü›X[ˆ
+ˆÐ[šÈØ\T™Y™\™[˜Ù\Ê›ÛÛX[Š_H\ÜÈ[œÈ[ˆ]ÈÝÛˆÜÝ]š\ÚX›HÝYÙH[™™[XZ[œÈBˆ
+ˆÚ[™ÛHÝÛ™\ˆÙˆÜÙHY™XÞXÛHÚYHY™™XÝËÜ‚ˆ
+‹Âˆš]˜]H›ÚY™\\™SÝ™\›^QÙ[ÛY]žP™Y›Ü™P]XÚ
+
+HÂˆËÈH\ØÜš\ÜœÈÙ\™HØYYÛ˜ÙHžHHš\ÝX[Ú[™Y›Ü™H[™›][Û‹ˆ™K\™XY[™È[BˆËÈ\™H\ÙYÈ\œÙHHØ[YH”ÓÓˆ™YH[Y\È™Y›Ü™HHš\œÝš\ÚX›Hœ˜[YK‚ˆ\]U[YYÛÛ^
+
+NÂˆ\]Q]U[YJ
+NÂ‚ˆ\ÝœšXÚÕ\OˆœšXÚÜÈHœšXÚÕ\Kœ\œÙSÜ™\Š™YœË˜œšXÚÓÜ™\‹™Ù]
+
+JNÂˆÙ]œšXÚÕ\OˆœšXÚÜÔÙ]H[[TÙ]››Û™SÙŠœšXÚÕ\K˜Û\ÜÊNÂˆœšXÚÜÔÙ]˜Y[
+œšXÚÜÊNÂ‚ˆËÈ›ÈÚ[˜[œÚ][ÛˆX^HÝ\YØZ[œÝH™YH]Ú[™ÝÓX[˜YÙ\ˆÙ\È›ÝÝÛˆY]‚ˆš[™[™Ë›Ý™\›^PÛÛZ[™\‹œÙ]^[Ý]˜[œÚ][ÛŠ[
+NÂˆ™[Ü™\œšXÚÜÊœšXÚÜÊNÂˆ\U[YPœšXÚÔÙ][™ÜÊ
+NÂˆ\Q]PœšXÚÔÙ][™ÜÊ
+NÂˆ\SYYXPœšXÚÔÙ][™ÜÊ
+NÂˆ\UÚYšPœšXÚÔÙ][™ÜÊ
+NÂˆ\QÜÐœšXÚÔÙ][™ÜÊ
+NÂˆ\P›Y]ÛÝœšXÚÔÙ][™ÜÊ
+NÂˆ\TÛ™PÙ[[\œšXÚÔÙ][™ÜÊ
+NÂˆ\TÛ™P˜]\žPœšXÚÔÙ][™ÜÊ
+NÂˆ\TÛ™S™]ÛÜšÕ\PœšXÚÔÙ][™ÜÊ
+NÂˆ\R[™ÛÜ•[\œšXÚÔÙ][™ÜÊ
+NÂˆ\SÝ]ÛÜ•[\œšXÚÔÙ][™ÜÊ
+NÂˆ™[™\’ÛYP\ÜÚ\Ý[œšXÚÜÊYJNÂˆ™[™\”Û™TÝ]\ÐœšXÚÜÊYJNÂˆ\]TÛ™R[™XØ]ÜœÊ
+NÂˆ\PœšXÚÕš\ÚXš[]JœšXÚÜÔÙ]
+NÂ‚ˆš[™[™Ë›Ý™\›^PÛÛZ[™\‹œÙ]Y[™Êˆ™YœËœY[™ÓY™Ù]
+
+Kˆ™YœËœY[™ÕÜ™Ù]
+
+Kˆ™YœËœY[™ÔšYÚ™Ù]
+
+Kˆ™YœËœY[™Ð›ÝÛK™Ù]
+
+JNÂˆ[™\XØ[Y[™ÈHš[™[™Ë›Ý™\›^PÛÛZ[™\‹™Ù]Y[™ÕÜ
+
+Bˆ
+Èš[™[™Ë›Ý™\›^PÛÛZ[™\‹™Ù]Y[™Ð›ÝÛJ
+NÂˆš[™[™Ë›Ý™\›^PÛÛZ[™\‹œÙ]Z[š[][RZYÚ
+ˆÛÛ\]SZ[•ÚYÙ]ZYÚ
+œšXÚÜÔÙ]
+H
+È™\XØ[Y[™ÊNÂˆB‚ˆš]˜]H›ÚY™[[Ý™TÝ]\ÓÝ™\›^TØY™[J›Û“[Ýš[™È™X\ÛÛŠHÂˆÝ™\›^P]XÚÙ[™\˜][ÛŠÊÎÂˆÝ™\›^Uš\ÚX›QÙ[™\˜][ÛˆHLNÂˆØ[˜Ù[Y™\œ™Y[YÜ˜][Û”Ý\
+
+NÂˆYˆ
+š[™[™ÈOH[Ú[™ÝÓX[˜YÙ\ˆOH[
+HÂˆÝ™\›^P]XÚYH˜[ÙNÂˆ™]\›ŽÂˆBˆšY]È›ÛÝHš[™[™Ë™Ù]›ÛÝ
+
+NÂˆ›ÛÝ˜[š[X]J
+K˜Ø[˜Ù[
+
+NÂˆYˆ
+[Ý™\›^P]XÚY	‰ˆ\›ÛÝš\Ð]XÚYÕÚ[™ÝÊ
+JH™]\›ŽÂˆžHÂˆÚ[™ÝÓX[˜YÙ\‹œ™[[Ý™UšY]Ê›ÛÝ
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙËÊQË”Ý]\ÈÝ™\›^HØ\È[™XYH]XÚY\š[™Èˆ
+È™X\ÛÛ‹˜Z[\™JNÂˆHš[˜[HÂˆÝ™\›^P]XÚYH˜[ÙNÂˆBˆB‚ˆÊŠ‚ˆ
+ˆ™\XÙ\ÈÛ›HHÚ[™ÝÓX[˜YÙ\ˆ›ÛÝY\ˆÝ\™˜XÙQ›[™Ù\‹Ô]ZXÚÐ›ÛÝÝÛ™\œÚ\Ú[™Ù\Ë‚ˆ
+ˆØØ][Û‹ÛÛ›™XÝ]š]KYYXH[™™ZXÛHÝXœØÜš\[ÛœÈÝ^H[XÝÈX\š[™ÈÜÙHÝÛ‚ˆ
+ˆ\™HÛÝ[›ÝÜ™X]H[ˆX\›Hš[™\ˆ\œÝ[™™\]Z\™HHÙXÛÛ™[[[YHÝ\\‚ˆ
+‹Âˆš]˜]H›ÚY™]˜[Y]TÝ]\ÓÝ™\›^UÚ[™ÝÓÛ›J›Û“[Ýš[™È™X\ÛÛŠHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÝ™\›^P]XÚ™]žJNÂˆÝ™\›^P]XÚ™]žTØÚY[YH˜[ÙNÂˆÝ™\›^P]XÚ][\ÈHÂˆYˆ
+š[™[™ÈOH[
+HÂˆš[™[™Ë™Ù]›ÛÝ
+
+K˜[š[X]J
+K˜Ø[˜Ù[
+
+NÂˆš[™[™Ë›Ý™\›^PÛÛZ[™\‹œÙ]^[Ý]˜[œÚ][ÛŠ[
+NÂˆBˆ[™[™ÐY™™\™Y˜[œÚ][ÛœÈHÂˆ™[[Ý™TÝ]\ÓÝ™\›^TØY™[J™X\ÛÛŠNÂˆš[™[™ÈH[Âˆ\˜[\ÈH[ÂˆÜ™X]SÝ™\›^UšY]Ê
+NÂˆB‚ˆÊŠ‚ˆ
+ˆÝÜÈ]™\žH\Ý[™\ˆ[™[^YY\ÚÈÝÛ™Y^Û\Ú]™[HžHHÝ]\Ë\›ÝÈÝ\™˜XÙHÚ[Bˆ
+ˆX]š[™ÈKÓTUÔÜ]Û™KØÙ[˜\š[ÜÈ[™Hš]™\ˆ˜Z[[]™K‚ˆ
+‚ˆ
+ˆ•Hš]™\ˆ[™[Ø[ˆ™H[˜X›YÚ]Ý]HÝ]\È›ÝËˆY\™[H™[[Ýš[™ÈHÚ[™ÝÓX[˜YÙ\‚ˆ
+ˆšY]È\È›Ý[›ÝYÚˆ]Y]YYÛØÚËÑÓ”ÔËÕÚKQšKÛYYXHØ[˜XÚÜÈÝ[™[™\ˆ[ÈÐ[šÈØš[™[™ßBˆ
+ˆ[™ÛÝ[Z]\ˆÜ˜\ÚY\ˆ]\ÈÛX\™YÜˆœšYY›H™XÜ™X]HÝ[HÛÜšÈÚ[ˆH›ÝÈ\Âˆ
+ˆ[˜X›YYØZ[‹ˆÙY\\ÈX\™ÝÛˆÞ[[Y]šXØ[Ú]H˜XÚÚ[™ÈÙXÝ[Ûˆ[‚ˆ
+ˆÐ[šÈØ\T™Y™\™[˜Ù\Ê›ÛÛX[Š_KÜ‚ˆ
+‹Âˆš]˜]H›ÚY]XÚÝ]\ÔÝ\™˜XÙT[[YJ›Û“[Ýš[™È™X\ÛÛŠHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÝ™\›^P]XÚ™]žJNÂˆÝ™\›^P]XÚ™]žTØÚY[YH˜[ÙNÂˆËÈH]\ˆ^XÚ][˜X›HÝ\ÈHœ™\Ú™]žHÙ\]Y[˜ÙKˆÝ\Ú\ÙHH™]š[Ý\È˜[œÚY[ˆËÈÚ[™ÝÓX[˜YÙ\ˆÝ]YÙHÛÝ[XZÙHHš\œÝ™]È™]žHØZ]HÛÌ\ÙXÛÛ™X^[][K‚ˆÝ™\›^P]XÚ][\ÈHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ\]Q]U[YT[›˜X›JNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ›Ü™YÜ›Ý[™\ÚXÚÔ[›˜X›JNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ\]QÛœÜÔÝ]\Ô[›˜X›JNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ™XXÚXš[]T›Ø™T[›˜X›JNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊØ][]\ÐÛÝ[™\Ù][›˜X›JNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊYYXT›ÙÜ™\ÜÕXÚÊNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÚš[šÐY™™\”ØY™]PÛÜÙJNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÜ\™Yœ™\Ú
+NÂ‚ˆÝÜØØ][Û•˜XÚÚ[™Ê
+NÂˆÝÜÛÛ›™XÝ]š]U˜XÚÚ[™Ê
+NÂˆ[œ™YÚ\Ý\”Ø][]TÝ]\Ô™XÙZ]™\Š
+NÂˆ[œ™YÚ\Ý\›Y]ÛÝ™XÙZ]™\Š
+NÂˆ[ÛX[\Ý\
+œÝ]\ÈYYXH˜XÚÚ[™È‹\ÎŽ™\ØX›SYYXU˜XÚÚ[™ÊNÂ‚ˆYˆ
+™XXÚXš[]PÚXÚÙ\ˆOH[
+HÂˆ™XXÚXš[]PÚXÚÙ\ˆÚXÚÙ\ˆH™XXÚXš[]PÚXÚÙ\ŽÂˆ™XXÚXš[]PÚXÚÙ\ˆH[Âˆ[ÛX[\Ý\
+œÝ]\È™XXÚXš[]HÚXÚÙ\ˆ‹ÚXÚÙ\ŽŽœÚ]ÝÛŠNÂˆB‚ˆYˆ
+Ø\•[[Y]žQ^Ü\ˆOH[
+HÂˆ[ÛX[\Ý\
+œÝ]\ÈØ\ˆÙ[œÛÜˆÝXœØÜš\[ÛœÈ‹
+
+HOˆÂˆØ\’[YÜ˜][ÛˆØ\ˆHØ\’[YÜ˜][ÛœË™Ù]
+\ÊNÂˆØ\‹[œÝXœØÜšX™JœšXÚÕ\K’S‘ÓÔ—ÕST
+NÂˆØ\‹[œÝXœØÜšX™JœšXÚÕ\K“ÕUÓÔ—ÕST
+NÂˆJNÂˆB‚ˆYˆ
+Ü\Ý™\›^HOH[
+HÂˆ[ÛX[\Ý\
+œÜ\Ý™\›^\È‹Ü\Ý™\›^NŽ™\Ý›ÞJNÂˆÜ\Ý™\›^HH[ÂˆB‚ˆYˆ
+š[™[™ÈOH[
+HÂˆš[™[™Ë™Ù]›ÛÝ
+
+K˜[š[X]J
+K˜Ø[˜Ù[
+
+NÂˆš[™[™Ë›Ý™\›^PÛÛZ[™\‹œÙ]^[Ý]˜[œÚ][ÛŠ[
+NÂˆBˆ[™[™ÐY™™\™Y˜[œÚ][ÛœÈHÂˆYˆ
+\Û™S›ÝYšXØ][Û‘›Ü™YÜ›Ý[™˜XÚÚ[™Ó™YYY
+
+JHÂˆ\ØYÙTÝ]ÓX[˜YÙ\ˆH[Âˆ\Ý›Ü™YÜ›Ý[™XÚØYÙHH[ÂˆBˆÝ™\›^RY[žP\H˜[ÙNÂˆÚYšTÝ]HHÚQšTÝ]K“Ñ‘ŽÂˆÛœÜÔÝ]HHÛœÜÔÝ]K“Ñ‘ŽÂˆ\ÝØØ][Û•\]Q[\ÙYHÂˆÛÛ›™XÝYYœË˜ÛX\Š
+NÂˆ›Y]ÛÝÝ]HH›Y]ÛÝÝ]K“Ñ‘ŽÂˆÛ™P[˜ÜÔ™XYHH˜[ÙNÂˆ\ÝYYXTÝX]HH[Âˆ™[[Ý™TÝ]\ÓÝ™\›^TØY™[J™X\ÛÛŠNÂˆš[™[™ÈH[Âˆ\˜[\ÈH[ÂˆËÈ›ÝYšXØ][ÛˆY™\œ˜[\È[™\[™[œ›ÛHHÜ[Û˜[Ý]\Ë\›ÝÈÝ\™˜XÙKˆ™XÛÛ˜Ú[BˆËÈ]È]™[ÜÛ]Y\ˆš[™[™È™XÛÛY\È[[œÝXYÙˆÚ[[HÜÚ[™È›Ü™YÜ›Ý[™‚ˆYˆ
+Û™S›ÝYšXØ][Û‘›Ü™YÜ›Ý[™˜XÚÚ[™Ó™YYY
+
+JH\]Q›Ü™YÜ›Ý[™\˜XÚÚ[™Ê
+NÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛÛÛ™šYÝ\˜][ÛÚ[™ÙY
+›Û“[ÛÛ™šYÝ\˜][Ûˆ™]ÐÛÛ™šYÊHÂˆÝ\\‹›ÛÛÛ™šYÝ\˜][ÛÚ[™ÙY
+™]ÐÛÛ™šYÊNÂˆËÈ™KXÜ™X]H]KÝ[YH›Ü›X]\œÈÛÈHØØ[HÚ[™ÙH\È™Y›XÝY‚ˆ[YQ›Ü›X]H™]ÈÚ[\Q]Q›Ü›X]
+’›[H‹ØØ[K™Ù]Y˜][
+
+JNÂˆÝ\œ™[]Q›Ü›X]]\›ˆH[ÂˆËÈYˆH\Ù\ˆ\È[ˆ™›ÛÝÈÞ\Ý[Hˆ[ÙKHÞ\Ý[HZS[ÙH›\YX[œÈHØXÚYˆËÈ[YYÛÛ^›ÝÈÚ[È]HÜ›Û™ÈÛÛ™šYÝ\˜][Ûˆ8 %[˜[Y]HÛÈH™^ˆËÈ\T™Y™\™[˜Ù\Ê
+H™XZ[È]‚ˆ[YYÛÛ^H[Âˆ\YY[YT™YˆHLNÂ‚ˆYˆ
+š[™[™ÈOH[
+HÂˆ™[[Ý™TÝ]\ÓÝ™\›^TØY™[J˜ÛÛ™šYÝ\˜][ÛˆÚ[™ÙHŠNÂˆš[™[™ÈH[Âˆ\˜[\ÈH[ÂˆÜ™X]SÝ™\›^UšY]Ê
+NÂˆBˆB‚ˆÝ\™\ÜÓ[
+“Z\ÜÚ[™Ô\›Z\ÜÚ[ÛˆŠBˆX›XÈ›ÚY\T™Y™\™[˜Ù\Ê
+HÂˆ\T™Y™\™[˜Ù\ÊYJNÂˆB‚ˆÊŠ‚ˆ
+ˆØZÙ\ÈH[™XYK\[›š[™ÈÚ\™YÜÝY\ˆHš]™\‹\[™[[˜X›HÚ]Ý]™[ØY[™È]™\žBˆ
+ˆÛÛ›™XÝÜˆÛˆXXÚÙ[ÛY]žHÛY\ˆÚ[™ÙK‚ˆ
+‚ˆ
+ˆ•\È[ÛÈ™\Ý[Y\ÈHÝ]\È]XÚ]Ø\È]\ÙYžHH[\Ü˜\žH\›Z\ÜÚ[Ûˆ[šX[ˆ]ˆ
+ˆ[X™\˜][HX]™\È[ˆ^\Ý[™È]XÚ™]žH[Û™HÛÈ™\X]YÙ][™ÜÈ]™[ÈØ[››Ýž\\ÜÂˆ
+ˆ]È›Ý[™Y˜XÚÛÙ™‹Ü‚ˆ
+‹Âˆ›ÚY[œÝ\™Q[˜X›Y[[YJ
+HÂˆYˆ
+\Ý›ÞYY™YœÈOH[
+H™]\›ŽÂˆYˆ
+]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]
+H™]\›ŽÂˆYˆ
+ÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\ÒXY\ÜÒÜÝ
+™YœÊBˆ	‰ˆZ[YÜ˜][ÛœÔÝ\Y
+HÂˆ[’[š]X[[YÜ˜][Û”Ý\\
+
+NÂˆBˆYˆ
+™YœËÚYÙ][˜X›Y™Ù]
+
+H	‰ˆš[™[™ÈOH[	‰ˆ[Ý™\›^P]XÚ™]žTØÚY[Yˆ	‰ˆ\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊJHÂˆÜ™X]SÝ™\›^UšY]Ê
+NÂˆBˆB‚ˆÊŠ‚ˆ
+ˆY[\Ý[š\ÝX[[Û›HØZÙH\ÙYžHÓQKØ›ÛÝÚ[HÛÛ›Û\ˆÛÜšÈX^HÝ[™H\šÙY‚ˆ
+ˆ][X™\˜][HÙ\È›ÝØ[\T™Y™\™[˜Ù\ÈÜˆÛÛœÝXÝHXY\ÜÈ[[YHÜ˜\‚ˆ
+‹Âˆ›ÚY[œÝ\™P]]ÛX]XÕš\ÝX[Ý\™˜XÙJ
+HÂˆYˆ
+ÛÜ\‹›^SÛÜ\Š
+HOHÛÜ\‹™Ù]XZ[“ÛÜ\Š
+JHÂˆXZ[’[™\‹œÜÝ
+\ÎŽ™[œÝ\™P]]ÛX]XÕš\ÝX[Ý\™˜XÙJNÂˆ™]\›ŽÂˆBˆYˆ
+\Ý›ÞYY™YœÈOH[\™YœËÚYÙ][˜X›Y™Ù]
+
+Bˆš[™[™ÈOH[Ý™\›^P]XÚ™]žTØÚY[YˆT\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊJH™]\›ŽÂˆÜ™X]SÝ™\›^UšY]Ê
+NÂˆB‚ˆÊŠˆ™X]XÚ\ÈÛ›HHÚ[™ÝÓX[˜YÙ\ˆ›ÛÝY\ˆ]ZXÚÐ›ÛÝÈ]™HÛÛ›™XÝÜœÈÝ^H[ÝXÚYˆ
+‹ÂˆX›XÈ›ÚY™]˜[Y]P]]ÛX]XÕš\ÝX[Ý\™˜XÙPY\”]ZXÚÐ›ÛÝ
+
+HÂˆYˆ
+ÛÜ\‹›^SÛÜ\Š
+HOHÛÜ\‹™Ù]XZ[“ÛÜ\Š
+JHÂˆXZ[’[™\‹œÜÝ
+\ÎŽœ™]˜[Y]P]]ÛX]XÕš\ÝX[Ý\™˜XÙPY\”]ZXÚÐ›ÛÝ
+NÂˆ™]\›ŽÂˆBˆYˆ
+\Ý›ÞYY™YœÈOH[\™YœËÚYÙ][˜X›Y™Ù]
+
+BˆT\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊJH™]\›ŽÂˆ]]ÛX]XÔÝ\™˜XÙT™]˜[Y][Û”™\]Z\™YH˜[ÙNÂˆ™]˜[Y]TÝ]\ÓÝ™\›^UÚ[™ÝÓÛ›Jš[[YYX]H]ZXÚÐ›ÛÝÝ\™˜XÙH™]˜[Y][ÛˆŠNÂˆB‚ˆÊŠ‚ˆ
+ˆ]ZXÚÐ›ÛÝØ[ˆ™\Ù\™H\È[YÜ˜][ÛˆÜÝÚ[HÚ[™ÝÓX[˜YÙ\‹ÒQ›ØÙ\ÜÙ\È\™Bˆ
+ˆ™XÜ™X]Yˆ™XÛÛ˜Ú[H]]ÛX]XÈÝ\™˜XÙ\ÈY\ˆH]ZY][™HÚ]Ý]™XÛÛ›™XÝ[™È[žBˆ
+ˆ˜[œÜÜÜˆ™\^Z[™ÈH[ÛÛ›Û\ˆÜ˜\‚ˆ
+‹ÂˆX›XÈ›ÚY™XÛÛ˜Ú[P]]ÛX]XÓY™XÞXÛTÝ\™˜XÙ\Ê
+HÂˆYˆ
+\Ý›ÞYY™YœÈOH[
+H™]\›ŽÂˆYˆ
+ÛÜ\‹›^SÛÜ\Š
+HOHÛÜ\‹™Ù]XZ[“ÛÜ\Š
+JHÂˆXZ[’[™\‹œÜÝ
+\ÎŽœ™XÛÛ˜Ú[P]]ÛX]XÓY™XÞXÛTÝ\™˜XÙ\ÊNÂˆ™]\›ŽÂˆBˆ]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[T[™[™ÈHYNÂˆYˆ
+]]ÛX]XÔÝ\™˜XÙT™]˜[Y][Û”™\]Z\™Y	‰ˆ™YœËÚYÙ][˜X›Y™Ù]
+
+JHÂˆ]]ÛX]XÔÝ\™˜XÙT™]˜[Y][Û”™\]Z\™YH˜[ÙNÂˆ™]˜[Y]TÝ]\ÓÝ™\›^UÚ[™ÝÓÛ›J™Y™\œ™Y]ZXÚÐ›ÛÝÝ\™˜XÙH™]˜[Y][ÛˆŠNÂˆBˆ›ÛÛX[ˆØZ]Ñ›Ü•š\ÚX›TÝ\™˜XÙHH™YœËÚYÙ][˜X›Y™Ù]
+
+Bˆ	‰ˆ\›Z\ÜÚ[ÛœË˜[\›Z\ÜÚ[ÛœÑÜ˜[Y
+\ÊNÂˆYˆ
+ØZ]Ñ›Ü•š\ÚX›TÝ\™˜XÙJHÂˆËÈ\œÚ\ÝHXØÙ\YÜÝ[™Ù™ˆ™Y›Ü™HYšY]ÎˆHÞ[˜Ú›Û›Ý\ÈÑSHÚ[™ÝÓX[˜YÙ\‚ˆËÈ™Z™XÝ[ÛˆX^HÛX\ˆš[™[™Ë]H]\ˆ›Ý[™Y™]žH]\ÝÝ[™[X\ÙH\ÂˆËÈ^XÝ\šÙY[[YHY\ˆ]È™X[œ˜[YK‚ˆ]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›HHYNÂˆYˆ
+š[™[™ÈOH[
+HÜ™X]SÝ™\›^UšY]Ê
+NÂˆ›ÛÛX[ˆÝ\™˜XÙT™XYHHš[™[™ÈOH[	‰ˆÝ™\›^P]XÚYˆ	‰ˆÝ™\›^Uš\ÚX›QÙ[™\˜][ÛˆOHÝ™\›^P]XÚÙ[™\˜][Û‚ˆ	‰ˆš[™[™Ë™Ù]›ÛÝ
+
+K™Ù][J
+HHŽNNYŽÂˆYˆ
+š[™[™ÈOH[	‰ˆ\Ý\™˜XÙT™XYJHÂˆËÈ\È›YÈ\ÈZ[YÛ›HžH[ˆXØÙ\YÜÝYÙ[™\˜][ÛˆØ[˜XÚËˆHš\ÚX›BˆËÈØ[˜XÚÈX^H\™Y›Ü™H™[X\ÙHH\šÙYÜ˜\]Ø[ˆ™]™\ˆÜ[ˆHÜÝˆËÈ˜\œšY\ˆÛˆ]ÈÝÛ‹‚ˆ]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›HHYNÂˆØÚY[R[š]X[[YÜ˜][Û”Ý\\Y\‘œ˜[YJ
+NÂˆ™]\›ŽÂˆBˆYˆ
+Ý\™˜XÙT™XYJHÂˆ›ÛÛX[ˆ™[X\ÙY\šÙY[[YHH]]ÛX]XÔ[[YT\šÙYˆ]]ÛX]XÓY™XÞXÛT]ZY]Âˆ]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›HH˜[ÙNÂˆ™\Ý[YP]]ÛX]XÓY™XÞXÛR[YÜ˜][ÛœÐY\”]ZY]
+
+NÂˆYˆ
+\™[X\ÙY\šÙY[[YJHš[š\Ú]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[RY”™XYJ
+NÂˆ™]\›ŽÂˆBˆYˆ
+UÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\ÒXY\ÜÒÜÝ
+™YœÊJH™]\›ŽÂˆ]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›HH˜[ÙNÂˆBˆ›ÛÛX[ˆ™[X\ÙY\šÙY[[YHH]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]Âˆ™\Ý[YP]]ÛX]XÓY™XÞXÛR[YÜ˜][ÛœÐY\”]ZY]
+
+NÂˆYˆ
+\™[X\ÙY\šÙY[[YJHš[š\Ú]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[RY”™XYJ
+NÂˆB‚ˆš]˜]H›ÚYš[š\Ú]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[RY”™XYJ
+HÂˆYˆ
+X]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[T[™[™È]]ÛX]XÔ[[YT\šÙYˆ]]ÛX]XÓY™XÞXÛT]ZY]ˆ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÈZ[YÜ˜][ÛœÔÝ\Y
+H™]\›ŽÂˆ]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[T[™[™ÈH˜[ÙNÂˆYˆ
+™YœË™š]™\”[™[[˜X›Y™Ù]
+
+JHÂˆ[’[YÜ˜][Û”Ý\
+˜]]ÛX]XÈš]™\ˆÝ\™˜XÙH™XÛÛ˜Ú[H‹ˆ
+
+HOˆš]™\”[™[Ù\šXÙK˜\J\ÊJNÂˆBˆYˆ
+™YœËšY[™[[˜X›Y™Ù]
+
+H	‰ˆ™YœËšY[™[]]ÜÝ\™Ù]
+
+JHÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆÂˆYˆ
+Y\Ý›ÞYY	‰ˆ™YœÈOH[	‰ˆ™YœËšY[™[[˜X›Y™Ù]
+
+Bˆ	‰ˆ™YœËšY[™[]]ÜÝ\™Ù]
+
+JHÂˆ[’[YÜ˜][Û”Ý\
+˜]]ÛX]XÈQÝ\™˜XÙH™XÛÛ˜Ú[H‹ˆ
+
+HOˆY™\Ù[][Û”Ù\šXÙKœ™XÛÛ˜Ú[P]]ÛX]XÓY™XÞXÛJ\ÊJNÂˆBˆJNÂˆBˆØÚY[T[™[™Ð]]ÛX][Û•ZT™Yœ™\Ú
+
+NÂˆB‚ˆÊŠ‚ˆ
+ˆ]ZXÚÐ›ÛÝX^H™\Ù\™H\È›ØÙ\ÜÈÚ[H]™\žH˜Y[ËÝ™[™ÜˆÙ\šXÙH[™\›™X]]›\Ë‚ˆ
+ˆ\šÈÛ›H™XÛÛ›™XÝ[™È˜[œÜÜÈ[[YYX][NÈH‘ÔÈ›ÝYšXØ][Ûˆ[™ØXÚYRH™[XZ[‹‚ˆ
+‹ÂˆX›XÈ›ÚY[\]]ÛX]XÓY™XÞXÛT]ZY]
+
+HÂˆ[\]]ÛX]XÓY™XÞXÛT]ZY]
+˜[ÙJNÂˆB‚ˆX›XÈ›ÚY[\]]ÛX]XÓY™XÞXÛT]ZY]
+›ÛÛX[ˆ™]˜[Y]Uš\ÝX[Ý\™˜XÙR[[YYX][JHÂˆYˆ
+ÛÜ\‹›^SÛÜ\Š
+HOHÛÜ\‹™Ù]XZ[“ÛÜ\Š
+JHÂˆ[\]]ÛX]XÓY™XÞXÛT]ZY]Û“XZ[Š™]˜[Y]Uš\ÝX[Ý\™˜XÙR[[YYX][JNÂˆH[ÙHÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆ[\]]ÛX]XÓY™XÞXÛT]ZY]Û“XZ[Šˆ™]˜[Y]Uš\ÝX[Ý\™˜XÙR[[YYX][JJNÂˆBˆB‚ˆš]˜]H›ÚY[\]]ÛX]XÓY™XÞXÛT]ZY]Û“XZ[Šˆ›ÛÛX[ˆ™]˜[Y]Uš\ÝX[Ý\™˜XÙR[[YYX][JHÂˆYˆ
+\Ý›ÞYY\[[YR[š]X[^™Y
+H™]\›ŽÂˆYˆ
+X]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆ]]ÛX]XÓY™XÞXÛT]ZY]HYNÂˆ]]ÛX]XÓY™XÞXÛT™\Ý[YQÙ[™\˜][ÛŠÊÎÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆØ[˜Ù[Y™\œ™Y[YÜ˜][Û”Ý\
+
+NÂˆ]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›HH˜[ÙNÂˆBˆYˆ
+™]˜[Y]Uš\ÝX[Ý\™˜XÙR[[YYX][H	‰ˆš[™[™ÈOH[
+HÂˆ]]ÛX]XÔÝ\™˜XÙT™]˜[Y][Û”™\]Z\™YHYNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ]]ÛX]XÕš\ÝX[Ý\™˜XÙT™]˜[Y][ÛŠNÂˆXZ[’[™\‹œÜÝ
+]]ÛX]XÕš\ÝX[Ý\™˜XÙT™]˜[Y][ÛŠNÂˆBˆËÈHœ›ØYØ\Ý™XÙZ]™\‹]š\ÚX›H™[˜ÙHX›Ý™H\ÈÞ[˜Ú›Û›Ý\ËˆÛØÚÙ]Ðš[™\ˆX\™ÝÛˆ\ÂˆËÈ[X™\˜][HÜÝYÛÈ]ZXÚÐ›ÛÝ	ÜÈXZ[‹]™XYœ›ØYØ\ÝØ[ˆ™]\›ˆ[[YYX][K‚ˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ]]ÛX]XÓY™XÞXÛT]ZY]X\™ÝÛŠNÂˆ]]ÛX]XÓY™XÞXÛUX\™ÝÛ”ÝYÙHHÂˆXZ[’[™\‹œÜÝ
+]]ÛX]XÓY™XÞXÛT]ZY]X\™ÝÛŠNÂˆB‚ˆX›XÈ›ÚY™\Ý[YP]]ÛX]XÓY™XÞXÛR[YÜ˜][ÛœÐY\”]ZY]
+
+HÂˆYˆ
+ÛÜ\‹›^SÛÜ\Š
+HOHÛÜ\‹™Ù]XZ[“ÛÜ\Š
+JHÂˆXZ[’[™\‹œÜÝ
+\ÎŽœ™\Ý[YP]]ÛX]XÓY™XÞXÛR[YÜ˜][ÛœÐY\”]ZY]
+NÂˆ™]\›ŽÂˆBˆYˆ
+\Ý›ÞYY
+Y^XÚ]ØÙ[˜\š[Ô[[YSÝ™\œšYBˆ	‰ˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹œÚÝ[\šÐ]]ÛX]XÔ[[YJ\ÊJJH™]\›ŽÂˆ›ÛÛX[ˆY\šÙY[[YHH]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]ÂˆYˆ
+ZY\šÙY[[YJH™]\›ŽÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ]]ÛX]XÓY™XÞXÛT]ZY]X\™ÝÛŠNÂˆ]]ÛX]XÔ[[YT\šÙYH˜[ÙNÂˆ]]ÛX]XÓY™XÞXÛT]ZY]H˜[ÙNÂˆ]]ÛX]XÒÜÝ™[X\ÙPY\•š\ÚX›HH˜[ÙNÂˆ[Ù[™\˜][ÛˆH
+ÊØ]]ÛX]XÓY™XÞXÛT™\Ý[YQÙ[™\˜][ÛŽÂˆYˆ
+[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÊHÂˆËÈÝYÙH™\›È\ÈHÛ™K][YH\œÚ\Ý[˜ÙH˜\œšY\‹ˆ]™\žH]\ˆ\X[K\Ý\YÜ˜\\ÂˆËÈ™\^YYœ›ÛHÝYÙHÛ™HÛÈÝÜY˜[œÜÜÈ™YØZ[ˆHœ™\ÚÙ\šX[^™YÙ\ÜÚ[Û‹‚ˆYˆ
+[š]X[[YÜ˜][Û”ÝYÙHˆJH[š]X[[YÜ˜][Û”ÝYÙHHNÂˆ[š]X[[YÜ˜][Û”ÝYÙT™]žPÛÝ[HÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆËÈÝYÙH™\›ÉÜÈ˜XÚÙÜ›Ý[™\œÚ\Ý[˜ÙH˜\œšY\ˆÝÛœÈ›ÙÜ™\ÜÚ[Ûˆ[[]È™\Ý[\ÂˆËÈÛÛ[Z]Yˆ]ÈÛÛ\][ÛˆØ[˜XÚÈÚ[™\Ý[YH\È^XÝ[™HÛ˜ÙH]ZY]Ü[œË‚ˆYˆ
+\Ý\\Ý]P˜\œšY\’[‘›YÚ
+HXZ[’[™\‹œÜÝ
+[š]X[[YÜ˜][Û”ÝYÙT[›™\ŠNÂˆ™]\›ŽÂˆBˆYˆ
+Z[YÜ˜][ÛœÔÝ\Y
+HÂˆ[’[š]X[[YÜ˜][Û”Ý\\
+
+NÂˆ™]\›ŽÂˆBˆÜ™Y[X[™Yœ™\Ú[™[™ÈH˜[ÙNÂˆ[›˜X›V×HÝYÙ\ÈH™]È[›˜X›V×HÂˆ
+
+HOˆÈ[œÝ\™TÛ™T[[YQÜ˜\
+
+NÈÛ™PÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÈKˆ
+
+HOˆÈ[œÝ\™S\][[YQÜ˜\
+
+NÈ\]ÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÈKˆ
+
+HOˆÈ[œÝ\™RÛYP\ÜÚ\Ý[[[YQÜ˜\
+
+NÈP\PÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÈKˆ
+
+HOˆÈ[œÝ\™TÜ][[YQÜ˜\
+
+NÈÜ]ÛÛ›Û\‹œ™XÛÛ™šYÝ\™J
+NÈBˆNÂˆ›Üˆ
+[[™^HÈ[™^ÝYÙ\Ë›[™ÝÈ[™^
+ÊÊHÂˆš[˜[[ÝYÙHH[™^ÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆÂˆYˆ
+\Ý›ÞYY]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]ˆÙ[™\˜][ÛˆOH]]ÛX]XÓY™XÞXÛT™\Ý[YQÙ[™\˜][ÛŠH™]\›ŽÂˆ[’[YÜ˜][Û”Ý\
+˜]]ÛX]XÈY™XÞXÛH™\Ý[YHˆ
+ÈÝYÙKÝYÙ\ÖÜÝYÙWJNÂˆYˆ
+ÝYÙHOHÝYÙ\Ë›[™ÝHJHÂˆØÚY[T[™[™Ð]]ÛX][Û•ZT™Yœ™\Ú
+
+NÂˆš[š\Ú]]ÛX]XÔÝ\™˜XÙT™XÛÛ˜Ú[RY”™XYJ
+NÂˆBˆJNÂˆBˆB‚ˆÊŠ‚ˆ
+ˆ™K[Ü[œÈÛ›HÙ^\ÝÜ™KX˜XÚÙY˜[œÜÜÈY\ˆTÑT—ÕS“ÐÒÑQ‚ˆ
+‚ˆ
+ˆ‘š]™\‹ÒQÐÛ[X]H[™Ý]\Ë]Ú[™ÝÈÙ[ÛY]žH™[Û™ÈÈH[™XYHÛØ[\ØÙY›ÛÝˆ
+ˆÙ[™\˜][Ûˆ[™]\Ý›Ý™H™XZ[Y\™[H™XØ]\ÙHÜ™Y[X[È™XØ[YH™XYX›KÜ‚ˆ
+‹ÂˆX›XÈ›ÚY™XÛÛ™šYÝ\™PÜ™Y[X[˜XÚÙY[YÜ˜][ÛœÐY\•[›ØÚÊ
+HÂˆYˆ
+\Ý›ÞYY™YœÈOH[
+H™]\›ŽÂˆYˆ
+ÛÜ\‹›^SÛÜ\Š
+HOHÛÜ\‹™Ù]XZ[“ÛÜ\Š
+JHÂˆXZ[’[™\‹œÜÝ
+\ÎŽœ™XÛÛ™šYÝ\™PÜ™Y[X[˜XÚÙY[YÜ˜][ÛœÐY\•[›ØÚÊNÂˆ™]\›ŽÂˆBˆYˆ
+[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÊHÂˆÜ™Y[X[™Yœ™\Ú[™[™ÈHYNÂˆ™]\›ŽÂˆBˆYˆ
+Z[YÜ˜][ÛœÔÝ\Y
+HÂˆ[’[š]X[[YÜ˜][Û”Ý\\
+
+NÂˆ™]\›ŽÂˆBˆYˆ
+]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]
+HÂˆËÈHÝYÙYY™XÞXÛH™\Ý[YH[˜ÛY\È]™\žHÙ^\ÝÜ™KX˜XÚÙY˜[œÜÜ[™Û™NÂˆËÈÈ›Ý6÷Î´¶‰žËkºwµçHÛÛ™šYÝ\˜][ÛˆÙ™ÈH™]ÈÛÛ™šYÝ\˜][ÛŠÙ]™\ÛÝ\˜Ù\Ê
+K™Ù]ÛÛ™šYÝ\˜][ÛŠ
+JNÂˆÙ™ËZS[ÙHH
+Ù™ËZS[ÙH	ˆÛÛ™šYÝ\˜][Û‹•RWÓSÑWÓ’QÒÓPTÒÊHZS[ÙNÂˆ[YYÛÛ^HÜ™X]PÛÛ™šYÝ\˜][ÛÛÛ^
+Ù™ÊNÂˆBˆ\YY[YT™YˆH™YŽÂˆB‚ˆš]˜]HÝ]XÈ›ÚY\RÜš^›Û[X\™Ú[œÊšY]ÈšY]Ë[Ý\[[™
+HÂˆ[™X\“^[Ý]“^[Ý]\˜[\ÈH
+[™X\“^[Ý]“^[Ý]\˜[\ÊHšY]Ë™Ù]^[Ý]\˜[\Ê
+NÂˆœÙ]X\™Ú[”Ý\
+Ý\
+NÂˆœÙ]X\™Ú[‘[™
+[™
+NÂˆšY]ËœÙ]^[Ý]\˜[\Ê
+NÂˆB‚ˆš]˜]Hš[˜[[[SX\œšXÚÕ\KÙ]Ýš[™ÏˆY™™XÝ]™RYS\ÝÈH™]È[[SX\ŠœšXÚÕ\K˜Û\ÜÊNÂ‚ˆš]˜]H›ÚY™XZ[Y™™XÝ]™RYS\ÝÊ
+HÂˆY™™XÝ]™RYS\ÝË˜ÛX\Š
+NÂˆ›Üˆ
+œšXÚÕ\H\HˆœšXÚÕ\K˜[Y\Ê
+JHÂˆœšXÚÕ\HÛÝ\˜ÙHH™YœË™Y™™XÝ]™RYTÛÝ\˜ÙQ›ÜŠ\JNÂˆY™™XÝ]™RYS\ÝËœ]
+\K™YœËšYS\Ý›ÜŠÛÝ\˜ÙJK™Ù]
+
+JNÂˆBˆB‚ˆš]˜]H›ÛÛX[ˆ\ÐœšXÚÒY[žP\
+œšXÚÕ\H\JHÂˆÙ]Ýš[™Ïˆ\ÝHY™™XÝ]™RYS\ÝË™Ù]
+\JNÂˆ™]\›ˆX]Ú\Ñ›Ü™YÜ›Ý[™ÛÛ^
+\Ý
+NÂˆB‚ˆš]˜]H›ÛÛX[ˆ\Ó][˜Ú\’ÛYUÜÝ\™˜XÙJ
+HÂˆËÈ\È›ØÙ\ÜË[ØØ[Y™XÞXÛHÚÙ[ˆÛÛY\Èœ›ÛH][˜Ú\XÝ]š]H]Ù[‹ˆÛˆH\™Ù]ˆËÈ[™›ÚYHXY[š]Û›HÛ™HXÝ]š]H\È™\Ý[YY]H[YKÛÈØZ][™È›ÜˆHÙXÛÛ™ˆËÈXØÙ\ÜÚXš[]KÕ\ØYÙTÝ]ÈXÚØYÙHØ[\HY\™[HX]™\ÈHœ™\ÚH™\Ý[YYÓQHš\ÚX›BˆËÈÚ]Ý[H[\È›ÜˆÛ™H›Ü™YÜ›Ý[™]˜XÚÙ\ˆ\ÜË‚ˆ™]\›ˆÝ]\Ð˜\”Ý\™˜XÙPÛÛ^š\Ó][˜Ú\’ÛYQ›Ü™YÜ›Ý[™
+
+NÂˆB‚ˆš]˜]H›ÛÛX[ˆX]Ú\Ñ›Ü™YÜ›Ý[™ÛÛ^
+[X›HÙ]Ýš[™Ïˆ\™Ù]ÊHÂˆ›ÛÛX[ˆ˜]šYØ]Ü•Ú[™ÝÈHY™™XÝ]™S˜]šYØ]Ü•Ú[™ÝÑ›Ü™YÜ›Ý[™
+
+NÂˆ™]\›ˆÝ]\Ð˜\”Ý\™˜XÙPÛÛ^›X]Ú\Êˆ\™Ù]Ë\Ý›Ü™YÜ›Ý[™XÚØYÙKˆ˜]šYØ]Ü•Ú[™ÝÈÈ˜[ÙHˆ\Ó][˜Ú\’ÛYUÜÝ\™˜XÙJ
+K˜]šYØ]Ü•Ú[™ÝÊNÂˆB‚ˆš]˜]H›ÛÛX[ˆ[žPœšXÚÓ™YYÔXÚØYÙU˜XÚÚ[™Ê
+HÂˆ›Üˆ
+Ù]Ýš[™ÏˆÈˆY™™XÝ]™RYS\ÝË˜[Y\Ê
+JHÂˆYˆ
+Ý]\Ð˜\”Ý\™˜XÙPÛÛ^œ™\]Z\™\ÔXÚØYÙU˜XÚÚ[™ÊÊJH™]\›ˆYNÂˆBˆ›Üˆ
+PœšXÚÐÛÛ™šYÈÛÛ™šYÈˆÛÛ™šYÝ\™YXZ[œšXÚÜÊHÂˆYˆ
+Ý]\Ð˜\”Ý\™˜XÙPÛÛ^œ™\]Z\™\ÔXÚØYÙU˜XÚÚ[™ÊÛÛ™šYËšYR[”XÚØYÙ\ÊJHÂˆ™]\›ˆYNÂˆBˆBˆ™]\›ˆ˜[ÙNÂˆB‚ˆš]˜]H›ÚY\PœšXÚÕš\ÚXš[]JÙ]œšXÚÕ\OˆœšXÚÜÔÙ]
+HÂˆYˆ
+š[™[™ÈOH[
+H™]\›ŽÂˆ›ÛÛX[ˆ]PXÝ]™HHœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K‘UJBˆ	‰ˆ
+™YœË™]KœÚÝÑ]K™Ù]
+
+H™YœË™]KœÚÝÑ^SÙ•ÙYZË™Ù]
+
+JNÂˆËÈØ\ˆœšXÚÜÈÛ›H™[™\ˆÚ[ˆH™ZXÛHÝ\ÜÈHÙ[œÛÜˆ8 %H™\Ù][\ÜYœ›ÛBˆËÈ[›Ý\ˆØ\ˆX^H\Ý[H[ˆœšXÚÓÜ™\‹[™[ˆ[œÝ\ÜYÙ[œÛÜˆÛÝ[Ý\Ú\ÙBˆËÈX]™HH\›X[™[Hœ›Þ™[ˆXÙZÛ\ˆœšXÚÈ[ˆH›ÝË‚ˆËÈ™Y›Ü™HH[^YYPÐT–ÝYÙK™\Ù\™HÛÛ™šYÝ\™Y[\\˜]\™HÛÝÈ\Ú[™ÈXÙZÛ\œË‚ˆËÈH]\ˆØ\Xš[]HØ[˜XÚÈÛÛ\Ù\È[œÝ\ÜYÙ[œÛÜœÈÚ]Ý]›ØÚÚ[™Èš\œÝ˜]Ë‚ˆØ\’[YÜ˜][ÛˆØ\ˆHØ\•[[Y]žQ^Ü\ˆOH[È[ˆØ\’[YÜ˜][ÛœË™Ù]
+\ÊNÂˆ›ÛÛX[ˆ[™ÛÜ•[\XÝ]™HHœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K’S‘ÓÔ—ÕST
+Bˆ	‰ˆ
+Ø\ˆOH[Ø\‹š\ÐœšXÚÔÝ\ÜY
+œšXÚÕ\K’S‘ÓÔ—ÕST
+JNÂˆ›ÛÛX[ˆÝ]ÛÜ•[\XÝ]™HHœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K“ÕUÓÔ—ÕST
+Bˆ	‰ˆ
+Ø\ˆOH[Ø\‹š\ÐœšXÚÔÝ\ÜY
+œšXÚÕ\K“ÕUÓÔ—ÕST
+JNÂˆ›ÛÛX[ˆÛYP\ÜÚ\Ý[XÝ]™HHœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K’ÓQWÐTÔÒTÕS•
+Bˆ	‰ˆš[™[™ËšÛYP\ÜÚ\Ý[ÛÛZ[™\‹™Ù]Ú[ÛÝ[
+
+HˆÂˆ›ÛÛX[ˆÛ™TÝ]\ÐXÝ]™HHœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K”Ó‘WÔÕUTÊBˆ	‰ˆ\Õš\ÚX›TÛ™TÝ]\Õ˜[Y\Ê
+NÂˆ›ÛÛX[ˆÛ™PÙ[[\XÝ]™HHœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K”Ó‘WÐÑSSTŠBˆ	‰ˆ
+Û™T\˜Ù[
+›™]ÛÜšËœÚYÛ˜[ŠHOH[ˆ\Û™U^
+›™]ÛÜšË›Ü\˜]ÜˆŠKš\Ñ[\J
+Bˆ™YœËœÛ™PÙ[[\‹œÚÝÓ™]ÛÜšÕ\K™Ù]
+
+Bˆ	‰ˆ\Û™S™]ÛÜšÕ\J
+Kš\Ñ[\J
+JNÂˆ›ÛÛX[ˆÛ™P˜]\žPXÝ]™HHœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K”Ó‘WÐUT–JBˆ	‰ˆÛ™T\˜Ù[
+˜˜]\žK›]™[ŠHOH[Âˆ›ÛÛX[ˆÛ™S™]ÛÜšÕ\PXÝ]™HHœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K”Ó‘WÓ‘UÓÔ’×ÕTJBˆ	‰ˆ\Û™S™]ÛÜšÕ\J
+Kš\Ñ[\J
+NÂˆœšXÚÕ\™Ù]×H\™Ù]ÈHÂˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K•SQKœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K•SQJKˆš[™[™Ë[YU^™YœË[YK˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K‘UK]PXÝ]™Kˆš[™[™Ë™]U^™YœË™]K˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K•ÒQ’KœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K•ÒQ’JKˆš[™[™ËÚYšTÝ]\ÒXÛÛ‹™YœËÚYšK˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K‘ÔËœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K‘ÔÊKˆš[™[™Ë™ÛœÜÔÝ]\ÒXÛÛ‹™YœË™ÜË˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K“QUÓÕœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K“QUÓÕ
+Kˆš[™[™Ë˜›Y]ÛÝÝ]\ÒXÛÛ‹™YœË˜›Y]ÛÝ˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K’S‘ÓÔ—ÕST[™ÛÜ•[\XÝ]™Kˆš[™[™Ëš[™ÛÜ•[\^™YœËš[™ÛÜ•[\˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K“ÕUÓÔ—ÕSTÝ]ÛÜ•[\XÝ]™Kˆš[™[™Ë›Ý]ÛÜ•[\^™YœË›Ý]ÛÜ•[\˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K’ÓQWÐTÔÒTÕS•ÛYP\ÜÚ\Ý[XÝ]™Kˆš[™[™ËšÛYP\ÜÚ\Ý[ÛÛZ[™\‹™YœËšÛYP\ÜÚ\Ý[˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K”Ó‘WÔÕUTËÛ™TÝ]\ÐXÝ]™Kˆš[™[™ËœÛ™TÝ]\ÐÛÛZ[™\‹™YœËœÛ™TÝ]\Ë˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K”Ó‘WÐÑSST‹Û™PÙ[[\XÝ]™Kˆš[™[™ËœÛ™PÙ[[\ÛÛZ[™\‹™YœËœÛ™PÙ[[\‹˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K”Ó‘WÐUT–KÛ™P˜]\žPXÝ]™Kˆš[™[™ËœÛ™P˜]\žTÝ]\ÒXÛÛ‹™YœËœÛ™P˜]\žK˜ÛÛ[[K™Ù]
+
+JKˆ™\ÛÛ™U\™Ù]
+œšXÚÕ\K”Ó‘WÓ‘UÓÔ’×ÕTKÛ™S™]ÛÜšÕ\PXÝ]™Kˆš[™[™ËœÛ™S™]ÛÜšÕ\U^™YœËœÛ™S™]ÛÜšÕ\K˜ÛÛ[[K™Ù]
+
+JKˆNÂ‚ˆËÈYYXH\ÈH^˜HÙ\ÜÚ[ÛˆØ]KÛÈÙHZ[]ÈœšXÚÕ\™Ù]\™Kˆ[ˆ\XÝ[\‹BˆËÈY™\œ™YÜÝX›ÛÝ[YÜ˜][Ûˆ™Yœ™\Ú]\Ý›ÝXZÙH[ˆ[\HYYXPÛÛZ[™\ˆš\ÚX›BˆËÈY\ˆ[˜X›SYYXU˜XÚÚ[™È[™XYHY]ˆÛ›H™X[XÝ]™HYYXHX^HØØÝ\HH›ÝË‚ˆ›ÛÛX[ˆÛ™S›ÝYšXØ][ÛXÝ]™HH\ÔÛ™S›ÝYšXØ][ÛXÝ]™J
+NÂˆYYXPÛÛ›Û\ˆYYXPÛÛ›Û\ˆHXÚÐXÝ]™SYYXPÛÛ›Û\Š
+NÂˆ›ÛÛX[ˆYYXTÙ\ÜÚ[ÛXÝ]™HHÝ]\ÓYYXUš\ÚXš[]TÛXÞKš\Õš\ÚX›PÛÛ[
+ˆÛ™S›ÝYšXØ][ÛXÝ]™KˆYYXPÛÛ›Û\ˆOH[ˆ\ÐXÝX[T^Z[™ÊYYXPÛÛ›Û\ŠKˆ™YœË›YYXK›Û›UÚ[T^Z[™Ë™Ù]
+
+JNÂˆ›ÛÛX[ˆYYXTÚÝ[™QÛÛ™HHXœšXÚÜÔÙ]˜ÛÛZ[œÊœšXÚÕ\K“QQPJBˆZ\Ô™[[Ý[Uš\ÚX›JœšXÚÕ\K“QQPJH[YYXTÙ\ÜÚ[ÛXÝ]™NÂˆ›ÛÛX[ˆYYXRY[žP\H[YYXTÚÝ[™QÛÛ™Bˆ	‰ˆ\ÐœšXÚÒY[žP\
+œšXÚÕ\K“QQPJNÂˆœšXÚÕ\™Ù]YYXU\™Ù]ÂˆYˆ
+YYXTÚÝ[™QÛÛ™JHÂˆYYXU\™Ù]H™]ÈœšXÚÕ\™Ù]
+š[™[™Ë›YYXPÛÛZ[™\‹šY]Ë‘ÓÓ‘KYŠNÂˆH[ÙHYˆ
+YYXRY[žP\
+HÂˆYˆ
+™YœËšYRÙY\ÔÜXÙQ›ÜŠœšXÚÕ\K“QQPJK™Ù]
+
+JHÂˆYYXU\™Ù]H™]ÈœšXÚÕ\™Ù]
+š[™[™Ë›YYXPÛÛZ[™\‹šY]Ë•’TÒP“KŠNÂˆH[ÙHÂˆYYXU\™Ù]H™]ÈœšXÚÕ\™Ù]
+š[™[™Ë›YYXPÛÛZ[™\‹šY]Ë‘ÓÓ‘KYŠNÂˆBˆH[ÙHÂˆYYXU\™Ù]H™]ÈœšXÚÕ\™Ù]
+š[™[™Ë›YYXPÛÛZ[™\‹šY]Ë•’TÒP“Kˆ™YœË›YYXK˜ÛÛ[[K™Ù]
+
+HÈMYŠNÂˆB‚ˆËÈØ]YÛÜš\ÙHHÚ[™Ù\Ëˆš\ÚXš[]H›\È
+’TÒP“x¡¥ÓÓ‘JHÙ]H˜[œÚ][Û“X[˜YÙ\ˆ
+ÂˆËÈÚ[™ÝËXY™™\ˆ™X]Y[È\™H[HÚ[™Ù\È
+ÙY\\ÜXÙH[ÙHÚ\™HHœšXÚÈÝ^\ÂˆËÈ[ˆH^[Ý]
+H\ÝÙ]HZ[ˆ[H[š[X][Û‹‚ˆ˜]˜K][“\ÝœšXÚÕ\™Ù]ˆš\ÚXš[]Q›\ÈH™]È˜]˜K][\œ˜^S\ÝŠ
+NÂˆ˜]˜K][“\ÝœšXÚÕ\™Ù]ˆ[SÛ›HH™]È˜]˜K][\œ˜^S\ÝŠ
+NÂˆ›ÛÛX[ˆ^[™[™ÈH˜[ÙNÂˆ›Üˆ
+œšXÚÕ\™Ù]ˆ\™Ù]ÊHÂˆYˆ
+šY]Ë™Ù]š\ÚXš[]J
+HOHš\ÚXš[]JHÂˆš\ÚXš[]Q›\Ë˜Y
+
+NÂˆYˆ
+š\ÚXš[]HOHšY]Ë•’TÒP“JH^[™[™ÈHYNÂˆH[ÙHYˆ
+š\ÚXš[]HOHšY]Ë•’TÒP“JHÂˆ[SÛ›K˜Y
+
+NÂˆBˆBˆËÈYYXHÛË‚ˆYˆ
+YYXU\™Ù]šY]Ë™Ù]š\ÚXš[]J
+HOHYYXU\™Ù]š\ÚXš[]JHÂˆš\ÚXš[]Q›\Ë˜Y
+YYXU\™Ù]
+NÂˆYˆ
+YYXU\™Ù]š\ÚXš[]HOHšY]Ë•’TÒP“JH^[™[™ÈHYNÂˆBˆ›ÛÛX[ˆ™Yœ™\Úš\ÚX›SYYXHHYYXU\™Ù]š\ÚXš[]HOHšY]Ë•’TÒP“Bˆ	‰ˆ[YYXTÚÝ[™QÛÛ™H	‰ˆ[YYXRY[žP\Â‚ˆYˆ
+]š\ÚXš[]Q›\Ëš\Ñ[\J
+H	‰ˆÝ™\›^P]XÚY
+HÂˆËÈØÙ[™H›ÛÝ›Üˆ˜[œÚ][Û“X[˜YÙ\ˆ\ÈHS“‘TˆÛÛZ[™\ˆ8 %HÝ]\ˆœ˜[YS^[Ý]ˆËÈÙ]È™\Ú^™YÈHØÜ™Y[‹]ÚYY™™\ˆšXHÚ[™ÝÓX[˜YÙ\‹[™ÙHØ[BˆËÈ˜[œÚ][ÛˆÈ^H[œÚYHHÝX›H[›™\ˆ[™X\“^[Ý]›ÝÚ\ÙHHY™™\‹‚ˆ™YÚ[•š\ÚXš[]U˜[œÚ][ÛŠš[™[™Ë›Ý™\›^PÛÛZ[™\‹^[™[™ÊNÂˆB‚ˆËÈ\H[\™Ù]Ëˆ›Üˆš\ÚXš[]H›\È˜YH˜[œÚ][Ûˆ[™\ÈH[H[š[X][ÛŽÂˆËÈ›Üˆ[K[Û›HÛ™\ÈÙH[ˆ[ˆ^XÚ]šY]Ô›Ü\P[š[X]Ü‹‚ˆ›Üˆ
+œšXÚÕ\™Ù]ˆ\™Ù]ÊHÂˆ\PœšXÚÕ\™Ù]
+Ý™\›^P]XÚY	‰ˆš\ÚXš[]Q›\Ë˜ÛÛZ[œÊ
+JNÂˆBˆ\PœšXÚÕ\™Ù]
+YYXU\™Ù]ˆÝ™\›^P]XÚY	‰ˆš\ÚXš[]Q›\Ë˜ÛÛZ[œÊYYXU\™Ù]
+JNÂˆËÈÜ[]HHYYXH›ÝÜÈÛˆH™\žHœ˜[YH[ˆÚXÚHœšXÚÈ™XÛÛY\Èš\ÚX›KˆHÛˆËÈ]™Yœ™\ÚYÛ›H’TÒP“x¡¤•’TÒP“NÈÓÓ‘x¡¤•’TÒP“H^ÜÙYHS›ÛÝÝ˜\Ý]BˆËÈ
+Ý]HXÛÛˆ\È[ˆ[\KX][YX\Ý\˜X›H\˜][Ûˆ^šY]ÊH[[H™^^Y\‚ˆËÈØ[˜XÚËˆ\[™[™ÈÛˆÚ[ˆX[™^]\ÚXÈX›\ÚYY]Y]K]ÛÝ[\ÝÙXÛÛ™ÂˆËÈY\ˆ›ÛÝ[™[ˆš\ÚX›HÚ[™ÙHHÝ]\Ë\›ÝÈZYÚ‚ˆYˆ
+™Yœ™\Úš\ÚX›SYYXJHÂˆ\]SYYXR[™›Ê
+NÂˆB‚ˆËÈ\‹XœšXÚÈ[H›ÝÛÝ™\™YžHH˜YH˜[œÚ][Ûˆ
+ÙY\\ÜXÙH’TÒP“x¡¤•’TÒP“JK‚ˆËÈHœšXÚÜÈ[ˆ[SÛ›HZYÚÝ[Ø[Hš\ÚX›KX[H\]HYˆÛÛ[[BˆËÈ™YˆÚ[™ÙY8 %[™YžH\VœšXÚÔÙ][™ÜÈÙ][HÚXÚ[œÈ™Y›Ü™H\Ë‚ˆB‚ˆÊŠˆÛ˜\ÚÝÙˆH\Ú\™Y[™Ý]H›ÜˆHœšXÚÈšY]Ëˆ
+‹Âˆš]˜]HÝ]XÈš[˜[Û\ÜÈœšXÚÕ\™Ù]Âˆš[˜[šY]ÈšY]ÎÂˆš[˜[[š\ÚXš[]NÂˆÊŠˆ\™Ù][HÚ[ˆÐ[šÈÝš\ÚXš[]_H\ÈÐÛÙH’TÒP“_NÈYÛ›Ü™YÝ\Ú\ÙKˆ
+‹Âˆš[˜[›Ø]š\ÚX›P[NÂˆœšXÚÕ\™Ù]
+šY]ÈšY]Ë[š\ÚXš[]K›Ø]š\ÚX›P[JHÂˆ\ËšY]ÈHšY]ÎÂˆ\Ëš\ÚXš[]HHš\ÚXš[]NÂˆ\Ëš\ÚX›P[HHš\ÚX›P[NÂˆBˆB‚ˆÊŠ‚ˆ
+ˆXÚYHHš[˜[šY]ÈÝ]H›ÜˆHœšXÚËˆÐÛÙHXÝ]™R[“^[Ý]Y˜[Ù_H
+œšXÚÈ›Ý[‚ˆ
+ˆH^[Ý]È]HÚ]›Ý›YÜÈÙ™ŠH8¡¤ˆÐÛÙHÓÓ‘_K\™ÛÛ\ÙKˆÝ\Ú\ÙHÛ›Ý\‚ˆ
+ˆÐ[šÈ™Y™\™[˜Ù\ÈÚYRÙY\ÔÜXÙQ›ÜŸNˆYˆYK™[™\ˆ[ˆS•’TÒP“KY\]Z]˜[[
+’TÒP“Bˆ
+ˆšY]Ë[H[š[X]YÈ
+NÈYˆ˜[ÙKZ[ˆÓÓ‘K‚ˆ
+‹Âˆš]˜]HœšXÚÕ\™Ù]™\ÛÛ™U\™Ù]
+œšXÚÕ\H\K›ÛÛX[ˆXÝ]™R[“^[Ý]šY]ÈšY]Ëˆ[ÛÛ[[T™YŠHÂˆ›Ø]˜\ÙP[HHÛÛ[[T™YˆÈMYŽÂˆYˆ
+XXÝ]™R[“^[Ý]Z\Ô™[[Ý[Uš\ÚX›J\JJHÂˆ™]\›ˆ™]ÈœšXÚÕ\™Ù]
+šY]ËšY]Ë‘ÓÓ‘K˜\ÙP[JNÂˆBˆËÈHÚ[™[ˆ[™\[™[HÚÛÜÙHÚ]\ˆÈ[š\š]HÜ›Ý\	ÜÈ\\ÝÈZ\‚ˆËÈ™[™\™\ˆ\È[™XYH™[[Ý™YÜˆXYH˜[œÜ\™[HX]Ú[™ÈÚ[™[‹‚ˆYˆ
+\HOHœšXÚÕ\K’ÓQWÐTÔÒTÕS•	‰ˆ\ÐœšXÚÒY[žP\
+\JJHÂˆYˆ
+™YœËšYRÙY\ÔÜXÙQ›ÜŠ\JK™Ù]
+
+JHÂˆËÈ’TÒP“K]Ú]X[KL™\XÙ\ÈHÛS•’TÒP“HÛÛœÝ[8 %Ø[YHY™™XÝÛ‚ˆËÈ^[Ý]
+ÜXÙH™\Ù\™Y
+H][š[X]X›K‚ˆ™]\›ˆ™]ÈœšXÚÕ\™Ù]
+šY]ËšY]Ë•’TÒP“KŠNÂˆBˆ™]\›ˆ™]ÈœšXÚÕ\™Ù]
+šY]ËšY]Ë‘ÓÓ‘K˜\ÙP[JNÂˆBˆ™]\›ˆ™]ÈœšXÚÕ\™Ù]
+šY]ËšY]Ë•’TÒP“K˜\ÙP[JNÂˆB‚ˆš]˜]H›ÛÛX[ˆ\Ô™[[Ý[Uš\ÚX›JœšXÚÕ\H\JHÂˆ™]\›ˆ]]ÛX][Û”Ý]\ÈOH[]]ÛX][Û”Ý]\Âˆ™Ù]
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÐ•RSS‹\K˜]]ÛX][Û’Y
+
+JKš\ÚX›NÂˆB‚ˆÊŠˆØ[YY\ˆZ]\ˆ[ˆ^ÜYœ›ØYØ\ÝÜˆTUXÚÙ]\È™Y[ˆ\œÚ\ÝYˆ
+‹ÂˆX›XÈ›ÚYÛ]]ÛX][Û”Ý]PÚ[™ÙY
+Ýš[™ÈØÛÜKÝš[™ÈY
+HÂˆYˆ
+\Ý›ÞYY
+H™]\›ŽÂˆYˆ
+ØÙ[˜\š[ÐÛÛ›Û\ˆOH[
+HÂˆØÙ[˜\š[ÐÛÛ›Û\‹œ™Yœ™\ÚÞ\Ý[PÛÛ™][ÛœÊ
+NÂˆBˆÞ[˜Ú›Ûš^™Y
+]]ÛX][Û•ZSØÚÊHÂˆ[™[™Ð]]ÛX][Û•ZK˜ÛÛ\]RYXœÙ[
+ØÛÜKYÛ›Ü™YOˆ™]È\ÚÙ]Š
+JK˜Y
+Y
+NÂˆBˆØÚY[T[™[™Ð]]ÛX][Û•ZT™Yœ™\Ú
+
+NÂˆB‚ˆš]˜]H›ÚY\Ü]Ú]]ÛX][Û”™\Ù[][Û•\™Ù]Ê›Û“[Ù]Ýš[™Ïˆ\™Ù]ÊHÂˆX\Ýš[™ËÙ]Ýš[™ÏˆÜ›Ý\YH™]È[šÙY\ÚX\Š
+NÂˆ›Üˆ
+Ýš[™È\™Ù]ˆ\™Ù]ÊHÂˆ[]šY\ˆH\™Ù]š[™^ÙŠ	ß	ÊNÂˆYˆ
+]šY\ˆH]šY\ˆH\™Ù]›[™Ý
+
+HHJHÛÛ[YNÂˆÜ›Ý\Y˜ÛÛ\]RYXœÙ[
+\™Ù]œÝXœÝš[™Ê]šY\ŠKYÛ›Ü™YOˆ™]È\ÚÙ]Š
+JBˆ˜Y
+\™Ù]œÝXœÝš[™Ê]šY\ˆ
+ÈJJNÂˆBˆ\Ü]Ú]]ÛX][Û”™\Ù[][ÛÚ[™Ù\ÊÜ›Ý\Y
+NÂˆB‚ˆš]˜]H›ÚY\Ü]Ú]]ÛX][Û”™\Ù[][ÛÚ[™Ù\Êˆ›Û“[X\Ýš[™ËÙ]Ýš[™ÏˆÚ[™ÙY
+HÂˆYˆ
+]]ÛX][Û”™\Ù[][Û“\Ý[™\œËš\Ñ[\J
+JH™]\›ŽÂˆ›Üˆ
+X\‘[žOÝš[™ËÙ]Ýš[™Ïˆ[žHˆÚ[™ÙY™[žTÙ]
+
+JHÂˆÙ]Ýš[™ÏˆYÈHÛÛXÝ[ÛœË[›[ÙYšXX›TÙ]
+™]È[šÙY\ÚÙ]Š[žK™Ù]˜[YJ
+JJNÂˆ›Üˆ
+]]ÛX][Û”™\Ù[][Û“\Ý[™\ˆ\Ý[™\ˆˆ]]ÛX][Û”™\Ù[][Û“\Ý[™\œÊHÂˆžHÂˆ\Ý[™\‹›Û]]ÛX][Û”™\Ù[][ÛÚ[™ÙY
+[žK™Ù]Ù^J
+KYÊNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙËÊQË]]ÛX][Ûˆ™\Ù[][Ûˆ\Ý[™\ˆ˜Z[Y‹˜Z[\™JNÂˆBˆBˆBˆB‚ˆš]˜]H›ÛÛX[ˆ]]ÛX]XÔÝ\™˜XÙT™Yœ™\ÚÝ\™\ÜÙY
+
+HÂˆ™]\›ˆ[š]X[[YÜ˜][Û”Ý\\[”›ÙÜ™\ÜÈÜ™Y[X[™Yœ™\ÚØÚY[Yˆ]]ÛX]XÔ[[YT\šÙY]]ÛX]XÓY™XÞXÛT]ZY]ˆÝ\\ÛÜšÐÛÛÜ™[˜]Ü‹œÚÝ[Y™\]]ÛX]XÔÝXÚÞT™\Ý\
+\ÊNÂˆB‚ˆš]˜]H›ÚYØÚY[T[™[™Ò[YÜ˜][Û”™XÛÛ™šYÝ\™J
+HÂˆYˆ
+Z[YÜ˜][Û”™XÛÛ™šYÝ\™T[™[™È]]ÛX]XÔÝ\™˜XÙT™Yœ™\ÚÝ\™\ÜÙY
+
+Bˆ\Ý›ÞYY
+H™]\›ŽÂˆ[YÜ˜][Û”™XÛÛ™šYÝ\™T[™[™ÈH˜[ÙNÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆÂˆYˆ
+Y\Ý›ÞYY
+H\T™Y™\™[˜Ù\ÊYJNÂˆJNÂˆB‚ˆš]˜]H›ÚYØÚY[T[™[™Ð]]ÛX][Û•ZT™Yœ™\Ú
+
+HÂˆÞ[˜Ú›Ûš^™Y
+]]ÛX][Û•ZSØÚÊHÂˆYˆ
+[™[™Ð]]ÛX][Û•ZKš\Ñ[\J
+H]]ÛX][Û•ZT™Yœ™\ÚØÚY[Yˆ]]ÛX]XÔÝ\™˜XÙT™Yœ™\ÚÝ\™\ÜÙY
+
+JH™]\›ŽÂˆ]]ÛX][Û•ZT™Yœ™\ÚØÚY[YHYNÂˆBˆËÈÛ™H™[™\™Yœ˜[YH\ˆÛÛ›™XÝÜˆ\œÝ[œÝXYÙˆ™XZ[[™ÈH›ÝÈÛ˜ÙH\ˆ[]K‚ˆXZ[’[™\‹œÜÝ[^YY
+]]ÛX][Û•ZT™Yœ™\ÚÌ“
+NÂˆB‚ˆÊŠˆ™XY[Û›HÛ˜\ÚÝÈ]HÙXÛÛ™Ý™\›^H™]\ÙHÜšYÚ[˜[œšXÚÈ]HÚ]Ý]\XØ][™Âˆ
+ˆ›ÝYšXØ][Û‹PØ\–Ó”ÔÈÜˆÛÛ›™XÝ]š]H\Ý[™\œËˆØ[YÛ›HÛˆHXZ[ˆ™XYˆ
+‹Âˆ[X›Bˆš]˜]HÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YHÜ\Z[[•˜[YJ›Û“[Ýš[™ÈY
+HÂˆYˆ
+š[™[™ÈOH[
+H™]\›ˆ[ÂˆÝÚ]Ú
+Y
+HÂˆØ\ÙH˜Z[[‹[YHŽ‚ˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJ[YQ›Ü›X]™›Ü›X]
+™]È]J
+JKˆˆÑ‘‘‘‘‘‘‘ˆ‹[YJNÂˆØ\ÙH˜Z[[‹™]HŽ‚ˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJÝš[™Ë˜[YSÙŠš[™[™Ë™]U^™Ù]^
+
+JKˆˆÑ‘‘‘‘‘‘‘ˆ‹[YJNÂˆØ\ÙH˜Z[[‹›YYXHŽ‚ˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJ\ÝYYXTÝX]KˆˆÑ‘‘‘‘‘‘‘ˆ‹[Z\Ñ[\J\ÝYYXTÝX]JJNÂˆØ\ÙH˜Z[[‹ÚYšHŽ‚ˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJˆ‹ˆÑ‘‘‘‘‘‘‘ˆ‹ÚYšH‹ˆYJNÂˆØ\ÙH˜Z[[‹™ÜÈŽ‚ˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJˆ‹ˆÑ‘‘‘‘‘‘‘ˆ‹™ÜÈ‹ˆYJNÂˆØ\ÙH˜Z[[‹˜›Y]ÛÝŽ‚ˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJˆ‹ˆÑ‘‘‘‘‘‘‘ˆ‹˜›Y]ÛÝ‹ˆYJNÂˆØ\ÙH˜Z[[‹š[™ÛÜ—Ý[\Ž‚ˆ™]\›ˆÜ\^˜[YJš[™[™Ëš[™ÛÜ•[\^[\\˜]\™H‹YJNÂˆØ\ÙH˜Z[[‹›Ý]ÛÜ—Ý[\Ž‚ˆ™]\›ˆÜ\^˜[YJš[™[™Ë›Ý]ÛÜ•[\^[\\˜]\™H‹YJNÂˆØ\ÙH˜Z[[‹šÛYWØ\ÜÚ\Ý[Ž‚ˆÝš[™ÐZ[\ˆ^H™]ÈÝš[™ÐZ[\Š
+NÂˆ›Üˆ
+[HHÈHš[™[™ËšÛYP\ÜÚ\Ý[ÛÛZ[™\‹™Ù]Ú[ÛÝ[
+
+NÈJÊÊHÂˆšY]ÈÚ[Hš[™[™ËšÛYP\ÜÚ\Ý[ÛÛZ[™\‹™Ù]Ú[]
+JNÂˆYˆ
+JÚ[[œÝ[˜Ù[Ùˆ[™›ÚYÚYÙ]•^šY]ÊBˆÚ[™Ù]š\ÚXš[]J
+HOHšY]Ë•’TÒP“JHÛÛ[YNÂˆYˆ
+^›[™Ý
+
+Hˆ
+H^˜\[™
+	È	ÊNÂˆ^˜\[™
+
+
+[™›ÚYÚYÙ]•^šY]ÊHÚ[
+K™Ù]^
+
+JNÂˆBˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJ^ÔÝš[™Ê
+KˆÑ‘‘‘‘‘‘‘ˆ‹[ˆš[™[™ËšÛYP\ÜÚ\Ý[ÛÛZ[™\‹™Ù]š\ÚXš[]J
+HOHšY]Ë•’TÒP“JNÂˆØ\ÙH˜Z[[‹œÛ™WÜÝ]\ÈŽ‚ˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJˆ›Ú[™Yš\ÚX›U^
+š[™[™ËœÛ™TÝ]\ÐÛÛZ[™\ŠKˆÑ‘‘‘‘‘‘‘ˆ‹ˆœÛ™H‹š[™[™ËœÛ™TÝ]\ÐÛÛZ[™\‹™Ù]š\ÚXš[]J
+HOHšY]Ë•’TÒP“JNÂˆØ\ÙH˜Z[[‹œÛ™WØÙ[[\ˆŽ‚ˆ[YÙ\ˆÚYÛ˜[HÛ™T\˜Ù[
+›™]ÛÜšËœÚYÛ˜[ŠNÂˆÝš[™ÈÜ\˜]ÜˆHÛ™U^
+›™]ÛÜšË›Ü\˜]ÜˆŠNÂˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJˆ[Ü\˜]Ü‹š\Ñ[\J
+HÈÜ\˜]ÜˆˆÚYÛ˜[OH[ÈˆˆˆÚYÛ˜[
+È‰H‹ˆˆÑ‘‘‘‘‘‘‘ˆ‹ˆœÛ™H‹ÚYÛ˜[OH[[Ü\˜]Ü‹š\Ñ[\J
+JNÂˆØ\ÙH˜Z[[‹œÛ™WØ˜]\žHŽ‚ˆ[YÙ\ˆ˜]\žHHÛ™T\˜Ù[
+˜˜]\žK›]™[ŠNÂˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJˆ˜]\žHOH[Èˆˆˆ˜]\žH
+È‰H‹ˆÑ‘‘‘‘‘‘‘ˆ‹ˆ˜˜]\žH‹˜]\žHOH[
+NÂˆY˜][‚ˆ™]\›ˆ[ÂˆBˆB‚ˆš]˜]HÝ]XÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YHÜ\^˜[YJˆ[™›ÚYÚYÙ]•^šY]ÈšY]Ë[X›HÝš[™ÈXÛÛ’Y›ÛÛX[ˆš\ÚX›JHÂˆ™]\›ˆ™]ÈÜ\Ý™\›^PÛÛ›Û\‹Z[[•˜[YJÝš[™Ë˜[YSÙŠšY]Ë™Ù]^
+
+JKˆÝš[™Ë™›Ü›X]
+ØØ[K”“ÓÕˆÉL‹šY]Ë™Ù]Ý\œ™[^ÛÛÜŠ
+JKXÛÛ’Yˆš\ÚX›JNÂˆB‚ˆÊŠ‚ˆ
+ˆ\Y\ÈHœšXÚÉÜÈ\™Ù]Ý]Kˆ›Üˆš\ÚXš[]H›\ÈHX]žHY[™È\ÈÛ™HžHBˆ
+ˆÐÛÙH˜[œÚ][Û“X[˜YÙ\ŸHØÙ[™HÙ]\žHÐ[šÈØ™YÚ[•š\ÚXš[]U˜[œÚ][ÛŸH8 %ÙBˆ
+ˆ\ÝÙÙÛHÐÛÙHÙ]š\ÚXš[]_H[™H˜YH˜[œÚ][ÛˆÜ›ÜÜËY˜Y\È[HÚ[Bˆ
+ˆÚ[™ÙP›Ý[™ÈÛY\ÈÚX›[™ÜÈ[ÈXÙKˆ›Üˆ[K[Û›HÚ[™Ù\È
+ÙY\\ÜXÙHYJBˆ
+ˆÙH[š[X]H[H^XÚ]K‚ˆ
+‹Âˆš]˜]H›ÚY\PœšXÚÕ\™Ù]
+œšXÚÕ\™Ù]\™Ù]›ÛÛX[ˆ[™YžU˜[œÚ][ÛŠHÂˆYˆ
+[Ý™\›^P]XÚY
+HÂˆËÈ™KXYšY]ÈÙ[ÛY]žH›Ü›X[^˜][Ûˆ]\Ý™HÞ[˜Ú›Û›Ý\È[™š[˜[ˆ[š[X]ÜœÈÛˆBˆËÈ]XÚY™YHØ[ˆ™\Ù\™HHS[KÝš\ÚXš[]H[È]Èš\œÝ]XÚYœ˜[YK‚ˆ\™Ù]šY]Ë˜[š[X]J
+K˜Ø[˜Ù[
+
+NÂˆ\™Ù]šY]ËœÙ]š\ÚXš[]J\™Ù]š\ÚXš[]JNÂˆYˆ
+\™Ù]š\ÚXš[]HOHšY]Ë•’TÒP“JHÂˆ\™Ù]šY]ËœÙ][J\™Ù]š\ÚX›P[JNÂˆBˆ™]\›ŽÂˆBˆYˆ
+\™Ù]š\ÚXš[]HOHšY]Ë‘ÓÓ‘JHÂˆ\™Ù]šY]Ë˜[š[X]J
+K˜Ø[˜Ù[
+
+NÂˆ\™Ù]šY]ËœÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆ™]\›ŽÂˆBˆ\™Ù]šY]ËœÙ]š\ÚXš[]JšY]Ë•’TÒP“JNÂˆYˆ
+[™YžU˜[œÚ][ÛŠHÂˆËÈ˜YH˜[œÚ][Ûˆ[š[X]\ÈH[H›Üˆ\ÎÈXZÙHÝ\™HHš[˜[˜[YH\ÈBˆËÈœšXÚÉÜÈÛÛ[[H™Yˆ
+›ÝKŒœ›ÛH˜YIÜÈY˜][
+K‚ˆ\™Ù]šY]ËœÙ][J\™Ù]š\ÚX›P[JNÂˆH[ÙHÂˆ\™Ù]šY]Ë˜[š[X]J
+K˜Ø[˜Ù[
+
+NÂˆ\™Ù]šY]Ë˜[š[X]J
+Bˆ˜[J\™Ù]š\ÚX›P[JBˆœÙ]\˜][ÛŠ”’PÒ×ÐSWÑTUSÓ—ÓTÊBˆœÝ\
+
+NÂˆBˆB‚ˆÊŠ‚ˆ
+ˆ[œÈH˜Y™™\ˆÚ[™ÝÈˆ[š[X][Û‹ˆšXÚÎˆ™Y›Ü™HšYÙÙ\š[™ÈBˆ
+ˆØÙ[™HÚ[™ÙHÙHZ]\ˆ^[™HÚ[™ÝÈÈØÜ™Y[ˆÚY
+Ú[ˆÛÛY][™È\ÈX›Ý]Âˆ
+ˆ\X\ŠHÜˆ[ˆ]È]ÈÝ\œ™[ÚY
+Ú[ˆÛÛY][™È\ÈX›Ý]È\Ø\X\ŠKˆÚ]ˆ
+ˆHÚ[™ÝÉÜÈÝ]\ˆ™XÝ[™ÛHœ›Þ™[ˆHÚ[™[‰ÜÈ˜YH
+ÈÚ[™ÙP›Ý[™È[š[X][ÛœÂˆ
+ˆ^HÛX[›H[œÚYH]ÈH\Ý[™\ˆ™\ÝÜ™\ÈHÚ[™ÝÈÈÔTÐÓÓ•S•Y\ˆBˆ
+ˆ˜[œÚ][ÛˆÛÈ]Û˜\ÈÈH™]È˜]\˜[Ú^™H[ˆÛ™HÛËˆ\ÈÚY\Ý\ÈBˆ
+ˆ\‹Yœ˜[YHÐÛÙH\]UšY]Ó^[Ý]H\›ØXÚ]Ø\Èš\ÝX[Hœ›ÚÙ[ˆÛˆ™X[\™Ø\™K‚ˆ
+‹Âˆš]˜]H›ÚY™YÚ[•š\ÚXš[]U˜[œÚ][ÛŠšY]ÑÜ›Ý\ØÙ[™T›ÛÝ›ÛÛX[ˆ^[™[™ÊHÂˆYˆ
+š[™[™ÈOH[
+H™]\›ŽÂˆ™YÚ[Y™™\™Y˜[œÚ][ÛŠ^[™[™ÊNÂ‚ˆ[™›ÚY˜[œÚ][Û‹•˜[œÚ][Û”Ù]H™]È[™›ÚY˜[œÚ][Û‹•˜[œÚ][Û”Ù]
+
+NÂˆ˜Y˜[œÚ][ÛŠ™]È[™›ÚY˜[œÚ][Û‹Ú[™ÙP›Ý[™Ê
+JNÂˆ˜Y˜[œÚ][ÛŠ™]È[™›ÚY˜[œÚ][Û‹‘˜YJ
+JNÂˆœÙ]Ü™\š[™Ê[™›ÚY˜[œÚ][Û‹•˜[œÚ][Û”Ù]“Ô‘T’S‘×ÕÑÑUTŠNÂˆœÙ]\˜][ÛŠ”’PÒ×ÕS”ÒUSÓ—ÑTUSÓ—ÓTÊNÂˆœÙ][\œÛ]ÜŠ™]È[™›ÚYšY]Ë˜[š[X][Û‹XØÙ[\˜]QXÙ[\˜]R[\œÛ]ÜŠ
+JNÂˆËÈ\Ý[™\ˆØ[ˆXZÈHY™™\ˆÛÝ[\ˆYˆ˜[œÚ][Û“X[˜YÙ\ˆXÚY\È›Ý[™ÂˆËÈ[š[X]X›HÚ[™ÙY[™™]™\ˆš\™\ÈHY™XÞXÛHØ[˜XÚÜÈ8 %Û›ÝÛˆ›ÛÝYÝ[‹‚ˆËÈÝX\™Ú]HÚ[™ÛK\ÚÝÛÜÙH›YÈ[™HØY™]H[›˜X›H][œÈ[˜ÛÛ™][Û˜[BˆËÈY\ˆÛYÚHÛ™Ù\ˆ[ˆH˜[œÚ][Û‰ÜÈÝÛˆ\˜][Û‹ˆÚXÚ]™\ˆš\™\Èš\œÝˆËÈÛÜÙ\ÈHY™™\ŽÈHÝ\ˆ™XÛÛY\ÈH›Ë[Ü‚ˆš[˜[›ÛÛX[–×HÛÜÙYHÙ˜[Ù_NÂˆ[›˜X›HÛÜÙSÛ˜ÙHH
+
+HOˆÂˆYˆ
+ÛÜÙYÌJH™]\›ŽÂˆÛÜÙYÌHHYNÂˆ[™Y™™\™Y˜[œÚ][ÛŠ
+NÂˆNÂˆ˜Y\Ý[™\Š™]È[™›ÚY˜[œÚ][Û‹•˜[œÚ][Û‹•˜[œÚ][Û“\Ý[™\Š
+HÂˆÝ™\œšYHX›XÈ›ÚYÛ•˜[œÚ][Û”Ý\
+[™›ÚY˜[œÚ][Û‹•˜[œÚ][Ûˆ
+HßBˆÝ™\œšYHX›XÈ›ÚYÛ•˜[œÚ][Û‘[™
+[™›ÚY˜[œÚ][Û‹•˜[œÚ][Ûˆ
+HÂˆÛÜÙSÛ˜ÙKœ[Š
+NÂˆBˆÝ™\œšYHX›XÈ›ÚYÛ•˜[œÚ][ÛØ[˜Ù[
+[™›ÚY˜[œÚ][Û‹•˜[œÚ][Ûˆ
+HÂˆÛÜÙSÛ˜ÙKœ[Š
+NÂˆBˆÝ™\œšYHX›XÈ›ÚYÛ•˜[œÚ][Û”]\ÙJ[™›ÚY˜[œÚ][Û‹•˜[œÚ][Ûˆ
+HßBˆÝ™\œšYHX›XÈ›ÚYÛ•˜[œÚ][Û”™\Ý[YJ[™›ÚY˜[œÚ][Û‹•˜[œÚ][Ûˆ
+HßBˆJNÂˆ[™›ÚY˜[œÚ][Û‹•˜[œÚ][Û“X[˜YÙ\‹˜™YÚ[‘[^YY˜[œÚ][ÛŠØÙ[™T›ÛÝ
+NÂˆXZ[’[™\‹œÜÝ[^YY
+ÛÜÙSÛ˜ÙK”’PÒ×ÕS”ÒUSÓ—ÑTUSÓ—ÓTÈ
+ÈL
+NÂˆB‚ˆÊŠ‚ˆ
+ˆÜ[ˆHÚ[™ÝËXY™™\™Y˜[œÚ][ÛŽˆYˆ›ÈÝ\ˆY™™\™Y˜[œÚ][Ûˆ\È[ˆ›YÚ™K\™\Ú^™Bˆ
+ˆHÚ[™ÝÓX[˜YÙ\ˆÚ[™ÝÈÈZ]\ˆØÜ™Y[ˆÚY
+ÐÛÙH^[™[™ßJHÜˆ]ÈÝ\œ™[ÚYˆ
+ˆ
+Úš[šÚ[™ÊKÛÈH[š[X][Ûˆ]›ÛÝÜÈ^\È[œÚYHHÝX›H™XÝ[™ÛH[œÝXYÙ‚ˆ
+ˆšYÚ[™ÈÜ˜\XÛÛ[ˆY[\Ý[[™\ˆ™\Ý[™Îˆ™KY[˜[Ø[\œÈ\Ý[\HÛÝ[\‹‚ˆ
+‹Âˆš]˜]H›ÚY™YÚ[Y™™\™Y˜[œÚ][ÛŠ›ÛÛX[ˆ^[™[™ÊHÂˆYˆ
+š[™[™ÈOH[
+H™]\›ŽÂˆYˆ
+[™[™ÐY™™\™Y˜[œÚ][ÛœÊÊÈOH
+HÂˆYˆ
+\˜[\ÈOH[	‰ˆ™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTŠHÂˆ[ÛÚYH\˜[\ËÚYÂˆYˆ
+^[™[™ÊHÂˆ\˜[\ËÚYHÙ]™\ÛÝ\˜Ù\Ê
+K™Ù]\Ü^SY]šXÜÊ
+KÚY^[ÎÂˆH[ÙHÂˆ[Ý\œ™[ÚYHš[™[™Ë™Ù]›ÛÝ
+
+K™Ù]ÚY
+
+NÂˆYˆ
+Ý\œ™[ÚYˆ
+H\˜[\ËÚYHÝ\œ™[ÚYÂˆBˆžHÂˆÚ[™ÝÓX[˜YÙ\‹\]UšY]Ó^[Ý]
+š[™[™Ë™Ù]›ÛÝ
+
+K\˜[\ÊNÂˆHØ]Ú
+^Ù\[ÛˆYÛ›Ü™Y
+HÂˆ\˜[\ËÚYHÛÚYÂˆBˆBˆBˆB‚ˆÊŠˆÛÜÙ\ÈH˜[œÚ][ÛˆÜ[™YžHÐ[šÈØ™YÚ[Y™™\™Y˜[œÚ][ÛŸKˆÚ[ˆH\Ý[‹Y›YÚˆ
+ˆ˜[œÚ][Ûˆ[™Ë™\ÝÜ™\ÈHÚ[™ÝÈÈÔTÐÓÓ•S•ÛÈ]Û˜\ÈÈ˜]\˜[Ú^™Kˆ
+‹Âˆš]˜]H›ÚY[™Y™™\™Y˜[œÚ][ÛŠ
+HÂˆYˆ
+[™[™ÐY™™\™Y˜[œÚ][ÛœÈH
+H™]\›ŽÂˆYˆ
+K\[™[™ÐY™™\™Y˜[œÚ][ÛœÈOH
+HÂˆ™\ÝÜ™UÚ[™ÝÕÕÜ˜\ÛÛ[
+
+NÂˆBˆB‚ˆš]˜]H›ÚY™\ÝÜ™UÚ[™ÝÕÕÜ˜\ÛÛ[
+
+HÂˆYˆ
+\˜[\ÈOH[š[™[™ÈOH[
+H™]\›ŽÂˆYˆ
+™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTŠHÂˆ\˜[\ËÚYHÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë“PUÒÔT‘S•ÂˆH[ÙHÂˆ\˜[\ËÚYHÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë•ÔTÐÓÓ•S•ÂˆBˆžHÂˆÚ[™ÝÓX[˜YÙ\‹\]UšY]Ó^[Ý]
+š[™[™Ë™Ù]›ÛÝ
+
+K\˜[\ÊNÂˆHØ]Ú
+^Ù\[ÛˆYÛ›Ü™Y
+HßBˆB‚ˆš]˜]HÙ]œšXÚÕ\OˆÝ\œ™[œšXÚÔÙ]
+
+HÂˆÙ]œšXÚÕ\OˆÙ]H[[TÙ]››Û™SÙŠœšXÚÕ\K˜Û\ÜÊNÂˆÙ]˜Y[
+œšXÚÕ\Kœ\œÙSÜ™\Š™YœË˜œšXÚÓÜ™\‹™Ù]
+
+JJNÂˆ™]\›ˆÙ]ÂˆB‚ˆ›Û“[ˆš]˜]HÙ]œšXÚÕ\Oˆš]™\’[™›Ü›X][ÛœšXÚÕ\\Ê
+HÂˆ›ÛÛX[ˆ[˜X›YH™YœÈOH[	‰ˆ™YœË™š]™\”[™[[˜X›Y™Ù]
+
+NÂˆÝš[™ÈœÛÛˆH™YœÈOH[Èˆ‚ˆˆ™YœË˜XÝ]™Qš]™\”[™[›Ùš[J
+KœÚÜÝ]ÒœÛÛ‹™Ù]
+
+NÂˆYˆ
+ÛÛ™šYÝ\™Yš]™\’[™›Ü›X][Û’œÛÛˆOH[ˆ	‰ˆ[˜X›YOHÛÛ™šYÝ\™Yš]™\”[™[[˜X›Yˆ	‰ˆØš™XÝË™\]X[ÊœÛÛ‹ÛÛ™šYÝ\™Yš]™\’[™›Ü›X][Û’œÛÛŠJHÂˆ™]\›ˆÛÛ™šYÝ\™Yš]™\’[™›Ü›X][Û•\\ÎÂˆBˆÙ]œšXÚÕ\Oˆ™\Ý[H[[]]X›PœšXÚÕ\\ÊØYš]™\’[™›Ü›X][ÛœšXÚÕ\\Ê
+JNÂˆÛÛ™šYÝ\™Yš]™\”[™[[˜X›YH[˜X›YÂˆÛÛ™šYÝ\™Yš]™\’[™›Ü›X][Û’œÛÛˆH™YœÈOH[Èˆ‚ˆˆ™YœË˜XÝ]™Qš]™\”[™[›Ùš[J
+KœÚÜÝ]ÒœÛÛ‹™Ù]
+
+NÂˆÛÛ™šYÝ\™Yš]™\’[™›Ü›X][Û•\\ÈH™\Ý[Âˆ™]\›ˆ™\Ý[ÂˆB‚ˆ›Û“[ˆš]˜]HÙ]œšXÚÕ\OˆØYš]™\’[™›Ü›X][ÛœšXÚÕ\\Ê
+HÂˆÙ]œšXÚÕ\Oˆ™\Ý[H[[TÙ]››Û™SÙŠœšXÚÕ\K˜Û\ÜÊNÂˆYˆ
+™YœÈOH[\™YœË™š]™\”[™[[˜X›Y™Ù]
+
+JH™]\›ˆ™\Ý[Âˆ›Üˆ
+][˜Ú\”ÚÜÝ]ÝÜ™K”ÚÜÝ]ÚÜÝ]‚ˆ][˜Ú\”ÚÜÝ]ÝÜ™K™›Ü‘š]™\”[™[
+™YœÊK˜[
+
+JHÂˆYˆ
+\ÚÜÝ]™[˜X›YÚÜÝ]šÚ[™OH][˜Ú\”ÚÜÝ]ÝÜ™K’Ú[™’S‘“ÊHÛÛ[YNÂˆœšXÚÕ\H\HHÝ]\Ð˜\’[™›Ü›X][ÛØ][ÙË\Q›Ü•\™Ù]
+ÚÜÝ]\™Ù]
+NÂˆYˆ
+\HOH[
+H™\Ý[˜Y
+\JNÂˆBˆ™]\›ˆ™\Ý[ÂˆB‚ˆÊŠ‚ˆ
+ˆÛÛ\]\ÈH[\ÝœšXÚÈZYÚ
+[ˆ^[ÊHÝ™\ˆ[œšXÚÜÈÝ\œ™[H[‚ˆ
+ˆÐÛÙHœšXÚÓÜ™\ŸK™YØ\™\ÜÈÙˆ\‹X\š\ÚXš[]Kˆ\ÙY\ÈHÚYÙ]	ÜÈZ[š[][HZYÚÛÂˆ
+ˆHœšXÚÈ\Ø\X\š[™ÈÛˆH\XÝ[\ˆ\Ù\Û‰ÝÚš[šÈH›ÝË‚ˆ
+‚ˆ
+ˆ^œšXÚÜÈ\ÙHÐ[šÈZ[ÙÙ]›ÛY]šXÜÊ
+_HÛˆHÛÜHÙˆH^šY]ÉÜÈZ[]Bˆ
+ˆÚ]™[ˆ^[Ú^™H8 %\ÈX]Ú\È^XÝHHZYÚH^šY]È]Ù[ˆÛÝ[YX\Ý\™H›ÜˆBˆ
+ˆÚ[™ÛH[™H
+Ú]ÐÛÙH[˜ÛYQ›ÛY[™Ï]Y_KHY˜][
+K‚ˆ
+‹Âˆš]˜]H[ÛÛ\]SZ[•ÚYÙ]ZYÚ
+Ù]œšXÚÕ\OˆœšXÚÜÊHÂˆ[HÂˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K•SQJJHÂˆHX]›X^
+^[™RZYÚ
+š[™[™Ë[YU^™YœË[YK™›ÛÚ^™K™Ù]
+
+JJNÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K‘UJJHÂˆËÈÛÈ[™\ÈÚ[ˆ^K[Ù‹]ÙYZÈ
+È]H\™H›ÝÚÝÛˆ[™›ÝÛÛ\ÙY[ÈÛ™H[™K‚ˆ[[™\ÈH
+™YœË™]KœÚÝÑ]K™Ù]
+
+H	‰ˆ™YœË™]KœÚÝÑ^SÙ•ÙYZË™Ù]
+
+Bˆ	‰ˆ\™YœË™]K›Û™S[™S^[Ý]™Ù]
+
+JHÈˆˆNÂˆHX]›X^
+^[™RZYÚ
+š[™[™Ë™]U^™YœË™]K™›ÛÚ^™K™Ù]
+
+JH
+ˆ[™\ÊNÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K“QQPJJHÂˆËÈ™\Ù\™HHÛÛ\]HÛÛ™šYÝ\™YYYXHÙ[ÛY]žH]™[ˆ™Y›Ü™HHš\œÝ˜XÚÂˆËÈ\œš]™\Ëˆ\˜][Ûˆ[™›ÙÜ™\ÜÈ\™HY]Y]KY\[™[Ú[™[ŽˆYˆ^H\™H›ÝˆËÈ[˜ÛYY[ˆ\È›ÛÜ‹HÚ[™ÝÓX[˜YÙ\‰ÜÈÔTÐÓÓ•S•Ý]\ÈÚ[™ÝÈØ[ˆÚ[™ÙBˆËÈZYÚÚ[ˆHš\œÝYYXTÙ\ÜÚ[ÛˆÛ˜\ÚÝÜ[]\È[K‚ˆ[]RZYÚH^[™RZYÚ
+š[™[™Ë›YYXU]U^™YœË›YYXK™›ÛÚ^™K™Ù]
+
+JNÂˆ[]T›ÝÒZYÚH]RZYÚÂˆYˆ
+™YœË›YYXKœÚÝÑ\˜][Û‹™Ù]
+
+JHÂˆ]T›ÝÒZYÚHX]›X^
+]T›ÝÒZYÚ^[™RZYÚ
+ˆš[™[™Ë›YYXQ\˜][Û•^™YœË›YYXK™\˜][Û‘›ÛÚ^™K™Ù]
+
+JJNÂˆBˆ[YYXRZYÚH]T›ÝÒZYÚÂˆYˆ
+™YœË›YYXKœÚÝÔÛÝ\˜ÙK™Ù]
+
+JHÂˆ[ÛÝ\˜ÙRZYÚH^[™RZYÚ
+š[™[™Ë›YYXP\^ˆ™YœË›YYXKœÛÝ\˜ÙQ›ÛÚ^™K™Ù]
+
+JNÂˆYYXRZYÚHÛÝ\˜ÙRZYÚ
+È]T›ÝÒZYÚ
+È™YœË›YYXK›[™QØ\™Ù]
+
+NÂˆBˆYˆ
+™YœË›YYXKœ›ÙÜ™\ÜÐ˜\‘[˜X›Y™Ù]
+
+JHÂˆšY]ÑÜ›Ý\“^[Ý]\˜[\È˜]ÈHš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹™Ù]^[Ý]\˜[\Ê
+NÂˆ[›ÙÜ™\ÜÒZYÚHX]›X^
+˜]ËšZYÚ
+NÂˆYˆ
+˜]È[œÝ[˜Ù[ÙˆšY]ÑÜ›Ý\“X\™Ú[“^[Ý]\˜[\ÊHÂˆšY]ÑÜ›Ý\“X\™Ú[“^[Ý]\˜[\ÈX\™Ú[œÈH
+šY]ÑÜ›Ý\“X\™Ú[“^[Ý]\˜[\ÊH˜]ÎÂˆ›ÙÜ™\ÜÒZYÚ
+ÏHX]›X^
+X\™Ú[œËÜX\™Ú[ŠBˆ
+ÈX]›X^
+X\™Ú[œË˜›ÝÛSX\™Ú[ŠNÂˆBˆYYXRZYÚ
+ÏH›ÙÜ™\ÜÒZYÚÂˆBˆHX]›X^
+YYXRZYÚ
+NÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K•ÒQ’JJHÂˆHX]›X^
+™YœËÚYšKœÚ^™K™Ù]
+
+JNÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K‘ÔÊJHÂˆHX]›X^
+™YœË™ÜËœÚ^™K™Ù]
+
+JNÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K“QUÓÕ
+JHÂˆHX]›X^
+™YœË˜›Y]ÛÝœÚ^™K™Ù]
+
+JNÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K”Ó‘WÐÑSSTŠJHÂˆHX]›X^
+™YœËœÛ™PÙ[[\‹œÚ^™K™Ù]
+
+JNÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K”Ó‘WÐUT–JJHÂˆHX]›X^
+™YœËœÛ™P˜]\žKœÚ^™K™Ù]
+
+JNÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K”Ó‘WÓ‘UÓÔ’×ÕTJJHÂˆHX]›X^
+^[™RZYÚ
+ˆš[™[™ËœÛ™S™]ÛÜšÕ\U^™YœËœÛ™S™]ÛÜšÕ\K™›ÛÚ^™K™Ù]
+
+JJNÂˆBˆËÈØ\ˆœšXÚÜÈÛ›HÛÛšX]HÈHZYÚ›ÛÜˆÚ[ˆH™ZXÛHXÝX[H™[™\œÈ[BˆËÈ
+Ø[YH\ÐœšXÚÔÝ\ÜYØ]H\È\PœšXÚÕš\ÚXš[]JH8 %Ý\Ú\ÙHH™\Ù]œ›ÛH[›Ý\‚ˆËÈØ\ˆÛÝ[[™›]HHÚYÙ]ZYÚ›ÜˆœšXÚÜÈ]™]™\ˆ\X\‹‚ˆØ\’[YÜ˜][ÛˆØ\ˆHØ\•[[Y]žQ^Ü\ˆOH[È[ˆØ\’[YÜ˜][ÛœË™Ù]
+\ÊNÂˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K’S‘ÓÔ—ÕST
+Bˆ	‰ˆ
+Ø\ˆOH[Ø\‹š\ÐœšXÚÔÝ\ÜY
+œšXÚÕ\K’S‘ÓÔ—ÕST
+JJHÂˆHX]›X^
+^[™RZYÚ
+š[™[™Ëš[™ÛÜ•[\^™YœËš[™ÛÜ•[\™›ÛÚ^™K™Ù]
+
+JJNÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K“ÕUÓÔ—ÕST
+Bˆ	‰ˆ
+Ø\ˆOH[Ø\‹š\ÐœšXÚÔÝ\ÜY
+œšXÚÕ\K“ÕUÓÔ—ÕST
+JJHÂˆHX]›X^
+^[™RZYÚ
+š[™[™Ë›Ý]ÛÜ•[\^™YœË›Ý]ÛÜ•[\™›ÛÚ^™K™Ù]
+
+JJNÂˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K’ÓQWÐTÔÒTÕS•
+JHÂˆ›Üˆ
+[HHÈHš[™[™ËšÛYP\ÜÚ\Ý[ÛÛZ[™\‹™Ù]Ú[ÛÝ[
+
+NÈJÊÊHÂˆšY]ÈÚ[Hš[™[™ËšÛYP\ÜÚ\Ý[ÛÛZ[™\‹™Ù]Ú[]
+JNÂˆYˆ
+Ú[[œÝ[˜Ù[ÙˆÝ][™U^šY]ÊHÂˆÝ][™U^šY]È^H
+Ý][™U^šY]ÊHÚ[ÂˆHX]›X^
+^[™RZYÚ
+^X]œ›Ý[™
+^™Ù]^Ú^™J
+JJBˆ
+È^™Ù]Y[™ÕÜ
+
+H
+È^™Ù]Y[™Ð›ÝÛJ
+JNÂˆBˆBˆBˆYˆ
+œšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K”Ó‘WÔÕUTÊJHÂˆHX]›X^
+^[™RZYÚ
+ˆš\œÝÛ™TÝ]\Õ^šY]Ê
+K™YœËœÛ™TÝ]\Ë™›ÛÚ^™K™Ù]
+
+JJNÂˆBˆ™]\›ˆÂˆB‚ˆš]˜]HÝ]XÈ[^[™RZYÚ
+Ý][™U^šY]ÈšY]Ë[›ÛÚ^™T
+HÂˆËÈÛÜHÛÈÙHÛ‰Ý]]]HH]™H˜]Ú[™ÈZ[ˆHÛÜH™\Ù\™\È\Y˜XÙKÚXÚ\ÂˆËÈÜXÚX[™XØ]\ÙH›Ø›ÝÈÛÛ™[œÙYYY][H\ÈY™™\™[Y]šXÜÈœ›ÛHHY˜][‚ˆZ[H™]ÈZ[
+šY]Ë™Ù]Z[
+
+JNÂˆœÙ]^Ú^™J›ÛÚ^™T
+NÂˆZ[‘›ÛY]šXÜÈ›HH™Ù]›ÛY]šXÜÊ
+NÂˆËÈ[^^šY]ÜÈ[ˆHÚYÙ]]™H[˜ÛYQ›ÛY[™ÏY˜[ÙH8 %^[Ý]›Ý[™È\ÙBˆËÈ\ØÙ[Ù\ØÙ[
+\ÝHÛ\Y]šXÜË›È^˜HXØÙ[Ù\ØÙ[™\ˆ™\Ù\™JK‚ˆ™]\›ˆ
+[
+HX]˜ÙZ[
+›K™\ØÙ[H›K˜\ØÙ[
+NÂˆB‚ˆX›XÈ›ÚYÙ]Ý™\›^TÝ]S\Ý[™\Š[X›HÝ™\›^TÝ]S\Ý[™\ˆ\Ý[™\ŠHÂˆ\Ë›Ý™\›^TÝ]S\Ý[™\ˆH\Ý[™\ŽÂˆYˆ
+\Ý[™\ˆOH[
+HÂˆ›ÝYžSÝ™\›^TÝ]J
+NÂˆBˆB‚ˆš]˜]H›ÚY›ÝYžSÝ™\›^TÝ]J
+HÂˆYˆ
+Ý™\›^TÝ]S\Ý[™\ˆOH[\˜[\ÈOH[š[™[™ÈOH[
+H™]\›ŽÂˆÝ™\›^TÝ]S\Ý[™\‹›Û“Ý™\›^TÝ]PÚ[™ÙY
+ˆ\˜[\Ëž\˜[\ËžKˆš[™[™Ë™Ù]›ÛÝ
+
+K™Ù]ÚY
+
+Kˆš[™[™Ë™Ù]›ÛÝ
+
+K™Ù]ZYÚ
+
+JNÂˆB‚ˆÊŠ‚ˆ
+ˆ\Ú\ÈHØ]™YÚYÙ]ÜÚ][Ûˆ[™[ÙK\ÜXÚYšXÈÚ[™ÝÈ\˜[\È[ÈHÚ[™ÝÓX[˜YÙ\‹‚ˆ
+ˆØ[Yœ›ÛHÐ[šÈØ\T™Y™\™[˜Ù\Ê
+_HÛÈHÜÚ][ÛˆÛY\œÈÈ[ÙHÝÚ]Ú\ˆ[‚ˆ
+ˆÙ][™ÜÈY™™XÝHÚYÙ]]™KˆÚÚ\YÚ[ˆHÚYÙ]\Û‰Ý˜]ÛˆY]‚ˆ
+‹Âˆš]˜]H›ÚY\SÝ™\›^TÜÚ][ÛŠ
+HÂˆYˆ
+\˜[\ÈOH[š[™[™ÈOH[Ú[™ÝÓX[˜YÙ\ˆOH[
+H™]\›ŽÂˆ›ÛÛX[ˆÝ]\Ð˜\ˆH™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTŽÂˆ[™]ÕÚYHÝ]\Ð˜\‚ˆÈÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë“PUÒÔT‘S•ˆˆÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\Ë•ÔTÐÓÓ•S•ÂˆËÈ\š[™ÈHY™™\™Y˜[œÚ][ÛˆHÚ[™ÝÈ\È[[[Û˜[H[›™YÚY\ˆ[‚ˆËÈÜ˜\ØÛÛ[ÛÈÚ[™[ˆØ[ˆ[š[X]HÚ]Ý]™Z[™ÈÛ\YˆÝ™\Üš][™ÂˆËÈ\˜[\ËÚY\™HÛÝ[Û˜\HÚ[™ÝÈZYX[š[X][Ûˆ[™[ÛÈÝ˜[™BˆËÈ˜[œÚ][Û“X[˜YÙ\ˆ\Ý[™\ˆ
+›ÈØÙ[™HÚ[™ÙH8¡¤ˆ›ÈÛ•˜[œÚ][Û‘[™8¡¤ˆÛÝ[\‚ˆËÈXZÊKˆHY™™\ˆÛÜÙ\ˆÚ[™\ÝÜ™HÜ˜\ØÛÛ[Ú[ˆ][™Ë‚ˆYˆ
+[™[™ÐY™™\™Y˜[œÚ][ÛœÈˆ	‰ˆ\Ý]\Ð˜\ŠHÂˆ™]ÕÚYH\˜[\ËÚYÂˆBˆ[™]ÖHÝ]\Ð˜\ˆÈˆ™YœË›Ý™\›^V™Ù]
+
+NÂˆ[™]ÖHHÝ]\Ð˜\ˆÈˆ™YœË›Ý™\›^VK™Ù]
+
+NÂˆYˆ
+\˜[\ËžOH™]Ö	‰ˆ\˜[\ËžHOH™]ÖH	‰ˆ\˜[\ËÚYOH™]ÕÚY
+H™]\›ŽÂˆ\˜[\ËžH™]ÖÂˆ\˜[\ËžHH™]ÖNÂˆ\˜[\ËÚYH™]ÕÚYÂˆžHÂˆÚ[™ÝÓX[˜YÙ\‹\]UšY]Ó^[Ý]
+š[™[™Ë™Ù]›ÛÝ
+
+K\˜[\ÊNÂˆHØ]Ú
+^Ù\[ÛˆYÛ›Ü™Y
+HÂˆBˆB‚ˆš]˜]H›ÚY[˜X›SYYXU˜XÚÚ[™Ê
+HÂˆYˆ
+YYXTÙ\ÜÚ[Û“X[˜YÙ\ˆOH[
+HÂˆËÈ\PœšXÚÕš\ÚXš[]J
+H[œÈ™Y›Ü™H\ÈY]Ù[™X^H]™HXYHHÛÛ™šYÝ\™YˆËÈYYXHœšXÚÈ’TÒP“Kˆ™XÛÛ˜Ú[H]]™[ˆÚ[ˆ˜XÚÚ[™ÈØ\È[™XYH™YÚ\Ý\™Y‚ˆËÈÚ]Ý][ˆXÝ]™HÛÛ›Û\ˆH[\HÛÛZ[™\ˆ]\Ý™]\›ˆÈÓÓ‘H[[YYX][KˆËÈ˜]\ˆ[ˆØØÝ\Z[™ÈH›[šÈ›ÝÈ[[Hš\œÝYYXTÙ\ÜÚ[ÛˆØ[˜XÚË‚ˆ\]SYYXR[™›Ê
+NÂˆ™]\›ŽÂˆBˆYYXTÙ\ÜÚ[Û“X[˜YÙ\ˆH
+YYXTÙ\ÜÚ[Û“X[˜YÙ\ŠHÙ]Þ\Ý[TÙ\šXÙJQQPWÔÑTÔÒSÓ—ÔÑT•’PÑJNÂˆYˆ
+YYXTÙ\ÜÚ[Û“X[˜YÙ\ˆOH[
+H™]\›ŽÂˆÛÛ\Û™[˜[YHÛÛ\Û™[H™]ÈÛÛ\Û™[˜[YJ\ËYYXS›ÝYšXØ][Û“\Ý[™\‹˜Û\ÜÊNÂˆžHÂˆYYXTÙ\ÜÚ[Û“X[˜YÙ\‹˜YÛXÝ]™TÙ\ÜÚ[ÛœÐÚ[™ÙY\Ý[™\ŠXÝ]™TÙ\ÜÚ[ÛœÐÚ[™ÙY\Ý[™\‹ÛÛ\Û™[XZ[’[™\ŠNÂˆ™Xš[™YYXPÛÛ›Û\œÊYYXTÙ\ÜÚ[Û“X[˜YÙ\‹™Ù]XÝ]™TÙ\ÜÚ[ÛœÊÛÛ\Û™[
+JNÂˆHØ]Ú
+ÙXÝ\š]Q^Ù\[ÛˆJHÂˆÙËÊQË“›ÝYšXØ][ÛˆXØÙ\ÜÈ›ÝÜ˜[YÈYYXH˜XÚÚ[™È\ØX›Y‹JNÂˆYYXTÙ\ÜÚ[Û“X[˜YÙ\ˆH[ÂˆBˆB‚ˆš]˜]H›ÚY\ØX›SYYXU˜XÚÚ[™Ê
+HÂˆYˆ
+YYXTÙ\ÜÚ[Û“X[˜YÙ\ˆOH[
+H™]\›ŽÂˆžHÂˆYYXTÙ\ÜÚ[Û“X[˜YÙ\‹œ™[[Ý™SÛXÝ]™TÙ\ÜÚ[ÛœÐÚ[™ÙY\Ý[™\ŠXÝ]™TÙ\ÜÚ[ÛœÐÚ[™ÙY\Ý[™\ŠNÂˆHØ]Ú
+^Ù\[ÛˆYÛ›Ü™Y
+HÂˆBˆ›Üˆ
+YYXPÛÛ›Û\ˆÈˆXÝ]™SYYXPÛÛ›Û\œÊHÂˆË[œ™YÚ\Ý\Ø[˜XÚÊYYXPÛÛ›Û\Ø[˜XÚÊNÂˆBˆXÝ]™SYYXPÛÛ›Û\œË˜ÛX\Š
+NÂˆYYXTÙ\ÜÚ[Û“X[˜YÙ\ˆH[ÂˆB‚ˆš]˜]H›ÚY™Xš[™YYXPÛÛ›Û\œÊ[X›H\ÝYYXPÛÛ›Û\ˆÛÛ›Û\œÊHÂˆ›Üˆ
+YYXPÛÛ›Û\ˆÈˆXÝ]™SYYXPÛÛ›Û\œÊHÂˆË[œ™YÚ\Ý\Ø[˜XÚÊYYXPÛÛ›Û\Ø[˜XÚÊNÂˆBˆXÝ]™SYYXPÛÛ›Û\œË˜ÛX\Š
+NÂˆYˆ
+ÛÛ›Û\œÈOH[
+HÂˆ›Üˆ
+YYXPÛÛ›Û\ˆÈˆÛÛ›Û\œÊHÂˆXÝ]™SYYXPÛÛ›Û\œË˜Y
+ÊNÂˆËœ™YÚ\Ý\Ø[˜XÚÊYYXPÛÛ›Û\Ø[˜XÚËXZ[’[™\ŠNÂˆBˆBˆ\]SYYXR[™›Ê
+NÂˆB‚ˆš]˜]H›ÚY[™TÛ™SÝÐ˜]\žP[\
+›Û“[ÛÛ›™XÝÜ•˜[YH˜[YJHÂˆYˆ
+™YœÈOH[]˜[YK™œ™\Ú]˜[YK˜]˜Z[X›H]˜[YKœ™XYX›BˆJ˜[YKœ˜]Õ˜[YH[œÝ[˜Ù[Ùˆ[X™\ŠJH™]\›ŽÂˆ[]™[H
+
+[X™\ŠH˜[YKœ˜]Õ˜[YJKš[˜[YJ
+NÂˆYˆ
+]™[]™[ˆL
+H™]\›ŽÂˆÛ™SÝÐ˜]\žP[\ÛXÞK”™\Ý[™\Ý[HÛ™SÝÐ˜]\žP[\ÛXÞK™]˜[X]Jˆ™YœËœÛ™SÝÐ˜]\žP[\[˜X›Y™Ù]
+
+Kˆ™YœËœÛ™SÝÐ˜]\žP[\™\ÚÛ™Ù]
+
+KˆÛ™SÝÐ˜]\žP[\]ÚY]™[
+NÂˆYˆ
+Û™SÝÐ˜]\žP[\]ÚYOH™\Ý[›]ÚY
+HÂˆ™YœËœÛ™SÝÐ˜]\žP[\]ÚYœÙ]
+™\Ý[›]ÚY
+NÂˆBˆÛ™SÝÐ˜]\žP[\]ÚYH™\Ý[›]ÚYÂˆÛ™SÝÐ˜]\žP[\ÛXÞK”™\Ý[™\Ý[ˆHÛ™SÝÐ˜]\žP[\ÛXÞK™]˜[X]Jˆ™YœËœÛ™SÝÐ˜]\žP[\[˜X›Y™Ù]
+
+Kˆ™YœËœÛ™SÝÐ˜]\žP[\™\ÚÛ‹™Ù]
+
+KˆÛ™SÝÐ˜]\žP[\]ÚY‹]™[
+NÂˆYˆ
+Û™SÝÐ˜]\žP[\]ÚYˆOH™\Ý[‹›]ÚY
+HÂˆ™YœËœÛ™SÝÐ˜]\žP[\]ÚY‹œÙ]
+™\Ý[‹›]ÚY
+NÂˆBˆÛ™SÝÐ˜]\žP[\]ÚYˆH™\Ý[‹›]ÚYÂ‚ˆËÈHÚ[™ÛH^XÝØ[\HX^HÜ›ÜÜÈ›Ý™\ÚÛÎÈ™\Ù\™HHÛÛ™šYÝ\™YÜ™\‹‚ˆYˆ
+™\Ý[šYÙÙ\ŠHÂˆ[œ]Y]YTÛ™SÝÐ˜]\žP[\
+]™[™YœËœÛ™SÝÐ˜]\žP[\ÛÛÜ‹™Ù]
+
+JNÂˆBˆYˆ
+™\Ý[‹šYÙÙ\ŠHÂˆ[œ]Y]YTÛ™SÝÐ˜]\žP[\
+]™[™YœËœÛ™SÝÐ˜]\žP[\ÛÛÜŒ‹™Ù]
+
+JNÂˆBˆB‚ˆÊŠ‚ˆ
+ˆX›\Ú\ÈH™YHšY[È™Y›Ü™HZ]\ˆ\Ý[˜][Ûˆ™[™\œËˆØØ[ØÙ[˜\š[ÜÈ\™Y›Ü™Bˆ
+ˆ™\ÛÛ™HH^XÝØ[YH\XØ][Û‹ÝÜXËÝ^š\ÚXš[]H›ÜˆHÝ]\È›ÝÈ[™Ü\‚ˆ
+‹Âˆš]˜]H›ÚY\]TÛ™S›ÝYšXØ][Û‘šY[Ý]\Êˆ›Û“[Û™TÝ]\Ð˜\”ÛXÞK“›ÝYšXØ][Û”™\Ù[][Ûˆ™\Ù[][Û‹ˆ›Û“[Ù]Ýš[™ÏˆÙ[XÝYšY[ÊHÂˆYˆ
+]]ÛX][Û”Ý]\ÈOH[™YœÈOH[
+H™]\›ŽÂˆ[ÙXÛÛ™ÈHX]›X^
+KX]›Z[ŠLŒˆ™YœËœÛ™TÝ]\Ð˜\“›ÝYšXØ][Û”ÙXÛÛ™Ë™Ù]
+
+JJNÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆÛ™È^\™\Ð]H›ÝÈ
+ÈÙXÛÛ™È
+ˆWÌÂˆžHÂˆ›Üˆ
+Ýš[™ÈšY[YˆÛ™TÝ]\Ð˜\”ÛXÞK››ÝYšXØ][Û‘šY[YÊ
+JHÂˆÝš[™È]]ÛX][Û’YBˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹˜]]ÛX][Û’Y›Ü‘šY[
+šY[Y
+NÂˆÝš[™È^HÛ™TÝ]\Ð˜\”ÛXÞK››ÝYšXØ][Û‘šY[^
+ˆ™\Ù[][Û‹šY[Y
+NÂˆ›ÛÛX[ˆš\ÚX›HHÙ[XÝYšY[Ë˜ÛÛZ[œÊšY[Y
+H	‰ˆ]^š\Ñ[\J
+NÂˆ”ÓÓ“Øš™XÝ]ÚH™]È”ÓÓ“Øš™XÝ
+
+Bˆœ]
+^‹^
+Bˆœ]
+š\ÚX›H‹š\ÚX›JBˆœ]
+™œ™\Ú‹YJBˆœ]
+œÛÝ\˜ÙH‹œÛ™HŠBˆœ]
+\]YØ]‹›ÝÊBˆœ]
+™^\™\×Ø]‹^\™\Ð]
+NÂˆYˆ
+Û™TÝ]\Ð˜\”ÛXÞK‘’QSÐTPÐUSÓ‹™\]X[ÊšY[Y
+JHÂˆ]Úœ]
+šXÛÛˆ‹™\Ù[][Û‹šXÛÛØXÚYˆ	‰ˆ\™\Ù[][Û‹˜\Y[YšY\‹š\Ñ[\J
+BˆÈœÛ™KX\ˆˆ
+È™\Ù[][Û‹˜\Y[YšY\‚ˆˆˆŠNÂˆBˆ]]ÛX][Û”Ý]\Ë˜\J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔT]]ÛX][Û’Yˆ]Ú
+NÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔT]]ÛX][Û’Y
+NÂˆBˆHØ]Ú
+”ÓÓ‘^Ù\[Ûˆ[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙË™JQËÛÝ[›ÝX›\ÚÛ™H›ÝYšXØ][ÛˆšY[È‹˜Z[\™JNÂˆBˆB‚ˆš]˜]H›ÛÛX[ˆÚÝÔÛ™TÝ]\Ó›ÝYšXØ][ÛŠˆ›Û“[Û™TÝ]\Ð˜\”ÛXÞK“›ÝYšXØ][Û”™\Ù[][Ûˆ™\Ù[][Û‹ˆ›Û“[Ù]Ýš[™ÏˆÙ[XÝYšY[ÊHÂˆËÈHÝËX˜]\žHØ\›š[™È\È˜\™\ˆ[™ØY™]K\™[]˜[ÈÙY\]š\ÚX›H›Üˆ]È[ˆËÈÛÛ™šYÝ\™Y[\˜[[œÝXYÙˆ][™ÈH›Ý][™HSÔÈ]™[™\XÙH]‚ˆYˆ
+XÝ]™TÛ™P˜]\žP[\^OH[	‰ˆ\ÔÛ™S›ÝYšXØ][ÛXÝ]™J
+JH™]\›ˆ˜[ÙNÂˆ›ÛÛX[ˆ™\XÚ[™Ô™\Ù[][ÛˆH\ÐXÝ]™TÛ™TÝ]\Ð[\
+
+NÂˆYˆ
+\™\XÚ[™Ô™\Ù[][Ûˆ	‰ˆš[™[™ÈOH[
+HÂˆYYXQ\˜][Û•š\ÚXš[]P™Y›Ü™TÛ™S›ÝYšXØ][ÛˆBˆš[™[™Ë›YYXQ\˜][Û•^™Ù]š\ÚXš[]J
+NÂˆYYXT›ÙÜ™\ÜÕš\ÚXš[]P™Y›Ü™TÛ™S›ÝYšXØ][ÛˆBˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹™Ù]š\ÚXš[]J
+NÂˆBˆYˆ
+š[™[™ÈOH[
+HÂˆËÈHÙXÛÛ™›ÝYšXØ][ÛˆØ[ˆ]™HY[XØ[^ˆ›Ü˜ÙHHœ™\ÚX\œ]YYHÞXÛH›Ü‚ˆËÈH™]È[]™\žH[œÝXYÙˆÛÛ[Z[™È[Ø^H›ÝYÚH™]š[Ý\ÈÛ™K‚ˆš[™[™Ë›YYXU]U^œÙ]X\œ]YYU^
+ˆŠNÂˆBˆXÝ]™TÛ™S›ÝYšXØ][ÛˆH™\Ù[][ÛŽÂˆXÝ]™TÛ™S›ÝYšXØ][Û‘šY[ÈHÛÛXÝ[ÛœË[›[ÙYšXX›TÙ]
+ˆ™]È[šÙY\ÚÙ]ŠÙ[XÝYšY[ÊJNÂˆXÝ]™TÛ™P˜]\žP[\^H[ÂˆXÝ]™TÛ™P˜]\žP[\ÛÛÜˆH[ÂˆØÚY[TÛ™TÝ]\Ð[\
+
+NÂˆ™]\›ˆYNÂˆB‚ˆÊŠˆÜ[œÈH™\Ù\™YÚ[™ÝÈ[ˆXÙNÈ]È™YHšY[Ý]\ÈÙ\™H[™XYH™\XÙYX›Ý™Kˆ
+‹Âˆš]˜]H›ÛÛX[ˆÚÝÔÛ™TÜ\›ÝYšXØ][ÛŠˆ›Û“[Û™TÝ]\Ð˜\”ÛXÞK“›ÝYšXØ][Û”™\Ù[][Ûˆ™\Ù[][ÛŠHÂˆYˆ
+]]ÛX][Û”Ý]\ÈOH[™YœÈOH[
+H™]\›ˆ˜[ÙNÂˆžHÂˆ[œÝ\™TÛ™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™Y
+
+NÂˆYˆ
+\Û™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™Y
+H™]\›ˆ˜[ÙNÂˆ\TÜ\™Y™\™[˜Ù\ÔØY™[J
+NÂˆ[ÙXÛÛ™ÈHX]›X^
+KX]›Z[ŠLŒˆ™YœËœÛ™TÝ]\Ð˜\“›ÝYšXØ][Û”ÙXÛÛ™Ë™Ù]
+
+JJNÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆÛ™È^\™\Ð]H›ÝÈ
+ÈÙXÛÛ™È
+ˆWÌÂˆ”ÓÓ“Øš™XÝÝ™\›^HH™]È”ÓÓ“Øš™XÝ
+
+Bˆœ]
+š\ÚX›H‹YJBˆœ]
+™œ™\Ú‹YJBˆœ]
+œÛÝ\˜ÙH‹œÛ™HŠBˆœ]
+\]YØ]‹›ÝÊBˆœ]
+™^\™\×Ø]‹^\™\Ð]
+NÂˆ›ÛÛX[ˆ\ÙRXÛÛ“^[Ý]H™\Ù[][Û‹šXÛÛØXÚYˆ	‰ˆ\™\Ù[][Û‹˜\Y[YšY\‹š\Ñ[\J
+Bˆ	‰ˆÛ™P\XÛÛ”ÝÜ™K™Ù]
+\ÊKš\ÒXÛÛŠ™\Ù[][Û‹˜\Y[YšY\ŠNÂˆÝš[™ÈÚÝÛ“Ý™\›^HH\ÙRXÛÛ“^[Ý]ˆÈÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÕÒUÒPÓÓ—ÒQˆˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÒQÂˆÝš[™ÈY[“Ý™\›^HH\ÙRXÛÛ“^[Ý]ˆÈÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÒQˆˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÕÒUÒPÓÓ—ÒQÂˆ]]ÛX][Û”Ý]\Ë˜\J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKˆY[“Ý™\›^Kˆ™]È”ÓÓ“Øš™XÝ
+
+Kœ]
+š\ÚX›H‹˜[ÙJKœ]
+™œ™\Ú‹˜[ÙJBˆœ]
+\]YØ]‹›ÝÊJNÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKY[“Ý™\›^JNÂˆ]]ÛX][Û”Ý]\Ë˜\J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKˆÚÝÛ“Ý™\›^KÝ™\›^JNÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKˆÚÝÛ“Ý™\›^JNÂˆXÝ]™TÛ™TÜ\›ÝYšXØ][Û‘^\™\Ð]Bˆ[™›ÚY›ÜË”Þ\Ý[PÛØÚË™[\ÙY™X[[YJ
+H
+ÈÙXÛÛ™È
+ˆWÌÂˆXÝ]™TÛ™SÝÐ˜]\žTÜ\H˜[ÙNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÛ™TÜ\›ÝYšXØ][Û‘^\žJNÂˆXZ[’[™\‹œÜÝ[^YY
+Û™TÜ\›ÝYšXØ][Û‘^\žKÙXÛÛ™È
+ˆWÌ
+NÂˆ™]\›ˆYNÂˆHØ]Ú
+”ÓÓ‘^Ù\[Ûˆ[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙË™JQËÛÝ[›Ý™\Ù[Û™H›ÝYšXØ][ÛˆÜ\‹˜Z[\™JNÂˆ™]\›ˆ˜[ÙNÂˆBˆB‚ˆš]˜]H›ÚYÛX\”Û™TÜ\›ÝYšXØ][ÛŠ
+HÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÛ™TÜ\›ÝYšXØ][Û‘^\žJNÂˆXÝ]™TÛ™TÜ\›ÝYšXØ][Û‘^\™\Ð]HÂˆXÝ]™TÛ™SÝÐ˜]\žTÜ\H˜[ÙNÂˆYˆ
+]]ÛX][Û”Ý]\ÈOH[
+H™]\›ŽÂˆžHÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆ›Üˆ
+Ýš[™ÈÝ™\›^RYˆ™]ÈÝš[™Ö×^ÂˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÒQˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÕÒUÒPÓÓ—ÒQJHÂˆ]]ÛX][Û”Ý]\Ë˜\J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKˆÝ™\›^RYˆ™]È”ÓÓ“Øš™XÝ
+
+Kœ]
+š\ÚX›H‹˜[ÙJKœ]
+™œ™\Ú‹˜[ÙJBˆœ]
+\]YØ]‹›ÝÊJNÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKÝ™\›^RY
+NÂˆBˆÛX\”Û™S›ÝYšXØ][Û‘šY[ÒY’[˜XÝ]™J
+NÂˆHØ]Ú
+”ÓÓ‘^Ù\[Ûˆ[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙËÊQËÛÝ[›ÝÛX\ˆÛ™H›ÝYšXØ][ÛˆÜ\‹˜Z[\™JNÂˆBˆB‚ˆÊŠ‚ˆ
+ˆÛX\œÈÚ\™YšY[Ý]HÛ›HY\ˆ›Ý\Ý[˜][ÛœÈ]™Hš[š\ÚYˆ\ÈÙY\ÈÝ]\Ë\›ÝÂˆ
+ˆÛÛ™][ÛœÈÛÜšÚ[™ÈÚ[ˆHÜ\\È\ØX›Y[™Ü\ÛÛ™][ÛœÈÛÜšÚ[™ÈÚ[ˆHXZ[‚ˆ
+ˆÝ]\ÈÝ\™˜XÙH\È\ØX›Y‚ˆ
+‹Âˆš]˜]H›ÚYÛX\”Û™S›ÝYšXØ][Û‘šY[ÒY’[˜XÝ]™J
+HÂˆYˆ
+]]ÛX][Û”Ý]\ÈOH[
+H™]\›ŽÂˆÛ™È[\ÙYH[™›ÚY›ÜË”Þ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆ›ÛÛX[ˆÝ]\ÔÝ[\Ù\ÑšY[ÈHXÝ]™TÛ™S›ÝYšXØ][ÛˆOH[ˆ	‰ˆ™YœÈOH[ˆ	‰ˆ™YœËœÛ™TÝ]\Ð˜\“›ÝYšXØ][ÛœÑ[˜X›Y™Ù]
+
+Bˆ	‰ˆ[\ÙYXÝ]™TÛ™S›ÝYšXØ][Û‘^\™\Ð]Âˆ›ÛÛX[ˆÜ\Ý[\Ù\ÑšY[ÈHXÝ]™TÛ™TÜ\›ÝYšXØ][Û‘^\™\Ð]ˆˆ	‰ˆ[\ÙYXÝ]™TÛ™TÜ\›ÝYšXØ][Û‘^\™\Ð]ÂˆYˆ
+Ý]\ÔÝ[\Ù\ÑšY[ÈÜ\Ý[\Ù\ÑšY[ÊH™]\›ŽÂˆžHÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆ›Üˆ
+Ýš[™È]]ÛX][Û’YˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹™šY[]]ÛX][Û’YÊ
+JHÂˆ]]ÛX][Û”Ý]\Ë˜\J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔT]]ÛX][Û’Yˆ™]È”ÓÓ“Øš™XÝ
+
+Kœ]
+^‹ˆŠKœ]
+š\ÚX›H‹˜[ÙJBˆœ]
+™œ™\Ú‹˜[ÙJKœ]
+\]YØ]‹›ÝÊJNÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔT]]ÛX][Û’Y
+NÂˆBˆHØ]Ú
+”ÓÓ‘^Ù\[Ûˆ[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙËÊQËÛÝ[›ÝÛX\ˆÛ™H›ÝYšXØ][ÛˆšY[È‹˜Z[\™JNÂˆBˆB‚ˆš]˜]H›ÛÛX[ˆÚÝÔÛ™SÝÐ˜]\žTÝ]\Ê[]™[›Û“[Ýš[™ÈÛÛÜŠHÂˆ›ÛÛX[ˆ™\XÚ[™Ô™\Ù[][ÛˆH\ÐXÝ]™TÛ™TÝ]\Ð[\
+
+NÂˆYˆ
+\™\XÚ[™Ô™\Ù[][Ûˆ	‰ˆš[™[™ÈOH[
+HÂˆYYXQ\˜][Û•š\ÚXš[]P™Y›Ü™TÛ™S›ÝYšXØ][ÛˆBˆš[™[™Ë›YYXQ\˜][Û•^™Ù]š\ÚXš[]J
+NÂˆYYXT›ÙÜ™\ÜÕš\ÚXš[]P™Y›Ü™TÛ™S›ÝYšXØ][ÛˆBˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹™Ù]š\ÚXš[]J
+NÂˆBˆYˆ
+š[™[™ÈOH[
+Hš[™[™Ë›YYXU]U^œÙ]X\œ]YYU^
+ˆŠNÂˆXÝ]™TÛ™S›ÝYšXØ][ÛˆH[ÂˆXÝ]™TÛ™S›ÝYšXØ][Û‘šY[ÈHÛÛXÝ[ÛœË™[\TÙ]
+
+NÂˆXÝ]™TÛ™P˜]\žP[\^BˆÙ]Ýš[™Ê‹œÝš[™ËœÛ™WÛÝ×Ø˜]\žWØ[\Ý^]™[
+NÂˆXÝ]™TÛ™P˜]\žP[\ÛÛÜˆHÛÛÜŽÂˆÛX\”Û™S›ÝYšXØ][Û‘šY[ÒY’[˜XÝ]™J
+NÂˆØÚY[TÛ™TÝ]\Ð[\
+
+NÂˆYˆ
+Û™S›ÝYšXØ][Û\œÝXÝ]™H	‰ˆ\]Y]YYÛ™S›ÝYšXØ][ÛœËš\Ñ[\J
+JHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÛ™S›ÝYšXØ][Û”]Y]YPY˜[˜ÙJNÂˆXZ[’[™\‹œÜÝ[^YY
+Û™S›ÝYšXØ][Û”]Y]YPY˜[˜ÙKˆXÝ]™TÛ™SÝÐ˜]\žT™[XZ[š[™Ê
+JNÂˆBˆ™]\›ˆYNÂˆB‚ˆÊŠ‚ˆ
+ˆX›\Ú\ÈHÝËX˜]\žHØ\›š[™È[ÈHÛÛ™šYÝ\™YXÛÛˆ›ÝYšXØ][ÛˆØ\™ˆHØ[\‚ˆ
+ˆ\Y\ÈHØ[YHÜ\\Ý[˜][ÛˆÝÚ]Ú\ÙYžHÜ™[˜\žHSÔÈ›ÝYšXØ][ÛœË‚ˆ
+‹Âˆš]˜]H›ÛÛX[ˆÚÝÔÛ™SÝÐ˜]\žTÜ\
+[]™[
+HÂˆYˆ
+]]ÛX][Û”Ý]\ÈOH[™YœÈOH[
+H™]\›ˆ˜[ÙNÂˆžHÂˆ[œÝ\™TÛ™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™Y
+
+NÂˆYˆ
+\Û™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™Y
+H™]\›ˆ˜[ÙNÂˆ\TÜ\™Y™\™[˜Ù\ÔØY™[J
+NÂˆ[ÙXÛÛ™ÈHX]›X^
+KX]›Z[ŠLŒˆ™YœËœÛ™TÝ]\Ð˜\“›ÝYšXØ][Û”ÙXÛÛ™Ë™Ù]
+
+JJNÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆÛ™È^\™\Ð]H›ÝÈ
+ÈÙXÛÛ™È
+ˆWÌÂˆÝš[™Ö×H^H™]ÈÝš[™Ö×^ÂˆÙ]Ýš[™Ê‹œÝš[™ËœÛ™WÛÝ×Ø˜]\žWÜÜ\Ø\XØ][ÛŠKˆÙ]Ýš[™Ê‹œÝš[™ËœÛ™WÛÝ×Ø˜]\žWÜÜ\Ý]JKˆÙ]Ýš[™Ê‹œÝš[™ËœÛ™WÛÝ×Ø˜]\žWÜÜ\Ø›ÙK]™[
+BˆNÂˆÝš[™Ö×HYÈH™]ÈÝš[™Ö×^ÂˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹TPÐUSÓ—ÐUUÓPUSÓ—ÒQˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹•ÔP×ÐUUÓPUSÓ—ÒQˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹•VÐUUÓPUSÓ—ÒQˆNÂˆ›Üˆ
+[[™^HÈ[™^YË›[™ÝÈ[™^
+ÊÊHÂˆ”ÓÓ“Øš™XÝšY[H™]È”ÓÓ“Øš™XÝ
+
+Bˆœ]
+^‹^Ú[™^JBˆœ]
+š\ÚX›H‹YJBˆœ]
+™œ™\Ú‹YJBˆœ]
+œÛÝ\˜ÙH‹œÛ™K[ÝËX˜]\žHŠBˆœ]
+\]YØ]‹›ÝÊBˆœ]
+™^\™\×Ø]‹^\™\Ð]
+NÂˆYˆ
+[™^OH
+HÂˆšY[œ]
+šXÛÛˆ‹Û™S›ÝYšXØ][Û]]ÛX][Û‹“Õ×ÐUT–WÒPÓÓ—ÒQ
+NÂˆBˆ]]ÛX][Û”Ý]\Ë˜\J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔTYÖÚ[™^KšY[
+NÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔTYÖÚ[™^JNÂˆBˆ]]ÛX][Û”Ý]\Ë˜\J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÒQˆ™]È”ÓÓ“Øš™XÝ
+
+Kœ]
+š\ÚX›H‹˜[ÙJKœ]
+™œ™\Ú‹˜[ÙJBˆœ]
+\]YØ]‹›ÝÊJNÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÒQ
+NÂˆ]]ÛX][Û”Ý]\Ë˜\J]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÕÒUÒPÓÓ—ÒQˆ™]È”ÓÓ“Øš™XÝ
+
+Kœ]
+š\ÚX›H‹YJKœ]
+™œ™\Ú‹YJBˆœ]
+œÛÝ\˜ÙH‹œÛ™K[ÝËX˜]\žHŠBˆœ]
+\]YØ]‹›ÝÊKœ]
+™^\™\×Ø]‹^\™\Ð]
+JNÂˆÛ]]ÛX][Û”Ý]PÚ[™ÙY
+]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓÕ‘T“VKˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹“Õ‘T“VWÕÒUÒPÓÓ—ÒQ
+NÂˆXÝ]™TÛ™TÜ\›ÝYšXØ][Û‘^\™\Ð]BˆÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+H
+ÈÙXÛÛ™È
+ˆWÌÂˆXÝ]™TÛ™SÝÐ˜]\žTÜ\HYNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÛ™TÜ\›ÝYšXØ][Û‘^\žJNÂˆXZ[’[™\‹œÜÝ[^YY
+Û™TÜ\›ÝYšXØ][Û‘^\žKÙXÛÛ™È
+ˆWÌ
+NÂˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆ™]\›ˆYNÂˆHØ]Ú
+”ÓÓ‘^Ù\[Ûˆ[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙË™JQËÛÝ[›Ý™\Ù[ÝË\Û™KX˜]\žHÜ\‹˜Z[\™JNÂˆ™]\›ˆ˜[ÙNÂˆBˆB‚ˆš]˜]H›ÚYØÚY[TÛ™TÝ]\Ð[\
+
+HÂˆ[ÙXÛÛ™ÈHX]›X^
+KX]›Z[ŠLŒˆ™YœËœÛ™TÝ]\Ð˜\“›ÝYšXØ][Û”ÙXÛÛ™Ë™Ù]
+
+JJNÂˆXÝ]™TÛ™S›ÝYšXØ][Û‘^\™\Ð]H[™›ÚY›ÜË”Þ\Ý[PÛØÚË™[\ÙY™X[[YJ
+Bˆ
+ÈÙXÛÛ™È
+ˆWÌÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÛ™S›ÝYšXØ][Û‘^\žJNÂˆXZ[’[™\‹œÜÝ[^YY
+Û™S›ÝYšXØ][Û‘^\žKÙXÛÛ™È
+ˆWÌ
+NÂˆYˆ
+š[™[™ÈOH[
+H\]SYYXR[™›Ê
+NÂˆB‚ˆš]˜]H›ÛÛX[ˆ\ÐXÝ]™TÛ™TÝ]\Ð[\
+
+HÂˆ™]\›ˆXÝ]™TÛ™S›ÝYšXØ][ÛˆOH[ˆU^][Ëš\Ñ[\JXÝ]™TÛ™P˜]\žP[\^
+NÂˆB‚ˆš]˜]H›ÛÛX[ˆ\ÔÛ™S›ÝYšXØ][ÛXÝ]™J
+HÂˆYˆ
+Z\ÐXÝ]™TÛ™TÝ]\Ð[\
+
+H™YœÈOH[
+H™]\›ˆ˜[ÙNÂˆYˆ
+[™›ÚY›ÜË”Þ\Ý[PÛØÚË™[\ÙY™X[[YJ
+BˆHXÝ]™TÛ™S›ÝYšXØ][Û‘^\™\Ð]
+H™]\›ˆ˜[ÙNÂˆYˆ
+XÝ]™TÛ™P˜]\žP[\^OH[
+HÂˆ™]\›ˆ™YœËœÛ™SÝÐ˜]\žP[\[˜X›Y™Ù]
+
+Bˆ	‰ˆ™YœËœÛ™TÝ]\Ð˜\“›ÝYšXØ][ÛœÑ[˜X›Y™Ù]
+
+NÂˆBˆ™]\›ˆ™YœËœÛ™TÝ]\Ð˜\“›ÝYšXØ][ÛœÑ[˜X›Y™Ù]
+
+Bˆ	‰ˆXXÝ]™TÛ™S›ÝYšXØ][Û•^
+
+Kš\Ñ[\J
+NÂˆB‚ˆš]˜]H›ÚYÛX\”Û™TÝ]\Ó›ÝYšXØ][ÛŠ›ÛÛX[ˆ™\ÝÜ™SYYXUš\ÚXš[]JHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÛ™S›ÝYšXØ][Û‘^\žJNÂˆXÝ]™TÛ™S›ÝYšXØ][ÛˆH[ÂˆXÝ]™TÛ™S›ÝYšXØ][Û‘šY[ÈHÛÛXÝ[ÛœË™[\TÙ]
+
+NÂˆXÝ]™TÛ™P˜]\žP[\^H[ÂˆXÝ]™TÛ™P˜]\žP[\ÛÛÜˆH[ÂˆXÝ]™TÛ™S›ÝYšXØ][Û‘^\™\Ð]HÂˆYˆ
+š[™[™ÈOH[
+HÂˆËÈÛX\š[™ÈH[\]\Ý[ÛÈÝÜHÝ\ÝÛHX\œ]YYHÚ[ˆQQPH\È\ØX›YÜ‚ˆËÈ™[[Ý™Yˆ[ˆ]]\]SYYXR[™›Ê
+H\È[[[Û˜[H›ÝØ[Y‚ˆš[™[™Ë›YYXP\^œÙ]X\œ]YYU^
+ˆŠNÂˆš[™[™Ë›YYXU]U^œÙ]X\œ]YYU^
+ˆŠNÂˆš[™[™Ë›YYXU]U^œÙ]X\œ]YYQ[˜X›Y
+™YœË›YYXK›X\œ]YYQ[˜X›Y™Ù]
+
+JNÂˆš[™[™Ë›YYXU]U^œÙ]^ÛÛÜŠˆÛÛ^ÛÛ\]™Ù]ÛÛÜŠ[YYÛÛ^OH[È\Èˆ[YYÛÛ^ˆ‹˜ÛÛÜ‹^Üš[X\žJJNÂˆBˆYˆ
+™\ÝÜ™SYYXUš\ÚXš[]H	‰ˆš[™[™ÈOH[
+HÂˆš[™[™Ë›YYXQ\˜][Û•^œÙ]š\ÚXš[]JˆYYXQ\˜][Û•š\ÚXš[]P™Y›Ü™TÛ™S›ÝYšXØ][ÛŠNÂˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹œÙ]š\ÚXš[]JˆYYXT›ÙÜ™\ÜÕš\ÚXš[]P™Y›Ü™TÛ™S›ÝYšXØ][ÛŠNÂˆBˆÛX\”Û™S›ÝYšXØ][Û‘šY[ÒY’[˜XÝ]™J
+NÂˆB‚ˆ›Û“[ˆš]˜]HÝš[™ÈXÝ]™TÛ™S›ÝYšXØ][Û•^
+
+HÂˆYˆ
+U^][Ëš\Ñ[\JXÝ]™TÛ™P˜]\žP[\^
+JHÂˆ™]\›ˆXÝ]™TÛ™P˜]\žP[\^ÂˆBˆÛ™TÝ]\Ð˜\”ÛXÞK“›ÝYšXØ][Û”™\Ù[][Ûˆ™\Ù[][ÛˆBˆXÝ]™TÛ™S›ÝYšXØ][ÛŽÂˆYˆ
+™\Ù[][ÛˆOH[
+H™]\›ˆˆŽÂˆÙ]Ýš[™Ïˆš\ÚX›QšY[ÈH™]È[šÙY\ÚÙ]Š
+NÂˆ›Üˆ
+Ýš[™ÈšY[YˆXÝ]™TÛ™S›ÝYšXØ][Û‘šY[ÊHÂˆÝš[™È˜[YHHÛ™TÝ]\Ð˜\”ÛXÞK››ÝYšXØ][Û‘šY[^
+ˆ™\Ù[][Û‹šY[Y
+NÂˆYˆ
+˜[YKš\Ñ[\J
+JHÛÛ[YNÂˆÝš[™È]]ÛX][Û’YBˆÛ™S›ÝYšXØ][Û]]ÛX][Û‹˜]]ÛX][Û’Y›Ü‘šY[
+šY[Y
+NÂˆ›ÛÛX[ˆš\ÚX›HH]]ÛX][Û”Ý]\ÈOH[ˆ]]ÛX][Û”Ý]\Ë™Y™™XÝ]™Uš\ÚXš[]Jˆ]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÔÔT]]ÛX][Û’YYJNÂˆYˆ
+š\ÚX›JHš\ÚX›QšY[Ë˜Y
+šY[Y
+NÂˆBˆ™]\›ˆÛ™TÝ]\Ð˜\”ÛXÞK››ÝYšXØ][Û•^
+™\Ù[][Û‹š\ÚX›QšY[ÊNÂˆB‚ˆÊŠ‚ˆ
+ˆ[\Ü˜\š[H™]\Ù\ÈHÛÛ™šYÝ\™Y›ÝÈ^Z[™ÈÙ[ÛY]žKˆ\È\È™\Ù[][Û‹[Û›N‚ˆ
+ˆYYXTÙ\ÜÚ[ÛˆØ[˜XÚÜÈ[™^X˜XÚÈÛÛ[YHÚ[HHSÔÈ^ØØÝ\Y\ÈH›ÝÜË‚ˆ
+‹Âˆš]˜]H›ÚY™[™\”Û™TÝ]\Ó›ÝYšXØ][ÛŠ
+HÂˆYˆ
+š[™[™ÈOH[Z\ÔÛ™S›ÝYšXØ][ÛXÝ]™J
+JH™]\›ŽÂ‚ˆÝÜYYXT›ÙÜ™\ÜÕXÚÙ\Š
+NÂˆš[™[™Ë›YYXTÝ]RXÛÛ‹œÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆš[™[™Ë›YYXQ\˜][Û•^œÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹œÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂ‚ˆš[™[™Ë›YYXTÛÝ\˜ÙT›ÝËœÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆš[™[™Ë›YYXU]T›ÝËœÙ]š\ÚXš[]JšY]Ë•’TÒP“JNÂˆš[™[™Ë›YYXP\^œÙ]X\œ]YYU^
+ˆŠNÂˆš[™[™Ë›YYXU]U^œÙ]X\œ]YYQ[˜X›Y
+YJNÂˆ[Y˜][ÛÛÜˆHÛÛ^ÛÛ\]™Ù]ÛÛÜŠˆ[YYÛÛ^OH[È\Èˆ[YYÛÛ^‹˜ÛÛÜ‹^Üš[X\žJNÂˆÝš[™ÈÛÛ™šYÝ\™YÛÛÜˆHXÝ]™TÛ™P˜]\žP[\^OH[ˆÈ
+^][Ëš\Ñ[\JXÝ]™TÛ™P˜]\žP[\ÛÛÜŠBˆÈ™YœËœÛ™SÝÐ˜]\žP[\ÛÛÜ‹™Ù]
+
+HˆXÝ]™TÛ™P˜]\žP[\ÛÛÜŠBˆˆ™YœËœÛ™TÝ]\Ð˜\“›ÝYšXØ][ÛÛÛÜ‹™Ù]
+
+NÂˆš[™[™Ë›YYXU]U^œÙ]^ÛÛÜŠˆ]]ÛX][Û”Ý]Kœ\œÙPÛÛÜŠÛÛ™šYÝ\™YÛÛÜ‹Y˜][ÛÛÜŠJNÂˆš[™[™Ë›YYXU]U^œÙ]X\œ]YYU^
+XÝ]™TÛ™S›ÝYšXØ][Û•^
+
+JNÂ‚ˆ[™X\“^[Ý]“^[Ý]\˜[\È]S^[Ý]Bˆ
+[™X\“^[Ý]“^[Ý]\˜[\ÊHš[™[™Ë›YYXU]T›ÝË™Ù]^[Ý]\˜[\Ê
+NÂˆYˆ
+]S^[Ý]ÜX\™Ú[ˆOH
+HÂˆ]S^[Ý]ÜX\™Ú[ˆHÂˆš[™[™Ë›YYXU]T›ÝËœÙ]^[Ý]\˜[\Ê]S^[Ý]
+NÂˆB‚ˆËÈš\ÚXš[]H™[XZ[œÈÛÛ[HÝÛ™YžH\PœšXÚÕš\ÚXš[]J
+Kˆ[ˆ\XÝ[\‹BˆËÈ›ÝYšXØ][ÛˆX^H›Ýž\\ÜÈ™[[ÝHš\ÚXš[]HÜˆHÝ\œ™[\	ÜÈYH[K‚ˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆB‚ˆš]˜]H›ÚY\]SYYXR[™›Ê
+HÂˆYˆ
+š[™[™ÈOH[
+H™]\›ŽÂˆYˆ
+\ÔÛ™S›ÝYšXØ][ÛXÝ]™J
+JHÂˆ™[™\”Û™TÝ]\Ó›ÝYšXØ][ÛŠ
+NÂˆ™]\›ŽÂˆBˆËÈ™\ÝÜ™H]™\žHšY]È›Ü\H[\Ü˜\š[HÚ[™ÙYžHHSÔÈ™\Ù[][Ûˆ™Y›Ü™BˆËÈ™[™\š[™ÈHÝ\œ™[YYXTÙ\ÜÚ[ÛˆÛ˜\ÚÝ‚ˆš[™[™Ë›YYXTÝ]RXÛÛ‹œÙ]š\ÚXš[]Jˆ™YœË›YYXKœÚÝÔ^X˜XÚÔÝ]RXÛÛ‹™Ù]
+
+HÈšY]Ë•’TÒP“HˆšY]Ë‘ÓÓ‘JNÂˆš[™[™Ë›YYXU]U^œÙ]X\œ]YYQ[˜X›Y
+™YœË›YYXK›X\œ]YYQ[˜X›Y™Ù]
+
+JNÂˆ›ÛÛX[ˆXZ[“YYXT™\]Y\ÝYHÝ\œ™[œšXÚÔÙ]
+
+K˜ÛÛZ[œÊœšXÚÕ\K“QQPJBˆ	‰ˆ\Ô™[[Ý[Uš\ÚX›JœšXÚÕ\K“QQPJNÂˆ›ÛÛX[ˆXZ[“YYXRY[ˆHXZ[“YYXT™\]Y\ÝY	‰ˆ\ÐœšXÚÒY[žP\
+œšXÚÕ\K“QQPJNÂˆ›ÛÛX[ˆÜ\YYXT™\]Y\ÝYH\ÔÜ\Z[[”™\]Y\ÝY
+œšXÚÕ\K“QQPJNÂˆ›ÛÛX[ˆš]™\“YYXT™\]Y\ÝYBˆš]™\’[™›Ü›X][ÛœšXÚÕ\\Ê
+K˜ÛÛZ[œÊœšXÚÕ\K“QQPJNÂˆYYXPÛÛ›Û\ˆ^Z[™ÈHXÚÐXÝ]™SYYXPÛÛ›Û\Š
+NÂˆ^X˜XÚÔÝ]H^X˜XÚÔÝ]HH^Z[™ÈOH[È[ˆ^Z[™Ë™Ù]^X˜XÚÔÝ]J
+NÂˆ›ÛÛX[ˆ]\ÚXÔ™\Ù[][Û•š\ÚX›HHÝ]\ÓYYXUš\ÚXš[]TÛXÞKš\Õš\ÚX›PÛÛ[
+ˆ˜[ÙKˆ^Z[™ÈOH[ˆ\ÐXÝX[T^Z[™Ê^X˜XÚÔÝ]JKˆ™YœË›YYXK›Û›UÚ[T^Z[™Ë™Ù]
+
+JNÂˆ›ÛÛX[ˆXZ[“YYXRÙY\ÔÜXÙHH]\ÚXÔ™\Ù[][Û•š\ÚX›H	‰ˆXZ[“YYXRY[‚ˆ	‰ˆ™YœËšYRÙY\ÔÜXÙQ›ÜŠœšXÚÕ\K“QQPJK™Ù]
+
+NÂˆ›ÛÛX[ˆXZ[“YYXUš\ÚX›HH]\ÚXÔ™\Ù[][Û•š\ÚX›Bˆ	‰ˆXZ[“YYXT™\]Y\ÝY	‰ˆ[XZ[“YYXRY[ŽÂˆYˆ
+[XZ[“YYXUš\ÚX›H	‰ˆ[XZ[“YYXRÙY\ÔÜXÙBˆ	‰ˆ\Ü\YYXT™\]Y\ÝY	‰ˆYš]™\“YYXT™\]Y\ÝY
+HÂˆš[™[™Ë›YYXPÛÛZ[™\‹œÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆÝÜYYXT›ÙÜ™\ÜÕXÚÙ\Š
+NÂˆš[™[™Ë›YYXP\^œÙ]X\œ]YYU^
+ˆŠNÂˆš[™[™Ë›YYXU]U^œÙ]X\œ]YYU^
+ˆŠNÂˆ\ÝYYXTÝX]HH[ÂˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆ™]\›ŽÂˆBˆYˆ
+^Z[™ÈOH[
+HÂˆš[™[™Ë›YYXPÛÛZ[™\‹œÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆÝÜYYXT›ÙÜ™\ÜÕXÚÙ\Š
+NÂˆš[™[™Ë›YYXP\^œÙ]X\œ]YYU^
+ˆŠNÂˆš[™[™Ë›YYXU]U^œÙ]X\œ]YYU^
+ˆŠNÂˆ\ÝYYXTÝX]HH[ÂˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆ™]\›ŽÂˆBˆYYXSY]Y]HY]Y]HH^Z[™Ë™Ù]Y]Y]J
+NÂˆÝš[™È]HHXÚÓYYXU]JY]Y]JNÂˆÝš[™È\\ÝHY]Y]HOH[ÈY]Y]K™Ù]Ýš[™ÊYYXSY]Y]K“QUQUWÒÑVWÐT•TÕ
+Hˆ[ÂˆYˆ
+\Õ[šÛ›ÝÛ\\ÝXÙZÛ\Š\\Ý
+JHÂˆËÈÛÛYH^Y\œÈ
+›ÝX›HÝØÚÈ[™›ÚY]\ÚXÊHš[H\\ÝšY[Ú]H]\˜[ˆËÈ•[šÛ›ÝÛˆ\\ÝˆÈ´'t-t.4-ô,´-t`t`´/tbô.H4.4`t/ô/´.ô/t.4`´-t.ôcˆÝš[™ÈÚ[ˆHYÈ\ÈZ\ÜÚ[™Ë‚ˆËÈ™X]]\È›È\\ÝÛÈHÝX]H˜[È˜XÚÈÈH]H[Û™K‚ˆ\\ÝH[ÂˆBˆÝš[™ÈÝX]NÂˆ›ÛÛX[ˆ]Qš\œÝH™YœË›YYXK]Qš\œÝ™Ù]
+
+NÂˆÝš[™Èš\œÝH]Qš\œÝÈ]Hˆ\\ÝÂˆÝš[™ÈÙXÛÛ™H]Qš\œÝÈ\\Ýˆ]NÂˆYˆ
+Z\Ñ[\Jš\œÝ
+H	‰ˆZ\Ñ[\JÙXÛÛ™
+JHÂˆÝX]HHš\œÝ
+Èˆ8 %ˆ
+ÈÙXÛÛ™ÂˆH[ÙHYˆ
+Z\Ñ[\J]JJHÂˆÝX]HH]NÂˆH[ÙHYˆ
+Z\Ñ[\J\\Ý
+JHÂˆÝX]HH\\ÝÂˆH[ÙHÂˆËÈÛÛY][™È\È^Z[™È]H^Y\ˆ^ÜÙ\È›ÈY]Y]H][8 %]X\ÝÚÝÈBˆËÈXÙZÛ\ˆÛÈH\Ù\ˆØ[ˆÙYH]YYXH^X˜XÚÈ\ÈXÝ]™K‚ˆÝX]HHÙ]Ýš[™Ê‹œÝš[™Ë›YYXWÝ[šÛ›ÝÛ—Ý˜XÚÊNÂˆBˆYˆ
+^X˜XÚÔÝ]HOH[ˆ	‰ˆ
+^X˜XÚÔÝ]K™Ù]Ý]J
+HOH^X˜XÚÔÝ]K”ÕUWÔVRS‘Âˆ^X˜XÚÔÝ]K™Ù]Ý]J
+HOH^X˜XÚÔÝ]K”ÕUWÔUTÑQ
+JHÂˆYYXT^X˜XÚÒ\ÝÜžTÝÜ™Kœ™XÛÜ™
+\Ë^Z[™Ë™Ù]XÚØYÙS˜[YJ
+Kˆ^X˜XÚÔÝ]K™Ù]Ý]J
+HOH^X˜XÚÔÝ]K”ÕUWÔVRS‘ÊNÂˆBˆËÈ]\ÙHÚ\HÛ›H›Üˆ[ˆXÝX[UTÑQÈ˜[œÚY[Ý]\È
+Y™™\š[™ÈÈÙYZÚ[™ÊHÙY\BˆËÈ^HÚ\HÛÈHXÛÛˆÙ\Û‰Ý›XÚÙ\ˆ]™\žH[YHH\Ù\ˆØÜXœË‚ˆËÈ^Y\œÈ™\X›\Ú^X˜XÚÔÝ]HÛÛ[[Ý\ÛH
+X[™^]\ÚXÈ]™\žHÙXÛÛ™
+K[™ˆËÈ^šY]ËœÙ]^[˜ÛÛ™][Û˜[H›ÜÈ]È^[Ý][™™\]Y\ÝÈH[™K[^[Ý]]™[‚ˆËÈ›ÜˆY[XØ[^ˆÛˆÑSHXY[š]È]\‹\ÙXÛÛ™^[Ý]ÝÜ›HXZÙ\ÈHÚÛBˆËÈ]H›ÝÈš\ÚX›Hš]\ˆÚ[HHX\œ]YYHØÜ›ÛÈ8 %ÛÈ]™\žHÙ]\ˆ\™H]\Ý™BˆËÈH›Ë[ÜÚ[ˆH˜[YHY‰ÝXÝX[HÚ[™ÙH
+YYXTÝ]RXÛÛ•šY]ËœÙ]]\ÙY\ÊK‚ˆš[™[™Ë›YYXTÝ]RXÛÛ‹œÙ]]\ÙY
+^X˜XÚÔÝ]HOH[ˆ	‰ˆ^X˜XÚÔÝ]K™Ù]Ý]J
+HOH^X˜XÚÔÝ]K”ÕUWÔUTÑQ
+NÂˆš[™[™Ë›YYXP\^œÙ]X\œ]YYU^
+Ù]\X™[
+^Z[™Ë™Ù]XÚØYÙS˜[YJ
+JJNÂˆËÈ™XÛÛ˜Ú[HH›ÝÈÝXÝ\™HÛÎˆÙ][™ÜÈX^H]™HÚ[™ÙYÚ[HHÛÛ›Û\ˆØ[˜XÚÂˆËÈØ\È]Y]YYˆHØ[YHY]Ù[™XYH˜[ˆ\š[™È\T™Y™\™[˜Ù\Ê
+KÛÈ^X˜XÚÈÝ\[™ÂˆËÈØ[››Ý™HHš\œÝ]™[]\ÝX›\Ú\ÈHÛÛ™šYÝ\™YÚYÙ]ZYÚ‚ˆ\SYYXS[™TÝXÝ\™J
+NÂˆš[™[™Ë›YYXU]U^œÙ]X\œ]YYU^
+ÝX]JNÂˆÞ[˜ÓYYXT›ÙÜ™\ÜÕÚY
+
+NÂ‚ˆËÈ\˜][ÛŽˆ›Ü›X]\È8¡¤ˆ“N”ÔÈˆÈ’“SN”ÔÈ‹ˆY[ˆÚ[ˆH\Ù\ˆÜYÝ]ÜˆBˆËÈ^Y\ˆÙ\Û‰Ý^ÜÙHHÜÚ]]™H\˜][Ûˆ
+]™HÝ™X[\ËÙØ\Ý™KXY™™\ŠK‚ˆÛ™È\˜][Û“\ÈHY]Y]HOH[ˆÈY]Y]K™Ù]Û™ÊYYXSY]Y]K“QUQUWÒÑVWÑTUSÓŠBˆˆÂˆËÈ˜XÚÈY[]Nˆ\˜][Û‹Ü›ÙÜ™\ÜÈš\ÚXš[]HX^HÛ›HÓÓTÑHÛˆH™X[˜XÚÂˆËÈÚ[™ÙKˆ^Y\œÈ™\X›\ÚY]Y]HÛÛ[[Ý\ÛH
+X[™^]\ÚXÎˆ]™\žHÙXÛÛ™
+H[™ˆËÈH\˜][Ûˆ\È˜[œÚY[HXœÙ[[ˆÛÛYH™\X›\Ú\È8 %Y[™ÈÛˆÜÙH›\ÂˆËÈÛÛ\ÙYH›ÝÈZYÚÛ˜ÙHHÙXÛÛ™ÚXÚ™XY\ÈHÚÛHÚYÙ]œ™YÜ›Ý\[™È‚ˆËÈÚ[HHX\œ]YYHØÜ›ÛË‚ˆ›ÛÛX[ˆ˜XÚÐÚ[™ÙYHU^][Ë™\]X[ÊÝX]K\ÝYYXTÝX]JNÂˆ\ÝYYXTÝX]HHÝX]NÂ‚ˆYˆ
+\™YœË›YYXKœÚÝÑ\˜][Û‹™Ù]
+
+JHÂˆš[™[™Ë›YYXQ\˜][Û•^œÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆH[ÙHYˆ
+\˜][Û“\Èˆ
+HÂˆËÈXY[™ÈÜXÙHÚ]™\ÈHØ\™]ÙY[ˆ]H[™\˜][ÛˆÚ]Ý][ˆ^˜H^[Ý]ˆËÈX\™Ú[ˆ™Yˆ8 %ØØ[\È˜]\˜[HÚ]H\˜][Ûˆ›ÛÚ^™K‚ˆÙ]^YÚ[™ÙY
+š[™[™Ë›YYXQ\˜][Û•^ˆˆ
+È›Ü›X]˜XÚÑ\˜][ÛŠ\˜][Û“\ÊJNÂˆš[™[™Ë›YYXQ\˜][Û•^œÙ]š\ÚXš[]JšY]Ë•’TÒP“JNÂˆH[ÙHYˆ
+˜XÚÐÚ[™ÙY
+HÂˆËÈ™]È˜XÚÈÚ]›È\ØX›H\˜][Ûˆ
+]™HÝ™X[JH8 %YH›Üˆ™X[‚ˆš[™[™Ë›YYXQ\˜][Û•^œÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆBˆËÈ[ÙNˆ˜[œÚY[›\ÛˆHØ[YH˜XÚÈ8 %ÙY\H\ÝÚÝÛˆ˜[YK‚‚ˆËÈ›ÙÜ™\ÜÈ˜\ˆš\ÚXš[]H\ÈXÚYY\™HÓ“H
+\]SYYXT›ÙÜ™\ÜÈ™]™\ˆÝXÚ\È]8 %ˆËÈÙYHHÛÛ[Y[\™JKˆØ[YH›\]Û\˜[ÛXÞH\ÈH\˜][Ûˆ^‚ˆYˆ
+\™YœË›YYXKœ›ÙÜ™\ÜÐ˜\‘[˜X›Y™Ù]
+
+JHÂˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹œÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆH[ÙHYˆ
+\˜][Û“\Èˆ
+HÂˆYˆ
+š[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹™Ù]š\ÚXš[]J
+HOHšY]Ë•’TÒP“JHÂˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹œÙ]ÛÛÜŠˆÛÛ^ÛÛ\]™Ù]ÛÛÜŠ[YYÛÛ^OH[È[YYÛÛ^ˆ\Ëˆ‹˜ÛÛÜ‹^Üš[X\žJJNÂˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹œÙ]š\ÚXš[]JšY]Ë•’TÒP“JNÂˆBˆH[ÙHYˆ
+˜XÚÐÚ[™ÙY
+HÂˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹œÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆB‚ˆYˆ
+XZ[“YYXRÙY\ÔÜXÙH	‰ˆ[XZ[“YYXUš\ÚX›JHÂˆËÈHÙ\ÜÚ[ÛˆØ[ˆ™YÚ[ˆÚ[HHÝ\œ™[›Ü™YÜ›Ý[™\\È^ÛYYˆ[ˆ]Ø\ÙBˆËÈ\PœšXÚÕš\ÚXš[]H™]š[Ý\ÛHØ]È›ÈXÝ]™HÛÛ›Û\ˆ[™YHšY]ÈÓÓ‘BˆËÈÚ]›Ü›X[[NÈ\ÝX›\ÚHÙY\\ÜXÙH[H™Y›Ü™H™]™X[[™È]È^[Ý]‚ˆš[™[™Ë›YYXPÛÛZ[™\‹œÙ][JŠNÂˆBˆš[™[™Ë›YYXPÛÛZ[™\‹œÙ]š\ÚXš[]JˆXZ[“YYXUš\ÚX›HXZ[“YYXRÙY\ÔÜXÙHÈšY]Ë•’TÒP“HˆšY]Ë‘ÓÓ‘JNÂ‚ˆ\]SYYXT›ÙÜ™\ÜÊ^Z[™ÊNÂˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆB‚ˆÊŠ‚ˆ
+ˆÙY\H[Y[[™H[™\ˆHXÝX[H™[™\™Y]K›Ý[™\ˆHÚÛH]H›ÝË‚ˆ
+ˆH›ÝÈX^HY][Û˜[HÛÛZ[ˆ\˜][Ûˆ[™H^H[™XØ]Ü‹Ú[HX\œ]YYH[ÙHÙY\Âˆ
+ˆHÙXÛÛ™[\›˜[ÛÜHÙˆH^ˆ™Z]\ˆ]\ÝXZÙHH[™HÛ™Ù\ˆ[ˆHš\ÚX›HÛÛ™Ë‚ˆ
+‹Âˆš]˜]H›ÚYÞ[˜ÓYYXT›ÙÜ™\ÜÕÚY
+
+HÂˆYˆ
+š[™[™ÈOH[
+H™]\›ŽÂˆš[™[™Ë›YYXU]U^œÜÝ
+
+
+HOˆÂˆYˆ
+š[™[™ÈOH[
+H™]\›ŽÂˆÚ\”Ù\]Y[˜ÙHÛÝ\˜ÙHHš[™[™Ë›YYXU]U^™Ù]X\œ]YYTÛÝ\˜ÙU^
+
+NÂˆ›Ø]YX\Ý\™YHš[™[™Ë›YYXU]U^™Ù]Z[
+
+Bˆ›YX\Ý\™U^
+ÛÝ\˜ÙKÛÝ\˜ÙK›[™Ý
+
+JNÂˆ[šY]ÜÜÚYHš[™[™Ë›YYXU]U^™Ù]ÚY
+
+NÂˆ[\™Ù]ÚYHYYXT›ÙÜ™\ÜÕÚYÛXÞKÚY
+ˆYX\Ý\™Yˆš[™[™Ë›YYXU]U^™Ù]ÛÛ\Ý[™Y[™ÓY
+
+Kˆš[™[™Ë›YYXU]U^™Ù]ÛÛ\Ý[™Y[™ÔšYÚ
+
+KˆšY]ÜÜÚY
+NÂˆ[XY[™ÓX\™Ú[ˆHYYXT›ÙÜ™\ÜÕÚYÛXÞK›XY[™ÓX\™Ú[Šˆš[™[™Ë›YYXU]U^™Ù]Y
+
+Kš[™[™Ë›YYXU]T›ÝË™Ù]Y[™ÓY
+
+JNÂˆ[™X\“^[Ý]“^[Ý]\˜[\È\˜[\ÈBˆ
+[™X\“^[Ý]“^[Ý]\˜[\ÊHš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹™Ù]^[Ý]\˜[\Ê
+NÂˆYˆ
+\˜[\ËÚYOH\™Ù]ÚY\˜[\Ë™Ù]X\™Ú[”Ý\
+
+HOHXY[™ÓX\™Ú[ŠHÂˆ\˜[\ËÚYH\™Ù]ÚYÂˆ\˜[\ËœÙ]X\™Ú[”Ý\
+XY[™ÓX\™Ú[ŠNÂˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹œÙ]^[Ý]\˜[\Ê\˜[\ÊNÂˆBˆJNÂˆB‚ˆÊŠ‚ˆ
+ˆ›Ü›X]HÜÚ]]™H\˜][Ûˆ[ˆZ[\ÙXÛÛ™È\ÈÐÛÙHN”ÔßH
+[™\ˆ[ˆÝ\ŠHÜ‚ˆ
+ˆÐÛÙH“SN”ÔßH
+Û™HÝ\ˆÜˆÛ™Ù\ŠKˆØØ[KZ[™\[™[8 %\Ù\ÈHØ[YHYÚ]›Ü›\Âˆ
+ˆ]™\ž]Ú\™H™XØ]\ÙHH\˜][Ûˆ\È\Ü^YY[Û™ÜÚYHHX\œ]YYHÝX]KÚ\™Bˆ
+ˆ™YÚ[Û˜[YÚ]ÝXœÝ]][ÛœÈÛÝ[ÛÚÈÝ]ÙˆXÙK‚ˆ
+‹Âˆš]˜]HÝ]XÈÝš[™È›Ü›X]˜XÚÑ\˜][ÛŠÛ™È\ÊHÂˆÛ™ÈÝ[ÙXÛÛ™ÈH\ÈÈLÂˆÛ™ÈÝ\œÈHÝ[ÙXÛÛ™ÈÈÍŒÂˆÛ™ÈZ[]\ÈH
+Ý[ÙXÛÛ™È	HÍŒ
+HÈŒÂˆÛ™ÈÙXÛÛ™ÈHÝ[ÙXÛÛ™È	HŒÂˆYˆ
+Ý\œÈˆ
+HÂˆ™]\›ˆÝš[™Ë™›Ü›X]
+˜]˜K][“ØØ[K”“ÓÕ‰Y‰L™‰L™‹Ý\œËZ[]\ËÙXÛÛ™ÊNÂˆBˆ™]\›ˆÝš[™Ë™›Ü›X]
+˜]˜K][“ØØ[K”“ÓÕ‰Y‰L™‹Z[]\ËÙXÛÛ™ÊNÂˆB‚ˆÊŠ‚ˆ
+ˆÛ˜\H›ÙÜ™\ÜÈ˜\ˆÈHÝ\œ™[^X˜XÚÈÜÚ][Ûˆ[™\›KÙ\Ø\›HH\š[ÙXÈXÚÙ\‹‚ˆ
+ˆØ[Y›Ýœ›ÛHÐ[šÈÝ\]SYYXR[™›ßH
+Ý]KÛY]Y]H›\ÊH[™œ›ÛBˆ
+ˆÐ[šÈÛYYXT›ÙÜ™\ÜÕXÚßH
+Û˜ÙH\ˆÙXÛÛ™Ú[H^Z[™ÊHÈY˜[˜ÙHH˜\ˆÛ[ÛÝK‚ˆ
+‹Âˆš]˜]H›ÚY\]SYYXT›ÙÜ™\ÜÊ[X›HYYXPÛÛ›Û\ˆ^Z[™ÊHÂˆYˆ
+š[™[™ÈOH[
+H™]\›ŽÂˆËÈš\ÚXš[]HÛXÞNˆ\ÈY]Ù‘U‘TˆÚ[™Ù\ÈH˜\‰ÜÈš\ÚXš[]Kˆ›\[™ÂˆËÈÓÓ‘KÕ’TÒP“HÚ[™Ù\ÈHYYXHÛÛZ[™\‰ÜÈZYÚ[™™[^[Ý]ÈHÚÛHœšXÚÂˆËÈ›ÝÈ8 %[™^Y\œÈZÙHX[™^]\ÚXÈ™\X›\ÚÝ]KÛY]Y]H]™\žHÙXÛÛ™Ú]ˆËÈH\˜][Ûˆ˜[œÚY[HZ\ÜÚ[™ËÚXÚ\›™Y]›\[ÈHÛ˜ÙKXK\ÙXÛÛ™ˆËÈš\ÚX›Hœ™YÜ›Ý\ˆÙˆH›ÝÈÚ[HHX\œ]YYHØÜ›ÛËˆš\ÚXš[]H\ÈXÚYYˆËÈÛÛ[H[ˆ\]SYYXR[™›È
+™X[˜XÚËÜÝ]HÚ[™Ù\ÊNÈ\™HÙHÛ›HY˜[˜ÙHBˆËÈš[œ˜XÝ[Ûˆ8 %H\™H™\Z[‚ˆYˆ
+\™YœË›YYXKœ›ÙÜ™\ÜÐ˜\‘[˜X›Y™Ù]
+
+H^Z[™ÈOH[ˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹™Ù]š\ÚXš[]J
+HOHšY]Ë•’TÒP“JHÂˆÝÜYYXT›ÙÜ™\ÜÕXÚÙ\Š
+NÂˆ™]\›ŽÂˆBˆYYXSY]Y]HY]Y]HH^Z[™Ë™Ù]Y]Y]J
+NÂˆÛ™È\˜][ÛˆHY]Y]HOH[ˆÈY]Y]K™Ù]Û™ÊYYXSY]Y]K“QUQUWÒÑVWÑTUSÓŠBˆˆÂˆ^X˜XÚÔÝ]HÝ]HH^Z[™Ë™Ù]^X˜XÚÔÝ]J
+NÂˆYˆ
+\˜][ÛˆHÝ]HOH[
+HÂˆËÈ[Y[[™H˜[œÚY[H[˜]˜Z[X›H
+Y]Y]H™\X›\Ú[ˆ›YÚ
+H8 %ÙY\H\ÝˆËÈ™[™\™Yš[[™]H™^XÚÈØ]Ú\˜]\ˆ[ˆÝXÚ[™È^[Ý]‚ˆ™]\›ŽÂˆBˆÛ™È›ÝÈH[™›ÚY›ÜË”Þ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆÛ™È\Ý\]HHÝ]K™Ù]\ÝÜÚ][Û•\]U[YJ
+NÂˆÛ™È˜\ÙTÜÚ][ÛˆHÝ]K™Ù]ÜÚ][ÛŠ
+NÂˆËÈ^X˜XÚÔÝ]K™Ù]ÜÚ][ÛŠ
+H™]\›œÈHÜÚ][Ûˆ\ÈÙˆÙ]\ÝÜÚ][Û•\]U[YJ
+NÂˆËÈ›ÜˆH
+˜Ý\œ™[
+ˆ[ÛY[ÙH^˜\Û]HÚ]H™\ÜY^X˜XÚÈÜYY
+\XØ[HKŒ
+K‚ˆÛ™ÈXÝX[ÜÚ][ÛˆH˜\ÙTÜÚ][Û‚ˆ
+È
+Û™ÊH
+
+›ÝÈH\Ý\]JH
+ˆÝ]K™Ù]^X˜XÚÔÜYY
+
+JNÂˆYˆ
+XÝX[ÜÚ][Ûˆ
+HXÝX[ÜÚ][ÛˆHÂˆYˆ
+XÝX[ÜÚ][Ûˆˆ\˜][ÛŠHXÝX[ÜÚ][ÛˆH\˜][ÛŽÂ‚ˆš[™[™Ë›YYXT›ÙÜ™\ÜÐ˜\‹œÙ]›ÙÜ™\ÜÊ
+›Ø]
+HXÝX[ÜÚ][ÛˆÈ
+›Ø]
+H\˜][ÛŠNÂ‚ˆYˆ
+Ý]K™Ù]Ý]J
+HOH^X˜XÚÔÝ]K”ÕUWÔVRS‘ÊHÂˆËÈ™KX\›H8 %H™]ÈÜÝ[^YY™\XÙ\È[žH™]š[Ý\ÛH]Y]YYÛ™KY[\Ý[‚ˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊYYXT›ÙÜ™\ÜÕXÚÊNÂˆXZ[’[™\‹œÜÝ[^YY
+YYXT›ÙÜ™\ÜÕXÚËQQPWÔ“ÑÔ‘TÔ×ÕPÒ×ÓTÊNÂˆH[ÙHÂˆÝÜYYXT›ÙÜ™\ÜÕXÚÙ\Š
+NÂˆBˆB‚ˆš]˜]H›ÚYÝÜYYXT›ÙÜ™\ÜÕXÚÙ\Š
+HÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊYYXT›ÙÜ™\ÜÕXÚÊNÂˆB‚ˆš]˜]Hš[˜[[›˜X›HYYXT›ÙÜ™\ÜÕXÚÈH
+
+HOˆ\]SYYXT›ÙÜ™\ÜÊXÚÐXÝ]™SYYXPÛÛ›Û\Š
+JNÂ‚ˆÊŠ‚ˆ
+ˆ™\ÝYY™›Ü^˜XÝ[ÛˆÙˆH˜XÚÈ]Hœ›ÛHHYYXHY]Y]Kˆ˜[È˜XÚÈ›ÝYÚÙ]™\˜[ˆ
+ˆÝ[™\™Ù^\Ë[ˆÈHš[H˜[YH\œÙYÝ]ÙˆHYYXHT’KÛÈÙHÝ[ÚÝÈÛÛY][™Âˆ
+ˆ\ÙY[›Üˆ^Y\œÈ]Û‰ÝÜ[]HÐ[šÈYYXSY]Y]HÓQUQUWÒÑVWÕU_K‚ˆ
+‹Âˆ[X›Bˆš]˜]HÝ]XÈÝš[™ÈXÚÓYYXU]J[X›HYYXSY]Y]HY]Y]JHÂˆYˆ
+Y]Y]HOH[
+H™]\›ˆ[ÂˆÝš[™Ö×HÙ^\ÈHÂˆYYXSY]Y]K“QUQUWÒÑVWÕUKˆYYXSY]Y]K“QUQUWÒÑVWÑTÔVWÕUKˆYYXSY]Y]K“QUQUWÒÑVWÑTÔVWÔÕP•UKˆYYXSY]Y]K“QUQUWÒÑVWÑTÔVWÑTÐÔ’TSÓ‹ˆNÂˆ›Üˆ
+Ýš[™ÈÙ^HˆÙ^\ÊHÂˆÝš[™È˜[YHHY]Y]K™Ù]Ýš[™ÊÙ^JNÂˆYˆ
+Z\Ñ[\J˜[YJJH™]\›ˆ˜[YNÂˆBˆÝš[™È\šQš[[˜[YHHš[[˜[YQœ›ÛU\šJY]Y]K™Ù]Ýš[™ÊYYXSY]Y]K“QUQUWÒÑVWÓQQPWÕT’JJNÂˆYˆ
+Z\Ñ[\J\šQš[[˜[YJJH™]\›ˆ\šQš[[˜[YNÂˆ™]\›ˆš[[˜[YQœ›ÛU\šJY]Y]K™Ù]Ýš[™ÊYYXSY]Y]K“QUQUWÒÑVWÓQQPWÒQ
+JNÂˆB‚ˆÊŠ‚ˆ
+ˆ™XÛÙÛš\ÙHH]\˜[•[šÛ›ÝÛˆ\\ÝˆÈ´'t-t.4-ô,´-t`t`´/tbô.H4.4`t/ô/´.ô/t.4`´-t.ôcˆXÙZÛ\œÈ]ˆ
+ˆÛÛYH^Y\œÈÜš]H[ÈH\\ÝšY[Ú[ˆHYÈ\ÈZ\ÜÚ[™È8 %Ø\ÙKZ[œÙ[œÚ]]™Bˆ
+ˆ[™Ú]\ÜXÙK]Û\˜[‚ˆ
+‹Âˆš]˜]HÝ]XÈ›ÛÛX[ˆ\Õ[šÛ›ÝÛ\\ÝXÙZÛ\Š[X›HÝš[™ÈÊHÂˆYˆ
+ÈOH[
+H™]\›ˆ˜[ÙNÂˆÝš[™Èš[[YYHËš[J
+NÂˆ™]\›ˆš[[YY™\]X[ÒYÛ›Ü™PØ\ÙJ[šÛ›ÝÛˆ\\ÝŠBˆš[[YY™\]X[ÒYÛ›Ü™PØ\ÙJ´/t-t.4-ô,´-t`t`´/tbô.H4.4`t/ô/´.ô/t.4`´-t.ôcŠNÂˆB‚ˆ[X›Bˆš]˜]HÝ]XÈÝš[™Èš[[˜[YQœ›ÛU\šJ[X›HÝš[™È˜]ÊHÂˆYˆ
+\Ñ[\J˜]ÊJH™]\›ˆ[ÂˆÝš[™È\ÝH[ÂˆžHÂˆ[™›ÚY›™]•\šH\šHH[™›ÚY›™]•\šKœ\œÙJ˜]ÊNÂˆ\ÝH\šK™Ù]\Ý]ÙYÛY[
+
+NÂˆHØ]Ú
+^Ù\[ÛˆYÛ›Ü™Y
+HÂˆBˆYˆ
+\Ñ[\J\Ý
+JHÂˆ[Û\ÚHX]›X^
+˜]Ë›\Ý[™^ÙŠ	ËÉÊK˜]Ë›\Ý[™^ÙŠ	×	ÊJNÂˆ\ÝH
+Û\ÚH	‰ˆÛ\Ú˜]Ë›[™Ý
+
+HHJHÈ˜]ËœÝXœÝš[™ÊÛ\Ú
+ÈJHˆ˜]ÎÂˆBˆYˆ
+\Ñ[\J\Ý
+JH™]\›ˆ[Âˆ[ÝH\Ý›\Ý[™^ÙŠ	Ë‰ÊNÂˆYˆ
+Ýˆ
+HÂˆ\ÝH\ÝœÝXœÝš[™ÊÝ
+NÂˆBˆ™]\›ˆ[™›ÚY›™]•\šK™XÛÙJ\Ý
+NÂˆB‚ˆ[X›Bˆš]˜]HYYXPÛÛ›Û\ˆXÚÐXÝ]™SYYXPÛÛ›Û\Š
+HÂˆËÈ™Y™\ˆHÛÛ›Û\ˆ]\ÈÝ\œ™[H^Z[™ËˆYˆ›Û™H\È^Z[™Ë˜[˜XÚÈÈ[žBˆËÈÛÛ›Û\ˆ[ˆH˜[œÚY[›YYXH\ÈØYY[™H\Ù\ˆ\ÈÚ[™ÈÛÛY][™ÈÚ]]‚ˆËÈÝ]H8 %]\ÙYY™™\š[™Ë˜\ÝY›ÜØ\™[™Ë™]Ú[™[™ËÚÚ\[™ËˆÙY\[™ÈHœšXÚÂˆËÈš\ÚX›HXÜ›ÜÜÈ\ÙHÚÜ[]™Y˜[œÚ][ÛœÈ]›ÚYÈH’TÒP“x¡¤‘ÓÓ‘x¡¤•’TÒP“H›[šÂˆËÈ
+ÚXÚÛÝ[™K[^[Ý]H]H^œ›ÛH™\›ÈÚ^™H[™™\Ù]HX\œ]YYHØÜ›Û
+BˆËÈ]™\žH[YHH\Ù\ˆÙYZÜÈÜˆH^Y\ˆœšYY›HY™™\œË‚ˆYYXPÛÛ›Û\ˆ˜[˜XÚÈH[Âˆ›Üˆ
+YYXPÛÛ›Û\ˆÈˆXÝ]™SYYXPÛÛ›Û\œÊHÂˆ^X˜XÚÔÝ]HÈHË™Ù]^X˜XÚÔÝ]J
+NÂˆYˆ
+ÈOH[
+HÛÛ[YNÂˆ[Ý]HHË™Ù]Ý]J
+NÂˆYˆ
+Ý]HOH^X˜XÚÔÝ]K”ÕUWÔVRS‘ÊHÂˆ™]\›ˆÎÂˆBˆYˆ
+˜[˜XÚÈOH[	‰ˆ\ÓYYXPXÝ]™TÝ]JÝ]JJHÂˆ˜[˜XÚÈHÎÂˆBˆBˆ™]\›ˆ˜[˜XÚÎÂˆB‚ˆš]˜]HÝ]XÈ›ÛÛX[ˆ\ÓYYXPXÝ]™TÝ]J[Ý]JHÂˆÝÚ]Ú
+Ý]JHÂˆØ\ÙH^X˜XÚÔÝ]K”ÕUWÔUTÑQ‚ˆØ\ÙH^X˜XÚÔÝ]K”ÕUWÐ•Q‘‘T’S‘Î‚ˆØ\ÙH^X˜XÚÔÝ]K”ÕUWÑTÕÑ“Ô•ÐT‘S‘Î‚ˆØ\ÙH^X˜XÚÔÝ]K”ÕUWÔ‘UÒS‘S‘Î‚ˆØ\ÙH^X˜XÚÔÝ]K”ÕUWÔÒÒTS‘×Õ×Ó‘V‚ˆØ\ÙH^X˜XÚÔÝ]K”ÕUWÔÒÒTS‘×Õ×Ô‘U’SÕTÎ‚ˆØ\ÙH^X˜XÚÔÝ]K”ÕUWÔÒÒTS‘×Õ×ÔUQUQWÒUSN‚ˆØ\ÙH^X˜XÚÔÝ]K”ÕUWÐÓÓ“‘PÕS‘Î‚ˆ™]\›ˆYNÂˆY˜][‚ˆ™]\›ˆ˜[ÙNÂˆBˆB‚ˆš]˜]HÝ]XÈ›ÛÛX[ˆ\ÐXÝX[T^Z[™Ê[X›HYYXPÛÛ›Û\ˆÛÛ›Û\ŠHÂˆ™]\›ˆÛÛ›Û\ˆOH[	‰ˆ\ÐXÝX[T^Z[™ÊÛÛ›Û\‹™Ù]^X˜XÚÔÝ]J
+JNÂˆB‚ˆš]˜]HÝ]XÈ›ÛÛX[ˆ\ÐXÝX[T^Z[™Ê[X›H^X˜XÚÔÝ]HÝ]JHÂˆ™]\›ˆÝ]HOH[	‰ˆÝ]K™Ù]Ý]J
+HOH^X˜XÚÔÝ]K”ÕUWÔVRS‘ÎÂˆB‚ˆš]˜]HÝš[™ÈÙ]\X™[
+Ýš[™ÈÙÊHÂˆžHÂˆXÚØYÙSX[˜YÙ\ˆHHÙ]XÚØYÙSX[˜YÙ\Š
+NÂˆ\XØ][Û’[™›È[™›ÈHK™Ù]\XØ][Û’[™›ÊÙË
+NÂˆÚ\”Ù\]Y[˜ÙHX™[HK™Ù]\XØ][Û“X™[
+[™›ÊNÂˆ™]\›ˆX™[OH[ÈX™[ÔÝš[™Ê
+HˆÙÎÂˆHØ]Ú
+^Ù\[ÛˆJHÂˆ™]\›ˆÙÎÂˆBˆB‚ˆš]˜]HÝ]XÈ›ÛÛX[ˆ\Ñ[\J[X›HÝš[™ÈÊHÂˆ™]\›ˆÈOH[Ëš\Ñ[\J
+NÂˆB‚ˆš]˜]H›ÚY™YÚ\Ý\”Ø][]TÝ]\Ô™XÙZ]™\Š
+HÂˆYˆ
+Ø][]T™XÙZ]™\”™YÚ\Ý\™Y
+H™]\›ŽÂˆ[[š[\ˆš[\ˆH™]È[[š[\ŠÓ”ÔÔÒT‘WÔÐUSUWÔÕUT×ÐPÕSÓŠNÂˆžHÂˆYˆ
+Z[•‘T”ÒSÓ‹”Ñ×ÒS•HZ[•‘T”ÒSÓ—ÐÓÑTË•TSRTÕJHÂˆ™YÚ\Ý\”™XÙZ]™\ŠØ][]TÝ]\Ô™XÙZ]™\‹š[\‹‘PÑRU‘T—Ó“ÕÑVÔ•Q
+NÂˆH[ÙHÂˆ™YÚ\Ý\”™XÙZ]™\ŠØ][]TÝ]\Ô™XÙZ]™\‹š[\ŠNÂˆBˆØ][]T™XÙZ]™\”™YÚ\Ý\™YHYNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆØ][]T™XÙZ]™\”™YÚ\Ý\™YH˜[ÙNÂˆÙËÊQËÛÝ[›Ý™YÚ\Ý\ˆØ][]HÝ]\È™XÙZ]™\ˆ‹˜Z[\™JNÂˆBˆB‚ˆš]˜]H›ÚY[œ™YÚ\Ý\”Ø][]TÝ]\Ô™XÙZ]™\Š
+HÂˆYˆ
+\Ø][]T™XÙZ]™\”™YÚ\Ý\™Y
+H™]\›ŽÂˆžHÂˆ[œ™YÚ\Ý\”™XÙZ]™\ŠØ][]TÝ]\Ô™XÙZ]™\ŠNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙËÊQË”Ø][]HÝ]\È™XÙZ]™\ˆØ\È[™XYH[œ™YÚ\Ý\™Y‹˜Z[\™JNÂˆBˆØ][]T™XÙZ]™\”™YÚ\Ý\™YH˜[ÙNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊØ][]\ÐÛÝ[™\Ù][›˜X›JNÂˆØ][]\ÐÛÝ[HLNÂˆÛœÜÓ[ÙQ›YÜÈHÂˆB‚ˆš]˜]H›ÚY™YÚ\Ý\›Y]ÛÝ™XÙZ]™\Š
+HÂˆYˆ
+™XÙZ]™\”™YÚ\Ý\™Y
+H™]\›ŽÂˆ[[š[\ˆš[\ˆH™]È[[š[\Š
+NÂˆš[\‹˜YXÝ[ÛŠ›Y]ÛÝY\\‹PÕSÓ—ÔÕUWÐÒS‘ÑQ
+NÂˆš[\‹˜YXÝ[ÛŠ›Y]ÛÝ]šXÙKPÕSÓ—ÐPÓÐÓÓ“‘PÕQ
+NÂˆš[\‹˜YXÝ[ÛŠ›Y]ÛÝ]šXÙKPÕSÓ—ÐPÓÑTÐÓÓ“‘PÕQ
+NÂˆžHÂˆ™YÚ\Ý\”™XÙZ]™\Š›Y]ÛÝ™XÙZ]™\‹š[\ŠNÂˆ™XÙZ]™\”™YÚ\Ý\™YHYNÂˆHØ]Ú
+›ÝØX›H
+HÂˆÙËÊQË‘˜Z[YÈ™YÚ\Ý\ˆ›Y]ÛÝ™XÙZ]™\ˆ‹
+NÂˆBˆB‚ˆš]˜]H›ÚY[œ™YÚ\Ý\›Y]ÛÝ™XÙZ]™\Š
+HÂˆËÈ›Ùš[K\›ÞHØ[˜XÚÜÈØ[ˆÝ]]™H\È™XÙZ]™\‹ˆ[˜[Y]H[H™Y›Ü™HÛX\š[™ÈBˆËÈÝ]\ÈÝ\™˜XÙHÛÈH]HØ[˜XÚÈØ[››Ý™\Ü[]HHÝ[HÛÛ›™XÝYY]šXÙHÙ]‚ˆ›Y]ÛÝ˜XÚÚ[™ÑÙ[™\˜][ÛŠÊÎÂˆYˆ
+X™XÙZ]™\”™YÚ\Ý\™Y
+H™]\›ŽÂˆžHÂˆ[œ™YÚ\Ý\”™XÙZ]™\Š›Y]ÛÝ™XÙZ]™\ŠNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ˜Z[\™JHÂˆÙËÊQË›Y]ÛÝ™XÙZ]™\ˆØ\È[™XYH[œ™YÚ\Ý\™Y‹˜Z[\™JNÂˆBˆ™XÙZ]™\”™YÚ\Ý\™YH˜[ÙNÂˆB‚ˆ[X›Bˆš]˜]HÝ]XÈ›Y]ÛÝY\\ˆÙ]›Y]ÛÝY\\Š
+HÂˆžHÂˆ™]\›ˆ›Y]ÛÝY\\‹™Ù]Y˜][Y\\Š
+NÂˆHØ]Ú
+›ÝØX›H
+HÂˆ™]\›ˆ[ÂˆBˆB‚ˆÊŠ‚ˆ
+ˆÙYYHÛÛ›™XÝYY]šXÙHÙ]œ›ÛHÚ]]™\ˆHÞ\Ý[HØ[ˆÞ[˜Ú›Û›Ý\ÛH[\ËÚ]ˆ
+ˆ[ˆ\Þ[˜È›Ùš[K\›ÞH™Yœ™\ÚÛˆÜ‚ˆ
+ˆ‚ˆ
+ˆHÞ[˜Ú›Û›Ý\È]]\˜]\ÈÐ[šÈ›Y]ÛÝY\\ˆÙÙ]›Û™Y]šXÙ\Ê
+_H[™™Y›XÝÈÛ‚ˆ
+ˆHY[ˆÐÛÙH›Y]ÛÝ]šXÙKš\ÐÛÛ›™XÝY
+
+_HY]Ù8 %\ÈÛÜšÜÈÛˆSÔÔ[™Bˆ
+ˆ\XØ[Ø\‹RH“Ó\È\š]™Yœ›ÛH]™]\›œÈ[œÝ[K[™ÜXÚX[HÛÝ™\œÈBˆ
+ˆ˜œšXÚÈØ\È\ÝYY•\È[™XYHÛˆ[™H]šXÙH\ÈZ\™YˆØ\ÙH]\™Bˆ
+ˆ›Ùš[K\›ÞHÙYY[™ÈZ\ÜÙ\Ë‚ˆ
+ˆ‚ˆ
+ˆH\Þ[˜È]ÙY\È]Y\žZ[™ÈPQÑUÈL‘›ÞY\È\ÈHØY™]H™]›ÜˆÑSH“Ó\ÈÚ\™Bˆ
+ˆH™Y›XÝ[ÛˆšXÚÈ\È[˜]˜Z[X›K[™›Üˆ[˜›Û™Y][ÛY[\š[HÛÛ›™XÝY]šXÙ\Ë‚ˆ
+ˆPÓÐÓÓ“‘PÕQÈPÓÑTÐÓÓ“‘PÕQœ›ØYØ\ÝÈ
+™YÚ\Ý\™YÙ\\˜][JH[™H]™H\]\Âˆ
+ˆÛ˜ÙHH™XÙZ]™\ˆ\È[ˆXÙK‚ˆ
+‹Âˆš]˜]H›ÚY™Yœ™\ÚÛÛ›™XÝYœ›ÛT›ÞY\Ê
+HÂˆš[˜[[Ù[™\˜][ÛˆH
+ÊØ›Y]ÛÝ˜XÚÚ[™ÑÙ[™\˜][ÛŽÂˆÛÛ›™XÝYYœË˜ÛX\Š
+NÂˆ›Y]ÛÝY\\ˆY\\ˆHÙ]›Y]ÛÝY\\Š
+NÂˆYˆ
+Y\\ˆOH[
+H™]\›ŽÂˆžHÂˆYˆ
+XY\\‹š\Ñ[˜X›Y
+
+JHÂˆÛÛ›™XÝYYœË˜ÛX\Š
+NÂˆ™]\›ŽÂˆBˆHØ]Ú
+›ÝØX›H
+HÂˆ™]\›ŽÂˆB‚ˆÙYYÛÛ›™XÝYœ›ÛP›Û™Y]šXÙ\ÊY\\ŠNÂ‚ˆ›Y]ÛÝ›Ùš[K”Ù\šXÙS\Ý[™\ˆ\Ý[™\ˆH™]È›Y]ÛÝ›Ùš[K”Ù\šXÙS\Ý[™\Š
+HÂˆÝ™\œšYBˆX›XÈ›ÚYÛ”Ù\šXÙPÛÛ›™XÝY
+[›Ùš[K›Y]ÛÝ›Ùš[H›ÞJHÂˆ›ÛÛX[ˆÝ\œ™[HÙ[™\˜][ÛˆOH›Y]ÛÝ˜XÚÚ[™ÑÙ[™\˜][Û‚ˆ	‰ˆš[™[™ÈOH[	‰ˆ™YœÈOH[	‰ˆ™YœËÚYÙ][˜X›Y™Ù]
+
+NÂˆYˆ
+Ý\œ™[
+HÂˆžHÂˆ›Üˆ
+›Y]ÛÝ]šXÙHˆ›ÞK™Ù]ÛÛ›™XÝY]šXÙ\Ê
+JHÂˆYˆ
+OH[	‰ˆ™Ù]Y™\ÜÊ
+HOH[
+HÂˆÛÛ›™XÝYYœË˜Y
+™Ù]Y™\ÜÊ
+JNÂˆBˆBˆHØ]Ú
+›ÝØX›HYÛ›Ü™Y
+HÂˆBˆBˆžHÂˆY\\‹˜ÛÜÙT›Ùš[T›ÞJ›Ùš[K›ÞJNÂˆHØ]Ú
+›ÝØX›HYÛ›Ü™Y
+HÂˆBˆYˆ
+Ý\œ™[
+H\]P›Y]ÛÝÝ]\Ê
+NÂˆB‚ˆÝ™\œšYBˆX›XÈ›ÚYÛ”Ù\šXÙQ\ØÛÛ›™XÝY
+[›Ùš[JHÂˆBˆNÂˆžHÂˆY\\‹™Ù]›Ùš[T›ÞJ\Ë\Ý[™\‹›Y]ÛÝ›Ùš[K’PQÑU
+NÂˆY\\‹™Ù]›Ùš[T›ÞJ\Ë\Ý[™\‹›Y]ÛÝ›Ùš[KL‘
+NÂˆHØ]Ú
+›ÝØX›H
+HÂˆÙËÊQË‘˜Z[YÈ]Y\žH›Y]ÛÝ›Ùš[H›ÞY\È‹
+NÂˆBˆB‚ˆÊŠ‚ˆ
+ˆÞ[˜Ú›Û›Ý\ÛHÜ[]HÐ[šÈØÛÛ›™XÝYYœßHœ›ÛH›Û™Y]šXÙ\ÈšXHHY[‚ˆ
+ˆÐÛÙH›Y]ÛÝ]šXÙKš\ÐÛÛ›™XÝY
+
+_HY]ÙˆØY™HÈØ[™\X]YH8 %HÙ]\ÈBˆ
+ˆ[š[Û‹ÛÈHÝ[H[žHÛÝ[Û›H™HÛX\™YžHHPÓÑTÐÓÓ“‘PÕQœ›ØYØ\ÝÜˆžBˆ
+ˆH[›Y]ÛÝ[Ù™ˆ˜[œÚ][Û‹‚ˆ
+‹Âˆš]˜]H›ÚYÙYYÛÛ›™XÝYœ›ÛP›Û™Y]šXÙ\Ê›Y]ÛÝY\\ˆY\\ŠHÂˆ˜]˜K›[™Ëœ™Y›XÝ“Y]Ù\ÐÛÛ›™XÝYÂˆžHÂˆ\ÐÛÛ›™XÝYH›Y]ÛÝ]šXÙK˜Û\ÜË™Ù]Y]Ù
+š\ÐÛÛ›™XÝYŠNÂˆHØ]Ú
+›ÔÝXÚY]Ù^Ù\[ÛˆœÛJHÂˆ™]\›ŽÂˆHØ]Ú
+›ÝØX›H
+HÂˆ™]\›ŽÂˆBˆÙ]›Y]ÛÝ]šXÙOˆ›Û™YÂˆžHÂˆ›Û™YHY\\‹™Ù]›Û™Y]šXÙ\Ê
+NÂˆHØ]Ú
+›ÝØX›H
+HÂˆ™]\›ŽÂˆBˆYˆ
+›Û™YOH[
+H™]\›ŽÂˆ›Üˆ
+›Y]ÛÝ]šXÙH]šXÙHˆ›Û™Y
+HÂˆYˆ
+]šXÙHOH[]šXÙK™Ù]Y™\ÜÊ
+HOH[
+HÛÛ[YNÂˆžHÂˆØš™XÝ™\Ý[H\ÐÛÛ›™XÝYš[›ÚÙJ]šXÙJNÂˆYˆ
+™\Ý[[œÝ[˜Ù[Ùˆ›ÛÛX[ˆ	‰ˆ
+›ÛÛX[ŠH™\Ý[
+HÂˆÛÛ›™XÝYYœË˜Y
+]šXÙK™Ù]Y™\ÜÊ
+JNÂˆBˆHØ]Ú
+›ÝØX›HYÛ›Ü™Y
+HÂˆBˆBˆB‚ˆš]˜]H›ÚY\]P›Y]ÛÝÝ]\Ê
+HÂˆ›Y]ÛÝY\\ˆY\\ˆHÙ]›Y]ÛÝY\\Š
+NÂˆ›ÛÛX[ˆ[˜X›YÂˆžHÂˆ[˜X›YHY\\ˆOH[	‰ˆY\\‹š\Ñ[˜X›Y
+
+NÂˆHØ]Ú
+›ÝØX›H
+HÂˆ[˜X›YH˜[ÙNÂˆBˆ›Y]ÛÝÝ]H™]ÔÝ]NÂˆYˆ
+Y[˜X›Y
+HÂˆ™]ÔÝ]HH›Y]ÛÝÝ]K“Ñ‘ŽÂˆÛÛ›™XÝYYœË˜ÛX\Š
+NÂˆH[ÙHYˆ
+ÛÛ›™XÝYYœËš\Ñ[\J
+JHÂˆ™]ÔÝ]HH›Y]ÛÝÝ]K““×ÑU’PÑNÂˆH[ÙHÂˆ™]ÔÝ]HH›Y]ÛÝÝ]KÓÓ“‘PÕQÂˆBˆ›Y]ÛÝÝ]HH™]ÔÝ]NÂˆYˆ
+š[™[™ÈOH[
+HÂˆ\]RXÛÛ”Ý]\ÊPÓÓ—ÕTWÐ•š[™[™Ë˜›Y]ÛÝÝ]\ÒXÛÛ‹›Y]ÛÝÝ]K›Ü™[˜[
+
+JNÂˆÛ™P›Y]ÛÝ[™XØ]Ü”ÛXÞK\X\˜[˜ÙHÛ™P\X\˜[˜ÙHBˆÛ™P›Y]ÛÝ[™XØ]Ü”ÛXÞKœ™\ÛÛ™Jˆ›Y]ÛÝÝ]HOH›Y]ÛÝÝ]KÓÓ“‘PÕQˆ\ÔÙ[XÝYÛ™PÛÛ™šYÝ\˜][ÛŠ
+Kˆ\ÔÛ™S›ÝYšXØ][Û”]]˜Z[X›J
+JNÂˆYˆ
+Û™P\X\˜[˜ÙHOHÛ™P›Y]ÛÝ[™XØ]Ü”ÛXÞK\X\˜[˜ÙK‘QUS
+HÂˆËÈÛ™H›]Ñ‹\Ý[H[™H[™Û™H[ˆSÔÈ™XY[™\ÜÈ\È[[[Û˜[H›ÝˆËÈ[˜ÛÙYžHHÙ\\˜][HÛÛÝ\™Y›ÙKÛÝ][™H[ž[[Ü™K‚ˆš[™[™Ë˜›Y]ÛÝÝ]\ÒXÛÛ‹œÙ][XYÙT™\ÛÝ\˜ÙJˆ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÜÛÛY
+NÂˆš[™[™Ë˜›Y]ÛÝÝ]\ÒXÛÛ‹œÙ]˜]ÒXÛÛŠYJNÂˆÛÛ^ÛÛ^H[YYÛÛ^OH[È\Èˆ[YYÛÛ^Âˆ[XYÙUšY]ÐÛÛ\]œÙ][XYÙU[\Ý
+š[™[™Ë˜›Y]ÛÝÝ]\ÒXÛÛ‹ˆÛÛÜ”Ý]S\Ý˜[YSÙŠÛÛ^ÛÛ\]™Ù]ÛÛÜŠˆÛÛ^‹˜ÛÛÜ‹œÝ]\×Ø›Y]ÛÝ
+JJNÂˆš[™[™Ë˜›Y]ÛÝÝ]\ÒXÛÛ‹œÙ]Ý][™UÚY
+
+NÂˆBˆBˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆB‚ˆš]˜]H›ÛÛX[ˆ\ÔÛ™PÛÛ›™XÝÜ“[šÔ™\Ù[
+
+HÂˆÛÛ›™XÝÜ•˜[YHÛÛ›™XÝYHÛ™TÝ]\Õ˜[Y\Ë™Ù]
+˜ÛÛ›™XÝYŠNÂˆ™]\›ˆÛÛ›™XÝYOH[	‰ˆÛÛ›™XÝY™œ™\Ú	‰ˆÛÛ›™XÝY˜]˜Z[X›Bˆ	‰ˆÛÛ›™XÝYœ™XYX›H	‰ˆ›ÛÛX[‹••QK™\]X[ÊÛÛ›™XÝYœ˜]Õ˜[YJNÂˆB‚ˆš]˜]H›ÛÛX[ˆ\ÔÙ[XÝYÛ™PÛÛ™šYÝ\˜][ÛŠ
+HÂˆ™]\›ˆ™YœÈOH[	‰ˆ\™YœËœÛ™Q]šXÙPY™\ÜË™Ù]
+
+Kš[J
+Kš\Ñ[\J
+NÂˆB‚ˆÊŠˆH]™HSÔÈÝXœØÜš\[Ûˆ[™HÝ\œ™[H™XYX›H›ÝYšXØ][Ûˆ™YY\™H›Ý™\]Z\™Yˆ
+‹Âˆš]˜]H›ÛÛX[ˆ\ÔÛ™S›ÝYšXØ][Û”]]˜Z[X›J
+HÂˆÛÛ›™XÝÜ•˜[YH›Ùš[HHÛ™TÝ]\Õ˜[Y\Ë™Ù]
+œ›Ùš[\Ë˜[˜ÜÈŠNÂˆ›ÛÛX[ˆ›Ùš[PXÝ]™HH›Ùš[HOH[	‰ˆ›Ùš[K™œ™\Ú	‰ˆ›Ùš[K˜]˜Z[X›Bˆ	‰ˆ›Ùš[Kœ™XYX›H	‰ˆ›ÛÛX[‹••QK™\]X[Ê›Ùš[Kœ˜]Õ˜[YJNÂˆÛÛ›™XÝÜ•˜[YH›ÝYšXØ][ÛœÈHÛ™TÝ]\Õ˜[Y\Ë™Ù]
+››ÝYšXØ][ÛœËš][\ÈŠNÂˆ›ÛÛX[ˆ™YYXÝ]™HH›ÝYšXØ][ÛœÈOH[	‰ˆ›ÝYšXØ][ÛœË™œ™\Úˆ	‰ˆ›ÝYšXØ][ÛœË˜]˜Z[X›H	‰ˆ›ÝYšXØ][ÛœËœ™XYX›NÂˆ™]\›ˆÛ™P[˜ÜÔ™XYH	‰ˆ›Ùš[PXÝ]™H	‰ˆ™YYXÝ]™NÂˆB‚ˆš]˜]H›ÚY\]Q›Ü™YÜ›Ý[™\˜XÚÚ[™Ê
+HÂˆ›ÛÛX[ˆÛ™U˜XÚÚ[™Ó™YYYHÛ™S›ÝYšXØ][Û‘›Ü™YÜ›Ý[™˜XÚÚ[™Ó™YYY
+
+NÂˆÛ™Q^\›˜[Ý™\›^PXÝ]™HHÛ™U˜XÚÚ[™Ó™YYYˆ	‰ˆÚYÙ]XØÙ\ÜÚXš[]TÙ\šXÙKš\ÓX]\šX[^\›˜[Ý™\›^J
+NÂˆ›ÛÛX[ˆÝ\™˜XÙUš\ÚXš[]S™YYYHÝ]\Ð˜\”Ý\™˜XÙPÛÛ^œ™\]Z\™\ÔXÚØYÙU˜XÚÚ[™ÊˆY[’[”XÚØYÙ\ÊH[žPœšXÚÓ™YYÔXÚØYÙU˜XÚÚ[™Ê
+NÂˆYˆ
+š[™[™ÈOH[	‰ˆ\Û™U˜XÚÚ[™Ó™YYY	‰ˆ\Ý\™˜XÙUš\ÚXš[]S™YYY
+HÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ›Ü™YÜ›Ý[™\ÚXÚÔ[›˜X›JNÂˆ\ØYÙTÝ]ÓX[˜YÙ\ˆH[Âˆ\Ý›Ü™YÜ›Ý[™XÚØYÙHH[Âˆ™]\›ŽÂˆBˆ›ÛÛX[ˆ™YY˜XÚÚ[™ÈHÝ\™˜XÙUš\ÚXš[]S™YYYÛ™U˜XÚÚ[™Ó™YYYÂˆ›ÛÛX[ˆXØÙ\ÜÚXš[]PXÝ]™HHÚYÙ]XØÙ\ÜÚXš[]TÙ\šXÙK™Ù][œÝ[˜ÙJ
+HOH[Âˆ›ÛÛX[ˆ\ØYÙQÜ˜[YH\›Z\ÜÚ[ÛœËš\Õ\ØYÙPXØÙ\ÜÑÜ˜[Y
+\ÊNÂˆËÈÛÈ]ÈÈH›Ü™YÜ›Ý[™XÚØYÙN‚ˆËÈHXØÙ\ÜÚXš[]TÙ\šXÙH
+™Y™\œ™Y
+Nˆ\‹Y\Ü^H]K][KY\Ü^HØY™K‚ˆËÈH\ØYÙTÝ]ÓX[˜YÙ\ˆ
+˜[˜XÚÊNˆÛØ˜[Ú[™ÛH›Ü™YÜ›Ý[™XÜ›ÜÜÈ[\Ü^\Ë‚ˆËÈÙHÛ›HÛÚ[ˆ™Z]\ˆ]\È™Z[™Èš]™[ˆžH]™[ÎˆHXØÙ\ÜÚXš[]HÙ\šXÙBˆËÈ\Ú\ÈšXHÐ[šÈÛÛ‘›Ü™YÜ›Ý[™\Ü^SX\\]Y
+
+_K›ÈÛ[™È™YYY‚ˆ›ÛÛX[ˆÚÝ[ÛH™YY˜XÚÚ[™È	‰ˆXXØÙ\ÜÚXš[]PXÝ]™H	‰ˆ\ØYÙQÜ˜[YÂˆYˆ
+™YY˜XÚÚ[™È	‰ˆ
+XØÙ\ÜÚXš[]PXÝ]™H\ØYÙQÜ˜[Y
+JHÂˆYˆ
+\ØYÙQÜ˜[Y	‰ˆ\ØYÙTÝ]ÓX[˜YÙ\ˆOH[
+HÂˆ\ØYÙTÝ]ÓX[˜YÙ\ˆH
+\ØYÙTÝ]ÓX[˜YÙ\ŠHÙ]Þ\Ý[TÙ\šXÙJTÐQÑWÔÕU×ÔÑT•’PÑJNÂˆBˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ›Ü™YÜ›Ý[™\ÚXÚÔ[›˜X›JNÂˆYˆ
+ÚÝ[Û
+HÂˆXZ[’[™\‹œÜÝ
+›Ü™YÜ›Ý[™\ÚXÚÔ[›˜X›JNÂˆBˆËÈYˆXØÙ\ÜÚXš[]H\ÝÛÛ›™XÝY™XÛÛ\]HÛ˜ÙH›ÝÈ8 %ÙHÛÛ‰ÝÙ][ˆ]™[ˆËÈ[[ÛÛY][™ÈXÝX[HÚ[™Ù\ÈÛˆH\Ü^K‚ˆYˆ
+XØÙ\ÜÚXš[]PXÝ]™JHÂˆØY™PÚXÚÑ›Ü™YÜ›Ý[™\
+˜XÚÚ[™È]Ú[™ÙYŠNÂˆBˆH[ÙHÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊ›Ü™YÜ›Ý[™\ÚXÚÔ[›˜X›JNÂˆ\ØYÙTÝ]ÓX[˜YÙ\ˆH[ÂˆÝš[™È˜[˜XÚÔXÚØYÙHHÝ]\Ð˜\”Ý\™˜XÙPÛÛ^š\Ó][˜Ú\’ÛYQ›Ü™YÜ›Ý[™
+
+BˆÈÙ]XÚØYÙS˜[YJ
+Hˆ[Âˆ›ÛÛX[ˆXÚØYÙPÚ[™ÙYHSØš™XÝË™\]X[Êˆ\Ý›Ü™YÜ›Ý[™XÚØYÙK˜[˜XÚÔXÚØYÙJNÂˆ\Ý›Ü™YÜ›Ý[™XÚØYÙHH˜[˜XÚÔXÚØYÙNÂˆËÈHÞ[]XÈÓQK[Û›H[H\È[H]™[Yš]™[ˆ[™[X™\˜][H™\]Z\™\È›ÂˆËÈXÚØYÙH˜XÚÙ\‹]]Ý[ÝÛœÈÝ\œ™[š\ÚXš[]H\š[™È[š]X[Ù\šXÙHš[™‚ˆ\SÝ™\›^Uš\ÚXš[]JX]Ú\Ñ›Ü™YÜ›Ý[™ÛÛ^
+Y[’[”XÚØYÙ\ÊJNÂˆYˆ
+XÚØYÙPÚ[™ÙY
+HÛ”Û™S›ÝYšXØ][Û‘›Ü™YÜ›Ý[™Ú[™ÙY
+
+NÂˆBˆB‚ˆÊŠ‚ˆ
+ˆØ[YžHÐ[šÈÚYÙ]XØÙ\ÜÚXš[]TÙ\šXÙ_HÚ[ˆH\‹Y\Ü^H›Ü™YÜ›Ý[™X\Ú[™Ù\Ë‚ˆ
+ˆ™XÛÛ\]\Èš\ÚXš[]H˜\ÙYÛˆHXÚØYÙHÛˆO›Ý\ÚOˆ\Ü^K‚ˆ
+‹ÂˆX›XÈ›ÚYÛ‘›Ü™YÜ›Ý[™\Ü^SX\\]Y
+
+HÂˆYˆ
+XØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ˆOH[
+HÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\‹œ™Yœ™\Ú
+˜XØÙ\ÜÚXš[]KY\Ü^K[X\ŠNÂˆBˆXZ[’[™\‹œÜÝ
+
+
+HOˆØY™PÚXÚÑ›Ü™YÜ›Ý[™\
+™\Ü^HX\\]HŠJNÂˆB‚ˆÊŠˆ]™[Yš]™[ˆÚYÛ˜[›Üˆ[ˆ\XØ][ÛˆÚ[™ÝÈX›Ý™HH›Ü™YÜ›Ý[™\ÚËˆ
+‹ÂˆX›XÈ›ÚYÛ‘^\›˜[Ý™\›^UÚ[™ÝÔÝ]PÚ[™ÙY
+›ÛÛX[ˆXÝ]™JHÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆÂˆYˆ
+\Ý›ÞYYÛ™Q^\›˜[Ý™\›^PXÝ]™HOHXÝ]™JH™]\›ŽÂˆÛ™Q^\›˜[Ý™\›^PXÝ]™HHXÝ]™NÂˆÛ”Û™S›ÝYšXØ][Û‘›Ü™YÜ›Ý[™Ú[™ÙY
+
+NÂˆJNÂˆB‚ˆÊŠˆ]™[Yš]™[ˆY™XÞXÛH\]H›Üˆ›Û‹\XÚØYÙH\™Ù]ÈÝXÚ\ÈÝ\ˆÓQHXÝ]š]Kˆ
+‹ÂˆX›XÈ›ÚYÛ‘›Ü™YÜ›Ý[™Ý\™˜XÙPÛÛ^Ú[™ÙY
+
+HÂˆ›ÛÛX[ˆ™YØ[“Ü[Z\ÝXÐÛÛ™š\›X][ÛˆH˜[ÙNÂˆ˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK“Ü[Z\ÝXÐXÝ[ÛˆÜ[Z\ÝXÐXÝ[ÛˆBˆ˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK›Ü[Z\ÝXÐXÝ[ÛY\”Ý\™˜XÙPÚ[™ÙJˆXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][Û”[™[™ËˆÝ]\Ð˜\”Ý\™˜XÙPÛÛ^š\Ó˜]šYØ]Ü•Ú[™ÝÑ›Ü™YÜ›Ý[™
+
+KˆÝ]\Ð˜\”Ý\™˜XÙPÛÛ^š\Ó˜]šYØ]Ü•Ú[™ÝÓÜ[Z\ÝXÊ
+JNÂˆÝÚ]Ú
+Ü[Z\ÝXÐXÝ[ÛŠHÂˆØ\ÙHÕT•ÓÔ—Ô‘TÕT•‚ˆËÈHœ™\ÚÝXØÙ\ÜÙ[Ý\XÝ]š]H[™[Ù™ˆÝÛœÈHœ™\Ú›Ý[™YÜ˜XÙKˆBˆËÈ›ÛÝÚ[™È^XÝ˜[œÜ\™[Ü\ÚLL^H]™[ÛÛ™\ÈH˜[˜XÚÈÚÙ[ˆ]ˆËÈ[X™\˜][HX]™\È\È[™\[™[™[™ÜˆÛÛ™š\›X][Ûˆ[›š[™Ë‚ˆ™YÚ[‘XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][ÛŠ
+NÂˆ™YØ[“Ü[Z\ÝXÐÛÛ™š\›X][ÛˆHYNÂˆœ™XZÎÂˆØ\ÙHÐSÑS‚ˆØ[˜Ù[XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][ÛŠ
+NÂˆœ™XZÎÂˆØ\ÙHÑQT‚ˆØ\ÙHQN‚ˆY˜][‚ˆœ™XZÎÂˆBˆYˆ
+X™YØ[“Ü[Z\ÝXÐÛÛ™š\›X][Ûˆ	‰ˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ˆOH[
+HÂˆËÈH\[ÝÛ™Y][˜ÚÙ›ØÝ\ÈÚÙ[ˆ\È[[[Û˜[HÜ[Z\ÝXËˆ™XÛÛ˜Ú[H]Ú]BˆËÈ™X[™[™Üˆœ˜[YHY\ˆ]™\žH˜[œÚ][Û‹]™[ˆÛˆš\›]Ø\™H]ÛZ]ÈØ[˜XÚÜË‚ˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\‹œ™Yœ™\Ú
+œÝ\™˜XÙKXÛÛ^ŠNÂˆBˆ™XÛÛ\]Q›Ü™YÜ›Ý[™Ý\™˜XÙT™\Ù[][ÛŠ
+NÂˆB‚ˆÊŠˆ\Y\È›Ý›ÛÝ[™\‹Y[[Y[[\ÈÚ]Ý]™XÝ\œÚ]™[H™\]Y\Ý[™È[›Ý\ˆÛ˜\ÚÝˆ
+‹Âˆš]˜]H›ÚY™XÛÛ\]Q›Ü™YÜ›Ý[™Ý\™˜XÙT™\Ù[][ÛŠ
+HÂˆ[›˜X›H\]HH
+
+HOˆÂˆ›ÛÛX[ˆXÚØYÙPÚ[™ÙYH˜[ÙNÂˆYˆ
+Ý]\Ð˜\”Ý\™˜XÙPÛÛ^š\Ó][˜Ú\’ÛYQ›Ü™YÜ›Ý[™
+
+Bˆ	‰ˆYY™™XÝ]™S˜]šYØ]Ü•Ú[™ÝÑ›Ü™YÜ›Ý[™
+
+JHÂˆËÈTHŽ[X™\˜][HYÛ›Ü™\ÈÝ\ˆÝÛˆXØÙ\ÜÚXš[]H]™[Ëˆ™\XÙHHÛÜÙYˆËÈœ™YY›Ü›H˜]šYØ]Ü‰ÜÈÝ[HXÚØYÙH[[YYX][HÚ[ˆÓQH™YØZ[œÈ›ØÝ\Ë‚ˆXÚØYÙPÚ[™ÙYHYÙ]XÚØYÙS˜[YJ
+K™\]X[Ê\Ý›Ü™YÜ›Ý[™XÚØYÙJNÂˆ\Ý›Ü™YÜ›Ý[™XÚØYÙHHÙ]XÚØYÙS˜[YJ
+NÂˆBˆ\SÝ™\›^Uš\ÚXš[]JX]Ú\Ñ›Ü™YÜ›Ý[™ÛÛ^
+Y[’[”XÚØYÙ\ÊJNÂˆYˆ
+XÚØYÙPÚ[™ÙY
+HÛ”Û™S›ÝYšXØ][Û‘›Ü™YÜ›Ý[™Ú[™ÙY
+
+NÂˆYˆ
+š[™[™ÈOH[
+HÂˆ™[™\’ÛYP\ÜÚ\Ý[œšXÚÜÊ
+NÂˆ\PœšXÚÕš\ÚXš[]JÝ\œ™[œšXÚÔÙ]
+
+JNÂˆBˆNÂˆËÈ][˜Ú\ˆY™XÞXÛHØ[˜XÚÜÈ[™XYH[ˆÛˆXZ[‹ˆ\Z[™È[›[™H]›ÚYÈHÛ™K[ÛÜˆËÈ›\ÚÙˆÝ[Hš\ÚXš[]HÚ[H™\Ù\š[™ÈHØY™H]›Üˆ[žH]\™H›Û‹URHØ[\‹‚ˆYˆ
+ÛÜ\‹›^SÛÜ\Š
+HOHÛÜ\‹™Ù]XZ[“ÛÜ\Š
+JH\]Kœ[Š
+NÂˆ[ÙHXZ[’[™\‹œÜÝ
+\]JNÂˆB‚ˆÊŠ‚ˆ
+ˆØ[YžHÐ[šÈÚYÙ]XØÙ\ÜÚXš[]TÙ\šXÙ_HÚ[ˆ]ÈÛÛ›™XÝ[ÛˆÝ]H›\È8 %ÛÛ›™XÝˆ
+ˆÜˆ\ØÛÛ›™XÝˆ™KY]˜[X]\ÈÚXÚ›Ü™YÜ›Ý[™]˜XÚÚ[™È\[[™HÈ\ÙH
+XØÙ\ÜÚXš[]Bˆ
+ˆ\ÚœËˆ\ØYÙTÝ]ÈÛ
+K‚ˆ
+‹ÂˆX›XÈ›ÚYÛ‘›Ü™YÜ›Ý[™˜XÚÚ[™Ô]Ú[™ÙY
+
+HÂˆXZ[’[™\‹œÜÝ
+
+
+HOˆØY™U\]Q›Ü™YÜ›Ý[™\˜XÚÚ[™Ê˜XØÙ\ÜÚXš[]HÝ]HŠJNÂˆB‚ˆÊŠˆ™[™ÜˆÙ[ÛY]žH\È]]Üš]]]™HÚ[ˆ]˜Z[X›NÈS’Ó“ÕÓˆ™\Ù\™\ÈHØY™H˜[˜XÚËˆ
+‹Âˆš]˜]H›ÚYÛ‘XØ\ž˜]šYØ]Ü•Ú[™ÝÔÝ]PÚ[™ÙY
+ˆ›Û“[˜]šYØ]Ü•Ú[™ÝÑœ˜[YTÛXÞK”™\Ý[™\Ý[
+HÂˆYˆ
+\Ý›ÞYY
+H™]\›ŽÂˆ˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK•™[™Ü‘XÚ\Ú[ÛˆXÚ\Ú[ÛˆBˆ˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK™XÚ\Ú[Û‘›ÜŠˆ™\Ý[XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][Û”[™[™ËˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[ÛŠNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊXØ\ž˜]šYØ]Ü•Ú[™ÝÓX\ÙQ^\žJNÂˆYˆ
+XÚ\Ú[ÛˆOH˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK•™[™Ü‘XÚ\Ú[Û‹““Ó‘JHÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[ÛˆHXÚ\Ú[ÛŽÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û][\ÙYHLSÂˆ™XÛÛ\]Q›Ü™YÜ›Ý[™Ý\™˜XÙT™\Ù[][ÛŠ
+NÂˆ™]\›ŽÂˆB‚ˆØ[˜Ù[XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][ÛŠ
+NÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[ÛˆHXÚ\Ú[ÛŽÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û][\ÙYHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆXZ[’[™\‹œÜÝ[^YY
+XØ\ž˜]šYØ]Ü•Ú[™ÝÓX\ÙQ^\žKˆPÐT–ÓU’QÐUÔ—ÐÓÓ‘’T“PUSÓ—ÓPTÑWÓTÈ
+ÈS
+NÂ‚ˆËÈÝ\XÝ]š]IÜÈÜ[Z\ÝXÈÚÙ[ˆY\È\™K]]]\Ý›ÝÝ]]™HH[™\[™[ˆËÈ™[™ÜˆX\ÙKˆ˜[œÙ™\ˆÝÛ™\œÚ\žHÛÛœÝ[Z[™ÈÛ›HH™KY^\Ý[™È˜[˜XÚÈ\ÜÙ\[ÛŽÂˆËÈH]\ˆXØÙ\ÜÚXš[]KÛY™XÞXÛH]™[™[XZ[œÈœ™YHÈX›\ÚHœ™\Ú˜[˜XÚË‚ˆÝ]\Ð˜\”Ý\™˜XÙPÛÛ^˜ÛÛœÝ[YS˜]šYØ]Ü•Ú[™ÝÑ˜[˜XÚÊ
+NÂˆ™XÛÛ\]Q›Ü™YÜ›Ý[™Ý\™˜XÙT™\Ù[][ÛŠ
+NÂˆB‚ˆš]˜]H›ÚY™YÚ[‘XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][ÛŠ
+HÂˆXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][Û”[™[™ÈHYNÂˆXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔÝ\Y][\ÙYHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žR[™^HÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žJNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÑ^\žJNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊXØ\ž˜]šYØ]Ü•Ú[™ÝÓX\ÙQ^\žJNÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[ÛˆH˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK•™[™Ü‘XÚ\Ú[Û‹““Ó‘NÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û][\ÙYHLSÂˆXZ[’[™\‹œÜÝ
+XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žJNÂˆXZ[’[™\‹œÜÝ[^YY
+XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÑ^\žKˆPÐT–ÓU’QÐUÔ—ÓÔSRTÕP×ÑÔPÑWÓTÈ
+ÈS
+NÂˆB‚ˆš]˜]H›ÚY[‘XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žJ
+HÂˆYˆ
+\Ý›ÞYYYXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][Û”[™[™ÊH™]\›ŽÂˆÛ™ÈYÙHHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+HHXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔÝ\Y][\ÙYÂˆYˆ
+YÙHYÙHˆPÐT–ÓU’QÐUÔ—ÓÔSRTÕP×ÑÔPÑWÓTÊH™]\›ŽÂˆYˆ
+XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žR[™^ˆHPÐT–ÓU’QÐUÔ—ÓÔSRTÕP×Ô‘U–WÓÑ‘”ÑU×ÓTË›[™Ý
+H™]\›ŽÂˆ[][\HXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žR[™^
+ÊÎÂˆYˆ
+XØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ˆOH[
+HÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\‹œ™Yœ™\Ú
+›Ü[Z\ÝXËXÛÛ™š\›X][Û‹Hˆ
+È][\
+NÂˆBˆYˆ
+XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žR[™^ˆPÐT–ÓU’QÐUÔ—ÓÔSRTÕP×Ô‘U–WÓÑ‘”ÑU×ÓTË›[™Ý
+HÂˆÛ™È™^Ù™œÙ]HPÐT–ÓU’QÐUÔ—ÓÔSRTÕP×Ô‘U–WÓÑ‘”ÑU×ÓTÖÂˆXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žR[™^NÂˆXZ[’[™\‹œÜÝ[^YY
+XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žKˆX]›X^
+S™^Ù™œÙ]HYÙJJNÂˆBˆB‚ˆš]˜]H›ÚYØ[˜Ù[XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][ÛŠ
+HÂˆXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][Û”[™[™ÈH˜[ÙNÂˆXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔÝ\Y][\ÙYHLSÂˆXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žR[™^HÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔ™]žJNÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÑ^\žJNÂˆB‚ˆš]˜]H›ÚY^\™QXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][ÛŠ
+HÂˆYˆ
+\Ý›ÞYYYXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][Û”[™[™ÊH™]\›ŽÂˆÛ™ÈYÙHHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+HHXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÔÝ\Y][\ÙYÂˆYˆ
+YÙHH	‰ˆYÙHHPÐT–ÓU’QÐUÔ—ÓÔSRTÕP×ÑÔPÑWÓTÊHÂˆXZ[’[™\‹œÜÝ[^YY
+XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÑ^\žKˆPÐT–ÓU’QÐUÔ—ÓÔSRTÕP×ÑÔPÑWÓTÈHYÙH
+ÈS
+NÂˆ™]\›ŽÂˆBˆØ[˜Ù[XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][ÛŠ
+NÂˆ›ÛÛX[ˆÛÛœÝ[YY][˜Ú\ÜÙ\[ÛˆBˆÝ]\Ð˜\”Ý\™˜XÙPÛÛ^˜ÛÛœÝ[YS˜]šYØ]Ü•Ú[™ÝÓÜ[Z\ÝXÊ
+NÂˆYˆ
+XÛÛœÝ[YY][˜Ú\ÜÙ\[Û‚ˆ	‰ˆÝ]\Ð˜\”Ý\™˜XÙPÛÛ^š\Ó˜]šYØ]Ü•Ú[™ÝÑ›Ü™YÜ›Ý[™
+
+Bˆ	‰ˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ˆOH[
+HÂˆËÈ˜[œÜ\™[Ü\ÚLL^HX^H[™XYH]™HÛÛ™\YH][˜ÚX\šÙ\ˆ[È[ˆ^XÝˆËÈ˜[˜XÚÈ\ÜÙ\[Û‹ˆ]H[™ÙˆH™[™ÜˆÜ˜XÙKXÝ]™[H™K\]Y\žHÛ˜ÙH[Ü™HÛÂˆËÈÛÈÛÛ™š\›YYP”ÑS•Ø[\\ÈØ[ˆ›Ý[™]˜[˜XÚÈÛÎÈS’Ó“ÕÓˆÝ[˜Z[È˜XÚÂˆËÈÈH^XÝXØÙ\ÜÚXš[]H]šY[˜ÙK‚ˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\‹œ™Yœ™\Ú
+›Ü[Z\ÝXËY^\žHŠNÂˆBˆžHÂˆXYÛ›ÜÝXÒ›Ý\›˜[Ø\›Š›˜]šYØ]Ü‹]Ú[™ÝÈ‹›Ü[Z\ÝXÈÛÛ™š\›X][Ûˆ^\™YŠNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ[šØYÙQ\œ›ÜˆYÛ›Ü™Y
+HßBˆ™XÛÛ\]Q›Ü™YÜ›Ý[™Ý\™˜XÙT™\Ù[][ÛŠ
+NÂˆB‚ˆš]˜]H›ÛÛX[ˆY™™XÝ]™S˜]šYØ]Ü•Ú[™ÝÑ›Ü™YÜ›Ý[™
+
+HÂˆ™]\›ˆ˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK™Y™™XÝ]™UÚ[™ÝÊˆÝ]\Ð˜\”Ý\™˜XÙPÛÛ^š\Ó˜]šYØ]Ü•Ú[™ÝÑ›Ü™YÜ›Ý[™
+
+KˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û‹XØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û][\ÙYˆÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+KPÐT–ÓU’QÐUÔ—ÐÓÓ‘’T“PUSÓ—ÓPTÑWÓTÊNÂˆB‚ˆš]˜]H›ÛÛX[ˆ\Ó]™QXØ\ž˜]šYØ]Ü•Ú[™ÝÐÛÛ™š\›X][ÛŠ
+HÂˆ™]\›ˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û‚ˆOH˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK•™[™Ü‘XÚ\Ú[Û‹•ÒS‘ÕÑQˆ	‰ˆ˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞKš\Ó]™JˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û‹XØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û][\ÙYˆÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+KPÐT–ÓU’QÐUÔ—ÐÓÓ‘’T“PUSÓ—ÓPTÑWÓTÊNÂˆB‚ˆÊŠˆXÝ]™H^\žH\È™\]Z\™YˆÚ]HXYš[™\ˆ\™HX^H™H›È]™[ÈšYÙÙ\ˆH^žH™XYˆ
+‹Âˆš]˜]H›ÚY^\™QXØ\ž˜]šYØ]Ü•Ú[™ÝÓX\ÙJ
+HÂˆYˆ
+\Ý›ÞYYXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û‚ˆOH˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK•™[™Ü‘XÚ\Ú[Û‹““Ó‘JH™]\›ŽÂˆÛ™È›ÝÈHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆÛ™ÈYÙHH›ÝÈHXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û][\ÙYÂˆYˆ
+YÙHH	‰ˆYÙHHPÐT–ÓU’QÐUÔ—ÐÓÓ‘’T“PUSÓ—ÓPTÑWÓTÊHÂˆXZ[’[™\‹œÜÝ[^YY
+XØ\ž˜]šYØ]Ü•Ú[™ÝÓX\ÙQ^\žKˆPÐT–ÓU’QÐUÔ—ÐÓÓ‘’T“PUSÓ—ÓPTÑWÓTÈHYÙH
+ÈS
+NÂˆ™]\›ŽÂˆBˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[ÛˆH˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK•™[™Ü‘XÚ\Ú[Û‹““Ó‘NÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û][\ÙYHLSÂˆžHÂˆXYÛ›ÜÝXÒ›Ý\›˜[Ø\›Š›˜]šYØ]Ü‹]Ú[™ÝÈ‹™[™ÜˆÛÛ™š\›X][ÛˆX\ÙH^\™YŠNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ[šØYÙQ\œ›ÜˆYÛ›Ü™Y
+HßBˆ™XÛÛ\]Q›Ü™YÜ›Ý[™Ý\™˜XÙT™\Ù[][ÛŠ
+NÂˆB‚ˆš]˜]H›ÚYØY™PÚXÚÑ›Ü™YÜ›Ý[™\
+›Û“[Ýš[™ÈÜ\˜][ÛŠHÂˆžHÂˆÚXÚÑ›Ü™YÜ›Ý[™\
+
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ[šØYÙQ\œ›ÜˆÝ]Ù“Y[[ÜžQ\œ›Üˆ˜Z[\™JHÂˆ™\Ü›Ü™YÜ›Ý[™˜Z[\™JÜ\˜][Û‹˜Z[\™JNÂˆBˆB‚ˆš]˜]H›ÚYØY™U\]Q›Ü™YÜ›Ý[™\˜XÚÚ[™Ê›Û“[Ýš[™ÈÜ\˜][ÛŠHÂˆžHÂˆ\]Q›Ü™YÜ›Ý[™\˜XÚÚ[™Ê
+NÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ[šØYÙQ\œ›ÜˆÝ]Ù“Y[[ÜžQ\œ›Üˆ˜Z[\™JHÂˆ™\Ü›Ü™YÜ›Ý[™˜Z[\™JÜ\˜][Û‹˜Z[\™JNÂˆBˆB‚ˆš]˜]H›ÚY™\Ü›Ü™YÜ›Ý[™˜Z[\™J›Û“[Ýš[™ÈÜ\˜][Û‹ˆ›Û“[›ÝØX›H˜Z[\™JHÂˆYˆ
+˜Z[\™H[œÝ[˜Ù[ÙˆÝ]Ù“Y[[ÜžQ\œ›ÜŠH™]\›ŽÂˆÛ™È›ÝÈHÞ\Ý[PÛØÚË™[\ÙY™X[[YJ
+NÂˆYˆ
+\Ý›Ü™YÜ›Ý[™˜Z[\™SÙÑ[\ÙYOHˆ	‰ˆ›ÝÈH\Ý›Ü™YÜ›Ý[™˜Z[\™SÙÑ[\ÙY“Ô‘QÔ“ÕS‘ÑRST‘WÓÑ×ÒS•T•SÓTÊHÂˆ™]\›ŽÂˆBˆ\Ý›Ü™YÜ›Ý[™˜Z[\™SÙÑ[\ÙYH›ÝÎÂˆÝš[™È]Z[HÜ\˜][Ûˆ
+Èˆ™Z™XÝYˆ
+È˜Z[\™K™Ù]Û\ÜÊ
+K™Ù]Ú[\S˜[YJ
+NÂˆžHÈÙËÊQË]Z[
+NÈBˆØ]Ú
+[[YQ^Ù\[Ûˆ[šØYÙQ\œ›ÜˆYÛ›Ü™Y
+HßBˆžHÈXYÛ›ÜÝXÒ›Ý\›˜[Ø\›Š›˜]šYØ]Ü‹Y›Ü™YÜ›Ý[™‹]Z[
+NÈBˆØ]Ú
+[[YQ^Ù\[Ûˆ[šØYÙQ\œ›ÜˆYÛ›Ü™Y
+HßBˆB‚ˆš]˜]H›ÚYÚXÚÑ›Ü™YÜ›Ý[™\
+
+HÂˆYˆ
+TÝ]\Ð˜\”Ý\™˜XÙPÛÛ^œ™\]Z\™\ÔXÚØYÙU˜XÚÚ[™ÊY[’[”XÚØYÙ\ÊBˆ	‰ˆX[žPœšXÚÓ™YYÔXÚØYÙU˜XÚÚ[™Ê
+Bˆ	‰ˆ\Û™S›ÝYšXØ][Û‘›Ü™YÜ›Ý[™˜XÚÚ[™Ó™YYY
+
+JH™]\›ŽÂ‚ˆÚYÙ]XØÙ\ÜÚXš[]TÙ\šXÙHLL^HHÚYÙ]XØÙ\ÜÚXš[]TÙ\šXÙK™Ù][œÝ[˜ÙJ
+NÂˆÝš[™È]\ÝXÚØYÙNÂˆYˆ
+LL^HOH[
+HÂˆËÈ\Ü^KX]Ø\™NˆÛÚÈ\H›Ü™YÜ›Ý[™XÚØYÙHÛˆÝ\ˆÝ™\›^IÜÈ\Ü^HÛ›K‚ˆËÈYˆHXØÙ\ÜÚXš[]Hœ˜[Y]ÛÜšÈ\Û‰Ý™\ÜY[ž][™È›Üˆ]\Ü^HY]ˆËÈ˜[›ÝYÚÈH\ØYÙTÝ]È]ÛÈÙIÜ™H›Ý›[™Ûˆš\œÝÝ\‚ˆ[^Q\Ü^RYHÝ\œ™[Ý™\›^Q\Ü^RY
+
+NÂˆ]\ÝXÚØYÙHHLL^K™Ù]›Ü™YÜ›Ý[™XÚØYÙSÛ‘\Ü^J^Q\Ü^RY
+NÂˆYˆ
+]\ÝXÚØYÙHOH[	‰ˆ\ØYÙTÝ]ÓX[˜YÙ\ˆOH[ˆ	‰ˆ\›Z\ÜÚ[ÛœËš\Õ\ØYÙPXØÙ\ÜÑÜ˜[Y
+\ÊJHÂˆ]\ÝXÚØYÙHH]\ÝXÚØYÙQœ›ÛU\ØYÙTÝ]Ê
+NÂˆBˆH[ÙHÂˆËÈÛØ˜[]8 %ÛÜšÜÈÛˆÚ[™ÛKY\Ü^H]šXÙ\Ë‚ˆYˆ
+\ØYÙTÝ]ÓX[˜YÙ\ˆOH[
+H™]\›ŽÂˆYˆ
+T\›Z\ÜÚ[ÛœËš\Õ\ØYÙPXØÙ\ÜÑÜ˜[Y
+\ÊJHÂˆ\]Q›Ü™YÜ›Ý[™\˜XÚÚ[™Ê
+NÂˆ™]\›ŽÂˆBˆ]\ÝXÚØYÙHH]\ÝXÚØYÙQœ›ÛU\ØYÙTÝ]Ê
+NÂˆBˆYˆ
+]\ÝXÚØYÙHOH[
+H™]\›ŽÂˆYˆ
+Ý]\Ð˜\”Ý\™˜XÙPÛÛ^š\Ó˜]šYØ]Ü•Ú[™ÝÑ›Ü™YÜ›Ý[™
+
+Bˆ	‰ˆZ\Ó]™QXØ\ž˜]šYØ]Ü•Ú[™ÝÐÛÛ™š\›X][ÛŠ
+Bˆ	‰ˆYXØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][Û”[™[™Âˆ	‰ˆTÝ]\Ð˜\”Ý\™˜XÙPÛÛ^š\ÖX[™^XÚØYÙJ]\ÝXÚØYÙJJHÂˆËÈ\ØYÙTÝ]È\È›ÈXÝ]š]HÛ\ÜÈ[™X^HYÈ™Z[™HÛÝÈœ™YY›Ü›H[™[Ù™‹ÛÈ]ˆËÈØ[››ÝØ[˜Ù[H[™\[™[][˜ÚÜ˜XÙKˆÛ˜ÙH]Ü˜XÙH\È[™Y]Ø[ˆÝ[ˆËÈ›Ý™H]H›Ø][™ÈÝ\™˜XÙH\È›ÈÛ™Ù\ˆÜ[ÜÝ[™™]™[H˜[˜XÚÈÚÙ[‚ˆËÈœ›ÛHXZÚ[™È[ÈH™^Ü™[˜\žH\XØ][Û‹‚ˆÝ]\Ð˜\”Ý\™˜XÙPÛÛ^œÙ]˜]šYØ]Ü•Ú[™ÝÑ›Ü™YÜ›Ý[™
+˜[ÙJNÂˆB‚ˆ›ÛÛX[ˆÚ[™ÙYH[]\ÝXÚØYÙK™\]X[Ê\Ý›Ü™YÜ›Ý[™XÚØYÙJNÂˆ\Ý›Ü™YÜ›Ý[™XÚØYÙHH]\ÝXÚØYÙNÂˆ\SÝ™\›^Uš\ÚXš[]JX]Ú\Ñ›Ü™YÜ›Ý[™ÛÛ^
+Y[’[”XÚØYÙ\ÊJNÂˆYˆ
+Ú[™ÙY
+HÂˆÛ”Û™S›ÝYšXØ][Û‘›Ü™YÜ›Ý[™Ú[™ÙY
+
+NÂˆYˆ
+š[™[™ÈOH[
+HÂˆ™[™\’ÛYP\ÜÚ\Ý[œšXÚÜÊ
+NÂˆ\PœšXÚÕš\ÚXš[]JÝ\œ™[œšXÚÔÙ]
+
+JNÂˆBˆBˆB‚ˆÊŠˆ\Ü^HQÝ\ˆÝ™\›^IÜÈÚ[™ÝÈ\È]XÚYËˆY˜][ÈÈÐÛÙHQUSÑTÔV_Bˆ
+ˆYˆÙHØ[‰Ý]\›Z[™H]
+Ú[™ÛKY\Ü^H]šXÙ\ÈÜˆ™KX]XÚ
+Kˆ
+‹Âˆš]˜]H[Ý\œ™[Ý™\›^Q\Ü^RY
+
+HÂˆYˆ
+š[™[™ÈOH[
+H™]\›ˆ[™›ÚYšY]Ë‘\Ü^K‘QUSÑTÔVNÂˆ[™›ÚYšY]Ë‘\Ü^H\Ü^HHš[™[™Ë™Ù]›ÛÝ
+
+K™Ù]\Ü^J
+NÂˆ™]\›ˆ\Ü^HOH[È\Ü^K™Ù]\Ü^RY
+
+Hˆ[™›ÚYšY]Ë‘\Ü^K‘QUSÑTÔVNÂˆB‚ˆÊŠˆ^˜XÝÈH[ÜÝ™XÙ[›Ü™YÜ›Ý[™XÚØYÙHœ›ÛHÐ[šÈ\ØYÙTÝ]ÓX[˜YÙ\ŸKˆ[Y‚ˆ
+ˆ›Ý[™ÈØ\È™\ÜY[ˆHÛÚØ˜XÚÈÚ[™ÝËˆ
+‹Âˆ[X›Bˆš]˜]HÝš[™È]\ÝXÚØYÙQœ›ÛU\ØYÙTÝ]Ê
+HÂˆYˆ
+\ØYÙTÝ]ÓX[˜YÙ\ˆOH[
+H™]\›ˆ[ÂˆÛ™È›ÝÈHÞ\Ý[K˜Ý\œ™[[YSZ[\Ê
+NÂˆ\ØYÙQ]™[È]™[ÈH\ØYÙTÝ]ÓX[˜YÙ\‹œ]Y\žQ]™[Ê›ÝÈH“Ô‘QÔ“ÕS‘ÐTÓÓÒÐPÒ×ÓTË›ÝÊNÂˆ\ØYÙQ]™[Ë‘]™[]™[H™]È\ØYÙQ]™[Ë‘]™[
+
+NÂˆÝš[™È]\ÝH\Ý›Ü™YÜ›Ý[™XÚØYÙNÂˆÛ™È]\Ý[Y\Ý[\HÂˆÚ[H
+]™[Ë™Ù]™^]™[
+]™[
+JHÂˆ[\HH]™[™Ù]]™[\J
+NÂˆYˆ
+\HOH\ØYÙQ]™[Ë‘]™[“SÕ‘WÕ×Ñ“Ô‘QÔ“ÕS‘ˆ
+Z[•‘T”ÒSÓ‹”Ñ×ÒS•HZ[•‘T”ÒSÓ—ÐÓÑTË”Bˆ	‰ˆ\HOH\ØYÙQ]™[Ë‘]™[PÕU’UWÔ‘TÕSQQ
+JHÂˆYˆ
+]™[™Ù][YTÝ[\
+
+HH]\Ý[Y\Ý[\
+HÂˆ]\Ý[Y\Ý[\H]™[™Ù][YTÝ[\
+
+NÂˆ]\ÝH]™[™Ù]XÚØYÙS˜[YJ
+NÂˆBˆBˆBˆ™]\›ˆ]\ÝÂˆB‚ˆš]˜]H›ÚY\SÝ™\›^Uš\ÚXš[]J›ÛÛX[ˆYJHÂˆYˆ
+Ý™\›^RY[žP\OHYJHÂˆ™]\›ŽÂˆBˆÝ™\›^RY[žP\HYNÂˆYˆ
+š[™[™ÈOH[
+H™]\›ŽÂˆšY]È›ÛÝHš[™[™Ë™Ù]›ÛÝ
+
+NÂˆ›ÛÝ˜[š[X]J
+K˜Ø[˜Ù[
+
+NÂˆYˆ
+YJHÂˆËÈ[š[X]HÈ[H˜[œÜ\™[[ˆÛÛ\ÙHÛÈHÚ[™ÝÈÝÜÈØØÝ\Z[™ÈÜXÙK‚ˆ›ÛÝ˜[š[X]J
+Bˆ˜[JŠBˆœÙ]\˜][ÛŠÕ‘T“VWÑQWÑTUSÓ—ÓTÊBˆÚ][™XÝ[ÛŠ
+
+HOˆÂˆYˆ
+Ý™\›^RY[žP\
+H›ÛÝœÙ]š\ÚXš[]JšY]Ë‘ÓÓ‘JNÂˆJBˆœÝ\
+
+NÂˆH[ÙHÂˆËÈH[š[X]J
+K˜Ø[˜Ù[
+
+HX›Ý™HX]™\È[H]Ú]]™\ˆ]Ø\ÈZYX[š[X][ÛŽÂˆËÈÝ\H˜YKZ[ˆœ›ÛHHÝ\œ™[˜[YHÈ]È\™Ù]ÙˆY‹‚ˆ›ÛÝœÙ]š\ÚXš[]JšY]Ë•’TÒP“JNÂˆ›ÛÝ˜[š[X]J
+Bˆ˜[JYŠBˆœÙ]\˜][ÛŠÕ‘T“VWÑQWÑTUSÓ—ÓTÊBˆœÝ\
+
+NÂˆBˆB‚ˆš]˜]H›ÚY\]P˜XÚÙÜ›Ý[™
+
+HÂˆYˆ
+š[™[™ÈOH[
+HÂˆ™]\›ŽÂˆBˆYˆ
+[YYÛÛ^OH[
+HÂˆ\]U[YYÛÛ^
+
+NÂˆBˆËÈ™XYœ›ÛHH[›™\ˆÛÛZ[™\‹ÚXÚ\ÈÚ\™HH˜XÚÙÜ›Ý[™˜]ØX›H]™\È[™Ú]ˆËÈ˜[œÚ][Û“X[˜YÙ\ˆ[š[X]\Ëˆ™XY[™Èœ›ÛHÙ]›ÛÝ
+
+HÛÝ[\š[™ÈHš\ÚXš[]BˆËÈ˜[œÚ][Û‹œšYY›H™]\›ˆHØÜ™Y[‹]ÚYÚ[™ÝÈY™™\ˆ[™Ø\X^˜Y]\ÈÛÈYÚ‚ˆ[ÚYHš[™[™Ë›Ý™\›^PÛÛZ[™\‹™Ù]ÚY
+
+NÂˆ[ZYÚHš[™[™Ë›Ý™\›^PÛÛZ[™\‹™Ù]ZYÚ
+
+NÂˆYˆ
+ÚYOHZYÚOH
+HÂˆ™]\›ŽÂˆBˆ[X^˜Y]\ÈHX]›Z[ŠÚYZYÚ
+HÈŽÂˆ[˜XÚÙÜ›Ý[™ÛÜ›™\”˜Y]\ÈH
+™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTŠBˆÈˆˆX^˜Y]\È
+ˆ™YœË˜˜XÚÙÜ›Ý[™ÛÜ›™\”˜Y]\Ë™Ù]
+
+HÈLÂˆ[˜XÚÙÜ›Ý[™ÛÛÜˆHÛÛ^ÛÛ\]™Ù]ÛÛÜŠ[YYÛÛ^‹˜ÛÛÜ‹ÚYÙ]Ø˜XÚÙÜ›Ý[™
+H	ˆ‘‘‘‘‘ˆ
+™YœË˜˜XÚÙÜ›Ý[™[K™Ù]
+
+H
+NÂˆš[™[™Ë›Ý™\›^PÛÛZ[™\‹œÙ]˜XÚÙÜ›Ý[™
+Ù]˜XÚÙÜ›Ý[™
+˜XÚÙÜ›Ý[™ÛÛÜ‹˜XÚÙÜ›Ý[™ÛÜ›™\”˜Y]\ÊJNÂˆB‚ˆš]˜]H˜]ØX›HÙ]˜XÚÙÜ›Ý[™
+[ÛÛÜ‹[ÛÜ›™\”˜Y]\ÊHÂˆYˆ
+\Ë˜˜XÚÙÜ›Ý[™OH[ÛÛÜˆOH\Ë˜™ÐÛÛÜˆÛÜ›™\”˜Y]\ÈOH\Ë˜™ÐÛÜ›™\”˜Y]\ÊHÂˆ\Ë˜˜XÚÙÜ›Ý[™H™]ÈÜ˜YY[˜]ØX›J
+NÂˆ\Ë˜˜XÚÙÜ›Ý[™œÙ]ÛÛÜŠÛÛÜŠNÂˆ\Ë˜˜XÚÙÜ›Ý[™œÙ]ÛÜ›™\”˜Y]\ÊÛÜ›™\”˜Y]\ÊNÂˆ\Ë˜™ÐÛÛÜˆHÛÛÜŽÂˆ\Ë˜™ÐÛÜ›™\”˜Y]\ÈHÛÜ›™\”˜Y]\ÎÂˆB‚ˆ™]\›ˆ\Ë˜˜XÚÙÜ›Ý[™ÂˆB‚ˆš]˜]H›ÚY\]Q]U[YJ
+HÂˆYˆ
+š[™[™ÈOH[
+H™]\›ŽÂˆÙ]œšXÚÕ\OˆœšXÚÜÈH[[TÙ]››Û™SÙŠœšXÚÕ\K˜Û\ÜÊNÂˆœšXÚÜË˜Y[
+œšXÚÕ\Kœ\œÙSÜ™\Š™YœË˜œšXÚÓÜ™\‹™Ù]
+
+JJNÂˆ›ÛÛX[ˆÚÝÕ[YHHœšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K•SQJH\ÔÜ\Z[[”™\]Y\ÝY
+œšXÚÕ\K•SQJNÂˆ›ÛÛX[ˆ]PœšXÚÐXÝ]™HHœšXÚÜË˜ÛÛZ[œÊœšXÚÕ\K‘UJBˆ\ÔÜ\Z[[”™\]Y\ÝY
+œšXÚÕ\K‘UJNÂˆ›ÛÛX[ˆÚÝÑ]HH]PœšXÚÐXÝ]™H	‰ˆ™YœË™]KœÚÝÑ]K™Ù]
+
+NÂˆ›ÛÛX[ˆÚÝÑ^SÙ•UÙYZÈH]PœšXÚÐXÝ]™H	‰ˆ™YœË™]KœÚÝÑ^SÙ•ÙYZË™Ù]
+
+NÂ‚ˆYˆ
+\ÚÝÕ[YH	‰ˆ\ÚÝÑ]H	‰ˆ\ÚÝÑ^SÙ•UÙYZÊHÂˆ™]\›ŽÂˆB‚ˆ›ÛÛX[ˆÚÝÑ[^P[™[ÛH™YœË™]KœÚÝÑ[˜[YK™Ù]
+
+NÂ‚ˆÝš[™È]šY\ˆH
+ÚÝÑ]H	‰ˆÚÝÑ^SÙ•UÙYZÊHÈ
+™YœË™]K›Û™S[™S^[Ý]™Ù]
+
+HÈ‹ˆˆˆˆŠHˆˆŽÂˆÝš[™È^SÙ•UÙYZÑ›Ü›X]ÝˆHÚÝÑ[^P[™[ÛÈ‘QQQHˆˆ‘QQHŽÂˆÝš[™È]Q›Ü›X]ÝˆHÚÝÑ[^P[™[ÛÈ™SSSHˆˆ™SSHŽÂ‚ˆËÈÙHYÜXÙ\È]HÝ\Ù[™È]›ÚYÝ][™HÜ›Ü[™ÈžHØ[˜\ÈÚXÚ\È›Ý™XYH›ÜˆHÝ][™BˆÝš[™È^T\HÚÝÑ^SÙ•UÙYZÈÈˆˆ
+È^SÙ•UÙYZÑ›Ü›X]ÝˆˆˆŽÂˆÝš[™È]T\HÚÝÑ]HÈˆˆ
+È]Q›Ü›X]ÝˆˆˆŽÂˆÝš[™È[›Ü›X]ÝˆH™YœË™]K™]P™Y›Ü™Q^SÙ•ÙYZË™Ù]
+
+BˆÈ]T\
+È
+ÚÝÑ]H	‰ˆÚÝÑ^SÙ•UÙYZÈÈ]šY\ˆˆˆŠH
+È^T\
+Èˆ‚ˆˆ^T\
+È
+ÚÝÑ]H	‰ˆÚÝÑ^SÙ•UÙYZÈÈ]šY\ˆˆˆŠH
+È]T\
+ÈˆŽÂ‚ˆYˆ
+Y[›Ü›X]Ý‹™\]X[ÊÝ\œ™[]Q›Ü›X]]\›ŠJHÂˆ]Q›Ü›X]H™]ÈÚ[\Q]Q›Ü›X]
+[›Ü›X]Ý‹ØØ[K™Ù]Y˜][
+
+JNÂˆÝ\œ™[]Q›Ü›X]]\›ˆH[›Ü›X]ÝŽÂˆB‚ˆ]H›ÝÈH™]È]J
+NÂˆYˆ
+ÚÝÕ[YJHÂˆÝš[™È[YTÝˆH[YQ›Ü›X]™›Ü›X]
+›ÝÊNÂˆYˆ
+][YTÝ‹˜ÛÛ[\]X[Êš[™[™Ë[YU^™Ù]^
+
+JJHÂˆš[™[™Ë[YU^œÙ]^
+[YTÝŠNÂˆBˆBˆYˆ
+ÚÝÑ]HÚÝÑ^SÙ•UÙYZÊHÂˆÝš[™È]TÝˆH]Q›Ü›X]™›Ü›X]
+›ÝÊNÂˆYˆ
+Y]TÝ‹˜ÛÛ[\]X[Êš[™[™Ë™]U^™Ù]^
+
+JJHÂˆš[™[™Ë™]U^œÙ]^
+]TÝŠNÂˆBˆBˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆB‚ˆÝ\™\ÜÓ[
+ÛXÚØX›UšY]ÐXØÙ\ÜÚXš[]HŠBˆš]˜]H›ÚYÙ]\˜YÓ\Ý[™\Š
+HÂˆš[™[™Ë™Ù]›ÛÝ
+
+KœÙ]Û•ÝXÚ\Ý[™\Š
+‹]™[
+HOˆÂˆÚ[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\È\˜[\ÈH
+Ú[™ÝÓX[˜YÙ\‹“^[Ý]\˜[\ÊHš[™[™Ë™Ù]›ÛÝ
+
+K™Ù]^[Ý]\˜[\Ê
+NÂ‚ˆÝÚ]Ú
+]™[™Ù]XÝ[ÛŠ
+JHÂˆØ\ÙH[Ý[Û‘]™[PÕSÓ—ÑÕÓŽ‚ˆ[š]X[H\˜[\ËžÂˆ[š]X[HH\˜[\ËžNÂˆ[š]X[ÝXÚH]™[™Ù]˜]Ö
+
+NÂˆ[š]X[ÝXÚHH]™[™Ù]˜]ÖJ
+NÂˆ™]\›ˆYNÂ‚ˆØ\ÙH[Ý[Û‘]™[PÕSÓ—ÓSÕ‘N‚ˆYˆ
+™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTŠHÂˆËÈ[›™YÈ
+
+H[]ÚY8 %˜YÈ\È\ØX›Y]ÛÛœÝ[YHH]™[ÛÂˆËÈPÕSÓ—ÕTÝ[\œš]™\È›ÜˆÛXÚÈ[™[™Ë‚ˆ™]\›ˆYNÂˆBˆ\˜[\ËžH[š]X[
+È
+[
+H
+]™[™Ù]˜]Ö
+
+HH[š]X[ÝXÚ
+NÂˆ\˜[\ËžHH[š]X[H
+È
+[
+H
+]™[™Ù]˜]ÖJ
+HH[š]X[ÝXÚJNÂˆÚ[™ÝÓX[˜YÙ\‹\]UšY]Ó^[Ý]
+š[™[™Ë™Ù]›ÛÝ
+
+K\˜[\ÊNÂˆ›ÝYžSÝ™\›^TÝ]J
+NÂˆ™]\›ˆYNÂ‚ˆØ\ÙH[Ý[Û‘]™[PÕSÓ—ÕT‚ˆYˆ
+™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTŠHÂˆØ]™TÜÚ][ÛŠ
+NÂˆB‚ˆËÈ[™HÛXÚÂˆYˆ
+X]˜XœÊ]™[™Ù]˜]Ö
+
+HH[š]X[ÝXÚ
+HÝXÚÛÜ	‰ˆX]˜XœÊ]™[™Ù]˜]ÖJ
+HH[š]X[ÝXÚJHÝXÚÛÜ
+HÂˆYˆ
+š[™[™ËÚYšTÝ]\ÒXÛÛ‹™Ù]š\ÚXš[]J
+HOHšY]Ë•’TÒP“H	‰‚ˆÙ]›Ý[™Êš[™[™ËÚYšTÝ]\ÒXÛÛŠK˜ÛÛZ[œÊ
+[
+H]™[™Ù]
+
+K
+[
+H]™[™Ù]J
+JJHÂˆ[[[[H™]È[[
+Ù][™ÜËPÕSÓ—ÕÒQ’WÔÑUS‘ÔÊNÂˆ[[˜Y›YÜÊ[[‘“Q×ÐPÕU’UWÓ‘U×ÕTÒÊNÂˆØY™TÝ\XÝ]š]J[[
+NÂˆ™]\›ˆYNÂˆBˆYˆ
+š[™[™Ë™ÛœÜÔÝ]\ÒXÛÛ‹™Ù]š\ÚXš[]J
+HOHšY]Ë•’TÒP“H	‰‚ˆÙ]›Ý[™Êš[™[™Ë™ÛœÜÔÝ]\ÒXÛÛŠK˜ÛÛZ[œÊ
+[
+H]™[™Ù]
+
+K
+[
+H]™[™Ù]J
+JJHÂˆ[[[[HÙ]XÚØYÙSX[˜YÙ\Š
+K™Ù]][˜Ú[[›Ü”XÚØYÙJÓ”ÔÔÒT‘WÐÓQS•ÔPÒÐQÑJNÂˆYˆ
+[[OH[
+HÂˆ[[H™]È[[
+Ù][™ÜËPÕSÓ—ÓÐÐUSÓ—ÔÓÕTÑWÔÑUS‘ÔÊNÂˆBˆ[[˜Y›YÜÊ[[‘“Q×ÐPÕU’UWÓ‘U×ÕTÒÊNÂˆØY™TÝ\XÝ]š]J[[
+NÂˆ™]\›ˆYNÂˆB‚ˆÝ\XZ[XÝ]š]J
+NÂˆBˆ™]\›ˆYNÂˆBˆ™]\›ˆ˜[ÙNÂˆJNÂˆB‚ˆš]˜]H›ÚYÝ\XZ[XÝ]š]J
+HÂˆ[[Ý\[[H™]È[[
+ÚYÙ]Ù\šXÙK\ËXZ[XÝ]š]K˜Û\ÜÊNÂˆÝ\[[œÙ]›YÜÊ[[‘“Q×ÐPÕU’UWÔÒS‘ÓWÕÔ[[‘“Q×ÐPÕU’UWÓ‘U×ÕTÒÊNÂˆØY™TÝ\XÝ]š]JÝ\[[
+NÂˆB‚ˆÊŠ‚ˆ
+ˆÛÛYHØ\ˆXY[š]ÈÛ‰ÝÚ\HÞ\Ý[HÚKQšHÈØØ][ÛˆÈ\Z[™›ÈXÝ]š]Y\È][ˆ
+ˆÛÈ][˜Ú[™È[Hœ›ÛHHÝ™\›^H›ÝÜÈXÝ]š]S›Ý›Ý[™^Ù\[Ûˆ[™X\œÈÝÛˆBˆ
+ˆÙ\šXÙH›ØÙ\ÜËˆÝØ[ÝÈH˜Z[\™H8 %HXÛÛˆ\\È›Û‹Y\ÜÙ[X[‚ˆ
+‹Âˆš]˜]H›ÚYØY™TÝ\XÝ]š]J[[[[
+HÂˆžHÂˆÝ\XÝ]š]J[[
+NÂˆHØ]Ú
+›ÝØX›H
+HÂˆÙËÊQËœÝ\XÝ]š]H˜Z[Y›Üˆˆ
+È[[™Ù]XÝ[ÛŠ
+K
+NÂˆBˆB‚ˆš]˜]H›ÚYÙ]ÚYšTÝ]\ÊÚQšTÝ]H™]ÔÝ]JHÂˆYˆ
+\Ý›ÞYYš[™[™ÈOH[™YœÈOH[\™YœËÚYÙ][˜X›Y™Ù]
+
+JH™]\›ŽÂˆYˆ
+ÚYšTÝ]HOH™]ÔÝ]JH™]\›ŽÂˆÚYšTÝ]HH™]ÔÝ]NÂˆYˆ
+™]ÔÝ]HOHÚQšTÝ]K“Ñ‘ŠHÚYšTÚYÛ˜[]™[HÂˆ[ÙHÚYšTÚYÛ˜[]™[H™XYÚYšTÚYÛ˜[]™[
+
+NÂˆ\]UÚYšTÝ]\Ê
+NÂˆB‚ˆš]˜]H›ÚY\]UÚYšTÝ]\Ê
+HÂˆYˆ
+š[™[™ÈOH[
+HÂˆÝ][™R[XYÙUšY]ÈXÛÛˆHš[™[™ËÚYšTÝ]\ÒXÛÛŽÂˆXÛÛ‹œÙ][XYÙT™\ÛÝ\˜ÙJ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÝÚYšWÛ]™[
+NÂˆXÛÛ‹œÙ][XYÙS]™[
+ÚYšTÚYÛ˜[]™[
+ˆL
+NÂˆXÛÛ‹œÙ]˜]ÒXÛÛŠYJNÂˆ[XYÙUšY]ÐÛÛ\]œÙ][XYÙU[\Ý
+XÛÛ‹[
+NÂˆ\PÛÛ™šYÝ\™YXÛÛ“Ý][™JXÛÛ‹™YœËÚYšJNÂˆXÛÛ‹œÙ]˜YÙU^
+[
+NÂˆYˆ
+ÚYšTÝ]HOHÚQšTÝ]K“SRUQÒS•T“‘U
+HÂˆ˜]ØX›H›YÈHÛÛ^ÛÛ\]™Ù]˜]ØX›J\Ë‹™˜]ØX›KšX×Ø˜YÙWÜWÙ›YÊNÂˆXÛÛ‹œÙ]˜YÙQ˜]ØX›J›YÈOH[È[ˆ›YË›]]]J
+JNÂˆH[ÙHÂˆXÛÛ‹œÙ]˜YÙQ˜]ØX›J[
+NÂˆBˆBˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆB‚ˆš]˜]H›ÚY™Yœ™\ÚÚYšTÚYÛ˜[]™[
+
+HÂˆ[™^HÚYšTÝ]HOHÚQšTÝ]K“Ñ‘ˆÈˆ™XYÚYšTÚYÛ˜[]™[
+
+NÂˆYˆ
+™^OHÚYšTÚYÛ˜[]™[
+H™]\›ŽÂˆÚYšTÚYÛ˜[]™[H™^Âˆ\]UÚYšTÝ]\Ê
+NÂˆB‚ˆš]˜]H[™XYÚYšTÚYÛ˜[]™[
+
+HÂˆžHÂˆÚYšSX[˜YÙ\ˆX[˜YÙ\ˆH
+ÚYšSX[˜YÙ\ŠHÙ]\XØ][ÛÛÛ^
+
+Bˆ™Ù]Þ\Ý[TÙ\šXÙJÛÛ^•ÒQ’WÔÑT•’PÑJNÂˆÚYšR[™›È[™›ÈHX[˜YÙ\ˆOH[È[ˆX[˜YÙ\‹™Ù]ÛÛ›™XÝ[Û’[™›Ê
+NÂˆYˆ
+[™›ÈOH[[™›Ë™Ù]™]ÛÜšÒY
+
+H
+H™]\›ˆÂˆ™]\›ˆX]›X^
+KX]›Z[ŠˆÚYšSX[˜YÙ\‹˜Ø[Ý[]TÚYÛ˜[]™[
+[™›Ë™Ù]œÜÚJ
+K
+H
+ÈJJNÂˆHØ]Ú
+[[YQ^Ù\[Ûˆ[˜]˜Z[X›JHÂˆÙËÊQËÛÝ[›Ý™XYÚKQšH”ÔÒH‹[˜]˜Z[X›JNÂˆ™]\›ˆÚYšTÝ]HOHÚQšTÝ]K“Ñ‘ˆÈˆNÂˆBˆB‚ˆš]˜]H›ÚYÙ]ÛœÜÔÝ]\ÊÛœÜÔÝ]H™]ÔÝ]JHÂˆYˆ
+\Ý›ÞYYš[™[™ÈOH[™YœÈOH[\™YœËÚYÙ][˜X›Y™Ù]
+
+JH™]\›ŽÂˆYˆ
+ÛœÜÔÝ]HOH™]ÔÝ]JHÂˆ™]\›ŽÂˆBˆÛœÜÔÝ]HH™]ÔÝ]NÂˆ\]QÛœÜÔÝ]\Ê
+NÂˆB‚ˆš]˜]H›ÚY\]QÛœÜÔÝ]\Ê
+HÂˆYˆ
+š[™[™ÈOH[
+HÂˆ\]RXÛÛ”Ý]\ÊPÓÓ—ÕTWÑÓ”ÔËš[™[™Ë™ÛœÜÔÝ]\ÒXÛÛ‹ÛœÜÔÝ]K›Ü™[˜[
+
+JNÂˆBˆØÚY[TÜ\™Yœ™\Ú
+
+NÂˆB‚ˆš]˜]H›ÚY\]RXÛÛ”Ý]\Ê[XÛÛ•\KÝ][™R[XYÙUšY]ÈXÛÛ‹[Ý]JHÂˆ[\ÚYÛ’YHX]›Z[ŠX]›X^
+™YœËšXÛÛ‘\ÚYÛ‹™Ù]
+
+JKPÓÓ—ÑTÒQÓ”Ë›[™ÝHJNÂˆ[×V×H\ÚYÛˆHPÓÓ—ÑTÒQÓ”ÖÙ\ÚYÛ’YNÂˆ[Ý]RYHX]›Z[ŠX]›X^
+Ý]JK\ÚYÛ–ÚXÛÛ•\WK›[™ÝHJNÂˆXÛÛ‹œÙ][XYÙT™\ÛÝ\˜ÙJ\ÚYÛ–ÚXÛÛ•\WVÜÝ]RYJNÂˆXÛÛ‹œÙ]˜]ÒXÛÛŠYJNÂ‚ˆ[XÛÛ”Ý[HHX]›Z[ŠX]›X^
+™YœËšXÛÛ”Ý[K™Ù]
+
+JKJNÂˆ[×HÛÛÜ”™\ÎÂˆ™Y™\™[˜Ù\Ë’XÛÛœšXÚÔ™YœÈXÛÛ”™YœÎÂˆÝÚ]Ú
+XÛÛ•\JHÂˆØ\ÙHPÓÓ—ÕTWÑÓ”ÔÎ‚ˆÛÛÜ”™\ÈHÓ”Ô×ÔÕUWÐÓÓÔ—Ô‘TÎÂˆXÛÛ”™YœÈH™YœË™ÜÎÂˆœ™XZÎÂˆØ\ÙHPÓÓ—ÕTWÐ•‚ˆÛÛÜ”™\ÈH•ÔÕUWÐÓÓÔ—Ô‘TÎÂˆXÛÛ”™YœÈH™YœË˜›Y]ÛÝÂˆœ™XZÎÂˆØ\ÙHPÓÓ—ÕTWÕÒQ’N‚ˆY˜][‚ˆÛÛÜ”™\ÈHÒQ’WÔÕUWÐÓÓÔ—Ô‘TÎÂˆXÛÛ”™YœÈH™YœËÚYšNÂˆœ™XZÎÂˆBˆËÈ[YYÛÛ^\È[ÛY[\š[H[™]ÙY[ˆÛÛÛ™šYÝ\˜][ÛÚ[™ÙY
+ÚXÚ[˜[Y]\È]
+BˆËÈ[™H™^\T™Y™\™[˜Ù\È]™XZ[È]ˆHÝ]\È\]H[™[™È[ˆ]Ú[™ÝÂˆËÈ]\Ý›ÝÜ˜\ÚÛÈ˜[˜XÚÈÈHÙ\šXÙHÛÛ^
+X]Ú\ÈHÝX\™]Ù]Ý][™PÛÛÜŠK‚ˆÛÛ^ÝH[YYÛÛ^OH[È[YYÛÛ^ˆ\ÎÂˆ[[H
+XÛÛ”Ý[HOHÕSWÐÓÓÔŠBˆÈÛÛ^ÛÛ\]™Ù]ÛÛÜŠÝÛÛÜ”™\ÖÜÝ]RYJBˆˆÛÛ^ÛÛ\]™Ù]ÛÛÜŠÝ‹˜ÛÛÜ‹^Üš[X\žJNÂˆËÈÚÚ\H›Ë[Ü[Ù]ˆ\R[XYÙU[[˜[Y]\ÈH˜]ØX›H[˜ÛÛ™][Û˜[KˆËÈ[™\È[œÈÛˆ]™\žH\š[ÙXÈÝ]\Èœ›ØYØ\Ý‚ˆÛÛÜ”Ý]S\ÝÝ\œ™[[H[XYÙUšY]ÐÛÛ\]™Ù][XYÙU[\Ý
+XÛÛŠNÂˆYˆ
+Ý\œ™[[OH[Ý\œ™[[™Ù]Y˜][ÛÛÜŠ
+HOH[
+HÂˆ[XYÙUšY]ÐÛÛ\]œÙ][XYÙU[\Ý
+XÛÛ‹ÛÛÜ”Ý]S\Ý˜[YSÙŠ[
+JNÂˆB‚ˆ\PÛÛ™šYÝ\™YXÛÛ“Ý][™JXÛÛ‹XÛÛ”™YœÊNÂ‚ˆËÈÚ][\Ý
+\ÜÚX[‹[Û›H[\›™]
+H8 %Ý™\›^HHÛX[›YÈ˜YÙH™YØ\™\ÜÈÙˆÝ[K‚ˆYˆ
+XÛÛ•\HOHPÓÓ—ÕTWÕÒQ’H	‰ˆÝ]RYOHÚQšTÝ]K“SRUQÒS•T“‘U›Ü™[˜[
+
+JHÂˆ˜]ØX›H›YÈHÛÛ^ÛÛ\]™Ù]˜]ØX›J\Ë‹™˜]ØX›KšX×Ø˜YÙWÜWÙ›YÊNÂˆËÈ]]]J
+H[œÝ\™\ÈÙ]›Ý[™Ê
+HÙ\Û‰ÝY™™XÝHÚ\™YØXÚY[œÝ[˜ÙK‚ˆXÛÛ‹œÙ]˜YÙQ˜]ØX›J›YÈOH[È›YË›]]]J
+Hˆ[
+NÂˆH[ÙHÂˆXÛÛ‹œÙ]˜YÙQ˜]ØX›J[
+NÂˆB‚ˆËÈ^˜YÙNˆÓ”ÔÈØ][]HÛÝ[ÈˆÈÜÛÙˆX\šÙ\ˆ›ÜˆÔËÛÛ›™XÝYY]šXÙHÛÝ[ˆËÈ›Üˆ›Y]ÛÝ‚ˆÝš[™È˜YÙU^H[Âˆ[˜YÙP™ÈHÂˆËÈ›Ü™YÜ›Ý[™Y˜][ÈÈHÚYÙ]^ÛÛÝ\ˆ
+›\ÈÚ]H[YKZ\œÈÚ]BˆËÈÝ[KYš]™[ˆ˜XÚÙÜ›Ý[™È™[ÝÊNÈHÛÛÝ\™YÓ”ÔÈX\šÙ\œÈÝ™\œšYH]ÈHš^Y\šÂˆËÈ[šÈÛÈHX™[Ý^\ÈYÚX›HÛˆZ\ˆ[X™\ˆÈ™Y[È
+Ú]HÛˆ[X™\ˆ\ÈŒKŽNŒJK‚ˆ[˜YÙQ™ÈHÛÛ^ÛÛ\]™Ù]ÛÛÜŠÝ‹˜ÛÛÜ‹^ÛÝ][™JH‘ŒÂˆËÈY˜][˜YÙH˜XÚÙÜ›Ý[™›ÛÝÜÈHXÛÛ‰ÜÈÝÛˆÛÛÝ\š[™ÎÈHÓ”ÔÈX\šÙ\œÈÝ™\œšYH]ˆËÈ™[ÝÈÚ]Hš^YÙ[X[XÈÛÛÝ\ˆÛÈHYX[š[™È™XYÈHØ[YH[ˆ›ÝXÛÛˆÝ[\Ë‚ˆ[Ý[P™ÈH
+XÛÛ”Ý[HOHÕSWÐÓÓÔŠBˆÈÛÛ^ÛÛ\]™Ù]ÛÛÜŠÝÛÛÜ”™\ÖÜÝ]RYJBˆˆÛÛ^ÛÛ\]™Ù]ÛÛÜŠÝ‹˜ÛÛÜ‹^Üš[X\žJNÂˆYˆ
+XÛÛ•\HOHPÓÓ—ÕTWÑÓ”ÔÈ	‰ˆ™YœË™ÜËœÚÝÔØ][]P˜YÙK™Ù]
+
+Bˆ	‰ˆ[™›ÚY›ÜË”Þ\Ý[PÛØÚË\[YSZ[\Ê
+HHØ][]\ÐÛÝ[[Y\Ý[\Ó”ÔÔÒT‘WÔÐUSUWÔÕUT×ÕSQSÕUÓTÊHÂˆËÈÛÈ[™\[™[›YÜÎˆXY™XÚÛÛš[™Èš]™\ÈH^ÜÛÙš[™Èš]™\ÈHÛÛÝ\‹ˆËÈÛÈ›Ý™XYÙ™ˆHØ[YH[
+K™Ëˆ‘ˆˆÛˆ™YH™[˜XÚÈÈˆ™XØ]\ÙHÙˆHÜÛÙŠK‚ˆ›ÛÛX[ˆXY™XÚÛÛš[™ÈH
+ÛœÜÓ[ÙQ›YÜÈ	ˆÓ”ÔÔÒT‘WÓSÑWÑŠHOHÂˆ›ÛÛX[ˆÜÛÙ‘]XÝYH
+ÛœÜÓ[ÙQ›YÜÈ	ˆÓ”ÔÔÒT‘WÓSÑWÔÔÓÑŠHOHÂˆYˆ
+XY™XÚÛÛš[™ÊHÂˆ˜YÙU^HÙ]Ýš[™Ê‹œÝš[™Ë™ÛœÜ×Ù—Ø˜YÙJNÂˆH[ÙHYˆ
+ÜÛÙ‘]XÝY
+HÂˆËÈÜÛÙš[™È]Ý[ÛˆÔÎˆÚÝÈHX\šÙ\‹›ÝHÛÝ[8 %HÛÝ[\ÂˆËÈ[\ÝÛÜH[™\ˆHÜÛÙˆ[™X^H™HXœÙ[
+ÛÛYHÛY[È™\ÜLJK‚ˆ˜YÙU^HÙ]Ýš[™Ê‹œÝš[™Ë™ÛœÜ×ÜÜÛÙ—Ø˜YÙJNÂˆH[ÙHYˆ
+Ø][]\ÐÛÝ[ˆ
+HÂˆ˜YÙU^HÝš[™Ë˜[YSÙŠØ][]\ÐÛÝ[
+NÂˆBˆYˆ
+˜YÙU^OH[
+HÂˆYˆ
+ÜÛÙ‘]XÝY
+HÂˆËÈÜÛÙš[™È]XÝY8 %™YÚ]\ˆÙIÜ™HÛˆˆÜˆÝ[ÛˆÔË‚ˆ˜YÙP™ÈHÛÛ^ÛÛ\]™Ù]ÛÛÜŠÝ‹˜ÛÛÜ‹œÝ]\×Ù\œ›ÜŠNÂˆ˜YÙQ™ÈHÛÛ^ÛÛ\]™Ù]ÛÛÜŠÝ‹˜ÛÛÜ‹œÝ]\×Ø˜YÙWÝ^
+NÂˆH[ÙHYˆ
+XY™XÚÛÛš[™ÊHÂˆËÈXY™XÚÛÛš[™ÈÚ]Ý]HÜÛÙˆ8 %[X™\ˆ
+YÜ˜YY›Ý[ˆ]XÚÊK‚ˆ˜YÙP™ÈHÛÛ^ÛÛ\]™Ù]ÛÛÜŠÝ‹˜ÛÛÜ‹œÝ]\×ÝØ\›š[™ÊNÂˆ˜YÙQ™ÈHÛÛ^ÛÛ\]™Ù]ÛÛÜŠÝ‹˜ÛÛÜ‹œÝ]\×Ø˜YÙWÝ^
+NÂˆH[ÙHÂˆ˜YÙP™ÈHÝ[P™ÎÂˆBˆBˆH[ÙHYˆ
+XÛÛ•\HOHPÓÓ—ÕTWÐ•	‰ˆ™YœË˜›Y]ÛÝœÚÝÑ]šXÙPÛÝ[˜YÙK™Ù]
+
+Bˆ	‰ˆ›Y]ÛÝÝ]HOH›Y]ÛÝÝ]KÓÓ“‘PÕQ	‰ˆXÛÛ›™XÝYYœËš\Ñ[\J
+JHÂˆ˜YÙU^HÝš[™Ë˜[YSÙŠÛÛ›™XÝYYœËœÚ^™J
+JNÂˆ˜YÙP™ÈHÝ[P™ÎÂˆBˆYˆ
+˜YÙU^OH[
+HÂˆXÛÛ‹œÙ]˜YÙU^
+˜YÙU^˜YÙP™Ë˜YÙQ™ÊNÂˆH[ÙHÂˆXÛÛ‹œÙ]˜YÙU^
+[
+NÂˆBˆB‚ˆš]˜]H›ÚY\PÛÛ™šYÝ\™YXÛÛ“Ý][™J›Û“[Ý][™R[XYÙUšY]ÈXÛÛ‹ˆ›Û“[™Y™\™[˜Ù\Ë’XÛÛœšXÚÔ™YœÈXÛÛ”™YœÊHÂˆÛÛ^ÛÛ^H[YYÛÛ^OH[È[YYÛÛ^ˆ\ÎÂˆ[Ý][™P[HHX]›X^
+X]›Z[ŠMKXÛÛ”™YœË›Ý][™P[K™Ù]
+
+JJNÂˆYˆ
+Ý][™P[HH
+HÂˆXÛÛ‹œÙ]Ý][™UÚY
+
+NÂˆ™]\›ŽÂˆBˆ[[ÐÛÛÜˆH
+ÛÛ^ÛÛ\]™Ù]ÛÛÜŠÛÛ^‹˜ÛÛÜ‹^ÛÝ][™JH	ˆ‘‘‘‘‘ŠBˆ
+Ý][™P[H
+NÂˆXÛÛ‹œÙ]Ý][™PÛÛÜŠ[ÐÛÛÜŠNÂˆXÛÛ‹œÙ]Ý][™UÚY
+XÛÛ”™YœË›Ý][™UÚY™Ù]
+
+JNÂˆB‚ˆËÈÚKQšHÝ]HÛÛÝ\œÈžHÜ™[˜[
+Ñ‘‹“×ÒS•T“‘USRUQÒS•T“‘US•T“‘U
+K‚ˆš]˜]HÝ]XÈš[˜[[×HÒQ’WÔÕUWÐÓÓÔ—Ô‘TÈHÂˆ‹˜ÛÛÜ‹œÝ]\×ÛÙ™‹ˆ‹˜ÛÛÜ‹œÝ]\×Ù\œ›Ü‹ˆ‹˜ÛÛÜ‹œÝ]\×ÝØ\›š[™Ëˆ‹˜ÛÛÜ‹œÝ]\×ÛÚÂˆNÂˆËÈÓ”ÔÈÝ]HÛÛÝ\œÈžHÜ™[˜[
+Ñ‘‹QÓÓÑ
+K‚ˆš]˜]HÝ]XÈš[˜[[×HÓ”Ô×ÔÕUWÐÓÓÔ—Ô‘TÈHÂˆ‹˜ÛÛÜ‹œÝ]\×ÛÙ™‹ˆ‹˜ÛÛÜ‹œÝ]\×ÝØ\›š[™Ëˆ‹˜ÛÛÜ‹œÝ]\×ÛÚÂˆNÂˆËÈ›Y]ÛÝÝ]HÛÛÝ\œÈžHÜ™[˜[
+Ñ‘‹“×ÑU’PÑKÓÓ“‘PÕQ
+K‚ˆš]˜]HÝ]XÈš[˜[[×H•ÔÕUWÐÓÓÔ—Ô‘TÈHÂˆ‹˜ÛÛÜ‹œÝ]\×ÛÙ™‹ˆ‹˜ÛÛÜ‹œÝ]\×ÛÙ™‹ˆ‹˜ÛÛÜ‹œÝ]\×Ø›Y]ÛÝˆNÂ‚ˆš]˜]H›ÚYÜ™X]S›ÝYšXØ][ÛÚ[›™[
+
+HÂˆ›ÝYšXØ][ÛÚ[›™[Ù\šXÙPÚ[›™[H™]È›ÝYšXØ][ÛÚ[›™[
+ÒS“‘SÒQÙ]Ýš[™Ê‹œÝš[™Ë››ÝYšXØ][Û—ØÚ[›™[Ý]JK›ÝYšXØ][Û“X[˜YÙ\‹’STÔ•SÑWÓÕÊNÂˆ›ÝYšXØ][Û“X[˜YÙ\ˆX[˜YÙ\ˆHÙ]Þ\Ý[TÙ\šXÙJ›ÝYšXØ][Û“X[˜YÙ\‹˜Û\ÜÊNÂˆYˆ
+X[˜YÙ\ˆOH[
+HÂˆX[˜YÙ\‹˜Ü™X]S›ÝYšXØ][ÛÚ[›™[
+Ù\šXÙPÚ[›™[
+NÂˆBˆB‚ˆš]˜]H›ÝYšXØ][ÛˆÜ™X]S›ÝYšXØ][ÛŠ
+HÂˆ[[›ÝYšXØ][Û’[[H™]È[[
+\ËXZ[XÝ]š]K˜Û\ÜÊNÂˆ[™[™Ò[[[™[™Ò[[H[™[™Ò[[™Ù]XÝ]š]J\Ë›ÝYšXØ][Û’[[[™[™Ò[[‘“Q×ÒSSUUP“H[™[™Ò[[‘“Q×ÕTUWÐÕT”‘S•
+NÂ‚ˆ™]\›ˆ™]È›ÝYšXØ][ÛÛÛ\]Z[\Š\ËÒS“‘SÒQ
+KœÙ]ÛÛ[]JÙ]Ýš[™Ê‹œÝš[™Ë˜\Û˜[YJJKœÙ]ÛÛ[^
+Ù]Ýš[™Ê‹œÝš[™Ë››ÝYšXØ][Û—ØÛÛ[
+JKœÙ]ÛX[XÛÛŠ‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÙÜ×ØXÝ]™JKœÙ]ÛÛ[[[
+[™[™Ò[[
+KœÙ]Û™ÛÚ[™ÊYJK˜Z[
+
+NÂˆB‚ˆš]˜]H›ÚYØ]™TÜÚ][ÛŠ
+HÂˆYˆ
+\˜[\ÈOH[
+HÂˆ™YœË›Ý™\›^VœÙ]
+\˜[\Ëž
+NÂˆ™YœË›Ý™\›^VKœÙ]
+\˜[\ËžJNÂˆBˆB‚‚ˆÝ™\œšYBˆX›XÈ›ÚYÛ‘\Ý›ÞJ
+HÂˆ\Ý›ÞYYHYNÂˆ[œÝ[˜ÙHH[ÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÙ\šXÙUØ]ÚÙÒX\™X]
+NÂˆYˆ
+™YœÈOH[	‰ˆÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\Ð]]ÛX]XÒ[YÜ˜][Û’ÜÝ
+™YœÊJHÂˆÚYÙ]Ù\šXÙUØ]ÚÙË˜\›J\ËˆÚYÙ]Ù\šXÙUØ]ÚÙË‘TÕ“ÖWÔ‘PÓÕ‘T–WÑSVWÓTÊNÂˆH[ÙHÂˆÚYÙ]Ù\šXÙUØ]ÚÙË˜Ø[˜Ù[
+\ÊNÂˆBˆ]]ÛX][Û”™\Ù[][Û“\Ý[™\œË˜ÛX\Š
+NÂˆËÈHš\œÝ]\ÙY[\Ý\™˜XÙH]™[X^H]™H™Y[ˆØZ][™ÈÛÛ[H›Üˆ\ÈÜÝ	ÜÈ™XY[™\ÜË‚ˆËÈÛ˜ÙHHÜÝ\ÈÛÛ™K]\XØ][Ûˆš[š\Ú]È[[YYX]H]™[Yš]™[ˆ[š]X[^˜][Û‹‚ˆÝ]\ÕÚYÙ]\XØ][Û‹œ™\Ý[YTÝ\™˜XÙSÝÛ™Y[š]X[^˜][ÛŠ\ÊNÂˆÛ™ÈÝÛ™\•ÚÙ[ˆHÝ\\Ý]SÝÛ™\•ÚÙ[ŽÂˆYˆ
+ÝÛ™\•ÚÙ[ˆOH
+HÂˆÕT•TÔÕUWÓÕÓ‘T‹˜ÛÛ\\™P[™Ù]
+ÝÛ™\•ÚÙ[‹ÝÛ™\•ÚÙ[ˆ
+ÈS
+NÂˆÝ\\Ý]SÝÛ™\•ÚÙ[ˆHÂˆBˆYˆ
+\[[YR[š]X[^™Y
+HÂˆÝÜ›Ü™YÜ›Ý[™
+YJNÂˆÝ\\‹›Û‘\Ý›ÞJ
+NÂˆ™]\›ŽÂˆBˆYˆ
+XØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ˆOH[
+HÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\‹œÝÜ
+
+NÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÓØœÙ\™\ˆH[ÂˆBˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊXØ\ž˜]šYØ]Ü•Ú[™ÝÓX\ÙQ^\žJNÂˆØ[˜Ù[XØ\ž˜]šYØ]Ü“Ü[Z\ÝXÐÛÛ™š\›X][ÛŠ
+NÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[ÛˆH˜]šYØ]Ü•Ú[™ÝÔÛÝ\˜ÙTÛXÞK•™[™Ü‘XÚ\Ú[Û‹““Ó‘NÂˆXØ\ž˜]šYØ]Ü•Ú[™ÝÑXÚ\Ú[Û][\ÙYHLSÂˆ[YÜ˜][Û”Ý\\ØÚY[YH˜[ÙNÂˆØ[˜Ù[Y™\œ™Y[YÜ˜][Û”Ý\
+
+NÂˆÝ\\Ý]UÛÜšÙ\‹œÚ]ÝÛ“›ÝÊ
+NÂˆ[š]X[[YÜ˜][Û•ÛÜšÙ\’[‘›YÚH˜[ÙNÂˆ™\\™Y[š]X[[YÜ˜][Û”ÝYÙH[œX›\ÚYBˆ[™[™Ò[š]X[[YÜ˜][Û”ÝYÙK™Ù][™Ù]
+[
+NÂˆYˆ
+[œX›\ÚYOH[
+H\ØØ\™™\\™Y[š]X[[YÜ˜][Û”ÝYÙJ[œX›\ÚY
+NÂ‚ˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÐ[™Y\ÜØYÙ\Ê[
+NÂ‚ˆËÈ[œ™YÚ\Ý\ˆ\š]™Y\Ý[™\œÈš\œÝˆÛÛ›™XÝÜˆÚ]ÝÛˆ[Z]ÈÞ[˜Ú›Û›Ý\ÈÝ[H]™[ÎÂˆËÈÚ]HÝX\™ÈX›Ý™H[™›ÈØÙ[˜\š[ËÜÜ\\Ý[™\œÈY›Û™HØ[ˆ™XÜ™X]HHÚ[™ÝË‚ˆYˆ
+ÛÛ›™XÝÜ•˜[Y\ÈOH[
+HÂˆÛÛ›™XÝÜ•˜[Y\Ëœ™[[Ý™S\Ý[™\ŠÛ™TÝ]\Ó\Ý[™\ŠNÂˆÛÛ›™XÝÜ•˜[Y\Ëœ™[[Ý™S\Ý[™\ŠÜ›ÜÜÔÛÝ\˜ÙT[S\Ý[™\ŠNÂˆBˆÛ™TÝ]\Õ˜[Y\Ë˜ÛX\Š
+NÂˆØœÙ\™YÛ™S›ÝYšXØ][Û’Ù^\Ë˜ÛX\Š
+NÂˆ]Y]YYÛ™S›ÝYšXØ][ÛœË˜ÛX\Š
+NÂˆY™\œ™YÛ™S›ÝYšXØ][ÛœË˜ÛX\Š
+NÂˆ]Y]YYÛ™S›ÝYšXØ][Û“Ý™\™›ÝÐÛÝ[HÂˆY™\œ™YÛ™S›ÝYšXØ][Û“Ý™\™›ÝÐÛÝ[HÂˆY™\œ™YÛ™S›ÝYšXØ][Û“Ý™\™›ÝÔÝ\Y[\ÙYHÂˆ[™[™Ò[[ØÙ[˜\š[ÐÛÛ[X[™Ë˜ÛX\Š
+NÂˆÛ™S›ÝYšXØ][Û\œÝXÝ]™HH˜[ÙNÂˆÛ™P[˜ÜÔ™XYHH˜[ÙNÂˆXÝ]™TÛ™S›ÝYšXØ][ÛˆH[ÂˆXÝ]™TÛ™S›ÝYšXØ][Û‘šY[ÈHÛÛXÝ[ÛœË™[\TÙ]
+
+NÂˆXÝ]™TÛ™P˜]\žP[\^H[ÂˆXÝ]™TÛ™P˜]\žP[\ÛÛÜˆH[ÂˆÛ™SÝÐ˜]\žP[\]ÚYH˜[ÙNÂˆÛ™SÝÐ˜]\žP[\]ÚYˆH˜[ÙNÂˆÛ™Q^\›˜[Ý™\›^PXÝ]™HH˜[ÙNÂˆXÝ]™TÛ™S›ÝYšXØ][Û‘^\™\Ð]HÂˆXÝ]™TÛ™TÜ\›ÝYšXØ][Û‘^\™\Ð]HÂˆXÝ]™TÛ™SÝÐ˜]\žTÜ\H˜[ÙNÂˆÛ™S›ÝYšXØ][Û”Ü\ÛÛ™šYÝ\™YH˜[ÙNÂˆÜ›ÜÜÔÛÝ\˜ÙT[T™Yœ™\ÚØÚY[YœÙ]
+˜[ÙJNÂˆÞ[˜Ú›Ûš^™Y
+]]ÛX][Û•ZSØÚÊHÂˆ[™[™Ð]]ÛX][Û•ZK˜ÛX\Š
+NÂˆ]]ÛX][Û•ZT™Yœ™\ÚØÚY[YH˜[ÙNÂˆBˆYˆ
+[[ØÙ[˜\š[ÐÛÛ›Û\ˆOH[
+HÂˆ[ÛX[\Ý\
+š[[ØÙ[˜\š[ÜÈ‹[[ØÙ[˜\š[ÐÛÛ›Û\ŽŽ™\Ý›ÞJNÂˆBˆ[[ØÙ[˜\š[ÐÛÛ›Û\ˆH[ÂˆYˆ
+ØÙ[˜\š[ÐÛÛ›Û\ˆOH[
+HÂˆ[ÛX[\Ý\
+š\ÝX[ØÙ[˜\š[ÜÈ‹ØÙ[˜\š[ÐÛÛ›Û\ŽŽ™\Ý›ÞJNÂˆBˆØÙ[˜\š[ÐÛÛ›Û\ˆH[ÂˆYˆ
+Ü\Ý™\›^HOH[
+H[ÛX[\Ý\
+œÜ\Ý™\›^\È‹Ü\Ý™\›^NŽ™\Ý›ÞJNÂˆÜ\Ý™\›^HH[ÂˆËÈÙY\Ü][]™H[[›ÝH^XÝY]šXÙH\ØÛÛ›™XÝØ[˜XÚÈ[™H^Ü\‰ÜÂˆËÈš[˜[ÛÛ\[œØ][™ÈÑ‘ˆ]™H™Y[ˆÝX›Z]Y‚ˆYˆ
+Û™PÛÛ›Û\ˆOH[
+HÂˆ[ÛX[\Ý\
+œÛ™H‹Û™PÛÛ›Û\ŽŽœÝÜ
+NÂˆBˆÛ™PÛÛ›Û\ˆH[ÂˆYˆ
+Û™T™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆ[ÛX[\Ý\
+œÛ™H™\Ù[˜ÙH‹Û™T™\Ù[˜ÙQ^Ü\ŽŽœÝÜ
+NÂˆBˆÛ™T™\Ù[˜ÙQ^Ü\ˆH[ÂˆYˆ
+Û™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆOH[
+HÂˆ[ÛX[\Ý\
+œÛ™HSÔÈ™\Ù[˜ÙH‹Û™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ŽŽœÝÜ
+NÂˆBˆÛ™P[˜ÜÔ™\Ù[˜ÙQ^Ü\ˆH[Âˆ›ÛÛX[ˆØ\”[[YUØ\Ò[š]X[^™YHØ\•[[Y]žQ^Ü\ˆOH[ÂˆYˆ
+Ø\”[[YUØ\Ò[š]X[^™Y
+HÂˆ[ÛX[\Ý\
+˜Ø\ˆ[[Y]žH‹Ø\•[[Y]žQ^Ü\ŽŽœÝÜ
+NÂˆBˆØ\•[[Y]žQ^Ü\ˆH[ÂˆYˆ
+\]ÛÛ›Û\ˆOH[
+H[ÛX[\Ý\
+“TU‹\]ÛÛ›Û\ŽŽœÝÜ
+NÂˆ\]ÛÛ›Û\ˆH[ÂˆYˆ
+Ü]ÛÛ›Û\ˆOH[
+H[ÛX[\Ý\
+”Ü]šXˆ‹Ü]ÛÛ›Û\ŽŽœÝÜ
+NÂˆÜ]ÛÛ›Û\ˆH[ÂˆYˆ
+P\PÛÛ›Û\ˆOH[
+HÂˆ[ÛX[\Ý\
+’ÛYH\ÜÚ\Ý[‹P\PÛÛ›Û\ŽŽœÝÜ
+NÂˆBˆP\PÛÛ›Û\ˆH[ÂˆXÝ[Û‘\Ü]Ú\ˆH[ÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÐ[™Y\ÜØYÙ\Ê[
+NÂ‚ˆ™[[Ý™TÝ]\ÓÝ™\›^TØY™[JœÙ\šXÙHÚ]ÝÛˆŠNÂˆš[™[™ÈH[Âˆ\˜[\ÈH[Â‚ˆÝÜØØ][Û•˜XÚÚ[™Ê
+NÂˆÝÜÛÛ›™XÝ]š]U˜XÚÚ[™Ê
+NÂ‚ˆYˆ
+™XXÚXš[]PÚXÚÙ\ˆOH[
+HÂˆ™XXÚXš[]PÚXÚÙ\ˆÚXÚÙ\ˆH™XXÚXš[]PÚXÚÙ\ŽÂˆ™XXÚXš[]PÚXÚÙ\ˆH[Âˆ[ÛX[\Ý\
+œ™XXÚXš[]HÚXÚÙ\ˆ‹ÚXÚÙ\ŽŽœÚ]ÝÛŠNÂˆB‚ˆ[œ™YÚ\Ý\”Ø][]TÝ]\Ô™XÙZ]™\Š
+NÂˆ[œ™YÚ\Ý\›Y]ÛÝ™XÙZ]™\Š
+NÂˆ[ÛX[\Ý\
+›YYXH˜XÚÚ[™È‹\ÎŽ™\ØX›SYYXU˜XÚÚ[™ÊNÂˆËÈ›ÜØ\ˆÙ[œÛÜˆÝXœØÜš\[ÛœÈ]ÙY\H›ØÙ\ÜË]ÚYH[YÜ˜][Ûˆ[]™H8 %BˆËÈÙ][™ÜÈRHX^HÝ[]Y\žH\ÐœšXÚÔÝ\ÜYY\ˆHÝ™\›^HÙ\šXÙHÝÜË‚ˆYˆ
+Ø\”[[YUØ\Ò[š]X[^™Y
+HÂˆ[ÛX[\Ý\
+˜Ø\ˆÙ[œÛÜˆÝXœØÜš\[ÛœÈ‹
+
+HOˆÂˆØ\’[YÜ˜][ÛˆØ\ˆHØ\’[YÜ˜][ÛœË™Ù]
+\ÊNÂˆØ\‹œÙ]]˜Z[Xš[]PÚ[™ÙY\Ý[™\Š[
+NÂˆØ\‹[œÝXœØÜšX™JœšXÚÕ\K’S‘ÓÔ—ÕST
+NÂˆØ\‹[œÝXœØÜšX™JœšXÚÕ\K“ÕUÓÔ—ÕST
+NÂˆJNÂˆBˆÝ\\‹›Û‘\Ý›ÞJ
+NÂˆB‚ˆš]˜]H›ÚY™Yœ™\ÚÙ\šXÙUØ]ÚÙÊ
+HÂˆXZ[’[™\‹œ™[[Ý™PØ[˜XÚÜÊÙ\šXÙUØ]ÚÙÒX\™X]
+NÂˆYˆ
+\Ý›ÞYY™YœÈOH[ˆUÚYÙ]Ù\šXÙTÝ\\‹œ™\]Z\™\Ð]]ÛX]XÒ[YÜ˜][Û’ÜÝ
+™YœÊJHÂˆÚYÙ]Ù\šXÙUØ]ÚÙË˜Ø[˜Ù[
+\ÊNÂˆ™]\›ŽÂˆBˆÚYÙ]Ù\šXÙUØ]ÚÙË˜\›J\ÊNÂˆXZ[’[™\‹œÜÝ[^YY
+Ù\šXÙUØ]ÚÙÒX\™X]ÑT•’PÑWÕÐUÒÑ×ÒPT•‘PUÓTÊNÂˆB‚ˆ[X›BˆÝ™\œšYBˆX›XÈPš[™\ˆÛš[™
+[[[[
+HÂˆ™]\›ˆ[ÂˆB‚ˆX›XÈÝ]XÈÚYÙ]Ù\šXÙHÙ][œÝ[˜ÙJ
+HÂˆ™]\›ˆ[œÝ[˜ÙNÂˆB‚ˆX›XÈÝ]XÈ›ÛÛX[ˆ\Ô[›š[™Ê
+HÂˆ™]\›ˆ[œÝ[˜ÙHOH[ÂˆB‚ˆ›ÛÛX[ˆ\Ò[YÜ˜][Û”[[YT™XYQ›Ü\XØ][ÛŠ
+HÂˆ™]\›ˆY\Ý›ÞYY	‰ˆ[YÜ˜][ÛœÔÝ\YÂˆB‚ˆÊŠˆÝ\œ™[]™HSÔÈÝXœØÜš\[Û‹\ÙYžHš]™\ˆ›ÝÜÈ]^XÚ]HÜ[È\ÈØ]Kˆ
+‹ÂˆX›XÈ›ÛÛX[ˆ\ÔÛ™P[˜ÜÔ™XYJ
+HÂˆ™]\›ˆY\Ý›ÞYY	‰ˆÛ™P[˜ÜÔ™XYNÂˆB‚ˆÊŠ‚ˆ
+ˆ™XY[Û›HØ[YK\›ØÙ\ÜÈÙ[ÛY]žH›ÜˆÓQHØY™KX\™XHØ[Ý[][Û‹‚ˆ
+‚ˆ
+ˆ•H™]\›™Y˜[YH\ÈHXÝX[YX\Ý\™YÜ\›ÝÈÚ[™ÝË›ÝH\XØ]Y\Ý[X]Bˆ
+ˆœ›ÛH›ÛÚXÛÛˆÙ][™ÜËˆ™\›ÈYX[œÈ]›ÈÝ]\ËX˜\‹[[ÙHÝ™\›^HÝ\œ™[HØØÝ\Y\ÈBˆ
+ˆÜYÙKÜ‚ˆ
+‹ÂˆX›XÈ[Ù]Ý]\Ð˜\“Ý™\›^RZYÚ
+
+HÂˆYˆ
+\Ý›ÞYY™YœÈOH[\™YœËÚYÙ][˜X›Y™Ù]
+
+Bˆ™YœËÚYÙ][ÙK™Ù]
+
+HOHÒQÑUÓSÑWÔÕUT×ÐTˆš[™[™ÈOH[
+HÂˆ™]\›ˆÂˆBˆšY]È›ÛÝHš[™[™Ë™Ù]›ÛÝ
+
+NÂˆ™]\›ˆX]›X^
+›ÛÝ™Ù]ZYÚ
+
+K›ÛÝ™Ù]YX\Ý\™YZYÚ
+
+JNÂˆB‚ˆÊŠ‚ˆ
+ˆÝ\œ™[Ý]\ËX˜\ˆœšXÚÈ™\Ù[][Ûˆ›ÜˆØ[YK\›ØÙ\ÜÈÙXÛÛ™\žHÝ\™˜XÙ\Ë‚ˆ
+‚ˆ
+ˆ•\È\È[X™\˜][HH™XY[Û›HÛ˜\ÚÝˆHš]™\ˆ[™[™]\Ù\ÈH^XÝÙ[XÝYˆ
+ˆXÛÛˆ˜[Z[KÙ[X[XÈÝ]HÛÛÝ\‹Ý][™H[™˜YÙHÚ]Ý]™YÚ\Ý\š[™ÈHÙXÛÛ™Ù]Ù‚ˆ
+ˆ›Y]ÛÝÓ”ÔËÛÛ›™XÝ]š]KYYXHÜˆ™ZXÛH\Ý[™\œËÜ‚ˆ
+‹Âˆ[X›BˆX›XÈÝ]\ÐœšXÚÔÛ˜\ÚÝÝ]\ÐœšXÚÔÛ˜\ÚÝ
+›Û“[œšXÚÕ\H\JHÂˆYˆ
+\Ý›ÞYY™YœÈOH[š[™[™ÈOH[
+H™]\›ˆ[ÂˆÝš[™È^HˆŽÂˆ[XÛÛ”™\ÛÝ\˜ÙHHÂˆ[XÛÛ•[HÛÛ^ÛÛ\]™Ù]ÛÛÜŠˆ[YYÛÛ^OH[È[YYÛÛ^ˆ\Ë‹˜ÛÛÜ‹^Üš[X\žJNÂˆ[XÛÛ“]™[HLÂˆ[YÙ\ˆ˜]\žT\˜Ù[H[Âˆ›ÛÛX[ˆ˜]\žPÚ\™Ú[™ÈH˜[ÙNÂˆ[YÙ\ˆÙ[[\”ÚYÛ˜[\˜Ù[H[ÂˆÝš[™ÈÙ[[\“Ü\˜]ÜˆHˆŽÂˆÝš[™ÈÙ[[\“™]ÛÜšÕ\HHˆŽÂˆ[Ý][™PÛÛÜˆHÛÛ^ÛÛ\]™Ù]ÛÛÜŠˆ[YYÛÛ^OH[È[YYÛÛ^ˆ\Ë‹˜ÛÛÜ‹^ÛÝ][™JNÂˆ[Ý][™UÚYHÂˆÝš[™È˜YÙU^H[Âˆ[˜YÙP˜XÚÙÜ›Ý[™HÂˆ[˜YÙQ›Ü™YÜ›Ý[™HÛÛ^ÛÛ\]™Ù]ÛÛÜŠˆ[YYÛÛ^OH[È[YYÛÛ^ˆ\Ë‹˜ÛÛÜ‹^ÛÝ][™JBˆ‘ŒÂˆ[˜YÙQ˜]ØX›T™\ÛÝ\˜ÙHHÂˆ›ÛÛX[ˆÛ›ÝÛˆHYNÂˆ›ÛÛX[ˆXÝ]™HHYNÂ‚ˆ[XÛÛ•\HHLNÂˆ[Ý]HHÂˆ™Y™\™[˜Ù\Ë’XÛÛœšXÚÔ™YœÈXÛÛ”™YœÈH[ÂˆÝÚ]Ú
+\JHÂˆØ\ÙHSQN‚ˆ^H[YQ›Ü›X]™›Ü›X]
+™]È]J
+JNÂˆœ™XZÎÂˆØ\ÙHUN‚ˆ^HÝš[™Ë˜[YSÙŠš[™[™Ë™]U^™Ù]^
+
+JNÂˆÛ›ÝÛˆH]^š[J
+Kš\Ñ[\J
+NÂˆœ™XZÎÂˆØ\ÙHQQPN‚ˆ^H\ÝYYXTÝX]HOH[Èˆˆˆ\ÝYYXTÝX]NÂˆÛ›ÝÛˆH]^š\Ñ[\J
+NÂˆXÝ]™HHÛ›ÝÛŽÂˆœ™XZÎÂˆØ\ÙHÒQ’N‚ˆXÛÛ”™\ÛÝ\˜ÙHH‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WÝÚYšWÛ]™[ÂˆXÛÛ•[HÈËÈ™\Ù\™H\‹X\˜ÈÜ˜^KÙÜ™Y[ˆ™XÝÜˆÛÛÜœË‚ˆXÛÛ“]™[HÚYšTÚYÛ˜[]™[
+ˆLÂˆXÛÛ”™YœÈH™YœËÚYšNÂˆXÝ]™HHÚYšTÝ]HOHÚQšTÝ]K’S•T“‘UˆÚYšTÝ]HOHÚQšTÝ]K“SRUQÒS•T“‘UÂˆÝÚ]Ú
+ÚYšTÝ]JHÂˆØ\ÙHS•T“‘Uˆ^H´&4/t`´-t`4/t-t`ˆŽÈœ™XZÎÂˆØ\ÙHSRUQÒS•T“‘Uˆ^H´'´,ô`4,4/t.4aô-t/t/t,4cÈ4`t-t`´cŽÈœ™XZÎÂˆØ\ÙH“×ÒS•T“‘Uˆ^H´$t-t-È4.4/t`´-t`4/t-t`´,ŽÈœ™XZÎÂˆØ\ÙHÑ‘Ž‚ˆY˜][ˆ^H•Úx $QšH4,´bô.´.ôc´aô-t/HŽÈœ™XZÎÂˆBˆœ™XZÎÂˆØ\ÙHÔÎ‚ˆXÛÛ•\HHPÓÓ—ÕTWÑÓ”ÔÎÂˆÝ]HHÛœÜÔÝ]K›Ü™[˜[
+
+NÂˆXÛÛ”™YœÈH™YœË™ÜÎÂˆXÝ]™HHÛœÜÔÝ]HOHÛœÜÔÝ]K‘ÓÓÑÂˆ^HÛœÜÔÝ]HOHÛœÜÔÝ]K‘ÓÓÑÈ‘ÔÈ‚ˆˆÛœÜÔÝ]HOHÛœÜÔÝ]KQÈ´'t-t`ˆ4a4.4.´`t,4a´.4.ˆˆ‘ÔÈ4,´bô.´.ôc´aô-t/HŽÂˆœ™XZÎÂˆØ\ÙH“QUÓÕ‚ˆXÛÛ•\HHPÓÓ—ÕTWÐ•ÂˆÝ]HH›Y]ÛÝÝ]K›Ü™[˜[
+
+NÂˆXÛÛ”™YœÈH™YœË˜›Y]ÛÝÂˆXÝ]™HH›Y]ÛÝÝ]HOH›Y]ÛÝÝ]KÓÓ“‘PÕQÂˆ^H›Y]ÛÝÝ]HOH›Y]ÛÝÝ]KÓÓ“‘PÕQˆÈ´'ô/´-4.´.ôc´aô-t/t/ˆˆˆ›Y]ÛÝÝ]HOH›Y]ÛÝÝ]K““×ÑU’PÑBˆÈ´'t-t`ˆ4`ô`t`´`4/´.t`t`´,ˆˆˆ›Y]ÛÝ4,´bô.´.ôc´aô-t/HŽÂˆœ™XZÎÂˆØ\ÙHS‘ÓÔ—ÕST‚ˆ^HÝš[™Ë˜[YSÙŠš[™[™Ëš[™ÛÜ•[\^™Ù]^
+
+JNÂˆÛ›ÝÛˆH]^š\Ñ[\J
+H	‰ˆUSTÔPÑRÓT‹™\]X[Ê^
+NÂˆXÝ]™HHÛ›ÝÛŽÂˆœ™XZÎÂˆØ\ÙHÕUÓÔ—ÕST‚ˆ^HÝš[™Ë˜[YSÙŠš[™[™Ë›Ý]ÛÜ•[\^™Ù]^
+
+JNÂˆÛ›ÝÛˆH]^š\Ñ[\J
+H	‰ˆUSTÔPÑRÓT‹™\]X[Ê^
+NÂˆXÝ]™HHÛ›ÝÛŽÂˆœ™XZÎÂˆØ\ÙHÓ‘WÔÕUTÎ‚ˆ^H›Ú[™Yš\ÚX›U^
+š[™[™ËœÛ™TÝ]\ÐÛÛZ[™\ŠNÂˆÛ›ÝÛˆH]^š\Ñ[\J
+NÂˆXÝ]™HHÛ›ÝÛŽÂˆœ™XZÎÂˆØ\ÙHÓ‘WÐÑSSTŽ‚ˆ[YÙ\ˆÚYÛ˜[HÛ™T\˜Ù[
+›™]ÛÜšËœÚYÛ˜[ŠNÂˆÝš[™ÈÜ\˜]ÜˆHÛ™U^
+›™]ÛÜšË›Ü\˜]ÜˆŠNÂˆÝš[™È˜]ÐÙ[[\•\HHÛ™S™]ÛÜšÕ\J
+NÂˆÝš[™ÈÙ[[\•\HH™YœËœÛ™PÙ[[\‹œÚÝÓ™]ÛÜšÕ\K™Ù]
+
+BˆÈ˜]ÐÙ[[\•\HˆˆŽÂˆÙ[[\”ÚYÛ˜[\˜Ù[HÚYÛ˜[ÂˆÙ[[\“Ü\˜]ÜˆHÜ\˜]ÜŽÂˆÙ[[\“™]ÛÜšÕ\HH˜]ÐÙ[[\•\NÂˆÛ›ÝÛˆHÚYÛ˜[OH[[Ü\˜]Ü‹š\Ñ[\J
+HXÙ[[\•\Kš\Ñ[\J
+NÂˆXÝ]™HH[Ü\˜]Ü‹š\Ñ[\J
+HXÙ[[\•\Kš\Ñ[\J
+BˆÚYÛ˜[OH[	‰ˆÚYÛ˜[ˆÂˆ^HXÙ[[\•\Kš\Ñ[\J
+H	‰ˆ[Ü\˜]Ü‹š\Ñ[\J
+BˆÈÙ[[\•\H
+Èˆ0­Èˆ
+ÈÜ\˜]Ü‚ˆˆXÙ[[\•\Kš\Ñ[\J
+HÈÙ[[\•\Bˆˆ[Ü\˜]Ü‹š\Ñ[\J
+HÈÜ\˜]ÜˆˆÛ›ÝÛˆÈÚYÛ˜[
+È‰HˆˆˆŽÂˆXÛÛ”™\ÛÝ\˜ÙHH‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØÙ[[\—Û]™[ÂˆXÛÛ•[HÈËÈXÝ]™KÚ[˜XÝ]™H˜\œÈØ\œžHZ\ˆÝÛˆÛÛÜœË‚ˆXÛÛ“]™[HÙ[[\˜\œÊÚYÛ˜[
+H
+ˆLÂˆXÛÛ”™YœÈH™YœËœÛ™PÙ[[\ŽÂˆœ™XZÎÂˆØ\ÙHÓ‘WÐUT–N‚ˆ[YÙ\ˆ˜]\žHHÛ™T\˜Ù[
+˜˜]\žK›]™[ŠNÂˆÛ›ÝÛˆH˜]\žHOH[ÂˆXÝ]™HHÛ›ÝÛŽÂˆ^HÛ›ÝÛˆÈ˜]\žH
+È‰HˆˆˆŽÂˆXÛÛ”™\ÛÝ\˜ÙHH‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ˜]\žNÂˆXÛÛ“]™[H˜]\žHOH[Èˆ˜]\žH
+ˆLÂˆXÛÛ”™YœÈH™YœËœÛ™P˜]\žNÂˆ˜]\žPÚ\™Ú[™ÈHÛ™PÚ\™Ú[™Ó›ÝÊ
+NÂˆXÛÛ•[HÛ™P˜]\žPÛÛÜŠ˜]\žK˜]\žPÚ\™Ú[™ÊNÂˆ˜]\žT\˜Ù[H™YœËœÛ™P˜]\žKœÚÝÔ\˜Ù[YÙK™Ù]
+
+HÈ˜]\žHˆ[Âˆœ™XZÎÂˆØ\ÙHÓ‘WÓ‘UÓÔ’×ÕTN‚ˆ^HÛ™S™]ÛÜšÕ\J
+NÂˆÛ›ÝÛˆH]^š\Ñ[\J
+NÂˆXÝ]™HHÛ›ÝÛŽÂˆœ™XZÎÂˆY˜][‚ˆ™]\›ˆ[ÂˆB‚ˆYˆ
+XÛÛ•\HH	‰ˆXÛÛ”™YœÈOH[
+HÂˆ[\ÚYÛ’[™^HX]›Z[ŠX]›X^
+™YœËšXÛÛ‘\ÚYÛ‹™Ù]
+
+JKˆPÓÓ—ÑTÒQÓ”Ë›[™ÝHJNÂˆ[×V×H\ÚYÛˆHPÓÓ—ÑTÒQÓ”ÖÙ\ÚYÛ’[™^NÂˆÝ]HHX]›Z[ŠX]›X^
+Ý]JK\ÚYÛ–ÚXÛÛ•\WK›[™ÝHJNÂˆXÛÛ”™\ÛÝ\˜ÙHH\ÚYÛ–ÚXÛÛ•\WVÜÝ]WNÂˆ[×HÛÛÜ”™\ÛÝ\˜Ù\ÈHXÛÛ•\HOHPÓÓ—ÕTWÕÒQ’HÈÒQ’WÔÕUWÐÓÓÔ—Ô‘TÂˆˆXÛÛ•\HOHPÓÓ—ÕTWÑÓ”ÔÈÈÓ”Ô×ÔÕUWÐÓÓÔ—Ô‘TÈˆ•ÔÕUWÐÓÓÔ—Ô‘TÎÂˆYˆ
+X]›Z[ŠX]›X^
+™YœËšXÛÛ”Ý[K™Ù]
+
+JKJHOHÕSWÐÓÓÔŠHÂˆXÛÛ•[HÛÛ^ÛÛ\]™Ù]ÛÛÜŠˆ[YYÛÛ^OH[È[YYÛÛ^ˆ\ËÛÛÜ”™\ÛÝ\˜Ù\ÖÜÝ]WJNÂˆBˆ[Ý][™P[HHXÛÛ”™YœË›Ý][™P[K™Ù]
+
+NÂˆÝ][™UÚYHÝ][™P[HHÈˆXÛÛ”™YœË›Ý][™UÚY™Ù]
+
+NÂˆÝ][™PÛÛÜˆH
+Ý][™PÛÛÜˆ	ˆ‘‘‘‘‘ŠBˆ
+X]›Z[ŠMKX]›X^
+Ý][™P[JJH
+NÂˆ[Ý[P˜XÚÙÜ›Ý[™HXÛÛ•[Â‚ˆYˆ
+XÛÛ•\HOHPÓÓ—ÕTWÕÒQ’Bˆ	‰ˆÝ]HOHÚQšTÝ]K“SRUQÒS•T“‘U›Ü™[˜[
+
+JHÂˆ˜YÙQ˜]ØX›T™\ÛÝ\˜ÙHH‹™˜]ØX›KšX×Ø˜YÙWÜWÙ›YÎÂˆH[ÙHYˆ
+XÛÛ•\HOHPÓÓ—ÕTWÑÓ”ÔÈ	‰ˆ™YœË™ÜËœÚÝÔØ][]P˜YÙK™Ù]
+
+Bˆ	‰ˆ[™›ÚY›ÜË”Þ\Ý[PÛØÚË\[YSZ[\Ê
+HHØ][]\ÐÛÝ[[Y\Ý[\ˆÓ”ÔÔÒT‘WÔÐUSUWÔÕUT×ÕSQSÕUÓTÊHÂˆ›ÛÛX[ˆXY™XÚÛÛš[™ÈH
+ÛœÜÓ[ÙQ›YÜÈ	ˆÓ”ÔÔÒT‘WÓSÑWÑŠHOHÂˆ›ÛÛX[ˆÜÛÙ‘]XÝYH
+ÛœÜÓ[ÙQ›YÜÈ	ˆÓ”ÔÔÒT‘WÓSÑWÔÔÓÑŠHOHÂˆYˆ
+XY™XÚÛÛš[™ÊH˜YÙU^HÙ]Ýš[™Ê‹œÝš[™Ë™ÛœÜ×Ù—Ø˜YÙJNÂˆ[ÙHYˆ
+ÜÛÙ‘]XÝY
+H˜YÙU^HÙ]Ýš[™Ê‹œÝš[™Ë™ÛœÜ×ÜÜÛÙ—Ø˜YÙJNÂˆ[ÙHYˆ
+Ø][]\ÐÛÝ[ˆ
+H˜YÙU^HÝš[™Ë˜[YSÙŠØ][]\ÐÛÝ[
+NÂˆYˆ
+˜YÙU^OH[
+HÂˆYˆ
+ÜÛÙ‘]XÝY
+HÂˆ˜YÙP˜XÚÙÜ›Ý[™HÛÛ^ÛÛ\]™Ù]ÛÛÜŠ\Ë‹˜ÛÛÜ‹œÝ]\×Ù\œ›ÜŠNÂˆ˜YÙQ›Ü™YÜ›Ý[™HÛÛ^ÛÛ\]™Ù]ÛÛÜŠˆ\Ë‹˜ÛÛÜ‹œÝ]\×Ø˜YÙWÝ^
+NÂˆH[ÙHYˆ
+XY™XÚÛÛš[™ÊHÂˆ˜YÙP˜XÚÙÜ›Ý[™HÛÛ^ÛÛ\]™Ù]ÛÛÜŠ\Ë‹˜ÛÛÜ‹œÝ]\×ÝØ\›š[™ÊNÂˆ˜YÙQ›Ü™YÜ›Ý[™HÛÛ^ÛÛ\]™Ù]ÛÛÜŠˆ\Ë‹˜ÛÛÜ‹œÝ]\×Ø˜YÙWÝ^
+NÂˆH[ÙHÂˆ˜YÙP˜XÚÙÜ›Ý[™HÝ[P˜XÚÙÜ›Ý[™ÂˆBˆBˆH[ÙHYˆ
+XÛÛ•\HOHPÓÓ—ÕTWÐ•ˆ	‰ˆ™YœË˜›Y]ÛÝœÚÝÑ]šXÙPÛÝ[˜YÙK™Ù]
+
+Bˆ	‰ˆ›Y]ÛÝÝ]HOH›Y]ÛÝÝ]KÓÓ“‘PÕQˆ	‰ˆXÛÛ›™XÝYYœËš\Ñ[\J
+JHÂˆ˜YÙU^HÝš[™Ë˜[YSÙŠÛÛ›™XÝYYœËœÚ^™J
+JNÂˆ˜YÙP˜XÚÙÜ›Ý[™HÝ[P˜XÚÙÜ›Ý[™ÂˆBˆYˆ
+XÛÛ•\HOHPÓÓ—ÕTWÐ•
+HÂˆÛ™P›Y]ÛÝ[™XØ]Ü”ÛXÞK\X\˜[˜ÙH\X\˜[˜ÙHBˆÛ™P›Y]ÛÝ[™XØ]Ü”ÛXÞKœ™\ÛÛ™Jˆ›Y]ÛÝÝ]HOH›Y]ÛÝÝ]KÓÓ“‘PÕQˆ\ÔÙ[XÝYÛ™PÛÛ™šYÝ\˜][ÛŠ
+Kˆ\ÔÛ™S›ÝYšXØ][Û”]]˜Z[X›J
+JNÂˆYˆ
+\X\˜[˜ÙHOHÛ™P›Y]ÛÝ[™XØ]Ü”ÛXÞK\X\˜[˜ÙK‘QUS
+HÂˆXÛÛ”™\ÛÝ\˜ÙHH‹™˜]ØX›KšX×ÜÝ]\×Ú\Û™WØ›Y]ÛÝÜÛÛYÂˆXÛÛ•[HÛÛ^ÛÛ\]™Ù]ÛÛÜŠˆ[YYÛÛ^OH[È[YYÛÛ^ˆ\Ëˆ‹˜ÛÛÜ‹œÝ]\×Ø›Y]ÛÝ
+NÂˆÝ][™UÚYHÂˆBˆBˆH[ÙHYˆ
+XÛÛ”™\ÛÝ\˜ÙHOH	‰ˆXÛÛ”™YœÈOH[
+HÂˆ[Ý][™P[HHX]›X^
+X]›Z[ŠMKXÛÛ”™YœË›Ý][™P[K™Ù]
+
+JJNÂˆÝ][™UÚYHÝ][™P[HHÈˆXÛÛ”™YœË›Ý][™UÚY™Ù]
+
+NÂˆÝ][™PÛÛÜˆH
+Ý][™PÛÛÜˆ	ˆ‘‘‘‘‘ŠH
+Ý][™P[H
+NÂˆYˆ
+\HOHœšXÚÕ\K•ÒQ’H	‰ˆÚYšTÝ]HOHÚQšTÝ]K“SRUQÒS•T“‘U
+HÂˆ˜YÙQ˜]ØX›T™\ÛÝ\˜ÙHH‹™˜]ØX›KšX×Ø˜YÙWÜWÙ›YÎÂˆBˆBˆ™]\›ˆ™]ÈÝ]\ÐœšXÚÔÛ˜\ÚÝ
+^XÛÛ”™\ÛÝ\˜ÙKXÛÛ•[XÛÛ“]™[˜]\žT\˜Ù[ˆ˜]\žPÚ\™Ú[™ËÙ[[\”ÚYÛ˜[\˜Ù[Ù[[\“Ü\˜]Ü‹Ù[[\“™]ÛÜšÕ\KˆÝ][™PÛÛÜ‹Ý][™UÚY˜YÙU^˜YÙP˜XÚÙÜ›Ý[™˜YÙQ›Ü™YÜ›Ý[™ˆ˜YÙQ˜]ØX›T™\ÛÝ\˜ÙKÛ›ÝÛ‹XÝ]™JNÂˆB‚ˆÊŠˆ[[]]X›H™XY[Û›HÛÛ›™XÝÜˆÛ˜\ÚÝ›ÜˆÙ][™ÜËØØ][ÙÈXÚÙ\œËˆ
+‹Âˆ›Û“[ˆX›XÈ\ÝÛÛ›™XÝÜ•˜[YOˆÛÛ›™XÝÜ•˜[YTÛ˜\ÚÝ
+
+HÂˆÛÛ›™XÝÜ•˜[YT™YÚ\ÝžHÝ\œ™[HÛÛ›™XÝÜ•˜[Y\ÎÂˆ™]\›ˆÝ\œ™[OH[È˜]˜K][ÛÛXÝ[ÛœË™[\S\Ý
+
+HˆÝ\œ™[œÛ˜\ÚÝ
+
+NÂˆB‚ˆÊŠ‚ˆ
+ˆÝXœØÜšX™\ÈHØ[YK\›ØÙ\ÜÈÓQHÝ\™˜XÙHÈ˜]ÈKÓTUÔÜ]˜[YHÚ[™Ù\Ë‚ˆ
+‚ˆ
+ˆ•H™]\›™Y[š]X[Û˜\ÚÝÛÜÙ\ÈHš\œÝ[][˜Ú˜XÙNˆHÛÛ›™XÝÜˆX^H]™Bˆ
+ˆÛÛ\]YÞ[˜Ú›Ûš^˜][Ûˆ™Y›Ü™H][˜Ú\XÝ]š]HØZ[™YHÙ\šXÙHÚ[™Û]Û‹Ü‚ˆ
+‹Âˆ›Û“[ˆX›XÈ\ÝÛÛ›™XÝÜ•˜[YOˆYÛÛ›™XÝÜ•˜[YS\Ý[™\Šˆ›Û“[ÛÛ›™XÝÜ•˜[YT™YÚ\ÝžK“\Ý[™\ˆ\Ý[™\ŠHÂˆÛÛ›™XÝÜ•˜[YT™YÚ\ÝžHÝ\œ™[HÛÛ›™XÝÜ•˜[Y\ÎÂˆYˆ
+Ý\œ™[OH[
+H™]\›ˆ˜]˜K][ÛÛXÝ[ÛœË™[\S\Ý
+
+NÂˆËÈÝXœØÜšX™H™Y›Ü™H™XY[™Îˆ[ˆ\]H˜XÚ[™È\ÈÛ˜\ÚÝ\ÈZ]\ˆ[™XYH[˜ÛYYÜ‚ˆËÈ\œš]™\È›ÝYÚH\Ý[™\ˆ[[YYX][HY\Ø\™Ë™]™\ˆÜÝ™]ÙY[ˆHÛÈÝ\Ë‚ˆÝ\œ™[˜Y\Ý[™\Š\Ý[™\ŠNÂˆ™]\›ˆÝ\œ™[œÛ˜\ÚÝ
+
+NÂˆB‚ˆX›XÈ›ÚY™[[Ý™PÛÛ›™XÝÜ•˜[YS\Ý[™\Šˆ›Û“[ÛÛ›™XÝÜ•˜[YT™YÚ\ÝžK“\Ý[™\ˆ\Ý[™\ŠHÂˆÛÛ›™XÝÜ•˜[YT™YÚ\ÝžHÝ\œ™[HÛÛ›™XÝÜ•˜[Y\ÎÂˆYˆ
+Ý\œ™[OH[
+HÝ\œ™[œ™[[Ý™S\Ý[™\Š\Ý[™\ŠNÂˆB‚ˆÊŠˆ™YÚ\Ý\œÈHØ[YK\›ØÙ\ÜÈš\ÝX[Ý\™˜XÙH›Üˆ[™XYKXÛØ[\ØÙY]]ÛX][Ûˆ[˜[Y][ÛœËˆ
+‹ÂˆX›XÈ›ÚYY]]ÛX][Û”™\Ù[][Û“\Ý[™\Šˆ›Û“[]]ÛX][Û”™\Ù[][Û“\Ý[™\ˆ\Ý[™\ŠHÂˆÞ[˜Ú›Ûš^™Y
+]]ÛX][Û”™\Ù[][Û“\Ý[™\œÊHÂˆYˆ
+]]ÛX][Û”™\Ù[][Û“\Ý[™\œË˜ÛÛZ[œÊ\Ý[™\ŠJH™]\›ŽÂˆYˆ
+]]ÛX][Û”™\Ù[][Û“\Ý[™\œËœÚ^™J
+BˆHPVÐUUÓPUSÓ—Ô‘TÑS•USÓ—ÓTÕS‘T”ÊHÂˆ›ÝÈ™]È[YØ[Ý]Q^Ù\[ÛŠ•ÛÈX[žH]]ÛX][Ûˆ™\Ù[][Ûˆ\Ý[™\œÈŠNÂˆBˆ]]ÛX][Û”™\Ù[][Û“\Ý[™\œË˜Y
+\Ý[™\ŠNÂˆBˆB‚ˆX›XÈ›ÚY™[[Ý™P]]ÛX][Û”™\Ù[][Û“\Ý[™\Šˆ›Û“[]]ÛX][Û”™\Ù[][Û“\Ý[™\ˆ\Ý[™\ŠHÂˆ]]ÛX][Û”™\Ù[][Û“\Ý[™\œËœ™[[Ý™J\Ý[™\ŠNÂˆB‚ˆÊŠˆÛÛ\]HØÙ[˜\š[ËØœ›ØYØ\Ý™\Ù[][ÛˆÝ]H›ÜˆÛ™H^\›˜[Q[[Y[ˆ
+‹Âˆ›Û“[ˆX›XÈ]]ÛX][Û”Ý]HY]]ÛX][Û”Ý]J›Û“[Ýš[™È]]ÛX][Û’Y
+HÂˆ]]ÛX][Û”Ý]TÝÜ™HÝ\œ™[H]]ÛX][Û”Ý]\ÎÂˆ™]\›ˆÝ\œ™[OH[È]]ÛX][Û”Ý]K›Z\ÜÚ[™Ê
+HˆÝ\œ™[™Ù]
+ˆ]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÒQ]]ÛX][Û’Y
+NÂˆB‚ˆÊŠˆØÙ[˜\š[Ë\™\ÛÛ™Yš\ÚXš[]H›ÜˆÛ™Hš]™\‹\[™[ÚÜÝ]ˆ
+‹ÂˆX›XÈ›ÛÛX[ˆš]™\”ÚÜÝ]š\ÚX›J›Û“[Ýš[™ÈÚÜÝ]Y›ÛÛX[ˆY˜][˜[YJHÂˆ]]ÛX][Û”Ý]TÝÜ™HÝ\œ™[H]]ÛX][Û”Ý]\ÎÂˆ™]\›ˆÝ\œ™[OH[ÈY˜][˜[YHˆÝ\œ™[™Y™™XÝ]™Uš\ÚXš[]Jˆ]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÑ’U‘T‹ÚÜÝ]YY˜][˜[YJNÂˆB‚ˆÊŠˆØÙ[˜\š[Ë\™\ÛÛ™Y[\˜XÝ[ÛˆØ]H›ÜˆÛ™Hš]™\‹\[™[ÚÜÝ]ˆ
+‹ÂˆX›XÈ›ÛÛX[ˆš]™\”ÚÜÝ]XÝ[Û‘[˜X›Y
+›Û“[Ýš[™ÈÚÜÝ]Yˆ›ÛÛX[ˆY˜][˜[YJHÂˆ]]ÛX][Û”Ý]TÝÜ™HÝ\œ™[H]]ÛX][Û”Ý]\ÎÂˆ™]\›ˆÝ\œ™[OH[ÈY˜][˜[YHˆÝ\œ™[™Y™™XÝ]™PXÝ[Û‘[˜X›Y
+ˆ]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÑ’U‘T‹ÚÜÝ]YY˜][˜[YJNÂˆB‚ˆÊŠˆÛÛ\]HY™™XÝ]™Hš]™\ˆÝ[K[˜ÛY[™ÈH[‹[Y[[ÜžHØÙ[˜\š[È™XÙY[˜ÙH^Y\‹ˆ
+‹Âˆ›Û“[ˆX›XÈ]]ÛX][Û”Ý]Hš]™\]]ÛX][Û”Ý]J›Û“[Ýš[™È\™Ù]Y
+HÂˆ]]ÛX][Û”Ý]TÝÜ™HÝ\œ™[H]]ÛX][Û”Ý]\ÎÂˆ™]\›ˆÝ\œ™[OH[È]]ÛX][Û”Ý]K›Z\ÜÚ[™Ê
+HˆÝ\œ™[™Ù]
+ˆ]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÑ’U‘T‹\™Ù]Y
+NÂˆB‚ˆÊŠˆÛÛ\]HY™™XÝ]™HÓQHÚÜÝ]Ý[K[˜ÛY[™ÈH[‹[Y[[ÜžHØÙ[˜\š[È^Y\‹ˆ
+‹Âˆ›Û“[ˆX›XÈ]]ÛX][Û”Ý]H][˜Ú\]]ÛX][Û”Ý]J›Û“[Ýš[™È\™Ù]Y
+HÂˆ]]ÛX][Û”Ý]TÝÜ™HÝ\œ™[H]]ÛX][Û”Ý]\ÎÂˆ™]\›ˆÝ\œ™[OH[È]]ÛX][Û”Ý]K›Z\ÜÚ[™Ê
+HˆÝ\œ™[™Ù]
+ˆ]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÓUSÒT‹\™Ù]Y
+NÂˆB‚ˆÊŠˆ^XÚ]]]ÛX][ÛˆXÚ\Ú[Ûˆ›ÜˆÛ™H˜[œÚY[˜]›Üš]\È[™[È[™\Ù\™\ÈX[X[RKˆ
+‹Âˆ[X›BˆX›XÈ›ÛÛX[ˆš]™\‘˜]›Üš]T[™[š\ÚXš[]J›Û“[Ýš[™È[™[Y
+HÂˆ]]ÛX][Û”Ý]TÝÜ™HÝ\œ™[H]]ÛX][Û”Ý]\ÎÂˆ™]\›ˆÝ\œ™[OH[È[ˆÝ\œ™[™^XÚ]š\ÚXš[]Jˆ]]ÛX][ÛÛÛ˜XÝ”ÐÓÔWÑ’U‘T‹[™[Y
+NÂˆB‚ˆš]˜]HÝ]XÈ™XÝÙ]›Ý[™ÊšY]ÈšY]ÊHÂˆ™]\›ˆ™]È™XÝ
+šY]Ë™Ù]Y
+
+KšY]Ë™Ù]Ü
+
+KšY]Ë™Ù]šYÚ
+
+KšY]Ë™Ù]›ÝÛJ
+JNÂˆBŸB

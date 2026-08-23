@@ -60,6 +60,9 @@ int getVersionCode() {
     if (version == '2.2.12') {
         return 208021246
     }
+    if (version == '2.2.13') {
+        return 208021247
+    }
     // Preserve the immutable 2.2.4-r3 build identity for exact release replay.
     if (version == '2.2.4') {
         return 208021238
