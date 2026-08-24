@@ -25,7 +25,7 @@ public final class Natro230RoadRecoveryContractTest {
         assertTrue(controller.contains("YANDEX_RECEIVER_VERIFY_MS = 2_000L"));
         assertTrue(controller.contains("coldStartEscalation = attempt > 0"));
         assertTrue(controller.contains("receiver_result_verification"));
-        assertTrue(command.contains("verified_media_browser_fallback"));
+        assertTrue(command.contains("verified_media_browser_bootstrap"));
         assertTrue(command.contains("isUsablePlaySession"));
         assertTrue(command.contains("processState(context, target)"));
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));

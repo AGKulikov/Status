@@ -15,7 +15,7 @@ import androidx.annotation.NonNull;
 
 import dezz.status.widget.phone.PhoneConnectionJournal;
 
-/** Starts Yandex playback through its exported MediaBrowser service without opening any UI. */
+/** Bootstraps Yandex through its exported MediaBrowser service without opening any UI. */
 final class YandexMusicBrowserStarter {
     private static final ComponentName SERVICE = new ComponentName(
             "ru.yandex.music",
@@ -27,9 +27,12 @@ final class YandexMusicBrowserStarter {
 
     private YandexMusicBrowserStarter() {}
 
-    /** Returns immediately; connection and PLAY are serialized on Android's main looper. */
+    /**
+     * Returns immediately. A successful bind is only a process/session bootstrap; actual playback
+     * is confirmed by {@link MediaAutoResumeController}, never inferred from this request.
+     */
     @NonNull
-    static String requestPlay(@NonNull Context context) {
+    static String requestBootstrap(@NonNull Context context) {
         Context app = context.getApplicationContext();
         if (app == null) app = context;
         try {
@@ -40,10 +43,16 @@ final class YandexMusicBrowserStarter {
         Context exactApp = app;
         try {
             MAIN.post(() -> startOrJoin(exactApp));
-            return "scheduled";
+            return "bootstrap_scheduled";
         } catch (RuntimeException rejected) {
             return "schedule_" + rejected.getClass().getSimpleName();
         }
+    }
+
+    /** Kept for source compatibility with older HOME-control callers. */
+    @NonNull
+    static String requestPlay(@NonNull Context context) {
+        return requestBootstrap(context);
     }
 
     private static void startOrJoin(@NonNull Context context) {
@@ -84,9 +93,12 @@ final class YandexMusicBrowserStarter {
                 MediaController controller = new MediaController(
                         context, browser.getSessionToken());
                 controller.getTransportControls().play();
-                finish("play_dispatched", "none");
+                // This is a request on the browser token, not proof that audio started. The exact
+                // package session is polled and verified by MediaAutoResumeController.
+                finish("bootstrap_connected", "play_request_sent_unverified");
             } catch (RuntimeException failure) {
-                finish("play_failed", failure.getClass().getSimpleName());
+                finish("bootstrap_session_request_failed",
+                        failure.getClass().getSimpleName());
             }
         }
 

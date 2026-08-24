@@ -36,8 +36,10 @@ final class MediaResumeCommand {
     enum Result {
         ALREADY_PLAYING,
         SESSION_COMMAND,
+        SESSION_MEDIA_BUTTON,
         RECEIVER_COMMAND,
-        BROWSER_COMMAND,
+        BROWSER_BOOTSTRAP,
+        WAITING_FOR_SESSION,
         DISPATCH_FAILED,
         NO_TARGET
     }
@@ -74,22 +76,40 @@ final class MediaResumeCommand {
     static DispatchTrace playWithTrace(@NonNull Context context,
                                        @NonNull String targetPackage,
                                        boolean coldStartEscalation) {
-        return sendWithTrace(context, targetPackage, Command.PLAY, coldStartEscalation);
+        return playWithTrace(context, targetPackage, coldStartEscalation, false, false);
+    }
+
+    /**
+     * Durable Yandex boot-recovery state is owned by {@link MediaAutoResumeController}. Passing it
+     * here keeps each dispatch exclusive: one browser bootstrap, then an exact-session PLAY, then
+     * an exact-session media-button fallback only when PLAY was verified as ineffective.
+     */
+    @NonNull
+    static DispatchTrace playWithTrace(@NonNull Context context,
+                                       @NonNull String targetPackage,
+                                       boolean coldStartEscalation,
+                                       boolean yandexBrowserBootstrapRequested,
+                                       boolean yandexSessionPlayAttempted) {
+        return sendWithTrace(context, targetPackage, Command.PLAY, coldStartEscalation,
+                yandexBrowserBootstrapRequested, yandexSessionPlayAttempted);
     }
 
     @NonNull
     static Result playPause(@NonNull Context context, @NonNull String targetPackage) {
-        return sendWithTrace(context, targetPackage, Command.PLAY_PAUSE, false).result;
+        return sendWithTrace(context, targetPackage, Command.PLAY_PAUSE, false,
+                false, false).result;
     }
 
     @NonNull
     static Result previous(@NonNull Context context, @NonNull String targetPackage) {
-        return sendWithTrace(context, targetPackage, Command.PREVIOUS, false).result;
+        return sendWithTrace(context, targetPackage, Command.PREVIOUS, false,
+                false, false).result;
     }
 
     @NonNull
     static Result next(@NonNull Context context, @NonNull String targetPackage) {
-        return sendWithTrace(context, targetPackage, Command.NEXT, false).result;
+        return sendWithTrace(context, targetPackage, Command.NEXT, false,
+                false, false).result;
     }
 
     /** A timeline position has no safe media-button fallback, so require the exact session. */
@@ -127,7 +147,9 @@ final class MediaResumeCommand {
     private static DispatchTrace sendWithTrace(@NonNull Context context,
                                                @NonNull String targetPackage,
                                                @NonNull Command command,
-                                               boolean coldStartEscalation) {
+                                               boolean coldStartEscalation,
+                                               boolean yandexBrowserBootstrapRequested,
+                                               boolean yandexSessionPlayAttempted) {
         String target = targetPackage.trim();
         if (target.isEmpty()) return trace(Result.NO_TARGET, "target=empty");
         String sessionError = "none";
@@ -174,22 +196,43 @@ final class MediaResumeCommand {
                             }
                             if (YANDEX_MUSIC_PACKAGE.equals(target)) {
                                 // Give Yandex's exported receiver the first configured-time chance.
-                                // A freshly restored Yandex session reports STATE_NONE and accepts
-                                // transportControls.play() without actually starting audio. A later
-                                // verified retry may use a genuinely actionable session.
+                                // Road logs show that the exact session can legitimately expose
+                                // PLAY while still reporting STATE_NONE. After background bootstrap
+                                // that is actionable and must not be discarded as an inert session.
                                 deferredYandexPlaySession = controller;
                                 deferredYandexPlaybackState = playbackState;
                                 deferredYandexActions = actions;
                                 if (coldStartEscalation
                                         && isUsablePlaySession(playbackState, actions)) {
+                                    if (yandexSessionPlayAttempted) {
+                                        String dispatchError = sendSessionKey(controller,
+                                                KeyEvent.KEYCODE_MEDIA_PLAY,
+                                                YANDEX_PLAY_KEY_UP_DELAY_MS);
+                                        return trace(dispatchError.isEmpty()
+                                                        ? Result.SESSION_MEDIA_BUTTON
+                                                        : Result.DISPATCH_FAILED,
+                                                "route=verified_exact_session_media_button"
+                                                        + ", process="
+                                                        + processState(context, target)
+                                                        + ", activeSessions="
+                                                        + activeSessionCount
+                                                        + ", sessions=" + sessionInventory
+                                                        + ", playbackState=" + playbackState
+                                                        + ", actions=" + actions
+                                                        + ", dispatchError="
+                                                        + emptyAsNone(dispatchError));
+                                    }
                                     controller.getTransportControls().play();
                                     return trace(Result.SESSION_COMMAND,
-                                            "route=verified_session_fallback, process="
+                                            "route=verified_exact_session_play, process="
                                                     + processState(context, target)
                                                     + ", activeSessions=" + activeSessionCount
                                                     + ", sessions=" + sessionInventory
                                                     + ", playbackState=" + playbackState
-                                                    + ", actions=" + actions);
+                                                    + ", actions=" + actions
+                                                    + ", stateNoneAccepted="
+                                                    + (playbackState
+                                                    == PlaybackState.STATE_NONE));
                                 }
                                 break;
                             }
@@ -223,18 +266,33 @@ final class MediaResumeCommand {
 
         // The first boot attempt always gives the exact exported receiver its configured-time
         // chance. A later attempt reaches here only after the controller observed no playback.
-        // Start Yandex through its background MediaBrowser before repeating the inert receiver.
+        // Bind Yandex's background MediaBrowser once to bootstrap its process/session, then poll
+        // only for the exact session. Rebinding on every retry delayed recovery in the road logs.
         if (coldStartEscalation && YANDEX_MUSIC_PACKAGE.equals(target)
                 && command == Command.PLAY) {
-            String browser = requestYandexBrowserIfUseful(context, target, command);
-            if ("scheduled".equals(browser)) {
-                return trace(Result.BROWSER_COMMAND,
-                        "route=verified_media_browser_fallback, process="
+            String browser = yandexBrowserBootstrapRequested
+                    ? "already_requested"
+                    : requestYandexBrowserIfUseful(context, target, command);
+            if ("bootstrap_scheduled".equals(browser)) {
+                return trace(Result.BROWSER_BOOTSTRAP,
+                        "route=verified_media_browser_bootstrap, process="
                                 + processState(context, target)
                                 + ", activeSessions=" + activeSessionCount
                                 + ", sessions=" + sessionInventory
                                 + ", sessionError=" + sessionError
                                 + ", deferredPlaybackState=" + deferredYandexPlaybackState
+                                + ", deferredActions=" + deferredYandexActions
+                                + ", browser=" + browser);
+            }
+            if (yandexBrowserBootstrapRequested) {
+                return trace(Result.WAITING_FOR_SESSION,
+                        "route=waiting_for_exact_session, process="
+                                + processState(context, target)
+                                + ", activeSessions=" + activeSessionCount
+                                + ", sessions=" + sessionInventory
+                                + ", sessionError=" + sessionError
+                                + ", deferredPlaybackState="
+                                + deferredYandexPlaybackState
                                 + ", deferredActions=" + deferredYandexActions
                                 + ", browser=" + browser);
             }
@@ -318,9 +376,9 @@ final class MediaResumeCommand {
             }
         }
         String browser = requestYandexBrowserIfUseful(context, target, command);
-        if ("scheduled".equals(browser)) {
-            return trace(Result.BROWSER_COMMAND,
-                    "route=media_browser, activeSessions=" + activeSessionCount
+        if ("bootstrap_scheduled".equals(browser)) {
+            return trace(Result.BROWSER_BOOTSTRAP,
+                    "route=media_browser_bootstrap, activeSessions=" + activeSessionCount
                             + ", process=" + processState(context, target)
                             + ", sessions=" + sessionInventory
                             + ", sessionError=" + sessionError
@@ -398,7 +456,27 @@ final class MediaResumeCommand {
     private static boolean isUsablePlaySession(int playbackState, long actions) {
         boolean explicitPlay = (actions & PlaybackState.ACTION_PLAY) != 0L
                 || (actions & PlaybackState.ACTION_PLAY_PAUSE) != 0L;
-        return explicitPlay && playbackState != PlaybackState.STATE_NONE;
+        // Yandex exposes ACTION_PLAY/ACTION_PLAY_PAUSE before it moves from STATE_NONE. The action
+        // mask is the capability contract; STATE_NONE only means playback has not begun yet.
+        return explicitPlay;
+    }
+
+    /** Dispatches only to the already resolved exact MediaSession; this is never a global key. */
+    @NonNull
+    private static String sendSessionKey(@NonNull MediaController controller,
+                                         int keyCode, long keyUpDelayMs) {
+        long now = SystemClock.uptimeMillis();
+        try {
+            boolean downAccepted = controller.dispatchMediaButtonEvent(new KeyEvent(
+                    now, now, KeyEvent.ACTION_DOWN, keyCode, 0));
+            if (keyUpDelayMs > 0L) SystemClock.sleep(keyUpDelayMs);
+            long releasedAt = SystemClock.uptimeMillis();
+            boolean upAccepted = controller.dispatchMediaButtonEvent(new KeyEvent(
+                    now, releasedAt, KeyEvent.ACTION_UP, keyCode, 0));
+            return downAccepted && upAccepted ? "" : "controller_rejected";
+        } catch (RuntimeException failure) {
+            return failure.getClass().getSimpleName();
+        }
     }
 
     @NonNull

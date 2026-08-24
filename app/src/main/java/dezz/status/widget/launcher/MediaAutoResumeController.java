@@ -44,6 +44,7 @@ public final class MediaAutoResumeController {
     private static final String PREFS = "launcher_media_auto_resume_state";
     private static final String KEY_CAPTURE_TOKEN = "captureToken";
     private static final String KEY_CAPTURE_ELAPSED = "captureElapsed";
+    private static final String KEY_LAST_LIFECYCLE_ELAPSED = "lastLifecycleElapsed";
     private static final String KEY_PLAN_ANCHOR_ELAPSED = "planAnchorElapsed";
     private static final String KEY_CAPTURE_ACTION = "captureAction";
     private static final String KEY_CAPTURE_BOOT_COUNT = "captureBootCount";
@@ -56,11 +57,18 @@ public final class MediaAutoResumeController {
     private static final String KEY_OBSERVATION_KICK_ELAPSED = "observationKickElapsed";
     private static final String KEY_FIRST_COMMAND_ELAPSED = "firstCommandElapsed";
     private static final String KEY_LAST_COMMAND_ELAPSED = "lastCommandElapsed";
+    private static final String KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED =
+            "yandexBrowserBootstrapRequested";
+    private static final String KEY_YANDEX_SESSION_PLAY_ATTEMPTED =
+            "yandexSessionPlayAttempted";
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
     /** mSaver's field-proven bounded policy: one initial PLAY plus four 10-second retries. */
     private static final int MAX_ATTEMPTS = 5;
     private static final long RETRY_DELAY_MS = 10_000L;
+    /** Yandex may expose its first exact session tens of seconds after MediaBrowser bootstrap. */
+    private static final int YANDEX_MAX_ATTEMPTS = 20;
+    private static final long YANDEX_SESSION_POLL_MS = 5_000L;
     /** Verify the exact receiver result quickly, then escalate without shifting attempt one. */
     private static final long YANDEX_RECEIVER_VERIFY_MS = 2_000L;
     private static final String YANDEX_MUSIC_PACKAGE = "ru.yandex.music";
@@ -97,9 +105,12 @@ public final class MediaAutoResumeController {
         long now = SystemClock.elapsedRealtime();
         int bootCount = currentBootCount(app);
         long previousElapsed = state.getLong(KEY_CAPTURE_ELAPSED, Long.MIN_VALUE);
+        long previousLifecycleElapsed = state.getLong(
+                KEY_LAST_LIFECYCLE_ELAPSED, previousElapsed);
         int previousBootCount = state.getInt(KEY_CAPTURE_BOOT_COUNT, Integer.MIN_VALUE);
         String previousAction = state.getString(KEY_CAPTURE_ACTION, "");
-        long delta = previousElapsed == Long.MIN_VALUE ? Long.MAX_VALUE : now - previousElapsed;
+        long delta = previousLifecycleElapsed == Long.MIN_VALUE
+                ? Long.MAX_VALUE : now - previousLifecycleElapsed;
         boolean differentKnownBootCount = bootCount >= 0 && previousBootCount >= 0
                 && bootCount != previousBootCount;
         long previousToken = state.getLong(KEY_CAPTURE_TOKEN, 0L);
@@ -108,7 +119,7 @@ public final class MediaAutoResumeController {
             boolean moveAnchor = MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
                     previousAction, action);
             SharedPreferences.Editor duplicate = state.edit()
-                    .putLong(KEY_CAPTURE_ELAPSED, now)
+                    .putLong(KEY_LAST_LIFECYCLE_ELAPSED, now)
                     .putString(KEY_CAPTURE_ACTION, action);
             if (moveAnchor) duplicate.putLong(KEY_PLAN_ANCHOR_ELAPSED, now);
             duplicate.apply();
@@ -127,6 +138,7 @@ public final class MediaAutoResumeController {
         state.edit()
                 .putLong(KEY_CAPTURE_TOKEN, captureToken)
                 .putLong(KEY_CAPTURE_ELAPSED, now)
+                .putLong(KEY_LAST_LIFECYCLE_ELAPSED, now)
                 .putLong(KEY_PLAN_ANCHOR_ELAPSED, now)
                 .putString(KEY_CAPTURE_ACTION, action)
                 .putInt(KEY_CAPTURE_BOOT_COUNT, bootCount)
@@ -135,6 +147,8 @@ public final class MediaAutoResumeController {
                 .putLong(KEY_OBSERVATION_KICK_ELAPSED, Long.MIN_VALUE)
                 .putLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putLong(KEY_LAST_COMMAND_ELAPSED, Long.MIN_VALUE)
+                .putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false)
+                .putBoolean(KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false)
                 .putBoolean(KEY_COMPLETED, false)
                 .apply();
         // A queued retry from the previous standard/QuickBoot lifecycle must never cross the new
@@ -247,6 +261,8 @@ public final class MediaAutoResumeController {
         state.edit()
                 .putLong(KEY_BOOT_TOKEN, captureToken)
                 .putString(KEY_TARGET_PACKAGE, target)
+                .putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false)
+                .putBoolean(KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false)
                 .putBoolean(KEY_COMPLETED, false)
                 .apply();
         int delaySeconds = clamp(preferences.launcherMediaAutoResumeDelaySeconds.get(), 0, 60);
@@ -311,14 +327,27 @@ public final class MediaAutoResumeController {
         long dispatchStartedAt = SystemClock.elapsedRealtime();
         boolean coldStartEscalation = attempt > 0
                 && YANDEX_MUSIC_PACKAGE.equals(target);
+        boolean yandexBrowserBootstrapRequested = state.getBoolean(
+                KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false);
+        boolean yandexSessionPlayAttempted = state.getBoolean(
+                KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false);
         MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(
-                app, target, coldStartEscalation);
+                app, target, coldStartEscalation,
+                yandexBrowserBootstrapRequested, yandexSessionPlayAttempted);
         long dispatchFinishedAt = SystemClock.elapsedRealtime();
         long firstCommandAt = state.getLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE);
         SharedPreferences.Editor commandTiming = state.edit()
                 .putLong(KEY_LAST_COMMAND_ELAPSED, dispatchFinishedAt);
         if (firstCommandAt == Long.MIN_VALUE) {
             commandTiming.putLong(KEY_FIRST_COMMAND_ELAPSED, dispatchStartedAt);
+        }
+        if (YANDEX_MUSIC_PACKAGE.equals(target)
+                && trace.result == MediaResumeCommand.Result.BROWSER_BOOTSTRAP) {
+            commandTiming.putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, true);
+        }
+        if (YANDEX_MUSIC_PACKAGE.equals(target)
+                && trace.result == MediaResumeCommand.Result.SESSION_COMMAND) {
+            commandTiming.putBoolean(KEY_YANDEX_SESSION_PLAY_ATTEMPTED, true);
         }
         commandTiming.apply();
         PhoneConnectionJournal.append("media-auto-resume",
@@ -341,9 +370,8 @@ public final class MediaAutoResumeController {
         }
 
         int nextAttempt = attempt + 1;
-        if (nextAttempt < MAX_ATTEMPTS) {
-            long retryDelay = attempt == 0 && YANDEX_MUSIC_PACKAGE.equals(target)
-                    ? YANDEX_RECEIVER_VERIFY_MS : RETRY_DELAY_MS;
+        if (nextAttempt < maxAttempts(target)) {
+            long retryDelay = retryDelayMillis(target, attempt, trace.result);
             schedule(app, bootToken, nextAttempt, retryDelay,
                     attempt == 0 && YANDEX_MUSIC_PACKAGE.equals(target)
                             ? "receiver_result_verification" : "command_retry");
@@ -485,7 +513,11 @@ public final class MediaAutoResumeController {
         long now = SystemClock.elapsedRealtime();
         long targetElapsed = state.getLong(KEY_TARGET_ELAPSED, Long.MAX_VALUE);
         long lastKick = state.getLong(KEY_OBSERVATION_KICK_ELAPSED, Long.MIN_VALUE);
-        if (now < targetElapsed || (lastKick != Long.MIN_VALUE && now - lastKick < 1_000L)) {
+        boolean waitingForFirstYandexSessionCommand = YANDEX_MUSIC_PACKAGE.equals(target)
+                && state.getBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false)
+                && !state.getBoolean(KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false);
+        if ((!waitingForFirstYandexSessionCommand && now < targetElapsed)
+                || (lastKick != Long.MIN_VALUE && now - lastKick < 1_000L)) {
             return;
         }
         long bootToken = state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE);
@@ -512,7 +544,8 @@ public final class MediaAutoResumeController {
         if (bootToken == Long.MIN_VALUE
                 || state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken) return;
         int attempt = state.getInt(KEY_NEXT_ATTEMPT, 0);
-        if (attempt >= MAX_ATTEMPTS) return;
+        String target = state.getString(KEY_TARGET_PACKAGE, "").trim();
+        if (attempt >= maxAttempts(target)) return;
         schedule(app, bootToken, attempt, 50L, "audio_route_ready");
         PhoneConnectionJournal.append("media-auto-resume",
                 "trace event=audio_route_kick, source=" + source
@@ -535,7 +568,7 @@ public final class MediaAutoResumeController {
         PhoneConnectionJournal.append("media-auto-resume",
                 "trace event=plan_completed, reason=" + reason
                         + ", token=" + snapshot.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE)
-                        + ", attempts=" + snapshot.getInt(KEY_NEXT_ATTEMPT, -1)
+                        + ", attempts=" + (snapshot.getInt(KEY_NEXT_ATTEMPT, -1) + 1)
                         + ", totalSinceCaptureMs=" + elapsedSince(snapshot,
                         KEY_CAPTURE_ELAPSED, completedAt)
                         + ", elapsed=" + completedAt);
@@ -593,6 +626,20 @@ public final class MediaAutoResumeController {
 
     private static int clamp(int value, int minimum, int maximum) {
         return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static int maxAttempts(@NonNull String target) {
+        return YANDEX_MUSIC_PACKAGE.equals(target) ? YANDEX_MAX_ATTEMPTS : MAX_ATTEMPTS;
+    }
+
+    private static long retryDelayMillis(@NonNull String target, int attempt,
+                                         @NonNull MediaResumeCommand.Result result) {
+        if (!YANDEX_MUSIC_PACKAGE.equals(target)) return RETRY_DELAY_MS;
+        if (attempt == 0) return YANDEX_RECEIVER_VERIFY_MS;
+        if (result == MediaResumeCommand.Result.SESSION_COMMAND) {
+            return YANDEX_RECEIVER_VERIFY_MS;
+        }
+        return YANDEX_SESSION_POLL_MS;
     }
 
     private static long elapsedSince(@NonNull SharedPreferences preferences,
