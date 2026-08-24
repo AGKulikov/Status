@@ -13,7 +13,7 @@ import org.junit.Test;
 
 /** Regression boundary for the 2026-08-24 08:17 road session and the Helper 68 journal storm. */
 public final class Natro2219RoadLogRecoveryContractTest {
-    @Test public void yandexReceiverAttemptRemainsExclusiveBeforeVerifiedFallback()
+    @Test public void yandexReceiverRemainsExclusiveBeforeBrowserAndExactSession()
             throws Exception {
         String build = read("build.gradle");
         String command = read("app/src/main/java/dezz/status/widget/launcher/"
@@ -23,21 +23,17 @@ public final class Natro2219RoadLogRecoveryContractTest {
 
         assertTrue(build.contains("if (version == '2.2.19')"));
         assertTrue(build.contains("return 208021253"));
-        assertTrue(command.contains("deferredYandexPlaySession = controller"));
-        assertTrue(command.contains("skipped_receiver_available"));
-        assertTrue(command.contains("verified_media_browser_bootstrap"));
+        assertTrue(command.contains("route=exact_session_play"));
+        assertTrue(command.contains("route=exact_media_browser_bootstrap"));
+        assertTrue(command.contains("route=waiting_for_exact_session"));
+        assertFalse(command.contains("deferredYandexPlaySession"));
         String queriedReceiver = between(command,
                 "for (ResolveInfo resolved : receivers)",
                 "ComponentName known = knownReceiver(target)");
         assertTrue(queriedReceiver.contains("sendKey(context, receiver"));
         assertFalse(queriedReceiver.contains("requestYandexBrowserIfUseful"));
-        assertTrue(command.indexOf("deferredYandexPlaySession = controller")
+        assertTrue(command.indexOf("route=exact_session_play")
                 < command.indexOf("PackageManager packages"));
-        String sessionFallback = between(command,
-                "String deferredSession = \"not_used\";",
-                "String browser = requestYandexBrowserIfUseful");
-        assertTrue(sessionFallback.contains("return trace(Result.SESSION_COMMAND"));
-        assertTrue(sessionFallback.contains("browser=skipped_session_available"));
         assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 15_000L"));
         assertTrue(browser.contains("connect_coalesced"));
     }
