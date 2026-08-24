@@ -34,7 +34,7 @@ public final class Natro2219RoadLogRecoveryContractTest {
         assertTrue(command.indexOf("deferredYandexPlaySession = controller")
                 < command.indexOf("PackageManager packages"));
         String sessionFallback = between(command,
-                "if (deferredYandexPlaySession != null)",
+                "String deferredSession = \"not_used\";",
                 "String browser = requestYandexBrowserIfUseful");
         assertTrue(sessionFallback.contains("return trace(Result.SESSION_COMMAND"));
         assertTrue(sessionFallback.contains("browser=skipped_session_available"));

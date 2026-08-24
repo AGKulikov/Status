@@ -41,7 +41,7 @@ public final class Ha1235AncsActiveRecoveryContractTest {
         assertTrue(direct.contains("autoConnect=false"));
         assertTrue(direct.contains("autoConnect=false"));
         assertFalse(direct.contains("passiveEnrolledRetry"));
-        assertTrue(route.contains("base.consecutiveFailures >= 1"));
+        assertTrue(route.contains("base.consecutiveFailures >= 2"));
         assertTrue(route.contains("beginScan(base)"));
         assertTrue(route.contains("unfiltered scan; accept only stack-resolved exact saved public "));
         assertTrue(route.contains("identity + bonded facade"));

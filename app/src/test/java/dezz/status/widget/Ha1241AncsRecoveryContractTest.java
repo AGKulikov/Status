@@ -26,7 +26,7 @@ public final class Ha1241AncsRecoveryContractTest {
         assertTrue(build.contains("return 208021241"));
         assertTrue(route.contains("systemConnectionAdvertisement"));
         assertTrue(route.contains("Classic is not required"));
-        assertTrue(route.contains("base.consecutiveFailures >= 1"));
+        assertTrue(route.contains("base.consecutiveFailures >= 2"));
         assertTrue(adapter.contains("scan_start mode=unfiltered_enrolled_identity"));
         assertTrue(adapter.contains("filters.add(new ScanFilter.Builder()"));
         assertTrue(adapter.contains("jitterRetryDelay"));

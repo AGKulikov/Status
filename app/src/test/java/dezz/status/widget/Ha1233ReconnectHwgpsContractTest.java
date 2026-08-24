@@ -36,7 +36,7 @@ public final class Ha1233ReconnectHwgpsContractTest {
         assertTrue(route.contains("exact Classic presence; same public BluetoothGatt.connect()"));
         assertTrue(route.contains("autoConnect=false"));
         assertTrue(platform.contains("createGattOwner(token, enrolled, false, null)"));
-        assertTrue(platform.contains("retry exact saved owner"));
+        assertTrue(platform.contains("one bounded direct exact-owner retry before presence scan"));
     }
 
     @Test public void hwgpsTriggerUsesItsDirectDrContract() throws Exception {
