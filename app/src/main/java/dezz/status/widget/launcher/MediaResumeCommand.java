@@ -5,6 +5,7 @@
 
 package dezz.status.widget.launcher;
 
+import android.app.ActivityManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -62,22 +63,33 @@ final class MediaResumeCommand {
     @NonNull
     static DispatchTrace playWithTrace(@NonNull Context context,
                                        @NonNull String targetPackage) {
-        return sendWithTrace(context, targetPackage, Command.PLAY);
+        return playWithTrace(context, targetPackage, false);
+    }
+
+    /**
+     * A boot retry may escalate beyond the exported receiver after the controller has allowed a
+     * verification grace period. Normal HOME controls never use this cold-start route.
+     */
+    @NonNull
+    static DispatchTrace playWithTrace(@NonNull Context context,
+                                       @NonNull String targetPackage,
+                                       boolean coldStartEscalation) {
+        return sendWithTrace(context, targetPackage, Command.PLAY, coldStartEscalation);
     }
 
     @NonNull
     static Result playPause(@NonNull Context context, @NonNull String targetPackage) {
-        return sendWithTrace(context, targetPackage, Command.PLAY_PAUSE).result;
+        return sendWithTrace(context, targetPackage, Command.PLAY_PAUSE, false).result;
     }
 
     @NonNull
     static Result previous(@NonNull Context context, @NonNull String targetPackage) {
-        return sendWithTrace(context, targetPackage, Command.PREVIOUS).result;
+        return sendWithTrace(context, targetPackage, Command.PREVIOUS, false).result;
     }
 
     @NonNull
     static Result next(@NonNull Context context, @NonNull String targetPackage) {
-        return sendWithTrace(context, targetPackage, Command.NEXT).result;
+        return sendWithTrace(context, targetPackage, Command.NEXT, false).result;
     }
 
     /** A timeline position has no safe media-button fallback, so require the exact session. */
@@ -114,7 +126,8 @@ final class MediaResumeCommand {
     @NonNull
     private static DispatchTrace sendWithTrace(@NonNull Context context,
                                                @NonNull String targetPackage,
-                                               @NonNull Command command) {
+                                               @NonNull Command command,
+                                               boolean coldStartEscalation) {
         String target = targetPackage.trim();
         if (target.isEmpty()) return trace(Result.NO_TARGET, "target=empty");
         String sessionError = "none";
@@ -160,13 +173,24 @@ final class MediaResumeCommand {
                                                 + ", actions=" + actions);
                             }
                             if (YANDEX_MUSIC_PACKAGE.equals(target)) {
-                                // mSaver always gives Yandex's exported receiver the first chance.
+                                // Give Yandex's exported receiver the first configured-time chance.
                                 // A freshly restored Yandex session reports STATE_NONE and accepts
-                                // transportControls.play() without actually starting audio. Keep it
-                                // only as the fallback when the exact receiver is unavailable.
+                                // transportControls.play() without actually starting audio. A later
+                                // verified retry may use a genuinely actionable session.
                                 deferredYandexPlaySession = controller;
                                 deferredYandexPlaybackState = playbackState;
                                 deferredYandexActions = actions;
+                                if (coldStartEscalation
+                                        && isUsablePlaySession(playbackState, actions)) {
+                                    controller.getTransportControls().play();
+                                    return trace(Result.SESSION_COMMAND,
+                                            "route=verified_session_fallback, process="
+                                                    + processState(context, target)
+                                                    + ", activeSessions=" + activeSessionCount
+                                                    + ", sessions=" + sessionInventory
+                                                    + ", playbackState=" + playbackState
+                                                    + ", actions=" + actions);
+                                }
                                 break;
                             }
                             controller.getTransportControls().play();
@@ -197,6 +221,25 @@ final class MediaResumeCommand {
             sessionError = "manager_unavailable";
         }
 
+        // The first boot attempt always gives the exact exported receiver its configured-time
+        // chance. A later attempt reaches here only after the controller observed no playback.
+        // Start Yandex through its background MediaBrowser before repeating the inert receiver.
+        if (coldStartEscalation && YANDEX_MUSIC_PACKAGE.equals(target)
+                && command == Command.PLAY) {
+            String browser = requestYandexBrowserIfUseful(context, target, command);
+            if ("scheduled".equals(browser)) {
+                return trace(Result.BROWSER_COMMAND,
+                        "route=verified_media_browser_fallback, process="
+                                + processState(context, target)
+                                + ", activeSessions=" + activeSessionCount
+                                + ", sessions=" + sessionInventory
+                                + ", sessionError=" + sessionError
+                                + ", deferredPlaybackState=" + deferredYandexPlaybackState
+                                + ", deferredActions=" + deferredYandexActions
+                                + ", browser=" + browser);
+            }
+        }
+
         PackageManager packages = context.getPackageManager();
         Intent query = new Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(target);
         List<ResolveInfo> receivers;
@@ -216,14 +259,14 @@ final class MediaResumeCommand {
             long keyUpDelayMs = keyUpDelayMillis(target, command);
             String dispatchError = sendKey(context, receiver,
                     keyCodeWithoutSession(command), keyUpDelayMs);
-            // The reference mSaver route is exclusive: when this receiver exists it never opens
-            // a simultaneous MediaBrowser connection. Real KX11 logs showed those bind/time-out
-            // cycles leaving Yandex in STATE_NONE and delaying the player process for ~30 s.
+            // This individual attempt is exclusive. Boot attempt one uses only the receiver;
+            // the controller may choose a verified background fallback on a later attempt.
             String browser = YANDEX_MUSIC_PACKAGE.equals(target) && command == Command.PLAY
                     ? "skipped_receiver_available" : "not_used";
             return trace(dispatchError.isEmpty()
                             ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
                     "route=queried_receiver, activeSessions=" + activeSessionCount
+                            + ", process=" + processState(context, target)
                             + ", sessions=" + sessionInventory
                             + ", sessionError=" + sessionError
                             + ", receiverCount=" + receiverCount
@@ -243,6 +286,7 @@ final class MediaResumeCommand {
             return trace(dispatchError.isEmpty()
                             ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
                     "route=known_receiver, activeSessions=" + activeSessionCount
+                            + ", process=" + processState(context, target)
                             + ", sessions=" + sessionInventory
                             + ", sessionError=" + sessionError
                             + ", receiverCount=" + receiverCount
@@ -258,10 +302,11 @@ final class MediaResumeCommand {
                 deferredYandexPlaySession.getTransportControls().play();
                 deferredSession = "play_dispatched_state_" + deferredYandexPlaybackState
                         + "_actions_" + deferredYandexActions;
-                // mSaver also treats this as an exclusive second route: a usable session wins,
-                // and MediaBrowser is tried only when neither receiver nor session is present.
+                // Outside the verified boot escalation, a discovered exact session remains the
+                // exclusive fallback when the receiver is unavailable.
                 return trace(Result.SESSION_COMMAND,
                         "route=session_fallback, activeSessions=" + activeSessionCount
+                                + ", process=" + processState(context, target)
                                 + ", sessions=" + sessionInventory
                                 + ", sessionError=" + sessionError
                                 + ", receiverCount=" + receiverCount
@@ -276,6 +321,7 @@ final class MediaResumeCommand {
         if ("scheduled".equals(browser)) {
             return trace(Result.BROWSER_COMMAND,
                     "route=media_browser, activeSessions=" + activeSessionCount
+                            + ", process=" + processState(context, target)
                             + ", sessions=" + sessionInventory
                             + ", sessionError=" + sessionError
                             + ", receiverCount=" + receiverCount
@@ -285,6 +331,7 @@ final class MediaResumeCommand {
         }
         return trace(Result.NO_TARGET,
                 "route=none, activeSessions=" + activeSessionCount
+                        + ", process=" + processState(context, target)
                         + ", sessions=" + sessionInventory
                         + ", sessionError=" + sessionError
                         + ", receiverCount=" + receiverCount
@@ -346,6 +393,33 @@ final class MediaResumeCommand {
     @NonNull
     private static String emptyAsNone(@NonNull String value) {
         return value.isEmpty() ? "none" : value;
+    }
+
+    private static boolean isUsablePlaySession(int playbackState, long actions) {
+        boolean explicitPlay = (actions & PlaybackState.ACTION_PLAY) != 0L
+                || (actions & PlaybackState.ACTION_PLAY_PAUSE) != 0L;
+        return explicitPlay && playbackState != PlaybackState.STATE_NONE;
+    }
+
+    @NonNull
+    private static String processState(@NonNull Context context,
+                                       @NonNull String packageName) {
+        ActivityManager activity = context.getSystemService(ActivityManager.class);
+        if (activity == null) return "manager_unavailable";
+        try {
+            List<ActivityManager.RunningAppProcessInfo> processes =
+                    activity.getRunningAppProcesses();
+            if (processes == null) return "inventory_unavailable";
+            for (ActivityManager.RunningAppProcessInfo process : processes) {
+                if (process == null || process.pkgList == null) continue;
+                for (String item : process.pkgList) {
+                    if (packageName.equals(item)) return "running";
+                }
+            }
+            return "not_running";
+        } catch (RuntimeException failure) {
+            return "query_" + failure.getClass().getSimpleName();
+        }
     }
 
     private static ComponentName knownReceiver(@NonNull String packageName) {

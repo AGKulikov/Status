@@ -61,6 +61,9 @@ public final class MediaAutoResumeController {
     /** mSaver's field-proven bounded policy: one initial PLAY plus four 10-second retries. */
     private static final int MAX_ATTEMPTS = 5;
     private static final long RETRY_DELAY_MS = 10_000L;
+    /** Verify the exact receiver result quickly, then escalate without shifting attempt one. */
+    private static final long YANDEX_RECEIVER_VERIFY_MS = 2_000L;
+    private static final String YANDEX_MUSIC_PACKAGE = "ru.yandex.music";
     /**
      * AlarmManager remains the durable process-death fallback. This timer is the hot path: it is
      * not serialized behind WidgetService/startup work and therefore fires at the user-selected
@@ -306,7 +309,10 @@ public final class MediaAutoResumeController {
         long planned = state.getLong(KEY_TARGET_ELAPSED, executeAt);
         long lateness = Math.max(0L, executeAt - planned);
         long dispatchStartedAt = SystemClock.elapsedRealtime();
-        MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(app, target);
+        boolean coldStartEscalation = attempt > 0
+                && YANDEX_MUSIC_PACKAGE.equals(target);
+        MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(
+                app, target, coldStartEscalation);
         long dispatchFinishedAt = SystemClock.elapsedRealtime();
         long firstCommandAt = state.getLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE);
         SharedPreferences.Editor commandTiming = state.edit()
@@ -336,7 +342,11 @@ public final class MediaAutoResumeController {
 
         int nextAttempt = attempt + 1;
         if (nextAttempt < MAX_ATTEMPTS) {
-            schedule(app, bootToken, nextAttempt, RETRY_DELAY_MS, "command_retry");
+            long retryDelay = attempt == 0 && YANDEX_MUSIC_PACKAGE.equals(target)
+                    ? YANDEX_RECEIVER_VERIFY_MS : RETRY_DELAY_MS;
+            schedule(app, bootToken, nextAttempt, retryDelay,
+                    attempt == 0 && YANDEX_MUSIC_PACKAGE.equals(target)
+                            ? "receiver_result_verification" : "command_retry");
             Log.i(TAG, "Media resume attempt " + (attempt + 1) + " for " + target
                     + " returned " + trace.result + "; retry scheduled");
             return;

@@ -1,0 +1,199 @@
+name: Verify Natro 2.3.0 and Helper 69 Personal Team
+
+on:
+  push:
+    branches: ['release/natro-2.3.0-helper69']
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'ios/KX11-iPhone-ANCS-Helper-v69-personal/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - '.github/workflows/verify-natro-2.3.0-helper69-personal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android tests and unsigned release APK
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: '2.3.0'
+      VERSION_CODE: '208021254'
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Java 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Test and build
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
+        run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+      - name: Verify release identity and no embedded APNs private key
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "if (version == '2.3.0')" build.gradle
+          grep -Fq "return 208021254" build.gradle
+          grep -Fq 'skipped_receiver_available' \
+            app/src/main/java/dezz/status/widget/launcher/MediaResumeCommand.java
+          grep -Fq 'verified_media_browser_fallback' \
+            app/src/main/java/dezz/status/widget/launcher/MediaResumeCommand.java
+          grep -Fq 'YANDEX_RECEIVER_VERIFY_MS = 2_000L' \
+            app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java
+          grep -Fq 'CONNECTION_TIMEOUT_MS = 15_000L' \
+            app/src/main/java/dezz/status/widget/launcher/YandexMusicBrowserStarter.java
+          grep -Fq 'ANCS Control Point transport write failed' \
+            app/src/main/java/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2.java
+          grep -Fq 'one bounded direct exact-owner retry before presence scan' \
+            app/src/main/java/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2.java
+          grep -Fq 'ENROLLED_WAIT_SYSTEM_RECOVERY_MS = 5_000L' \
+            app/src/main/java/dezz/status/widget/phone/transport/v2/AndroidCentralRoute.java
+          grep -Fq 'HELLO_COALESCE_MS = 30_000L' \
+            app/src/main/java/dezz/status/widget/phone/CarRemoteControllerV1.java
+          test -z "$(find app ios -type f \( -name '*.p8' -o -name 'AuthKey_*.p8' \) -print -quit)"
+          APK=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
+          test -n "$APK"
+          mv "$APK" "$RUNNER_TEMP/Natro-2.3.0-unsigned-release.apk"
+      - name: Upload Android candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Natro-2.3.0-unsigned-release
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/Natro-2.3.0-unsigned-release.apk
+      - name: Detect stable signing material
+        id: signing_material
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          configured=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || configured=$((configured + 1))
+          done
+          case "$configured" in
+            3)
+              echo 'available=true' >> "$GITHUB_OUTPUT"
+              ;;
+            0)
+              echo 'available=false' >> "$GITHUB_OUTPUT"
+              echo '::notice::Stable signing secrets are absent; keep the verified unsigned handoff for the offline signer.'
+              ;;
+            *)
+              echo 'Stable signing secrets must be supplied completely or omitted completely.' >&2
+              exit 1
+              ;;
+          esac
+      - name: Sign with the stable Natro update certificate
+        if: github.event_name != 'pull_request' && steps.signing_material.outputs.available == 'true'
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STABLE_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
+        run: |
+          set -euo pipefail
+          umask 077
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -n "${!required:-}" || {
+              echo "Missing required repository secret: $required" >&2
+              exit 1
+            }
+          done
+          KEYSTORE="$RUNNER_TEMP/natro-stable-update.jks"
+          SIGNED="$RUNNER_TEMP/Natro-2.3.0-signed.apk"
+          trap 'shred -u -- "$KEYSTORE" 2>/dev/null || true' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          export KEY_PASSWORD
+          KEYTOOL_OUTPUT=$(keytool -J-Duser.language=en -J-Duser.country=US \
+            -list -v -keystore "$KEYSTORE" -alias "$KEY_ALIAS" \
+            -storepass:env KEY_PASSWORD)
+          KEYSTORE_CERT=$(printf '%s\n' "$KEYTOOL_OUTPUT" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          test "$KEYSTORE_CERT" = "$STABLE_CERT_SHA256"
+          TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          "$TOOLS/apksigner" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEY_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --min-sdk-version 28 \
+            --v1-signing-enabled false \
+            --v2-signing-enabled false \
+            --v3-signing-enabled true \
+            --v4-signing-enabled false \
+            --out "$SIGNED" \
+            "$RUNNER_TEMP/Natro-2.3.0-unsigned-release.apk"
+          "$TOOLS/zipalign" -c -P 16 -v 4 "$SIGNED" >/dev/null
+          BADGING=$("$TOOLS/aapt" dump badging "$SIGNED")
+          printf '%s\n' "$BADGING" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='208021254' versionName='2.3.0'"
+          CERT_REPORT="$RUNNER_TEMP/Natro-2.3.0-certificates.txt"
+          "$TOOLS/apksigner" verify --verbose --print-certs \
+            --min-sdk-version 28 "$SIGNED" | tee "$CERT_REPORT"
+          grep -Fq 'Verified using v1 scheme (JAR signing): false' "$CERT_REPORT"
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): false' "$CERT_REPORT"
+          grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' "$CERT_REPORT"
+          grep -Fq 'Number of signers: 1' "$CERT_REPORT"
+          grep -Fq "Signer #1 certificate SHA-256 digest: $STABLE_CERT_SHA256" "$CERT_REPORT"
+      - name: Upload signed Android update
+        if: github.event_name != 'pull_request' && steps.signing_material.outputs.available == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Natro-2.3.0-signed-stable-update
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            ${{ runner.temp }}/Natro-2.3.0-signed.apk
+            ${{ runner.temp }}/Natro-2.3.0-certificates.txt
+
+  helper:
+    name: Helper 69 Personal Team Apple-SDK compile
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Replay portable contracts
+        run: ios/KX11-iPhone-ANCS-Helper-v69-personal/verify-v69-personal-contract.sh
+      - name: Compile unsigned simulator app and extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v69-personal/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Release \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/Helper69PersonalProducts" \
+            OBJROOT="$RUNNER_TEMP/Helper69PersonalIntermediates" \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+          APP="$RUNNER_TEMP/Helper69PersonalProducts/Release-iphonesimulator/KX11ANCSHelper.app"
+          test -d "$APP/PlugIns/NatroLiveActivityExtension.appex"
+          test "$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Info.plist")" = '69.0'
+          test "$(plutil -extract CFBundleVersion raw -o - "$APP/Info.plist")" = '69'
+          tar -czf "$RUNNER_TEMP/KX11-ANCS-Helper-v69-personal-unsigned-simulator.tar.gz" \
+            -C "$(dirname "$APP")" "$(basename "$APP")"
+      - name: Upload Helper candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: KX11-ANCS-Helper-v69-personal-unsigned-simulator
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/KX11-ANCS-Helper-v69-personal-unsigned-simulator.tar.gz

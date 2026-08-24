@@ -2930,7 +2930,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (current.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
                 && status != BluetoothGatt.GATT_SUCCESS) {
             apply(AndroidCentralRoute.linkLost(current, owner.ownerToken,
-                    "enrolled locator status failure; retry exact saved owner"));
+                    "enrolled connection status=" + status
+                            + "; one bounded direct exact-owner retry before presence scan"));
             return;
         }
         if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {

@@ -142,7 +142,7 @@ public final class AndroidCentralRouteTest {
         assertFalse(hasEffect(repeatedPresence, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
     }
 
-    @Test public void enrolledLinkLossUsesUnfilteredExactIdentityRecoveryScan() {
+    @Test public void enrolledLinkLossRetriesDirectOnceThenUsesExactIdentityScan() {
         AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 3L));
         state = AndroidCentralRoute.startupQuietElapsed(
                 state, state.expected, true).state;
@@ -158,11 +158,21 @@ public final class AndroidCentralRouteTest {
         BleRouteTransition<AndroidCentralRoute.State> retry =
                 AndroidCentralRoute.retryElapsed(state, state.expected, true);
 
-        assertEquals(AndroidCentralRoute.Phase.SCANNING, retry.state.phase);
-        assertFalse(hasEffect(retry, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
-        assertTrue(hasEffect(retry, BleRouteEffect.Type.START_SCAN));
-        assertTrue(retry.effects.get(0).detail.contains("unfiltered scan"));
-        assertTrue(retry.effects.get(0).detail.contains("exact saved public identity"));
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, retry.state.phase);
+        assertTrue(hasEffect(retry, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+        assertFalse(hasEffect(retry, BleRouteEffect.Type.START_SCAN));
+
+        BleRouteTransition<AndroidCentralRoute.State> secondFailure =
+                AndroidCentralRoute.connected(retry.state, retry.state.expected, false);
+        state = AndroidCentralRoute.attemptTeardownComplete(
+                secondFailure.state, secondFailure.state.expected).state;
+        BleRouteTransition<AndroidCentralRoute.State> scan =
+                AndroidCentralRoute.retryElapsed(state, state.expected, true);
+        assertEquals(AndroidCentralRoute.Phase.SCANNING, scan.state.phase);
+        assertFalse(hasEffect(scan, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+        assertTrue(hasEffect(scan, BleRouteEffect.Type.START_SCAN));
+        assertTrue(scan.effects.get(0).detail.contains("unfiltered scan"));
+        assertTrue(scan.effects.get(0).detail.contains("exact saved public identity"));
     }
 
     @Test public void alphabeticSelectedBondCanonicalizesBeforeSingleOwnerAllocation() {

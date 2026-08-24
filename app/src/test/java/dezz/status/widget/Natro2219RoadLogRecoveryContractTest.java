@@ -13,7 +13,8 @@ import org.junit.Test;
 
 /** Regression boundary for the 2026-08-24 08:17 road session and the Helper 68 journal storm. */
 public final class Natro2219RoadLogRecoveryContractTest {
-    @Test public void yandexReceiverIsExclusiveAndWinsOverAnInertSession() throws Exception {
+    @Test public void yandexReceiverAttemptRemainsExclusiveBeforeVerifiedFallback()
+            throws Exception {
         String build = read("build.gradle");
         String command = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaResumeCommand.java");
@@ -24,6 +25,7 @@ public final class Natro2219RoadLogRecoveryContractTest {
         assertTrue(build.contains("return 208021253"));
         assertTrue(command.contains("deferredYandexPlaySession = controller"));
         assertTrue(command.contains("skipped_receiver_available"));
+        assertTrue(command.contains("verified_media_browser_fallback"));
         String queriedReceiver = between(command,
                 "for (ResolveInfo resolved : receivers)",
                 "ComponentName known = knownReceiver(target)");

@@ -28,7 +28,7 @@ public final class AndroidCentralRoute {
     /** Autonomous retained-owner probe after the bounded fast reassert ladder is exhausted. */
     public static final long WAIT_SYSTEM_RECOVERY_MS = 180_000L;
     /** Enrolled Route A must recover during one ignition cycle, not after multi-minute silence. */
-    public static final long ENROLLED_WAIT_SYSTEM_RECOVERY_MS = 15_000L;
+    public static final long ENROLLED_WAIT_SYSTEM_RECOVERY_MS = 5_000L;
     public static final int MAX_ATTEMPTS_PER_EPOCH = 6;
     private static final long[] SAME_OWNER_REASSERT_MS = {30_000L, 60_000L, 120_000L};
 
@@ -834,11 +834,12 @@ public final class AndroidCentralRoute {
             return beginScan(base);
         }
         if (!startup) {
-            // A registered callback proves the prior owner terminal, so the next enrolled
-            // attempt may safely use the existing unfiltered exact-identity recovery scan.
-            // A completely silent clientIf follows the retained-owner path above instead.
+            // A registered callback proves the prior owner terminal. Give a stable saved identity
+            // one fresh direct attempt before paying for an unfiltered presence window; a second
+            // registered failure enters the exact-identity scan. A completely silent clientIf
+            // follows the retained-owner path above instead and never allocates a second wrapper.
             if (base.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
-                    && base.consecutiveFailures >= 1) {
+                    && base.consecutiveFailures >= 2) {
                 return beginScan(base);
             }
             return beginDirectConnect(base);
