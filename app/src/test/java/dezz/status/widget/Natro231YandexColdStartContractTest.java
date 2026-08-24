@@ -13,7 +13,7 @@ import org.junit.Test;
 
 /** Regression boundary for the 2026-08-24 18:18 road journals. */
 public final class Natro231YandexColdStartContractTest {
-    @Test public void stateNoneSessionIsActionableAndGetsAnExactVerifiedFallback()
+    @Test public void staleStateNoneSessionIsSupersededByProcessVerifiedRecovery()
             throws Exception {
         String build = read("build.gradle");
         String controller = read("app/src/main/java/dezz/status/widget/launcher/"
@@ -26,16 +26,17 @@ public final class Natro231YandexColdStartContractTest {
         assertTrue(build.contains("if (version == '2.3.1')"));
         assertTrue(build.contains("return 208021255"));
         String usability = between(command, "private static boolean isUsablePlaySession(",
-                "/** Dispatches only to the already resolved exact MediaSession");
-        assertTrue(usability.contains("return explicitPlay;"));
-        assertFalse(usability.contains("playbackState != PlaybackState.STATE_NONE"));
-        assertTrue(command.contains("stateNoneAccepted="));
-        assertTrue(command.contains("verified_exact_session_media_button"));
-        assertTrue(command.contains("controller.dispatchMediaButtonEvent"));
+                "private static String processState(");
+        assertTrue(usability.contains("\"running\".equals(processState)"));
+        assertTrue(usability.contains("!\"not_running\".equals(processState)"));
+        assertFalse(command.contains("verified_exact_session_media_button"));
+        assertFalse(command.contains("controller.dispatchMediaButtonEvent"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
 
-        assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 20"));
+        assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 72"));
         assertTrue(controller.contains("YANDEX_SESSION_POLL_MS = 5_000L"));
+        assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 30_000L"));
+        assertTrue(controller.contains("YANDEX_RECEIVER_RETRY_INTERVAL = 6"));
         assertTrue(controller.contains("KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED"));
         assertTrue(controller.contains("KEY_YANDEX_SESSION_PLAY_ATTEMPTED"));
         assertTrue(command.contains("Result.WAITING_FOR_SESSION"));
@@ -43,6 +44,7 @@ public final class Natro231YandexColdStartContractTest {
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));
 
         assertTrue(browser.contains("bootstrap_scheduled"));
+        assertTrue(browser.contains("service_prewarm"));
         assertTrue(browser.contains("play_request_sent_unverified"));
         assertFalse(browser.contains("finish(\"play_dispatched\""));
     }

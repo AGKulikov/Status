@@ -3,7 +3,9 @@ package dezz.status.widget.launcher;
 
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
 import android.media.browse.MediaBrowser;
 import android.media.session.MediaController;
 import android.os.Bundle;
@@ -36,7 +38,8 @@ final class YandexMusicBrowserStarter {
         Context app = context.getApplicationContext();
         if (app == null) app = context;
         try {
-            app.getPackageManager().getServiceInfo(SERVICE, 0);
+            ServiceInfo service = app.getPackageManager().getServiceInfo(SERVICE, 0);
+            if (!service.enabled || !service.exported) return "service_not_exported";
         } catch (PackageManager.NameNotFoundException | RuntimeException unavailable) {
             return "service_unavailable";
         }
@@ -77,6 +80,16 @@ final class YandexMusicBrowserStarter {
 
         void start() {
             if (completed) return;
+            // A direct, component-scoped service prewarm is still background-only: it neither
+            // resolves an Activity nor emits a global media key. Some KX11 boots otherwise leave
+            // the exported browser bind pending until Yandex is started minutes later.
+            try {
+                ComponentName started = context.startService(
+                        new Intent().setComponent(SERVICE));
+                journal("service_prewarm", started == null ? "null_component" : "none");
+            } catch (RuntimeException rejected) {
+                journal("service_prewarm", rejected.getClass().getSimpleName());
+            }
             try {
                 browser = new MediaBrowser(context, SERVICE, this, (Bundle) null);
                 browser.connect();

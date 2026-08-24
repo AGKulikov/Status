@@ -8,12 +8,13 @@ import java.io.IOException;
 import org.junit.Test;
 
 public final class SprutChallengeCompatibilityTest {
-    @Test public void standardBase64OperatorPrefixesRequestAFreshChallenge() {
-        assertTrue(SprutHubController.hasParserUnsafeProofPrefix("/abc"));
-        assertTrue(SprutHubController.hasParserUnsafeProofPrefix("+abc"));
-        assertTrue(SprutHubController.hasParserUnsafeProofPrefix(""));
-        assertFalse(SprutHubController.hasParserUnsafeProofPrefix("A/+/="));
-        assertFalse(SprutHubController.hasParserUnsafeProofPrefix("7/+/="));
+    @Test public void standardBase64RelayOperatorsRequestAFreshChallenge() {
+        assertTrue(SprutHubController.hasParserUnsafeProofCharacters("/abc"));
+        assertTrue(SprutHubController.hasParserUnsafeProofCharacters("+abc"));
+        assertTrue(SprutHubController.hasParserUnsafeProofCharacters(""));
+        assertTrue(SprutHubController.hasParserUnsafeProofCharacters("A/+/="));
+        assertTrue(SprutHubController.hasParserUnsafeProofCharacters("7/+/="));
+        assertFalse(SprutHubController.hasParserUnsafeProofCharacters("A+bc=="));
     }
 
     @Test public void retriesOnlyTheCloudResultParserRegression() {

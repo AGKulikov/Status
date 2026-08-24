@@ -59,6 +59,15 @@ public final class AncsDeliveryTraceV2 {
             }
         }
         this.preExistingRecords = saturatedAdd(this.preExistingRecords, i6);
+        // iOS may replay dozens of old Notification Source records immediately after CCCD
+        // subscription. The consumer deliberately suppresses those records, so journalling each
+        // one only competes with C5/ANCS work on this Android 9 main FIFO. Keep logarithmic
+        // checkpoints plus the terminal counters instead of one disk event per old notification.
+        boolean preExistingOnly = i6 == length;
+        if (preExistingOnly && this.sourceRecords > 1L
+                && !isPowerOfTwo(this.sourceRecords)) {
+            return null;
+        }
         return prefix() + "source records=" + this.sourceRecords + " packetRecords=" + length + " added=" + i + " modified=" + i2 + " removed=" + i3 + " preExisting=" + i6 + " category=" + i5 + " flags=0x" + java.lang.Integer.toHexString(i4).toUpperCase(java.util.Locale.ROOT);
     }
 
@@ -117,5 +126,9 @@ public final class AncsDeliveryTraceV2 {
             return Long.MAX_VALUE;
         }
         return j + j2;
+    }
+
+    private static boolean isPowerOfTwo(long value) {
+        return value > 0L && (value & (value - 1L)) == 0L;
     }
 }

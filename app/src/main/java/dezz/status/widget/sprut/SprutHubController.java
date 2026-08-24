@@ -531,14 +531,15 @@ public final class SprutHubController {
                     /*
                      * beta.spruthub.ru currently routes account.answer through a result-token
                      * parser before the account handler. A perfectly valid standard-Base64
-                     * Ed25519 signature can begin with '/' or '+'. Such a proof is rejected as
-                     * syntax (-32602) before Sprut gets a chance to verify it. The official web
+                     * Ed25519 signature can contain '/'. The road journal proves that the relay
+                     * rejects that character even in the middle of an otherwise valid proof as
+                     * syntax (-32602), before Sprut gets a chance to verify it. The official web
                      * client creates a fresh random challenge on every restarted auth dialogue,
                      * so restart that dialogue instead of changing or quoting the signature.
                      */
-                    if (hasParserUnsafeProofPrefix(answer)) {
+                    if (hasParserUnsafeProofCharacters(answer)) {
                         return restartCloudChallenge(current, challengeRestart,
-                                "generated proof has a relay-unsafe Base64 prefix");
+                                "generated proof has relay-unsafe Base64 characters");
                     }
                     return current.call(SprutProtocolAdapter.buildAuthAnswerParams(answer))
                         .<CompletableFuture<JSONObject>>handle((value, failure) -> {
@@ -579,12 +580,13 @@ public final class SprutHubController {
                         current, email, nextRestart));
     }
 
-    static boolean hasParserUnsafeProofPrefix(@NonNull String answer) {
+    static boolean hasParserUnsafeProofCharacters(@NonNull String answer) {
         if (answer.isEmpty()) return true;
         char first = answer.charAt(0);
-        return !((first >= 'A' && first <= 'Z')
+        boolean safeTokenStart = (first >= 'A' && first <= 'Z')
                 || (first >= 'a' && first <= 'z')
-                || (first >= '0' && first <= '9'));
+                || (first >= '0' && first <= '9');
+        return !safeTokenStart || answer.indexOf('/') >= 0;
     }
 
     static boolean isChallengeResultParserFailure(@NonNull Throwable failure) {

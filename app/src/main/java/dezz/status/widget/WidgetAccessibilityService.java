@@ -525,6 +525,8 @@ public class WidgetAccessibilityService extends AccessibilityService {
         }
         if (publishedExternalOverlayActive == active) return;
         publishedExternalOverlayActive = active;
+        ActionRecorder.recordOverlay("accessibility-external-window",
+                active ? "ACTIVE" : "INACTIVE", "event-derived window lease");
         WidgetService widget = WidgetService.getInstance();
         if (widget != null) widget.onExternalOverlayWindowStateChanged(active);
     }

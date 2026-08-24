@@ -58,6 +58,8 @@ final class CarRemoteControllerV1 {
     private final AudioManager audio;
     private final Sender sender;
     private final Map<String, CarControlDescriptor> catalog = new HashMap<>();
+    /** Last state put on C5, keyed by the finite wire id; prevents callback echo storms. */
+    private final Map<Integer, Long> lastStateFingerprints = new HashMap<>();
     private final Set<String> subscribedIds = new LinkedHashSet<>();
     private final CarIntegration.ControlStateListener stateListener = this::sendState;
     private final CarIntegration.TelemetryListener telemetryListener = this::sendTelemetry;
@@ -252,9 +254,7 @@ final class CarRemoteControllerV1 {
         }
         int value = Double.isFinite(state.value)
                 ? scaledWireValue(state.value, entry.scale) : 0;
-        send(new IphoneCarRemoteProtocolV1.Frame(
-                IphoneCarRemoteProtocolV1.Type.STATE, entry.wireId, 0, flags, 0,
-                nextOutboundSequence(), value, 0));
+        sendStateFrame(entry.wireId, flags, value);
     }
 
     private void sendAncsState() {
@@ -291,6 +291,14 @@ final class CarRemoteControllerV1 {
     }
 
     private void sendCompanionState(int stateId, int flags, int value) {
+        sendStateFrame(stateId, flags, value);
+    }
+
+    private void sendStateFrame(int stateId, int flags, int value) {
+        if (!sessionOpen) return;
+        long fingerprint = ((long) flags << 32) ^ (value & 0xffff_ffffL);
+        Long previous = lastStateFingerprints.put(stateId, fingerprint);
+        if (previous != null && previous.longValue() == fingerprint) return;
         send(new IphoneCarRemoteProtocolV1.Frame(
                 IphoneCarRemoteProtocolV1.Type.STATE, stateId, 0, flags, 0,
                 nextOutboundSequence(), value, 0));
@@ -429,9 +437,7 @@ final class CarRemoteControllerV1 {
         int flags = IphoneCarRemoteProtocolV1.FLAG_AVAILABLE
                 | IphoneCarRemoteProtocolV1.FLAG_KNOWN
                 | (current > 0 ? IphoneCarRemoteProtocolV1.FLAG_ACTIVE : 0);
-        send(new IphoneCarRemoteProtocolV1.Frame(
-                IphoneCarRemoteProtocolV1.Type.STATE, 54, 0, flags, 0,
-                nextOutboundSequence(), scaledWireValue(percent, 100), 0));
+        sendStateFrame(54, flags, scaledWireValue(percent, 100));
     }
 
     private static int mediaKind(CarRemoteControlRegistryV1.Entry entry) {
@@ -488,6 +494,7 @@ final class CarRemoteControllerV1 {
         car.unsubscribeTelemetry(telemetryListener);
         catalog.clear();
         subscribedIds.clear();
+        lastStateFingerprints.clear();
         lastInboundSequence = 0L;
         outboundSequence = 0L;
         rateWindowStarted = 0L;

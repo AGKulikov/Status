@@ -838,12 +838,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void startBootstrapScan(BleRouteToken token) {
         if (ingressFrozen || !currentEpoch(token) || adapter == null
                 || !adapter.isEnabled() || scanRunning) {
-            postRouteDeadline(token);
+            if (!retainsEnrolledSystemOwner(token)) postRouteDeadline(token);
             return;
         }
         BluetoothLeScanner exactScanner = adapter.getBluetoothLeScanner();
         if (exactScanner == null) {
-            postRouteDeadline(token);
+            if (!retainsEnrolledSystemOwner(token)) postRouteDeadline(token);
             return;
         }
         boolean enrolledRecovery = state != null
@@ -859,7 +859,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 .build();
         ScanAttempt attempt = new ScanAttempt(token, exactScanner);
         if (!scanAttemptFence.begin(attempt)) {
-            postRouteDeadline(token);
+            if (!retainsEnrolledSystemOwner(token)) postRouteDeadline(token);
             return;
         }
         scanner = exactScanner;
@@ -877,9 +877,24 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 retireScanAttempt(attempt);
                 reportError(IphoneTransportErrorV2.Kind.GATT,
                         "bootstrap scan start failed: " + error.getClass().getSimpleName(), true);
-                postRouteDeadline(token);
+                if (!retainsEnrolledSystemOwner(token)) postRouteDeadline(token);
             }
         }
+    }
+
+    /**
+     * A failed optional presence scan must not consume the already-armed recovery timer or
+     * advance an unproven sole GATT wrapper into drain.  Only a real owner callback may prove
+     * that wrapper terminal; until then recovery is same-wrapper-only.
+     */
+    private boolean retainsEnrolledSystemOwner(BleRouteToken token) {
+        AndroidCentralRoute.State current = state;
+        GattOwner exact = owner;
+        return token != null && current != null && current.expected != null
+                && current.expected.equals(token)
+                && current.phase == AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION
+                && current.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                && exact != null && exact.ownerToken.sameOwner(token);
     }
 
     private void stopBootstrapScan(BleRouteToken token) {
@@ -2751,7 +2766,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         retireScanAttempt(attempt);
         reportError(IphoneTransportErrorV2.Kind.GATT,
                 "bootstrap scan failed: " + errorCode, true);
-        postRouteDeadline(token);
+        if (!retainsEnrolledSystemOwner(token)) postRouteDeadline(token);
         maybeCompleteTeardown();
     }
 
@@ -3342,7 +3357,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             apply(AndroidCentralRoute.serviceChanged(state, owner.ownerToken));
         } else if (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid) && ancsSession != null) {
             if (ingressFrozen) return;
-            reportPlatformDiagnostic(owner.ownerToken, ancsTrace.notificationSource(value));
+            String trace = ancsTrace.notificationSource(value);
+            if (trace != null) reportPlatformDiagnostic(owner.ownerToken, trace);
             applyAncsEffects(ancs.notificationSource(
                     ancsSession, value, android.os.SystemClock.elapsedRealtime()));
         } else if (AncsProtocol.DATA_SOURCE.equals(uuid) && ancsSession != null) {

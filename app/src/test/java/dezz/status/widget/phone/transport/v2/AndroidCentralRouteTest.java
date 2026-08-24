@@ -86,7 +86,7 @@ public final class AndroidCentralRouteTest {
         assertFalse(hasEffect(observed, BleRouteEffect.Type.CONNECT_GATT));
     }
 
-    @Test public void enrolledSilentRetainedOwnerEscalatesToFreshEpochWithinOneMinute() {
+    @Test public void enrolledSilentRetainedOwnerNeverDrainsWithoutTerminalCallback() {
         AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 40L));
         state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
 
@@ -110,12 +110,16 @@ public final class AndroidCentralRouteTest {
                         retainedReassert.state, retainedReassert.state.expected);
         assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION,
                 secondDeadline.state.phase);
-        BleRouteTransition<AndroidCentralRoute.State> freshEpoch =
+        BleRouteTransition<AndroidCentralRoute.State> repeatedRecovery =
                 AndroidCentralRoute.systemConnectionRecoveryElapsed(
                         secondDeadline.state, secondDeadline.state.expected);
-        assertEquals(AndroidCentralRoute.Phase.RETRY_DRAINING, freshEpoch.state.phase);
-        assertTrue(hasEffect(freshEpoch, BleRouteEffect.Type.CLOSE_GATT));
-        assertTrue(freshEpoch.state.detail.contains("fresh exact epoch"));
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, repeatedRecovery.state.phase);
+        assertEquals(firstDeadline.state.activeOwnerId,
+                repeatedRecovery.state.activeOwnerId);
+        assertTrue(hasEffect(repeatedRecovery, BleRouteEffect.Type.REASSERT_SAME_GATT));
+        assertFalse(hasEffect(repeatedRecovery, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(repeatedRecovery, BleRouteEffect.Type.CONNECT_GATT));
+        assertFalse(hasEffect(repeatedRecovery, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
     }
 
     @Test public void exactClassicPresencePromptsRetainedOwnerWithoutWrapperReplacement() {

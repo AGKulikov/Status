@@ -563,9 +563,10 @@ public final class AndroidCentralRoute {
                     "connect watchdog"));
             effects.add(op(BleRouteEffect.Type.REPORT_ERROR, token,
                     "OWNER_UNPROVABLE: no second wrapper; periodic recovery remains armed"));
-            if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                    && state.sameOwnerReassertions <= SAME_OWNER_REASSERT_MS.length) {
                 effects.add(op(BleRouteEffect.Type.START_SCAN, recovery,
-                        "unfiltered presence scan while retaining the sole GATT wrapper"));
+                        "one enrolled presence scan while retaining the sole GATT wrapper"));
             }
             effects.add(BleRouteEffect.retry(recovery, waitSystemRecoveryMillis(state),
                     "autonomous retained-owner recovery; Classic is not required"));
@@ -609,11 +610,6 @@ public final class AndroidCentralRoute {
             State state, BleRouteToken token) {
         if (!expects(state, Phase.WAIT_SYSTEM_CONNECTION, token)) {
             return BleRouteTransition.ignored(state);
-        }
-        if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
-                && state.sameOwnerReassertions > SAME_OWNER_REASSERT_MS.length) {
-            return retry(state, token,
-                    "retained enrolled owner still silent; drain and start fresh exact epoch");
         }
         BleRouteToken reconnect = nextOperation(token);
         if (reconnect == null) return counterExhausted(state, token, "operation");

@@ -73,8 +73,15 @@ public final class AndroidCentralTransportV2SourceTest {
         String failed = between(source, "private void handleScanFailure",
                 "private void handleScanResult");
         assertTrue(failed.contains("if (!isCurrentScanAttempt(attempt)) return;"));
-        assertTrue(failed.contains("postRouteDeadline(token)"));
+        assertTrue(failed.contains(
+                "if (!retainsEnrolledSystemOwner(token)) postRouteDeadline(token)"));
         assertFalse(failed.contains("postRouteDeadline(scanToken)"));
+
+        String retained = between(source, "private boolean retainsEnrolledSystemOwner",
+                "private void stopBootstrapScan");
+        assertTrue(retained.contains("WAIT_SYSTEM_CONNECTION"));
+        assertTrue(retained.contains("ENROLLED_LE_IDENTITY"));
+        assertTrue(retained.contains("exact.ownerToken.sameOwner(token)"));
     }
 
     @Test public void selectedBondUsesOneActiveOwnerAndBootstrapIsExplicitDirect()

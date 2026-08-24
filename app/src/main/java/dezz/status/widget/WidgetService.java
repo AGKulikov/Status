@@ -483,6 +483,10 @@ public class WidgetService extends Service {
     private boolean phoneNotificationBurstActive;
     private long activePhoneNotificationExpiresAt;
     private long activePhonePopupNotificationExpiresAt;
+    private boolean phoneNotificationOverlayPaused;
+    private long pausedPhoneNotificationRemainingMs;
+    private long pausedPhonePopupRemainingMs;
+    private boolean pausedPhoneNotificationQueueAdvance;
     private boolean activePhoneLowBatteryPopup;
     private boolean phoneNotificationPopupConfigured;
     private int mediaDurationVisibilityBeforePhoneNotification = View.GONE;
@@ -491,7 +495,8 @@ public class WidgetService extends Service {
             changedValues -> postPhoneValuesChanged(new ArrayList<>(changedValues));
     private final Runnable phoneNotificationExpiry = new Runnable() {
         @Override public void run() {
-            if (destroyed || !hasActivePhoneStatusAlert()) return;
+            if (destroyed || phoneNotificationOverlayPaused
+                    || !hasActivePhoneStatusAlert()) return;
             long remaining = activePhoneNotificationExpiresAt
                     - android.os.SystemClock.elapsedRealtime();
             if (remaining > 0L) {
@@ -512,7 +517,8 @@ public class WidgetService extends Service {
     };
     private final Runnable phonePopupNotificationExpiry = new Runnable() {
         @Override public void run() {
-            if (destroyed || activePhonePopupNotificationExpiresAt <= 0L) return;
+            if (destroyed || phoneNotificationOverlayPaused
+                    || activePhonePopupNotificationExpiresAt <= 0L) return;
             long remaining = activePhonePopupNotificationExpiresAt
                     - android.os.SystemClock.elapsedRealtime();
             if (remaining > 0L) {
@@ -524,7 +530,8 @@ public class WidgetService extends Service {
     };
     private final Runnable phoneNotificationQueueAdvance = new Runnable() {
         @Override public void run() {
-            if (destroyed || !phoneNotificationBurstActive) return;
+            if (destroyed || phoneNotificationOverlayPaused
+                    || !phoneNotificationBurstActive) return;
             long batteryRemaining = activePhoneLowBatteryRemaining();
             if (batteryRemaining > 0L) {
                 mainHandler.postDelayed(this, batteryRemaining);
@@ -2543,8 +2550,10 @@ public class WidgetService extends Service {
         binding.overlayContainer.setSizeChangeHint((oldW, newW, oldH, newH) -> {
             if (params == null) return;
             if (prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR) return;
-            if (newW >= oldW) return;   // grow path already works
             if (pendingBufferedTransitions > 0) return;   // some transition already buffering
+            // KX11 keeps the previous WRAP_CONTENT outer width when an already-visible brick
+            // grows internally (notably signal bars followed later by the LTE text). Buffer both
+            // directions so WindowManager receives a second natural-size relayout.
             beginBufferedTransition(true);
             mainHandler.removeCallbacks(shrinkBufferSafetyClose);
             mainHandler.postDelayed(shrinkBufferSafetyClose,
@@ -4156,8 +4165,7 @@ public class WidgetService extends Service {
         if (batteryRemaining > 0L) {
             appendQueuedPhoneNotification(delivery);
             phoneNotificationBurstActive = true;
-            mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-            mainHandler.postDelayed(phoneNotificationQueueAdvance, batteryRemaining);
+            schedulePhoneNotificationQueueAdvanceAfter(batteryRemaining);
             return;
         }
         if (phoneNotificationBurstActive) {
@@ -4170,8 +4178,7 @@ public class WidgetService extends Service {
             long delay = PHONE_NOTIFICATION_QUEUE_SLOT_MS;
             holdPhoneNotificationDestinationsUntil(
                     SystemClock.elapsedRealtime() + delay);
-            mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-            mainHandler.postDelayed(phoneNotificationQueueAdvance, delay);
+            schedulePhoneNotificationQueueAdvanceAfter(delay);
             return;
         }
         presentPhoneNotification(delivery);
@@ -4184,6 +4191,16 @@ public class WidgetService extends Service {
             return;
         }
         queuedPhoneNotifications.addLast(delivery);
+    }
+
+    private void schedulePhoneNotificationQueueAdvanceAfter(long delayMillis) {
+        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+        if (phoneNotificationOverlayPaused) {
+            pausedPhoneNotificationQueueAdvance = true;
+            return;
+        }
+        mainHandler.postDelayed(phoneNotificationQueueAdvance,
+                Math.max(0L, delayMillis));
     }
 
     private boolean phoneNotificationForegroundTrackingNeeded() {
@@ -4209,6 +4226,113 @@ public class WidgetService extends Service {
     /** Called by the shared event-driven foreground tracker only when its package really changes. */
     private void onPhoneNotificationForegroundChanged() {
         reconcileDeferredPhoneNotifications();
+    }
+
+    private boolean shouldPausePhoneNotificationForExternalOverlay() {
+        return prefs != null
+                && prefs.phoneNotificationDelayInAppsEnabled.get()
+                && prefs.phoneNotificationDelayForExternalOverlays.get()
+                && phoneExternalOverlayActive;
+    }
+
+    /** Keeps an already-rendered phone delivery alive while another full-screen window covers it. */
+    private void syncPhoneNotificationExternalOverlayPause() {
+        boolean shouldPause = shouldPausePhoneNotificationForExternalOverlay();
+        if (shouldPause == phoneNotificationOverlayPaused) return;
+        if (shouldPause) pausePhoneNotificationForExternalOverlay();
+        else resumePhoneNotificationAfterExternalOverlay();
+    }
+
+    private void pausePhoneNotificationForExternalOverlay() {
+        phoneNotificationOverlayPaused = true;
+        long now = SystemClock.elapsedRealtime();
+        pausedPhoneNotificationRemainingMs = hasActivePhoneStatusAlert()
+                && activePhoneNotificationExpiresAt > 0L
+                ? Math.max(1L, activePhoneNotificationExpiresAt - now) : 0L;
+        pausedPhonePopupRemainingMs = activePhonePopupNotificationExpiresAt > 0L
+                ? Math.max(1L, activePhonePopupNotificationExpiresAt - now) : 0L;
+        pausedPhoneNotificationQueueAdvance = phoneNotificationBurstActive;
+        mainHandler.removeCallbacks(phoneNotificationExpiry);
+        mainHandler.removeCallbacks(phonePopupNotificationExpiry);
+        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+        if (pausedPhoneNotificationRemainingMs > 0L) {
+            activePhoneNotificationExpiresAt = Long.MAX_VALUE;
+        }
+        if (pausedPhonePopupRemainingMs > 0L) {
+            activePhonePopupNotificationExpiresAt = Long.MAX_VALUE;
+            updatePhonePopupAutomationExpiry(0L);
+        }
+        DiagnosticJournal.info("phone-notification",
+                "external overlay pause statusRemainingMs="
+                        + pausedPhoneNotificationRemainingMs
+                        + " popupRemainingMs=" + pausedPhonePopupRemainingMs
+                        + " queue=" + pausedPhoneNotificationQueueAdvance);
+        dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                "phone-notification-external", "PAUSED",
+                "statusRemainingMs=" + pausedPhoneNotificationRemainingMs
+                        + ", popupRemainingMs=" + pausedPhonePopupRemainingMs);
+    }
+
+    private void resumePhoneNotificationAfterExternalOverlay() {
+        phoneNotificationOverlayPaused = false;
+        long now = SystemClock.elapsedRealtime();
+        long statusRemaining = pausedPhoneNotificationRemainingMs;
+        long popupRemaining = pausedPhonePopupRemainingMs;
+        boolean resumeQueue = pausedPhoneNotificationQueueAdvance;
+        pausedPhoneNotificationRemainingMs = 0L;
+        pausedPhonePopupRemainingMs = 0L;
+        pausedPhoneNotificationQueueAdvance = false;
+        if (statusRemaining > 0L && hasActivePhoneStatusAlert()) {
+            activePhoneNotificationExpiresAt = now + statusRemaining;
+            mainHandler.postDelayed(phoneNotificationExpiry, statusRemaining);
+        }
+        if (popupRemaining > 0L && activePhonePopupNotificationExpiresAt > 0L) {
+            activePhonePopupNotificationExpiresAt = now + popupRemaining;
+            updatePhonePopupAutomationExpiry(
+                    System.currentTimeMillis() + popupRemaining);
+            mainHandler.postDelayed(phonePopupNotificationExpiry, popupRemaining);
+        }
+        if (resumeQueue && phoneNotificationBurstActive) {
+            mainHandler.postDelayed(phoneNotificationQueueAdvance,
+                    PHONE_NOTIFICATION_QUEUE_SLOT_MS);
+        }
+        DiagnosticJournal.info("phone-notification",
+                "external overlay resume statusRemainingMs=" + statusRemaining
+                        + " popupRemainingMs=" + popupRemaining
+                        + " queue=" + resumeQueue);
+        dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                "phone-notification-external", "RESUMED",
+                "statusRemainingMs=" + statusRemaining
+                        + ", popupRemainingMs=" + popupRemaining);
+        if (binding != null) {
+            updateMediaInfo();
+            applyBrickVisibility(currentBrickSet());
+        }
+        schedulePopupRefresh();
+    }
+
+    /** Updates only phone-owned transient states; content and visibility remain unchanged. */
+    private void updatePhonePopupAutomationExpiry(long expiresAtWallMillis) {
+        if (automationStates == null) return;
+        long now = System.currentTimeMillis();
+        List<String> ids = new ArrayList<>(PhoneNotificationAutomation.fieldAutomationIds());
+        ids.add(PhoneNotificationAutomation.OVERLAY_ID);
+        ids.add(PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID);
+        for (String id : ids) {
+            String scope = PhoneNotificationAutomation.isFieldAutomationId(id)
+                    ? AutomationContract.SCOPE_POPUP : AutomationContract.SCOPE_OVERLAY;
+            AutomationState state = automationStates.get(scope, id);
+            if (!state.present || state.source == null
+                    || !state.source.startsWith("phone")) continue;
+            try {
+                automationStates.apply(scope, id, new JSONObject()
+                        .put("expires_at", expiresAtWallMillis)
+                        .put("updated_at", now));
+                onAutomationStateChanged(scope, id);
+            } catch (JSONException | RuntimeException failure) {
+                Log.w(TAG, "Could not pause phone popup expiry", failure);
+            }
+        }
     }
 
     /**
@@ -4376,6 +4500,7 @@ public class WidgetService extends Service {
         deferredPhoneNotificationOverflowCount = 0;
         deferredPhoneNotificationOverflowStartedElapsed = 0L;
         phoneNotificationBurstActive = false;
+        pausedPhoneNotificationQueueAdvance = false;
     }
 
     @NonNull
@@ -5707,7 +5832,8 @@ public class WidgetService extends Service {
         int seconds = Math.max(1, Math.min(120,
                 prefs.phoneStatusBarNotificationSeconds.get()));
         long now = System.currentTimeMillis();
-        long expiresAt = now + seconds * 1_000L;
+        long expiresAt = phoneNotificationOverlayPaused
+                ? 0L : now + seconds * 1_000L;
         try {
             for (String fieldId : PhoneStatusBarPolicy.notificationFieldIds()) {
                 String automationId =
@@ -5775,7 +5901,8 @@ public class WidgetService extends Service {
             int seconds = Math.max(1, Math.min(120,
                     prefs.phoneStatusBarNotificationSeconds.get()));
             long now = System.currentTimeMillis();
-            long expiresAt = now + seconds * 1_000L;
+            long expiresAt = phoneNotificationOverlayPaused
+                    ? 0L : now + seconds * 1_000L;
             JSONObject overlay = new JSONObject()
                     .put("visible", true)
                     .put("fresh", true)
@@ -5800,11 +5927,18 @@ public class WidgetService extends Service {
                     shownOverlay, overlay);
             onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
                     shownOverlay);
-            activePhonePopupNotificationExpiresAt =
-                    android.os.SystemClock.elapsedRealtime() + seconds * 1_000L;
+            if (phoneNotificationOverlayPaused) {
+                pausedPhonePopupRemainingMs = seconds * 1_000L;
+                activePhonePopupNotificationExpiresAt = Long.MAX_VALUE;
+            } else {
+                activePhonePopupNotificationExpiresAt =
+                        android.os.SystemClock.elapsedRealtime() + seconds * 1_000L;
+            }
             activePhoneLowBatteryPopup = false;
             mainHandler.removeCallbacks(phonePopupNotificationExpiry);
-            mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
+            if (!phoneNotificationOverlayPaused) {
+                mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
+            }
             return true;
         } catch (JSONException | RuntimeException failure) {
             Log.e(TAG, "Could not present phone notification popup", failure);
@@ -5815,6 +5949,7 @@ public class WidgetService extends Service {
     private void clearPhonePopupNotification() {
         mainHandler.removeCallbacks(phonePopupNotificationExpiry);
         activePhonePopupNotificationExpiresAt = 0L;
+        pausedPhonePopupRemainingMs = 0L;
         activePhoneLowBatteryPopup = false;
         if (automationStates == null) return;
         try {
@@ -5879,8 +6014,7 @@ public class WidgetService extends Service {
         clearPhoneNotificationFieldsIfInactive();
         schedulePhoneStatusAlert();
         if (phoneNotificationBurstActive && !queuedPhoneNotifications.isEmpty()) {
-            mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-            mainHandler.postDelayed(phoneNotificationQueueAdvance,
+            schedulePhoneNotificationQueueAdvanceAfter(
                     activePhoneLowBatteryRemaining());
         }
         return true;
@@ -5899,7 +6033,8 @@ public class WidgetService extends Service {
             int seconds = Math.max(1, Math.min(120,
                     prefs.phoneStatusBarNotificationSeconds.get()));
             long now = System.currentTimeMillis();
-            long expiresAt = now + seconds * 1_000L;
+            long expiresAt = phoneNotificationOverlayPaused
+                    ? 0L : now + seconds * 1_000L;
             String[] text = new String[]{
                     getString(R.string.phone_low_battery_popup_application),
                     getString(R.string.phone_low_battery_popup_title),
@@ -5937,11 +6072,18 @@ public class WidgetService extends Service {
                             .put("updated_at", now).put("expires_at", expiresAt));
             onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
                     PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID);
-            activePhonePopupNotificationExpiresAt =
-                    SystemClock.elapsedRealtime() + seconds * 1_000L;
+            if (phoneNotificationOverlayPaused) {
+                pausedPhonePopupRemainingMs = seconds * 1_000L;
+                activePhonePopupNotificationExpiresAt = Long.MAX_VALUE;
+            } else {
+                activePhonePopupNotificationExpiresAt =
+                        SystemClock.elapsedRealtime() + seconds * 1_000L;
+            }
             activePhoneLowBatteryPopup = true;
             mainHandler.removeCallbacks(phonePopupNotificationExpiry);
-            mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
+            if (!phoneNotificationOverlayPaused) {
+                mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
+            }
             schedulePopupRefresh();
             return true;
         } catch (JSONException | RuntimeException failure) {
@@ -5953,10 +6095,17 @@ public class WidgetService extends Service {
     private void schedulePhoneStatusAlert() {
         int seconds = Math.max(1, Math.min(120,
                 prefs.phoneStatusBarNotificationSeconds.get()));
-        activePhoneNotificationExpiresAt = android.os.SystemClock.elapsedRealtime()
-                + seconds * 1_000L;
+        if (phoneNotificationOverlayPaused) {
+            pausedPhoneNotificationRemainingMs = seconds * 1_000L;
+            activePhoneNotificationExpiresAt = Long.MAX_VALUE;
+        } else {
+            activePhoneNotificationExpiresAt = android.os.SystemClock.elapsedRealtime()
+                    + seconds * 1_000L;
+        }
         mainHandler.removeCallbacks(phoneNotificationExpiry);
-        mainHandler.postDelayed(phoneNotificationExpiry, seconds * 1_000L);
+        if (!phoneNotificationOverlayPaused) {
+            mainHandler.postDelayed(phoneNotificationExpiry, seconds * 1_000L);
+        }
         if (binding != null) updateMediaInfo();
     }
 
@@ -5984,6 +6133,7 @@ public class WidgetService extends Service {
         activePhoneBatteryAlertText = null;
         activePhoneBatteryAlertColor = null;
         activePhoneNotificationExpiresAt = 0L;
+        pausedPhoneNotificationRemainingMs = 0L;
         if (binding != null) {
             // Clearing the alert must also stop the custom marquee when MEDIA is disabled or
             // removed. In that path updateMediaInfo() is intentionally not called.
@@ -6661,8 +6811,8 @@ public class WidgetService extends Service {
 
     private void updateForegroundAppTracking() {
         boolean phoneTrackingNeeded = phoneNotificationForegroundTrackingNeeded();
-        phoneExternalOverlayActive = phoneTrackingNeeded
-                && WidgetAccessibilityService.hasMaterialExternalOverlay();
+        setPhoneExternalOverlayActive(phoneTrackingNeeded
+                && WidgetAccessibilityService.hasMaterialExternalOverlay());
         boolean surfaceVisibilityNeeded = StatusBarSurfaceContext.requiresPackageTracking(
                 hiddenInPackages) || anyBrickNeedsPackageTracking();
         if (binding == null && !phoneTrackingNeeded && !surfaceVisibilityNeeded) {
@@ -6722,10 +6872,16 @@ public class WidgetService extends Service {
     /** Event-driven signal for an application window above the foreground task. */
     public void onExternalOverlayWindowStateChanged(boolean active) {
         mainHandler.post(() -> {
-            if (destroyed || phoneExternalOverlayActive == active) return;
-            phoneExternalOverlayActive = active;
-            onPhoneNotificationForegroundChanged();
+            if (destroyed) return;
+            setPhoneExternalOverlayActive(active);
         });
+    }
+
+    private void setPhoneExternalOverlayActive(boolean active) {
+        boolean changed = phoneExternalOverlayActive != active;
+        phoneExternalOverlayActive = active;
+        syncPhoneNotificationExternalOverlayPause();
+        if (changed) onPhoneNotificationForegroundChanged();
     }
 
     /** Event-driven lifecycle update for non-package targets such as our HOME Activity. */
@@ -7516,6 +7672,10 @@ public class WidgetService extends Service {
         phoneLowBatteryAlertLatched = false;
         phoneLowBatteryAlertLatched2 = false;
         phoneExternalOverlayActive = false;
+        phoneNotificationOverlayPaused = false;
+        pausedPhoneNotificationRemainingMs = 0L;
+        pausedPhonePopupRemainingMs = 0L;
+        pausedPhoneNotificationQueueAdvance = false;
         activePhoneNotificationExpiresAt = 0L;
         activePhonePopupNotificationExpiresAt = 0L;
         activePhoneLowBatteryPopup = false;
