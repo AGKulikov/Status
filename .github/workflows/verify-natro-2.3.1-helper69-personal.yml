@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   android:
@@ -19,6 +20,17 @@ jobs:
     steps:
       - name: Checkout exact source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Publish Android workflow locator
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state=pending \
+            -f context='natro-2.3.1/android' \
+            -f description='Android tests and unsigned release are running' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
       - name: Java 21
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:
@@ -61,6 +73,24 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: ${{ runner.temp }}/Natro-2.3.1-unsigned-release.apk
+      - name: Publish final Android status
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          case "$JOB_STATUS" in
+            success) STATE=success ;;
+            failure) STATE=failure ;;
+            *) STATE=error ;;
+          esac
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state="$STATE" \
+            -f context='natro-2.3.1/android' \
+            -f description="Android job finished: $JOB_STATUS" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
   helper:
     name: Helper 69 unchanged Personal Team companion
