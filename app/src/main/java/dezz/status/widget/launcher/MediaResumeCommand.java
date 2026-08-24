@@ -258,6 +258,16 @@ final class MediaResumeCommand {
                 deferredYandexPlaySession.getTransportControls().play();
                 deferredSession = "play_dispatched_state_" + deferredYandexPlaybackState
                         + "_actions_" + deferredYandexActions;
+                // mSaver also treats this as an exclusive second route: a usable session wins,
+                // and MediaBrowser is tried only when neither receiver nor session is present.
+                return trace(Result.SESSION_COMMAND,
+                        "route=session_fallback, activeSessions=" + activeSessionCount
+                                + ", sessions=" + sessionInventory
+                                + ", sessionError=" + sessionError
+                                + ", receiverCount=" + receiverCount
+                                + ", receiverQueryError=" + receiverQueryError
+                                + ", sessionFallback=" + deferredSession
+                                + ", browser=skipped_session_available");
             } catch (RuntimeException failure) {
                 deferredSession = "play_" + failure.getClass().getSimpleName();
             }
