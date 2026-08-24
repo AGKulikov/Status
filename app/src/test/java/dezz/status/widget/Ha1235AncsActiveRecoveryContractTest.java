@@ -60,12 +60,11 @@ public final class Ha1235AncsActiveRecoveryContractTest {
         String write = between(platform, "private void writeControlPoint",
                 "private void transmitControlOnMain");
         int pending = write.indexOf("if (pendingGatt != null)");
-        int defer = write.indexOf("deferredAncsRequest = request", pending);
+        int defer = write.indexOf("deferAncsWrite(request, value", pending);
         int rejection = write.indexOf("ancs.controlPointWriteResult(request, false)", pending);
 
         assertTrue(pending >= 0);
-        assertTrue(write.contains("pendingGatt.type != RawOperation.WRITE_CONTROL_POINT"));
-        assertTrue(write.contains("pendingGatt.type != RawOperation.WRITE_ROUTE_CONTROL"));
+        assertTrue(write.contains("preemptCarRemoteWriteForAncs();"));
         assertTrue(defer > pending);
         assertTrue(rejection > defer);
         assertTrue(platform.contains("drainDeferredAncsAfterGatt()"));
