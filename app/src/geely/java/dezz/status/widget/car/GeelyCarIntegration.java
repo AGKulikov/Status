@@ -325,10 +325,11 @@ final class GeelyCarIntegration implements CarIntegration {
     private volatile boolean lowLevelHighBeamKnown;
     private volatile long lowLevelGearObservedMonoMillis;
     private volatile long lowLevelHighBeamObservedMonoMillis;
-    /** Main-thread-owned projection of the two exact external-display response properties. */
+    /** Main-thread-owned projection of the exact camera and parking-overlay properties. */
     @Nullable private ExternalOverlayListener externalOverlayListener;
     @Nullable private Integer externalOverlaySwitchRaw;
     @Nullable private Integer externalOverlayVisionRaw;
+    @Nullable private Integer externalOverlayParkingRaw;
     private boolean externalOverlayStatePublished;
     private boolean externalOverlayActive;
 
@@ -1815,6 +1816,7 @@ final class GeelyCarIntegration implements CarIntegration {
         externalOverlayListener = listener;
         externalOverlaySwitchRaw = null;
         externalOverlayVisionRaw = null;
+        externalOverlayParkingRaw = null;
         externalOverlayStatePublished = false;
         externalOverlayActive = false;
         reconcileSignalFallback();
@@ -1827,11 +1829,15 @@ final class GeelyCarIntegration implements CarIntegration {
             externalOverlaySwitchRaw = raw;
         } else if (propertyId == EcarxExternalOverlayPolicy.PROPERTY_VISION_IMAGE_MODE) {
             externalOverlayVisionRaw = raw;
+        } else if (propertyId
+                == EcarxExternalOverlayPolicy.PROPERTY_PARKING_DISTANCE_CONTROL_STATUS) {
+            externalOverlayParkingRaw = raw;
         } else {
             return;
         }
         boolean active = EcarxExternalOverlayPolicy.isActive(
-                externalOverlaySwitchRaw, externalOverlayVisionRaw);
+                externalOverlaySwitchRaw, externalOverlayVisionRaw,
+                externalOverlayParkingRaw);
         if (externalOverlayStatePublished && externalOverlayActive == active) return;
         externalOverlayStatePublished = true;
         externalOverlayActive = active;
@@ -1842,6 +1848,7 @@ final class GeelyCarIntegration implements CarIntegration {
         boolean notifyInactive = externalOverlayStatePublished && externalOverlayActive;
         externalOverlaySwitchRaw = null;
         externalOverlayVisionRaw = null;
+        externalOverlayParkingRaw = null;
         externalOverlayStatePublished = false;
         externalOverlayActive = false;
         ExternalOverlayListener listener = externalOverlayListener;
@@ -4655,6 +4662,7 @@ final class GeelyCarIntegration implements CarIntegration {
         externalOverlayListener = null;
         externalOverlaySwitchRaw = null;
         externalOverlayVisionRaw = null;
+        externalOverlayParkingRaw = null;
         externalOverlayStatePublished = false;
         externalOverlayActive = false;
     }

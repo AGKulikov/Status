@@ -170,9 +170,9 @@ public final class PhoneConnectorController {
     private static final int HFP_AUDIO_DISCONNECTED = 0;
     private static final int HFP_AUDIO_CONNECTING = 1;
     private static final int HFP_AUDIO_CONNECTED = 2;
-    /** Cumulative retries at about 1, 3, 7 and 15 seconds after HFP appears. */
+    /** Cumulative retries at about 1, 3, 7, 15, 23, 39 and 71 seconds after HFP appears. */
     private static final long[] HFP_STATE_BACKFILL_GAPS_MS = {
-            1_000L, 2_000L, 4_000L, 8_000L
+            1_000L, 2_000L, 4_000L, 8_000L, 8_000L, 16_000L, 32_000L
     };
 
     private static final String CHANNEL_GROUP_ID = "phone_mirror_group";
@@ -287,6 +287,8 @@ public final class PhoneConnectorController {
     @Nullable private PhoneTelemetryStore.Record retainedTelemetry;
     private boolean batteryLiveSeenThisConnection;
     private boolean networkLiveSeenThisConnection;
+    /** Only an HFP AG event/read may complete the HFP signal backfill. */
+    private boolean hfpNetworkLiveSeenThisConnection;
     private boolean telemetryStale;
     @Nullable private Boolean networkAvailable;
     @Nullable private Integer networkSignal;
@@ -750,6 +752,7 @@ public final class PhoneConnectorController {
         retainedTelemetry = null;
         batteryLiveSeenThisConnection = false;
         networkLiveSeenThisConnection = false;
+        hfpNetworkLiveSeenThisConnection = false;
         telemetryStale = false;
         networkAvailable = null;
         networkSignal = null;
@@ -1316,7 +1319,7 @@ public final class PhoneConnectorController {
     }
 
     private boolean hfpNetworkBackfillComplete() {
-        return networkLiveSeenThisConnection
+        return hfpNetworkLiveSeenThisConnection
                 && (networkSignal != null || Boolean.FALSE.equals(networkAvailable));
     }
 
@@ -1361,7 +1364,17 @@ public final class PhoneConnectorController {
         if (initial.agEvents != null) {
             Intent event = new Intent(ACTION_HFP_AG_EVENT);
             event.putExtras(initial.agEvents);
+            Integer rawSignal = intExtra(event, EXTRA_HFP_NETWORK_SIGNAL,
+                    "android.bluetooth.headsetclient.extra.NETWORK_SIGNAL",
+                    "network_signal", "signal", "signal_level");
+            Integer status = intExtra(event, EXTRA_HFP_NETWORK_STATUS, "network_status");
+            PhoneConnectionJournal.append("hfp-initial-state",
+                    "agBundle=true, keys=" + initial.agEvents.size()
+                            + ", signal=" + (rawSignal == null ? "absent" : rawSignal)
+                            + ", status=" + (status == null ? "absent" : status));
             applyHfpEvent(token, event);
+        } else {
+            PhoneConnectionJournal.append("hfp-initial-state", "agBundle=false");
         }
         if (initial.currentCalls != null) {
             calls.clear();
@@ -2198,6 +2211,7 @@ public final class PhoneConnectorController {
         if (batteryUpdated || networkUpdated) {
             markTelemetryUpdated(batteryUpdated, networkUpdated);
         }
+        if (networkUpdated) hfpNetworkLiveSeenThisConnection = true;
         if (hfpNetworkBackfillComplete()) cancelHfpStateBackfill();
         publishSnapshot(token);
     }
@@ -2311,6 +2325,7 @@ public final class PhoneConnectorController {
         retainedTelemetry = telemetryStore.load(address, System.currentTimeMillis());
         batteryLiveSeenThisConnection = false;
         networkLiveSeenThisConnection = false;
+        hfpNetworkLiveSeenThisConnection = false;
         telemetryStale = retainedTelemetry != null;
     }
 
@@ -2324,6 +2339,7 @@ public final class PhoneConnectorController {
     private void markTelemetryDisconnected() {
         batteryLiveSeenThisConnection = false;
         networkLiveSeenThisConnection = false;
+        hfpNetworkLiveSeenThisConnection = false;
         telemetryStale = retainedTelemetryFresh(System.currentTimeMillis());
     }
 
@@ -2446,6 +2462,7 @@ public final class PhoneConnectorController {
         clearHfpCallData();
         refreshBatteryValues();
         networkLiveSeenThisConnection = false;
+        hfpNetworkLiveSeenThisConnection = false;
         batteryLiveSeenThisConnection = basBatteryKnown || genericBatteryKnown
                 || helperPowerUpdatedAtElapsed > 0L;
     }

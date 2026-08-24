@@ -565,6 +565,8 @@ final class EcarxSignalFallback {
         if (externalOverlayDemand) {
             requiredIds.add(EcarxExternalOverlayPolicy.PROPERTY_DISPLAY_SWITCH_STATUS);
             requiredIds.add(EcarxExternalOverlayPolicy.PROPERTY_VISION_IMAGE_MODE);
+            requiredIds.add(
+                    EcarxExternalOverlayPolicy.PROPERTY_PARKING_DISTANCE_CONTROL_STATUS);
         }
         LinkedHashSet<Integer> recorderIds = new LinkedHashSet<>();
         if (adasRecorderDemand) {
@@ -814,6 +816,7 @@ final class EcarxSignalFallback {
         if (externalOverlayDemand) {
             ids.add(EcarxExternalOverlayPolicy.PROPERTY_DISPLAY_SWITCH_STATUS);
             ids.add(EcarxExternalOverlayPolicy.PROPERTY_VISION_IMAGE_MODE);
+            ids.add(EcarxExternalOverlayPolicy.PROPERTY_PARKING_DISTANCE_CONTROL_STATUS);
         }
         if (adasRecorderDemand) {
             // Runtime-discovered ECARX properties are not guaranteed to be integer-valued.

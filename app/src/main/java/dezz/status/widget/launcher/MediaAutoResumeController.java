@@ -71,7 +71,7 @@ public final class MediaAutoResumeController {
     /** One initial exact PLAY plus bounded recovery while the Yandex process is cold-starting. */
     private static final int YANDEX_MAX_ATTEMPTS = 24;
     private static final long YANDEX_SESSION_POLL_MS = 5_000L;
-    private static final long YANDEX_BROWSER_RETRY_COOLDOWN_MS = 30_000L;
+    private static final long YANDEX_BROWSER_RETRY_COOLDOWN_MS = 15_000L;
     private static final int YANDEX_FAST_RECEIVER_ATTEMPTS = 8;
     /** A package-scoped PLAY is idempotent, so verify/retry it without a 30-second gap. */
     private static final long YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L;
@@ -340,14 +340,14 @@ public final class MediaAutoResumeController {
                 < YANDEX_BROWSER_RETRY_COOLDOWN_MS;
         boolean yandexSessionPlayAttempted = state.getBoolean(
                 KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false);
-        // The exported target-package receiver is the only road-log-proven cold-start route.
-        // KEYCODE_MEDIA_PLAY cannot pause an already-started player, so every unsuccessful retry
-        // may safely repeat it. A real PLAYING observation completes the plan immediately.
-        boolean repeatYandexReceiver = attempt > 0;
+        // Attempt one mirrors mSaver's exact receiver. Attempt two starts the exported background
+        // browser service, and later retries may refresh that bootstrap after its bounded cooldown.
+        boolean requestYandexBrowserBootstrap = coldStartEscalation
+                && !yandexBrowserCooldownActive;
         MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(
                 app, target, coldStartEscalation,
-                yandexBrowserCooldownActive, yandexSessionPlayAttempted,
-                repeatYandexReceiver);
+                requestYandexBrowserBootstrap, yandexBrowserCooldownActive,
+                yandexSessionPlayAttempted);
         long dispatchFinishedAt = SystemClock.elapsedRealtime();
         long firstCommandAt = state.getLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE);
         SharedPreferences.Editor commandTiming = state.edit()

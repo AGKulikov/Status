@@ -60,7 +60,7 @@ public final class Natro232RoadLogRecoveryContractTest {
         assertTrue(trace.contains("isPowerOfTwo(this.sourceRecords)"));
     }
 
-    @Test public void yandexRecoveryWaitsForARealProcessWithoutOpeningUi() throws Exception {
+    @Test public void yandexRecoveryTrustsExactSessionWithoutOpeningUi() throws Exception {
         String controller = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaAutoResumeController.java");
         String command = read("app/src/main/java/dezz/status/widget/launcher/"
@@ -69,10 +69,10 @@ public final class Natro232RoadLogRecoveryContractTest {
                 + "YandexMusicBrowserStarter.java");
 
         assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
-        assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 30_000L"));
-        assertTrue(controller.contains("repeatYandexReceiver = attempt > 0"));
-        assertTrue(command.contains("\"running\".equals(processState)"));
-        assertTrue(command.contains("!\"not_running\".equals(processState)"));
+        assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 15_000L"));
+        assertTrue(controller.contains("requestYandexBrowserBootstrap = coldStartEscalation"));
+        assertTrue(command.contains("route=exact_session_play"));
+        assertFalse(command.contains("isUsablePlaySession"));
         assertFalse(command.contains("MediaAppLauncher"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
         assertTrue(browser.contains("new Intent().setComponent(SERVICE)"));

@@ -23,4 +23,11 @@ public final class EcarxExternalOverlayPolicyTest {
         assertTrue(EcarxExternalOverlayPolicy.isActive(null, 1));
         assertTrue(EcarxExternalOverlayPolicy.isActive(null, 2));
     }
+
+    @Test public void parkingDistanceSignalIndependentlyBracketsParktronicOverlay() {
+        assertFalse(EcarxExternalOverlayPolicy.isActive(8, 0, 1));
+        assertTrue(EcarxExternalOverlayPolicy.isActive(8, 0, 3));
+        assertTrue(EcarxExternalOverlayPolicy.isActive(8, 0, 2));
+        assertFalse(EcarxExternalOverlayPolicy.isActive(8, 0, 1));
+    }
 }

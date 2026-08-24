@@ -53,7 +53,7 @@ public final class Natro233FastStartupOverlayContractTest {
         assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
         assertTrue(controller.contains("YANDEX_FAST_RECEIVER_ATTEMPTS = 8"));
         assertTrue(controller.contains("YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L"));
-        assertTrue(controller.contains("repeatYandexReceiver = attempt > 0"));
+        assertTrue(controller.contains("requestYandexBrowserBootstrap = coldStartEscalation"));
         assertTrue(command.contains("KEYCODE_MEDIA_PLAY"));
         assertTrue(command.contains("new Intent(Intent.ACTION_MEDIA_BUTTON)"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
