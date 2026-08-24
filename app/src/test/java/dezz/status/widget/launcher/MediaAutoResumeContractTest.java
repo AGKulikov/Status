@@ -29,7 +29,7 @@ public final class MediaAutoResumeContractTest {
                 "\"launcherMediaAutoResumeEnabled\", false"));
         assertTrue(controller.contains(
                 "if (!preferences.launcherMediaAutoResumeEnabled.get())"));
-        assertTrue(controller.contains("private static final int MAX_ATTEMPTS = 24"));
+        assertTrue(controller.contains("private static final int MAX_ATTEMPTS = 5"));
         assertTrue(controller.contains("KEY_TARGET_PACKAGE"));
         assertTrue(controller.contains("KEY_BOOT_TOKEN"));
         assertTrue(controller.contains("MediaPlaybackTargetPolicy.shouldAutoResume("));
@@ -39,7 +39,9 @@ public final class MediaAutoResumeContractTest {
         assertTrue(controller.contains("onPlaybackObservation"));
         assertTrue(controller.contains("ScheduledExecutorService EXACT_TIMER"));
         assertTrue(controller.contains("scheduleInProcess(app, bootToken, attempt, delayMillis)"));
-        assertTrue(controller.contains("150L, 250L, 400L, 700L"));
+        assertTrue(controller.contains("RETRY_DELAY_MS = 10_000L"));
+        assertFalse(controller.contains("MediaAppLauncher.launchPackage"));
+        assertFalse(controller.contains("event=target_warm_launch"));
         assertTrue(preferences.contains("\"launcherMediaFixedPlayerEnabled\", false"));
         assertTrue(preferences.contains("\"launcherMediaFixedPlayerPackage\", \"\""));
         assertTrue(controller.contains(
@@ -57,6 +59,8 @@ public final class MediaAutoResumeContractTest {
         assertTrue(command.contains(
                 "new Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(target)"));
         assertTrue(command.contains("KeyEvent.KEYCODE_MEDIA_PLAY"));
+        assertTrue(command.contains("YANDEX_PLAY_KEY_UP_DELAY_MS = 100L"));
+        assertTrue(command.contains("YandexMusicBrowserStarter.requestPlay(context)"));
         assertTrue(command.contains("Intent.FLAG_INCLUDE_STOPPED_PACKAGES"));
         assertFalse(command.contains("KEYCODE_MEDIA_PLAY_PAUSE"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));

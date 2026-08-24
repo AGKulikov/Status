@@ -100,13 +100,16 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private static final int ROUTINE_REQUIRED_MTU = 69;
     private static final long TELEMETRY_REFRESH_QUIET_MS = 30_000L;
     private static final long TELEMETRY_REFRESH_RETRY_MS = 5_000L;
+    private static final long ANCS_CONTROL_WRITE_RETRY_BASE_MS = 80L;
+    private static final long ANCS_CONTROL_WRITE_RETRY_MAX_MS = 640L;
     /**
      * C5 is an optional bulk channel.  Helper 68 exposes write-without-response so Android 9
      * never waits for the callback which the ECARX stack occasionally drops.  A short local
      * settle window preserves the single ATT slot while keeping ANCS strictly higher priority.
      */
-    private static final long CAR_REMOTE_NO_RESPONSE_SETTLE_MS = 24L;
-    private static final long CAR_REMOTE_INTER_FRAME_MS = 12L;
+    private static final long CAR_REMOTE_NO_RESPONSE_SETTLE_MS = 60L;
+    private static final long CAR_REMOTE_INTER_FRAME_MS = 40L;
+    private static final long CAR_REMOTE_ANCS_PAUSE_MS = 250L;
     private static final int CAR_REMOTE_REJECT_LIMIT = 5;
     private static final long CAR_REMOTE_BACKOFF_MIN_MS = 2_000L;
     private static final long CAR_REMOTE_BACKOFF_MAX_MS = 30_000L;
@@ -312,6 +315,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private Runnable telemetryRefreshTimer;
     private AncsRequestTokenV2 deferredAncsRequest;
     private byte[] deferredAncsValue;
+    private Runnable deferredAncsDrainTimer;
+    private int ancsControlSynchronousRejects;
     private BluetoothGattCharacteristic batteryStatusCharacteristic;
     private BluetoothGattCharacteristic batteryLevelCharacteristic;
     private int batteryProbeStage;
@@ -406,7 +411,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                         "C5 protected output queue reached its hard limit", true);
                 return;
             }
-            scheduleCarRemoteDrain(0L);
+            long quarantineRemaining = Math.max(0L, carRemoteRetryNotBeforeMillis
+                    - SystemClock.elapsedRealtime());
+            scheduleCarRemoteDrain(quarantineRemaining);
         });
     }
 
@@ -1570,8 +1577,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
 
     private void clearTelemetrySubscription() {
         cancelTelemetryRefresh();
-        deferredAncsRequest = null;
-        deferredAncsValue = null;
+        clearDeferredAncsRequest(null);
         if (pendingGatt != null && pendingGatt.type == RawOperation.REQUEST_TELEMETRY) {
             pendingGatt = null;
         }
@@ -1636,6 +1642,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         carRemoteCharacteristic = null;
         carRemoteSubscriptionToken = null;
         carRemoteWriteTimeouts = 0;
+        carRemoteRetryNotBeforeMillis = 0L;
         carRemoteNoResponseWrites = 0L;
         if (pendingGatt != null && (pendingGatt.type == RawOperation.WRITE_CAR_REMOTE
                 || pendingGatt.type == RawOperation.SUBSCRIBE_CAR_REMOTE)) {
@@ -1664,9 +1671,15 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             return;
         }
         if (carRemoteWrites.isEmpty()) return;
-        if (pendingGatt != null || !requestTimers.isEmpty()
+        long quarantineRemaining = Math.max(0L, carRemoteRetryNotBeforeMillis
+                - SystemClock.elapsedRealtime());
+        if (quarantineRemaining > 0L) {
+            scheduleCarRemoteDrain(quarantineRemaining);
+            return;
+        }
+        if (pendingGatt != null || deferredAncsRequest != null || !requestTimers.isEmpty()
                 || !controlRetryTimers.isEmpty()) {
-            scheduleCarRemoteDrain(12L);
+            scheduleCarRemoteDrain(CAR_REMOTE_ANCS_PAUSE_MS);
             return;
         }
         byte[] frame = carRemoteWrites.poll();
@@ -1721,7 +1734,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                     ? 1L : carRemoteNoResponseWrites + 1L;
             int queued = carRemoteWrites.size();
             if (carRemoteNoResponseWrites == 1L
-                    || carRemoteNoResponseWrites % 64L == 0L || queued == 0) {
+                    || carRemoteNoResponseWrites % 64L == 0L) {
                 reportPlatformDiagnostic(exactOwner.ownerToken,
                         "c5_no_response_drain writes=" + carRemoteNoResponseWrites
                                 + ", queued=" + queued
@@ -1811,15 +1824,77 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void drainDeferredAncsAfterGatt() {
+        Runnable scheduled = deferredAncsDrainTimer;
+        deferredAncsDrainTimer = null;
+        if (scheduled != null) main.removeCallbacks(scheduled);
+        if (pendingGatt != null) {
+            scheduleDeferredAncsDrain(ANCS_CONTROL_WRITE_RETRY_BASE_MS);
+            return;
+        }
         AncsRequestTokenV2 request = deferredAncsRequest;
         byte[] value = deferredAncsValue;
         deferredAncsRequest = null;
         deferredAncsValue = null;
-        if (request != null && value != null) {
+        if (request != null && value != null && requestTimers.containsKey(request)) {
             writeControlPoint(request, value);
         } else if (telemetryRefreshTimer == null) {
             scheduleTelemetryRefresh();
         }
+    }
+
+    private void deferAncsWrite(AncsRequestTokenV2 request, byte[] value,
+                                long delayMillis, String reason) {
+        if (request == null || value == null) return;
+        if (deferredAncsRequest != null && !deferredAncsRequest.equals(request)) {
+            // The platform-neutral core permits one request only. Retain its oldest exact token;
+            // a second token would indicate a core invariant violation and will hit its watchdog.
+            reportPlatformDiagnostic(owner.ownerToken,
+                    "ancs_control_defer_collision retained=" + deferredAncsRequest
+                            + ", rejected=" + request);
+            return;
+        }
+        deferredAncsRequest = request;
+        deferredAncsValue = value.clone();
+        reportPlatformDiagnostic(owner.ownerToken,
+                "ancs_control_deferred reason=" + reason
+                        + ", retryMs=" + Math.max(0L, delayMillis)
+                        + ", request=" + request.requestId);
+        scheduleDeferredAncsDrain(delayMillis);
+    }
+
+    private void scheduleDeferredAncsDrain(long delayMillis) {
+        if (deferredAncsDrainTimer != null) return;
+        deferredAncsDrainTimer = () -> {
+            deferredAncsDrainTimer = null;
+            drainDeferredAncsAfterGatt();
+        };
+        main.postDelayed(deferredAncsDrainTimer, Math.max(0L, delayMillis));
+    }
+
+    /** Cancels only a local retry; the ANCS core remains the owner of request completion. */
+    private void clearDeferredAncsRequest(AncsRequestTokenV2 exactRequest) {
+        if (exactRequest != null && deferredAncsRequest != null
+                && !exactRequest.equals(deferredAncsRequest)) return;
+        deferredAncsRequest = null;
+        deferredAncsValue = null;
+        ancsControlSynchronousRejects = 0;
+        Runnable timer = deferredAncsDrainTimer;
+        deferredAncsDrainTimer = null;
+        if (timer != null) main.removeCallbacks(timer);
+    }
+
+    /** A no-response C5 write is already on the wire; release its local pacing slot for ANCS. */
+    private void preemptCarRemoteWriteForAncs() {
+        PendingGattOperation pending = pendingGatt;
+        if (pending == null || pending.type != RawOperation.WRITE_CAR_REMOTE) return;
+        if (carRemoteWriteSettleTimer != null) {
+            main.removeCallbacks(carRemoteWriteSettleTimer);
+            carRemoteWriteSettleTimer = null;
+        }
+        pendingGatt = null;
+        carRemoteNoResponseWrites = carRemoteNoResponseWrites == Long.MAX_VALUE
+                ? 1L : carRemoteNoResponseWrites + 1L;
+        scheduleCarRemoteDrain(CAR_REMOTE_NO_RESPONSE_SETTLE_MS);
     }
 
     /**
@@ -2105,19 +2180,14 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             }
             return;
         }
+        preemptCarRemoteWriteForAncs();
         if (pendingGatt != null) {
             // ANCS is the primary channel. A Notification Source edge may arrive while an
             // optional telemetry, battery or C5 operation owns the one Android ATT slot. Keep
             // the exact request pending behind that slot instead of falsely reporting a Control
             // Point rejection. Its existing 15-second request watchdog remains the hard bound.
-            if (pendingGatt.type != RawOperation.WRITE_CONTROL_POINT
-                    && pendingGatt.type != RawOperation.WRITE_ROUTE_CONTROL
-                    && deferredAncsRequest == null) {
-                deferredAncsRequest = request;
-                deferredAncsValue = value == null ? null : value.clone();
-                return;
-            }
-            applyAncsEffects(ancs.controlPointWriteResult(request, false));
+            deferAncsWrite(request, value, ANCS_CONTROL_WRITE_RETRY_BASE_MS,
+                    "att_slot_" + pendingGatt.type);
             return;
         }
         BluetoothGattCharacteristic control = characteristic(
@@ -2138,8 +2208,17 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         if (!started) {
             pendingGatt = null;
-            applyAncsEffects(ancs.controlPointWriteResult(request, false));
+            int rejects = Math.min(8, ancsControlSynchronousRejects + 1);
+            ancsControlSynchronousRejects = rejects;
+            long retry = Math.min(ANCS_CONTROL_WRITE_RETRY_MAX_MS,
+                    ANCS_CONTROL_WRITE_RETRY_BASE_MS << Math.min(3, rejects - 1));
+            // Android returns false when its local ATT queue is momentarily busy. No packet
+            // reached iOS, so treating this as a protocol rejection needlessly tears down a
+            // healthy ANCS owner. The existing request watchdog remains the terminal bound.
+            deferAncsWrite(request, value, retry,
+                    "android_gatt_busy_" + rejects);
         } else {
+            ancsControlSynchronousRejects = 0;
             reportPlatformDiagnostic(owner.ownerToken,
                     ancsTrace.controlPointWrite(request.kind, true));
         }
@@ -2233,9 +2312,13 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void armRequestDeadline(AncsRequestTokenV2 request) {
-        cancelRequestDeadline(request);
+        // WRITE_CONTROL_POINT is emitted before ARM_REQUEST_DEADLINE. Do not clear a local
+        // synchronous-busy retry which may already have been staged by that preceding effect.
+        Runnable previous = requestTimers.remove(request);
+        if (previous != null) main.removeCallbacks(previous);
         Runnable timer = () -> {
             requestTimers.remove(request);
+            clearDeferredAncsRequest(request);
             applyAncsEffects(ancs.requestDeadline(request));
         };
         requestTimers.put(request, timer);
@@ -2245,6 +2328,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void cancelRequestDeadline(AncsRequestTokenV2 request) {
         Runnable timer = requestTimers.remove(request);
         if (timer != null) main.removeCallbacks(timer);
+        clearDeferredAncsRequest(request);
     }
 
     private void armReplayQuiet(long generation) {
@@ -2485,6 +2569,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         routeTimers.clear();
         for (Runnable timer : requestTimers.values()) main.removeCallbacks(timer);
         requestTimers.clear();
+        clearDeferredAncsRequest(null);
         for (Runnable timer : controlRetryTimers.values()) main.removeCallbacks(timer);
         controlRetryTimers.clear();
         cancelReplayQuiet();
@@ -3188,6 +3273,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         pendingGatt = null;
         if (pending.type == RawOperation.WRITE_CONTROL_POINT) {
+            clearDeferredAncsRequest(pending.ancsRequest);
             reportPlatformDiagnostic(owner.ownerToken,
                     ancsTrace.controlPointResult(
                     pending.ancsRequest == null ? null : pending.ancsRequest.kind,

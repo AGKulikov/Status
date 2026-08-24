@@ -22,8 +22,10 @@ final class MediaAutoResumeLifecyclePolicy {
     }
 
     static boolean isUsableBoundary(String action) {
-        return ACTION_LOCKED_BOOT_COMPLETED.equals(action)
-                || ACTION_BOOT_COMPLETED.equals(action)
+        // Device-protected history is captured at LOCKED_BOOT, but third-party players are not
+        // reliably runnable yet.  Start the user's delay only after Android's normal boot gate,
+        // matching the proven mSaver behaviour and avoiding an ignored pre-unlock PLAY.
+        return ACTION_BOOT_COMPLETED.equals(action)
                 || ACTION_QUICKBOOT_POWERON.equals(action);
     }
 
@@ -46,9 +48,10 @@ final class MediaAutoResumeLifecyclePolicy {
         return standardPair || sameLifecycleBurst;
     }
 
-    /** The user delay starts at the earliest direct-boot boundary and is never moved later. */
+    /** Move a frozen direct-boot snapshot to the first player-usable boot boundary exactly once. */
     static boolean shouldMovePlanAnchor(String previousAction, String currentAction) {
-        return false;
+        return ACTION_LOCKED_BOOT_COMPLETED.equals(previousAction)
+                && isUsableBoundary(currentAction);
     }
 
     private static boolean isStandardBootAction(String action) {

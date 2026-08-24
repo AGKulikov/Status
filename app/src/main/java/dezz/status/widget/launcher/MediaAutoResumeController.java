@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.StartupWorkCoordinator;
-import dezz.status.widget.launcher.media.MediaAppLauncher;
 import dezz.status.widget.phone.PhoneConnectionJournal;
 
 /**
@@ -57,13 +56,11 @@ public final class MediaAutoResumeController {
     private static final String KEY_OBSERVATION_KICK_ELAPSED = "observationKickElapsed";
     private static final String KEY_FIRST_COMMAND_ELAPSED = "firstCommandElapsed";
     private static final String KEY_LAST_COMMAND_ELAPSED = "lastCommandElapsed";
-    private static final String KEY_WARM_LAUNCH_ELAPSED = "warmLaunchElapsed";
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
-    private static final int MAX_ATTEMPTS = 24;
-    private static final long[] RETRY_DELAYS_MS = {
-            150L, 250L, 400L, 700L, 1_000L, 1_500L, 2_000L, 3_000L, 5_000L
-    };
+    /** mSaver's field-proven bounded policy: one initial PLAY plus four 10-second retries. */
+    private static final int MAX_ATTEMPTS = 5;
+    private static final long RETRY_DELAY_MS = 10_000L;
     /**
      * AlarmManager remains the durable process-death fallback. This timer is the hot path: it is
      * not serialized behind WidgetService/startup work and therefore fires at the user-selected
@@ -135,7 +132,6 @@ public final class MediaAutoResumeController {
                 .putLong(KEY_OBSERVATION_KICK_ELAPSED, Long.MIN_VALUE)
                 .putLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putLong(KEY_LAST_COMMAND_ELAPSED, Long.MIN_VALUE)
-                .putLong(KEY_WARM_LAUNCH_ELAPSED, Long.MIN_VALUE)
                 .putBoolean(KEY_COMPLETED, false)
                 .apply();
         // A queued retry from the previous standard/QuickBoot lifecycle must never cross the new
@@ -194,6 +190,15 @@ public final class MediaAutoResumeController {
         if (captureToken == 0L) {
             captureToken = captureBootHistorySnapshot(app, Intent.ACTION_BOOT_COMPLETED);
             state = state(app);
+        }
+        String captureAction = state.getString(KEY_CAPTURE_ACTION, "");
+        if (!MediaAutoResumeLifecyclePolicy.isUsableBoundary(captureAction)) {
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=plan_deferred, reason=player_boot_gate, token="
+                            + captureToken + ", action=" + captureAction
+                            + ", sinceCaptureMs=" + elapsedSince(state,
+                            KEY_CAPTURE_ELAPSED, enteredAt));
+            return;
         }
         if (state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE) == captureToken) {
             if (!state.getBoolean(KEY_COMPLETED, false)) {
@@ -329,39 +334,9 @@ public final class MediaAutoResumeController {
             return;
         }
 
-        // A receiver broadcast can be accepted by Android while a force-stopped/hibernated
-        // player silently ignores it. The KX11 Yandex Music build did exactly that for all 24
-        // retries. Wake only the explicitly selected package, at most once per boot plan, then
-        // issue PLAY as soon as its process and MediaSession have had one short turn to appear.
-        long warmLaunchAt = state.getLong(KEY_WARM_LAUNCH_ELAPSED, Long.MIN_VALUE);
-        if (warmLaunchAt == Long.MIN_VALUE
-                && trace.result != MediaResumeCommand.Result.SESSION_COMMAND) {
-            long launchStartedAt = SystemClock.elapsedRealtime();
-            boolean launched = MediaAppLauncher.launchPackage(app, target);
-            long launchFinishedAt = SystemClock.elapsedRealtime();
-            state.edit().putLong(KEY_WARM_LAUNCH_ELAPSED, launchStartedAt).apply();
-            PhoneConnectionJournal.append("media-auto-resume",
-                    "trace event=target_warm_launch, token=" + bootToken
-                            + ", target=" + target
-                            + ", launched=" + launched
-                            + ", sourceResult=" + trace.result
-                            + ", durationMs="
-                            + Math.max(0L, launchFinishedAt - launchStartedAt)
-                            + ", sinceCaptureMs=" + elapsedSince(state,
-                            KEY_CAPTURE_ELAPSED, launchStartedAt)
-                            + ", elapsed=" + launchFinishedAt);
-            int nextAttempt = attempt + 1;
-            if (nextAttempt < MAX_ATTEMPTS) {
-                schedule(app, bootToken, nextAttempt, 300L,
-                        launched ? "target_warm_launch" : "target_warm_launch_failed");
-                return;
-            }
-        }
-
         int nextAttempt = attempt + 1;
         if (nextAttempt < MAX_ATTEMPTS) {
-            long retryDelay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
-            schedule(app, bootToken, nextAttempt, retryDelay, "command_retry");
+            schedule(app, bootToken, nextAttempt, RETRY_DELAY_MS, "command_retry");
             Log.i(TAG, "Media resume attempt " + (attempt + 1) + " for " + target
                     + " returned " + trace.result + "; retry scheduled");
             return;

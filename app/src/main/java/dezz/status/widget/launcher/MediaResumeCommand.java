@@ -28,10 +28,15 @@ import dezz.status.widget.MediaNotificationListener;
  * that path may be owned by the paired phone instead of the Android player shown on HOME.
  */
 final class MediaResumeCommand {
+    private static final String YANDEX_MUSIC_PACKAGE = "ru.yandex.music";
+    /** The Yandex receiver used by mSaver requires a real press rather than two adjacent frames. */
+    private static final long YANDEX_PLAY_KEY_UP_DELAY_MS = 100L;
+
     enum Result {
         ALREADY_PLAYING,
         SESSION_COMMAND,
         RECEIVER_COMMAND,
+        BROWSER_COMMAND,
         DISPATCH_FAILED,
         NO_TARGET
     }
@@ -194,8 +199,10 @@ final class MediaResumeCommand {
             if (resolved.activityInfo == null) continue;
             ComponentName receiver = new ComponentName(resolved.activityInfo.packageName,
                     resolved.activityInfo.name);
+            long keyUpDelayMs = keyUpDelayMillis(target, command);
             String dispatchError = sendKey(context, receiver,
-                    keyCodeWithoutSession(command));
+                    keyCodeWithoutSession(command), keyUpDelayMs);
+            String browser = requestYandexBrowserIfUseful(context, target, command);
             return trace(dispatchError.isEmpty()
                             ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
                     "route=queried_receiver, activeSessions=" + activeSessionCount
@@ -203,12 +210,17 @@ final class MediaResumeCommand {
                             + ", sessionError=" + sessionError
                             + ", receiverCount=" + receiverCount
                             + ", receiver=" + receiver.flattenToShortString()
+                            + ", keyUpDelayMs=" + keyUpDelayMs
+                            + ", browser=" + browser
                             + ", dispatchError=" + emptyAsNone(dispatchError));
         }
 
         ComponentName known = knownReceiver(target);
         if (known != null && isInstalled(packages, target)) {
-            String dispatchError = sendKey(context, known, keyCodeWithoutSession(command));
+            long keyUpDelayMs = keyUpDelayMillis(target, command);
+            String dispatchError = sendKey(context, known, keyCodeWithoutSession(command),
+                    keyUpDelayMs);
+            String browser = requestYandexBrowserIfUseful(context, target, command);
             return trace(dispatchError.isEmpty()
                             ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
                     "route=known_receiver, activeSessions=" + activeSessionCount
@@ -217,7 +229,19 @@ final class MediaResumeCommand {
                             + ", receiverCount=" + receiverCount
                             + ", receiverQueryError=" + receiverQueryError
                             + ", receiver=" + known.flattenToShortString()
+                            + ", keyUpDelayMs=" + keyUpDelayMs
+                            + ", browser=" + browser
                             + ", dispatchError=" + emptyAsNone(dispatchError));
+        }
+        String browser = requestYandexBrowserIfUseful(context, target, command);
+        if ("scheduled".equals(browser)) {
+            return trace(Result.BROWSER_COMMAND,
+                    "route=media_browser, activeSessions=" + activeSessionCount
+                            + ", sessions=" + sessionInventory
+                            + ", sessionError=" + sessionError
+                            + ", receiverCount=" + receiverCount
+                            + ", receiverQueryError=" + receiverQueryError
+                            + ", browser=" + browser);
         }
         return trace(Result.NO_TARGET,
                 "route=none, activeSessions=" + activeSessionCount
@@ -225,7 +249,8 @@ final class MediaResumeCommand {
                         + ", sessionError=" + sessionError
                         + ", receiverCount=" + receiverCount
                         + ", receiverQueryError=" + receiverQueryError
-                        + ", knownReceiver=" + (known != null));
+                        + ", knownReceiver=" + (known != null)
+                        + ", browser=" + browser);
     }
 
     /**
@@ -247,7 +272,7 @@ final class MediaResumeCommand {
 
     @NonNull
     private static String sendKey(@NonNull Context context, @NonNull ComponentName receiver,
-                                  int keyCode) {
+                                  int keyCode, long keyUpDelayMs) {
         long now = SystemClock.uptimeMillis();
         Intent down = new Intent(Intent.ACTION_MEDIA_BUTTON)
                 .setComponent(receiver)
@@ -255,14 +280,16 @@ final class MediaResumeCommand {
                         | Intent.FLAG_RECEIVER_FOREGROUND)
                 .putExtra(Intent.EXTRA_KEY_EVENT, new KeyEvent(now, now, KeyEvent.ACTION_DOWN,
                         keyCode, 0));
-        Intent up = new Intent(Intent.ACTION_MEDIA_BUTTON)
-                .setComponent(receiver)
-                .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES
-                        | Intent.FLAG_RECEIVER_FOREGROUND)
-                .putExtra(Intent.EXTRA_KEY_EVENT, new KeyEvent(now, now, KeyEvent.ACTION_UP,
-                        keyCode, 0));
         try {
             context.sendBroadcast(down);
+            if (keyUpDelayMs > 0L) SystemClock.sleep(keyUpDelayMs);
+            long releasedAt = SystemClock.uptimeMillis();
+            Intent up = new Intent(Intent.ACTION_MEDIA_BUTTON)
+                    .setComponent(receiver)
+                    .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES
+                            | Intent.FLAG_RECEIVER_FOREGROUND)
+                    .putExtra(Intent.EXTRA_KEY_EVENT, new KeyEvent(now, releasedAt,
+                            KeyEvent.ACTION_UP, keyCode, 0));
             context.sendBroadcast(up);
             return "";
         } catch (RuntimeException failure) {
@@ -281,7 +308,7 @@ final class MediaResumeCommand {
     }
 
     private static ComponentName knownReceiver(@NonNull String packageName) {
-        if ("ru.yandex.music".equals(packageName)) {
+        if (YANDEX_MUSIC_PACKAGE.equals(packageName)) {
             return new ComponentName(packageName,
                     "ru.yandex.music.common.service.player.DebugMediaButtonReceiver");
         }
@@ -300,5 +327,19 @@ final class MediaResumeCommand {
         } catch (PackageManager.NameNotFoundException | RuntimeException ignored) {
             return false;
         }
+    }
+
+    private static long keyUpDelayMillis(@NonNull String target,
+                                         @NonNull Command command) {
+        return YANDEX_MUSIC_PACKAGE.equals(target) && command == Command.PLAY
+                ? YANDEX_PLAY_KEY_UP_DELAY_MS : 0L;
+    }
+
+    @NonNull
+    private static String requestYandexBrowserIfUseful(@NonNull Context context,
+                                                        @NonNull String target,
+                                                        @NonNull Command command) {
+        if (!YANDEX_MUSIC_PACKAGE.equals(target) || command != Command.PLAY) return "not_used";
+        return YandexMusicBrowserStarter.requestPlay(context);
     }
 }

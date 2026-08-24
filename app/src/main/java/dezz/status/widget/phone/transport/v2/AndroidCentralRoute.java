@@ -17,7 +17,8 @@ import java.util.Objects;
  */
 public final class AndroidCentralRoute {
     public static final long SCAN_TIMEOUT_MS = 15_000L;
-    public static final long CONNECT_TIMEOUT_MS = 12_000L;
+    /** Start exact enrolled-presence recovery sooner than Android's late 30 s GATT 133 callback. */
+    public static final long CONNECT_TIMEOUT_MS = 8_000L;
     public static final long DISCOVERY_TIMEOUT_MS = 8_000L;
     public static final long PROOF_TIMEOUT_MS = 5_000L;
     public static final long CCCD_TIMEOUT_MS = 5_000L;

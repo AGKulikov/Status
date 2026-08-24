@@ -7,12 +7,12 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public final class MediaAutoResumeLifecyclePolicyTest {
-    @Test public void coldBootSequenceKeepsEarliestAnchor() {
+    @Test public void coldBootSequenceMovesDelayToFirstPlayerUsableBoundary() {
         assertTrue(MediaAutoResumeLifecyclePolicy.shouldCoalesce(
                 MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED,
                 MediaAutoResumeLifecyclePolicy.ACTION_BOOT_COMPLETED,
                 false, 180_000L));
-        assertFalse(MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
+        assertTrue(MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
                 MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED,
                 MediaAutoResumeLifecyclePolicy.ACTION_BOOT_COMPLETED));
         assertFalse(MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
@@ -20,9 +20,11 @@ public final class MediaAutoResumeLifecyclePolicyTest {
                 MediaAutoResumeLifecyclePolicy.ACTION_QUICKBOOT_POWERON));
     }
 
-    @Test public void lockedBootIsAnImmediatelyUsableBoundary() {
-        assertTrue(MediaAutoResumeLifecyclePolicy.isUsableBoundary(
+    @Test public void lockedBootOnlyCapturesHistoryAndNormalBootArmsPlayback() {
+        assertFalse(MediaAutoResumeLifecyclePolicy.isUsableBoundary(
                 MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED));
+        assertTrue(MediaAutoResumeLifecyclePolicy.isUsableBoundary(
+                MediaAutoResumeLifecyclePolicy.ACTION_BOOT_COMPLETED));
     }
 
     @Test public void ecarxQuickBootBurstNeverRestartsConsumedTimer() {

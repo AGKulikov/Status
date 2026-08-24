@@ -69,6 +69,10 @@ public final class Ha1235AncsActiveRecoveryContractTest {
         assertTrue(defer > pending);
         assertTrue(rejection > defer);
         assertTrue(platform.contains("drainDeferredAncsAfterGatt()"));
+        assertTrue(write.contains("android_gatt_busy_"));
+        String synchronousFailure = between(write, "if (!started) {", "} else {");
+        assertTrue(synchronousFailure.contains("deferAncsWrite(request, value"));
+        assertFalse(synchronousFailure.contains("controlPointWriteResult"));
     }
 
     @Test public void c5UsesNoResponsePacingAndCanNeverResetTheAncsOwner()
@@ -84,6 +88,8 @@ public final class Ha1235AncsActiveRecoveryContractTest {
         assertTrue(subscribe.contains("ancs_preserved=true"));
         assertTrue(drain.contains("WRITE_TYPE_NO_RESPONSE"));
         assertTrue(drain.contains("CAR_REMOTE_NO_RESPONSE_SETTLE_MS"));
+        assertTrue(drain.contains("CAR_REMOTE_ANCS_PAUSE_MS"));
+        assertTrue(drain.contains("carRemoteRetryNotBeforeMillis"));
         assertTrue(drain.contains("drainDeferredAncsAfterGatt()"));
         assertTrue(drain.indexOf("drainDeferredAncsAfterGatt()")
                 < drain.indexOf("scheduleCarRemoteDrain(",

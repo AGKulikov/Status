@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Regression boundary for the exact 2.2.16 road trace: 5.7 s queue wait + inert Yandex receiver. */
+/** Regression boundary carried forward from 2.2.17 into the road-log fixes in 2.2.18. */
 public final class Natro2217ImmediateMediaContractTest {
     @Test public void bootDeadlineCannotQueueBehindAnOlderMediaCommand() throws Exception {
         String build = read("build.gradle");
@@ -31,16 +31,20 @@ public final class Natro2217ImmediateMediaContractTest {
         assertTrue(boundary.contains("route=inline"));
     }
 
-    @Test public void anInertExplicitReceiverGetsOneExactPackageWarmLaunch() throws Exception {
+    @Test public void anInertReceiverNeverOpensYandexUiAndUsesBackgroundFallback()
+            throws Exception {
         String controller = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaAutoResumeController.java");
         String command = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaResumeCommand.java");
 
-        assertTrue(controller.contains("KEY_WARM_LAUNCH_ELAPSED"));
-        assertTrue(controller.contains("MediaAppLauncher.launchPackage(app, target)"));
-        assertTrue(controller.contains("event=target_warm_launch"));
-        assertTrue(controller.contains("300L"));
+        assertFalse(controller.contains("KEY_WARM_LAUNCH_ELAPSED"));
+        assertFalse(controller.contains("MediaAppLauncher.launchPackage(app, target)"));
+        assertFalse(controller.contains("event=target_warm_launch"));
+        assertTrue(controller.contains("MAX_ATTEMPTS = 5"));
+        assertTrue(controller.contains("RETRY_DELAY_MS = 10_000L"));
+        assertTrue(command.contains("YANDEX_PLAY_KEY_UP_DELAY_MS = 100L"));
+        assertTrue(command.contains("YandexMusicBrowserStarter.requestPlay(context)"));
         assertTrue(command.contains("sessions=" + "\" + sessionInventory"));
     }
 
