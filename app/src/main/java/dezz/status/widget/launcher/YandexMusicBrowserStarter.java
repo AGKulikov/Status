@@ -20,8 +20,10 @@ final class YandexMusicBrowserStarter {
     private static final ComponentName SERVICE = new ComponentName(
             "ru.yandex.music",
             "ru.yandex.music.common.media.mediabrowser.MusicBrowserService");
-    private static final long CONNECTION_TIMEOUT_MS = 5_000L;
+    /** Cold Yandex restore on the KX11 can take more than five seconds after BOOT_COMPLETED. */
+    private static final long CONNECTION_TIMEOUT_MS = 15_000L;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    private static Connection current;
 
     private YandexMusicBrowserStarter() {}
 
@@ -37,11 +39,20 @@ final class YandexMusicBrowserStarter {
         }
         Context exactApp = app;
         try {
-            MAIN.post(() -> new Connection(exactApp).start());
+            MAIN.post(() -> startOrJoin(exactApp));
             return "scheduled";
         } catch (RuntimeException rejected) {
             return "schedule_" + rejected.getClass().getSimpleName();
         }
+    }
+
+    private static void startOrJoin(@NonNull Context context) {
+        if (current != null && !current.completed) {
+            current.journal("connect_coalesced", "none");
+            return;
+        }
+        current = new Connection(context);
+        current.start();
     }
 
     private static final class Connection extends MediaBrowser.ConnectionCallback
@@ -103,6 +114,7 @@ final class YandexMusicBrowserStarter {
                 } catch (RuntimeException ignored) {
                 }
             }
+            if (current == this) current = null;
             journal(event, error);
         }
 

@@ -3278,9 +3278,20 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                     ancsTrace.controlPointResult(
                     pending.ancsRequest == null ? null : pending.ancsRequest.kind,
                             status));
-            applyAncsEffects(ancs.controlPointWriteResult(
-                    pending.ancsRequest, status == BluetoothGatt.GATT_SUCCESS));
-            if (telemetryRefreshTimer == null) scheduleTelemetryRefresh();
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                applyAncsEffects(ancs.controlPointWriteResult(
+                        pending.ancsRequest, true));
+                if (telemetryRefreshTimer == null) scheduleTelemetryRefresh();
+            } else {
+                // An asynchronous Android GATT status (notably 133 in the road trace) is a
+                // transport-owner failure, not an ANCS protocol rejection from iOS. Calling the
+                // shared core with false mislabeled it as "Control Point write rejected" and
+                // then waited for the delayed physical disconnect callback. Retire this exact
+                // owner immediately; the reducer keeps enrollment and starts a clean link.
+                String detail = "ANCS Control Point transport write failed: status=" + status;
+                reportError(IphoneTransportErrorV2.Kind.GATT, detail, true);
+                resetCurrentOwner(detail);
+            }
         } else if (pending.type == RawOperation.REQUEST_TELEMETRY) {
             // Keep the request as the one in-flight telemetry waiter until a fresh T arrives.
             if (deferredAncsRequest == null) {

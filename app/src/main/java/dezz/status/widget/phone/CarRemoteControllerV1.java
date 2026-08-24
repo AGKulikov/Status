@@ -38,7 +38,12 @@ final class CarRemoteControllerV1 {
     // can take several seconds to drain, while Helper repeats HELLO every two seconds. Starting a
     // fresh generation for every repeat filled the protected queue and destabilised the GATT
     // owner. Keep one bootstrap generation authoritative for a bounded drain window.
-    private static final long HELLO_COALESCE_MS = 12_000L;
+    // The new road trace measured up to ~20 seconds for the 100+ protected catalog/state frames
+    // to cross this Android 9 ATT stack while ANCS had priority. A 12-second boundary therefore
+    // began generation N+1 before generation N's SYNC_COMPLETE reached Helper and eventually
+    // filled the C5 queue. Keep one complete snapshot authoritative for the measured drain plus
+    // margin; a genuinely torn snapshot is retried after this bound without touching ANCS.
+    private static final long HELLO_COALESCE_MS = 30_000L;
     /** Read-only companion states; intentionally outside the finite command registry. */
     private static final int STATE_CABIN_TEMPERATURE = 0xfc;
     private static final int STATE_OUTDOOR_TEMPERATURE = 0xfd;

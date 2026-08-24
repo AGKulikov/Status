@@ -120,6 +120,9 @@ final class MediaResumeCommand {
         String sessionError = "none";
         String sessionInventory = "[]";
         int activeSessionCount = -1;
+        MediaController deferredYandexPlaySession = null;
+        int deferredYandexPlaybackState = -1;
+        long deferredYandexActions = 0L;
         MediaSessionManager sessions = context.getSystemService(MediaSessionManager.class);
         if (sessions != null) {
             try {
@@ -156,6 +159,16 @@ final class MediaResumeCommand {
                                                 + ", playbackState=" + playbackState
                                                 + ", actions=" + actions);
                             }
+                            if (YANDEX_MUSIC_PACKAGE.equals(target)) {
+                                // mSaver always gives Yandex's exported receiver the first chance.
+                                // A freshly restored Yandex session reports STATE_NONE and accepts
+                                // transportControls.play() without actually starting audio. Keep it
+                                // only as the fallback when the exact receiver is unavailable.
+                                deferredYandexPlaySession = controller;
+                                deferredYandexPlaybackState = playbackState;
+                                deferredYandexActions = actions;
+                                break;
+                            }
                             controller.getTransportControls().play();
                             break;
                         case PLAY_PAUSE:
@@ -169,6 +182,7 @@ final class MediaResumeCommand {
                             controller.getTransportControls().skipToNext();
                             break;
                     }
+                    if (deferredYandexPlaySession != null) break;
                     return trace(Result.SESSION_COMMAND,
                             "route=session, activeSessions=" + activeSessionCount
                                     + ", sessions=" + sessionInventory
@@ -202,7 +216,11 @@ final class MediaResumeCommand {
             long keyUpDelayMs = keyUpDelayMillis(target, command);
             String dispatchError = sendKey(context, receiver,
                     keyCodeWithoutSession(command), keyUpDelayMs);
-            String browser = requestYandexBrowserIfUseful(context, target, command);
+            // The reference mSaver route is exclusive: when this receiver exists it never opens
+            // a simultaneous MediaBrowser connection. Real KX11 logs showed those bind/time-out
+            // cycles leaving Yandex in STATE_NONE and delaying the player process for ~30 s.
+            String browser = YANDEX_MUSIC_PACKAGE.equals(target) && command == Command.PLAY
+                    ? "skipped_receiver_available" : "not_used";
             return trace(dispatchError.isEmpty()
                             ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
                     "route=queried_receiver, activeSessions=" + activeSessionCount
@@ -220,7 +238,8 @@ final class MediaResumeCommand {
             long keyUpDelayMs = keyUpDelayMillis(target, command);
             String dispatchError = sendKey(context, known, keyCodeWithoutSession(command),
                     keyUpDelayMs);
-            String browser = requestYandexBrowserIfUseful(context, target, command);
+            String browser = YANDEX_MUSIC_PACKAGE.equals(target) && command == Command.PLAY
+                    ? "skipped_receiver_available" : "not_used";
             return trace(dispatchError.isEmpty()
                             ? Result.RECEIVER_COMMAND : Result.DISPATCH_FAILED,
                     "route=known_receiver, activeSessions=" + activeSessionCount
@@ -233,6 +252,16 @@ final class MediaResumeCommand {
                             + ", browser=" + browser
                             + ", dispatchError=" + emptyAsNone(dispatchError));
         }
+        String deferredSession = "not_used";
+        if (deferredYandexPlaySession != null) {
+            try {
+                deferredYandexPlaySession.getTransportControls().play();
+                deferredSession = "play_dispatched_state_" + deferredYandexPlaybackState
+                        + "_actions_" + deferredYandexActions;
+            } catch (RuntimeException failure) {
+                deferredSession = "play_" + failure.getClass().getSimpleName();
+            }
+        }
         String browser = requestYandexBrowserIfUseful(context, target, command);
         if ("scheduled".equals(browser)) {
             return trace(Result.BROWSER_COMMAND,
@@ -241,6 +270,7 @@ final class MediaResumeCommand {
                             + ", sessionError=" + sessionError
                             + ", receiverCount=" + receiverCount
                             + ", receiverQueryError=" + receiverQueryError
+                            + ", sessionFallback=" + deferredSession
                             + ", browser=" + browser);
         }
         return trace(Result.NO_TARGET,
@@ -250,6 +280,7 @@ final class MediaResumeCommand {
                         + ", receiverCount=" + receiverCount
                         + ", receiverQueryError=" + receiverQueryError
                         + ", knownReceiver=" + (known != null)
+                        + ", sessionFallback=" + deferredSession
                         + ", browser=" + browser);
     }
 
