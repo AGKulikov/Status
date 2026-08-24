@@ -163,6 +163,11 @@ final class GeelyPassengerControlIntegration implements CarIntegration {
         delegate.setStockHudDisplayCategory(category, enabled, listener);
     }
 
+    @Override public void setExternalOverlayListener(
+            @Nullable ExternalOverlayListener listener) {
+        delegate.setExternalOverlayListener(listener);
+    }
+
     @Override public void shutdown() {
         raw.stop();
         delegate.shutdown();

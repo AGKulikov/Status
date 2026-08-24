@@ -17,6 +17,8 @@ import java.util.Objects;
  */
 public final class AndroidCentralRoute {
     public static final long SCAN_TIMEOUT_MS = 15_000L;
+    /** A saved identity recovery scan is only a presence probe, never a long idle state. */
+    public static final long ENROLLED_SCAN_TIMEOUT_MS = 8_000L;
     /** Start exact enrolled-presence recovery sooner than Android's late 30 s GATT 133 callback. */
     public static final long CONNECT_TIMEOUT_MS = 8_000L;
     public static final long DISCOVERY_TIMEOUT_MS = 8_000L;
@@ -822,7 +824,8 @@ public final class AndroidCentralRoute {
                                 + "identity + bonded facade"
                                 : "service UUID + protocol + iPhone-Helper-peripheral role; "
                                 + "no name match"),
-                BleRouteEffect.deadline(scan, enrolledRecovery ? 80_000L : SCAN_TIMEOUT_MS));
+                BleRouteEffect.deadline(scan,
+                        enrolledRecovery ? ENROLLED_SCAN_TIMEOUT_MS : SCAN_TIMEOUT_MS));
     }
 
     private static BleRouteTransition<State> beginAcquisition(State base, boolean startup) {
@@ -835,7 +838,8 @@ public final class AndroidCentralRoute {
             // registered failure enters the exact-identity scan. A completely silent clientIf
             // follows the retained-owner path above instead and never allocates a second wrapper.
             if (base.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
-                    && base.consecutiveFailures >= 2) {
+                    && base.consecutiveFailures >= 2
+                    && base.consecutiveFailures % 2 == 0) {
                 return beginScan(base);
             }
             return beginDirectConnect(base);

@@ -53,6 +53,7 @@ final class EcarxSignalFallback {
                                 @NonNull byte[] raw);
         void onGear(int adaptGear, int actualGear, boolean manualMode);
         void onHighBeam(int enabled);
+        void onExternalOverlaySignal(int propertyId, int raw);
         void onChannelLost();
     }
 
@@ -68,6 +69,7 @@ final class EcarxSignalFallback {
     private volatile boolean gearDemand;
     private volatile boolean highBeamDemand;
     private volatile boolean adasRecorderDemand;
+    private volatile boolean externalOverlayDemand;
     private volatile boolean closed;
 
     /** Worker-thread-owned reflection state. */
@@ -100,12 +102,15 @@ final class EcarxSignalFallback {
         this.listener = listener;
     }
 
-    void updateDemand(boolean needsGear, boolean needsHighBeam, boolean needsAdasRecorder) {
+    void updateDemand(boolean needsGear, boolean needsHighBeam, boolean needsAdasRecorder,
+                      boolean needsExternalOverlay) {
         if (closed || (gearDemand == needsGear && highBeamDemand == needsHighBeam
-                && adasRecorderDemand == needsAdasRecorder)) return;
+                && adasRecorderDemand == needsAdasRecorder
+                && externalOverlayDemand == needsExternalOverlay)) return;
         gearDemand = needsGear;
         highBeamDemand = needsHighBeam;
         adasRecorderDemand = needsAdasRecorder;
+        externalOverlayDemand = needsExternalOverlay;
         execute(() -> {
             listener.onChannelLost();
             unregisterCallback();
@@ -130,6 +135,7 @@ final class EcarxSignalFallback {
         gearDemand = false;
         highBeamDemand = false;
         adasRecorderDemand = false;
+        externalOverlayDemand = false;
         execute(() -> {
             unregisterCallback();
             releaseProxy();
@@ -138,7 +144,8 @@ final class EcarxSignalFallback {
     }
 
     private boolean hasDemand() {
-        return !closed && (gearDemand || highBeamDemand || adasRecorderDemand);
+        return !closed && (gearDemand || highBeamDemand || adasRecorderDemand
+                || externalOverlayDemand);
     }
 
     private void connectAndRegister() {
@@ -154,7 +161,9 @@ final class EcarxSignalFallback {
             scanPropertyIds(manager);
             if (!registerCallback(manager)) {
                 signalManager = null;
-                if (gearDemand || !highBeamIds.isEmpty()) releaseProxy();
+                if (gearDemand || !highBeamIds.isEmpty() || externalOverlayDemand) {
+                    releaseProxy();
+                }
                 scheduleRetry();
                 return;
             }
@@ -553,6 +562,10 @@ final class EcarxSignalFallback {
             requiredIds.addAll(manualModeIds);
         }
         if (highBeamDemand) requiredIds.addAll(highBeamIds);
+        if (externalOverlayDemand) {
+            requiredIds.add(EcarxExternalOverlayPolicy.PROPERTY_DISPLAY_SWITCH_STATUS);
+            requiredIds.add(EcarxExternalOverlayPolicy.PROPERTY_VISION_IMAGE_MODE);
+        }
         LinkedHashSet<Integer> recorderIds = new LinkedHashSet<>();
         if (adasRecorderDemand) {
             for (int propertyId : EcarxAdasSignalCatalog.propertyIds()) {
@@ -798,6 +811,10 @@ final class EcarxSignalFallback {
             ids.addAll(manualModeIds);
         }
         if (highBeamDemand) ids.addAll(highBeamIds);
+        if (externalOverlayDemand) {
+            ids.add(EcarxExternalOverlayPolicy.PROPERTY_DISPLAY_SWITCH_STATUS);
+            ids.add(EcarxExternalOverlayPolicy.PROPERTY_VISION_IMAGE_MODE);
+        }
         if (adasRecorderDemand) {
             // Runtime-discovered ECARX properties are not guaranteed to be integer-valued.
             // Several valid callback sources on KX11 (for example 0x8207 and 0x820c) expose
@@ -999,6 +1016,9 @@ final class EcarxSignalFallback {
     }
 
     private void handleSignal(int propertyId, int raw) {
+        if (externalOverlayDemand && EcarxExternalOverlayPolicy.isProperty(propertyId)) {
+            listener.onExternalOverlaySignal(propertyId, raw);
+        }
         if (adasRecorderDemand && (EcarxAdasSignalCatalog.contains(propertyId)
                 || activeRecorderIds.contains(propertyId))) {
             String runtimeName = propertyNames.get(propertyId);

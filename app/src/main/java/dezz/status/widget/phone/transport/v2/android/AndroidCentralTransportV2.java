@@ -215,6 +215,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         BluetoothGatt gatt;
         long connectGattStartedAtMillis;
         boolean callbackObserved;
+        /** A positive Android clientIf proves that close() can unregister this exact owner. */
+        boolean registrationProven;
         boolean connected;
         boolean closing;
         boolean waitingForProcessGate;
@@ -622,8 +624,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             return;
         }
         exact.closing = true;
-        if (!exact.callbackObserved) exact.quarantinedBeforeRegistration = true;
-        if (exact.callbackObserved) retireRegisteredGattOwner(exact);
+        if (!exact.registrationProven) exact.quarantinedBeforeRegistration = true;
+        if (exact.registrationProven) retireRegisteredGattOwner(exact);
     }
 
     private void startOnMain(IphoneTransportStartRequest request,
@@ -1136,7 +1138,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             cancelWaitingGattOwner(owner);
             return;
         }
-        if (!owner.callbackObserved && !radioResetProven
+        if (!owner.registrationProven && !radioResetProven
                 && adapter != null && adapter.isEnabled()) {
             owner.closing = true;
             owner.quarantinedBeforeRegistration = true;
@@ -1232,7 +1234,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
 
     private void maybeRefreshGattCache(GattOwner exact) {
         if (exact == null || exact.gatt == null || !exact.cacheRefreshRequested
-                || !exact.callbackObserved || Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+                || !exact.registrationProven || Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
             return;
         }
         boolean refreshed = false;
@@ -1455,7 +1457,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                     apply(AndroidCentralRoute.retryElapsed(current, token, radioEnabled()));
                     break;
                 default:
-                    apply(AndroidCentralRoute.deadline(current, token));
+                    if (current.phase != AndroidCentralRoute.Phase.CONNECTING
+                            || !recoverRegisteredSilentGatt(current, token)) {
+                        apply(AndroidCentralRoute.deadline(current, token));
+                    }
                     break;
             }
         };
@@ -1475,6 +1480,55 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void cancelRouteTimer(BleRouteToken token) {
         Runnable timer = routeTimers.remove(token);
         if (timer != null) main.removeCallbacks(timer);
+    }
+
+    /**
+     * Android 9 can finish native GATT client registration yet withhold the public connection
+     * callback until its fixed 30-second status-133 timeout. Once {@code mClientIf > 0} is
+     * observable, retiring this exact wrapper is safe: close() has a concrete native client to
+     * unregister. This turns the existing eight-second watchdog into a bounded cache-refresh and
+     * retry path without ever creating a second unregistered wrapper.
+     */
+    private boolean recoverRegisteredSilentGatt(AndroidCentralRoute.State current,
+                                                 BleRouteToken token) {
+        GattOwner exact = owner;
+        if (exact == null || exact.gatt == null || exact.callbackObserved
+                || !exact.ownerToken.sameOwner(token)
+                || !ProcessGattRegistrationGateV2.owns(exact)) return false;
+        Integer clientIf = registeredClientIf(exact.gatt);
+        if (clientIf == null || clientIf <= 0) {
+            reportPlatformDiagnostic(token,
+                    "silent_registration_probe result="
+                            + (clientIf == null ? "unavailable" : "not_registered"));
+            return false;
+        }
+        exact.registrationProven = true;
+        exact.cacheRefreshRequested = true;
+        reportPlatformDiagnostic(token,
+                "silent_registration_probe result=registered, clientIfPositive=true, "
+                        + "action=guarded_refresh_and_retry");
+        reportError(IphoneTransportErrorV2.Kind.GATT,
+                "Android registered GATT privately but withheld its callback; retrying exact "
+                        + "enrolled identity after guarded cache refresh", true);
+        apply(AndroidCentralRoute.connected(current, token, false));
+        return true;
+    }
+
+    private static Integer registeredClientIf(BluetoothGatt gatt) {
+        Class<?> type = gatt.getClass();
+        while (type != null) {
+            try {
+                java.lang.reflect.Field field = type.getDeclaredField("mClientIf");
+                field.setAccessible(true);
+                Object value = field.get(gatt);
+                return value instanceof Number ? ((Number) value).intValue() : null;
+            } catch (NoSuchFieldException missing) {
+                type = type.getSuperclass();
+            } catch (ReflectiveOperationException | RuntimeException unavailable) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private void postRouteDeadline(BleRouteToken token) {
@@ -2918,6 +2972,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                         + ", newState=" + newState);
         noteCacheSensitiveFailure(exact, status, "connection");
         owner.callbackObserved = true;
+        owner.registrationProven = true;
         owner.connected = newState == BluetoothProfile.STATE_CONNECTED;
         if (!ProcessGattRegistrationGateV2.owns(exact)) {
             // A process-wide radio reset already proved the old registration terminal.

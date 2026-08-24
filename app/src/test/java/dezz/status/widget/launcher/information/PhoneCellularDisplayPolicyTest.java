@@ -43,4 +43,12 @@ public final class PhoneCellularDisplayPolicyTest {
         assertFalse(value.known);
         assertFalse(value.active);
     }
+
+    @Test public void initialDashReservesLateNetworkTypeWidth() {
+        assertEquals("LTE", PhoneCellularDisplayPolicy.measurementFallback(false, true));
+        assertEquals("LTE · оператор",
+                PhoneCellularDisplayPolicy.measurementFallback(true, true));
+        assertEquals("оператор",
+                PhoneCellularDisplayPolicy.measurementFallback(true, false));
+    }
 }

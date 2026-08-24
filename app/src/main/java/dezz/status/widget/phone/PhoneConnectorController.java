@@ -170,6 +170,10 @@ public final class PhoneConnectorController {
     private static final int HFP_AUDIO_DISCONNECTED = 0;
     private static final int HFP_AUDIO_CONNECTING = 1;
     private static final int HFP_AUDIO_CONNECTED = 2;
+    /** Cumulative retries at about 1, 3, 7 and 15 seconds after HFP appears. */
+    private static final long[] HFP_STATE_BACKFILL_GAPS_MS = {
+            1_000L, 2_000L, 4_000L, 8_000L
+    };
 
     private static final String CHANNEL_GROUP_ID = "phone_mirror_group";
     private static final String CHANNEL_ID = "phone_mirror";
@@ -304,6 +308,8 @@ public final class PhoneConnectorController {
     @Nullable private Runnable stockConnectionTask;
     @Nullable private Runnable oemGattRefreshTask;
     @Nullable private Runnable classicAncsRecoveryTask;
+    @Nullable private Runnable hfpStateBackfillTask;
+    private int hfpStateBackfillAttempt;
     private ClassicAncsRecoveryPolicy.State classicAncsRecovery =
             ClassicAncsRecoveryPolicy.State.initial();
     private IphoneTransportRecoveryStateV2 ancsRecoveryRoute =
@@ -892,6 +898,12 @@ public final class PhoneConnectorController {
             if (!hfpConnected) {
                 persistCurrentTelemetry();
                 clearHfpData();
+            } else {
+                BluetoothAdapter adapter = bluetoothAdapter();
+                if (adapter != null && adapter.isEnabled()) {
+                    queryInitialProfileState(token, adapter, PROFILE_HEADSET_CLIENT);
+                }
+                restartHfpStateBackfill(token);
             }
             updateConnected(token);
         } else if (ACTION_MAP_CONNECTION.equals(action)) {
@@ -1019,6 +1031,7 @@ public final class PhoneConnectorController {
         updateConnected(token);
         queryInitialProfileState(token, adapter, BluetoothProfile.A2DP);
         queryInitialProfileState(token, adapter, PROFILE_HEADSET_CLIENT);
+        restartHfpStateBackfill(token);
         queryInitialProfileState(token, adapter, PROFILE_MAP_CLIENT);
         beginStockConnectionRequest(token, selectedAddress);
     }
@@ -1267,6 +1280,51 @@ public final class PhoneConnectorController {
         } catch (Throwable ignored) {
             // Unsupported profile id / permission denial is an explicit fail-closed result.
         }
+    }
+
+    /**
+     * The automotive Headset Client often reports CONNECTED before its AG bundle contains signal
+     * strength. A single startup read then freezes the cellular tile without bars for the whole
+     * drive. Re-open the short-lived profile proxy on a finite schedule until the exact selected
+     * phone supplies either a signal or an explicit no-service state.
+     */
+    private void restartHfpStateBackfill(long token) {
+        cancelHfpStateBackfill();
+        hfpStateBackfillAttempt = 0;
+        scheduleNextHfpStateBackfill(token);
+    }
+
+    private void scheduleNextHfpStateBackfill(long token) {
+        Handler handler = worker;
+        if (handler == null || hfpStateBackfillTask != null
+                || hfpNetworkBackfillComplete()
+                || hfpStateBackfillAttempt >= HFP_STATE_BACKFILL_GAPS_MS.length) return;
+        int attempt = hfpStateBackfillAttempt++;
+        Runnable backfill = () -> runIfCurrent(token, () -> {
+            hfpStateBackfillTask = null;
+            if (hfpNetworkBackfillComplete() || selectedDevice == null) return;
+            BluetoothAdapter adapter = bluetoothAdapter();
+            if (adapter != null && adapter.isEnabled()) {
+                PhoneConnectionJournal.append("hfp-network-backfill",
+                        "attempt=" + (attempt + 1) + ", selected=true");
+                queryInitialProfileState(token, adapter, PROFILE_HEADSET_CLIENT);
+            }
+            scheduleNextHfpStateBackfill(token);
+        });
+        hfpStateBackfillTask = backfill;
+        handler.postDelayed(backfill, HFP_STATE_BACKFILL_GAPS_MS[attempt]);
+    }
+
+    private boolean hfpNetworkBackfillComplete() {
+        return networkLiveSeenThisConnection
+                && (networkSignal != null || Boolean.FALSE.equals(networkAvailable));
+    }
+
+    private void cancelHfpStateBackfill() {
+        Runnable task = hfpStateBackfillTask;
+        if (task != null && worker != null) worker.removeCallbacks(task);
+        hfpStateBackfillTask = null;
+        hfpStateBackfillAttempt = 0;
     }
 
     @NonNull
@@ -2140,6 +2198,7 @@ public final class PhoneConnectorController {
         if (batteryUpdated || networkUpdated) {
             markTelemetryUpdated(batteryUpdated, networkUpdated);
         }
+        if (hfpNetworkBackfillComplete()) cancelHfpStateBackfill();
         publishSnapshot(token);
     }
 
@@ -2373,6 +2432,7 @@ public final class PhoneConnectorController {
     }
 
     private void clearHfpData() {
+        cancelHfpStateBackfill();
         hfpBatteryKnown = false;
         hfpBatteryPercentScale = false;
         hfpBatteryLevel = null;
@@ -2837,6 +2897,7 @@ public final class PhoneConnectorController {
         cancelStockConnectionRequest();
         cancelOemGattRefresh();
         cancelClassicAncsRecoveryWakeup();
+        cancelHfpStateBackfill();
     }
 
     private void cancelDeviceRescan() {

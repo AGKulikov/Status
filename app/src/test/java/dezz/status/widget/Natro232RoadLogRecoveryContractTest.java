@@ -68,9 +68,9 @@ public final class Natro232RoadLogRecoveryContractTest {
         String browser = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "YandexMusicBrowserStarter.java");
 
-        assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 72"));
+        assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
         assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 30_000L"));
-        assertTrue(controller.contains("YANDEX_RECEIVER_RETRY_INTERVAL = 6"));
+        assertTrue(controller.contains("repeatYandexReceiver = attempt > 0"));
         assertTrue(command.contains("\"running\".equals(processState)"));
         assertTrue(command.contains("!\"not_running\".equals(processState)"));
         assertFalse(command.contains("MediaAppLauncher"));

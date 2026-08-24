@@ -59,6 +59,16 @@ public final class PhoneCellularDisplayPolicy {
         return result.toString();
     }
 
+    /** Stable first-layout width before delayed Helper/HFP telemetry replaces the em dash. */
+    @NonNull
+    public static String measurementFallback(boolean showOperator,
+                                             boolean showNetworkType) {
+        if (showNetworkType && showOperator) return "LTE · оператор";
+        if (showNetworkType) return "LTE";
+        if (showOperator) return "оператор";
+        return "";
+    }
+
     public static final class Presentation {
         @NonNull public final String text;
         public final boolean known;

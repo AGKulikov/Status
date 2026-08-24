@@ -68,13 +68,13 @@ public final class MediaAutoResumeController {
     /** mSaver's field-proven bounded policy: one initial PLAY plus four 10-second retries. */
     private static final int MAX_ATTEMPTS = 5;
     private static final long RETRY_DELAY_MS = 10_000L;
-    /** Yandex may expose its first exact session tens of seconds after MediaBrowser bootstrap. */
-    private static final int YANDEX_MAX_ATTEMPTS = 72;
+    /** One initial exact PLAY plus bounded recovery while the Yandex process is cold-starting. */
+    private static final int YANDEX_MAX_ATTEMPTS = 24;
     private static final long YANDEX_SESSION_POLL_MS = 5_000L;
     private static final long YANDEX_BROWSER_RETRY_COOLDOWN_MS = 30_000L;
-    private static final int YANDEX_RECEIVER_RETRY_INTERVAL = 6;
-    /** Verify the exact receiver result quickly, then escalate without shifting attempt one. */
-    private static final long YANDEX_RECEIVER_VERIFY_MS = 2_000L;
+    private static final int YANDEX_FAST_RECEIVER_ATTEMPTS = 8;
+    /** A package-scoped PLAY is idempotent, so verify/retry it without a 30-second gap. */
+    private static final long YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L;
     private static final String YANDEX_MUSIC_PACKAGE = "ru.yandex.music";
     /**
      * AlarmManager remains the durable process-death fallback. This timer is the hot path: it is
@@ -340,8 +340,10 @@ public final class MediaAutoResumeController {
                 < YANDEX_BROWSER_RETRY_COOLDOWN_MS;
         boolean yandexSessionPlayAttempted = state.getBoolean(
                 KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false);
-        boolean repeatYandexReceiver = attempt > 0
-                && attempt % YANDEX_RECEIVER_RETRY_INTERVAL == 0;
+        // The exported target-package receiver is the only road-log-proven cold-start route.
+        // KEYCODE_MEDIA_PLAY cannot pause an already-started player, so every unsuccessful retry
+        // may safely repeat it. A real PLAYING observation completes the plan immediately.
+        boolean repeatYandexReceiver = attempt > 0;
         MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(
                 app, target, coldStartEscalation,
                 yandexBrowserCooldownActive, yandexSessionPlayAttempted,
@@ -650,7 +652,9 @@ public final class MediaAutoResumeController {
     private static long retryDelayMillis(@NonNull String target, int attempt,
                                          @NonNull MediaResumeCommand.Result result) {
         if (!YANDEX_MUSIC_PACKAGE.equals(target)) return RETRY_DELAY_MS;
-        if (attempt == 0) return YANDEX_RECEIVER_VERIFY_MS;
+        if (attempt < YANDEX_FAST_RECEIVER_ATTEMPTS) {
+            return YANDEX_FAST_RECEIVER_RETRY_MS;
+        }
         return YANDEX_SESSION_POLL_MS;
     }
 

@@ -449,6 +449,12 @@ public final class InformationPanelView extends FrameLayout {
         value.setSingleLine(phoneCellular);
         value.setMaxLines(phoneCellular ? 1 : Integer.MAX_VALUE);
         value.setEllipsize(null);
+        if (phoneCellular && item.showValue) {
+            String reserve = PhoneCellularDisplayPolicy.measurementFallback(
+                    item.phoneCellularShowOperator, item.phoneCellularShowNetworkType);
+            value.setMinWidth((int) Math.ceil(value.getPaint().measureText(reserve))
+                    + Math.max(1, scaledDp(2, item.scalePercent)));
+        }
         value.setVisibility(item.showValue ? View.VISIBLE : View.GONE);
         texts.addView(label, new LinearLayout.LayoutParams(match(), wrap()));
         texts.addView(value, new LinearLayout.LayoutParams(match(), wrap()));

@@ -325,6 +325,12 @@ final class GeelyCarIntegration implements CarIntegration {
     private volatile boolean lowLevelHighBeamKnown;
     private volatile long lowLevelGearObservedMonoMillis;
     private volatile long lowLevelHighBeamObservedMonoMillis;
+    /** Main-thread-owned projection of the two exact external-display response properties. */
+    @Nullable private ExternalOverlayListener externalOverlayListener;
+    @Nullable private Integer externalOverlaySwitchRaw;
+    @Nullable private Integer externalOverlayVisionRaw;
+    private boolean externalOverlayStatePublished;
+    private boolean externalOverlayActive;
 
     /** Accessed only by controlWorker, except vendor callbacks which only enqueue work/delivery. */
     @Nullable private ICarFunction controlWatcherSource;
@@ -1116,6 +1122,10 @@ final class GeelyCarIntegration implements CarIntegration {
                         deliverLowLevelHighBeam(enabled);
                     }
 
+                    @Override public void onExternalOverlaySignal(int propertyId, int raw) {
+                        mainHandler.post(() -> acceptExternalOverlaySignal(propertyId, raw));
+                    }
+
                     @Override public void onAdasCaptureReady(int propertyCount,
                                                              @NonNull String propertyIds) {
                         if (adasRecorderDemand && ActionRecorder.isRecording()) {
@@ -1144,6 +1154,7 @@ final class GeelyCarIntegration implements CarIntegration {
                         lowLevelHighBeamKnown = false;
                         lowLevelGearObservedMonoMillis = 0L;
                         lowLevelHighBeamObservedMonoMillis = 0L;
+                        mainHandler.post(GeelyCarIntegration.this::clearExternalOverlaySignals);
                     }
                 });
         ActionRecorder.addRecordingListener(adasRecordingListener);
@@ -1794,6 +1805,49 @@ final class GeelyCarIntegration implements CarIntegration {
         if (listener == null) mainHandler.post(this::pruneRecoveryRequests);
     }
 
+    @Override
+    public void setExternalOverlayListener(@Nullable ExternalOverlayListener listener) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(() -> setExternalOverlayListener(listener));
+            return;
+        }
+        if (externalOverlayListener == listener) return;
+        externalOverlayListener = listener;
+        externalOverlaySwitchRaw = null;
+        externalOverlayVisionRaw = null;
+        externalOverlayStatePublished = false;
+        externalOverlayActive = false;
+        reconcileSignalFallback();
+    }
+
+    private void acceptExternalOverlaySignal(int propertyId, int raw) {
+        ExternalOverlayListener listener = externalOverlayListener;
+        if (listener == null) return;
+        if (propertyId == EcarxExternalOverlayPolicy.PROPERTY_DISPLAY_SWITCH_STATUS) {
+            externalOverlaySwitchRaw = raw;
+        } else if (propertyId == EcarxExternalOverlayPolicy.PROPERTY_VISION_IMAGE_MODE) {
+            externalOverlayVisionRaw = raw;
+        } else {
+            return;
+        }
+        boolean active = EcarxExternalOverlayPolicy.isActive(
+                externalOverlaySwitchRaw, externalOverlayVisionRaw);
+        if (externalOverlayStatePublished && externalOverlayActive == active) return;
+        externalOverlayStatePublished = true;
+        externalOverlayActive = active;
+        listener.onExternalOverlayChanged(active);
+    }
+
+    private void clearExternalOverlaySignals() {
+        boolean notifyInactive = externalOverlayStatePublished && externalOverlayActive;
+        externalOverlaySwitchRaw = null;
+        externalOverlayVisionRaw = null;
+        externalOverlayStatePublished = false;
+        externalOverlayActive = false;
+        ExternalOverlayListener listener = externalOverlayListener;
+        if (notifyInactive && listener != null) listener.onExternalOverlayChanged(false);
+    }
+
     private void requestSensorRecovery(int sensorType) {
         mainHandler.post(() -> {
             if (!isSensorRecoveryDemanded(sensorType)) return;
@@ -2385,7 +2439,8 @@ final class GeelyCarIntegration implements CarIntegration {
             lowLevelHighBeamKnown = false;
             lowLevelHighBeamObservedMonoMillis = 0L;
         }
-        signalFallback.updateDemand(needsGear, needsHighBeam, adasRecorderDemand);
+        signalFallback.updateDemand(needsGear, needsHighBeam, adasRecorderDemand,
+                externalOverlayListener != null);
     }
 
     private void deliverLowLevelGear(int adaptGear, int actualGear, boolean manualMode) {
@@ -4597,5 +4652,10 @@ final class GeelyCarIntegration implements CarIntegration {
         telemetryWorker.shutdown();
         controlWorker.shutdown();
         availabilityChangedListener = null;
+        externalOverlayListener = null;
+        externalOverlaySwitchRaw = null;
+        externalOverlayVisionRaw = null;
+        externalOverlayStatePublished = false;
+        externalOverlayActive = false;
     }
 }

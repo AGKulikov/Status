@@ -81,8 +81,9 @@ final class MediaResumeCommand {
 
     /**
      * Durable Yandex boot-recovery state is owned by {@link MediaAutoResumeController}. Passing it
-     * here keeps each dispatch exclusive: a cooled-down browser bootstrap, an exact-session PLAY,
-     * or a periodic exact receiver PLAY. No path opens an Activity or emits a global media key.
+     * here keeps each dispatch exclusive: an exact-session PLAY or an exact receiver PLAY, with
+     * MediaBrowser retained only as a receiver-unavailable fallback. No path opens an Activity or
+     * emits a global media key.
      */
     @NonNull
     static DispatchTrace playWithTrace(@NonNull Context context,
@@ -251,8 +252,9 @@ final class MediaResumeCommand {
 
         // The first boot attempt always gives the exact exported receiver its configured-time
         // chance. A later attempt reaches here only after the controller observed no playback.
-        // Bind Yandex's background MediaBrowser once to bootstrap its process/session, then poll
-        // only for the exact session. Rebinding on every retry delayed recovery in the road logs.
+        // The road logs prove that waiting for MediaBrowser/session creation adds minutes while
+        // the package-scoped PLAY receiver starts playback. Only use MediaBrowser when the caller
+        // is not explicitly repeating that safe receiver route.
         if (coldStartEscalation && YANDEX_MUSIC_PACKAGE.equals(target)
                 && command == Command.PLAY && !repeatYandexReceiver) {
             String browser = yandexBrowserBootstrapRequested

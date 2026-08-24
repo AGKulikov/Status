@@ -73,7 +73,9 @@ public final class DriverInformationTileLayoutPolicy {
         if (showsValue(shortcut)) {
             if (isPhoneCellular(shortcut)) {
                 String actual = selectedCellularText(shortcut, liveSnapshot(shortcut));
-                String fallback = cellularMeasurementFallback(shortcut);
+                String fallback = PhoneCellularDisplayPolicy.measurementFallback(
+                        shortcut.informationPhoneCellularShowOperator,
+                        shortcut.informationPhoneCellularShowNetworkType);
                 textWidth = Math.max(textWidth, measuredTextWidth(context, shortcut,
                         actual, shortcut.informationValueTextSizeSp, safeScale));
                 textWidth = Math.max(textWidth, measuredTextWidth(context, shortcut,
@@ -121,18 +123,6 @@ public final class DriverInformationTileLayoutPolicy {
                         shortcut.informationPhoneCellularShowOperator,
                         shortcut.informationPhoneCellularShowNetworkType);
         return selected.text;
-    }
-
-    @NonNull
-    private static String cellularMeasurementFallback(
-            @NonNull LauncherShortcutStore.Shortcut shortcut) {
-        if (shortcut.informationPhoneCellularShowNetworkType
-                && shortcut.informationPhoneCellularShowOperator) {
-            return "LTE · оператор";
-        }
-        if (shortcut.informationPhoneCellularShowNetworkType) return "LTE";
-        if (shortcut.informationPhoneCellularShowOperator) return "оператор";
-        return "";
     }
 
     private static int measuredTextWidth(@NonNull Context context,

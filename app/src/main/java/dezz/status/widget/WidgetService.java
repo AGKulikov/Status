@@ -471,6 +471,11 @@ public class WidgetService extends Service {
     private boolean phoneLowBatteryAlertLatched2;
     /** Event-derived Android 9 window above the UsageStats foreground task (e.g. 360° camera). */
     private boolean phoneExternalOverlayActive;
+    private boolean phoneAccessibilityOverlayActive;
+    private boolean phoneVehicleOverlayActive;
+    private boolean phoneVehicleOverlayListenerInstalled;
+    private final CarIntegration.ExternalOverlayListener phoneVehicleOverlayListener =
+            this::onVehicleExternalOverlayChanged;
     private final Set<String> observedPhoneNotificationKeys = new LinkedHashSet<>();
     private final ArrayDeque<QueuedPhoneNotification> queuedPhoneNotifications =
             new ArrayDeque<>();
@@ -1399,6 +1404,7 @@ public class WidgetService extends Service {
             graph.car.setAvailabilityChangedListener(() -> mainHandler.post(() -> {
                 if (!destroyed && binding != null) refreshCarStatusSurface();
             }));
+            reconcileCarExternalOverlayListener(graph.car);
             carTelemetryExporter = graph.exporter;
         } catch (RuntimeException failure) {
             try { graph.exporter.stop(); } catch (RuntimeException ignored) { }
@@ -6811,8 +6817,18 @@ public class WidgetService extends Service {
 
     private void updateForegroundAppTracking() {
         boolean phoneTrackingNeeded = phoneNotificationForegroundTrackingNeeded();
-        setPhoneExternalOverlayActive(phoneTrackingNeeded
-                && WidgetAccessibilityService.hasMaterialExternalOverlay());
+        boolean externalOverlayTrackingNeeded = prefs != null
+                && prefs.phoneNotificationDelayInAppsEnabled.get()
+                && prefs.phoneNotificationDelayForExternalOverlays.get();
+        phoneAccessibilityOverlayActive = externalOverlayTrackingNeeded
+                && WidgetAccessibilityService.hasMaterialExternalOverlay();
+        if (!externalOverlayTrackingNeeded) phoneVehicleOverlayActive = false;
+        recomputePhoneExternalOverlayActive();
+        try {
+            reconcileCarExternalOverlayListener(CarIntegrations.get(this));
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Could not update vehicle overlay tracking", failure);
+        }
         boolean surfaceVisibilityNeeded = StatusBarSurfaceContext.requiresPackageTracking(
                 hiddenInPackages) || anyBrickNeedsPackageTracking();
         if (binding == null && !phoneTrackingNeeded && !surfaceVisibilityNeeded) {
@@ -6873,8 +6889,34 @@ public class WidgetService extends Service {
     public void onExternalOverlayWindowStateChanged(boolean active) {
         mainHandler.post(() -> {
             if (destroyed) return;
-            setPhoneExternalOverlayActive(active);
+            phoneAccessibilityOverlayActive = active;
+            recomputePhoneExternalOverlayActive();
         });
+    }
+
+    private void onVehicleExternalOverlayChanged(boolean active) {
+        mainHandler.post(() -> {
+            if (destroyed) return;
+            phoneVehicleOverlayActive = active;
+            recomputePhoneExternalOverlayActive();
+        });
+    }
+
+    private void reconcileCarExternalOverlayListener(@NonNull CarIntegration car) {
+        boolean needed = prefs != null
+                && prefs.phoneNotificationDelayInAppsEnabled.get()
+                && prefs.phoneNotificationDelayForExternalOverlays.get();
+        car.setExternalOverlayListener(needed ? phoneVehicleOverlayListener : null);
+        phoneVehicleOverlayListenerInstalled = needed;
+        if (!needed) {
+            phoneVehicleOverlayActive = false;
+            recomputePhoneExternalOverlayActive();
+        }
+    }
+
+    private void recomputePhoneExternalOverlayActive() {
+        setPhoneExternalOverlayActive(
+                phoneAccessibilityOverlayActive || phoneVehicleOverlayActive);
     }
 
     private void setPhoneExternalOverlayActive(boolean active) {
@@ -7672,6 +7714,8 @@ public class WidgetService extends Service {
         phoneLowBatteryAlertLatched = false;
         phoneLowBatteryAlertLatched2 = false;
         phoneExternalOverlayActive = false;
+        phoneAccessibilityOverlayActive = false;
+        phoneVehicleOverlayActive = false;
         phoneNotificationOverlayPaused = false;
         pausedPhoneNotificationRemainingMs = 0L;
         pausedPhonePopupRemainingMs = 0L;
@@ -7710,6 +7754,8 @@ public class WidgetService extends Service {
         }
         phoneAncsPresenceExporter = null;
         boolean carRuntimeWasInitialized = carTelemetryExporter != null;
+        boolean carIntegrationNeedsCleanup = carRuntimeWasInitialized
+                || phoneVehicleOverlayListenerInstalled;
         if (carRuntimeWasInitialized) {
             runCleanupStep("car telemetry", carTelemetryExporter::stop);
         }
@@ -7743,14 +7789,16 @@ public class WidgetService extends Service {
         runCleanupStep("media tracking", this::disableMediaTracking);
         // Drop car sensor subscriptions but keep the process-wide integration alive — the
         // settings UI may still query isBrickSupported after the overlay service stops.
-        if (carRuntimeWasInitialized) {
+        if (carIntegrationNeedsCleanup) {
             runCleanupStep("car sensor subscriptions", () -> {
                 CarIntegration car = CarIntegrations.get(this);
                 car.setAvailabilityChangedListener(null);
+                car.setExternalOverlayListener(null);
                 car.unsubscribe(BrickType.INDOOR_TEMP);
                 car.unsubscribe(BrickType.OUTDOOR_TEMP);
             });
         }
+        phoneVehicleOverlayListenerInstalled = false;
         super.onDestroy();
     }
 

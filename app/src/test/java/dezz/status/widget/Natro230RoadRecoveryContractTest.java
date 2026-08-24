@@ -22,7 +22,7 @@ public final class Natro230RoadRecoveryContractTest {
 
         assertTrue(build.contains("if (version == '2.3.0')"));
         assertTrue(build.contains("return 208021254"));
-        assertTrue(controller.contains("YANDEX_RECEIVER_VERIFY_MS = 2_000L"));
+        assertTrue(controller.contains("YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L"));
         assertTrue(controller.contains("coldStartEscalation = attempt > 0"));
         assertTrue(controller.contains("receiver_result_verification"));
         assertTrue(command.contains("verified_media_browser_bootstrap"));

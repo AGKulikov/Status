@@ -107,6 +107,11 @@ public interface CarIntegration {
         void onResult(boolean success, @Nullable String message);
     }
 
+    /** Reports whether a stock vehicle window currently covers Natro's visible surface. */
+    interface ExternalOverlayListener {
+        void onExternalOverlayChanged(boolean active);
+    }
+
     /** Independently switchable OEM HUD content groups exposed by the ECARX Settings API. */
     enum StockHudDisplayCategory {
         DRIVE_ENVIRONMENT,
@@ -219,6 +224,11 @@ public interface CarIntegration {
             @NonNull StockHudDisplayCategory category, boolean enabled,
             @NonNull ControlCommandListener listener) {
         listener.onResult(false, "Категории штатного HUD недоступны в этой сборке");
+    }
+
+    /** Replace the external-overlay listener; pass {@code null} to stop vendor signal demand. */
+    default void setExternalOverlayListener(
+            @Nullable ExternalOverlayListener listener) {
     }
 
     /** Release all subscriptions and vendor resources. The instance is not reusable afterwards. */

@@ -33,10 +33,10 @@ public final class Natro231YandexColdStartContractTest {
         assertFalse(command.contains("controller.dispatchMediaButtonEvent"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
 
-        assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 72"));
+        assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
         assertTrue(controller.contains("YANDEX_SESSION_POLL_MS = 5_000L"));
         assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 30_000L"));
-        assertTrue(controller.contains("YANDEX_RECEIVER_RETRY_INTERVAL = 6"));
+        assertTrue(controller.contains("repeatYandexReceiver = attempt > 0"));
         assertTrue(controller.contains("KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED"));
         assertTrue(controller.contains("KEY_YANDEX_SESSION_PLAY_ATTEMPTED"));
         assertTrue(command.contains("Result.WAITING_FOR_SESSION"));
