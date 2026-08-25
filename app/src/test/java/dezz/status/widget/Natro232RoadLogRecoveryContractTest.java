@@ -69,7 +69,7 @@ public final class Natro232RoadLogRecoveryContractTest {
                 + "YandexMusicBrowserStarter.java");
 
         assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
-        assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L"));
+        assertTrue(controller.contains("YANDEX_RECEIVER_GRACE_MS = 10_000L"));
         assertTrue(controller.contains(
                 "requestYandexBrowserBootstrap = yandexBootRecovery"));
         assertTrue(command.contains("route=exact_session_play"));

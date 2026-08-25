@@ -44,7 +44,7 @@ public final class Natro233FastStartupOverlayContractTest {
         assertFalse(transport.contains("removeBond("));
     }
 
-    @Test public void yandexRacesOneExactReceiverWithTheBrowserOnFastCadence()
+    @Test public void yandexUsesOneForegroundReceiverBeforeBrowserFallback()
             throws Exception {
         String controller = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaAutoResumeController.java");
@@ -56,8 +56,9 @@ public final class Natro233FastStartupOverlayContractTest {
         assertTrue(controller.contains("YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L"));
         assertTrue(controller.contains(
                 "requestYandexBrowserBootstrap = yandexBootRecovery"));
-        assertTrue(command.contains("RECEIVER_AND_BROWSER_BOOTSTRAP"));
-        assertTrue(command.contains("route=exact_receiver_browser_race"));
+        assertFalse(command.contains("RECEIVER_AND_BROWSER_BOOTSTRAP"));
+        assertTrue(command.contains("route=exact_foreground_receiver"));
+        assertTrue(command.contains("Intent.FLAG_RECEIVER_FOREGROUND"));
         assertTrue(command.contains("route=waiting_for_exact_session"));
         assertTrue(command.contains("KEYCODE_MEDIA_PLAY"));
         assertTrue(command.contains("new Intent(Intent.ACTION_MEDIA_BUTTON)"));

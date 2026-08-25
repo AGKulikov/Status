@@ -92,14 +92,14 @@ public final class Natro235RoadLogRecoveryContractTest {
         String browser = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "YandexMusicBrowserStarter.java");
 
-        assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L"));
+        assertTrue(controller.contains("YANDEX_RECEIVER_GRACE_MS = 10_000L"));
         assertTrue(controller.contains("boolean yandexBootRecovery ="));
         assertTrue(command.contains("!isUsablePlaySession(state)"));
         assertTrue(command.contains("state.getState() == PlaybackState.STATE_NONE"));
-        assertTrue(command.contains("yandexBrowserBootstrapRequested"));
+        assertTrue(command.contains("yandexColdStartRouteRequested"));
         assertTrue(command.contains("ignoredSessionState="));
         assertTrue(command.contains("route=waiting_for_exact_session"));
-        assertTrue(command.contains("route=exact_receiver_browser_race"));
+        assertTrue(command.contains("route=exact_foreground_receiver"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
         assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 20_000L"));
         assertFalse(browser.contains("startService("));

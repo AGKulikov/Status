@@ -23,6 +23,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -66,6 +67,7 @@ public final class PhoneConnectionJournal {
 
     private static Context appContext;
     private static boolean loaded;
+    private static boolean historyClearedInProcess;
     private static long revision;
 
     private PhoneConnectionJournal() {}
@@ -73,12 +75,14 @@ public final class PhoneConnectionJournal {
     public static void initialize(@NonNull Context context) {
         boolean opened = false;
         synchronized (LOCK) {
-            appContext = context.getApplicationContext();
+            Context app = context.getApplicationContext();
+            appContext = app == null ? context : app;
             if (loaded) return;
             loaded = true;
-            loadLocked();
             opened = true;
         }
+        // Persistent history is loaded only when the user opens or exports diagnostics. Reading
+        // 1,600 lines from cold flash here delayed both the boot receiver and ANCS by seconds.
         if (opened) append("session", "новый процесс Natro; Android=" + Build.VERSION.SDK_INT
                 + "; журнал сохраняет каждую смену reducer/effect");
     }
@@ -97,18 +101,27 @@ public final class PhoneConnectionJournal {
 
     @NonNull
     public static String tailText(int maximumLines) {
+        int keep = Math.max(1, maximumLines);
+        File file;
+        boolean ignoreDisk;
+        List<String> live;
         synchronized (LOCK) {
-            int keep = Math.max(1, maximumLines);
-            int skip = Math.max(0, LINES.size() - keep);
-            StringBuilder result = new StringBuilder();
-            int index = 0;
-            for (String line : LINES) {
-                if (index++ < skip) continue;
-                if (result.length() > 0) result.append('\n');
-                result.append(line);
-            }
-            return result.toString();
+            file = fileLocked();
+            ignoreDisk = historyClearedInProcess;
+            live = new ArrayList<>(LINES);
         }
+        LinkedHashSet<String> merged = new LinkedHashSet<>();
+        if (!ignoreDisk && file != null) merged.addAll(readLines(file));
+        merged.addAll(live);
+        int skip = Math.max(0, merged.size() - keep);
+        StringBuilder result = new StringBuilder();
+        int index = 0;
+        for (String line : merged) {
+            if (index++ < skip) continue;
+            if (result.length() > 0) result.append('\n');
+            result.append(line);
+        }
+        return result.toString();
     }
 
     public static void clear() {
@@ -119,6 +132,7 @@ public final class PhoneConnectionJournal {
         synchronized (LOCK) {
             LINES.clear();
             addLocked(line);
+            historyClearedInProcess = true;
             revision++;
         }
         WRITE_QUEUE.resetAndAppend(line);
@@ -130,20 +144,19 @@ public final class PhoneConnectionJournal {
         }
     }
 
-    private static void loadLocked() {
-        File file = fileLocked();
-        if (file == null || !file.isFile()) return;
+    @NonNull
+    private static List<String> readLines(@NonNull File file) {
         List<String> read = new ArrayList<>();
+        if (!file.isFile()) return read;
         try (BufferedReader input = new BufferedReader(new InputStreamReader(
                 new FileInputStream(file), StandardCharsets.UTF_8))) {
             String line;
             while ((line = input.readLine()) != null) read.add(sanitize(line));
         } catch (IOException ignored) {
-            return;
+            return read;
         }
         int start = Math.max(0, read.size() - MAX_LINES);
-        for (int index = start; index < read.size(); index++) addLocked(read.get(index));
-        if (start < read.size()) revision++;
+        return start == 0 ? read : new ArrayList<>(read.subList(start, read.size()));
     }
 
     private static void addLocked(@NonNull String line) {

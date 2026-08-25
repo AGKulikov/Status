@@ -95,7 +95,7 @@ final class YandexMusicBrowserStarter {
             if (completed) return;
             if (requestPlay) playRequested = true;
             journal(requestPlay ? "play_joined" : "warmup_coalesced", "none");
-            if (connected && playRequested) dispatchExactSessionAndFinish("connected_play");
+            if (connected && playRequested) dispatchBrowserTokenAndFinish("connected_play");
         }
 
         void start() {
@@ -114,7 +114,7 @@ final class YandexMusicBrowserStarter {
             if (completed || browser == null) return;
             connected = true;
             if (playRequested) {
-                dispatchExactSessionAndFinish("connected_play");
+                dispatchBrowserTokenAndFinish("connected_play");
             } else {
                 journal("warmup_connected", "none");
             }
@@ -146,6 +146,20 @@ final class YandexMusicBrowserStarter {
             if (completed) return;
             MediaResumeCommand.DispatchTrace trace =
                     MediaResumeCommand.playExactSessionOnly(context, SERVICE.getPackageName());
+            MediaAutoResumeController.onYandexBrowserSessionDispatch(context, trace.result);
+            finish(event, trace.result + ":" + trace.detail);
+        }
+
+        private void dispatchBrowserTokenAndFinish(@NonNull String event) {
+            if (completed || browser == null) return;
+            MediaResumeCommand.DispatchTrace trace;
+            try {
+                trace = MediaResumeCommand.playBrowserSession(
+                        context, browser.getSessionToken(), SERVICE.getPackageName());
+            } catch (RuntimeException failure) {
+                trace = MediaResumeCommand.playExactSessionOnly(
+                        context, SERVICE.getPackageName());
+            }
             MediaAutoResumeController.onYandexBrowserSessionDispatch(context, trace.result);
             finish(event, trace.result + ":" + trace.detail);
         }

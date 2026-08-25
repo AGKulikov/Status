@@ -13,7 +13,7 @@ import org.junit.Test;
 
 /** Regression boundary for the 2026-08-24 08:17 road session and the Helper 68 journal storm. */
 public final class Natro2219RoadLogRecoveryContractTest {
-    @Test public void yandexColdStartRacesExactReceiverAndBrowserOnce()
+    @Test public void yandexColdStartUsesExactReceiverBeforeBrowserFallback()
             throws Exception {
         String build = read("build.gradle");
         String command = read("app/src/main/java/dezz/status/widget/launcher/"
@@ -24,7 +24,9 @@ public final class Natro2219RoadLogRecoveryContractTest {
         assertTrue(build.contains("if (version == '2.2.19')"));
         assertTrue(build.contains("return 208021253"));
         assertTrue(command.contains("route=exact_session_play"));
-        assertTrue(command.contains("route=exact_receiver_browser_race"));
+        assertTrue(command.contains("route=exact_foreground_receiver"));
+        assertFalse(command.contains("exact_receiver_browser_race"));
+        assertTrue(command.contains("Intent.FLAG_RECEIVER_FOREGROUND"));
         assertTrue(command.contains("route=waiting_for_exact_session"));
         assertFalse(command.contains("deferredYandexPlaySession"));
         assertTrue(command.contains("sendKey(context, known"));

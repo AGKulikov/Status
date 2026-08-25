@@ -59,8 +59,10 @@ public final class MediaAutoResumeController {
     private static final String KEY_LAST_COMMAND_ELAPSED = "lastCommandElapsed";
     private static final String KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED =
             "yandexBrowserBootstrapRequested";
-    private static final String KEY_YANDEX_LAST_BROWSER_BOOTSTRAP_ELAPSED =
-            "yandexLastBrowserBootstrapElapsed";
+    private static final String KEY_YANDEX_RECEIVER_COMMAND_SENT =
+            "yandexReceiverCommandSent";
+    private static final String KEY_YANDEX_RECEIVER_COMMAND_ELAPSED =
+            "yandexReceiverCommandElapsed";
     private static final String KEY_YANDEX_SESSION_PLAY_ATTEMPTED =
             "yandexSessionPlayAttempted";
     private static final String KEY_COMPLETED = "completed";
@@ -71,7 +73,8 @@ public final class MediaAutoResumeController {
     /** One initial exact PLAY plus bounded recovery while the Yandex process is cold-starting. */
     private static final int YANDEX_MAX_ATTEMPTS = 24;
     private static final long YANDEX_SESSION_POLL_MS = 5_000L;
-    private static final long YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L;
+    /** Let the exact foreground receiver create Yandex's process/session before browser fallback. */
+    private static final long YANDEX_RECEIVER_GRACE_MS = 10_000L;
     private static final int YANDEX_FAST_SESSION_POLL_ATTEMPTS = 8;
     /** A package-scoped PLAY is idempotent, so verify/retry it without a 30-second gap. */
     private static final long YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L;
@@ -152,7 +155,8 @@ public final class MediaAutoResumeController {
                 .putLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putLong(KEY_LAST_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false)
-                .putLong(KEY_YANDEX_LAST_BROWSER_BOOTSTRAP_ELAPSED, Long.MIN_VALUE)
+                .putBoolean(KEY_YANDEX_RECEIVER_COMMAND_SENT, false)
+                .putLong(KEY_YANDEX_RECEIVER_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putBoolean(KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false)
                 .putBoolean(KEY_COMPLETED, false)
                 .apply();
@@ -267,7 +271,8 @@ public final class MediaAutoResumeController {
                 .putLong(KEY_BOOT_TOKEN, captureToken)
                 .putString(KEY_TARGET_PACKAGE, target)
                 .putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false)
-                .putLong(KEY_YANDEX_LAST_BROWSER_BOOTSTRAP_ELAPSED, Long.MIN_VALUE)
+                .putBoolean(KEY_YANDEX_RECEIVER_COMMAND_SENT, false)
+                .putLong(KEY_YANDEX_RECEIVER_COMMAND_ELAPSED, Long.MIN_VALUE)
                 .putBoolean(KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false)
                 .putBoolean(KEY_COMPLETED, false)
                 .apply();
@@ -277,14 +282,6 @@ public final class MediaAutoResumeController {
         long targetElapsed = planAnchorElapsed + Math.max(delaySeconds * 1_000L,
                 StartupWorkCoordinator.mediaAutoResumeMinimumDelayMillis());
         long delayMillis = Math.max(0L, targetElapsed - SystemClock.elapsedRealtime());
-        if (YANDEX_MUSIC_PACKAGE.equals(target)) {
-            // MediaBrowser.bind is the supported background-only process bootstrap. Start it before
-            // the PLAY deadline so Yandex can create its MediaSession without opening an Activity.
-            String warmup = YandexMusicBrowserStarter.requestWarmup(app);
-            PhoneConnectionJournal.append("media-auto-resume",
-                    "trace event=yandex_background_warmup, token=" + captureToken
-                            + ", result=" + warmup + ", remainingMs=" + delayMillis);
-        }
         schedule(app, captureToken, 0, delayMillis, "initial_plan");
         Log.i(TAG, "Scheduled auto-resume for " + target
                 + " after " + (delayMillis / 1_000L) + " s");
@@ -342,21 +339,28 @@ public final class MediaAutoResumeController {
         boolean yandexBootRecovery = YANDEX_MUSIC_PACKAGE.equals(target);
         boolean yandexBrowserBootstrapRequested = state.getBoolean(
                 KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false);
-        long lastYandexBrowserBootstrap = state.getLong(
-                KEY_YANDEX_LAST_BROWSER_BOOTSTRAP_ELAPSED, Long.MIN_VALUE);
-        boolean yandexBrowserCooldownActive = lastYandexBrowserBootstrap != Long.MIN_VALUE
-                && dispatchStartedAt - lastYandexBrowserBootstrap
-                < YANDEX_BROWSER_RETRY_COOLDOWN_MS;
+        boolean yandexReceiverCommandSent = state.getBoolean(
+                KEY_YANDEX_RECEIVER_COMMAND_SENT, false);
+        long yandexReceiverCommandElapsed = state.getLong(
+                KEY_YANDEX_RECEIVER_COMMAND_ELAPSED, Long.MIN_VALUE);
+        boolean yandexReceiverGraceActive = yandexReceiverCommandElapsed != Long.MIN_VALUE
+                && dispatchStartedAt >= yandexReceiverCommandElapsed
+                && dispatchStartedAt - yandexReceiverCommandElapsed
+                < YANDEX_RECEIVER_GRACE_MS;
         boolean yandexSessionPlayAttempted = state.getBoolean(
                 KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false);
-        // mSaver 2.7 races its exact receiver and exact MediaBrowser at the first configured
-        // deadline. Later retries refresh only the browser after a bounded cooldown; they never
-        // flood the receiver while the first bind is still creating Yandex's exact session.
+        boolean yandexColdStartRouteRequested = yandexReceiverCommandSent
+                || yandexBrowserBootstrapRequested;
+        // mSaver 2.7 uses the exported receiver when it is discoverable and only falls back to
+        // MediaBrowser when that route is unavailable. Do the same sequentially: racing both
+        // paths made Yandex publish a permanently STATE_NONE session in KX11 road traces.
         boolean requestYandexBrowserBootstrap = yandexBootRecovery
-                && (!yandexBrowserBootstrapRequested || !yandexBrowserCooldownActive);
+                && yandexReceiverCommandSent
+                && !yandexReceiverGraceActive
+                && !yandexBrowserBootstrapRequested;
         MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(
                 app, target, yandexBootRecovery,
-                requestYandexBrowserBootstrap, yandexBrowserBootstrapRequested,
+                requestYandexBrowserBootstrap, yandexColdStartRouteRequested,
                 yandexSessionPlayAttempted);
         long dispatchFinishedAt = SystemClock.elapsedRealtime();
         long firstCommandAt = state.getLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE);
@@ -366,23 +370,16 @@ public final class MediaAutoResumeController {
             commandTiming.putLong(KEY_FIRST_COMMAND_ELAPSED, dispatchStartedAt);
         }
         if (YANDEX_MUSIC_PACKAGE.equals(target)
-                && !yandexBrowserBootstrapRequested
-                && (trace.result == MediaResumeCommand.Result.RECEIVER_COMMAND
-                || trace.result == MediaResumeCommand.Result.DISPATCH_FAILED
-                || trace.result
-                == MediaResumeCommand.Result.RECEIVER_AND_BROWSER_BOOTSTRAP)) {
-            // This flag also records that the one-shot exact receiver kick has happened. Even if
-            // the first browser scheduling attempt was rejected, all later retries are browser/
-            // session-only and cannot recreate the 24-command receiver flood from 2.3.5.
-            commandTiming.putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, true);
+                && !yandexReceiverCommandSent
+                && trace.result == MediaResumeCommand.Result.RECEIVER_COMMAND) {
+            // The exact foreground receiver is intentionally one-shot. Subsequent attempts first
+            // observe its session and only then try the browser fallback once.
+            commandTiming.putBoolean(KEY_YANDEX_RECEIVER_COMMAND_SENT, true)
+                    .putLong(KEY_YANDEX_RECEIVER_COMMAND_ELAPSED, dispatchFinishedAt);
         }
         if (YANDEX_MUSIC_PACKAGE.equals(target)
-                && (trace.result == MediaResumeCommand.Result.BROWSER_BOOTSTRAP
-                || trace.result
-                == MediaResumeCommand.Result.RECEIVER_AND_BROWSER_BOOTSTRAP)) {
-            commandTiming.putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, true)
-                    .putLong(KEY_YANDEX_LAST_BROWSER_BOOTSTRAP_ELAPSED,
-                            dispatchFinishedAt);
+                && trace.result == MediaResumeCommand.Result.BROWSER_BOOTSTRAP) {
+            commandTiming.putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, true);
         }
         if (YANDEX_MUSIC_PACKAGE.equals(target)
                 && trace.result == MediaResumeCommand.Result.SESSION_COMMAND) {
@@ -569,7 +566,8 @@ public final class MediaAutoResumeController {
         long targetElapsed = state.getLong(KEY_TARGET_ELAPSED, Long.MAX_VALUE);
         long lastKick = state.getLong(KEY_OBSERVATION_KICK_ELAPSED, Long.MIN_VALUE);
         boolean waitingForFirstYandexSessionCommand = YANDEX_MUSIC_PACKAGE.equals(target)
-                && state.getBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false)
+                && (state.getBoolean(KEY_YANDEX_RECEIVER_COMMAND_SENT, false)
+                || state.getBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false))
                 && !state.getBoolean(KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false);
         if ((!waitingForFirstYandexSessionCommand && now < targetElapsed)
                 || (lastKick != Long.MIN_VALUE && now - lastKick < 1_000L)) {

@@ -7233,7 +7233,7 @@ public class WidgetService extends Service {
         ecarxNavigatorWindowDecisionAtElapsed = -1L;
         try {
             if (expiredWindow) {
-                DiagnosticJournal.warn("navigator-window",
+                DiagnosticJournal.debug("navigator-window",
                         "windowed vendor confirmation lease expired");
             } else {
                 DiagnosticJournal.debug("navigator-window",

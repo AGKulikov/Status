@@ -414,7 +414,17 @@ public final class PhoneConnectorController {
             thread.start();
             workerThread = thread;
             worker = new Handler(thread.getLooper());
-            worker.post(() -> runIfCurrent(token, () -> startSession(token, next)));
+            long packageReplaceQuietMs = next.transportNeeded()
+                    ? PackageReplaceBleRecoveryGate.remainingQuietMillis(context) : 0L;
+            Runnable start = () -> runIfCurrent(token, () -> startSession(token, next));
+            if (packageReplaceQuietMs > 0L) {
+                worker.postDelayed(start, packageReplaceQuietMs);
+                PhoneConnectionJournal.append("controller",
+                        "BLE start deferred after package replacement for "
+                                + packageReplaceQuietMs + " ms; generation=" + token);
+            } else {
+                worker.post(start);
+            }
         }
     }
 

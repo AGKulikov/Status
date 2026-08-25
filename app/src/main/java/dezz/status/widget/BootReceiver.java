@@ -31,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.launcher.MediaAutoResumeController;
+import dezz.status.widget.phone.PackageReplaceBleRecoveryGate;
+import dezz.status.widget.phone.PhoneConnectionJournal;
 
 public class BootReceiver extends BroadcastReceiver {
     private static final String TAG = "BootReceiver";
@@ -68,9 +70,17 @@ public class BootReceiver extends BroadcastReceiver {
         Context app = context.getApplicationContext();
         if (app == null) app = context;
         Context receiverContext = app;
+        // This only installs the file destination; persistent history is loaded lazily when the
+        // diagnostics screen/export asks for it, so cold flash I/O cannot stall this receiver.
+        PhoneConnectionJournal.initialize(receiverContext);
         Intent received = intent == null ? null : new Intent(intent);
         String receivedAction = received == null || received.getAction() == null
                 ? "" : received.getAction();
+        if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(receivedAction)) {
+            // Record this before admitting the new foreground host. The UI may appear immediately,
+            // while only its BLE/GATT transport waits for the killed process registration to drain.
+            PackageReplaceBleRecoveryGate.mark(receiverContext);
+        }
         // Admit media to its dedicated exact-timer lane before submitting shared startup work.
         // Putting timer creation there let unrelated restoration postpone seconds by minutes.
         MediaAutoResumeController.armAtReceiverBoundary(receiverContext, receivedAction);

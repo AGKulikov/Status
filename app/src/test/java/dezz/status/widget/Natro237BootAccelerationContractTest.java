@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 import org.junit.Test;
 
 public final class Natro237BootAccelerationContractTest {
-    @Test public void mediaDeadlineIsNotMovedAndYandexWarmupHasNoUi() throws Exception {
+    @Test public void mediaDeadlineIsNotMovedAndYandexColdStartHasNoUiRace() throws Exception {
         String lifecycle = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaAutoResumeLifecyclePolicy.java");
         String controller = read("app/src/main/java/dezz/status/widget/launcher/"
@@ -22,8 +22,9 @@ public final class Natro237BootAccelerationContractTest {
         assertTrue(lifecycle.contains("ACTION_USER_UNLOCKED"));
         assertTrue(lifecycle.contains("static boolean shouldMovePlanAnchor"));
         assertTrue(lifecycle.contains("return false;"));
-        assertTrue(controller.contains("YandexMusicBrowserStarter.requestWarmup(app)"));
-        assertTrue(browser.contains("warmup_connected"));
+        assertFalse(controller.contains("YandexMusicBrowserStarter.requestWarmup(app)"));
+        assertTrue(controller.contains("YANDEX_RECEIVER_GRACE_MS = 10_000L"));
+        assertTrue(browser.contains("playBrowserSession"));
         assertTrue(browser.contains("if (connected && playRequested)"));
         assertFalse(browser.contains("startActivity("));
         assertFalse(browser.contains("startService("));

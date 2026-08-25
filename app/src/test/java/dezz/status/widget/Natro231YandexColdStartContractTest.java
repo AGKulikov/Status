@@ -34,10 +34,11 @@ public final class Natro231YandexColdStartContractTest {
 
         assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
         assertTrue(controller.contains("YANDEX_SESSION_POLL_MS = 5_000L"));
-        assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L"));
+        assertTrue(controller.contains("YANDEX_RECEIVER_GRACE_MS = 10_000L"));
         assertTrue(controller.contains(
                 "requestYandexBrowserBootstrap = yandexBootRecovery"));
         assertTrue(controller.contains("KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED"));
+        assertTrue(controller.contains("KEY_YANDEX_RECEIVER_COMMAND_SENT"));
         assertTrue(controller.contains("KEY_YANDEX_SESSION_PLAY_ATTEMPTED"));
         assertTrue(command.contains("Result.BROWSER_BOOTSTRAP"));
         assertTrue(command.contains("Result.WAITING_FOR_SESSION"));
@@ -46,7 +47,7 @@ public final class Natro231YandexColdStartContractTest {
 
         assertTrue(browser.contains("bootstrap_scheduled"));
         assertFalse(browser.contains("service_prewarm"));
-        assertTrue(browser.contains("playExactSessionOnly"));
+        assertTrue(browser.contains("playBrowserSession"));
         assertTrue(browser.contains("finishOrDispatch(\"connection_failed\")"));
         assertTrue(browser.contains("warmup_connected"));
         assertFalse(browser.contains("finish(\"play_dispatched\""));

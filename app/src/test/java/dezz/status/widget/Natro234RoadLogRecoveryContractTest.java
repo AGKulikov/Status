@@ -29,7 +29,7 @@ public final class Natro234RoadLogRecoveryContractTest {
         assertTrue(manifest.contains("Helper 69 is intentionally unchanged"));
     }
 
-    @Test public void yandexPrewarmsThenUsesOnlyItsExactSession() throws Exception {
+    @Test public void yandexUsesReceiverThenExactBrowserSessionWithoutUi() throws Exception {
         String controller = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaAutoResumeController.java");
         String command = read("app/src/main/java/dezz/status/widget/launcher/"
@@ -39,9 +39,9 @@ public final class Natro234RoadLogRecoveryContractTest {
 
         assertTrue(controller.contains(
                 "requestYandexBrowserBootstrap = yandexBootRecovery"));
-        assertTrue(controller.contains("!yandexBrowserCooldownActive"));
-        assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L"));
-        assertTrue(command.contains("route=exact_receiver_browser_race"));
+        assertTrue(controller.contains("!yandexReceiverGraceActive"));
+        assertTrue(controller.contains("YANDEX_RECEIVER_GRACE_MS = 10_000L"));
+        assertTrue(command.contains("route=exact_foreground_receiver"));
         assertTrue(command.contains("route=exact_session_play"));
         assertTrue(command.contains("route=waiting_for_exact_session"));
         assertTrue(command.contains("isUsablePlaySession"));
@@ -80,7 +80,7 @@ public final class Natro234RoadLogRecoveryContractTest {
 
         assertTrue(policy.contains("PROPERTY_PARKING_DISTANCE_CONTROL_STATUS = 28995"));
         assertTrue(policy.contains("parkingDistanceStatus == 2"));
-        assertTrue(policy.contains("parkingDistanceStatus == 3"));
+        assertFalse(policy.contains("parkingDistanceStatus == 3"));
         assertTrue(fallback.contains(
                 "EcarxExternalOverlayPolicy.PROPERTY_PARKING_DISTANCE_CONTROL_STATUS"));
         assertTrue(integration.contains("externalOverlayParkingRaw"));

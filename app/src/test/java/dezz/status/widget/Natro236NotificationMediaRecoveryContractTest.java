@@ -80,7 +80,7 @@ public final class Natro236NotificationMediaRecoveryContractTest {
         assertTrue(widget.contains("phonePresentationGateChanged"));
     }
 
-    @Test public void yandexColdStartMatchesOneShotMSaverRace() throws Exception {
+    @Test public void yandexColdStartMatchesMSaverSequentialReceiverRoute() throws Exception {
         String controller = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaAutoResumeController.java");
         String command = read("app/src/main/java/dezz/status/widget/launcher/"
@@ -89,18 +89,17 @@ public final class Natro236NotificationMediaRecoveryContractTest {
                 + "YandexMusicBrowserStarter.java");
 
         assertTrue(command.contains("DebugMediaButtonReceiver"));
-        assertTrue(command.contains("route=exact_receiver_browser_race"));
+        assertTrue(command.contains("route=exact_foreground_receiver"));
         assertTrue(command.contains("MAIN.postDelayed(keyUp, keyUpDelayMs)"));
         assertTrue(command.contains("YANDEX_PLAY_KEY_UP_DELAY_MS = 100L"));
         assertTrue(command.contains("route=waiting_for_exact_session"));
         assertFalse(command.contains("SystemClock.sleep"));
-        assertFalse(command.contains("FLAG_RECEIVER_FOREGROUND"));
-        assertTrue(controller.contains("one-shot exact receiver kick"));
+        assertTrue(command.contains("FLAG_RECEIVER_FOREGROUND"));
+        assertTrue(controller.contains("exact foreground receiver is intentionally one-shot"));
         assertTrue(controller.contains("YANDEX_FAST_SESSION_POLL_ATTEMPTS"));
         assertTrue(browser.contains("MusicBrowserService"));
-        assertTrue(browser.contains("requestWarmup"));
-        assertTrue(browser.contains("warmup_connected"));
-        assertTrue(browser.contains("playExactSessionOnly"));
+        assertFalse(controller.contains("YandexMusicBrowserStarter.requestWarmup(app)"));
+        assertTrue(browser.contains("playBrowserSession"));
         assertFalse(browser.contains("startService("));
     }
 

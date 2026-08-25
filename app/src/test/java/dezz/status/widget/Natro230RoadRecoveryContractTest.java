@@ -26,7 +26,7 @@ public final class Natro230RoadRecoveryContractTest {
         assertTrue(controller.contains(
                 "requestYandexBrowserBootstrap = yandexBootRecovery"));
         assertTrue(controller.contains("cold_start_verification"));
-        assertTrue(command.contains("exact_receiver_browser_race"));
+        assertTrue(command.contains("exact_foreground_receiver"));
         assertTrue(command.contains("route=exact_session_play"));
         assertTrue(command.contains("processState(context, target)"));
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));

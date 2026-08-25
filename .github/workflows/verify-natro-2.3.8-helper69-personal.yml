@@ -1,0 +1,71 @@
+name: Verify Natro 2.3.8 and Helper 69 Personal Team
+
+on:
+  push:
+    branches: ['release/natro-2.3.8-helper69']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: '2.3.8'
+      VERSION_CODE: '208021262'
+      ALLOW_UNSIGNED_RELEASE: 'true'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Test and build unsigned candidate
+        run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+      - name: Verify release contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "if (version == '2.3.8')" build.gradle
+          grep -Fq 'return 208021262' build.gradle
+          grep -Fq 'Intent.FLAG_RECEIVER_FOREGROUND' \
+            app/src/main/java/dezz/status/widget/launcher/MediaResumeCommand.java
+          grep -Fq 'route=exact_foreground_receiver' \
+            app/src/main/java/dezz/status/widget/launcher/MediaResumeCommand.java
+          grep -Fq 'browser=deferred' \
+            app/src/main/java/dezz/status/widget/launcher/MediaResumeCommand.java
+          ! grep -Fq 'YandexMusicBrowserStarter.requestWarmup(app)' \
+            app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java
+          grep -Fq 'playBrowserSession' \
+            app/src/main/java/dezz/status/widget/launcher/YandexMusicBrowserStarter.java
+          grep -Fq 'QUIET_MS = 8_000L' \
+            app/src/main/java/dezz/status/widget/phone/PackageReplaceBleRecoveryGate.java
+          grep -Fq 'PackageReplaceBleRecoveryGate.mark(receiverContext)' \
+            app/src/main/java/dezz/status/widget/BootReceiver.java
+          grep -Fq 'worker.postDelayed(start, packageReplaceQuietMs)' \
+            app/src/main/java/dezz/status/widget/phone/PhoneConnectorController.java
+          grep -Fq 'merged.addAll(readLines(file))' \
+            app/src/main/java/dezz/status/widget/phone/PhoneConnectionJournal.java
+          grep -Fq 'parkingDistanceStatus == 2' \
+            app/src/main/java/dezz/status/widget/car/EcarxExternalOverlayPolicy.java
+          test -z "$(find app ios -type f \( -name '*.jks' -o -name '*.p8' -o -name 'AuthKey_*.p8' \) -print -quit)"
+          APK=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
+          test -n "$APK"
+          cp "$APK" "$RUNNER_TEMP/Natro-2.3.8-unsigned-release.apk"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-2.3.8-unsigned-release
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/Natro-2.3.8-unsigned-release.apk
+
+  helper:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Verify unchanged Helper 69 source contract
+        run: ios/KX11-iPhone-ANCS-Helper-v69-personal/verify-v69-personal-contract.sh
