@@ -70,12 +70,13 @@ public final class Natro232RoadLogRecoveryContractTest {
 
         assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
         assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L"));
-        assertTrue(controller.contains("requestYandexBrowserBootstrap = coldStartEscalation"));
+        assertTrue(controller.contains(
+                "requestYandexBrowserBootstrap = yandexBootRecovery"));
         assertTrue(command.contains("route=exact_session_play"));
         assertTrue(command.contains("isUsablePlaySession"));
         assertFalse(command.contains("MediaAppLauncher"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
-        assertTrue(browser.contains("new Intent().setComponent(SERVICE)"));
+        assertFalse(browser.contains("startService("));
         assertTrue(browser.contains("new MediaBrowser(context, SERVICE"));
     }
 

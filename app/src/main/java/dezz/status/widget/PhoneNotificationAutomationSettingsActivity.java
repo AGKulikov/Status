@@ -184,7 +184,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         page.addView(delayCard, topMargin(8));
         delayInApps.setOnCheckedChangeListener((button, checked) -> {
             if (binding) return;
-            if (checked && !foregroundTrackingAvailable()) {
+            if (checked && !delayPackages.isEmpty() && !foregroundTrackingAvailable()) {
                 binding = true;
                 delayInApps.setChecked(false);
                 binding = false;
@@ -195,14 +195,6 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         });
         delayExternalOverlays.setOnCheckedChangeListener((button, checked) -> {
             if (binding) return;
-            String component = new android.content.ComponentName(this,
-                    WidgetAccessibilityService.class).flattenToString();
-            if (checked && WidgetAccessibilityService.getInstance() == null
-                    && !Permissions.isAccessibilityServiceEnabled(this, component)) {
-                Toast.makeText(this,
-                        R.string.phone_notification_delay_external_overlays_access,
-                        Toast.LENGTH_LONG).show();
-            }
             persist();
         });
 
@@ -378,6 +370,11 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    if (!working.isEmpty() && delayInApps.isChecked()
+                            && !foregroundTrackingAvailable()) {
+                        showForegroundTrackingRequired();
+                        return;
+                    }
                     delayPackages.clear();
                     delayPackages.addAll(working);
                     persist();
@@ -523,10 +520,10 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
     }
 
     /**
-     * Delayed delivery is useful only when Natro can observe the foreground application. Keep
-     * activation fail-closed instead of pretending the selected camera/navigation application
-     * can be detected. Runtime also treats a temporarily unknown foreground as blocked until the
-     * configured deadline, covering service reconnects and permission revocation.
+     * A selected-package source is useful only when Natro can observe the foreground application.
+     * Vehicle 360/PAS signals are independent and never require this permission. Runtime treats a
+     * temporarily unknown selected-app foreground as blocked until the configured deadline,
+     * covering service reconnects and permission revocation.
      */
     private boolean foregroundTrackingAvailable() {
         String accessibilityComponent = new ComponentName(

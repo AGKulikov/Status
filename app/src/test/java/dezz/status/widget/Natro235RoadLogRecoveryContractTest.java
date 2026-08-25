@@ -83,7 +83,7 @@ public final class Natro235RoadLogRecoveryContractTest {
         assertFalse(phone.contains("decoded item waiting for app name"));
     }
 
-    @Test public void yandexRejectsStateNoneButKeepsExactReceiverDuringBrowserBind()
+    @Test public void yandexRejectsStateNoneAndDoesNotFloodReceiverDuringBrowserBind()
             throws Exception {
         String controller = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaAutoResumeController.java");
@@ -96,11 +96,13 @@ public final class Natro235RoadLogRecoveryContractTest {
         assertTrue(controller.contains("boolean yandexBootRecovery ="));
         assertTrue(command.contains("!isUsablePlaySession(state)"));
         assertTrue(command.contains("state.getState() == PlaybackState.STATE_NONE"));
-        assertTrue(command.contains("yandexBootstrap = \"cooldown_active\""));
+        assertTrue(command.contains("yandexBrowserBootstrapRequested"));
         assertTrue(command.contains("ignoredSessionState="));
-        assertFalse(command.contains("route=waiting_for_exact_session"));
+        assertTrue(command.contains("route=waiting_for_exact_session"));
+        assertTrue(command.contains("route=exact_receiver_browser_race"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
-        assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 10_000L"));
+        assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 20_000L"));
+        assertFalse(browser.contains("startService("));
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));
     }
 

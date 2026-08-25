@@ -270,11 +270,14 @@ public class PhoneWidgetServiceIntegrationContractTest {
         assertTrue(source.contains(
                 "prefs.phoneLowBatteryAlertLatched2.get()"));
         assertTrue(evaluate.contains("PhoneLowBatteryAlertPolicy.evaluate("));
-        assertTrue(evaluate.contains("prefs.phoneLowBatteryAlertLatched.set(result.latched)"));
-        assertTrue(evaluate.contains(
-                "prefs.phoneLowBatteryAlertLatched2.set(result2.latched)"));
+        assertFalse(evaluate.contains("prefs.phoneLowBatteryAlertLatched.set(true)"));
+        assertFalse(evaluate.contains("prefs.phoneLowBatteryAlertLatched2.set(true)"));
+        assertTrue(source.contains("markPhoneLowBatteryAlertPresented"));
+        assertTrue(source.contains("phoneLowBatteryAlertPending"));
+        assertTrue(source.contains("prefs.phoneLowBatteryAlertLatched.set(true)"));
+        assertTrue(source.contains("prefs.phoneLowBatteryAlertLatched2.set(true)"));
         assertTrue(evaluate.contains("enqueuePhoneLowBatteryAlert(level,"));
-        assertTrue(source.contains("enqueuePhoneDelivery(QueuedPhoneNotification.lowBattery("));
+        assertTrue(source.contains("QueuedPhoneNotification.lowBattery(level, color, stage)"));
         assertTrue(source.contains("phoneNotificationAllowedByLockState()"));
         assertTrue(source.contains("phoneNotificationBlockedByForeground()"));
         assertTrue(source.contains("prefs.phoneStatusBarNotificationsEnabled.get()"));

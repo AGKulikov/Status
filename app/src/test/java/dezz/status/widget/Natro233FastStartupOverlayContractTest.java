@@ -44,16 +44,21 @@ public final class Natro233FastStartupOverlayContractTest {
         assertFalse(transport.contains("removeBond("));
     }
 
-    @Test public void yandexRepeatsOnlyPackageScopedPlayOnFastCadence() throws Exception {
+    @Test public void yandexRacesOneExactReceiverWithTheBrowserOnFastCadence()
+            throws Exception {
         String controller = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaAutoResumeController.java");
         String command = read("app/src/main/java/dezz/status/widget/launcher/"
                 + "MediaResumeCommand.java");
 
         assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
-        assertTrue(controller.contains("YANDEX_FAST_RECEIVER_ATTEMPTS = 8"));
+        assertTrue(controller.contains("YANDEX_FAST_SESSION_POLL_ATTEMPTS = 8"));
         assertTrue(controller.contains("YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L"));
-        assertTrue(controller.contains("requestYandexBrowserBootstrap = coldStartEscalation"));
+        assertTrue(controller.contains(
+                "requestYandexBrowserBootstrap = yandexBootRecovery"));
+        assertTrue(command.contains("RECEIVER_AND_BROWSER_BOOTSTRAP"));
+        assertTrue(command.contains("route=exact_receiver_browser_race"));
+        assertTrue(command.contains("route=waiting_for_exact_session"));
         assertTrue(command.contains("KEYCODE_MEDIA_PLAY"));
         assertTrue(command.contains("new Intent(Intent.ACTION_MEDIA_BUTTON)"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
@@ -86,7 +91,8 @@ public final class Natro233FastStartupOverlayContractTest {
         assertTrue(policy.contains("PROPERTY_VISION_IMAGE_MODE = 29043"));
         assertTrue(fallback.contains("onExternalOverlaySignal(propertyId, raw)"));
         assertTrue(widget.contains(
-                "phoneAccessibilityOverlayActive || phoneVehicleOverlayActive"));
+                "setPhoneExternalOverlayActive(phoneVehicleOverlayActive)"));
+        assertFalse(widget.contains("phoneAccessibilityOverlayActive"));
         assertTrue(widget.contains("pausePhoneNotificationForExternalOverlay"));
         assertTrue(widget.contains("resumePhoneNotificationAfterExternalOverlay"));
     }

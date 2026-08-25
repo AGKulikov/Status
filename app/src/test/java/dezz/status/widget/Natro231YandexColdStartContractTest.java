@@ -35,17 +35,19 @@ public final class Natro231YandexColdStartContractTest {
         assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
         assertTrue(controller.contains("YANDEX_SESSION_POLL_MS = 5_000L"));
         assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L"));
-        assertTrue(controller.contains("requestYandexBrowserBootstrap = coldStartEscalation"));
+        assertTrue(controller.contains(
+                "requestYandexBrowserBootstrap = yandexBootRecovery"));
         assertTrue(controller.contains("KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED"));
         assertTrue(controller.contains("KEY_YANDEX_SESSION_PLAY_ATTEMPTED"));
         assertTrue(command.contains("Result.BROWSER_BOOTSTRAP"));
-        assertFalse(command.contains("Result.WAITING_FOR_SESSION"));
+        assertTrue(command.contains("Result.WAITING_FOR_SESSION"));
         assertTrue(command.contains("browser=\" + browser"));
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));
 
         assertTrue(browser.contains("bootstrap_scheduled"));
-        assertTrue(browser.contains("service_prewarm"));
-        assertTrue(browser.contains("play_request_sent_unverified"));
+        assertFalse(browser.contains("service_prewarm"));
+        assertTrue(browser.contains("playExactSessionOnly"));
+        assertTrue(browser.contains("dispatchExactSessionAndFinish(\"connection_failed\")"));
         assertFalse(browser.contains("finish(\"play_dispatched\""));
     }
 

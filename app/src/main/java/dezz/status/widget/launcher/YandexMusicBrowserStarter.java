@@ -3,11 +3,9 @@ package dezz.status.widget.launcher;
 
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.media.browse.MediaBrowser;
-import android.media.session.MediaController;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -22,8 +20,8 @@ final class YandexMusicBrowserStarter {
     private static final ComponentName SERVICE = new ComponentName(
             "ru.yandex.music",
             "ru.yandex.music.common.media.mediabrowser.MusicBrowserService");
-    /** A successful cold bind needs about six seconds; ten keeps that path but retries sooner. */
-    private static final long CONNECTION_TIMEOUT_MS = 10_000L;
+    /** mSaver leaves the exact bind alive; this guard only retires a genuinely wedged callback. */
+    private static final long CONNECTION_TIMEOUT_MS = 20_000L;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static Connection current;
 
@@ -45,8 +43,8 @@ final class YandexMusicBrowserStarter {
         }
         Context exactApp = app;
         try {
-            MAIN.post(() -> startOrJoin(exactApp));
-            return "bootstrap_scheduled";
+            return MAIN.post(() -> startOrJoin(exactApp))
+                    ? "bootstrap_scheduled" : "schedule_rejected";
         } catch (RuntimeException rejected) {
             return "schedule_" + rejected.getClass().getSimpleName();
         }
@@ -80,16 +78,6 @@ final class YandexMusicBrowserStarter {
 
         void start() {
             if (completed) return;
-            // A direct, component-scoped service prewarm is still background-only: it neither
-            // resolves an Activity nor emits a global media key. Some KX11 boots otherwise leave
-            // the exported browser bind pending until Yandex is started minutes later.
-            try {
-                ComponentName started = context.startService(
-                        new Intent().setComponent(SERVICE));
-                journal("service_prewarm", started == null ? "null_component" : "none");
-            } catch (RuntimeException rejected) {
-                journal("service_prewarm", rejected.getClass().getSimpleName());
-            }
             try {
                 browser = new MediaBrowser(context, SERVICE, this, (Bundle) null);
                 browser.connect();
@@ -102,29 +90,29 @@ final class YandexMusicBrowserStarter {
 
         @Override public void onConnected() {
             if (completed || browser == null) return;
-            try {
-                MediaController controller = new MediaController(
-                        context, browser.getSessionToken());
-                controller.getTransportControls().play();
-                // This is a request on the browser token, not proof that audio started. The exact
-                // package session is polled and verified by MediaAutoResumeController.
-                finish("bootstrap_connected", "play_request_sent_unverified");
-            } catch (RuntimeException failure) {
-                finish("bootstrap_session_request_failed",
-                        failure.getClass().getSimpleName());
-            }
+            dispatchExactSessionAndFinish("connected");
         }
 
         @Override public void onConnectionSuspended() {
-            finish("connection_suspended", "none");
+            dispatchExactSessionAndFinish("connection_suspended");
         }
 
         @Override public void onConnectionFailed() {
-            finish("connection_failed", "none");
+            // mSaver retries the exact active session even on this callback: the player process
+            // can publish its session immediately before the browser reports failure.
+            dispatchExactSessionAndFinish("connection_failed");
         }
 
         @Override public void run() {
-            finish("connection_timeout", "none");
+            dispatchExactSessionAndFinish("connection_timeout");
+        }
+
+        private void dispatchExactSessionAndFinish(@NonNull String event) {
+            if (completed) return;
+            MediaResumeCommand.DispatchTrace trace =
+                    MediaResumeCommand.playExactSessionOnly(context, SERVICE.getPackageName());
+            MediaAutoResumeController.onYandexBrowserSessionDispatch(context, trace.result);
+            finish(event, trace.result + ":" + trace.detail);
         }
 
         private void finish(@NonNull String event, @NonNull String error) {

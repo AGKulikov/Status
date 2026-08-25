@@ -72,7 +72,7 @@ public final class MediaAutoResumeController {
     private static final int YANDEX_MAX_ATTEMPTS = 24;
     private static final long YANDEX_SESSION_POLL_MS = 5_000L;
     private static final long YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L;
-    private static final int YANDEX_FAST_RECEIVER_ATTEMPTS = 8;
+    private static final int YANDEX_FAST_SESSION_POLL_ATTEMPTS = 8;
     /** A package-scoped PLAY is idempotent, so verify/retry it without a 30-second gap. */
     private static final long YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L;
     private static final String YANDEX_MUSIC_PACKAGE = "ru.yandex.music";
@@ -332,7 +332,8 @@ public final class MediaAutoResumeController {
         long lateness = Math.max(0L, executeAt - planned);
         long dispatchStartedAt = SystemClock.elapsedRealtime();
         boolean yandexBootRecovery = YANDEX_MUSIC_PACKAGE.equals(target);
-        boolean coldStartEscalation = attempt > 0 && yandexBootRecovery;
+        boolean yandexBrowserBootstrapRequested = state.getBoolean(
+                KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, false);
         long lastYandexBrowserBootstrap = state.getLong(
                 KEY_YANDEX_LAST_BROWSER_BOOTSTRAP_ELAPSED, Long.MIN_VALUE);
         boolean yandexBrowserCooldownActive = lastYandexBrowserBootstrap != Long.MIN_VALUE
@@ -340,13 +341,14 @@ public final class MediaAutoResumeController {
                 < YANDEX_BROWSER_RETRY_COOLDOWN_MS;
         boolean yandexSessionPlayAttempted = state.getBoolean(
                 KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false);
-        // Attempt one mirrors mSaver's exact receiver. Attempt two starts the exported background
-        // browser service, and later retries may refresh that bootstrap after its bounded cooldown.
-        boolean requestYandexBrowserBootstrap = coldStartEscalation
-                && !yandexBrowserCooldownActive;
+        // mSaver 2.7 races its exact receiver and exact MediaBrowser at the first configured
+        // deadline. Later retries refresh only the browser after a bounded cooldown; they never
+        // flood the receiver while the first bind is still creating Yandex's exact session.
+        boolean requestYandexBrowserBootstrap = yandexBootRecovery
+                && (!yandexBrowserBootstrapRequested || !yandexBrowserCooldownActive);
         MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(
                 app, target, yandexBootRecovery,
-                requestYandexBrowserBootstrap, yandexBrowserCooldownActive,
+                requestYandexBrowserBootstrap, yandexBrowserBootstrapRequested,
                 yandexSessionPlayAttempted);
         long dispatchFinishedAt = SystemClock.elapsedRealtime();
         long firstCommandAt = state.getLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE);
@@ -356,9 +358,21 @@ public final class MediaAutoResumeController {
             commandTiming.putLong(KEY_FIRST_COMMAND_ELAPSED, dispatchStartedAt);
         }
         if (YANDEX_MUSIC_PACKAGE.equals(target)
-                && trace.result == MediaResumeCommand.Result.BROWSER_BOOTSTRAP) {
-            commandTiming
-                    .putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, true)
+                && !yandexBrowserBootstrapRequested
+                && (trace.result == MediaResumeCommand.Result.RECEIVER_COMMAND
+                || trace.result == MediaResumeCommand.Result.DISPATCH_FAILED
+                || trace.result
+                == MediaResumeCommand.Result.RECEIVER_AND_BROWSER_BOOTSTRAP)) {
+            // This flag also records that the one-shot exact receiver kick has happened. Even if
+            // the first browser scheduling attempt was rejected, all later retries are browser/
+            // session-only and cannot recreate the 24-command receiver flood from 2.3.5.
+            commandTiming.putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, true);
+        }
+        if (YANDEX_MUSIC_PACKAGE.equals(target)
+                && (trace.result == MediaResumeCommand.Result.BROWSER_BOOTSTRAP
+                || trace.result
+                == MediaResumeCommand.Result.RECEIVER_AND_BROWSER_BOOTSTRAP)) {
+            commandTiming.putBoolean(KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED, true)
                     .putLong(KEY_YANDEX_LAST_BROWSER_BOOTSTRAP_ELAPSED,
                             dispatchFinishedAt);
         }
@@ -391,7 +405,7 @@ public final class MediaAutoResumeController {
             long retryDelay = retryDelayMillis(target, attempt, trace.result);
             schedule(app, bootToken, nextAttempt, retryDelay,
                     attempt == 0 && YANDEX_MUSIC_PACKAGE.equals(target)
-                            ? "receiver_result_verification" : "command_retry");
+                            ? "cold_start_verification" : "command_retry");
             Log.i(TAG, "Media resume attempt " + (attempt + 1) + " for " + target
                     + " returned " + trace.result + "; retry scheduled");
             return;
@@ -499,6 +513,22 @@ public final class MediaAutoResumeController {
                             + ", replaced=" + replaced
                             + ", delayMs=" + Math.max(0L, delayMillis)
                             + ", triggerElapsed=" + triggerElapsed);
+        }
+    }
+
+    /** Records the exact-session PLAY issued from a MediaBrowser callback. */
+    static void onYandexBrowserSessionDispatch(@NonNull Context context,
+                                               @NonNull MediaResumeCommand.Result result) {
+        Context app = applicationContext(context);
+        SharedPreferences snapshot = state(app);
+        if (snapshot.getBoolean(KEY_COMPLETED, true)
+                || !YANDEX_MUSIC_PACKAGE.equals(snapshot.getString(
+                KEY_TARGET_PACKAGE, "").trim())) return;
+        if (result == MediaResumeCommand.Result.SESSION_COMMAND) {
+            snapshot.edit().putBoolean(KEY_YANDEX_SESSION_PLAY_ATTEMPTED, true).apply();
+            onPlaybackObservation(app, YANDEX_MUSIC_PACKAGE, false);
+        } else if (result == MediaResumeCommand.Result.ALREADY_PLAYING) {
+            onPlaybackObservation(app, YANDEX_MUSIC_PACKAGE, true);
         }
     }
 
@@ -652,7 +682,7 @@ public final class MediaAutoResumeController {
     private static long retryDelayMillis(@NonNull String target, int attempt,
                                          @NonNull MediaResumeCommand.Result result) {
         if (!YANDEX_MUSIC_PACKAGE.equals(target)) return RETRY_DELAY_MS;
-        if (attempt < YANDEX_FAST_RECEIVER_ATTEMPTS) {
+        if (attempt < YANDEX_FAST_SESSION_POLL_ATTEMPTS) {
             return YANDEX_FAST_RECEIVER_RETRY_MS;
         }
         return YANDEX_SESSION_POLL_MS;

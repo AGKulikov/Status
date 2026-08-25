@@ -1023,6 +1023,9 @@ public class Preferences {
             "phoneLowBatteryAlertLatched", false);
     public final Bool phoneLowBatteryAlertLatched2 = new Bool(this,
             "phoneLowBatteryAlertLatched2", false);
+    /** 2.3.6 clears legacy latches that may have been written before a warning was visible. */
+    public final Bool phoneLowBatteryPresentedLatchMigration = new Bool(this,
+            "phoneLowBatteryPresentedLatchMigration", false);
     /** Optional writable Sprut.hub boolean characteristic reflecting phone presence. */
     public final Bool phoneSprutPresenceEnabled = new Bool(this,
             "phoneSprutPresenceEnabled", false);

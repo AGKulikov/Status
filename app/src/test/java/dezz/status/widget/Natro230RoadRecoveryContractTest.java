@@ -23,9 +23,10 @@ public final class Natro230RoadRecoveryContractTest {
         assertTrue(build.contains("if (version == '2.3.0')"));
         assertTrue(build.contains("return 208021254"));
         assertTrue(controller.contains("YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L"));
-        assertTrue(controller.contains("coldStartEscalation = attempt > 0"));
-        assertTrue(controller.contains("receiver_result_verification"));
-        assertTrue(command.contains("exact_media_browser_bootstrap"));
+        assertTrue(controller.contains(
+                "requestYandexBrowserBootstrap = yandexBootRecovery"));
+        assertTrue(controller.contains("cold_start_verification"));
+        assertTrue(command.contains("exact_receiver_browser_race"));
         assertTrue(command.contains("route=exact_session_play"));
         assertTrue(command.contains("processState(context, target)"));
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));

@@ -35,7 +35,7 @@ public final class Natro2218RoadStabilityContractTest {
         assertTrue(command.contains("YANDEX_PLAY_KEY_UP_DELAY_MS = 100L"));
         assertTrue(command.contains("YandexMusicBrowserStarter.requestPlay(context)"));
         assertTrue(browser.contains("MusicBrowserService"));
-        assertTrue(browser.contains("getTransportControls().play()"));
+        assertTrue(browser.contains("playExactSessionOnly"));
     }
 
     @Test public void ancsPreemptsAndRetriesInsteadOfPoisoningHealthyOwner() throws Exception {

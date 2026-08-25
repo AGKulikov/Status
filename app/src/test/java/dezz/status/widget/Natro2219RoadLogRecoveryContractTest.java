@@ -13,7 +13,7 @@ import org.junit.Test;
 
 /** Regression boundary for the 2026-08-24 08:17 road session and the Helper 68 journal storm. */
 public final class Natro2219RoadLogRecoveryContractTest {
-    @Test public void yandexReceiverRemainsExclusiveBeforeBrowserAndExactSession()
+    @Test public void yandexColdStartRacesExactReceiverAndBrowserOnce()
             throws Exception {
         String build = read("build.gradle");
         String command = read("app/src/main/java/dezz/status/widget/launcher/"
@@ -24,17 +24,15 @@ public final class Natro2219RoadLogRecoveryContractTest {
         assertTrue(build.contains("if (version == '2.2.19')"));
         assertTrue(build.contains("return 208021253"));
         assertTrue(command.contains("route=exact_session_play"));
-        assertTrue(command.contains("route=exact_media_browser_bootstrap"));
-        assertFalse(command.contains("route=waiting_for_exact_session"));
+        assertTrue(command.contains("route=exact_receiver_browser_race"));
+        assertTrue(command.contains("route=waiting_for_exact_session"));
         assertFalse(command.contains("deferredYandexPlaySession"));
-        String queriedReceiver = between(command,
-                "for (ResolveInfo resolved : receivers)",
-                "ComponentName known = knownReceiver(target)");
-        assertTrue(queriedReceiver.contains("sendKey(context, receiver"));
-        assertFalse(queriedReceiver.contains("requestYandexBrowserIfUseful"));
+        assertTrue(command.contains("sendKey(context, known"));
+        assertTrue(command.contains("requestYandexBrowserIfUseful(context, target, command)"));
         assertTrue(command.indexOf("route=exact_session_play")
                 < command.indexOf("PackageManager packages"));
-        assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 10_000L"));
+        assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 20_000L"));
+        assertTrue(browser.contains("playExactSessionOnly"));
         assertTrue(browser.contains("connect_coalesced"));
     }
 

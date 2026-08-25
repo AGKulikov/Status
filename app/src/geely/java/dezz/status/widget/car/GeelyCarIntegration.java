@@ -1825,12 +1825,16 @@ final class GeelyCarIntegration implements CarIntegration {
     private void acceptExternalOverlaySignal(int propertyId, int raw) {
         ExternalOverlayListener listener = externalOverlayListener;
         if (listener == null) return;
+        Integer previousRaw;
         if (propertyId == EcarxExternalOverlayPolicy.PROPERTY_DISPLAY_SWITCH_STATUS) {
+            previousRaw = externalOverlaySwitchRaw;
             externalOverlaySwitchRaw = raw;
         } else if (propertyId == EcarxExternalOverlayPolicy.PROPERTY_VISION_IMAGE_MODE) {
+            previousRaw = externalOverlayVisionRaw;
             externalOverlayVisionRaw = raw;
         } else if (propertyId
                 == EcarxExternalOverlayPolicy.PROPERTY_PARKING_DISTANCE_CONTROL_STATUS) {
+            previousRaw = externalOverlayParkingRaw;
             externalOverlayParkingRaw = raw;
         } else {
             return;
@@ -1838,13 +1842,26 @@ final class GeelyCarIntegration implements CarIntegration {
         boolean active = EcarxExternalOverlayPolicy.isActive(
                 externalOverlaySwitchRaw, externalOverlayVisionRaw,
                 externalOverlayParkingRaw);
-        if (externalOverlayStatePublished && externalOverlayActive == active) return;
+        boolean activeChanged = !externalOverlayStatePublished
+                || externalOverlayActive != active;
+        if (previousRaw == null || previousRaw != raw || activeChanged) {
+            DiagnosticJournal.info("phone-notification",
+                    "vehicle overlay signal property=" + propertyId
+                            + " raw=" + raw
+                            + " displaySwitch=" + externalOverlaySwitchRaw
+                            + " vision=" + externalOverlayVisionRaw
+                            + " parking=" + externalOverlayParkingRaw
+                            + " active=" + active);
+        }
+        if (!activeChanged) return;
         externalOverlayStatePublished = true;
         externalOverlayActive = active;
         listener.onExternalOverlayChanged(active);
     }
 
     private void clearExternalOverlaySignals() {
+        boolean hadSignals = externalOverlaySwitchRaw != null
+                || externalOverlayVisionRaw != null || externalOverlayParkingRaw != null;
         boolean notifyInactive = externalOverlayStatePublished && externalOverlayActive;
         externalOverlaySwitchRaw = null;
         externalOverlayVisionRaw = null;
@@ -1853,6 +1870,10 @@ final class GeelyCarIntegration implements CarIntegration {
         externalOverlayActive = false;
         ExternalOverlayListener listener = externalOverlayListener;
         if (notifyInactive && listener != null) listener.onExternalOverlayChanged(false);
+        if (hadSignals) {
+            DiagnosticJournal.info("phone-notification",
+                    "vehicle overlay signal channel unavailable; fail-open inactive");
+        }
     }
 
     private void requestSensorRecovery(int sensorType) {

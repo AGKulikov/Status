@@ -14,6 +14,8 @@ import android.content.pm.ResolveInfo;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.view.KeyEvent;
 
@@ -23,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 
 import dezz.status.widget.MediaNotificationListener;
+import dezz.status.widget.phone.PhoneConnectionJournal;
 
 /**
  * Exact-player media command. It never sends a global key through {@code AudioManager}, because
@@ -32,12 +35,15 @@ final class MediaResumeCommand {
     private static final String YANDEX_MUSIC_PACKAGE = "ru.yandex.music";
     /** The Yandex receiver used by mSaver requires a real press rather than two adjacent frames. */
     private static final long YANDEX_PLAY_KEY_UP_DELAY_MS = 100L;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     enum Result {
         ALREADY_PLAYING,
         SESSION_COMMAND,
         RECEIVER_COMMAND,
+        RECEIVER_AND_BROWSER_BOOTSTRAP,
         BROWSER_BOOTSTRAP,
+        WAITING_FOR_SESSION,
         DISPATCH_FAILED,
         NO_TARGET
     }
@@ -80,18 +86,19 @@ final class MediaResumeCommand {
 
     /**
      * Durable Yandex boot-recovery state is owned by {@link MediaAutoResumeController}. Passing it
-     * here keeps each dispatch exclusive: exact-session PLAY, exact receiver PLAY, or an exported
-     * MediaBrowser bootstrap. No path opens an Activity or emits a global media key.
+     * here keeps every address exact. The first cold dispatch deliberately races the receiver and
+     * MediaBrowser like mSaver; later dispatches use only the package session/browser. No path
+     * opens an Activity or emits a global media key.
      */
     @NonNull
     static DispatchTrace playWithTrace(@NonNull Context context,
                                        @NonNull String targetPackage,
                                        boolean coldStartEscalation,
                                        boolean requestYandexBrowserBootstrap,
-                                       boolean yandexBrowserBootstrapPending,
+                                       boolean yandexBrowserBootstrapRequested,
                                        boolean yandexSessionPlayAttempted) {
         return sendWithTrace(context, targetPackage, Command.PLAY, coldStartEscalation,
-                requestYandexBrowserBootstrap, yandexBrowserBootstrapPending,
+                requestYandexBrowserBootstrap, yandexBrowserBootstrapRequested,
                 yandexSessionPlayAttempted);
     }
 
@@ -137,6 +144,49 @@ final class MediaResumeCommand {
         return Result.NO_TARGET;
     }
 
+    /**
+     * mSaver re-addresses the exact package session from both MediaBrowser success and failure
+     * callbacks. This helper deliberately has no receiver/browser fallback, so the callback can
+     * never recurse into another bootstrap.
+     */
+    @NonNull
+    static DispatchTrace playExactSessionOnly(@NonNull Context context,
+                                              @NonNull String targetPackage) {
+        String target = targetPackage.trim();
+        if (target.isEmpty()) return trace(Result.NO_TARGET, "target=empty");
+        MediaSessionManager sessions = context.getSystemService(MediaSessionManager.class);
+        if (sessions == null) {
+            return trace(Result.NO_TARGET, "route=exact_session_only, manager=unavailable");
+        }
+        try {
+            ComponentName listener = new ComponentName(context,
+                    MediaNotificationListener.class);
+            List<MediaController> controllers = sessions.getActiveSessions(listener);
+            if (controllers == null) controllers = Collections.emptyList();
+            for (MediaController controller : controllers) {
+                if (!target.equals(controller.getPackageName())) continue;
+                PlaybackState state = controller.getPlaybackState();
+                int playbackState = state == null ? -1 : state.getState();
+                long actions = state == null ? 0L : state.getActions();
+                if (playbackState == PlaybackState.STATE_PLAYING) {
+                    return trace(Result.ALREADY_PLAYING,
+                            "route=exact_session_only, playbackState=" + playbackState
+                                    + ", actions=" + actions);
+                }
+                controller.getTransportControls().play();
+                return trace(Result.SESSION_COMMAND,
+                        "route=exact_session_only, playbackState=" + playbackState
+                                + ", actions=" + actions);
+            }
+            return trace(Result.NO_TARGET,
+                    "route=exact_session_only, activeSessions=" + controllers.size());
+        } catch (RuntimeException failure) {
+            return trace(Result.DISPATCH_FAILED,
+                    "route=exact_session_only, error="
+                            + failure.getClass().getSimpleName());
+        }
+    }
+
     private enum Command {
         PLAY,
         PLAY_PAUSE,
@@ -150,7 +200,7 @@ final class MediaResumeCommand {
                                                @NonNull Command command,
                                                boolean coldStartEscalation,
                                                boolean requestYandexBrowserBootstrap,
-                                               boolean yandexBrowserBootstrapPending,
+                                               boolean yandexBrowserBootstrapRequested,
                                                boolean yandexSessionPlayAttempted) {
         String target = targetPackage.trim();
         if (target.isEmpty()) return trace(Result.NO_TARGET, "target=empty");
@@ -245,28 +295,35 @@ final class MediaResumeCommand {
             sessionError = "manager_unavailable";
         }
 
+        boolean yandexColdPlay = coldStartEscalation
+                && YANDEX_MUSIC_PACKAGE.equals(target) && command == Command.PLAY;
         String yandexBootstrap = "not_requested";
-        // The first boot attempt mirrors mSaver's exact receiver. If no MediaSession appears, the
-        // next attempt prewarms the exported browser service; subsequent retries can then address
-        // Yandex's exact token instead of waiting minutes for an unrelated system launch.
-        if (coldStartEscalation && YANDEX_MUSIC_PACKAGE.equals(target)
-                && command == Command.PLAY && requestYandexBrowserBootstrap) {
-            yandexBootstrap = requestYandexBrowserIfUseful(context, target, command);
-            if ("bootstrap_scheduled".equals(yandexBootstrap)) {
-                return trace(Result.BROWSER_BOOTSTRAP,
-                        "route=exact_media_browser_bootstrap, process="
-                                + targetProcessState
-                                + ", activeSessions=" + activeSessionCount
-                                + ", sessions=" + sessionInventory
-                                + ", sessionError=" + sessionError
-                                + ", browser=" + yandexBootstrap);
+        if (yandexColdPlay && yandexBrowserBootstrapRequested) {
+            // mSaver sends the receiver only once. While that first browser bind is alive, wait
+            // for the exact MediaSession instead of flooding the same receiver every two seconds.
+            if (requestYandexBrowserBootstrap) {
+                yandexBootstrap = requestYandexBrowserIfUseful(context, target, command);
+                if ("bootstrap_scheduled".equals(yandexBootstrap)) {
+                    return trace(Result.BROWSER_BOOTSTRAP,
+                            "route=exact_media_browser_retry, process="
+                                    + targetProcessState
+                                    + ", activeSessions=" + activeSessionCount
+                                    + ", sessions=" + sessionInventory
+                                    + ", sessionError=" + sessionError
+                                    + ", browser=" + yandexBootstrap);
+                }
+            } else {
+                yandexBootstrap = "already_requested";
             }
-        }
-        if (coldStartEscalation && YANDEX_MUSIC_PACKAGE.equals(target)
-                && command == Command.PLAY && yandexBrowserBootstrapPending) {
-            // Do not spend the browser bind window polling in silence. An exact package receiver
-            // PLAY remains safe and may complete the same cold start while MediaBrowser connects.
-            yandexBootstrap = "cooldown_active";
+            return trace(Result.WAITING_FOR_SESSION,
+                    "route=waiting_for_exact_session, process=" + targetProcessState
+                            + ", activeSessions=" + activeSessionCount
+                            + ", sessions=" + sessionInventory
+                            + ", sessionError=" + sessionError
+                            + ", browser=" + yandexBootstrap
+                            + ", ignoredSessionState="
+                            + ignoredSessionState(ignoredYandexSessionState)
+                            + ", ignoredSessionActions=" + ignoredYandexSessionActions);
         }
 
         PackageManager packages = context.getPackageManager();
@@ -281,6 +338,30 @@ final class MediaResumeCommand {
         }
         if (receivers == null) receivers = Collections.emptyList();
         int receiverCount = receivers.size();
+        ComponentName known = knownReceiver(target);
+        if (yandexColdPlay && known != null && isInstalled(packages, target)) {
+            long keyUpDelayMs = keyUpDelayMillis(target, command);
+            String dispatchError = sendKey(context, known, keyCodeWithoutSession(command),
+                    keyUpDelayMs);
+            if (!yandexBrowserBootstrapRequested && requestYandexBrowserBootstrap) {
+                yandexBootstrap = requestYandexBrowserIfUseful(context, target, command);
+            }
+            return trace(receiverDispatchResult(dispatchError, yandexBootstrap),
+                    "route=exact_receiver_browser_race, activeSessions="
+                            + activeSessionCount
+                            + ", process=" + targetProcessState
+                            + ", sessions=" + sessionInventory
+                            + ", sessionError=" + sessionError
+                            + ", receiverCount=" + receiverCount
+                            + ", receiverQueryError=" + receiverQueryError
+                            + ", receiver=" + known.flattenToShortString()
+                            + ", keyUpDelayMs=" + keyUpDelayMs
+                            + ", browser=" + yandexBootstrap
+                            + ", ignoredSessionState="
+                            + ignoredSessionState(ignoredYandexSessionState)
+                            + ", ignoredSessionActions=" + ignoredYandexSessionActions
+                            + ", dispatchError=" + emptyAsNone(dispatchError));
+        }
         for (ResolveInfo resolved : receivers) {
             if (resolved.activityInfo == null) continue;
             ComponentName receiver = new ComponentName(resolved.activityInfo.packageName,
@@ -304,7 +385,6 @@ final class MediaResumeCommand {
                             + ", dispatchError=" + emptyAsNone(dispatchError));
         }
 
-        ComponentName known = knownReceiver(target);
         if (known != null && isInstalled(packages, target)) {
             long keyUpDelayMs = keyUpDelayMillis(target, command);
             String dispatchError = sendKey(context, known, keyCodeWithoutSession(command),
@@ -384,21 +464,35 @@ final class MediaResumeCommand {
         long now = SystemClock.uptimeMillis();
         Intent down = new Intent(Intent.ACTION_MEDIA_BUTTON)
                 .setComponent(receiver)
-                .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES
-                        | Intent.FLAG_RECEIVER_FOREGROUND)
+                .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
                 .putExtra(Intent.EXTRA_KEY_EVENT, new KeyEvent(now, now, KeyEvent.ACTION_DOWN,
                         keyCode, 0));
         try {
             context.sendBroadcast(down);
-            if (keyUpDelayMs > 0L) SystemClock.sleep(keyUpDelayMs);
-            long releasedAt = SystemClock.uptimeMillis();
-            Intent up = new Intent(Intent.ACTION_MEDIA_BUTTON)
-                    .setComponent(receiver)
-                    .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES
-                            | Intent.FLAG_RECEIVER_FOREGROUND)
-                    .putExtra(Intent.EXTRA_KEY_EVENT, new KeyEvent(now, releasedAt,
-                            KeyEvent.ACTION_UP, keyCode, 0));
-            context.sendBroadcast(up);
+            Context app = context.getApplicationContext();
+            if (app == null) app = context;
+            Context exactContext = app;
+            Runnable keyUp = () -> {
+                long releasedAt = SystemClock.uptimeMillis();
+                Intent up = new Intent(Intent.ACTION_MEDIA_BUTTON)
+                        .setComponent(receiver)
+                        .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+                        .putExtra(Intent.EXTRA_KEY_EVENT, new KeyEvent(now, releasedAt,
+                                KeyEvent.ACTION_UP, keyCode, 0));
+                try {
+                    exactContext.sendBroadcast(up);
+                } catch (RuntimeException failure) {
+                    PhoneConnectionJournal.append("media-auto-resume",
+                            "trace event=receiver_key_up_failed, receiver="
+                                    + receiver.flattenToShortString()
+                                    + ", error=" + failure.getClass().getSimpleName());
+                }
+            };
+            if (keyUpDelayMs > 0L) {
+                if (!MAIN.postDelayed(keyUp, keyUpDelayMs)) return "key_up_schedule_rejected";
+            } else {
+                keyUp.run();
+            }
             return "";
         } catch (RuntimeException failure) {
             return failure.getClass().getSimpleName();
@@ -408,6 +502,17 @@ final class MediaResumeCommand {
     @NonNull
     private static DispatchTrace trace(@NonNull Result result, @NonNull String detail) {
         return new DispatchTrace(result, detail);
+    }
+
+    @NonNull
+    private static Result receiverDispatchResult(@NonNull String dispatchError,
+                                                 @NonNull String browser) {
+        boolean receiverSent = dispatchError.isEmpty();
+        boolean browserScheduled = "bootstrap_scheduled".equals(browser);
+        if (receiverSent && browserScheduled) return Result.RECEIVER_AND_BROWSER_BOOTSTRAP;
+        if (receiverSent) return Result.RECEIVER_COMMAND;
+        if (browserScheduled) return Result.BROWSER_BOOTSTRAP;
+        return Result.DISPATCH_FAILED;
     }
 
     @NonNull

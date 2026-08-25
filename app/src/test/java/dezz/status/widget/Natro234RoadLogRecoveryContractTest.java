@@ -38,14 +38,14 @@ public final class Natro234RoadLogRecoveryContractTest {
                 + "YandexMusicBrowserStarter.java");
 
         assertTrue(controller.contains(
-                "requestYandexBrowserBootstrap = coldStartEscalation"));
+                "requestYandexBrowserBootstrap = yandexBootRecovery"));
         assertTrue(controller.contains("!yandexBrowserCooldownActive"));
         assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L"));
-        assertTrue(command.contains("route=exact_media_browser_bootstrap"));
+        assertTrue(command.contains("route=exact_receiver_browser_race"));
         assertTrue(command.contains("route=exact_session_play"));
-        assertFalse(command.contains("route=waiting_for_exact_session"));
+        assertTrue(command.contains("route=waiting_for_exact_session"));
         assertTrue(command.contains("isUsablePlaySession"));
-        assertTrue(browser.contains("new Intent().setComponent(SERVICE)"));
+        assertFalse(browser.contains("startService("));
         assertTrue(browser.contains("new MediaBrowser(context, SERVICE"));
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
