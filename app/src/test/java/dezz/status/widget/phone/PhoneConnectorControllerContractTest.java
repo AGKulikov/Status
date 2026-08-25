@@ -132,20 +132,18 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(incoming.contains("new NotificationRecord(\n"
                 + "                notification, categoryId, System.currentTimeMillis(), false,\n"
                 + "                observedAtElapsedMs, iconObservation.iconWasCached)"));
-        assertTrue(incoming.contains(
-                "if (hasDisplayName) {\n"
-                        + "            presentAncsNotification(token, record, true)"));
-        assertTrue(incoming.contains("scheduleUnresolvedNotificationExpiry(token, record)"));
+        assertTrue(incoming.contains("decoded item ready; category="));
+        assertTrue(incoming.contains("appName=\" + (hasDisplayName ? \"resolved\" : \"fallback\")"));
+        assertTrue(incoming.contains("presentAncsNotification(token, record, true)"));
         assertTrue(source.contains("cacheAppDisplayName(appIdentifier, displayName)"));
         assertTrue(source.contains("if (!record.presented)"));
         assertTrue(source.contains("presentAncsNotification(token, record, false)"));
-        assertTrue(source.contains("APP_DISPLAY_NAME_WAIT_TIMEOUT_MS = 15_000L"));
         assertTrue(source.contains("observedAtElapsedMs"));
-        assertTrue(source.contains("isUnresolvedNotificationExpired(record)"));
-        assertTrue(source.contains("APP_DISPLAY_NAME_WAIT_TIMEOUT_MS - age"));
-        assertTrue(source.contains("NotificationRecord current = notificationCache.get(uid)"));
-        assertTrue(source.contains("if (current != expected || current.presented) return"));
-        assertTrue(source.contains("notificationCache.remove(uid)"));
+        assertTrue(source.contains("PhoneAppCatalog.displayNameFallback(appIdentifier)"));
+        assertFalse(source.contains("APP_DISPLAY_NAME_WAIT_TIMEOUT_MS"));
+        assertFalse(source.contains("scheduleUnresolvedNotificationExpiry"));
+        assertFalse(source.contains("isUnresolvedNotificationExpired"));
+        assertFalse(source.contains("decoded item waiting for app name"));
         assertTrue(mirror.contains(".setSubText(appName)"));
         assertTrue(mirror.contains(".setContentTitle(record.notification.title)"));
         assertTrue(mirror.contains(".setContentText(record.notification.message)"));

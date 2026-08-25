@@ -71,7 +71,7 @@ public final class MediaAutoResumeController {
     /** One initial exact PLAY plus bounded recovery while the Yandex process is cold-starting. */
     private static final int YANDEX_MAX_ATTEMPTS = 24;
     private static final long YANDEX_SESSION_POLL_MS = 5_000L;
-    private static final long YANDEX_BROWSER_RETRY_COOLDOWN_MS = 15_000L;
+    private static final long YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L;
     private static final int YANDEX_FAST_RECEIVER_ATTEMPTS = 8;
     /** A package-scoped PLAY is idempotent, so verify/retry it without a 30-second gap. */
     private static final long YANDEX_FAST_RECEIVER_RETRY_MS = 2_000L;
@@ -331,8 +331,8 @@ public final class MediaAutoResumeController {
         long planned = state.getLong(KEY_TARGET_ELAPSED, executeAt);
         long lateness = Math.max(0L, executeAt - planned);
         long dispatchStartedAt = SystemClock.elapsedRealtime();
-        boolean coldStartEscalation = attempt > 0
-                && YANDEX_MUSIC_PACKAGE.equals(target);
+        boolean yandexBootRecovery = YANDEX_MUSIC_PACKAGE.equals(target);
+        boolean coldStartEscalation = attempt > 0 && yandexBootRecovery;
         long lastYandexBrowserBootstrap = state.getLong(
                 KEY_YANDEX_LAST_BROWSER_BOOTSTRAP_ELAPSED, Long.MIN_VALUE);
         boolean yandexBrowserCooldownActive = lastYandexBrowserBootstrap != Long.MIN_VALUE
@@ -345,7 +345,7 @@ public final class MediaAutoResumeController {
         boolean requestYandexBrowserBootstrap = coldStartEscalation
                 && !yandexBrowserCooldownActive;
         MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(
-                app, target, coldStartEscalation,
+                app, target, yandexBootRecovery,
                 requestYandexBrowserBootstrap, yandexBrowserCooldownActive,
                 yandexSessionPlayAttempted);
         long dispatchFinishedAt = SystemClock.elapsedRealtime();

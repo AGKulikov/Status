@@ -88,8 +88,9 @@ import java.security.SecureRandom;
  *
  * <p>All public calls, framework callbacks, reducer inputs, GATT operations, and listener calls
  * are serialized on the main looper.  There is at most one {@link BluetoothGatt} wrapper.  A
- * silent asynchronous client registration is retained and reasserted on that same wrapper; this
- * adapter never closes it and creates a second wrapper while registration is unprovable.</p>
+ * silent asynchronous client registration is retained while it is unprovable. Once a positive
+ * clientIf proves registration, that exact wrapper may be retired behind a bounded process-wide
+ * settle fence; this adapter never creates a second simultaneous wrapper.</p>
  */
 public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 {
     private static final long CONTROL_RETRY_DELAY_MS = 150L;
@@ -100,6 +101,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private static final int ROUTINE_REQUIRED_MTU = 69;
     private static final long TELEMETRY_REFRESH_QUIET_MS = 30_000L;
     private static final long TELEMETRY_REFRESH_RETRY_MS = 5_000L;
+    /** Ask Helper 69 for one fresh frame as soon as ANCS reaches READY. */
+    private static final long TELEMETRY_INITIAL_REFRESH_MS = 100L;
+    /** Android P unregisters clientIf asynchronously after close(); keep the process lease fenced. */
+    private static final long REGISTERED_GATT_RETIRE_SETTLE_MS = 2_000L;
     private static final long ANCS_CONTROL_WRITE_RETRY_BASE_MS = 80L;
     private static final long ANCS_CONTROL_WRITE_RETRY_MAX_MS = 640L;
     /**
@@ -222,6 +227,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         boolean waitingForProcessGate;
         boolean quarantinedBeforeRegistration;
         boolean cacheRefreshRequested;
+        boolean retirementSettleRequested;
 
         GattOwner(BleRouteToken ownerToken, BluetoothDevice device,
                   SelectedBondIdentityResolverV2.Candidate bondAttribution) {
@@ -807,7 +813,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 if (ancsSession != null) {
                     applyAncsEffects(ancs.subscriptionsReady(ancsSession));
                 }
-                subscribeCarRemoteIfPresent(effect.token);
+                scheduleTelemetryRefreshAfter(TELEMETRY_INITIAL_REFRESH_MS);
+                // The one-shot telemetry request owns the acknowledged ATT slot first. C5 is
+                // optional and starts a fraction later without delaying ANCS readiness.
+                scheduleCarRemoteSubscribe(effect.token, 250L);
                 scheduleStandardBatteryMonitoring(1_500L);
                 break;
             case REPORT_HELPER_ID_LEARNED:
@@ -1188,8 +1197,22 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             // The Java owner is terminal; switch coordinator still performs an owner-count gate.
         }
         ProcessGattRegistrationGateV2.cancelWaiter(closing);
-        ProcessGattRegistrationGateV2.release(closing);
-        dispatchMain(this::maybeCompleteTeardown);
+        boolean settle = closing.retirementSettleRequested && !radioResetProven
+                && adapter != null && adapter.isEnabled();
+        if (!settle) {
+            ProcessGattRegistrationGateV2.release(closing);
+            dispatchMain(this::maybeCompleteTeardown);
+            return;
+        }
+        reportPlatformDiagnostic(closing.ownerToken,
+                "gatt_retirement_settle phase=armed, delayMs="
+                        + REGISTERED_GATT_RETIRE_SETTLE_MS);
+        main.postDelayed(() -> {
+            ProcessGattRegistrationGateV2.release(closing);
+            reportPlatformDiagnostic(closing.ownerToken,
+                    "gatt_retirement_settle phase=complete");
+            maybeCompleteTeardown();
+        }, REGISTERED_GATT_RETIRE_SETTLE_MS);
     }
 
     private void noteCacheSensitiveFailure(GattOwner exact, int status, String stage) {
@@ -1504,9 +1527,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         exact.registrationProven = true;
         exact.cacheRefreshRequested = true;
+        exact.retirementSettleRequested = true;
         reportPlatformDiagnostic(token,
                 "silent_registration_probe result=registered, clientIfPositive=true, "
-                        + "action=guarded_refresh_and_retry");
+                        + "action=guarded_refresh_retire_settle_retry");
         reportError(IphoneTransportErrorV2.Kind.GATT,
                 "Android registered GATT privately but withheld its callback; retrying exact "
                         + "enrolled identity after guarded cache refresh", true);

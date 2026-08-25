@@ -95,7 +95,6 @@ public final class PhoneConnectorController {
     private static final long GATT_DISCOVERY_TIMEOUT_MS = 15_000L;
     private static final long DEVICE_RESCAN_MS = 15_000L;
     private static final long ANCS_STABLE_READY_RESET_MS = 50_000L;
-    private static final long APP_DISPLAY_NAME_WAIT_TIMEOUT_MS = 15_000L;
     /** Helper heartbeats remain 30 s; live notifications and one-second reads refresh sooner. */
     private static final long HELPER_TELEMETRY_TIMEOUT_MS = 65_000L;
     private static final int DESIRED_GATT_MTU = 512;
@@ -1336,13 +1335,21 @@ public final class PhoneConnectorController {
         Bundle agEvents = null;
         List<?> currentCalls = null;
         Integer audioState = null;
+        String agEventsRead = "returned_null";
         try {
             Method method = proxy.getClass().getMethod(
                     "getCurrentAgEvents", BluetoothDevice.class);
             method.setAccessible(true);
             Object raw = method.invoke(proxy, device);
-            if (raw instanceof Bundle) agEvents = new Bundle((Bundle) raw);
-        } catch (Throwable ignored) {}
+            if (raw instanceof Bundle) {
+                agEvents = new Bundle((Bundle) raw);
+                agEventsRead = "bundle";
+            } else if (raw != null) {
+                agEventsRead = "unexpected_" + raw.getClass().getSimpleName();
+            }
+        } catch (Throwable failure) {
+            agEventsRead = reflectionFailure(failure);
+        }
         try {
             Method method = proxy.getClass().getMethod(
                     "getCurrentCalls", BluetoothDevice.class);
@@ -1357,7 +1364,15 @@ public final class PhoneConnectorController {
             Object raw = method.invoke(proxy, device);
             if (raw instanceof Number) audioState = ((Number) raw).intValue();
         } catch (Throwable ignored) {}
-        return new HfpInitialState(agEvents, currentCalls, audioState);
+        return new HfpInitialState(agEvents, currentCalls, audioState, agEventsRead);
+    }
+
+    @NonNull
+    private static String reflectionFailure(@NonNull Throwable failure) {
+        Throwable cause = failure.getCause();
+        String outer = failure.getClass().getSimpleName();
+        if (cause == null || cause == failure) return outer;
+        return outer + "_cause_" + cause.getClass().getSimpleName();
     }
 
     private void applyInitialHfpState(long token, @NonNull HfpInitialState initial) {
@@ -1371,10 +1386,12 @@ public final class PhoneConnectorController {
             PhoneConnectionJournal.append("hfp-initial-state",
                     "agBundle=true, keys=" + initial.agEvents.size()
                             + ", signal=" + (rawSignal == null ? "absent" : rawSignal)
-                            + ", status=" + (status == null ? "absent" : status));
+                            + ", status=" + (status == null ? "absent" : status)
+                            + ", read=" + initial.agEventsRead);
             applyHfpEvent(token, event);
         } else {
-            PhoneConnectionJournal.append("hfp-initial-state", "agBundle=false");
+            PhoneConnectionJournal.append("hfp-initial-state",
+                    "agBundle=false, read=" + initial.agEventsRead);
         }
         if (initial.currentCalls != null) {
             calls.clear();
@@ -1877,11 +1894,12 @@ public final class PhoneConnectorController {
                             + ", network=" + telemetry.networkType
                             + ", locked=" + telemetry.phoneLocked
                             + ", sequence=" + telemetry.sequence);
-            markTelemetryUpdated(true, true);
+            // Helper is authoritative for radio generation only. Availability, operator and
+            // signal bars belong exclusively to a live HFP AG event/read; treating this frame as
+            // full network telemetry can persist null HFP fields over a retained signal sample.
+            markTelemetryUpdated(true, false);
         } else {
             batteryLiveSeenThisConnection = true;
-            networkLiveSeenThisConnection = true;
-            telemetryStale = false;
         }
         scheduleHelperTelemetryExpiry(token);
         if (powerChanged || networkChanged || lockChanged) publishSnapshot(token);
@@ -2010,15 +2028,6 @@ public final class PhoneConnectorController {
         }
         long observedAtElapsedMs = observedAt > 0L
                 ? observedAt : SystemClock.elapsedRealtime();
-        if (SystemClock.elapsedRealtime() - observedAtElapsedMs
-                > APP_DISPLAY_NAME_WAIT_TIMEOUT_MS) {
-            PhoneConnectionJournal.append("ancs-delivery",
-                    "decoded item expired before presentation; category=" + categoryId);
-            Log.w(TAG, "Dropping ANCS notification " + uid
-                    + ": transport item exceeded real-time TTL");
-            return;
-        }
-
         if (!cleanAppIdentifier.isEmpty() && !cleanAppName.isEmpty()) {
             cacheAppDisplayName(cleanAppIdentifier, cleanAppName);
         }
@@ -2037,13 +2046,14 @@ public final class PhoneConnectorController {
         notificationCache.remove(uid);
         notificationCache.put(uid, record);
         trimNotificationCache();
-        if (hasDisplayName) {
-            presentAncsNotification(token, record, true);
-        } else {
-            PhoneConnectionJournal.append("ancs-delivery",
-                    "decoded item waiting for app name; category=" + categoryId);
-            scheduleUnresolvedNotificationExpiry(token, record);
-        }
+        // App DisplayName is cosmetic and travels through a second serialized ANCS request. Under
+        // a notification burst or a busy Android ATT slot it can arrive much later than the live
+        // notification attributes. Present immediately with the deterministic bundle-id fallback;
+        // handleAncsTransportAppName() updates the same item when iOS supplies the friendly name.
+        PhoneConnectionJournal.append("ancs-delivery",
+                "decoded item ready; category=" + categoryId
+                        + ", appName=" + (hasDisplayName ? "resolved" : "fallback"));
+        presentAncsNotification(token, record, true);
     }
 
     private void handleAncsTransportAppName(long token, @Nullable String rawAppIdentifier,
@@ -2060,10 +2070,6 @@ public final class PhoneConnectorController {
             NotificationRecord record = iterator.next().getValue();
             if (!appIdentifier.equals(record.notification.appIdentifier)) continue;
             if (!record.presented) {
-                if (isUnresolvedNotificationExpired(record)) {
-                    iterator.remove();
-                    continue;
-                }
                 presentAncsNotification(token, record, false);
             } else {
                 mirrorAncsNotification(token, record);
@@ -2090,36 +2096,6 @@ public final class PhoneConnectorController {
         upsertAncsMessage(record);
         mirrorAncsNotification(token, record);
         if (publish) publishSnapshot(token);
-    }
-
-    /**
-     * A DisplayName response belongs to a live notification, not to an archive. If iOS never
-     * completes that App Attributes request, discard the hidden record instead of allowing a
-     * later notification for the same bundle to release an old burst.
-     */
-    private void scheduleUnresolvedNotificationExpiry(
-            long token, @NonNull NotificationRecord expected) {
-        Handler handler = worker;
-        if (handler == null) return;
-        long uid = expected.notification.uid;
-        long age = Math.max(0L,
-                SystemClock.elapsedRealtime() - expected.observedAtElapsedMs);
-        long remaining = Math.max(0L, APP_DISPLAY_NAME_WAIT_TIMEOUT_MS - age);
-        handler.postDelayed(() -> runIfCurrent(token, () -> {
-            NotificationRecord current = notificationCache.get(uid);
-            if (current != expected || current.presented) return;
-            notificationCache.remove(uid);
-            Log.w(TAG, "Dropping live ANCS notification " + uid
-                    + ": App DisplayName unresolved after "
-                    + APP_DISPLAY_NAME_WAIT_TIMEOUT_MS + " ms");
-        }), remaining);
-    }
-
-    private static boolean isUnresolvedNotificationExpired(
-            @NonNull NotificationRecord record) {
-        return !record.presented
-                && SystemClock.elapsedRealtime() - record.observedAtElapsedMs
-                > APP_DISPLAY_NAME_WAIT_TIMEOUT_MS;
     }
 
     private void cacheAppDisplayName(@NonNull String appIdentifier,
@@ -3746,12 +3722,14 @@ public final class PhoneConnectorController {
         @Nullable final Bundle agEvents;
         @Nullable final List<?> currentCalls;
         @Nullable final Integer audioState;
+        @NonNull final String agEventsRead;
 
         HfpInitialState(@Nullable Bundle agEvents, @Nullable List<?> currentCalls,
-                        @Nullable Integer audioState) {
+                        @Nullable Integer audioState, @NonNull String agEventsRead) {
             this.agEvents = agEvents;
             this.currentCalls = currentCalls;
             this.audioState = audioState;
+            this.agEventsRead = agEventsRead;
         }
     }
 

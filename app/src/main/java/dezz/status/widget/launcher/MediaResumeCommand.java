@@ -38,7 +38,6 @@ final class MediaResumeCommand {
         SESSION_COMMAND,
         RECEIVER_COMMAND,
         BROWSER_BOOTSTRAP,
-        WAITING_FOR_SESSION,
         DISPATCH_FAILED,
         NO_TARGET
     }
@@ -159,6 +158,8 @@ final class MediaResumeCommand {
         String sessionError = "none";
         String sessionInventory = "[]";
         int activeSessionCount = -1;
+        int ignoredYandexSessionState = Integer.MIN_VALUE;
+        long ignoredYandexSessionActions = 0L;
         MediaSessionManager sessions = context.getSystemService(MediaSessionManager.class);
         if (sessions != null) {
             try {
@@ -186,6 +187,16 @@ final class MediaResumeCommand {
                             && state.getState() == PlaybackState.STATE_PLAYING;
                     int playbackState = state == null ? -1 : state.getState();
                     long actions = state == null ? 0L : state.getActions();
+                    if (coldStartEscalation && YANDEX_MUSIC_PACKAGE.equals(target)
+                            && command == Command.PLAY && !isUsablePlaySession(state)) {
+                        // Yandex exposes a STATE_NONE token during process bootstrap. Road logs
+                        // show that TransportControls.play() on that token is accepted locally but
+                        // ignored indefinitely. Keep looking, then use the exact receiver/browser
+                        // cold-start routes until a real PAUSED/STOPPED session exists.
+                        ignoredYandexSessionState = playbackState;
+                        ignoredYandexSessionActions = actions;
+                        continue;
+                    }
                     switch (command) {
                         case PLAY:
                             if (playing) {
@@ -253,12 +264,9 @@ final class MediaResumeCommand {
         }
         if (coldStartEscalation && YANDEX_MUSIC_PACKAGE.equals(target)
                 && command == Command.PLAY && yandexBrowserBootstrapPending) {
-            return trace(Result.WAITING_FOR_SESSION,
-                    "route=waiting_for_exact_session, process=" + targetProcessState
-                            + ", activeSessions=" + activeSessionCount
-                            + ", sessions=" + sessionInventory
-                            + ", sessionError=" + sessionError
-                            + ", browser=cooldown_active");
+            // Do not spend the browser bind window polling in silence. An exact package receiver
+            // PLAY remains safe and may complete the same cold start while MediaBrowser connects.
+            yandexBootstrap = "cooldown_active";
         }
 
         PackageManager packages = context.getPackageManager();
@@ -290,6 +298,9 @@ final class MediaResumeCommand {
                             + ", receiver=" + receiver.flattenToShortString()
                             + ", keyUpDelayMs=" + keyUpDelayMs
                             + ", browser=" + yandexBootstrap
+                            + ", ignoredSessionState="
+                            + ignoredSessionState(ignoredYandexSessionState)
+                            + ", ignoredSessionActions=" + ignoredYandexSessionActions
                             + ", dispatchError=" + emptyAsNone(dispatchError));
         }
 
@@ -309,6 +320,9 @@ final class MediaResumeCommand {
                             + ", receiver=" + known.flattenToShortString()
                             + ", keyUpDelayMs=" + keyUpDelayMs
                             + ", browser=" + yandexBootstrap
+                            + ", ignoredSessionState="
+                            + ignoredSessionState(ignoredYandexSessionState)
+                            + ", ignoredSessionActions=" + ignoredYandexSessionActions
                             + ", dispatchError=" + emptyAsNone(dispatchError));
         }
         String browser = "not_requested".equals(yandexBootstrap)
@@ -350,6 +364,18 @@ final class MediaResumeCommand {
             default:
                 return KeyEvent.KEYCODE_MEDIA_PLAY;
         }
+    }
+
+    private static boolean isUsablePlaySession(PlaybackState state) {
+        if (state == null || state.getState() == PlaybackState.STATE_NONE) return false;
+        if (state.getState() == PlaybackState.STATE_PLAYING) return true;
+        long actions = state.getActions();
+        return (actions & (PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE)) != 0L;
+    }
+
+    @NonNull
+    private static String ignoredSessionState(int state) {
+        return state == Integer.MIN_VALUE ? "none" : Integer.toString(state);
     }
 
     @NonNull

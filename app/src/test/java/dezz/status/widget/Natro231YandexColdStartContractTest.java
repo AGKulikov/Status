@@ -27,19 +27,19 @@ public final class Natro231YandexColdStartContractTest {
         assertTrue(build.contains("return 208021255"));
         assertTrue(command.contains("route=exact_session_play"));
         assertTrue(command.contains("ActivityManager process inventory"));
-        assertFalse(command.contains("isUsablePlaySession"));
+        assertTrue(command.contains("isUsablePlaySession"));
         assertFalse(command.contains("verified_exact_session_media_button"));
         assertFalse(command.contains("controller.dispatchMediaButtonEvent"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
 
         assertTrue(controller.contains("YANDEX_MAX_ATTEMPTS = 24"));
         assertTrue(controller.contains("YANDEX_SESSION_POLL_MS = 5_000L"));
-        assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 15_000L"));
+        assertTrue(controller.contains("YANDEX_BROWSER_RETRY_COOLDOWN_MS = 10_000L"));
         assertTrue(controller.contains("requestYandexBrowserBootstrap = coldStartEscalation"));
         assertTrue(controller.contains("KEY_YANDEX_BROWSER_BOOTSTRAP_REQUESTED"));
         assertTrue(controller.contains("KEY_YANDEX_SESSION_PLAY_ATTEMPTED"));
         assertTrue(command.contains("Result.BROWSER_BOOTSTRAP"));
-        assertTrue(command.contains("Result.WAITING_FOR_SESSION"));
+        assertFalse(command.contains("Result.WAITING_FOR_SESSION"));
         assertTrue(command.contains("browser=\" + browser"));
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));
 

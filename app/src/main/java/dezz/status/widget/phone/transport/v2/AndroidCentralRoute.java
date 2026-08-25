@@ -25,7 +25,8 @@ public final class AndroidCentralRoute {
     public static final long PROOF_TIMEOUT_MS = 5_000L;
     public static final long CCCD_TIMEOUT_MS = 5_000L;
     public static final long STOP_TIMEOUT_MS = 4_000L;
-    public static final long STARTUP_QUIET_MS = 1_500L;
+    /** Lets Android P retire the replaced APK process's native client before a fresh registration. */
+    public static final long STARTUP_QUIET_MS = 3_000L;
     public static final long MAX_RETRY_MS = 15_000L;
     /** Autonomous retained-owner probe after the bounded fast reassert ladder is exhausted. */
     public static final long WAIT_SYSTEM_RECOVERY_MS = 180_000L;

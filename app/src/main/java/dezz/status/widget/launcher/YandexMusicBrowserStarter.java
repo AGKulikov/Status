@@ -22,8 +22,8 @@ final class YandexMusicBrowserStarter {
     private static final ComponentName SERVICE = new ComponentName(
             "ru.yandex.music",
             "ru.yandex.music.common.media.mediabrowser.MusicBrowserService");
-    /** Cold Yandex restore on the KX11 can take more than five seconds after BOOT_COMPLETED. */
-    private static final long CONNECTION_TIMEOUT_MS = 15_000L;
+    /** A successful cold bind needs about six seconds; ten keeps that path but retries sooner. */
+    private static final long CONNECTION_TIMEOUT_MS = 10_000L;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static Connection current;
 

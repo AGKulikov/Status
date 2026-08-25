@@ -25,7 +25,7 @@ public final class Natro2219RoadLogRecoveryContractTest {
         assertTrue(build.contains("return 208021253"));
         assertTrue(command.contains("route=exact_session_play"));
         assertTrue(command.contains("route=exact_media_browser_bootstrap"));
-        assertTrue(command.contains("route=waiting_for_exact_session"));
+        assertFalse(command.contains("route=waiting_for_exact_session"));
         assertFalse(command.contains("deferredYandexPlaySession"));
         String queriedReceiver = between(command,
                 "for (ResolveInfo resolved : receivers)",
@@ -34,7 +34,7 @@ public final class Natro2219RoadLogRecoveryContractTest {
         assertFalse(queriedReceiver.contains("requestYandexBrowserIfUseful"));
         assertTrue(command.indexOf("route=exact_session_play")
                 < command.indexOf("PackageManager packages"));
-        assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 15_000L"));
+        assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 10_000L"));
         assertTrue(browser.contains("connect_coalesced"));
     }
 

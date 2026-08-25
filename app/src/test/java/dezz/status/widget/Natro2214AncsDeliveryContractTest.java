@@ -33,7 +33,7 @@ public final class Natro2214AncsDeliveryContractTest {
         String controller = source(
                 "app/src/main/java/dezz/status/widget/phone/PhoneConnectorController.java");
         assertTrue(central.contains("ancsTrace.decodedNotification()"));
-        assertTrue(controller.contains("decoded item waiting for app name; category="));
+        assertTrue(controller.contains("decoded item ready; category="));
         assertTrue(controller.contains("notification presented; category="));
     }
 
