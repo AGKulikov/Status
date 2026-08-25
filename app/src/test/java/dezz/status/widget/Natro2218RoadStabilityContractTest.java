@@ -27,7 +27,8 @@ public final class Natro2218RoadStabilityContractTest {
         assertTrue(build.contains("if (version == '2.2.18')"));
         assertTrue(build.contains("return 208021252"));
         assertTrue(lifecycle.contains("return ACTION_BOOT_COMPLETED.equals(action)"));
-        assertTrue(lifecycle.contains("ACTION_LOCKED_BOOT_COMPLETED.equals(previousAction)"));
+        assertTrue(lifecycle.contains("static boolean shouldMovePlanAnchor"));
+        assertTrue(lifecycle.contains("ACTION_USER_UNLOCKED"));
         assertTrue(controller.contains("MAX_ATTEMPTS = 5"));
         assertTrue(controller.contains("RETRY_DELAY_MS = 10_000L"));
         assertTrue(controller.contains("reason=player_boot_gate"));

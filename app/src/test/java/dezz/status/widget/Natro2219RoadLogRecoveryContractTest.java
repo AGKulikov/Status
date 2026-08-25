@@ -33,7 +33,8 @@ public final class Natro2219RoadLogRecoveryContractTest {
                 < command.indexOf("PackageManager packages"));
         assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 20_000L"));
         assertTrue(browser.contains("playExactSessionOnly"));
-        assertTrue(browser.contains("connect_coalesced"));
+        assertTrue(browser.contains("play_joined"));
+        assertTrue(browser.contains("warmup_coalesced"));
     }
 
     @Test public void asynchronousGattFailureRetiresTheTransportNotTheAncsParser()

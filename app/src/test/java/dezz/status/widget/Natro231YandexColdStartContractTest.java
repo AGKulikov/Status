@@ -47,7 +47,8 @@ public final class Natro231YandexColdStartContractTest {
         assertTrue(browser.contains("bootstrap_scheduled"));
         assertFalse(browser.contains("service_prewarm"));
         assertTrue(browser.contains("playExactSessionOnly"));
-        assertTrue(browser.contains("dispatchExactSessionAndFinish(\"connection_failed\")"));
+        assertTrue(browser.contains("finishOrDispatch(\"connection_failed\")"));
+        assertTrue(browser.contains("warmup_connected"));
         assertFalse(browser.contains("finish(\"play_dispatched\""));
     }
 
