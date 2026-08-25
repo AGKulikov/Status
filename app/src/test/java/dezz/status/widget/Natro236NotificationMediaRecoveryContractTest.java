@@ -98,6 +98,8 @@ public final class Natro236NotificationMediaRecoveryContractTest {
         assertTrue(controller.contains("one-shot exact receiver kick"));
         assertTrue(controller.contains("YANDEX_FAST_SESSION_POLL_ATTEMPTS"));
         assertTrue(browser.contains("MusicBrowserService"));
+        assertTrue(browser.contains("requestWarmup"));
+        assertTrue(browser.contains("warmup_connected"));
         assertTrue(browser.contains("playExactSessionOnly"));
         assertFalse(browser.contains("startService("));
     }

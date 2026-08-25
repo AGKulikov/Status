@@ -34,9 +34,9 @@ public class PhoneWidgetServiceIntegrationContractTest {
                 "private PreparedInitialIntegrationStage prepareInitialIntegrationWorkerStage(",
                 "private PreparedInitialIntegrationStage preparePhonePresenceStage(");
         assertTrue(dispatch.contains("case 1:"));
-        assertTrue(dispatch.contains("return preparePhonePresenceStage(stage)"));
-        assertTrue(dispatch.contains("case 2:"));
         assertTrue(dispatch.contains("return preparePhoneStage(stage)"));
+        assertTrue(dispatch.contains("case 2:"));
+        assertTrue(dispatch.contains("return preparePhonePresenceStage(stage)"));
 
         String presence = between(source,
                 "private PreparedInitialIntegrationStage preparePhonePresenceStage(",

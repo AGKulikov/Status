@@ -1733,9 +1733,9 @@ public class WidgetService extends Service {
     private PreparedInitialIntegrationStage prepareInitialIntegrationWorkerStage(int stage) {
         switch (stage) {
             case 1:
-                return preparePhonePresenceStage(stage);
-            case 2:
                 return preparePhoneStage(stage);
+            case 2:
+                return preparePhonePresenceStage(stage);
             case 3:
                 return prepareStatusSurfaceStage(stage);
             case 4:
@@ -7227,10 +7227,18 @@ public class WidgetService extends Service {
                     ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS - age + 1L);
             return;
         }
+        boolean expiredWindow = ecarxNavigatorWindowDecision
+                == NavigatorWindowSourcePolicy.VendorDecision.WINDOWED;
         ecarxNavigatorWindowDecision = NavigatorWindowSourcePolicy.VendorDecision.NONE;
         ecarxNavigatorWindowDecisionAtElapsed = -1L;
         try {
-            DiagnosticJournal.warn("navigator-window", "vendor confirmation lease expired");
+            if (expiredWindow) {
+                DiagnosticJournal.warn("navigator-window",
+                        "windowed vendor confirmation lease expired");
+            } else {
+                DiagnosticJournal.debug("navigator-window",
+                        "non-windowed vendor confirmation lease expired");
+            }
         } catch (RuntimeException | LinkageError ignored) {}
         recomputeForegroundSurfacePresentation();
     }

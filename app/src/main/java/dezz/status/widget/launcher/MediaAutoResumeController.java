@@ -277,6 +277,14 @@ public final class MediaAutoResumeController {
         long targetElapsed = planAnchorElapsed + Math.max(delaySeconds * 1_000L,
                 StartupWorkCoordinator.mediaAutoResumeMinimumDelayMillis());
         long delayMillis = Math.max(0L, targetElapsed - SystemClock.elapsedRealtime());
+        if (YANDEX_MUSIC_PACKAGE.equals(target)) {
+            // MediaBrowser.bind is the supported background-only process bootstrap. Start it before
+            // the PLAY deadline so Yandex can create its MediaSession without opening an Activity.
+            String warmup = YandexMusicBrowserStarter.requestWarmup(app);
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=yandex_background_warmup, token=" + captureToken
+                            + ", result=" + warmup + ", remainingMs=" + delayMillis);
+        }
         schedule(app, captureToken, 0, delayMillis, "initial_plan");
         Log.i(TAG, "Scheduled auto-resume for " + target
                 + " after " + (delayMillis / 1_000L) + " s");

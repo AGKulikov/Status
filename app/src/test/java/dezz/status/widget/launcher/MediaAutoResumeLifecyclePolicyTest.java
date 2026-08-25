@@ -7,12 +7,12 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public final class MediaAutoResumeLifecyclePolicyTest {
-    @Test public void coldBootSequenceMovesDelayToFirstPlayerUsableBoundary() {
+    @Test public void coldBootSequencePreservesOriginalDelayAnchor() {
         assertTrue(MediaAutoResumeLifecyclePolicy.shouldCoalesce(
                 MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED,
                 MediaAutoResumeLifecyclePolicy.ACTION_BOOT_COMPLETED,
                 false, 180_000L));
-        assertTrue(MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
+        assertFalse(MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
                 MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED,
                 MediaAutoResumeLifecyclePolicy.ACTION_BOOT_COMPLETED));
         assertFalse(MediaAutoResumeLifecyclePolicy.shouldMovePlanAnchor(
@@ -20,11 +20,19 @@ public final class MediaAutoResumeLifecyclePolicyTest {
                 MediaAutoResumeLifecyclePolicy.ACTION_QUICKBOOT_POWERON));
     }
 
-    @Test public void lockedBootOnlyCapturesHistoryAndNormalBootArmsPlayback() {
+    @Test public void userUnlockIsTheEarliestPlayerUsableBoundary() {
         assertFalse(MediaAutoResumeLifecyclePolicy.isUsableBoundary(
                 MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED));
         assertTrue(MediaAutoResumeLifecyclePolicy.isUsableBoundary(
                 MediaAutoResumeLifecyclePolicy.ACTION_BOOT_COMPLETED));
+        assertTrue(MediaAutoResumeLifecyclePolicy.isLifecycleAction(
+                MediaAutoResumeLifecyclePolicy.ACTION_USER_UNLOCKED));
+        assertTrue(MediaAutoResumeLifecyclePolicy.isUsableBoundary(
+                MediaAutoResumeLifecyclePolicy.ACTION_USER_UNLOCKED));
+        assertTrue(MediaAutoResumeLifecyclePolicy.shouldCoalesce(
+                MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED,
+                MediaAutoResumeLifecyclePolicy.ACTION_USER_UNLOCKED,
+                false, 180_000L));
     }
 
     @Test public void ecarxQuickBootBurstNeverRestartsConsumedTimer() {

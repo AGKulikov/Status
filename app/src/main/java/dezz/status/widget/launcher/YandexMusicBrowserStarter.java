@@ -33,6 +33,17 @@ final class YandexMusicBrowserStarter {
      */
     @NonNull
     static String requestBootstrap(@NonNull Context context) {
+        return request(context, true);
+    }
+
+    /** Starts only Yandex's exported media service; it never opens UI or issues PLAY. */
+    @NonNull
+    static String requestWarmup(@NonNull Context context) {
+        return request(context, false);
+    }
+
+    @NonNull
+    private static String request(@NonNull Context context, boolean playRequested) {
         Context app = context.getApplicationContext();
         if (app == null) app = context;
         try {
@@ -43,8 +54,9 @@ final class YandexMusicBrowserStarter {
         }
         Context exactApp = app;
         try {
-            return MAIN.post(() -> startOrJoin(exactApp))
-                    ? "bootstrap_scheduled" : "schedule_rejected";
+            return MAIN.post(() -> startOrJoin(exactApp, playRequested))
+                    ? (playRequested ? "bootstrap_scheduled" : "warmup_scheduled")
+                    : "schedule_rejected";
         } catch (RuntimeException rejected) {
             return "schedule_" + rejected.getClass().getSimpleName();
         }
@@ -56,12 +68,12 @@ final class YandexMusicBrowserStarter {
         return requestBootstrap(context);
     }
 
-    private static void startOrJoin(@NonNull Context context) {
+    private static void startOrJoin(@NonNull Context context, boolean playRequested) {
         if (current != null && !current.completed) {
-            current.journal("connect_coalesced", "none");
+            current.request(playRequested);
             return;
         }
-        current = new Connection(context);
+        current = new Connection(context, playRequested);
         current.start();
     }
 
@@ -71,9 +83,19 @@ final class YandexMusicBrowserStarter {
         private final long startedAt = SystemClock.elapsedRealtime();
         private MediaBrowser browser;
         private boolean completed;
+        private boolean connected;
+        private boolean playRequested;
 
-        Connection(@NonNull Context context) {
+        Connection(@NonNull Context context, boolean playRequested) {
             this.context = context;
+            this.playRequested = playRequested;
+        }
+
+        void request(boolean requestPlay) {
+            if (completed) return;
+            if (requestPlay) playRequested = true;
+            journal(requestPlay ? "play_joined" : "warmup_coalesced", "none");
+            if (connected && playRequested) dispatchExactSessionAndFinish("connected_play");
         }
 
         void start() {
@@ -90,21 +112,34 @@ final class YandexMusicBrowserStarter {
 
         @Override public void onConnected() {
             if (completed || browser == null) return;
-            dispatchExactSessionAndFinish("connected");
+            connected = true;
+            if (playRequested) {
+                dispatchExactSessionAndFinish("connected_play");
+            } else {
+                journal("warmup_connected", "none");
+            }
         }
 
         @Override public void onConnectionSuspended() {
-            dispatchExactSessionAndFinish("connection_suspended");
+            finishOrDispatch("connection_suspended");
         }
 
         @Override public void onConnectionFailed() {
             // mSaver retries the exact active session even on this callback: the player process
             // can publish its session immediately before the browser reports failure.
-            dispatchExactSessionAndFinish("connection_failed");
+            finishOrDispatch("connection_failed");
         }
 
         @Override public void run() {
-            dispatchExactSessionAndFinish("connection_timeout");
+            finishOrDispatch("connection_timeout");
+        }
+
+        private void finishOrDispatch(@NonNull String event) {
+            if (playRequested) {
+                dispatchExactSessionAndFinish(event);
+            } else {
+                finish(event, "warmup_only");
+            }
         }
 
         private void dispatchExactSessionAndFinish(@NonNull String event) {
