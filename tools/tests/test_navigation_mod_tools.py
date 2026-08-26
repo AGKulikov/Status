@@ -106,6 +106,7 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn('KEY_ALIAS="${KEY_ALIAS:-status-widget-ha}"', navigator)
         self.assertIn("--v2-signing-enabled true", pair)
         self.assertIn("--v3-signing-enabled true", pair)
+        self.assertIn('--min-sdk-version 24 "$NATRO_SIGNED"', pair)
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
@@ -124,6 +125,7 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn('android:sharedUserId', verifier)
         self.assertIn('Main Natro content area: 1760x720', verifier)
         self.assertIn('plane 728x190 @ (0,720)', verifier)
+        self.assertIn('probe_api = 24 if scheme == "v2"', verifier)
         self.assertIn('verify_kx11_navigation_pair.py', pair)
         self.assertIn('KX11-COMPATIBILITY.txt', pair)
 

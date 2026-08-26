@@ -143,6 +143,8 @@ fi
 
 NATRO_VERIFY=$("$APKSIGNER" verify --verbose --print-certs \
   --min-sdk-version 28 "$NATRO_SIGNED")
+NATRO_V2_VERIFY=$("$APKSIGNER" verify --verbose --print-certs \
+  --min-sdk-version 24 "$NATRO_SIGNED")
 NAVIGATOR_VERIFY=$("$APKSIGNER" verify --verbose --print-certs \
   --min-sdk-version 28 "$NAVIGATOR_SIGNED")
 for verification in "$NATRO_VERIFY" "$NAVIGATOR_VERIFY"; do
@@ -154,7 +156,7 @@ for verification in "$NATRO_VERIFY" "$NAVIGATOR_VERIFY"; do
     <<<"$verification"
 done
 grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' \
-  <<<"$NATRO_VERIFY"
+  <<<"$NATRO_V2_VERIFY"
 "$ZIPALIGN" -c -P 16 -v 4 "$NATRO_SIGNED" >/dev/null
 "$ZIPALIGN" -c -P 16 -v 4 "$NAVIGATOR_SIGNED" >/dev/null
 
@@ -176,6 +178,8 @@ python3 "$SCRIPT_DIR/verify_kx11_navigation_pair.py" \
 {
   printf '%s\n' 'Natro:'
   printf '%s\n' "$NATRO_VERIFY"
+  printf '\n%s\n' 'Natro v2-presence probe (API 24 verifier mode):'
+  printf '%s\n' "$NATRO_V2_VERIFY"
   printf '\n%s\n' 'Navigator:'
   printf '%s\n' "$NAVIGATOR_VERIFY"
 } > "$REPORT"

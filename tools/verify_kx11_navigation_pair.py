@@ -117,9 +117,19 @@ def verify_signer(apksigner: Path, apk: Path, schemes: Iterable[str]) -> str:
         )
     if "Number of signers: 1" not in output:
         raise VerificationError(f"{apk.name}: APK must have exactly one signer")
+    probes = {KX11_ANDROID_API: output}
     for scheme in schemes:
+        # In an API-28-only range apksigner reports only the applicable v3 block, even when the
+        # APK also contains v2. Probe v2 at its introduction API solely to prove block presence;
+        # the actual KX11 signature has already been verified above at API 28.
+        probe_api = 24 if scheme == "v2" else KX11_ANDROID_API
+        if probe_api not in probes:
+            probes[probe_api] = run([
+                str(apksigner), "verify", "--verbose", "--print-certs",
+                "--min-sdk-version", str(probe_api), str(apk),
+            ])
         marker = f"Verified using {scheme} scheme (APK Signature Scheme {scheme}): true"
-        if marker not in output:
+        if marker not in probes[probe_api]:
             raise VerificationError(f"{apk.name}: required {scheme} signature is absent")
     return output
 
