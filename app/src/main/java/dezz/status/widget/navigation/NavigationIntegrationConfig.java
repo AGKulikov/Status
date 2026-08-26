@@ -1,0 +1,324 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+package dezz.status.widget.navigation;
+
+import androidx.annotation.NonNull;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.Locale;
+
+/** Independent rendering profiles for Navigator's main surface and Natro's HUD surface. */
+public final class NavigationIntegrationConfig {
+    public static final int SCHEMA_VERSION = 1;
+    public static final int MAX_JSON_CHARS = 384 * 1024;
+
+    @NonNull public MapProfile mainMap = MapProfile.defaults(Target.MAIN);
+    @NonNull public MapProfile hudMap = MapProfile.defaults(Target.HUD);
+    @NonNull public FloatingWindowProfile mainFloatingWindow = FloatingWindowProfile.defaults();
+
+    public enum Target { MAIN, HUD }
+
+    @NonNull
+    public JSONObject toJson() throws JSONException {
+        normalize();
+        return new JSONObject()
+                .put("schema", SCHEMA_VERSION)
+                .put("mainMap", mainMap.toJson())
+                .put("hudMap", hudMap.toJson())
+                .put("mainFloatingWindow", mainFloatingWindow.toJson());
+    }
+
+    @NonNull
+    public static NavigationIntegrationConfig fromJson(@NonNull String raw) {
+        if (raw.length() > MAX_JSON_CHARS || raw.indexOf('\u0000') >= 0) {
+            throw new IllegalArgumentException("Navigation configuration is too large");
+        }
+        try {
+            JSONObject source = new JSONObject(raw);
+            int schema = source.optInt("schema", SCHEMA_VERSION);
+            if (schema != SCHEMA_VERSION) {
+                throw new IllegalArgumentException(
+                        "Unsupported navigation configuration schema " + schema);
+            }
+            NavigationIntegrationConfig result = new NavigationIntegrationConfig();
+            result.mainMap = MapProfile.fromJson(Target.MAIN, source.optJSONObject("mainMap"));
+            result.hudMap = MapProfile.fromJson(Target.HUD, source.optJSONObject("hudMap"));
+            result.mainFloatingWindow = FloatingWindowProfile.fromJson(
+                    source.optJSONObject("mainFloatingWindow"));
+            result.normalize();
+            return result;
+        } catch (JSONException error) {
+            throw new IllegalArgumentException("Invalid navigation configuration", error);
+        }
+    }
+
+    public void normalize() {
+        if (mainMap == null || mainMap.target != Target.MAIN) {
+            mainMap = MapProfile.defaults(Target.MAIN);
+        }
+        if (hudMap == null || hudMap.target != Target.HUD) {
+            hudMap = MapProfile.defaults(Target.HUD);
+        }
+        if (mainFloatingWindow == null) mainFloatingWindow = FloatingWindowProfile.defaults();
+        mainMap.normalize();
+        hudMap.normalize();
+        mainFloatingWindow.normalize();
+    }
+
+    /** Visual map settings. Geometry of the HUD map stays in the HUD element layout. */
+    public static final class MapProfile {
+        private static final int MAX_STYLE_CHARS = 128 * 1024;
+
+        @NonNull public final Target target;
+        public boolean enabled;
+        @NonNull public String cameraMode = "FOLLOW_ROUTE";
+        public double zoomDelta;
+        public int tiltDegrees = 60;
+        public int focusXPercent = 50;
+        public int focusYPercent = 72;
+        public int mapScalePercent = 100;
+        public boolean automaticDayNight = true;
+        public boolean nightMode;
+        public boolean showRoute = true;
+        public boolean showTraffic = true;
+        public boolean showLabels = true;
+        public boolean showPois = true;
+        public boolean showBuildings = true;
+        public boolean showParks = true;
+        public boolean showWater = true;
+        public boolean showModels;
+        public boolean showCursor = true;
+        public int cursorScalePercent = 100;
+        @NonNull public String cursorColor = "#FFFFC400";
+        @NonNull public String cursorOutlineColor = "#FF17191E";
+        @NonNull public String routeColor = "#FFFFC400";
+        @NonNull public String routeOutlineColor = "#FF16181D";
+        public double routeWidth = 8d;
+        public double routeOutlineWidth = 2d;
+        public int maximumFps;
+        @NonNull public String dayStyleJson = "";
+        @NonNull public String nightStyleJson = "";
+
+        private MapProfile(@NonNull Target target) {
+            this.target = target;
+        }
+
+        @NonNull
+        public static MapProfile defaults(@NonNull Target target) {
+            MapProfile result = new MapProfile(target);
+            result.enabled = target == Target.MAIN;
+            result.maximumFps = target == Target.HUD ? 20 : 30;
+            if (target == Target.HUD) {
+                result.showPois = false;
+                result.showBuildings = false;
+                result.showModels = false;
+            }
+            return result;
+        }
+
+        @NonNull
+        JSONObject toJson() throws JSONException {
+            normalize();
+            return new JSONObject()
+                    .put("target", target.name())
+                    .put("enabled", enabled)
+                    .put("cameraMode", cameraMode)
+                    .put("zoomDelta", zoomDelta)
+                    .put("tiltDegrees", tiltDegrees)
+                    .put("focusXPercent", focusXPercent)
+                    .put("focusYPercent", focusYPercent)
+                    .put("mapScalePercent", mapScalePercent)
+                    .put("automaticDayNight", automaticDayNight)
+                    .put("nightMode", nightMode)
+                    .put("showRoute", showRoute)
+                    .put("showTraffic", showTraffic)
+                    .put("showLabels", showLabels)
+                    .put("showPois", showPois)
+                    .put("showBuildings", showBuildings)
+                    .put("showParks", showParks)
+                    .put("showWater", showWater)
+                    .put("showModels", showModels)
+                    .put("showCursor", showCursor)
+                    .put("cursorScalePercent", cursorScalePercent)
+                    .put("cursorColor", cursorColor)
+                    .put("cursorOutlineColor", cursorOutlineColor)
+                    .put("routeColor", routeColor)
+                    .put("routeOutlineColor", routeOutlineColor)
+                    .put("routeWidth", routeWidth)
+                    .put("routeOutlineWidth", routeOutlineWidth)
+                    .put("maximumFps", maximumFps)
+                    .put("dayStyleJson", dayStyleJson)
+                    .put("nightStyleJson", nightStyleJson);
+        }
+
+        @NonNull
+        static MapProfile fromJson(@NonNull Target target, JSONObject source) {
+            MapProfile result = defaults(target);
+            if (source == null) return result;
+            result.enabled = source.optBoolean("enabled", result.enabled);
+            result.cameraMode = source.optString("cameraMode", result.cameraMode);
+            result.zoomDelta = source.optDouble("zoomDelta", result.zoomDelta);
+            result.tiltDegrees = source.optInt("tiltDegrees", result.tiltDegrees);
+            result.focusXPercent = source.optInt("focusXPercent", result.focusXPercent);
+            result.focusYPercent = source.optInt("focusYPercent", result.focusYPercent);
+            result.mapScalePercent = source.optInt(
+                    "mapScalePercent", result.mapScalePercent);
+            result.automaticDayNight = source.optBoolean(
+                    "automaticDayNight", result.automaticDayNight);
+            result.nightMode = source.optBoolean("nightMode", result.nightMode);
+            result.showRoute = source.optBoolean("showRoute", result.showRoute);
+            result.showTraffic = source.optBoolean("showTraffic", result.showTraffic);
+            result.showLabels = source.optBoolean("showLabels", result.showLabels);
+            result.showPois = source.optBoolean("showPois", result.showPois);
+            result.showBuildings = source.optBoolean("showBuildings", result.showBuildings);
+            result.showParks = source.optBoolean("showParks", result.showParks);
+            result.showWater = source.optBoolean("showWater", result.showWater);
+            result.showModels = source.optBoolean("showModels", result.showModels);
+            result.showCursor = source.optBoolean("showCursor", result.showCursor);
+            result.cursorScalePercent = source.optInt(
+                    "cursorScalePercent", result.cursorScalePercent);
+            result.cursorColor = source.optString("cursorColor", result.cursorColor);
+            result.cursorOutlineColor = source.optString(
+                    "cursorOutlineColor", result.cursorOutlineColor);
+            result.routeColor = source.optString("routeColor", result.routeColor);
+            result.routeOutlineColor = source.optString(
+                    "routeOutlineColor", result.routeOutlineColor);
+            result.routeWidth = source.optDouble("routeWidth", result.routeWidth);
+            result.routeOutlineWidth = source.optDouble(
+                    "routeOutlineWidth", result.routeOutlineWidth);
+            result.maximumFps = source.optInt("maximumFps", result.maximumFps);
+            result.dayStyleJson = source.optString("dayStyleJson", result.dayStyleJson);
+            result.nightStyleJson = source.optString("nightStyleJson", result.nightStyleJson);
+            result.normalize();
+            return result;
+        }
+
+        void normalize() {
+            cameraMode = enumText(cameraMode, "FOLLOW_ROUTE",
+                    "FOLLOW_ROUTE", "NORTH_UP", "HEADING_UP", "FREE");
+            zoomDelta = clamp(zoomDelta, -8d, 8d);
+            tiltDegrees = clamp(tiltDegrees, 0, 80);
+            focusXPercent = clamp(focusXPercent, 0, 100);
+            focusYPercent = clamp(focusYPercent, 0, 100);
+            mapScalePercent = clamp(mapScalePercent, 50, 300);
+            cursorScalePercent = clamp(cursorScalePercent, 25, 300);
+            routeWidth = clamp(routeWidth, 1d, 40d);
+            routeOutlineWidth = clamp(routeOutlineWidth, 0d, 20d);
+            maximumFps = clamp(maximumFps, 1, 60);
+            cursorColor = color(cursorColor, "#FFFFC400");
+            cursorOutlineColor = color(cursorOutlineColor, "#FF17191E");
+            routeColor = color(routeColor, "#FFFFC400");
+            routeOutlineColor = color(routeOutlineColor, "#FF16181D");
+            dayStyleJson = bounded(dayStyleJson, MAX_STYLE_CHARS);
+            nightStyleJson = bounded(nightStyleJson, MAX_STYLE_CHARS);
+        }
+    }
+
+    /** Main-display freeform window settings; the Navigator patch applies them to its own task. */
+    public static final class FloatingWindowProfile {
+        public boolean enabled = true;
+        public int leftPercent = 4;
+        public int topPercent = 6;
+        public int widthPercent = 75;
+        public int heightPercent = 82;
+        public boolean movementLocked;
+        public boolean resizeLocked;
+        public int cornerRadiusDp = 24;
+        public int opacityPercent = 100;
+        public int borderWidthDp;
+        @NonNull public String borderColor = "#00000000";
+        public int shadowRadiusDp = 20;
+        public boolean closeButtonVisible = true;
+        public boolean keepAboveLauncher = true;
+
+        @NonNull
+        public static FloatingWindowProfile defaults() {
+            return new FloatingWindowProfile();
+        }
+
+        @NonNull
+        JSONObject toJson() throws JSONException {
+            normalize();
+            return new JSONObject()
+                    .put("enabled", enabled)
+                    .put("leftPercent", leftPercent)
+                    .put("topPercent", topPercent)
+                    .put("widthPercent", widthPercent)
+                    .put("heightPercent", heightPercent)
+                    .put("movementLocked", movementLocked)
+                    .put("resizeLocked", resizeLocked)
+                    .put("cornerRadiusDp", cornerRadiusDp)
+                    .put("opacityPercent", opacityPercent)
+                    .put("borderWidthDp", borderWidthDp)
+                    .put("borderColor", borderColor)
+                    .put("shadowRadiusDp", shadowRadiusDp)
+                    .put("closeButtonVisible", closeButtonVisible)
+                    .put("keepAboveLauncher", keepAboveLauncher);
+        }
+
+        @NonNull
+        static FloatingWindowProfile fromJson(JSONObject source) {
+            FloatingWindowProfile result = defaults();
+            if (source == null) return result;
+            result.enabled = source.optBoolean("enabled", result.enabled);
+            result.leftPercent = source.optInt("leftPercent", result.leftPercent);
+            result.topPercent = source.optInt("topPercent", result.topPercent);
+            result.widthPercent = source.optInt("widthPercent", result.widthPercent);
+            result.heightPercent = source.optInt("heightPercent", result.heightPercent);
+            result.movementLocked = source.optBoolean(
+                    "movementLocked", result.movementLocked);
+            result.resizeLocked = source.optBoolean("resizeLocked", result.resizeLocked);
+            result.cornerRadiusDp = source.optInt("cornerRadiusDp", result.cornerRadiusDp);
+            result.opacityPercent = source.optInt("opacityPercent", result.opacityPercent);
+            result.borderWidthDp = source.optInt("borderWidthDp", result.borderWidthDp);
+            result.borderColor = source.optString("borderColor", result.borderColor);
+            result.shadowRadiusDp = source.optInt("shadowRadiusDp", result.shadowRadiusDp);
+            result.closeButtonVisible = source.optBoolean(
+                    "closeButtonVisible", result.closeButtonVisible);
+            result.keepAboveLauncher = source.optBoolean(
+                    "keepAboveLauncher", result.keepAboveLauncher);
+            result.normalize();
+            return result;
+        }
+
+        void normalize() {
+            widthPercent = clamp(widthPercent, 20, 100);
+            heightPercent = clamp(heightPercent, 20, 100);
+            leftPercent = clamp(leftPercent, 0, 100 - widthPercent);
+            topPercent = clamp(topPercent, 0, 100 - heightPercent);
+            cornerRadiusDp = clamp(cornerRadiusDp, 0, 160);
+            opacityPercent = clamp(opacityPercent, 20, 100);
+            borderWidthDp = clamp(borderWidthDp, 0, 24);
+            borderColor = color(borderColor, "#00000000");
+            shadowRadiusDp = clamp(shadowRadiusDp, 0, 96);
+        }
+    }
+
+    private static int clamp(int value, int minimum, int maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static double clamp(double value, double minimum, double maximum) {
+        return Double.isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : minimum;
+    }
+
+    @NonNull
+    private static String enumText(String raw, String fallback, String... allowed) {
+        String value = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        for (String candidate : allowed) if (candidate.equals(value)) return value;
+        return fallback;
+    }
+
+    @NonNull
+    private static String color(String raw, String fallback) {
+        String value = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        return value.matches("#[0-9A-F]{8}") ? value : fallback;
+    }
+
+    @NonNull
+    private static String bounded(String raw, int maximum) {
+        String value = raw == null ? "" : raw.trim();
+        return value.length() <= maximum && value.indexOf('\u0000') < 0 ? value : "";
+    }
+}

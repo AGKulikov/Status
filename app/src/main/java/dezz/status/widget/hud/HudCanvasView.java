@@ -5,8 +5,6 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.ColorMatrix;
-import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
@@ -256,9 +254,6 @@ public final class HudCanvasView extends View {
             case HORIZONTAL_GROUP:
                 // Geometry-only container. A background is always an independent BACKDROP.
                 return;
-            case NAV_MAP:
-                drawNavigatorMap(canvas, item, bounds, scale);
-                return;
             case MEDIA_ARTWORK:
                 drawBitmap(canvas, data.media() == null ? null : data.media().artwork, bounds);
                 return;
@@ -324,107 +319,6 @@ public final class HudCanvasView extends View {
         paint.setColor(withAlpha(border, borderAlpha));
         canvas.drawRoundRect(borderBounds, Math.max(0f, radius - half),
                 Math.max(0f, radius - half), paint);
-    }
-
-    private void drawNavigatorMap(Canvas canvas, HudElementConfig item, RectF bounds,
-                                  float scale) {
-        int checkpoint = canvas.save();
-        if (!canvas.clipRect(bounds)) {
-            canvas.restoreToCount(checkpoint);
-            return;
-        }
-        Bitmap bitmap = data.navigatorMapFrame();
-        if (bitmap != null && !bitmap.isRecycled()) {
-            int sourceScale = clamp(item.options.optInt(
-                    "sourceScalePercent", 100), 100, 400);
-            float visibleWidth = bitmap.getWidth() * 100f / sourceScale;
-            float visibleHeight = bitmap.getHeight() * 100f / sourceScale;
-            float maxOffsetX = (bitmap.getWidth() - visibleWidth) / 2f;
-            float maxOffsetY = (bitmap.getHeight() - visibleHeight) / 2f;
-            float centerX = bitmap.getWidth() / 2f + maxOffsetX * clamp(
-                    item.options.optInt("sourceOffsetXPercent", 0), -100, 100) / 100f;
-            float centerY = bitmap.getHeight() / 2f + maxOffsetY * clamp(
-                    item.options.optInt("sourceOffsetYPercent", 0), -100, 100) / 100f;
-            Rect source = new Rect(
-                    Math.max(0, Math.round(centerX - visibleWidth / 2f)),
-                    Math.max(0, Math.round(centerY - visibleHeight / 2f)),
-                    Math.min(bitmap.getWidth(), Math.round(centerX + visibleWidth / 2f)),
-                    Math.min(bitmap.getHeight(), Math.round(centerY + visibleHeight / 2f)));
-            String mode = item.options.optString("fitMode", "STRETCH");
-            RectF target;
-            if ("FIT".equalsIgnoreCase(mode)) {
-                target = fitCenter(bitmap.getWidth(), bitmap.getHeight(), bounds);
-            } else if ("CROP".equalsIgnoreCase(mode)) {
-                target = centerCrop(bitmap.getWidth(), bitmap.getHeight(), bounds);
-            } else {
-                target = new RectF(bounds);
-            }
-
-            int saturation = clamp(item.options.optInt("saturationPercent", 100), 0, 200);
-            int contrast = clamp(item.options.optInt("contrastPercent", 100), 0, 200);
-            int brightness = clamp(item.options.optInt(
-                    "mapBrightnessPercent", 100), 0, 200);
-            boolean grayscale = item.options.optBoolean("grayscale", false);
-            ColorMatrix matrix = new ColorMatrix();
-            matrix.setSaturation(grayscale ? 0f : saturation / 100f);
-            float contrastFactor = contrast / 100f;
-            float offset = 127f * (1f - contrastFactor)
-                    + 255f * ((brightness - 100f) / 100f);
-            ColorMatrix tone = new ColorMatrix(new float[]{
-                    contrastFactor, 0f, 0f, 0f, offset,
-                    0f, contrastFactor, 0f, 0f, offset,
-                    0f, 0f, contrastFactor, 0f, offset,
-                    0f, 0f, 0f, 1f, 0f
-            });
-            matrix.postConcat(tone);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setAlpha(Math.round(255f * item.brightness / 100f));
-            paint.setColorFilter(new ColorMatrixColorFilter(matrix));
-            canvas.drawBitmap(bitmap, source, target, paint);
-            paint.setColorFilter(null);
-            paint.setAlpha(255);
-        } else if (editor) {
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(0xFF11151C);
-            canvas.drawRect(bounds, paint);
-            drawSimpleText(canvas, data.navigatorMapState(), bounds, 0xFF96A2B3,
-                    Math.max(10f, 15f * scale), Layout.Alignment.ALIGN_CENTER);
-        }
-
-        if (item.options.optBoolean("showCursor", true)) {
-            drawNavigatorCursor(canvas, item, bounds, scale);
-        }
-        canvas.restoreToCount(checkpoint);
-    }
-
-    private void drawNavigatorCursor(Canvas canvas, HudElementConfig item, RectF bounds,
-                                     float scale) {
-        float x = bounds.left + bounds.width() * clamp(
-                item.options.optInt("cursorXPercent", 50), 0, 100) / 100f;
-        float y = bounds.top + bounds.height() * clamp(
-                item.options.optInt("cursorYPercent", 72), 0, 100) / 100f;
-        float cursorScale = clamp(item.options.optInt(
-                "cursorScalePercent", 100), 25, 300) / 100f;
-        float size = Math.max(8f * scale,
-                Math.min(bounds.width(), bounds.height()) * .17f * cursorScale);
-        int fill = parseColor(null, item.options.optString(
-                "cursorColor", "#FFFFC400"), 0xFFFFC400);
-        int outline = parseColor(null, item.options.optString(
-                "cursorOutlineColor", "#FF17191E"), 0xFF17191E);
-        path.reset();
-        path.moveTo(x, y - size);
-        path.lineTo(x - size * .62f, y + size * .72f);
-        path.lineTo(x, y + size * .42f);
-        path.lineTo(x + size * .62f, y + size * .72f);
-        path.close();
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeJoin(Paint.Join.ROUND);
-        paint.setStrokeWidth(Math.max(2f * scale, size * .16f));
-        paint.setColor(outline);
-        canvas.drawPath(path, paint);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(fill);
-        canvas.drawPath(path, paint);
     }
 
     private void drawManeuver(Canvas canvas, HudElementConfig item, RectF bounds, int color) {
@@ -1103,15 +997,6 @@ public final class HudCanvasView extends View {
     private static RectF fitCenter(float sourceWidth, float sourceHeight, RectF target) {
         if (sourceWidth <= 0 || sourceHeight <= 0) return new RectF(target);
         float scale = Math.min(target.width() / sourceWidth, target.height() / sourceHeight);
-        float width = sourceWidth * scale;
-        float height = sourceHeight * scale;
-        return new RectF(target.centerX() - width / 2f, target.centerY() - height / 2f,
-                target.centerX() + width / 2f, target.centerY() + height / 2f);
-    }
-
-    private static RectF centerCrop(float sourceWidth, float sourceHeight, RectF target) {
-        if (sourceWidth <= 0 || sourceHeight <= 0) return new RectF(target);
-        float scale = Math.max(target.width() / sourceWidth, target.height() / sourceHeight);
         float width = sourceWidth * scale;
         float height = sourceHeight * scale;
         return new RectF(target.centerX() - width / 2f, target.centerY() - height / 2f,

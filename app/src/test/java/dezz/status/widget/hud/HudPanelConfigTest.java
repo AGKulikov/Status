@@ -69,8 +69,7 @@ public final class HudPanelConfigTest {
         assertEquals("#FF123456", decoded.backgroundColor);
         assertEquals(61, decoded.backgroundOpacityPercent);
         assertEquals(24, decoded.cornerRadiusPx);
-        assertEquals(HudElementType.NAV_MAP, restored.drawingOrder().get(0).type);
-        assertEquals(HudElementType.BACKDROP, restored.drawingOrder().get(1).type);
+        assertEquals(HudElementType.BACKDROP, restored.drawingOrder().get(0).type);
     }
 
     @Test public void ordinaryHudWidgetCannotRetainAutomaticBackground() {
@@ -84,23 +83,20 @@ public final class HudPanelConfigTest {
         assertEquals(0, clock.backgroundOpacityPercent);
     }
 
-    @Test public void oldLayoutReceivesOneFullViewportNavigatorMap() {
+    @Test public void legacyFrameCopyMapIsDroppedWithoutLosingOtherElements() {
         HudPanelConfig restored = HudPanelConfig.fromJson("{"
-                + "\"schema\":3,"
+                + "\"schema\":4,"
                 + "\"gridColumns\":44,"
                 + "\"gridRows\":18,"
-                + "\"elements\":[]"
+                + "\"elements\":["
+                + "{\"id\":\"legacy_map\",\"type\":\"NAV_MAP\"},"
+                + "{\"id\":\"clock\",\"type\":\"CLOCK\"}"
+                + "]"
                 + "}");
 
-        int maps = 0;
+        assertEquals(1, restored.elements.size());
         for (HudElementConfig item : restored.elements) {
-            if (item.type != HudElementType.NAV_MAP) continue;
-            maps++;
-            assertEquals(0, item.x);
-            assertEquals(0, item.y);
-            assertEquals(44, item.width);
-            assertEquals(18, item.height);
+            assertEquals(HudElementType.CLOCK, item.type);
         }
-        assertEquals(1, maps);
     }
 }

@@ -103,48 +103,6 @@ public final class HudElementConfig {
                 case CLOCK:
                     options.put("clockMode", "SYSTEM");
                     break;
-                case NAV_MAP:
-                    // The source surface and the editor use the verified physical HUD plane.
-                    // Keeping the full 44x18 grid as the default guarantees that neither the
-                    // map nor its cursor can be created outside the visible 728x190 viewport.
-                    options.put("fitMode", "STRETCH");
-                    options.put("sourceScalePercent", 100);
-                    options.put("sourceOffsetXPercent", 0);
-                    options.put("sourceOffsetYPercent", 0);
-                    options.put("zoomDelta", 0d);
-                    options.put("tilt", 60);
-                    options.put("dpi", 160);
-                    options.put("scaleFactor", 1d);
-                    options.put("fps", 20);
-                    options.put("nightMode", true);
-                    options.put("modelsEnabled", false);
-                    options.put("showRoute", true);
-                    options.put("routeColor", "#FFFFC400");
-                    options.put("routeOutlineColor", "#FF16181D");
-                    options.put("routeWidth", 8d);
-                    options.put("routeOutlineWidth", 2d);
-                    options.put("roadOnly", false);
-                    options.put("showLabels", true);
-                    options.put("showPois", true);
-                    options.put("showBuildings", true);
-                    options.put("showParks", true);
-                    options.put("showWater", true);
-                    options.put("backgroundColor", "");
-                    options.put("roadsColor", "");
-                    options.put("parksColor", "");
-                    options.put("waterColor", "");
-                    options.put("mapStyle", "");
-                    options.put("saturationPercent", 100);
-                    options.put("contrastPercent", 100);
-                    options.put("mapBrightnessPercent", 100);
-                    options.put("grayscale", false);
-                    options.put("showCursor", true);
-                    options.put("cursorXPercent", 50);
-                    options.put("cursorYPercent", 72);
-                    options.put("cursorScalePercent", 100);
-                    options.put("cursorColor", "#FFFFC400");
-                    options.put("cursorOutlineColor", "#FF17191E");
-                    break;
                 case NAV_MANEUVER_ARROW:
                 case NAV_COMBINED:
                     options.put("arrowAnimation", true);
@@ -262,52 +220,8 @@ public final class HudElementConfig {
         if (options == null || options.toString().length() > MAX_OPTIONS_CHARS) {
             options = new JSONObject();
         }
-        if (type == HudElementType.NAV_MAP) normalizeNavigatorMapOptions();
         if (type == HudElementType.HORIZONTAL_GROUP) {
             HudHorizontalGroup.normalizeOptions(this);
-        }
-    }
-
-    private void normalizeNavigatorMapOptions() {
-        try {
-            String fit = options.optString("fitMode", "STRETCH").toUpperCase(
-                    java.util.Locale.ROOT);
-            if (!"FIT".equals(fit) && !"CROP".equals(fit) && !"STRETCH".equals(fit)) {
-                fit = "STRETCH";
-            }
-            options.put("fitMode", fit);
-            options.put("zoomDelta", clamp(options.optDouble("zoomDelta", 0d), -8d, 8d));
-            options.put("tilt", clamp(options.optInt("tilt", 60), 0, 80));
-            options.put("dpi", clamp(options.optInt("dpi", 160), 72, 640));
-            options.put("scaleFactor",
-                    clamp(options.optDouble("scaleFactor", 1d), .5d, 3d));
-            options.put("fps", clamp(options.optInt("fps", 20), 5, 30));
-            options.put("sourceScalePercent",
-                    clamp(options.optInt("sourceScalePercent", 100), 100, 400));
-            options.put("sourceOffsetXPercent",
-                    clamp(options.optInt("sourceOffsetXPercent", 0), -100, 100));
-            options.put("sourceOffsetYPercent",
-                    clamp(options.optInt("sourceOffsetYPercent", 0), -100, 100));
-            options.put("routeWidth",
-                    clamp(options.optDouble("routeWidth", 8d), 1d, 40d));
-            options.put("routeOutlineWidth",
-                    clamp(options.optDouble("routeOutlineWidth", 2d), 0d, 20d));
-            options.put("saturationPercent",
-                    clamp(options.optInt("saturationPercent", 100), 0, 200));
-            options.put("contrastPercent",
-                    clamp(options.optInt("contrastPercent", 100), 0, 200));
-            options.put("mapBrightnessPercent",
-                    clamp(options.optInt("mapBrightnessPercent", 100), 0, 200));
-            options.put("cursorXPercent",
-                    clamp(options.optInt("cursorXPercent", 50), 0, 100));
-            options.put("cursorYPercent",
-                    clamp(options.optInt("cursorYPercent", 72), 0, 100));
-            options.put("cursorScalePercent",
-                    clamp(options.optInt("cursorScalePercent", 100), 25, 300));
-            options.put("mapStyle", bounded(options.optString("mapStyle", ""),
-                    MAX_OPTIONS_CHARS - 1_024, ""));
-        } catch (JSONException impossible) {
-            throw new IllegalStateException(impossible);
         }
     }
 
@@ -411,7 +325,4 @@ public final class HudElementConfig {
         return Math.max(minimum, Math.min(maximum, value));
     }
 
-    private static double clamp(double value, double minimum, double maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
-    }
 }

@@ -83,10 +83,10 @@ public class StatusWidgetApplication extends Application {
         DiagnosticJournal.initialize(this,
                 !hudProcess && preferences.debugModeEnabled.get());
         if (hudProcess) {
-            // HUD owns ImageReader, SurfaceFlinger and external-display callbacks in a dedicated
-            // process. Do not duplicate the status-row bootstrap, recorder overlay or lifecycle
-            // observers there. If vendor/native code terminates :hud, Android keeps WidgetService,
-            // the driver panel and the status row alive in the untouched main process.
+            // HUD owns SurfaceFlinger and external-display callbacks in a dedicated process. Do
+            // not duplicate the status-row bootstrap, recorder overlay or lifecycle observers
+            // there. If vendor/native code terminates :hud, Android keeps WidgetService, the
+            // driver panel and the status row alive in the untouched main process.
             return;
         }
         ActionRecorder.initialize(this);

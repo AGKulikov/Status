@@ -309,10 +309,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             editHorizontalGroup(item);
             return;
         }
-        if (item.type == HudElementType.NAV_MAP) {
-            editNavigatorMap(item);
-            return;
-        }
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
         form.setPadding(dp(18), dp(8), dp(18), dp(18));
@@ -436,7 +432,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
 
     private void addVisualElementOptions(@NonNull LinearLayout form,
             @NonNull HudElementConfig item, @NonNull Map<String, View> controls) {
-        if (item.type.name().startsWith("NAV_") && item.type != HudElementType.NAV_MAP) {
+        if (item.type.name().startsWith("NAV_")) {
             visualSwitch(form, controls, "bool:hideWhenInactive",
                     "Скрывать без активного маршрута",
                     item.options.optBoolean("hideWhenInactive", false));
@@ -566,203 +562,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 output.put(key, String.valueOf(((Spinner) control).getSelectedItem()));
             }
         }
-    }
-
-    /** Typed visual editor for the independent 728x190 Navigator map source. */
-    private void editNavigatorMap(@NonNull HudElementConfig item) {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout form = column();
-        form.setPadding(dp(20), dp(16), dp(20), dp(28));
-        scroll.addView(form);
-
-        form.addView(text("Источник: исходный Яндекс Навигатор · прямой Surface\n"
-                + runtime.navigatorMapState(), 13, 0xFF9DB3CC));
-        form.addView(text("Карта создаётся отдельно от экрана планшета и всегда обрезается "
-                + "точно по физической области HUD 728×190.", 12, 0xFF8F9AA9), marginTop(6));
-
-        EditText title = field(form, "Название элемента", item.title, false);
-        Switch itemEnabled = switchView("Показывать карту на HUD", item.enabled);
-        form.addView(itemEnabled, marginTop(8));
-
-        form.addView(section("Положение и размер"), marginTop(14));
-        LinearLayout geometry = new LinearLayout(this);
-        EditText x = compactNumber("X", item.x);
-        EditText y = compactNumber("Y", item.y);
-        EditText width = compactNumber("W", item.width);
-        EditText height = compactNumber("H", item.height);
-        geometry.addView(x, weighted());
-        geometry.addView(y, weighted());
-        geometry.addView(width, weighted());
-        geometry.addView(height, weighted());
-        form.addView(geometry);
-        Spinner fit = spinner(new String[]{"STRETCH", "CROP", "FIT"},
-                item.options.optString("fitMode", "STRETCH"));
-        form.addView(label("Заполнение фрейма"), marginTop(8));
-        form.addView(fit);
-        EditText sourceScale = field(form, "Масштаб выбранного фрагмента, % (100…400)",
-                Integer.toString(item.options.optInt("sourceScalePercent", 100)), true);
-        EditText sourceOffsetX = field(form, "Смещение фрагмента по X, % (−100…100)",
-                Integer.toString(item.options.optInt("sourceOffsetXPercent", 0)), true);
-        EditText sourceOffsetY = field(form, "Смещение фрагмента по Y, % (−100…100)",
-                Integer.toString(item.options.optInt("sourceOffsetYPercent", 0)), true);
-
-        form.addView(section("Камера независимой карты"), marginTop(14));
-        EditText zoom = field(form, "Дополнительный Zoom (−8…8)",
-                Double.toString(item.options.optDouble("zoomDelta", 0d)), false);
-        EditText tilt = field(form, "Угол 3D (0…80°)",
-                Integer.toString(item.options.optInt("tilt", 60)), true);
-        EditText dpi = field(form, "DPI карты (72…640)",
-                Integer.toString(item.options.optInt("dpi", 160)), true);
-        EditText scale = field(form, "Масштаб MapKit (0.5…3.0)",
-                Double.toString(item.options.optDouble("scaleFactor", 1d)), false);
-        EditText fps = field(form, "Частота кадров (5…30)",
-                Integer.toString(item.options.optInt("fps", 20)), true);
-        Switch night = switchView("Ночная карта", item.options.optBoolean("nightMode", true));
-        Switch models = switchView("3D-модели зданий",
-                item.options.optBoolean("modelsEnabled", false));
-        form.addView(night, marginTop(6));
-        form.addView(models, marginTop(4));
-
-        form.addView(section("Маршрут"), marginTop(14));
-        Switch showRoute = switchView("Показывать маршрут",
-                item.options.optBoolean("showRoute", true));
-        form.addView(showRoute);
-        EditText routeColor = field(form, "Цвет маршрута",
-                item.options.optString("routeColor", "#FFFFC400"), false);
-        EditText routeOutlineColor = field(form, "Цвет обводки маршрута",
-                item.options.optString("routeOutlineColor", "#FF16181D"), false);
-        EditText routeWidth = field(form, "Толщина маршрута (1…40)",
-                Double.toString(item.options.optDouble("routeWidth", 8d)), false);
-        EditText routeOutlineWidth = field(form, "Толщина обводки (0…20)",
-                Double.toString(item.options.optDouble("routeOutlineWidth", 2d)), false);
-
-        form.addView(section("Слои и цвета карты"), marginTop(14));
-        Switch roadOnly = switchView("Оставить только дороги и маршрут",
-                item.options.optBoolean("roadOnly", false));
-        Switch labels = switchView("Подписи",
-                item.options.optBoolean("showLabels", true));
-        Switch pois = switchView("Объекты и POI",
-                item.options.optBoolean("showPois", true));
-        Switch buildings = switchView("Здания",
-                item.options.optBoolean("showBuildings", true));
-        Switch parks = switchView("Парки",
-                item.options.optBoolean("showParks", true));
-        Switch water = switchView("Вода",
-                item.options.optBoolean("showWater", true));
-        form.addView(roadOnly);
-        form.addView(labels);
-        form.addView(pois);
-        form.addView(buildings);
-        form.addView(parks);
-        form.addView(water);
-        EditText backgroundColor = field(form, "Цвет фона (пусто = штатный)",
-                item.options.optString("backgroundColor", ""), false);
-        EditText roadsColor = field(form, "Цвет дорог (пусто = штатный)",
-                item.options.optString("roadsColor", ""), false);
-        EditText parksColor = field(form, "Цвет парков (пусто = штатный)",
-                item.options.optString("parksColor", ""), false);
-        EditText waterColor = field(form, "Цвет воды (пусто = штатный)",
-                item.options.optString("waterColor", ""), false);
-
-        form.addView(section("Фильтры изображения"), marginTop(14));
-        EditText brightness = field(form, "Яркость карты, % (0…200)",
-                Integer.toString(item.options.optInt("mapBrightnessPercent", 100)), true);
-        EditText contrast = field(form, "Контраст, % (0…200)",
-                Integer.toString(item.options.optInt("contrastPercent", 100)), true);
-        EditText saturation = field(form, "Насыщенность, % (0…200)",
-                Integer.toString(item.options.optInt("saturationPercent", 100)), true);
-        Switch grayscale = switchView("Чёрно-белая карта",
-                item.options.optBoolean("grayscale", false));
-        form.addView(grayscale);
-
-        form.addView(section("Курсор автомобиля"), marginTop(14));
-        Switch showCursor = switchView("Показывать курсор",
-                item.options.optBoolean("showCursor", true));
-        form.addView(showCursor);
-        EditText cursorX = field(form, "Положение X, % (0…100)",
-                Integer.toString(item.options.optInt("cursorXPercent", 50)), true);
-        EditText cursorY = field(form, "Положение Y, % (0…100)",
-                Integer.toString(item.options.optInt("cursorYPercent", 72)), true);
-        EditText cursorScale = field(form, "Размер курсора, % (25…300)",
-                Integer.toString(item.options.optInt("cursorScalePercent", 100)), true);
-        EditText cursorColor = field(form, "Цвет курсора",
-                item.options.optString("cursorColor", "#FFFFC400"), false);
-        EditText cursorOutline = field(form, "Цвет обводки курсора",
-                item.options.optString("cursorOutlineColor", "#FF17191E"), false);
-
-        form.addView(section("Расширенный стиль MapKit"), marginTop(14));
-        EditText customStyle = field(form,
-                "Собственный JSON стиля (пусто = настройки выше)",
-                item.options.optString("mapStyle", ""), false);
-        customStyle.setSingleLine(false);
-        customStyle.setMinLines(4);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Карта навигатора · 728×190")
-                .setView(scroll)
-                .setPositiveButton("Применить", null)
-                .setNegativeButton("Отмена", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
-                    try {
-                        JSONObject options = new JSONObject(item.options.toString());
-                        options.put("fitMode", String.valueOf(fit.getSelectedItem()));
-                        options.put("sourceScalePercent", integer(sourceScale, 100));
-                        options.put("sourceOffsetXPercent", integer(sourceOffsetX, 0));
-                        options.put("sourceOffsetYPercent", integer(sourceOffsetY, 0));
-                        options.put("zoomDelta", decimal(zoom,
-                                item.options.optDouble("zoomDelta", 0d)));
-                        options.put("tilt", integer(tilt, 60));
-                        options.put("dpi", integer(dpi, 160));
-                        options.put("scaleFactor", decimal(scale, 1d));
-                        options.put("fps", integer(fps, 20));
-                        options.put("nightMode", night.isChecked());
-                        options.put("modelsEnabled", models.isChecked());
-                        options.put("showRoute", showRoute.isChecked());
-                        options.put("routeColor", value(routeColor));
-                        options.put("routeOutlineColor", value(routeOutlineColor));
-                        options.put("routeWidth", decimal(routeWidth, 8d));
-                        options.put("routeOutlineWidth", decimal(routeOutlineWidth, 2d));
-                        options.put("roadOnly", roadOnly.isChecked());
-                        options.put("showLabels", labels.isChecked());
-                        options.put("showPois", pois.isChecked());
-                        options.put("showBuildings", buildings.isChecked());
-                        options.put("showParks", parks.isChecked());
-                        options.put("showWater", water.isChecked());
-                        options.put("backgroundColor", value(backgroundColor));
-                        options.put("roadsColor", value(roadsColor));
-                        options.put("parksColor", value(parksColor));
-                        options.put("waterColor", value(waterColor));
-                        options.put("mapBrightnessPercent", integer(brightness, 100));
-                        options.put("contrastPercent", integer(contrast, 100));
-                        options.put("saturationPercent", integer(saturation, 100));
-                        options.put("grayscale", grayscale.isChecked());
-                        options.put("showCursor", showCursor.isChecked());
-                        options.put("cursorXPercent", integer(cursorX, 50));
-                        options.put("cursorYPercent", integer(cursorY, 72));
-                        options.put("cursorScalePercent", integer(cursorScale, 100));
-                        options.put("cursorColor", value(cursorColor));
-                        options.put("cursorOutlineColor", value(cursorOutline));
-                        options.put("mapStyle", value(customStyle));
-                        item.title = value(title);
-                        item.enabled = itemEnabled.isChecked();
-                        item.x = integer(x, item.x);
-                        item.y = integer(y, item.y);
-                        item.width = integer(width, item.width);
-                        item.height = integer(height, item.height);
-                        item.options = options;
-                        item.normalize(config.gridColumns, config.gridRows);
-                        canvas.updateConfig(config);
-                        updateSelection(item);
-                        persist(false);
-                        dialog.dismiss();
-                    } catch (Exception error) {
-                        Toast.makeText(this, "Проверьте параметры карты: "
-                                + error.getMessage(), Toast.LENGTH_LONG).show();
-                    }
-                }));
-        showSafeDialog(dialog);
     }
 
     /** Configures a real geometry container; it never paints its own surface or shadow. */
@@ -1403,8 +1202,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 : " · " + config.displayWidth + "×" + config.displayHeight);
         status.setText((preferences.hudPanelEnabled.get() ? "Включён" : "Выключен")
                 + " · " + selectedDisplay + "\n"
-                + HudPresentationService.runtimeDetail(this) + "\n"
-                + runtime.navigatorMapState());
+                + HudPresentationService.runtimeDetail(this));
     }
 
     private void updateSelection(@Nullable HudElementConfig item) {

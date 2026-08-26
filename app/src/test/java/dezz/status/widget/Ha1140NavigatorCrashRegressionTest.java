@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget;
 
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -33,21 +32,6 @@ public final class Ha1140NavigatorCrashRegressionTest {
         assertTrue(source.contains("reportForegroundFailure(operation, failure)"));
     }
 
-    @Test public void optionalMapBridgeFailsClosedAndAllocatesOnlyWhenInstalled()
-            throws Exception {
-        String source = hud("NavigatorMapFrameProvider.java");
-
-        assertTrue(source.contains("navigatorBridgeAvailable()"));
-        assertTrue(source.contains("getServiceInfo("));
-        assertTrue(source.contains("runGuarded(\"navigator ACK\""));
-        assertTrue(source.contains("handleProviderFailure(operation, failure)"));
-        assertTrue(source.contains("@Nullable private int[] pixels"));
-        assertFalse(source.contains("@NonNull private final int[] pixels"));
-        // Direct independent-map support remains present; this fix must not replace it with a
-        // tablet screenshot or disable it for a Navigator that implements the contract.
-        assertTrue(source.contains(".putExtra(\"surface\", current.getSurface())"));
-    }
-
     @Test public void navigatorPayloadBurstsAreBoundedAndCoalescedBeforeQueueing()
             throws Exception {
         String source = source("launcher/YandexNavigationReceiver.java");
@@ -68,7 +52,4 @@ public final class Ha1140NavigatorCrashRegressionTest {
         return new String(Files.readAllBytes(root.resolve(relative)), StandardCharsets.UTF_8);
     }
 
-    private static String hud(String name) throws Exception {
-        return source("hud/" + name);
-    }
 }

@@ -63,7 +63,6 @@ public final class HudRuntimeData {
     @NonNull private final CarIntegration carIntegration;
     @NonNull private AutomationStateStore retainedAutomation;
     @NonNull private final Map<String, AutomationState> retainedAutomationCache = new HashMap<>();
-    @NonNull private final NavigatorMapFrameProvider navigatorMap;
     @NonNull private final Map<String, CarIntegration.TelemetryValue> telemetry = new HashMap<>();
     @NonNull private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
     @NonNull private HudPanelConfig config;
@@ -74,9 +73,6 @@ public final class HudRuntimeData {
     private final boolean isolatedHudProcess;
     private boolean started;
     private boolean navigationReceiverRegistered;
-    @NonNull private final NavigatorMapFrameProvider.Listener navigatorMapListener =
-            this::notifyChanged;
-
     private final CarIntegration.TelemetryListener telemetryListener = value -> runOnMain(() -> {
         if (!started) return;
         telemetry.put(value.id, value);
@@ -130,7 +126,6 @@ public final class HudRuntimeData {
         }));
         carIntegration = CarIntegrations.get(this.context);
         retainedAutomation = new AutomationStateStore(this.context);
-        navigatorMap = NavigatorMapFrameProvider.get(this.context);
     }
 
     public void start() {
@@ -147,7 +142,6 @@ public final class HudRuntimeData {
             navigationReceiverRegistered = false;
         }
         refreshNavigation();
-        navigatorMap.attach(config, navigatorMapListener);
         reconfigureVehicleSubscription();
         WidgetServiceStarter.startIfNeeded(context);
         if (!isolatedHudProcess) {
@@ -164,7 +158,6 @@ public final class HudRuntimeData {
         started = false;
         main.removeCallbacks(hostProbe);
         main.removeCallbacks(clockTick);
-        navigatorMap.detach(navigatorMapListener);
         mediaController.stop();
         carIntegration.unsubscribeTelemetry(telemetryListener);
         WidgetService host = attachedHost;
@@ -185,7 +178,6 @@ public final class HudRuntimeData {
     public void updateConfig(@NonNull HudPanelConfig next) {
         config = next;
         if (started) {
-            navigatorMap.update(next, navigatorMapListener);
             reconfigureVehicleSubscription();
             scheduleClockTick();
         }
@@ -204,8 +196,6 @@ public final class HudRuntimeData {
 
     @Nullable public NavigationDataRepository.Snapshot navigation() { return navigation; }
     @Nullable public LauncherMediaController.Snapshot media() { return media; }
-    @Nullable public android.graphics.Bitmap navigatorMapFrame() { return navigatorMap.frame(); }
-    @NonNull public String navigatorMapState() { return navigatorMap.state(); }
 
     @NonNull
     public AutomationState automation(@NonNull HudElementConfig item) {
@@ -570,8 +560,6 @@ public final class HudRuntimeData {
                     navigationReadQueued.set(false);
                     if (!started) return;
                     navigation = result;
-                    navigatorMap.updateRoutePoints(
-                            result == null ? "" : result.routePoints);
                     notifyChanged();
                 });
             });
