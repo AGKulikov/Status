@@ -178,6 +178,8 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(callback.contains("connect_gatt callback elapsedMs="));
         assertTrue(callback.contains("status="));
         assertTrue(callback.contains("newState="));
+        assertTrue(callback.contains("status == 133"));
+        assertTrue(callback.contains("registeredConnectionError133("));
 
         String reporter = between(source,
                 "private void reportPlatformDiagnostic",

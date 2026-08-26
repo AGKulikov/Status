@@ -3021,6 +3021,15 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (ingressFrozen) return;
         AndroidCentralRoute.State current = state;
         if (current == null) return;
+        if (status == 133) {
+            BleRouteTransition<AndroidCentralRoute.State> retained =
+                    AndroidCentralRoute.registeredConnectionError133(
+                            current, owner.ownerToken);
+            if (retained.accepted) {
+                apply(retained);
+                return;
+            }
+        }
         if (current.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
                 && status != BluetoothGatt.GATT_SUCCESS) {
             apply(AndroidCentralRoute.linkLost(current, owner.ownerToken,

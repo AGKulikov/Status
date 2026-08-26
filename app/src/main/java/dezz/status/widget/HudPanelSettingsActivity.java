@@ -632,21 +632,15 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         form.setPadding(dp(18), dp(8), dp(18), dp(24));
         scroll.addView(form);
 
-        form.addView(text("Профиль основной карты не связан с профилем HUD. Одна навигационная "
-                + "сессия передаёт данные обоим рендерам, но камера, стиль и масштаб хранятся "
-                + "отдельно.", 12, 0xFF95A0AF));
-        Switch mapEnabled = switchView("Применять профиль основной карты", map.enabled);
+        form.addView(text("Основной экран использует штатные маршрут, стрелку и ведение камеры "
+                + "Навигатора — это исключает вторую стрелку и прыжки. Здесь меняется только "
+                + "безопасное оформление. Полностью отдельные маршрут, курсор и камера "
+                + "настраиваются в элементе «Карта HUD».", 12, 0xFF95A0AF));
+        Switch mapEnabled = switchView("Изменять оформление основной карты", map.enabled);
         form.addView(mapEnabled, marginTop(8));
-        Spinner cameraMode = navigationCameraModeSpinner(map.cameraMode);
-        form.addView(label("Как основная карта следует за автомобилем"), marginTop(8));
-        form.addView(cameraMode);
-        EditText zoom = field(form, "Приближение: 0 — стандартное, + ближе, − дальше",
-                Double.toString(map.zoomDelta), false);
-        EditText tilt = field(form, "Наклон карты: 0° — сверху, 60° — перспектива",
-                Integer.toString(map.tiltDegrees), true);
-        EditText focusX = field(form, "Положение автомобиля по горизонтали, %",
+        EditText focusX = field(form, "Точка фокуса по горизонтали, %",
                 Integer.toString(map.focusXPercent), true);
-        EditText focusY = field(form, "Положение автомобиля по вертикали, %",
+        EditText focusY = field(form, "Точка фокуса по вертикали, %",
                 Integer.toString(map.focusYPercent), true);
         EditText mapScale = field(form, "Размер подписей и объектов карты, %",
                 Integer.toString(map.mapScalePercent), true);
@@ -655,48 +649,18 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch automaticDayNight = switchView("Автоматический день / ночь",
                 map.automaticDayNight);
         Switch nightMode = switchView("Принудительно ночной режим", map.nightMode);
-        Switch showRoute = switchView("Маршрут", map.showRoute);
-        Switch showTraffic = switchView("Пробки", map.showTraffic);
         Switch showLabels = switchView("Подписи", map.showLabels);
         Switch showPois = switchView("Полезные места", map.showPois);
         Switch showBuildings = switchView("Здания", map.showBuildings);
         Switch showParks = switchView("Парки", map.showParks);
         Switch showWater = switchView("Вода", map.showWater);
         Switch showModels = switchView("3D-модели", map.showModels);
-        Switch showCursor = switchView("Курсор автомобиля", map.showCursor);
-        for (Switch control : new Switch[]{automaticDayNight, nightMode, showRoute,
-                showTraffic, showLabels, showPois, showBuildings, showParks, showWater,
-                showModels, showCursor}) {
+        for (Switch control : new Switch[]{automaticDayNight, nightMode, showLabels,
+                showPois, showBuildings, showParks, showWater, showModels}) {
             form.addView(control, marginTop(4));
         }
-        EditText cursorScale = field(form, "Размер курсора, %",
-                Integer.toString(map.cursorScalePercent), true);
-        ColorField cursorColor = colorField(form, "Цвет автомобиля", map.cursorColor);
-        ColorField cursorOutline = colorField(form, "Контур автомобиля",
-                map.cursorOutlineColor);
-        ColorField routeColor = colorField(form, "Цвет маршрута", map.routeColor);
-        ColorField routeOutline = colorField(form, "Контур маршрута",
-                map.routeOutlineColor);
-        EditText routeWidth = field(form, "Толщина маршрута",
-                Double.toString(map.routeWidth), false);
-        EditText routeOutlineWidth = field(form, "Толщина контура маршрута",
-                Double.toString(map.routeOutlineWidth), false);
-        form.addView(section("Цвета загруженности дорог"), marginTop(16));
-        ColorField trafficFreeColor = colorField(form, "Дорога свободна",
-                map.trafficFreeColor);
-        ColorField trafficLightColor = colorField(form, "Небольшое затруднение",
-                map.trafficLightColor);
-        ColorField trafficHardColor = colorField(form, "Плотное движение",
-                map.trafficHardColor);
-        ColorField trafficVeryHardColor = colorField(form, "Сильная пробка",
-                map.trafficVeryHardColor);
-        ColorField trafficBlockedColor = colorField(form, "Дорога перекрыта",
-                map.trafficBlockedColor);
-        ColorField trafficUnknownColor = colorField(form, "Нет данных",
-                map.trafficUnknownColor);
-        EditText trafficGradient = field(form, "Длина перехода цветов пробок",
-                Double.toString(map.trafficGradientLength), false);
-        form.addView(text("Технические JSON-стили скрыты из обычных настроек.",
+        form.addView(text("Маршрут, пробки и стрелка основной карты остаются штатными. Их "
+                + "отдельное оформление доступно только для карты HUD.",
                 12, 0xFF95A0AF), marginTop(12));
 
         form.addView(section("Плавающее окно Навигатора"), marginTop(18));
@@ -747,7 +711,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             form.addView(control, marginTop(4));
         }
         form.addView(text("Кнопка находится в штатной левой колонке Навигатора, как в "
-                + "референсе 29.4.2."), marginTop(8));
+                + "референсе 29.4.2. В оконном режиме отдельная кнопка возврата остаётся "
+                + "поверх карты.", 12, 0xFFB8C0CC), marginTop(8));
+        form.addView(label("Угол кнопки возврата в оконном режиме"), marginTop(8));
+        Spinner buttonPosition = windowButtonPositionSpinner(window.modeButtonPosition);
+        form.addView(buttonPosition);
         EditText buttonSize = field(form, "Размер кнопки, dp",
                 Integer.toString(window.modeButtonSizeDp), true);
         EditText buttonOpacity = field(form, "Непрозрачность кнопки, %",
@@ -763,42 +731,18 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 .setOnClickListener(view -> {
                     try {
                         map.enabled = mapEnabled.isChecked();
-                        map.cameraMode = navigationCameraModeValue(
-                                cameraMode.getSelectedItemPosition());
-                        map.zoomDelta = decimal(zoom, map.zoomDelta);
-                        map.tiltDegrees = integer(tilt, map.tiltDegrees);
                         map.focusXPercent = integer(focusX, map.focusXPercent);
                         map.focusYPercent = integer(focusY, map.focusYPercent);
                         map.mapScalePercent = integer(mapScale, map.mapScalePercent);
                         map.maximumFps = integer(maximumFps, map.maximumFps);
                         map.automaticDayNight = automaticDayNight.isChecked();
                         map.nightMode = nightMode.isChecked();
-                        map.showRoute = showRoute.isChecked();
-                        map.showTraffic = showTraffic.isChecked();
                         map.showLabels = showLabels.isChecked();
                         map.showPois = showPois.isChecked();
                         map.showBuildings = showBuildings.isChecked();
                         map.showParks = showParks.isChecked();
                         map.showWater = showWater.isChecked();
                         map.showModels = showModels.isChecked();
-                        map.showCursor = showCursor.isChecked();
-                        map.cursorScalePercent = integer(cursorScale, map.cursorScalePercent);
-                        map.cursorColor = cursorColor.value;
-                        map.cursorOutlineColor = cursorOutline.value;
-                        map.routeColor = routeColor.value;
-                        map.routeOutlineColor = routeOutline.value;
-                        map.routeWidth = decimal(routeWidth, map.routeWidth);
-                        map.routeOutlineWidth = decimal(
-                                routeOutlineWidth, map.routeOutlineWidth);
-                        map.trafficFreeColor = trafficFreeColor.value;
-                        map.trafficLightColor = trafficLightColor.value;
-                        map.trafficHardColor = trafficHardColor.value;
-                        map.trafficVeryHardColor = trafficVeryHardColor.value;
-                        map.trafficBlockedColor = trafficBlockedColor.value;
-                        map.trafficUnknownColor = trafficUnknownColor.value;
-                        map.trafficGradientLength = decimal(
-                                trafficGradient, map.trafficGradientLength);
-
                         window.enabled = windowEnabled.isChecked();
                         window.movementLocked = movementLocked.isChecked();
                         window.resizeLocked = resizeLocked.isChecked();
@@ -816,6 +760,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         window.shadowRadiusDp = integer(shadowRadius, window.shadowRadiusDp);
                         window.shadowColor = shadowColor.value;
                         window.modeButtonVisible = modeButtonVisible.isChecked();
+                        window.modeButtonPosition = windowButtonPositionValue(
+                                buttonPosition.getSelectedItemPosition());
                         window.dragHandleVisible = dragHandleVisible.isChecked();
                         window.resizeHandleVisible = resizeHandleVisible.isChecked();
                         window.closeButtonVisible = closeButtonVisible.isChecked();
@@ -1834,6 +1780,33 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             case 3: return "FREE";
             case 0:
             default: return "FOLLOW_ROUTE";
+        }
+    }
+
+    private Spinner windowButtonPositionSpinner(@NonNull String position) {
+        Spinner result = spinner(new String[]{
+                "Сверху слева", "Сверху справа", "Снизу слева", "Снизу справа"
+        }, "");
+        int selected;
+        switch (position) {
+            case "TOP_RIGHT": selected = 1; break;
+            case "BOTTOM_LEFT": selected = 2; break;
+            case "BOTTOM_RIGHT": selected = 3; break;
+            case "TOP_LEFT":
+            default: selected = 0; break;
+        }
+        result.setSelection(selected);
+        return result;
+    }
+
+    @NonNull
+    private static String windowButtonPositionValue(int position) {
+        switch (position) {
+            case 1: return "TOP_RIGHT";
+            case 2: return "BOTTOM_LEFT";
+            case 3: return "BOTTOM_RIGHT";
+            case 0:
+            default: return "TOP_LEFT";
         }
     }
 

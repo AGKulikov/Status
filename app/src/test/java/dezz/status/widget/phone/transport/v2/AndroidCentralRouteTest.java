@@ -179,6 +179,65 @@ public final class AndroidCentralRouteTest {
         assertTrue(scan.effects.get(0).detail.contains("exact saved public identity"));
     }
 
+    @Test public void registered133ReassertsSameWrapperThenWaitsForStackRecovery() {
+        AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 31L));
+        state = AndroidCentralRoute.startupQuietElapsed(
+                state, state.expected, true).state;
+        long owner = state.activeOwnerId;
+        BleRouteToken ownerCallback = state.expected;
+
+        BleRouteTransition<AndroidCentralRoute.State> first =
+                AndroidCentralRoute.registeredConnectionError133(state, ownerCallback);
+        assertEquals(AndroidCentralRoute.Phase.WAIT_REASSERT, first.state.phase);
+        assertEquals(owner, first.state.activeOwnerId);
+        assertTrue(hasEffect(first, BleRouteEffect.Type.ARM_RETRY));
+        assertEquals(1_000L,
+                firstEffect(first, BleRouteEffect.Type.ARM_RETRY).delayMillis);
+        assertFalse(hasEffect(first, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(first, BleRouteEffect.Type.CONNECT_GATT));
+
+        state = AndroidCentralRoute.sameOwnerReassertElapsed(
+                first.state, first.state.expected).state;
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, state.phase);
+        assertTrue(state.expected.sameOwner(ownerCallback));
+
+        BleRouteTransition<AndroidCentralRoute.State> second =
+                AndroidCentralRoute.registeredConnectionError133(state, ownerCallback);
+        assertEquals(AndroidCentralRoute.Phase.WAIT_REASSERT, second.state.phase);
+        assertEquals(3_000L,
+                firstEffect(second, BleRouteEffect.Type.ARM_RETRY).delayMillis);
+        assertFalse(hasEffect(second, BleRouteEffect.Type.CLOSE_GATT));
+
+        state = AndroidCentralRoute.sameOwnerReassertElapsed(
+                second.state, second.state.expected).state;
+        BleRouteTransition<AndroidCentralRoute.State> retained =
+                AndroidCentralRoute.registeredConnectionError133(state, ownerCallback);
+        assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION,
+                retained.state.phase);
+        assertEquals(owner, retained.state.activeOwnerId);
+        assertTrue(hasEffect(retained, BleRouteEffect.Type.START_SCAN));
+        assertEquals(AndroidCentralRoute.REGISTERED_ERROR_RECOVERY_MS,
+                firstEffect(retained, BleRouteEffect.Type.ARM_RETRY).delayMillis);
+        assertFalse(hasEffect(retained, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(retained, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+
+        BleRouteTransition<AndroidCentralRoute.State> recovery =
+                AndroidCentralRoute.systemConnectionRecoveryElapsed(
+                        retained.state, retained.state.expected);
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, recovery.state.phase);
+        assertEquals(owner, recovery.state.activeOwnerId);
+        assertTrue(hasEffect(recovery, BleRouteEffect.Type.REASSERT_SAME_GATT));
+        assertFalse(hasEffect(recovery, BleRouteEffect.Type.CONNECT_GATT));
+
+        BleRouteTransition<AndroidCentralRoute.State> stillRetained =
+                AndroidCentralRoute.registeredConnectionError133(
+                        recovery.state, ownerCallback);
+        assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION,
+                stillRetained.state.phase);
+        assertEquals(owner, stillRetained.state.activeOwnerId);
+        assertFalse(hasEffect(stillRetained, BleRouteEffect.Type.CLOSE_GATT));
+    }
+
     @Test public void alphabeticSelectedBondCanonicalizesBeforeSingleOwnerAllocation() {
         IphoneTransportStartRequest request = new IphoneTransportStartRequest(
                 new BleRouteEpoch(11L, 2L), " aa:bC:dE:f0:A1:b2 ", HELPER, true, 0L,
@@ -265,6 +324,83 @@ public final class AndroidCentralRouteTest {
                 state, state.expected, GattResultV2.SUCCESS).state;
         assertTrue(state.isReady());
         assertTrue(AndroidCentralRoute.acceptsTelemetry(state, telemetryToken));
+    }
+
+    @Test public void firstDataSource133RetriesOnSameOwnerWithoutClosingControl() {
+        AndroidCentralRoute.State state = dataSourceState(new BleRouteEpoch(14L, 11L));
+        long owner = state.activeOwnerId;
+        BleRouteToken first = state.expected;
+
+        BleRouteTransition<AndroidCentralRoute.State> retry =
+                AndroidCentralRoute.dataSourceSubscribed(
+                        state, first, GattResultV2.TRANSIENT_FAILURE);
+
+        assertEquals(AndroidCentralRoute.Phase.SUBSCRIBING_DATA_SOURCE, retry.state.phase);
+        assertEquals(owner, retry.state.activeOwnerId);
+        assertEquals(owner, retry.state.expected.ownerId);
+        assertTrue(retry.state.expected.operationId > first.operationId);
+        assertEquals(AndroidCentralRoute.AuthorizationStep.DATA_SOURCE_CCCD,
+                retry.state.authorizationStep);
+        assertEquals(1, retry.state.authorizationRetries);
+        assertTrue(hasEffect(retry, BleRouteEffect.Type.SUBSCRIBE_ANCS_DATA_SOURCE));
+        assertTrue(hasEffect(retry, BleRouteEffect.Type.ARM_DEADLINE));
+        assertFalse(hasEffect(retry, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(retry, BleRouteEffect.Type.RESET_SESSION_STATE));
+        assertFalse(hasEffect(retry, BleRouteEffect.Type.REPORT_READY));
+        assertTrue(AndroidCentralRoute.acceptsTelemetry(retry.state, retry.state.expected));
+    }
+
+    @Test public void repeatedDataSource133KeepsOwnerAndReportsAncsDown() {
+        AndroidCentralRoute.State state = dataSourceState(new BleRouteEpoch(14L, 12L));
+        state = AndroidCentralRoute.dataSourceSubscribed(
+                state, state.expected, GattResultV2.TRANSIENT_FAILURE).state;
+        long owner = state.activeOwnerId;
+
+        BleRouteTransition<AndroidCentralRoute.State> waiting =
+                AndroidCentralRoute.dataSourceSubscribed(
+                        state, state.expected, GattResultV2.TRANSIENT_FAILURE);
+
+        assertEquals(AndroidCentralRoute.Phase.WAIT_ANCS, waiting.state.phase);
+        assertEquals(owner, waiting.state.activeOwnerId);
+        assertEquals(null, waiting.state.expected);
+        assertTrue(hasEffect(waiting, BleRouteEffect.Type.REPORT_ERROR));
+        assertTrue(hasEffect(waiting, BleRouteEffect.Type.REPORT_DOWN));
+        assertFalse(hasEffect(waiting, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(waiting, BleRouteEffect.Type.RESET_SESSION_STATE));
+        assertFalse(hasEffect(waiting, BleRouteEffect.Type.CONNECT_GATT));
+        assertFalse(hasEffect(waiting, BleRouteEffect.Type.REPORT_READY));
+        assertTrue(AndroidCentralRoute.acceptsTelemetry(
+                waiting.state, new BleRouteToken(IphoneBleMode.ANDROID_CENTRAL,
+                        waiting.state.epoch, owner, 1L)));
+    }
+
+    @Test public void dataSourceRetryCanCompleteReadyOnSameOwner() {
+        AndroidCentralRoute.State state = dataSourceState(new BleRouteEpoch(14L, 13L));
+        state = AndroidCentralRoute.dataSourceSubscribed(
+                state, state.expected, GattResultV2.TRANSIENT_FAILURE).state;
+        long owner = state.activeOwnerId;
+
+        BleRouteTransition<AndroidCentralRoute.State> ready =
+                AndroidCentralRoute.dataSourceSubscribed(
+                        state, state.expected, GattResultV2.SUCCESS);
+
+        assertTrue(ready.state.isReady());
+        assertEquals(owner, ready.state.activeOwnerId);
+        assertTrue(hasEffect(ready, BleRouteEffect.Type.REPORT_READY));
+        assertFalse(hasEffect(ready, BleRouteEffect.Type.CLOSE_GATT));
+    }
+
+    @Test public void repeatedDataSourceDeadlineAlsoRetainsWorkingOwner() {
+        AndroidCentralRoute.State state = dataSourceState(new BleRouteEpoch(14L, 14L));
+        state = AndroidCentralRoute.deadline(state, state.expected).state;
+
+        BleRouteTransition<AndroidCentralRoute.State> waiting =
+                AndroidCentralRoute.deadline(state, state.expected);
+
+        assertEquals(AndroidCentralRoute.Phase.WAIT_ANCS, waiting.state.phase);
+        assertTrue(hasEffect(waiting, BleRouteEffect.Type.REPORT_DOWN));
+        assertFalse(hasEffect(waiting, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(waiting, BleRouteEffect.Type.RESET_SESSION_STATE));
     }
 
     @Test public void telemetryCccdFailureIsSerializedOptionalAndStaleCannotAdvanceRoute() {
@@ -587,6 +723,23 @@ public final class AndroidCentralRouteTest {
                     state, state.expected).state;
         }
         return AndroidCentralRoute.deadline(state, state.expected).state;
+    }
+
+    private static AndroidCentralRoute.State dataSourceState(BleRouteEpoch epoch) {
+        AndroidCentralRoute.State state = startSelected(epoch);
+        state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
+        state = AndroidCentralRoute.connected(state, state.expected, true).state;
+        state = AndroidCentralRoute.servicesDiscovered(state, state.expected, complete()).state;
+        state = AndroidCentralRoute.peerProof(
+                state, state.expected, helperProof(HELPER), GattResultV2.SUCCESS).state;
+        state = AndroidCentralRoute.routeControlSubscribed(
+                state, state.expected, GattResultV2.SUCCESS).state;
+        state = AndroidCentralRoute.telemetrySubscribed(
+                state, state.expected, GattResultV2.SUCCESS).state;
+        state = AndroidCentralRoute.notificationSourceSubscribed(
+                state, state.expected, GattResultV2.SUCCESS).state;
+        assertEquals(AndroidCentralRoute.Phase.SUBSCRIBING_DATA_SOURCE, state.phase);
+        return state;
     }
 
     private static IphoneGattInventoryV2 complete() {

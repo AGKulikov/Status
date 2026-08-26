@@ -36,7 +36,9 @@ final class FloatingWindowController {
     private static final int FLOATING_FLAGS =
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                     | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                    | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
+                    | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
+    private static final int MUTATED_FLAGS =
+            FLOATING_FLAGS | WindowManager.LayoutParams.FLAG_DIM_BEHIND;
 
     private final Activity activity;
     private final Window window;
@@ -53,6 +55,7 @@ final class FloatingWindowController {
     private FloatingWindowProfile profile = new FloatingWindowProfile();
     private FrameLayout controlLayer;
     private TextView modeButton;
+    private TextView floatingModeButton;
     private TextView closeButton;
     private TextView dragHandle;
     private TextView resizeHandle;
@@ -102,7 +105,16 @@ final class FloatingWindowController {
         modeButton = control("◲", "Открыть Навигатор в окне");
         modeButton.setTextSize(32f);
         modeButton.setTypeface(Typeface.DEFAULT_BOLD);
-        modeButton.setOnClickListener(view -> restartInMode(!floating));
+        modeButton.setOnClickListener(view -> restartInMode(true));
+
+        // In 29.4.2 the return control belongs to the floating header itself.  Reusing the
+        // full-screen button leaves it under Navigator's hidden voice-search hierarchy and makes
+        // the window impossible to expand again.
+        floatingModeButton = control("◱", "Развернуть Навигатор на весь экран");
+        floatingModeButton.setTextSize(32f);
+        floatingModeButton.setTypeface(Typeface.DEFAULT_BOLD);
+        floatingModeButton.setOnClickListener(view -> restartInMode(false));
+        controlLayer.addView(floatingModeButton);
         mainHandler.post(modeButtonPoller);
         updateControls();
     }
@@ -183,6 +195,11 @@ final class FloatingWindowController {
 
     private void attachModeButtonToNavigator() {
         if (destroyed || modeButton == null) return;
+        if (floating) {
+            detachModeButtonFromNavigator();
+            updateModeButtons();
+            return;
+        }
         ViewGroup host = findNavigatorButtonHost();
         if (host != null && host != modeButtonHost) {
             if (modeButton.getParent() instanceof ViewGroup) {
@@ -205,7 +222,14 @@ final class FloatingWindowController {
             }
             modeButtonHost = host;
         }
-        updateModeButton();
+        updateModeButtons();
+    }
+
+    private void detachModeButtonFromNavigator() {
+        if (modeButton != null && modeButton.getParent() instanceof ViewGroup) {
+            ((ViewGroup) modeButton.getParent()).removeView(modeButton);
+        }
+        modeButtonHost = null;
     }
 
     private final Runnable modeButtonPoller = new Runnable() {
@@ -218,10 +242,7 @@ final class FloatingWindowController {
     void destroy() {
         destroyed = true;
         mainHandler.removeCallbacks(modeButtonPoller);
-        if (modeButton != null && modeButton.getParent() instanceof ViewGroup) {
-            ((ViewGroup) modeButton.getParent()).removeView(modeButton);
-        }
-        modeButtonHost = null;
+        detachModeButtonFromNavigator();
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
         if (parent != null) parent.removeView(controlLayer);
         controlLayer = null;
@@ -292,8 +313,8 @@ final class FloatingWindowController {
         attributes.type = originalType;
         attributes.gravity = originalGravity;
         attributes.format = originalFormat;
-        attributes.flags = (attributes.flags & ~FLOATING_FLAGS)
-                | (originalFlags & FLOATING_FLAGS);
+        attributes.flags = (attributes.flags & ~MUTATED_FLAGS)
+                | (originalFlags & MUTATED_FLAGS);
     }
 
     private void applyFloatingDecoration() {
@@ -351,11 +372,42 @@ final class FloatingWindowController {
         closeButton.setVisibility(floating && profile.closeButtonVisible
                 ? View.VISIBLE : View.GONE);
 
-        updateModeButton();
+        FrameLayout.LayoutParams floatingMode = new FrameLayout.LayoutParams(
+                dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp),
+                floatingModeButtonGravity());
+        int modeMargin = dp(8);
+        if (profile.modeButtonPosition.startsWith("TOP")) {
+            floatingMode.topMargin = modeMargin;
+        } else {
+            floatingMode.bottomMargin = modeMargin;
+        }
+        if (profile.modeButtonPosition.endsWith("LEFT")) {
+            floatingMode.leftMargin = modeMargin;
+            if (profile.closeButtonVisible && profile.modeButtonPosition.startsWith("TOP")) {
+                floatingMode.leftMargin += handle + modeMargin;
+            }
+        } else {
+            floatingMode.rightMargin = modeMargin;
+            if (profile.resizeHandleVisible && !profile.resizeLocked
+                    && profile.modeButtonPosition.startsWith("BOTTOM")) {
+                floatingMode.rightMargin += handle + modeMargin;
+            }
+        }
+        floatingModeButton.setLayoutParams(floatingMode);
+
+        updateModeButtons();
     }
 
-    private void updateModeButton() {
-        if (modeButton == null) return;
+    private int floatingModeButtonGravity() {
+        int vertical = profile.modeButtonPosition.startsWith("BOTTOM")
+                ? Gravity.BOTTOM : Gravity.TOP;
+        int horizontal = profile.modeButtonPosition.endsWith("RIGHT")
+                ? Gravity.END : Gravity.START;
+        return vertical | horizontal;
+    }
+
+    private void updateModeButtons() {
+        if (modeButton == null || floatingModeButton == null) return;
         ViewGroup.LayoutParams params = modeButton.getLayoutParams();
         if (params != null) {
             params.width = dp(profile.modeButtonSizeDp);
@@ -363,12 +415,13 @@ final class FloatingWindowController {
             modeButton.setLayoutParams(params);
         }
         modeButton.setAlpha(profile.modeButtonOpacityPercent / 100f);
-        modeButton.setVisibility(profile.enabled && profile.modeButtonVisible
+        modeButton.setVisibility(!floating && profile.enabled && profile.modeButtonVisible
                 ? View.VISIBLE : View.GONE);
-        modeButton.setText(floating ? "◱" : "◲");
-        modeButton.setContentDescription(floating
-                ? "Развернуть Навигатор на весь экран"
-                : "Открыть Навигатор в окне");
+        modeButton.setText("◲");
+        modeButton.setContentDescription("Открыть Навигатор в окне");
+        floatingModeButton.setAlpha(profile.modeButtonOpacityPercent / 100f);
+        floatingModeButton.setVisibility(floating && profile.enabled
+                && profile.modeButtonVisible ? View.VISIBLE : View.GONE);
     }
 
     private TextView control(String text, String description) {

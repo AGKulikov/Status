@@ -158,9 +158,12 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("mode != MODE_FULLSCREEN"));
         assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY"));
         assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_SYSTEM_ALERT"));
+        assertTrue(controller.contains("FLAG_WATCH_OUTSIDE_TOUCH"));
         assertTrue(controller.contains("navi_service_open_voice_search"));
         assertTrue(controller.contains("guidance_open_voice_search"));
         assertTrue(controller.contains("host.addView(modeButton, 0"));
+        assertTrue(controller.contains("controlLayer.addView(floatingModeButton)"));
+        assertTrue(controller.contains("restartInMode(false)"));
         assertTrue(entry.contains("NavigationBridgeClient.attachActivity"));
         assertTrue(entry.contains("NavigationBridgeClient.detachActivity"));
         assertTrue(client.contains("getPackagesForUid(sendingUid)"));
@@ -186,9 +189,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cursor.contains("UserLocationObjectListener"));
         assertTrue(cursor.contains("ViewProvider"));
         assertTrue(cursor.contains("setView"));
-        assertTrue(mainMap.contains("getDrivingNavigationBaseLayerId"));
-        assertTrue(mainMap.contains("getDrivingNavigationUserPlacemarkLayerId"));
-        assertTrue(mainMap.contains("Independent main MapProfile applied"));
+        assertTrue(mainMap.contains("Stable main MapProfile applied"));
+        assertFalse(mainMap.contains("rebuildRoute"));
+        assertFalse(mainMap.contains("addCollection"));
+        assertFalse(mainMap.contains("createUserLocationLayer"));
+        assertFalse(mainMap.contains("invoke(currentMap, \"move\""));
         assertFalse(mainMap.contains("getJamsLayerId"));
         assertTrue(publisher.contains("MapActivity.x()"));
         assertTrue(publisher.contains("getMapWindow"));
