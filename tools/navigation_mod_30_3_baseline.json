@@ -1,0 +1,34 @@
+{
+  "schema": "natro-navigation-baseline/v1",
+  "name": "YN_30.3.0_T2 working protection baseline",
+  "package_name": "ru.yandex.yandexnavi",
+  "version_code": 739564630,
+  "baseline_apk_sha256": "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f",
+  "baseline_signer_sha256": "a4590f0a8ad6c6a30b87900289a918be0fd6b036f82d2ec4551f3caf2d910892",
+  "release_signer_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "required_signature_schemes": [
+    "v3"
+  ],
+  "mutable_entries": [
+    "classes4.dex"
+  ],
+  "allowed_new_entries": [
+    "classes19.dex"
+  ],
+  "release_required_changed_entries": [
+    "classes4.dex"
+  ],
+  "release_required_new_entries": [
+    "classes19.dex"
+  ],
+  "critical_entries": [
+    "AndroidManifest.xml",
+    "resources.arsc",
+    "classes14.dex",
+    "classes18.dex"
+  ],
+  "critical_prefixes": [
+    "assets/",
+    "lib/"
+  ]
+}

@@ -25,6 +25,8 @@ public final class YandexWindowLauncherContractTest {
         assertTrue(source.contains("new Intent()"));
         assertTrue(source.contains("new Intent(\"navi_win/\" + target.packageName)"));
         assertTrue(source.contains("ru.yandex.yandexmaps.app.TransparentSplashActivity"));
+        assertTrue(source.contains(
+                "new Target(NAVIGATOR_PACKAGE, \"ru.yandex.yandexmaps.app.MapActivity\")"));
         assertTrue(source.contains("putExtra(\"ddnavwin\", true)"));
         assertFalse(source.contains("new Intent(\"navi_win/ru.yandex.yandexmaps\")"));
     }

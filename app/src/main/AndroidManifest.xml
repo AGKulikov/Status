@@ -302,6 +302,18 @@
             android:process=":hud"
             android:stopWithTask="false" />
 
+        <!-- Explicit-only bridge. The exported Binder validates the sending UID, exact Navigator
+             package and matching Natro release certificate on every transaction. Keeping the
+             endpoint here avoids any new component or permission in the protected Navigator
+             30.3.0 manifest. -->
+        <service
+            android:name=".navigation.NavigationHudEndpointService"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true"
+            android:process=":hud"
+            android:stopWithTask="false" />
+
         <service
             android:name=".diagnostics.ActionRecorderOverlayService"
             android:enabled="true"

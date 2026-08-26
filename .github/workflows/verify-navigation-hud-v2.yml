@@ -24,3 +24,13 @@ jobs:
           cache: gradle
       - name: Unit tests and debug APK
         run: ./gradlew testGeelyDebugUnitTest assembleGeelyDebug --no-daemon
+      - name: Compile isolated Navigator classes19.dex
+        run: bash tools/build_navigation_patch_dex.sh build/navigation-mod-ci
+      - name: Navigation APK baseline verifier self-tests
+        run: |
+          python3 -m py_compile \
+            tools/verify_navigation_mod_baseline.py \
+            tools/patch_navigation_map_activity.py \
+            tools/repack_apk_entries.py
+          python3 tools/tests/test_verify_navigation_mod_baseline.py
+          python3 tools/tests/test_navigation_mod_tools.py

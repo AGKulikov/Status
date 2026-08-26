@@ -40,6 +40,10 @@ public final class YandexWindowLauncher {
                     "ru.yandex.yandexnavi.TransparentSplashActivity"),
             new Target(NAVIGATOR_PACKAGE,
                     "ru.yandex.yandexnavi.app.TransparentSplashActivity"),
+            // Natro Navigator 30.3.0 keeps its manifest byte-identical to the proven protection
+            // baseline. Its exported MapActivity consumes the same ddnavwin contract directly,
+            // so existing Natro window shortcuts do not depend on adding a new manifest entry.
+            new Target(NAVIGATOR_PACKAGE, "ru.yandex.yandexmaps.app.MapActivity"),
             // Recent releases fold navigation into the Maps package.
             new Target(MAPS_PACKAGE, "ru.yandex.yandexmaps.TransparentSplashActivity"),
             new Target(MAPS_PACKAGE, "ru.yandex.yandexmaps.app.TransparentSplashActivity")

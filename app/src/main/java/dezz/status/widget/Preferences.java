@@ -773,6 +773,9 @@ public class Preferences {
     /** Restore the HUD presentation after boot/package replacement while the master switch is on. */
     public final Bool hudPanelAutostart = new Bool(this, "hudPanelAutostart", true);
     public final Str hudPanelConfigJson = new Str(this, "hudPanelConfigJson", "");
+    /** Independent main-map, HUD-map and Navigator floating-window profiles. */
+    public final Str navigationIntegrationConfigJson = new Str(this,
+            "navigationIntegrationConfigJson", "");
     /** Last explicitly selected OEM ProfileTransfer mode; -1 means do not change it. */
     public final Int hudStockProfileMode = new Int(this, "hudStockProfileMode", -1);
     /**

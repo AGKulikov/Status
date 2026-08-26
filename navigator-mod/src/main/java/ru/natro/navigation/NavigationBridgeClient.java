@@ -1,0 +1,203 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+package ru.natro.navigation;
+
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.os.Message;
+import android.os.Messenger;
+import android.os.RemoteException;
+import android.os.SystemClock;
+
+import java.util.UUID;
+
+/** Explicit, signature-pinned Navigator client for the Natro-owned HUD endpoint. */
+final class NavigationBridgeClient {
+    private static final int PROTOCOL_VERSION = 2;
+    private static final String NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi";
+    private static final String NATRO_PACKAGE = "ru.natro.statuswidget";
+    private static final String NATRO_SERVICE =
+            "dezz.status.widget.navigation.NavigationHudEndpointService";
+    private static final String BIND_ACTION = "ru.natro.navigation.bridge.BIND_V2";
+
+    private static final int MSG_HELLO = 1;
+    private static final int MSG_CAPABILITIES = 2;
+    private static final int MSG_APPLY_CONFIGURATION = 3;
+    private static final int MSG_SET_MAIN_WINDOW_MODE = 11;
+    private static final int MSG_HEARTBEAT = 13;
+
+    private static final long CAP_MAIN_FLOATING_WINDOW = 1L << 5;
+    private static final long CAP_NAVIGATOR_WINDOW_BUTTON = 1L << 8;
+    private static final long CAP_LEGACY_WINDOW_INTENTS = 1L << 9;
+
+    private static final String KEY_PROTOCOL_VERSION = "protocol_version";
+    private static final String KEY_SESSION_ID = "session_id";
+    private static final String KEY_CLIENT_PACKAGE = "client_package";
+    private static final String KEY_CAPABILITIES = "capabilities";
+    private static final String KEY_CONFIGURATION_JSON = "configuration_json";
+    private static final String KEY_WINDOW_MODE = "window_mode";
+
+    private static final long MIN_RETRY_MS = 1_000L;
+    private static final long MAX_RETRY_MS = 30_000L;
+    private static NavigationBridgeClient instance;
+
+    private final Context context;
+    private final Handler main;
+    private final Messenger callbacks;
+    private final String sessionId = UUID.randomUUID().toString();
+    private Messenger remote;
+    private boolean binding;
+    private boolean bound;
+    private long retryMs = MIN_RETRY_MS;
+    private long lastConnectedElapsedMs;
+
+    private final ServiceConnection connection = new ServiceConnection() {
+        @Override public void onServiceConnected(ComponentName name, IBinder service) {
+            binding = false;
+            bound = true;
+            remote = new Messenger(service);
+            retryMs = MIN_RETRY_MS;
+            lastConnectedElapsedMs = SystemClock.elapsedRealtime();
+            sendHello();
+        }
+
+        @Override public void onServiceDisconnected(ComponentName name) {
+            disconnectAndRetry();
+        }
+
+        @Override public void onBindingDied(ComponentName name) {
+            disconnectAndRetry();
+        }
+
+        @Override public void onNullBinding(ComponentName name) {
+            disconnectAndRetry();
+        }
+    };
+
+    static synchronized void ensureStarted(Context context) {
+        if (instance == null) instance = new NavigationBridgeClient(context);
+        instance.start();
+    }
+
+    private NavigationBridgeClient(Context context) {
+        this.context = context.getApplicationContext();
+        main = new Handler(Looper.getMainLooper());
+        callbacks = new Messenger(new Handler(Looper.getMainLooper(), this::onMessage));
+    }
+
+    private void start() {
+        if (binding || bound) return;
+        binding = true;
+        Intent intent = new Intent(BIND_ACTION)
+                .setComponent(new ComponentName(NATRO_PACKAGE, NATRO_SERVICE));
+        try {
+            if (!context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
+                binding = false;
+                scheduleRetry();
+            }
+        } catch (RuntimeException failure) {
+            binding = false;
+            scheduleRetry();
+        }
+    }
+
+    private boolean onMessage(Message message) {
+        if (!isTrustedNatro(message.sendingUid)) return true;
+        switch (message.what) {
+            case MSG_CAPABILITIES:
+                // The first implementation intentionally waits for a real Surface capability;
+                // receiving capabilities alone never enables a bitmap/frame-copy fallback.
+                break;
+            case MSG_APPLY_CONFIGURATION:
+                if (sessionMatches(message.getData())) {
+                    NatroEntryPoint.applyConfiguration(message.getData().getString(
+                            KEY_CONFIGURATION_JSON, ""));
+                }
+                break;
+            case MSG_SET_MAIN_WINDOW_MODE:
+                if (sessionMatches(message.getData())) {
+                    NatroEntryPoint.setWindowMode(message.getData().getInt(KEY_WINDOW_MODE, 2));
+                }
+                break;
+            case MSG_HEARTBEAT:
+                sendHello();
+                break;
+            default:
+                break;
+        }
+        return true;
+    }
+
+    private void sendHello() {
+        Messenger current = remote;
+        if (current == null) return;
+        Bundle data = new Bundle();
+        data.putInt(KEY_PROTOCOL_VERSION, PROTOCOL_VERSION);
+        data.putString(KEY_SESSION_ID, sessionId);
+        data.putString(KEY_CLIENT_PACKAGE, NAVIGATOR_PACKAGE);
+        data.putLong(KEY_CAPABILITIES,
+                CAP_MAIN_FLOATING_WINDOW
+                        | CAP_NAVIGATOR_WINDOW_BUTTON
+                        | CAP_LEGACY_WINDOW_INTENTS);
+        Message hello = Message.obtain(null, MSG_HELLO);
+        hello.replyTo = callbacks;
+        hello.setData(data);
+        try {
+            current.send(hello);
+        } catch (RemoteException failure) {
+            disconnectAndRetry();
+        }
+    }
+
+    private boolean sessionMatches(Bundle data) {
+        return sessionId.equals(data.getString(KEY_SESSION_ID, ""));
+    }
+
+    private boolean isTrustedNatro(int sendingUid) {
+        if (sendingUid <= 0) return false;
+        PackageManager packages = context.getPackageManager();
+        String[] names;
+        try {
+            names = packages.getPackagesForUid(sendingUid);
+        } catch (RuntimeException failure) {
+            return false;
+        }
+        boolean exact = false;
+        if (names != null) {
+            for (String name : names) {
+                if (NATRO_PACKAGE.equals(name)) exact = true;
+            }
+        }
+        if (!exact) return false;
+        try {
+            return packages.checkSignatures(NAVIGATOR_PACKAGE, NATRO_PACKAGE)
+                    == PackageManager.SIGNATURE_MATCH;
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    private void disconnectAndRetry() {
+        remote = null;
+        binding = false;
+        if (bound) {
+            bound = false;
+            try { context.unbindService(connection); } catch (RuntimeException ignored) {}
+        }
+        scheduleRetry();
+    }
+
+    private void scheduleRetry() {
+        main.removeCallbacks(retry);
+        main.postDelayed(retry, retryMs);
+        retryMs = Math.min(MAX_RETRY_MS, retryMs * 2L);
+    }
+
+    private final Runnable retry = this::start;
+}

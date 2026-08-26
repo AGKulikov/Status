@@ -1,0 +1,403 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+package ru.natro.navigation;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
+import android.util.DisplayMetrics;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+/** Activity-owned floating window with no resources or manifest additions. */
+final class FloatingWindowController {
+    private static final String ACTION_FLOATING = "navi_win/ru.yandex.yandexnavi";
+    private static final String EXTRA_WINDOWED = "ddnavwin";
+    private static final String EXTRA_FORCE_FULLSCREEN = "ddnavforcewinfull";
+    private static final String PREFS = "natro_floating_window_v2";
+    private static final int MODE_FULLSCREEN = 0;
+    private static final int MODE_FLOATING = 1;
+    private static final int MODE_TOGGLE = 2;
+    private static final int FLOATING_FLAGS =
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+
+    private final Activity activity;
+    private final Window window;
+    private final SharedPreferences preferences;
+    private final int originalType;
+    private final int originalFlags;
+    private final int originalGravity;
+    private final int originalFormat;
+    private final int originalSystemUi;
+    private final Drawable originalBackground;
+    private final float originalElevation;
+
+    private FloatingWindowProfile profile = new FloatingWindowProfile();
+    private FrameLayout controlLayer;
+    private TextView modeButton;
+    private TextView closeButton;
+    private TextView dragHandle;
+    private TextView resizeHandle;
+    private boolean floating;
+    private boolean destroyed;
+    private boolean geometryLoaded;
+
+    FloatingWindowController(Activity activity) {
+        this.activity = activity;
+        window = activity.getWindow();
+        preferences = activity.getSharedPreferences(PREFS, Activity.MODE_PRIVATE);
+        WindowManager.LayoutParams initial = window.getAttributes();
+        originalType = initial.type;
+        originalFlags = initial.flags;
+        originalGravity = initial.gravity;
+        originalFormat = initial.format;
+        View decor = window.getDecorView();
+        originalSystemUi = decor.getSystemUiVisibility();
+        originalBackground = decor.getBackground();
+        originalElevation = decor.getElevation();
+    }
+
+    void install() {
+        if (destroyed || controlLayer != null) return;
+        View decor = window.getDecorView();
+        if (!(decor instanceof ViewGroup)) return;
+        controlLayer = new FrameLayout(activity);
+        controlLayer.setClipChildren(false);
+        controlLayer.setClipToPadding(false);
+        ((ViewGroup) decor).addView(controlLayer, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        dragHandle = control("⋮⋮", "Переместить окно Навигатора");
+        dragHandle.setOnTouchListener(new DragTouchListener());
+        controlLayer.addView(dragHandle);
+
+        resizeHandle = control("◢", "Изменить размер окна Навигатора");
+        resizeHandle.setOnTouchListener(new ResizeTouchListener());
+        controlLayer.addView(resizeHandle);
+
+        closeButton = control("×", "Закрыть Навигатор");
+        closeButton.setOnClickListener(view -> activity.finish());
+        controlLayer.addView(closeButton);
+
+        modeButton = control("▣", "Открыть Навигатор в окне");
+        modeButton.setOnClickListener(view -> setWindowMode(MODE_TOGGLE));
+        controlLayer.addView(modeButton);
+        updateControls();
+    }
+
+    void consumeIntent(Intent intent) {
+        if (destroyed || intent == null || !profile.enabled) return;
+        boolean forceFull = intent.getBooleanExtra(EXTRA_FORCE_FULLSCREEN, false);
+        boolean requestsWindow = intent.getBooleanExtra(EXTRA_WINDOWED, false)
+                || ACTION_FLOATING.equals(intent.getAction());
+        if (forceFull) setWindowMode(MODE_FULLSCREEN);
+        else if (requestsWindow) setWindowMode(MODE_FLOATING);
+    }
+
+    void applyConfiguration(String rawConfiguration) {
+        profile = FloatingWindowProfile.fromConfiguration(rawConfiguration);
+        updateControls();
+        if (!profile.enabled && floating) setWindowMode(MODE_FULLSCREEN);
+        else if (floating) applyFloatingAttributes(false);
+    }
+
+    void setWindowMode(int mode) {
+        if (destroyed || !profile.enabled) return;
+        boolean next = mode == MODE_TOGGLE ? !floating : mode == MODE_FLOATING;
+        if (next == floating) {
+            updateControls();
+            return;
+        }
+        if (next) applyFloatingAttributes(true);
+        else applyFullscreenAttributes();
+    }
+
+    void destroy() {
+        destroyed = true;
+        ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
+        if (parent != null) parent.removeView(controlLayer);
+        controlLayer = null;
+    }
+
+    private void applyFloatingAttributes(boolean entering) {
+        DisplayMetrics screen = realDisplayMetrics();
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        int defaultWidth = Math.max(dp(200), screen.widthPixels * profile.widthPercent / 100);
+        int defaultHeight = Math.max(dp(200), screen.heightPixels * profile.heightPercent / 100);
+        if (entering || !geometryLoaded) {
+            attributes.width = profile.rememberGeometry
+                    ? preferences.getInt("width", defaultWidth) : defaultWidth;
+            attributes.height = profile.rememberGeometry
+                    ? preferences.getInt("height", defaultHeight) : defaultHeight;
+            attributes.x = profile.rememberGeometry
+                    ? preferences.getInt("x", screen.widthPixels * profile.leftPercent / 100)
+                    : screen.widthPixels * profile.leftPercent / 100;
+            attributes.y = profile.rememberGeometry
+                    ? preferences.getInt("y", screen.heightPixels * profile.topPercent / 100)
+                    : screen.heightPixels * profile.topPercent / 100;
+            geometryLoaded = true;
+        }
+        clampGeometry(attributes, screen);
+        attributes.type = Build.VERSION.SDK_INT >= 26
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                : WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
+        attributes.gravity = Gravity.TOP | Gravity.START;
+        attributes.flags = (attributes.flags | FLOATING_FLAGS)
+                & ~WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+        attributes.format = PixelFormat.TRANSLUCENT;
+        try {
+            window.setAttributes(attributes);
+            floating = true;
+            applyFloatingDecoration();
+            updateControls();
+        } catch (RuntimeException failure) {
+            floating = false;
+            restoreWindowIdentity(attributes);
+            try { window.setAttributes(attributes); } catch (RuntimeException ignored) {}
+            Toast.makeText(activity,
+                    "Оконный режим не разрешён прошивкой ГУ", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void applyFullscreenAttributes() {
+        if (floating && profile.rememberGeometry) saveGeometry();
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        restoreWindowIdentity(attributes);
+        attributes.width = WindowManager.LayoutParams.MATCH_PARENT;
+        attributes.height = WindowManager.LayoutParams.MATCH_PARENT;
+        attributes.x = 0;
+        attributes.y = 0;
+        try { window.setAttributes(attributes); } catch (RuntimeException ignored) {}
+        floating = false;
+        View decor = window.getDecorView();
+        decor.setAlpha(1f);
+        decor.setBackground(originalBackground);
+        decor.setClipToOutline(false);
+        decor.setElevation(originalElevation);
+        decor.setSystemUiVisibility(originalSystemUi);
+        updateControls();
+    }
+
+    private void restoreWindowIdentity(WindowManager.LayoutParams attributes) {
+        attributes.type = originalType;
+        attributes.gravity = originalGravity;
+        attributes.format = originalFormat;
+        attributes.flags = (attributes.flags & ~FLOATING_FLAGS)
+                | (originalFlags & FLOATING_FLAGS);
+    }
+
+    private void applyFloatingDecoration() {
+        View decor = window.getDecorView();
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.parseColor(profile.backgroundColor));
+        background.setCornerRadius(dp(profile.cornerRadiusDp));
+        if (profile.borderWidthDp > 0) {
+            background.setStroke(dp(profile.borderWidthDp),
+                    Color.parseColor(profile.borderColor));
+        }
+        decor.setBackground(background);
+        decor.setClipToOutline(profile.cornerRadiusDp > 0);
+        decor.setElevation(dp(profile.shadowRadiusDp));
+        if (Build.VERSION.SDK_INT >= 28) {
+            int shadow = Color.parseColor(profile.shadowColor);
+            decor.setOutlineAmbientShadowColor(shadow);
+            decor.setOutlineSpotShadowColor(shadow);
+        }
+        decor.setAlpha(profile.opacityPercent / 100f);
+        decor.setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    private void updateControls() {
+        if (controlLayer == null) return;
+        int handle = dp(36);
+        int margin = dp(8);
+
+        FrameLayout.LayoutParams drag = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, handle, Gravity.TOP | Gravity.START);
+        drag.leftMargin = dp(56);
+        drag.rightMargin = dp(56);
+        dragHandle.setLayoutParams(drag);
+        dragHandle.setVisibility(floating && profile.dragHandleVisible
+                && !profile.movementLocked ? View.VISIBLE : View.GONE);
+
+        FrameLayout.LayoutParams resize = new FrameLayout.LayoutParams(
+                handle, handle, Gravity.BOTTOM | Gravity.END);
+        resizeHandle.setLayoutParams(resize);
+        resizeHandle.setVisibility(floating && profile.resizeHandleVisible
+                && !profile.resizeLocked ? View.VISIBLE : View.GONE);
+
+        FrameLayout.LayoutParams close = new FrameLayout.LayoutParams(
+                handle, handle, Gravity.TOP | Gravity.START);
+        close.leftMargin = margin;
+        close.topMargin = margin;
+        closeButton.setLayoutParams(close);
+        closeButton.setVisibility(floating && profile.closeButtonVisible
+                ? View.VISIBLE : View.GONE);
+
+        int buttonGravity = gravity(profile.modeButtonPosition);
+        FrameLayout.LayoutParams mode = new FrameLayout.LayoutParams(
+                dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp), buttonGravity);
+        mode.setMargins(margin, margin, margin, margin);
+        modeButton.setLayoutParams(mode);
+        modeButton.setAlpha(profile.modeButtonOpacityPercent / 100f);
+        modeButton.setVisibility(profile.modeButtonVisible ? View.VISIBLE : View.GONE);
+        modeButton.setText(floating ? "□" : "▣");
+        modeButton.setContentDescription(floating
+                ? "Развернуть Навигатор на весь экран"
+                : "Открыть Навигатор в окне");
+    }
+
+    private TextView control(String text, String description) {
+        TextView view = new TextView(activity);
+        view.setText(text);
+        view.setTextColor(Color.WHITE);
+        view.setTextSize(20f);
+        view.setGravity(Gravity.CENTER);
+        view.setContentDescription(description);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xB8000000);
+        background.setCornerRadius(dp(18));
+        view.setBackground(background);
+        view.setElevation(dp(8));
+        return view;
+    }
+
+    private void updateGeometry(int x, int y, int width, int height) {
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        attributes.x = x;
+        attributes.y = y;
+        attributes.width = width;
+        attributes.height = height;
+        clampGeometry(attributes, realDisplayMetrics());
+        try { window.setAttributes(attributes); } catch (RuntimeException ignored) {}
+    }
+
+    private void clampGeometry(WindowManager.LayoutParams attributes, DisplayMetrics screen) {
+        attributes.width = Math.max(dp(200), Math.min(screen.widthPixels, attributes.width));
+        attributes.height = Math.max(dp(200), Math.min(screen.heightPixels, attributes.height));
+        attributes.x = Math.max(0, Math.min(
+                screen.widthPixels - attributes.width, attributes.x));
+        attributes.y = Math.max(0, Math.min(
+                screen.heightPixels - attributes.height, attributes.y));
+    }
+
+    private void saveGeometry() {
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        preferences.edit()
+                .putInt("x", attributes.x)
+                .putInt("y", attributes.y)
+                .putInt("width", attributes.width)
+                .putInt("height", attributes.height)
+                .apply();
+    }
+
+    private DisplayMetrics realDisplayMetrics() {
+        DisplayMetrics result = new DisplayMetrics();
+        try {
+            activity.getWindowManager().getDefaultDisplay().getRealMetrics(result);
+        } catch (RuntimeException ignored) {
+            result.setTo(activity.getResources().getDisplayMetrics());
+        }
+        return result;
+    }
+
+    private int dp(int value) {
+        return Math.max(1, Math.round(value
+                * activity.getResources().getDisplayMetrics().density));
+    }
+
+    private static int gravity(String position) {
+        if ("TOP_LEFT".equals(position)) return Gravity.TOP | Gravity.START;
+        if ("BOTTOM_LEFT".equals(position)) return Gravity.BOTTOM | Gravity.START;
+        if ("BOTTOM_RIGHT".equals(position)) return Gravity.BOTTOM | Gravity.END;
+        return Gravity.TOP | Gravity.END;
+    }
+
+    private final class DragTouchListener implements View.OnTouchListener {
+        private float downX;
+        private float downY;
+        private int startX;
+        private int startY;
+
+        @Override public boolean onTouch(View view, MotionEvent event) {
+            if (!floating || profile.movementLocked) return false;
+            WindowManager.LayoutParams attributes = window.getAttributes();
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = event.getRawX();
+                    downY = event.getRawY();
+                    startX = attributes.x;
+                    startY = attributes.y;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    updateGeometry(
+                            startX + Math.round(event.getRawX() - downX),
+                            startY + Math.round(event.getRawY() - downY),
+                            attributes.width,
+                            attributes.height);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (profile.rememberGeometry) saveGeometry();
+                    return true;
+                default:
+                    return false;
+            }
+        }
+    }
+
+    private final class ResizeTouchListener implements View.OnTouchListener {
+        private float downX;
+        private float downY;
+        private int startWidth;
+        private int startHeight;
+        private float aspect;
+
+        @Override public boolean onTouch(View view, MotionEvent event) {
+            if (!floating || profile.resizeLocked) return false;
+            WindowManager.LayoutParams attributes = window.getAttributes();
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = event.getRawX();
+                    downY = event.getRawY();
+                    startWidth = attributes.width;
+                    startHeight = attributes.height;
+                    aspect = startHeight == 0 ? 1f : (float) startWidth / startHeight;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    int width = startWidth + Math.round(event.getRawX() - downX);
+                    int height = startHeight + Math.round(event.getRawY() - downY);
+                    if (profile.aspectRatioLocked && aspect > 0f) {
+                        height = Math.round(width / aspect);
+                    }
+                    updateGeometry(attributes.x, attributes.y, width, height);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (profile.rememberGeometry) saveGeometry();
+                    return true;
+                default:
+                    return false;
+            }
+        }
+    }
+}

@@ -229,6 +229,16 @@ public final class NavigationIntegrationConfig {
         public int borderWidthDp;
         @NonNull public String borderColor = "#00000000";
         public int shadowRadiusDp = 20;
+        @NonNull public String shadowColor = "#66000000";
+        @NonNull public String backgroundColor = "#FF101216";
+        public boolean aspectRatioLocked;
+        public boolean rememberGeometry = true;
+        public boolean dragHandleVisible = true;
+        public boolean resizeHandleVisible = true;
+        public boolean modeButtonVisible = true;
+        @NonNull public String modeButtonPosition = "TOP_RIGHT";
+        public int modeButtonSizeDp = 44;
+        public int modeButtonOpacityPercent = 85;
         public boolean closeButtonVisible = true;
         public boolean keepAboveLauncher = true;
 
@@ -253,6 +263,16 @@ public final class NavigationIntegrationConfig {
                     .put("borderWidthDp", borderWidthDp)
                     .put("borderColor", borderColor)
                     .put("shadowRadiusDp", shadowRadiusDp)
+                    .put("shadowColor", shadowColor)
+                    .put("backgroundColor", backgroundColor)
+                    .put("aspectRatioLocked", aspectRatioLocked)
+                    .put("rememberGeometry", rememberGeometry)
+                    .put("dragHandleVisible", dragHandleVisible)
+                    .put("resizeHandleVisible", resizeHandleVisible)
+                    .put("modeButtonVisible", modeButtonVisible)
+                    .put("modeButtonPosition", modeButtonPosition)
+                    .put("modeButtonSizeDp", modeButtonSizeDp)
+                    .put("modeButtonOpacityPercent", modeButtonOpacityPercent)
                     .put("closeButtonVisible", closeButtonVisible)
                     .put("keepAboveLauncher", keepAboveLauncher);
         }
@@ -274,6 +294,25 @@ public final class NavigationIntegrationConfig {
             result.borderWidthDp = source.optInt("borderWidthDp", result.borderWidthDp);
             result.borderColor = source.optString("borderColor", result.borderColor);
             result.shadowRadiusDp = source.optInt("shadowRadiusDp", result.shadowRadiusDp);
+            result.shadowColor = source.optString("shadowColor", result.shadowColor);
+            result.backgroundColor = source.optString(
+                    "backgroundColor", result.backgroundColor);
+            result.aspectRatioLocked = source.optBoolean(
+                    "aspectRatioLocked", result.aspectRatioLocked);
+            result.rememberGeometry = source.optBoolean(
+                    "rememberGeometry", result.rememberGeometry);
+            result.dragHandleVisible = source.optBoolean(
+                    "dragHandleVisible", result.dragHandleVisible);
+            result.resizeHandleVisible = source.optBoolean(
+                    "resizeHandleVisible", result.resizeHandleVisible);
+            result.modeButtonVisible = source.optBoolean(
+                    "modeButtonVisible", result.modeButtonVisible);
+            result.modeButtonPosition = source.optString(
+                    "modeButtonPosition", result.modeButtonPosition);
+            result.modeButtonSizeDp = source.optInt(
+                    "modeButtonSizeDp", result.modeButtonSizeDp);
+            result.modeButtonOpacityPercent = source.optInt(
+                    "modeButtonOpacityPercent", result.modeButtonOpacityPercent);
             result.closeButtonVisible = source.optBoolean(
                     "closeButtonVisible", result.closeButtonVisible);
             result.keepAboveLauncher = source.optBoolean(
@@ -292,6 +331,12 @@ public final class NavigationIntegrationConfig {
             borderWidthDp = clamp(borderWidthDp, 0, 24);
             borderColor = color(borderColor, "#00000000");
             shadowRadiusDp = clamp(shadowRadiusDp, 0, 96);
+            shadowColor = color(shadowColor, "#66000000");
+            backgroundColor = color(backgroundColor, "#FF101216");
+            modeButtonPosition = enumText(modeButtonPosition, "TOP_RIGHT",
+                    "TOP_LEFT", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_RIGHT");
+            modeButtonSizeDp = clamp(modeButtonSizeDp, 28, 96);
+            modeButtonOpacityPercent = clamp(modeButtonOpacityPercent, 20, 100);
         }
     }
 
