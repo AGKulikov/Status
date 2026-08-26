@@ -9,6 +9,9 @@ import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.graphics.Typeface;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -17,6 +20,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,6 +41,7 @@ final class FloatingWindowController {
     private final Activity activity;
     private final Window window;
     private final SharedPreferences preferences;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final int originalType;
     private final int originalFlags;
     private final int originalGravity;
@@ -51,6 +56,7 @@ final class FloatingWindowController {
     private TextView closeButton;
     private TextView dragHandle;
     private TextView resizeHandle;
+    private ViewGroup modeButtonHost;
     private boolean floating;
     private boolean destroyed;
     private boolean geometryLoaded;
@@ -94,8 +100,10 @@ final class FloatingWindowController {
         controlLayer.addView(closeButton);
 
         modeButton = control("◲", "Открыть Навигатор в окне");
+        modeButton.setTextSize(32f);
+        modeButton.setTypeface(Typeface.DEFAULT_BOLD);
         modeButton.setOnClickListener(view -> restartInMode(!floating));
-        controlLayer.addView(modeButton);
+        mainHandler.post(modeButtonPoller);
         updateControls();
     }
 
@@ -157,8 +165,58 @@ final class FloatingWindowController {
         return decor instanceof ViewGroup ? (ViewGroup) decor : null;
     }
 
+    /** The 29.4.2 button lives in the row containing Navigator's voice-search control. */
+    private ViewGroup findNavigatorButtonHost() {
+        String[] anchorNames = {
+                "navi_service_open_voice_search",
+                "guidance_open_voice_search"
+        };
+        for (String name : anchorNames) {
+            int id = activity.getResources().getIdentifier(name, "id", activity.getPackageName());
+            View anchor = id == 0 ? null : activity.findViewById(id);
+            if (anchor == null || !(anchor.getParent() instanceof ViewGroup)) continue;
+            ViewGroup parent = (ViewGroup) anchor.getParent();
+            if (parent.getVisibility() == View.VISIBLE) return parent;
+        }
+        return null;
+    }
+
+    private void attachModeButtonToNavigator() {
+        if (destroyed || modeButton == null) return;
+        ViewGroup host = findNavigatorButtonHost();
+        if (host != null && host != modeButtonHost) {
+            if (modeButton.getParent() instanceof ViewGroup) {
+                ((ViewGroup) modeButton.getParent()).removeView(modeButton);
+            }
+            int size = dp(profile.modeButtonSizeDp);
+            if (host instanceof LinearLayout) {
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
+                params.setMargins(dp(4), 0, 0, dp(9));
+                host.addView(modeButton, 0, params);
+            } else {
+                host.addView(modeButton, 0, new ViewGroup.LayoutParams(size, size));
+            }
+            host.setClipChildren(false);
+            host.setClipToPadding(false);
+            modeButtonHost = host;
+        }
+        updateModeButton();
+    }
+
+    private final Runnable modeButtonPoller = new Runnable() {
+        @Override public void run() {
+            attachModeButtonToNavigator();
+            if (!destroyed) mainHandler.postDelayed(this, 1000L);
+        }
+    };
+
     void destroy() {
         destroyed = true;
+        mainHandler.removeCallbacks(modeButtonPoller);
+        if (modeButton != null && modeButton.getParent() instanceof ViewGroup) {
+            ((ViewGroup) modeButton.getParent()).removeView(modeButton);
+        }
+        modeButtonHost = null;
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
         if (parent != null) parent.removeView(controlLayer);
         controlLayer = null;
@@ -288,11 +346,17 @@ final class FloatingWindowController {
         closeButton.setVisibility(floating && profile.closeButtonVisible
                 ? View.VISIBLE : View.GONE);
 
-        int buttonGravity = gravity(profile.modeButtonPosition);
-        FrameLayout.LayoutParams mode = new FrameLayout.LayoutParams(
-                dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp), buttonGravity);
-        mode.setMargins(margin, margin, margin, margin);
-        modeButton.setLayoutParams(mode);
+        updateModeButton();
+    }
+
+    private void updateModeButton() {
+        if (modeButton == null) return;
+        ViewGroup.LayoutParams params = modeButton.getLayoutParams();
+        if (params != null) {
+            params.width = dp(profile.modeButtonSizeDp);
+            params.height = dp(profile.modeButtonSizeDp);
+            modeButton.setLayoutParams(params);
+        }
         modeButton.setAlpha(profile.modeButtonOpacityPercent / 100f);
         modeButton.setVisibility(profile.enabled && profile.modeButtonVisible
                 ? View.VISIBLE : View.GONE);
@@ -359,13 +423,6 @@ final class FloatingWindowController {
     private int dp(int value) {
         return Math.max(1, Math.round(value
                 * activity.getResources().getDisplayMetrics().density));
-    }
-
-    private static int gravity(String position) {
-        if ("TOP_LEFT".equals(position)) return Gravity.TOP | Gravity.START;
-        if ("BOTTOM_LEFT".equals(position)) return Gravity.BOTTOM | Gravity.START;
-        if ("BOTTOM_RIGHT".equals(position)) return Gravity.BOTTOM | Gravity.END;
-        return Gravity.TOP | Gravity.END;
     }
 
     private final class DragTouchListener implements View.OnTouchListener {

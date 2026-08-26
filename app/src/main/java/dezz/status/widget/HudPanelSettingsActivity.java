@@ -746,9 +746,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 resizeHandleVisible, closeButtonVisible}) {
             form.addView(control, marginTop(4));
         }
-        Spinner buttonPosition = windowButtonPositionSpinner(window.modeButtonPosition);
-        form.addView(label("Положение кнопки оконного режима"), marginTop(8));
-        form.addView(buttonPosition);
+        form.addView(text("Кнопка находится в штатной левой колонке Навигатора, как в "
+                + "референсе 29.4.2."), marginTop(8));
         EditText buttonSize = field(form, "Размер кнопки, dp",
                 Integer.toString(window.modeButtonSizeDp), true);
         EditText buttonOpacity = field(form, "Непрозрачность кнопки, %",
@@ -820,8 +819,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         window.dragHandleVisible = dragHandleVisible.isChecked();
                         window.resizeHandleVisible = resizeHandleVisible.isChecked();
                         window.closeButtonVisible = closeButtonVisible.isChecked();
-                        window.modeButtonPosition = windowButtonPositionValue(
-                                buttonPosition.getSelectedItemPosition());
                         window.modeButtonSizeDp = integer(buttonSize, window.modeButtonSizeDp);
                         window.modeButtonOpacityPercent = integer(
                                 buttonOpacity, window.modeButtonOpacityPercent);
@@ -1837,33 +1834,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             case 3: return "FREE";
             case 0:
             default: return "FOLLOW_ROUTE";
-        }
-    }
-
-    private Spinner windowButtonPositionSpinner(@NonNull String position) {
-        Spinner result = spinner(new String[]{
-                "Сверху слева", "Сверху справа", "Снизу слева", "Снизу справа"
-        }, "");
-        int selected;
-        switch (position) {
-            case "TOP_RIGHT": selected = 1; break;
-            case "BOTTOM_LEFT": selected = 2; break;
-            case "BOTTOM_RIGHT": selected = 3; break;
-            case "TOP_LEFT":
-            default: selected = 0; break;
-        }
-        result.setSelection(selected);
-        return result;
-    }
-
-    @NonNull
-    private static String windowButtonPositionValue(int position) {
-        switch (position) {
-            case 1: return "TOP_RIGHT";
-            case 2: return "BOTTOM_LEFT";
-            case 3: return "BOTTOM_RIGHT";
-            case 0:
-            default: return "TOP_LEFT";
         }
     }
 
