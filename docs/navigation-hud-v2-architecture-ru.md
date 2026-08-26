@@ -41,3 +41,23 @@ Natro хранит настройки и компонует интерфейс. 
 3. Natro: surface-элемент HUD, два независимых редактора профиля и редактор плавающего окна.
 4. Стендовые тесты на виртуальном display, затем физические тесты KX11: QuickBoot, сворачивание,
    перестроение маршрута, day/night, 30 минут движения и последовательные перезагрузки.
+
+## Основания решения
+
+- Yandex MapKit External Surfaces прямо предупреждает: дополнительный `Surface` дублирует
+  существующий `MapWindow` с теми же стилями и камерой, управлять им отдельно нельзя:
+  https://yandex.com/maps-api/docs/mapkit/android/static/tutorials/map_surface.html
+- `OffscreenMapWindow` создаёт отдельный `MapWindow` без `View` и умеет рисовать на переданный
+  `Surface`: https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/OffscreenMapWindow.html
+- `hudnav` подтверждает полезную границу «один state repository — два представления», но строит
+  собственный маршрут и пока использует упрощённую логику манёвров:
+  https://github.com/ingebyd/hudnav/blob/main/CLAUDE.md
+- BYDMate использует virtual display/freeform для проекции приложения. Это рабочий fallback для
+  зеркала, но не даёт независимую HUD-карту:
+  https://github.com/AndyShaman/BYDMate/blob/main/README.en.md
+- ynavi-zee показывает воспроизводимый apktool/smali-процесс патча Яндекс Навигатора для ГУ,
+  включая масштабирование и keepalive: https://github.com/maxim-saplin/ynavi-zee
+
+Для следующего этапа нужен точный APK модифицированного Навигатора 30.3.0, установленного на ГУ.
+Нельзя надёжно привязать smali-hook, проверить состав MapKit и сохранить совместимую подпись по
+другой сборке с тем же номером версии.
