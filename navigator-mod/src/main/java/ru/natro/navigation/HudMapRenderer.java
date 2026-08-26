@@ -3,13 +3,9 @@ package ru.natro.navigation;
 
 import android.content.Context;
 import android.content.res.Configuration;
-import android.graphics.Color;
 import android.graphics.PointF;
 import android.util.Log;
 import android.view.Surface;
-
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.lang.reflect.Method;
 
@@ -32,6 +28,7 @@ final class HudMapRenderer {
     private static final int VISIBILITY_STYLE_ID = CUSTOM_STYLE_ID + 1;
     private final Context context;
     private final FailureReporter reporter;
+    private final MapCursorStyler cursorStyler;
 
     private Surface surface;
     private int width;
@@ -48,17 +45,19 @@ final class HudMapRenderer {
     private Object routePolyline;
     private Object activeRoute;
     private long activeRouteEpoch = -1L;
+    private long activeJamFingerprint;
     private NavigatorStatePublisher.CameraState primaryCamera;
     private boolean freeCameraInitialized;
-    private HudProfile profile = new HudProfile();
+    private NavigationMapProfile profile = new NavigationMapProfile();
 
     HudMapRenderer(Context context, FailureReporter reporter) {
         this.context = context.getApplicationContext();
         this.reporter = reporter;
+        cursorStyler = new MapCursorStyler(this.context);
     }
 
     void applyConfiguration(String raw) {
-        HudProfile next = HudProfile.fromConfiguration(raw);
+        NavigationMapProfile next = NavigationMapProfile.fromConfiguration(raw, "hudMap");
         boolean enabledChanged = profile.enabled != next.enabled;
         boolean cameraModeChanged = !profile.cameraMode.equals(next.cameraMode);
         profile = next;
@@ -109,10 +108,13 @@ final class HudMapRenderer {
 
     void updateRoute(long routeEpoch, Object drivingRoute) {
         if (routeEpoch < activeRouteEpoch) return;
+        long jamFingerprint = RoutePolylineStyler.jamFingerprint(drivingRoute);
         boolean changed = routeEpoch != activeRouteEpoch || drivingRoute != activeRoute;
+        boolean jamsChanged = jamFingerprint != activeJamFingerprint;
         activeRouteEpoch = routeEpoch;
         activeRoute = drivingRoute;
-        if (changed) rebuildRoute();
+        activeJamFingerprint = jamFingerprint;
+        if (changed || jamsChanged) rebuildRoute();
     }
 
     private void startRenderer() {
@@ -147,6 +149,14 @@ final class HudMapRenderer {
             userLocationLayer = createOptionalLayer(
                     mapKit, mapKitClass, mapWindowClass, nextMapWindow,
                     "createUserLocationLayer");
+            if (userLocationLayer != null) {
+                try {
+                    cursorStyler.attach(userLocationLayer);
+                } catch (Throwable cursorFailure) {
+                    Log.w(TAG, "Custom HUD cursor listener unavailable: "
+                            + shortMessage(cursorFailure));
+                }
+            }
 
             applyProfile();
             Log.i(TAG, "Independent HUD OffscreenMapWindow attached, generation=" + generation
@@ -180,21 +190,27 @@ final class HudMapRenderer {
             }
             Object currentLocation = userLocationLayer;
             if (currentLocation != null) {
-                invoke(currentLocation, "setDefaultSource", new Class<?>[0]);
-                invoke(currentLocation, "setVisible", new Class<?>[]{boolean.class},
-                        profile.showCursor);
-                boolean free = "FREE".equals(profile.cameraMode);
-                invoke(currentLocation, "setAutoZoomEnabled",
-                        new Class<?>[]{boolean.class}, false);
-                invoke(currentLocation, "setHeadingModeActive",
-                        new Class<?>[]{boolean.class}, false);
-                if (free) {
-                    invoke(currentLocation, "resetAnchor", new Class<?>[0]);
-                } else {
-                    PointF anchor = new PointF(width * profile.focusXPercent / 100f,
-                            height * profile.focusYPercent / 100f);
-                    invoke(currentLocation, "setAnchor",
-                            new Class<?>[]{PointF.class, PointF.class}, anchor, anchor);
+                try {
+                    invoke(currentLocation, "setDefaultSource", new Class<?>[0]);
+                    invoke(currentLocation, "setVisible", new Class<?>[]{boolean.class},
+                            profile.showCursor);
+                    boolean free = "FREE".equals(profile.cameraMode);
+                    invoke(currentLocation, "setAutoZoomEnabled",
+                            new Class<?>[]{boolean.class}, false);
+                    invoke(currentLocation, "setHeadingModeActive",
+                            new Class<?>[]{boolean.class}, false);
+                    if (free) {
+                        invoke(currentLocation, "resetAnchor", new Class<?>[0]);
+                    } else {
+                        PointF anchor = new PointF(width * profile.focusXPercent / 100f,
+                                height * profile.focusYPercent / 100f);
+                        invoke(currentLocation, "setAnchor",
+                                new Class<?>[]{PointF.class, PointF.class}, anchor, anchor);
+                    }
+                    cursorStyler.apply(profile.showCursor, profile.cursorScalePercent,
+                            profile.cursorColor, profile.cursorOutlineColor);
+                } catch (Throwable cursorFailure) {
+                    Log.w(TAG, "HUD cursor profile could not be applied", cursorFailure);
                 }
             }
             boolean systemNight = (context.getResources().getConfiguration().uiMode
@@ -271,16 +287,7 @@ final class HudMapRenderer {
             Object line = invoke(collection, "addPolyline",
                     new Class<?>[]{polylineClass}, geometry);
             routePolyline = line;
-            invoke(line, "setStrokeColor", new Class<?>[]{int.class},
-                    Color.parseColor(profile.routeColor));
-            invoke(line, "setOutlineColor", new Class<?>[]{int.class},
-                    Color.parseColor(profile.routeOutlineColor));
-            invoke(line, "setStrokeWidth", new Class<?>[]{float.class},
-                    (float) profile.routeWidth);
-            invoke(line, "setOutlineWidth", new Class<?>[]{float.class},
-                    (float) profile.routeOutlineWidth);
-            invoke(line, "setZIndex", new Class<?>[]{float.class}, 100f);
-            invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
+            RoutePolylineStyler.apply(line, route, profile);
         } catch (Throwable failure) {
             Log.w(TAG, "Active route could not be rendered in the HUD MapWindow", failure);
         }
@@ -327,6 +334,7 @@ final class HudMapRenderer {
         mapWindow = null;
         map = null;
         trafficLayer = null;
+        cursorStyler.detach();
         userLocationLayer = null;
         routeCollection = null;
         routePolyline = null;
@@ -356,138 +364,4 @@ final class HudMapRenderer {
         return result.length() > 240 ? result.substring(0, 240) : result;
     }
 
-    private static final class HudProfile {
-        boolean enabled;
-        boolean automaticDayNight = true;
-        boolean nightMode;
-        boolean showPois;
-        boolean showLabels = true;
-        boolean showBuildings = true;
-        boolean showParks = true;
-        boolean showWater = true;
-        boolean showModels;
-        boolean showRoute = true;
-        boolean showTraffic = true;
-        boolean showCursor = true;
-        String cameraMode = "FOLLOW_ROUTE";
-        double zoomDelta;
-        int tiltDegrees = 60;
-        int focusXPercent = 50;
-        int focusYPercent = 72;
-        int mapScalePercent = 100;
-        int maximumFps = 20;
-        String routeColor = "#FFFFC400";
-        String routeOutlineColor = "#FF16181D";
-        double routeWidth = 8d;
-        double routeOutlineWidth = 2d;
-        String dayStyleJson = "";
-        String nightStyleJson = "";
-
-        static HudProfile fromConfiguration(String raw) {
-            HudProfile result = new HudProfile();
-            if (raw == null || raw.length() > 384 * 1024 || raw.indexOf('\u0000') >= 0) {
-                return result;
-            }
-            try {
-                JSONObject root = new JSONObject(raw);
-                JSONObject source = root.optJSONObject("hudMap");
-                if (source == null) return result;
-                result.enabled = source.optBoolean("enabled", false);
-                result.automaticDayNight = source.optBoolean("automaticDayNight", true);
-                result.nightMode = source.optBoolean("nightMode", false);
-                result.showPois = source.optBoolean("showPois", false);
-                result.showLabels = source.optBoolean("showLabels", true);
-                result.showBuildings = source.optBoolean("showBuildings", true);
-                result.showParks = source.optBoolean("showParks", true);
-                result.showWater = source.optBoolean("showWater", true);
-                result.showModels = source.optBoolean("showModels", false);
-                result.showRoute = source.optBoolean("showRoute", true);
-                result.showTraffic = source.optBoolean("showTraffic", true);
-                result.showCursor = source.optBoolean("showCursor", true);
-                result.cameraMode = enumText(source.optString(
-                        "cameraMode", "FOLLOW_ROUTE"));
-                result.zoomDelta = clamp(source.optDouble("zoomDelta", 0d), -8d, 8d, 0d);
-                result.tiltDegrees = clamp(source.optInt("tiltDegrees", 60), 0, 80);
-                result.focusXPercent = clamp(source.optInt("focusXPercent", 50), 0, 100);
-                result.focusYPercent = clamp(source.optInt("focusYPercent", 72), 0, 100);
-                result.mapScalePercent = clamp(
-                        source.optInt("mapScalePercent", 100), 50, 300);
-                result.maximumFps = clamp(source.optInt("maximumFps", 20), 1, 60);
-                result.routeColor = color(source.optString(
-                        "routeColor", "#FFFFC400"), "#FFFFC400");
-                result.routeOutlineColor = color(source.optString(
-                        "routeOutlineColor", "#FF16181D"), "#FF16181D");
-                result.routeWidth = clamp(
-                        source.optDouble("routeWidth", 8d), 1d, 40d, 8d);
-                result.routeOutlineWidth = clamp(source.optDouble(
-                        "routeOutlineWidth", 2d), 0d, 20d, 2d);
-                result.dayStyleJson = bounded(source.optString("dayStyleJson", ""));
-                result.nightStyleJson = bounded(source.optString("nightStyleJson", ""));
-            } catch (JSONException | RuntimeException ignored) {}
-            return result;
-        }
-
-        String visibilityStyleJson() {
-            StringBuilder rules = new StringBuilder(384).append('[');
-            boolean needsComma = false;
-            if (!showLabels) {
-                needsComma = appendRule(rules, needsComma,
-                        "{\"elements\":\"label\",\"stylers\":{\"visibility\":\"off\"}}");
-            }
-            if (!showBuildings) {
-                needsComma = appendRule(rules, needsComma,
-                        "{\"tags\":{\"all\":[\"building\"]},"
-                                + "\"stylers\":{\"visibility\":\"off\"}}");
-            }
-            if (!showParks) {
-                needsComma = appendRule(rules, needsComma,
-                        "{\"tags\":{\"any\":[\"park\",\"national_park\"]},"
-                                + "\"stylers\":{\"visibility\":\"off\"}}");
-            }
-            if (!showWater) {
-                appendRule(rules, needsComma,
-                        "{\"tags\":{\"all\":[\"water\"]},"
-                                + "\"stylers\":{\"visibility\":\"off\"}}");
-            }
-            rules.append(']');
-            return rules.length() == 2 ? "" : rules.toString();
-        }
-
-        private static boolean appendRule(StringBuilder target, boolean comma, String rule) {
-            if (comma) target.append(',');
-            target.append(rule);
-            return true;
-        }
-
-        private static int clamp(int value, int minimum, int maximum) {
-            return Math.max(minimum, Math.min(maximum, value));
-        }
-
-        private static double clamp(double value, double minimum, double maximum,
-                                    double fallback) {
-            return Double.isNaN(value) || Double.isInfinite(value)
-                    ? fallback : Math.max(minimum, Math.min(maximum, value));
-        }
-
-        private static String color(String raw, String fallback) {
-            String value = raw == null ? "" : raw.trim();
-            try {
-                Color.parseColor(value);
-                return value;
-            } catch (IllegalArgumentException invalid) {
-                return fallback;
-            }
-        }
-
-        private static String bounded(String raw) {
-            String value = raw == null ? "" : raw.trim();
-            return value.length() <= 128 * 1024 && value.indexOf('\u0000') < 0 ? value : "";
-        }
-
-        private static String enumText(String raw) {
-            String value = raw == null ? "" : raw.trim().toUpperCase(java.util.Locale.ROOT);
-            return "NORTH_UP".equals(value) || "HEADING_UP".equals(value)
-                    || "FREE".equals(value) ? value : "FOLLOW_ROUTE";
-        }
-    }
 }

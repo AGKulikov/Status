@@ -35,6 +35,10 @@ public final class NavigationBridgeStateStoreTest {
                 new NavigationRouteGeometryV2(11, "current", "[]")));
         assertEquals("current",
                 NavigationBridgeStateStore.routeGeometry().encodedPolyline);
+        assertTrue(NavigationBridgeStateStore.publishRouteGeometry(SESSION_A,
+                new NavigationRouteGeometryV2(11, "current", "[{\"type\":\"HARD\"}]")));
+        assertEquals("[{\"type\":\"HARD\"}]",
+                NavigationBridgeStateStore.routeGeometry().trafficSegmentsJson);
 
         assertTrue(NavigationBridgeStateStore.publishSnapshot(SESSION_A, snapshot(2, 12)));
         assertNull(NavigationBridgeStateStore.routeGeometry());

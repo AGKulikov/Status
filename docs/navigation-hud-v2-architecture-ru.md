@@ -88,10 +88,35 @@ level/zipalign допустима, а изменение любого защищ
 Natro. Внутри процесса Навигатора второй MapWindow получает сам `DrivingRoute.getGeometry()` и
 рисует его через отдельную `MapObjectCollection`, поэтому IPC-кодирование не участвует в кадрах.
 
+Пробки не разбиваются на тысячи объектов. MapKit гарантирует, что элемент N списка
+`DrivingRoute.getJamSegments()` относится к отрезку между точками N и N+1 геометрии. Один
+`PolylineMapObject` получает индексы палитры через `setStrokeColors`, а `ConditionsListener`
+обновляет HUD, основную карту и компактный RLE-поток `trafficSegmentsJson` без смены
+`routeEpoch`. Курсор обеих карт создаётся как программный `View`, передаётся штатному
+`ViewProvider` и настраивается через `UserLocationObjectListener`; resources baseline при этом
+не меняются.
+
+Для основной карты контроллер использует публичные ID подслоёв NaviKit. Пока собственная линия
+активного маршрута и курсор успешно созданы, исходные driving-navigation подслои скрыты; при
+ошибке, отключении профиля или уничтожении `MapActivity` их исходная видимость восстанавливается.
+Camera callbacks, вызванные собственным `Map.move`, распознаются и не передаются обратно в HUD,
+поэтому независимые `zoomDelta` не складываются циклически.
+
+Настройка `showTraffic` и палитра каждого профиля независимо управляют пробками на активном
+маршруте. Глобальный фоновый traffic-layer основной карты пока оставлен под управлением самого
+Навигатора: в публичном API 30.3.0 `getJamsLayerId()` устарел с пояснением, что отдельного слоя
+пробок больше нет. Ради совместимости baseline контроллер не привязывается к приватному владельцу
+`TrafficLayer`; отдельное управление этим слоем возможно только после нахождения стабильной
+публичной точки входа.
+
 Публичные основания решения: [automotive Guidance](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/navigation/automotive/Guidance.html),
 [RoutePosition](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/navigation/RoutePosition.html),
-[LocalizedValue](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/LocalizedValue.html) и
-[Map/CameraListener](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/Map.html).
+[LocalizedValue](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/LocalizedValue.html),
+[Map/CameraListener](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/Map.html),
+[route jam segments](https://yandex.com/maps-api/docs/mapkit/android/generated/tutorials/map_routes.html),
+[PolylineMapObject](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/PolylineMapObject.html),
+[UserLocationObjectListener](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/user_location/UserLocationObjectListener.html)
+и [LayerIds](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/LayerIds.html).
 
 ## IPC и граница доверия
 
@@ -180,9 +205,10 @@ Manifest baseline не меняется. Для package нового Навиг�
 4. Безопасный Natro endpoint, snapshot/route callbacks и восстановление соединения — выполнено;
    endpoint после HELLO явно запрашивает свежий snapshot и геометрию.
 5. Отдельный `OffscreenMapWindow`, настоящий Surface-элемент HUD и независимые
-   редакторы обоих `MapProfile` — базовый lifecycle, синхронизация основной камеры, активной
-   геометрии маршрута, zoomDelta/наклона/focus/цвета/толщины маршрута выполнены. Цветовые сегменты
-   пробок, полный custom cursor и применение всех параметров к основной карте ещё продолжаются.
+   редакторы обоих `MapProfile` — lifecycle, синхронизация камеры, активная геометрия и цветовые
+   сегменты пробок маршрута, custom cursor, независимые camera/focus/scale/style основной и
+   HUD-карт выполнены; отдельное управление глобальным traffic-layer основной карты отложено до
+   стабильной публичной точки входа.
 6. Редактор HUD, где карта и каждый навигационный элемент свободно перемещаются/масштабируются.
 7. Стендовые тесты, затем KX11: загрузка офлайн-карт, совместное наличие Яндекс Музыки, QuickBoot,
    холодный старт, оконный deep link, сворачивание, перестроение маршрута, day/night, 30 минут

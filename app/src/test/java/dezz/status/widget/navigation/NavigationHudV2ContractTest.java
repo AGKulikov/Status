@@ -18,8 +18,11 @@ public final class NavigationHudV2ContractTest {
         NavigationIntegrationConfig config = new NavigationIntegrationConfig();
         config.mainMap.zoomDelta = 2.5d;
         config.mainMap.routeColor = "#FF112233";
+        config.mainMap.trafficHardColor = "#FF334455";
         config.hudMap.zoomDelta = -1.25d;
         config.hudMap.routeColor = "#FFAABBCC";
+        config.hudMap.trafficBlockedColor = "#FF550011";
+        config.hudMap.trafficGradientLength = 24d;
         config.hudMap.enabled = true;
         config.mainFloatingWindow.movementLocked = true;
         config.mainFloatingWindow.cornerRadiusDp = 38;
@@ -35,6 +38,9 @@ public final class NavigationHudV2ContractTest {
         assertEquals(-1.25d, restored.hudMap.zoomDelta, 0d);
         assertEquals("#FF112233", restored.mainMap.routeColor);
         assertEquals("#FFAABBCC", restored.hudMap.routeColor);
+        assertEquals("#FF334455", restored.mainMap.trafficHardColor);
+        assertEquals("#FF550011", restored.hudMap.trafficBlockedColor);
+        assertEquals(24d, restored.hudMap.trafficGradientLength, 0d);
         assertTrue(restored.hudMap.enabled);
         assertTrue(restored.mainFloatingWindow.movementLocked);
         assertEquals(38, restored.mainFloatingWindow.cornerRadiusDp);
@@ -48,12 +54,14 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.zoomDelta = Double.NaN;
         config.hudMap.routeWidth = Double.POSITIVE_INFINITY;
         config.hudMap.routeOutlineWidth = Double.NEGATIVE_INFINITY;
+        config.hudMap.trafficGradientLength = Double.NaN;
 
         config.normalize();
 
         assertEquals(0d, config.hudMap.zoomDelta, 0d);
         assertEquals(8d, config.hudMap.routeWidth, 0d);
         assertEquals(2d, config.hudMap.routeOutlineWidth, 0d);
+        assertEquals(12d, config.hudMap.trafficGradientLength, 0d);
     }
 
     @Test public void bridgeRequiresDirectSurfaceAndSnapshotCapabilities() {
@@ -137,6 +145,9 @@ public final class NavigationHudV2ContractTest {
         String client = read(patchRoot.resolve("NavigationBridgeClient.java"));
         String renderer = read(patchRoot.resolve("HudMapRenderer.java"));
         String publisher = read(patchRoot.resolve("NavigatorStatePublisher.java"));
+        String mainMap = read(patchRoot.resolve("MainMapController.java"));
+        String cursor = read(patchRoot.resolve("MapCursorStyler.java"));
+        String routeStyler = read(patchRoot.resolve("RoutePolylineStyler.java"));
 
         assertTrue(controller.contains("ACTION_FLOATING = \"navi_win/ru.yandex.yandexnavi\""));
         assertTrue(controller.contains("EXTRA_WINDOWED = \"ddnavwin\""));
@@ -164,6 +175,16 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("updatePrimaryCamera"));
         assertTrue(renderer.contains("getGeometry"));
         assertTrue(renderer.contains("addPolyline"));
+        assertTrue(routeStyler.contains("getJamSegments"));
+        assertTrue(routeStyler.contains("setStrokeColors"));
+        assertTrue(routeStyler.contains("setPaletteColor"));
+        assertTrue(cursor.contains("UserLocationObjectListener"));
+        assertTrue(cursor.contains("ViewProvider"));
+        assertTrue(cursor.contains("setView"));
+        assertTrue(mainMap.contains("getDrivingNavigationBaseLayerId"));
+        assertTrue(mainMap.contains("getDrivingNavigationUserPlacemarkLayerId"));
+        assertTrue(mainMap.contains("Independent main MapProfile applied"));
+        assertFalse(mainMap.contains("getJamsLayerId"));
         assertTrue(publisher.contains("MapActivity.x()"));
         assertTrue(publisher.contains("getMapWindow"));
         assertTrue(publisher.contains("getGuidance"));
@@ -172,11 +193,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("getManoeuvres"));
         assertTrue(publisher.contains("getLaneSigns"));
         assertTrue(publisher.contains("getTrafficLightsWithSignal"));
+        assertTrue(publisher.contains("ConditionsListener"));
+        assertTrue(publisher.contains("trafficSegmentsJson"));
         assertTrue(publisher.contains("addCameraListener"));
         assertTrue(publisher.contains("getValue\"), 0d) * 3.6d"));
         assertFalse(publisher.contains("getDeclaredField"));
         assertFalse(renderer.contains("captureScreenshot("));
         assertFalse(renderer.contains("PlatformGLSurface"));
+        assertFalse(cursor.contains("Bitmap"));
         assertFalse(controller.contains("ImageReader"));
         assertFalse(controller.contains("MediaProjection"));
         assertFalse(controller.contains("Bitmap"));

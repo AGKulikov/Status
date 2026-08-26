@@ -96,6 +96,13 @@ public final class NavigationIntegrationConfig {
         @NonNull public String routeOutlineColor = "#FF16181D";
         public double routeWidth = 8d;
         public double routeOutlineWidth = 2d;
+        @NonNull public String trafficFreeColor = "#FF39B54A";
+        @NonNull public String trafficLightColor = "#FFFFD54F";
+        @NonNull public String trafficHardColor = "#FFFF8A3D";
+        @NonNull public String trafficVeryHardColor = "#FFF04444";
+        @NonNull public String trafficBlockedColor = "#FF7E1D2D";
+        @NonNull public String trafficUnknownColor = "#FF8A9099";
+        public double trafficGradientLength = 12d;
         public int maximumFps;
         @NonNull public String dayStyleJson = "";
         @NonNull public String nightStyleJson = "";
@@ -147,6 +154,13 @@ public final class NavigationIntegrationConfig {
                     .put("routeOutlineColor", routeOutlineColor)
                     .put("routeWidth", routeWidth)
                     .put("routeOutlineWidth", routeOutlineWidth)
+                    .put("trafficFreeColor", trafficFreeColor)
+                    .put("trafficLightColor", trafficLightColor)
+                    .put("trafficHardColor", trafficHardColor)
+                    .put("trafficVeryHardColor", trafficVeryHardColor)
+                    .put("trafficBlockedColor", trafficBlockedColor)
+                    .put("trafficUnknownColor", trafficUnknownColor)
+                    .put("trafficGradientLength", trafficGradientLength)
                     .put("maximumFps", maximumFps)
                     .put("dayStyleJson", dayStyleJson)
                     .put("nightStyleJson", nightStyleJson);
@@ -187,6 +201,20 @@ public final class NavigationIntegrationConfig {
             result.routeWidth = source.optDouble("routeWidth", result.routeWidth);
             result.routeOutlineWidth = source.optDouble(
                     "routeOutlineWidth", result.routeOutlineWidth);
+            result.trafficFreeColor = source.optString(
+                    "trafficFreeColor", result.trafficFreeColor);
+            result.trafficLightColor = source.optString(
+                    "trafficLightColor", result.trafficLightColor);
+            result.trafficHardColor = source.optString(
+                    "trafficHardColor", result.trafficHardColor);
+            result.trafficVeryHardColor = source.optString(
+                    "trafficVeryHardColor", result.trafficVeryHardColor);
+            result.trafficBlockedColor = source.optString(
+                    "trafficBlockedColor", result.trafficBlockedColor);
+            result.trafficUnknownColor = source.optString(
+                    "trafficUnknownColor", result.trafficUnknownColor);
+            result.trafficGradientLength = source.optDouble(
+                    "trafficGradientLength", result.trafficGradientLength);
             result.maximumFps = source.optInt("maximumFps", result.maximumFps);
             result.dayStyleJson = source.optString("dayStyleJson", result.dayStyleJson);
             result.nightStyleJson = source.optString("nightStyleJson", result.nightStyleJson);
@@ -205,11 +233,18 @@ public final class NavigationIntegrationConfig {
             cursorScalePercent = clamp(cursorScalePercent, 25, 300);
             routeWidth = clamp(routeWidth, 1d, 40d, 8d);
             routeOutlineWidth = clamp(routeOutlineWidth, 0d, 20d, 2d);
+            trafficGradientLength = clamp(trafficGradientLength, 0d, 100d, 12d);
             maximumFps = clamp(maximumFps, 1, 60);
             cursorColor = color(cursorColor, "#FFFFC400");
             cursorOutlineColor = color(cursorOutlineColor, "#FF17191E");
             routeColor = color(routeColor, "#FFFFC400");
             routeOutlineColor = color(routeOutlineColor, "#FF16181D");
+            trafficFreeColor = color(trafficFreeColor, "#FF39B54A");
+            trafficLightColor = color(trafficLightColor, "#FFFFD54F");
+            trafficHardColor = color(trafficHardColor, "#FFFF8A3D");
+            trafficVeryHardColor = color(trafficVeryHardColor, "#FFF04444");
+            trafficBlockedColor = color(trafficBlockedColor, "#FF7E1D2D");
+            trafficUnknownColor = color(trafficUnknownColor, "#FF8A9099");
             dayStyleJson = bounded(dayStyleJson, MAX_STYLE_CHARS);
             nightStyleJson = bounded(nightStyleJson, MAX_STYLE_CHARS);
         }

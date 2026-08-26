@@ -527,6 +527,20 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 Double.toString(profile.routeWidth), false);
         EditText routeOutlineWidth = field(form, "Толщина контура маршрута",
                 Double.toString(profile.routeOutlineWidth), false);
+        EditText trafficFreeColor = field(form, "Пробки: свободно ARGB",
+                profile.trafficFreeColor, false);
+        EditText trafficLightColor = field(form, "Пробки: небольшие ARGB",
+                profile.trafficLightColor, false);
+        EditText trafficHardColor = field(form, "Пробки: затруднение ARGB",
+                profile.trafficHardColor, false);
+        EditText trafficVeryHardColor = field(form, "Пробки: тяжёлые ARGB",
+                profile.trafficVeryHardColor, false);
+        EditText trafficBlockedColor = field(form, "Пробки: перекрыто ARGB",
+                profile.trafficBlockedColor, false);
+        EditText trafficUnknownColor = field(form, "Пробки: нет данных ARGB",
+                profile.trafficUnknownColor, false);
+        EditText trafficGradient = field(form, "Длина перехода цветов пробок",
+                Double.toString(profile.trafficGradientLength), false);
         EditText dayStyle = field(form, "JSON-стиль дневной карты",
                 profile.dayStyleJson, false);
         dayStyle.setSingleLine(false);
@@ -583,6 +597,14 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.routeWidth = decimal(routeWidth, profile.routeWidth);
                         profile.routeOutlineWidth = decimal(
                                 routeOutlineWidth, profile.routeOutlineWidth);
+                        profile.trafficFreeColor = value(trafficFreeColor);
+                        profile.trafficLightColor = value(trafficLightColor);
+                        profile.trafficHardColor = value(trafficHardColor);
+                        profile.trafficVeryHardColor = value(trafficVeryHardColor);
+                        profile.trafficBlockedColor = value(trafficBlockedColor);
+                        profile.trafficUnknownColor = value(trafficUnknownColor);
+                        profile.trafficGradientLength = decimal(
+                                trafficGradient, profile.trafficGradientLength);
                         profile.dayStyleJson = value(dayStyle);
                         profile.nightStyleJson = value(nightStyle);
 
@@ -667,6 +689,20 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 Double.toString(map.routeWidth), false);
         EditText routeOutlineWidth = field(form, "Толщина контура маршрута",
                 Double.toString(map.routeOutlineWidth), false);
+        EditText trafficFreeColor = field(form, "Пробки: свободно ARGB",
+                map.trafficFreeColor, false);
+        EditText trafficLightColor = field(form, "Пробки: небольшие ARGB",
+                map.trafficLightColor, false);
+        EditText trafficHardColor = field(form, "Пробки: затруднение ARGB",
+                map.trafficHardColor, false);
+        EditText trafficVeryHardColor = field(form, "Пробки: тяжёлые ARGB",
+                map.trafficVeryHardColor, false);
+        EditText trafficBlockedColor = field(form, "Пробки: перекрыто ARGB",
+                map.trafficBlockedColor, false);
+        EditText trafficUnknownColor = field(form, "Пробки: нет данных ARGB",
+                map.trafficUnknownColor, false);
+        EditText trafficGradient = field(form, "Длина перехода цветов пробок",
+                Double.toString(map.trafficGradientLength), false);
         EditText dayStyle = field(form, "JSON-стиль дневной карты", map.dayStyleJson, false);
         dayStyle.setSingleLine(false);
         dayStyle.setMinLines(3);
@@ -768,6 +804,14 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         map.routeWidth = decimal(routeWidth, map.routeWidth);
                         map.routeOutlineWidth = decimal(
                                 routeOutlineWidth, map.routeOutlineWidth);
+                        map.trafficFreeColor = value(trafficFreeColor);
+                        map.trafficLightColor = value(trafficLightColor);
+                        map.trafficHardColor = value(trafficHardColor);
+                        map.trafficVeryHardColor = value(trafficVeryHardColor);
+                        map.trafficBlockedColor = value(trafficBlockedColor);
+                        map.trafficUnknownColor = value(trafficUnknownColor);
+                        map.trafficGradientLength = decimal(
+                                trafficGradient, map.trafficGradientLength);
                         map.dayStyleJson = value(dayStyle);
                         map.nightStyleJson = value(nightStyle);
 

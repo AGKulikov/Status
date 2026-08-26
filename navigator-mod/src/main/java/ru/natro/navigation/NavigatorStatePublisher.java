@@ -15,6 +15,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -29,6 +30,8 @@ import java.util.List;
  */
 final class NavigatorStatePublisher {
     interface Sink {
+        void onPrimaryMap(Object mapWindow, Object map);
+
         void onPrimaryCamera(CameraState state);
 
         void onNavigationState(String snapshotJson, String routeJson, Object drivingRoute,
@@ -63,6 +66,7 @@ final class NavigatorStatePublisher {
     private static final long MAX_RESOLVE_RETRY_MS = 5_000L;
     private static final int MAX_POLYLINE_POINTS = 16_000;
     private static final int MAX_ENCODED_POLYLINE_CHARS = 190_000;
+    private static final int MAX_TRAFFIC_RUNS = 2_048;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Sink sink;
@@ -84,6 +88,8 @@ final class NavigatorStatePublisher {
     private String activeRouteKey;
     private Object activeRoute;
     private String encodedRoute = "";
+    private Object conditionsRoute;
+    private Object conditionsListener;
     private long resolveRetryMs = MIN_RESOLVE_RETRY_MS;
 
     NavigatorStatePublisher(Sink sink) {
@@ -135,6 +141,7 @@ final class NavigatorStatePublisher {
                     detachCameraListener();
                     throw bindingFailure;
                 }
+                sink.onPrimaryMap(mapWindow, nextMap);
                 resolvedSomething = true;
                 Log.i(TAG, "Primary Navigator MapWindow resolved");
             } catch (Throwable failure) {
@@ -276,6 +283,7 @@ final class NavigatorStatePublisher {
     }
 
     private boolean updateRoute(Object nextRoute, boolean routeMayHaveChanged) throws Exception {
+        if (conditionsRoute != nextRoute) attachRouteConditions(nextRoute);
         if (activeRouteKey != null && nextRoute == activeRoute && !routeMayHaveChanged) {
             return false;
         }
@@ -430,7 +438,154 @@ final class NavigatorStatePublisher {
                 .put("schema", 1)
                 .put("routeEpoch", routeEpoch)
                 .put("encodedPolyline", encodedRoute)
-                .put("trafficSegmentsJson", "[]");
+                .put("trafficSegmentsJson", encodeTrafficSegments(activeRoute));
+    }
+
+    private static String encodeTrafficSegments(Object route) {
+        if (route == null) return "[]";
+        try {
+            List<?> segments = invokeList(route, "getJamSegments");
+            if (segments.isEmpty()) return "[]";
+            Object geometry = invoke(route, "getGeometry");
+            List<?> points = invokeList(geometry, "getPoints");
+            if (points.size() < 2) return "[]";
+            int stride = Math.max(1, (points.size() + MAX_POLYLINE_POINTS - 1)
+                    / MAX_POLYLINE_POINTS);
+            ArrayList<TrafficSample> samples = new ArrayList<>();
+            int previousPoint = 0;
+            for (int point = stride; point < points.size(); point += stride) {
+                samples.add(sampleTraffic(segments, previousPoint, point));
+                previousPoint = point;
+            }
+            int finalPoint = points.size() - 1;
+            if (previousPoint != finalPoint) {
+                samples.add(sampleTraffic(segments, previousPoint, finalPoint));
+            }
+            if (samples.isEmpty()) return "[]";
+
+            JSONArray runs = new JSONArray();
+            int start = 0;
+            String type = samples.get(0).type;
+            double speedTotal = finite(samples.get(0).speedMps)
+                    ? samples.get(0).speedMps : 0d;
+            int speedCount = finite(samples.get(0).speedMps) ? 1 : 0;
+            for (int index = 1; index <= samples.size(); index++) {
+                String nextType = index < samples.size() ? samples.get(index).type : "";
+                if (index < samples.size() && type.equals(nextType)) {
+                    double speed = samples.get(index).speedMps;
+                    if (finite(speed)) {
+                        speedTotal += speed;
+                        speedCount++;
+                    }
+                    continue;
+                }
+                JSONObject run = new JSONObject()
+                        .put("from", start)
+                        .put("to", index)
+                        .put("type", type);
+                if (speedCount > 0) {
+                    run.put("speedMps", Math.round(speedTotal / speedCount * 10d) / 10d);
+                }
+                if (runs.length() >= MAX_TRAFFIC_RUNS - 1 && index < samples.size()) {
+                    runs.put(new JSONObject()
+                            .put("from", start)
+                            .put("to", samples.size())
+                            .put("type", "UNKNOWN")
+                            .put("partial", true));
+                    break;
+                }
+                runs.put(run);
+                if (index < samples.size()) {
+                    start = index;
+                    type = nextType;
+                    double speed = samples.get(index).speedMps;
+                    speedTotal = finite(speed) ? speed : 0d;
+                    speedCount = finite(speed) ? 1 : 0;
+                }
+            }
+            String result = runs.toString();
+            return result.length() <= MAX_ENCODED_POLYLINE_CHARS ? result : "[]";
+        } catch (Throwable ignored) {
+            return "[]";
+        }
+    }
+
+    private static TrafficSample sampleTraffic(List<?> segments, int from, int to)
+            throws Exception {
+        String type = "UNKNOWN";
+        int priority = 0;
+        double speedTotal = 0d;
+        int speedCount = 0;
+        int end = Math.min(to, segments.size());
+        for (int index = Math.max(0, from); index < end; index++) {
+            String candidate = jamType(segments.get(index));
+            int candidatePriority = jamPriority(candidate);
+            if (candidatePriority > priority) {
+                priority = candidatePriority;
+                type = candidate;
+            }
+            double speed = jamSpeed(segments.get(index));
+            if (finite(speed)) {
+                speedTotal += speed;
+                speedCount++;
+            }
+        }
+        return new TrafficSample(type,
+                speedCount == 0 ? Double.NaN : speedTotal / speedCount);
+    }
+
+    private static int jamPriority(String type) {
+        if ("BLOCKED".equals(type)) return 6;
+        if ("VERY_HARD".equals(type)) return 5;
+        if ("HARD".equals(type)) return 4;
+        if ("LIGHT".equals(type)) return 3;
+        if ("FREE".equals(type)) return 2;
+        return 1;
+    }
+
+    private static String jamType(Object segment) throws Exception {
+        Object value = invoke(segment, "getJamType");
+        return value == null ? "UNKNOWN" : value.toString();
+    }
+
+    private static double jamSpeed(Object segment) throws Exception {
+        return number(invoke(segment, "getSpeed"), Double.NaN);
+    }
+
+    private void attachRouteConditions(Object route) throws Exception {
+        detachRouteConditions();
+        if (route == null) return;
+        Class<?> listenerClass = Class.forName(
+                "com.yandex.mapkit.directions.driving.ConditionsListener");
+        Object nextListener = Proxy.newProxyInstance(listenerClass.getClassLoader(),
+                new Class<?>[]{listenerClass}, (proxy, method, arguments) -> {
+                    if (isObjectMethod(proxy, method, arguments)) {
+                        return objectMethodResult(proxy, method, arguments);
+                    }
+                    if ("onConditionsUpdated".equals(method.getName())
+                            || "onConditionsOutdated".equals(method.getName())) {
+                        runOnMain(() -> publishState(false, true));
+                    }
+                    return null;
+                });
+        invoke(route, "addConditionsListener", new Class<?>[]{listenerClass}, nextListener);
+        conditionsRoute = route;
+        conditionsListener = nextListener;
+    }
+
+    private void detachRouteConditions() {
+        Object route = conditionsRoute;
+        Object listener = conditionsListener;
+        if (route != null && listener != null) {
+            try {
+                Class<?> listenerClass = Class.forName(
+                        "com.yandex.mapkit.directions.driving.ConditionsListener");
+                invoke(route, "removeConditionsListener",
+                        new Class<?>[]{listenerClass}, listener);
+            } catch (Throwable ignored) {}
+        }
+        conditionsRoute = null;
+        conditionsListener = null;
     }
 
     private static String encodeRoute(Object route) throws Exception {
@@ -496,12 +651,14 @@ final class NavigatorStatePublisher {
                         reference);
             } catch (Throwable ignored) {}
         }
+        if (map != null) sink.onPrimaryMap(null, null);
         primaryMap = null;
         cameraListener = null;
         cameraListenerReference = null;
     }
 
     private void detachGuidanceListeners() {
+        detachRouteConditions();
         Object currentGuidance = guidance;
         Object currentGuidanceListener = guidanceListener;
         if (currentGuidance != null && currentGuidanceListener != null) {
@@ -546,6 +703,16 @@ final class NavigatorStatePublisher {
 
     private interface Event {
         void onEvent(String methodName);
+    }
+
+    private static final class TrafficSample {
+        final String type;
+        final double speedMps;
+
+        TrafficSample(String type, double speedMps) {
+            this.type = type;
+            this.speedMps = speedMps;
+        }
     }
 
     private static final class Manoeuvre {

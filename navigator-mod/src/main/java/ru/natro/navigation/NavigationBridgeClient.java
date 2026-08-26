@@ -71,6 +71,7 @@ final class NavigationBridgeClient {
     private final Context context;
     private final Handler main;
     private final Messenger callbacks;
+    private final MainMapController mainMapController;
     private final HudMapRenderer hudMapRenderer;
     private final NavigatorStatePublisher statePublisher;
     private final String sessionId = UUID.randomUUID().toString();
@@ -122,14 +123,22 @@ final class NavigationBridgeClient {
         this.context = context.getApplicationContext();
         main = new Handler(Looper.getMainLooper());
         callbacks = new Messenger(new Handler(Looper.getMainLooper(), this::onMessage));
+        mainMapController = new MainMapController(this.context);
         hudMapRenderer = new HudMapRenderer(this.context, this::sendSurfaceLost);
         statePublisher = new NavigatorStatePublisher(new NavigatorStatePublisher.Sink() {
+            @Override public void onPrimaryMap(Object mapWindow, Object map) {
+                mainMapController.attach(mapWindow, map);
+            }
+
             @Override public void onPrimaryCamera(NavigatorStatePublisher.CameraState state) {
-                hudMapRenderer.updatePrimaryCamera(state);
+                if (!mainMapController.updatePrimaryCamera(state)) {
+                    hudMapRenderer.updatePrimaryCamera(state);
+                }
             }
 
             @Override public void onNavigationState(String snapshotJson, String routeJson,
                                                      Object drivingRoute, long routeEpoch) {
+                mainMapController.updateRoute(routeEpoch, drivingRoute);
                 hudMapRenderer.updateRoute(routeEpoch, drivingRoute);
                 sendState(MSG_NAVIGATION_SNAPSHOT, KEY_SNAPSHOT_JSON, snapshotJson);
                 if (routeJson != null) {
@@ -166,6 +175,7 @@ final class NavigationBridgeClient {
                 if (sessionMatches(message.getData())) {
                     String raw = message.getData().getString(KEY_CONFIGURATION_JSON, "");
                     NatroEntryPoint.applyConfiguration(raw);
+                    mainMapController.applyConfiguration(raw);
                     hudMapRenderer.applyConfiguration(raw);
                 }
                 break;
