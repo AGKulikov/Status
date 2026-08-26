@@ -15,8 +15,8 @@ import java.util.Set;
 
 /** Versioned, exportable HUD layout and presentation settings. */
 public final class HudPanelConfig {
-    /** Schema 5 removes the abandoned frame-copy map experiment. */
-    public static final int SCHEMA_VERSION = 5;
+    /** Schema 6 adds a direct-Surface map; schema 4's frame-copy NAV_MAP stays discarded. */
+    public static final int SCHEMA_VERSION = 6;
     /** Safety-only document limit; the editor imposes no practical backdrop count limit. */
     public static final int MAX_ELEMENTS = 4_096;
     public static final int MAX_JSON_CHARS = 1_048_576;
@@ -136,11 +136,19 @@ public final class HudPanelConfig {
         navigationHideDelaySeconds = clamp(navigationHideDelaySeconds, 0, 600);
 
         Set<String> ids = new HashSet<>();
+        boolean directMapFound = false;
         for (int index = elements.size() - 1; index >= 0; index--) {
             HudElementConfig item = elements.get(index);
             try {
                 item.normalize(gridColumns, gridRows);
-                if (!ids.add(item.id)) elements.remove(index);
+                if (!ids.add(item.id)) {
+                    elements.remove(index);
+                } else if (item.type == HudElementType.NAV_MAP) {
+                    // One physical HUD surface has one independent MapWindow. Multiple map
+                    // elements would fight over the same producer and make geometry ambiguous.
+                    if (directMapFound) elements.remove(index);
+                    else directMapFound = true;
+                }
             } catch (RuntimeException invalid) {
                 elements.remove(index);
             }
@@ -162,6 +170,7 @@ public final class HudPanelConfig {
                 if (!ids.contains(id) || member == null
                         || member.type == HudElementType.HORIZONTAL_GROUP
                         || member.type == HudElementType.BACKDROP
+                        || member.type == HudElementType.NAV_MAP
                         || !claimed.add(id)) {
                     continue;
                 }
@@ -268,8 +277,17 @@ public final class HudPanelConfig {
                     JSONObject item = items.optJSONObject(index);
                     if (item == null) continue;
                     try {
-                        out.elements.add(HudElementConfig.fromJson(
-                                item, out.gridColumns, out.gridRows));
+                        if ("NAV_MAP".equalsIgnoreCase(item.optString("type", ""))) {
+                            JSONObject options = item.optJSONObject("options");
+                            if (schema < SCHEMA_VERSION || options == null
+                                    || !HudElementConfig.DIRECT_MAP_RENDERER.equals(
+                                    options.optString("renderer", ""))) {
+                                continue;
+                            }
+                        }
+                        HudElementConfig decoded = HudElementConfig.fromJson(
+                                item, out.gridColumns, out.gridRows);
+                        out.elements.add(decoded);
                     } catch (RuntimeException ignored) {
                         // Preserve every valid element if one imported future/invalid item exists.
                     }

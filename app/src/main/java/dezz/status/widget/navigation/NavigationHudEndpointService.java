@@ -11,6 +11,7 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
+import android.view.Surface;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,19 +23,108 @@ import dezz.status.widget.Preferences;
 /**
  * Explicit-only Natro endpoint to which the patched Navigator process connects.
  *
- * <p>This first executable slice accepts versioned snapshots/route geometry and sends the two-map
- * configuration back to Navigator. It intentionally does not advertise a HUD Surface capability
- * until the compositor owns a real lifecycle-safe Surface lease.</p>
+ * <p>The endpoint accepts versioned snapshots/route geometry, sends the two-map configuration and
+ * leases Natro's real HUD Surface to Navigator. The Surface is producer-owned: no screenshot,
+ * ImageReader or per-frame bitmap crosses this bridge.</p>
  */
 public final class NavigationHudEndpointService extends Service {
     private static final String TAG = "NavigationHudEndpoint";
+    static final int MAX_CONFIGURATION_CHARS = 384 * 1024;
+    @NonNull private static final Object SURFACE_LOCK = new Object();
+    @Nullable private static volatile NavigationHudEndpointService instance;
+    @Nullable private static SurfaceLease publishedSurface;
+    @Nullable private static volatile String publishedConfigurationJson;
+    private static long nextSurfaceGeneration;
     private static final long HOST_CAPABILITIES =
             NavigationBridgeContract.CAP_NATRO_CONFIGURATION_HOST
-                    | NavigationBridgeContract.CAP_NATRO_NAVIGATION_STATE_SINK;
+                    | NavigationBridgeContract.CAP_NATRO_NAVIGATION_STATE_SINK
+                    | NavigationBridgeContract.CAP_NATRO_HUD_SURFACE_PROVIDER;
 
     @NonNull private final Handler handler = new Handler(Looper.getMainLooper(), this::onMessage);
     @NonNull private final Messenger endpoint = new Messenger(handler);
     @Nullable private Client client;
+
+    /** Called by the HUD TextureView in this same isolated process. Ownership stays with it. */
+    public static void publishHudSurface(@NonNull Surface surface,
+                                         int width, int height, int dpi) {
+        if (!surface.isValid() || width <= 0 || height <= 0) return;
+        final SurfaceLease next;
+        synchronized (SURFACE_LOCK) {
+            next = new SurfaceLease(surface, width, height, Math.max(1, dpi),
+                    ++nextSurfaceGeneration);
+            publishedSurface = next;
+        }
+        NavigationHudEndpointService current = instance;
+        if (current != null) current.handler.post(() -> current.sendSurface(next));
+    }
+
+    /** Revokes exactly the lease backed by this TextureView Surface before its owner releases it. */
+    public static void revokeHudSurface(@NonNull Surface surface) {
+        final long generation;
+        synchronized (SURFACE_LOCK) {
+            if (publishedSurface == null || publishedSurface.surface != surface) return;
+            generation = publishedSurface.generation;
+            publishedSurface = null;
+        }
+        NavigationHudEndpointService current = instance;
+        if (current != null) current.handler.post(() -> current.sendSurfaceDetach(generation));
+    }
+
+    /** Re-sends independently edited map profiles to the authenticated Navigator client. */
+    public static void notifyConfigurationChanged() {
+        NavigationHudEndpointService current = instance;
+        if (current == null) return;
+        current.handler.post(() -> {
+            Client connected = current.client;
+            if (connected != null) {
+                current.sendConfiguration(connected.messenger, connected.sessionId);
+            }
+        });
+    }
+
+    /** Cross-process wake used by the settings UI after it persists either MapProfile. */
+    public static void requestConfigurationRefresh(@NonNull android.content.Context context) {
+        Intent command = new Intent(context, NavigationConfigurationRelayService.class)
+                .setAction(NavigationConfigurationRelayService.ACTION_REFRESH_CONFIGURATION);
+        String raw = new Preferences(context).navigationIntegrationConfigJson.get();
+        if (raw != null && raw.length() <= MAX_CONFIGURATION_CHARS
+                && raw.indexOf('\u0000') < 0) {
+            command.putExtra(NavigationConfigurationRelayService.EXTRA_CONFIGURATION_JSON, raw);
+        }
+        try {
+            context.startService(command);
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Could not wake navigation configuration endpoint", failure);
+        }
+    }
+
+    /** Called only by the non-exported relay in this :hud process. */
+    static void acceptRelayedConfiguration(@Nullable String raw) {
+        if (raw == null || raw.length() > MAX_CONFIGURATION_CHARS
+                || raw.indexOf('\u0000') >= 0) return;
+        try {
+            NavigationIntegrationConfig decoded = raw.trim().isEmpty()
+                    ? new NavigationIntegrationConfig()
+                    : NavigationIntegrationConfig.fromJson(raw);
+            publishedConfigurationJson = decoded.toJson().toString();
+        } catch (IllegalArgumentException | JSONException invalidDocument) {
+            Log.w(TAG, "Rejected invalid navigation configuration refresh", invalidDocument);
+            return;
+        }
+        NavigationHudEndpointService current = instance;
+        if (current != null) current.handler.post(() -> {
+            Client connected = current.client;
+            if (connected != null) {
+                current.sendConfiguration(connected.messenger, connected.sessionId);
+            }
+        });
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        instance = this;
+    }
 
     @Nullable
     @Override
@@ -55,6 +145,7 @@ public final class NavigationHudEndpointService extends Service {
 
     @Override
     public void onDestroy() {
+        if (instance == this) instance = null;
         disconnectCurrentClient();
         super.onDestroy();
     }
@@ -86,10 +177,11 @@ public final class NavigationHudEndpointService extends Service {
                     acceptRouteGeometry(current, message);
                     break;
                 case NavigationBridgeContract.MSG_HUD_SURFACE_LOST:
-                    // A future surface provider uses the generation to discard exactly one lease.
                     Log.i(TAG, "Navigator reported HUD surface loss, generation="
                             + message.getData().getLong(
-                                    NavigationBridgeContract.KEY_SURFACE_GENERATION, -1L));
+                                    NavigationBridgeContract.KEY_SURFACE_GENERATION, -1L)
+                            + ", detail=" + message.getData().getString(
+                            NavigationBridgeContract.KEY_ERROR_DETAIL, ""));
                     break;
                 case NavigationBridgeContract.MSG_HEARTBEAT:
                     replyCapabilities(current.messenger);
@@ -137,6 +229,7 @@ public final class NavigationHudEndpointService extends Service {
         NavigationBridgeStateStore.beginSession(session);
         replyCapabilities(reply);
         sendConfiguration(reply, session);
+        sendPublishedSurface();
         Log.i(TAG, "Authenticated Navigator bridge session started");
     }
 
@@ -167,7 +260,8 @@ public final class NavigationHudEndpointService extends Service {
     }
 
     private void sendConfiguration(@NonNull Messenger target, @NonNull String session) {
-        String raw = new Preferences(this).navigationIntegrationConfigJson.get();
+        String raw = publishedConfigurationJson;
+        if (raw == null) raw = new Preferences(this).navigationIntegrationConfigJson.get();
         NavigationIntegrationConfig config;
         try {
             config = raw.isEmpty()
@@ -177,14 +271,55 @@ public final class NavigationHudEndpointService extends Service {
             config = new NavigationIntegrationConfig();
         }
         try {
+            String normalized = config.toJson().toString();
+            publishedConfigurationJson = normalized;
             Bundle data = new Bundle();
             data.putString(NavigationBridgeContract.KEY_SESSION_ID, session);
             data.putString(NavigationBridgeContract.KEY_CONFIGURATION_JSON,
-                    config.toJson().toString());
+                    normalized);
             send(target, NavigationBridgeContract.MSG_APPLY_CONFIGURATION, data);
         } catch (JSONException failure) {
             replyError(target, "CONFIGURATION_ERROR", failure.getMessage());
         }
+    }
+
+    private void sendPublishedSurface() {
+        SurfaceLease lease;
+        synchronized (SURFACE_LOCK) {
+            lease = publishedSurface;
+        }
+        if (lease != null) sendSurface(lease);
+    }
+
+    private void sendSurface(@NonNull SurfaceLease lease) {
+        Client current = client;
+        if (current == null || !supportsDirectHudMap(current) || !lease.surface.isValid()) return;
+        synchronized (SURFACE_LOCK) {
+            if (publishedSurface != lease) return;
+        }
+        Bundle data = new Bundle();
+        data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
+        data.putParcelable(NavigationBridgeContract.KEY_SURFACE, lease.surface);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_WIDTH, lease.width);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_HEIGHT, lease.height);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_DPI, lease.dpi);
+        data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, lease.generation);
+        send(current.messenger, NavigationBridgeContract.MSG_ATTACH_HUD_SURFACE, data);
+    }
+
+    private void sendSurfaceDetach(long generation) {
+        Client current = client;
+        if (current == null || !supportsDirectHudMap(current)) return;
+        Bundle data = new Bundle();
+        data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
+        data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, generation);
+        send(current.messenger, NavigationBridgeContract.MSG_DETACH_HUD_SURFACE, data);
+    }
+
+    private static boolean supportsDirectHudMap(@NonNull Client value) {
+        long required = NavigationBridgeContract.CAP_HUD_INDEPENDENT_MAP_WINDOW
+                | NavigationBridgeContract.CAP_HUD_DIRECT_SURFACE;
+        return (value.capabilities & required) == required;
     }
 
     private void disconnectIf(@NonNull IBinder remote) {
@@ -245,6 +380,23 @@ public final class NavigationHudEndpointService extends Service {
             this.messenger = messenger;
             this.remote = remote;
             this.deathRecipient = deathRecipient;
+        }
+    }
+
+    private static final class SurfaceLease {
+        @NonNull final Surface surface;
+        final int width;
+        final int height;
+        final int dpi;
+        final long generation;
+
+        SurfaceLease(@NonNull Surface surface, int width, int height,
+                     int dpi, long generation) {
+            this.surface = surface;
+            this.width = width;
+            this.height = height;
+            this.dpi = dpi;
+            this.generation = generation;
         }
     }
 }

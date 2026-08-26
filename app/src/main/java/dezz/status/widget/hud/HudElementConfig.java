@@ -13,6 +13,7 @@ import dezz.status.widget.integration.SourceBinding;
 /** Mutable editor model for one independently addressable HUD element. */
 public final class HudElementConfig {
     public static final int SCHEMA_VERSION = 1;
+    public static final String DIRECT_MAP_RENDERER = "DIRECT_SURFACE_V2";
     public static final int MAX_TITLE_CHARS = 160;
     public static final int MAX_FORMAT_CHARS = 256;
     public static final int MAX_OPTIONS_CHARS = 32_768;
@@ -102,6 +103,11 @@ public final class HudElementConfig {
                     break;
                 case CLOCK:
                     options.put("clockMode", "SYSTEM");
+                    break;
+                case NAV_MAP:
+                    options.put("renderer", DIRECT_MAP_RENDERER);
+                    options.put("cornerRadiusPx", 0);
+                    options.put("opacityPercent", 100);
                     break;
                 case NAV_MANEUVER_ARROW:
                 case NAV_COMBINED:
@@ -219,6 +225,19 @@ public final class HudElementConfig {
         brightness = clamp(brightness, 0, 100);
         if (options == null || options.toString().length() > MAX_OPTIONS_CHARS) {
             options = new JSONObject();
+        }
+        if (type == HudElementType.NAV_MAP) {
+            try {
+                // A NAV_MAP is valid only as the new producer-to-Surface renderer. Never let an
+                // imported options object silently reactivate the removed bitmap bridge.
+                options.put("renderer", DIRECT_MAP_RENDERER);
+                options.put("cornerRadiusPx", clamp(
+                        options.optInt("cornerRadiusPx", 0), 0, 500));
+                options.put("opacityPercent", clamp(
+                        options.optInt("opacityPercent", 100), 20, 100));
+            } catch (JSONException impossible) {
+                throw new IllegalStateException(impossible);
+            }
         }
         if (type == HudElementType.HORIZONTAL_GROUP) {
             HudHorizontalGroup.normalizeOptions(this);

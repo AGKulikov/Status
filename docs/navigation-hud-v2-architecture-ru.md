@@ -57,8 +57,10 @@ level/zipalign допустима, а изменение любого защищ
   `routeEpoch`, а не в каждом кадре.
 - Основная карта использует собственный `MapProfile`: камера, zoom, наклон, focus point, слои,
   цвета, размеры маршрута/курсора, day/night, стиль и FPS.
-- HUD-карта получает другой `MapProfile` и отдельный `OffscreenMapWindow`. Это не копия кадра
-  основной карты, поэтому масштаб, камера, стиль и набор слоёв не связаны.
+- HUD-карта получает другой `MapProfile` и отдельный `OffscreenMapWindow`. Android `Surface`,
+  выданный Natro, преобразуется штатным `SurfaceFactory.from(...)` и добавляется в его
+  `MapWindow.addSurface(...)`. Это не копия кадра основной карты, поэтому масштаб, камера, стиль и
+  набор слоёв не связаны.
 - Навигатор рисует HUD-карту прямо в выданный Natro `Surface`. `Bitmap`, `ImageReader`,
   MediaProjection и покадровая передача RGBA не используются.
 - Natro размещает карту как один из элементов HUD, а манёвр, дистанцию, полосы, скорость,
@@ -71,17 +73,22 @@ level/zipalign допустима, а изменение любого защищ
 `ru.natro.statuswidget/dezz.status.widget.navigation.NavigationHudEndpointService`. Поэтому в
 manifest Навигатора не добавляется экспортируемый service/provider/receiver.
 
-Natro проверяет UID, точный package `ru.yandex.yandexnavi` и SHA-256 сертификата для каждого
-входящего Binder/Messenger-сообщения. Одних extras или action для доверия недостаточно. При
+Natro проверяет UID, точный package `ru.yandex.yandexnavi` и совпадение его подписи с установленным
+Natro для каждого входящего Binder/Messenger-сообщения. Одних extras или action для доверия недостаточно. При
 подключении стороны обмениваются версией протокола и capabilities; разрыв Binder, смерть процесса
-или `surfaceGeneration` немедленно освобождают старый `Surface` и запускают ограниченное
-переподключение.
+или смена `surfaceGeneration` освобождают старый consumer-handle `Surface` и запускают ограниченное
+переподключение. Сам producer остаётся во владении `TextureView` Natro до явного revoke.
+
+Редактор Natro передаёт новый профиль в процесс `:hud` через отдельный
+`NavigationConfigurationRelayService` с `exported=false`. Экспортируемый endpoint принимает только
+Binder-соединение Навигатора и принципиально не читает конфигурацию из `startService` extras.
 
 ## Оконный режим основного Навигатора
 
 В 29.4.2 оконный режим был не Android freeform и не окном Natro. Мод менял тип и параметры окна
 собственной `MapActivity`, добавлял drag/resize handles, сохранял `x/y/width/height` и рисовал
-скругление/рамку/тень. В 30.3.0 этого кода и `TransparentSplashActivity` уже нет.
+скругление/рамку/тень; на Android 8+ использовался тот же тип окна 2038, который применяет новый
+контроллер. В 30.3.0 этого кода и `TransparentSplashActivity` уже нет.
 
 Новая реализация сохраняет полезную модель, но не переносит старый smali:
 
@@ -102,10 +109,11 @@ Natro проверяет UID, точный package `ru.yandex.yandexnavi` и SHA
 4. `ddnavforcewinfull=true` для возврата в полный экран;
 5. оконный запуск deep link/сохранённого маршрута из Natro.
 
-Manifest baseline не меняется. Natro теперь пробует экспортируемую 30.3.0 `MapActivity` как прямую
-оконную цель после старых `TransparentSplashActivity`; `MapActivity` читает существующие extras в
-`onCreate` и `onNewIntent`. Таким образом старые ярлыки Natro работают и для старых модов, и для
-нового 30.3.0.
+Manifest baseline не меняется. Для package нового Навигатора Natro сначала пробует экспортируемую
+30.3.0 `MapActivity` как прямую оконную цель, чтобы промежуточный splash не потерял extras; старые
+`TransparentSplashActivity` остаются fallback для других сборок. Общий контроллер читает
+существующие extras в `onPostCreate` и `onNewIntent`. Поэтому старые ярлыки, сохранённые маршруты и
+кнопки Natro работают и для старых модов, и для нового 30.3.0.
 
 ## Что берём из YanaviHUD — только как функциональную спецификацию
 
@@ -128,7 +136,8 @@ Manifest baseline не меняется. Natro теперь пробует эк�
 
 Поэтому release gate состоит из двух вариантов:
 
-1. сначала проверить прямой `SurfaceView/TextureView` при корректно отключённом штатном HUD;
+1. сначала проверить `TextureView` (он допускает alpha/clipping и перекрытие другими HUD-элементами)
+   при корректно отключённом штатном HUD;
 2. если OEM-слой просвечивает, расширить существующий `app_process` helper до Binder surface
    broker: нижний Surface для MapKit, верхний прозрачный Surface для элементов Natro.
 
@@ -137,10 +146,15 @@ Manifest baseline не меняется. Natro теперь пробует эк�
 ## Этапы реализации и приёмка
 
 1. Baseline verifier и versioned contracts — выполнено.
-2. Минимальный patch pipeline: `classes4.dex` hook + новый `classes19.dex`, без apktool rebuild.
-3. `FloatingWindowController`, внутренняя кнопка и полная совместимость оконных запусков Natro.
-4. Безопасный Natro endpoint, snapshot/route callbacks и восстановление соединения.
-5. Отдельный `OffscreenMapWindow`, настоящий Surface-элемент HUD и два редактора `MapProfile`.
+2. Минимальный patch pipeline: `classes4.dex` hook + новый `classes19.dex`, без apktool rebuild —
+   выполнено.
+3. `FloatingWindowController`, внутренняя кнопка и полная совместимость оконных запусков Natro —
+   выполнено.
+4. Безопасный Natro endpoint, snapshot/route callbacks и восстановление соединения — выполнено;
+   публикация данных из внутренних объектов 30.3.0 продолжается.
+5. Отдельный `OffscreenMapWindow`, настоящий Surface-элемент HUD и независимые
+   редакторы обоих `MapProfile` — базовый lifecycle и хранение настроек выполнены; применение
+   внутренних слоёв основной карты и синхронизация камеры/маршрута продолжаются.
 6. Редактор HUD, где карта и каждый навигационный элемент свободно перемещаются/масштабируются.
 7. Стендовые тесты, затем KX11: загрузка офлайн-карт, совместное наличие Яндекс Музыки, QuickBoot,
    холодный старт, оконный deep link, сворачивание, перестроение маршрута, day/night, 30 минут
@@ -150,8 +164,14 @@ Manifest baseline не меняется. Natro теперь пробует эк�
 
 - Yandex MapKit External Surfaces предупреждает, что дополнительный Surface того же MapWindow
   дублирует его камеру и стили: https://yandex.com/maps-api/docs/mapkit/android/static/tutorials/map_surface.html
-- `OffscreenMapWindow` — отдельный MapWindow без View, рассчитанный на внешний Surface:
-  https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/OffscreenMapWindow.html
+- `OffscreenMapWindow` и External Surfaces — штатный путь отдельного рендера без `MapView`:
+  https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/OffscreenMapWindow.html и
+  https://yandex.com/maps-api/docs/mapkit/android/static/tutorials/map_surface.html
+- Android `TextureView` поддерживает поток из другого процесса, alpha и clipping; его
+  `SurfaceTexture` штатно превращается в `Surface`:
+  https://developer.android.com/reference/android/view/TextureView
+- Android `Surface` реализует `Parcelable`, поэтому его producer handle передаётся Binder-ом без
+  передачи кадров в Bundle: https://developer.android.com/reference/android/view/Surface
 - Yandex MapKit demo — публичная опора для обычного lifecycle MapKit:
   https://github.com/yandex/mapkit-android-demo
 - `hudnav` показывает полезную границу «одно navigation state — отдельный HUD display», но строит

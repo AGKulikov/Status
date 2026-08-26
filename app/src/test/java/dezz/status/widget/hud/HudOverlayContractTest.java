@@ -51,7 +51,7 @@ public final class HudOverlayContractTest {
     @Test
     public void oldLayoutsMigrateToAnEnabledStockHudMask() throws IOException {
         String config = source("dezz/status/widget/hud/HudPanelConfig.java");
-        assertTrue(config.contains("SCHEMA_VERSION = 4"));
+        assertTrue(config.contains("SCHEMA_VERSION = 6"));
         assertTrue(config.contains(
                 "public int displayId = HudViewportPolicy.VERIFIED_DISPLAY_ID"));
         assertTrue(config.contains(

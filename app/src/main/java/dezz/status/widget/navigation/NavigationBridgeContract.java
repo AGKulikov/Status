@@ -45,7 +45,8 @@ public final class NavigationBridgeContract {
     public static final long CAP_TRAFFIC = 1L << 3;
     public static final long CAP_MAIN_MAP_CONFIGURATION = 1L << 4;
     public static final long CAP_MAIN_FLOATING_WINDOW = 1L << 5;
-    public static final long CAP_HUD_OFFSCREEN_MAP = 1L << 6;
+    /** Navigator owns a second MapWindow backed by the leased HUD Surface. */
+    public static final long CAP_HUD_INDEPENDENT_MAP_WINDOW = 1L << 6;
     public static final long CAP_HUD_DIRECT_SURFACE = 1L << 7;
     public static final long CAP_NAVIGATOR_WINDOW_BUTTON = 1L << 8;
     public static final long CAP_LEGACY_WINDOW_INTENTS = 1L << 9;

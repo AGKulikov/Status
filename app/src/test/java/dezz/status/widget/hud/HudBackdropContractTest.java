@@ -22,7 +22,7 @@ public final class HudBackdropContractTest {
         String settings = read("dezz/status/widget/HudPanelSettingsActivity.java");
 
         assertTrue(canvas.contains("item.type == HudElementType.BACKDROP"));
-        assertTrue(canvas.contains("drawBackdrop(canvas, item, bounds)"));
+        assertTrue(canvas.contains("drawBackdrop(canvas, item, bounds, geometry)"));
         assertFalse(canvas.contains("setShadowLayer("));
         assertTrue(canvas.contains("drawStyledText(canvas, value, bounds"));
         assertTrue(settings.contains("Тень на HUD отключена"));

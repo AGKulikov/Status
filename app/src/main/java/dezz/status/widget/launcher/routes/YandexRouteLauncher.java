@@ -44,9 +44,9 @@ public final class YandexRouteLauncher {
         }
 
         // Do not create a second approximation of the vendor floating window here. The HOME
-        // "Navigator" shortcut already uses Yandex' ECARX-specific TransparentSplashActivity
-        // (`ddnavwin`). Opening that exact entry point first also keeps route buttons compatible
-        // with head units where ActivityOptions/windowingMode 5 opens on the wrong display.
+        // "Navigator" shortcut already uses the shared exact window target (`ddnavwin`). Opening
+        // that entry point first also keeps route buttons compatible with head units where
+        // ActivityOptions/windowingMode 5 opens on the wrong display.
         boolean opened = YandexWindowLauncher.launchOverLauncher(
                 context, windowProduct(route.product), false);
         if (!opened) {

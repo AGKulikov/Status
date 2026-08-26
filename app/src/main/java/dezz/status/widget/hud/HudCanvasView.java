@@ -129,7 +129,7 @@ public final class HudCanvasView extends View {
         for (HudElementConfig item : config.drawingOrder()) {
             if (!shouldDraw(item)) continue;
             RectF bounds = bounds(item, geometry);
-            drawElement(canvas, item, bounds, geometry.scale);
+            drawElement(canvas, item, bounds, geometry.scale, geometry);
             if ((item.type == HudElementType.TURN_SIGNAL_LEFT
                     || item.type == HudElementType.TURN_SIGNAL_RIGHT
                     || item.type == HudElementType.NAV_TRAFFIC_LIGHTS)
@@ -218,7 +218,7 @@ public final class HudCanvasView extends View {
             // cluster and DIM regions that share displayId=2.
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(Color.BLACK);
-            canvas.drawRect(geometry.content, paint);
+            drawPanelColorWithMapCutout(canvas, geometry);
             return;
         }
         if ("TRANSPARENT".equals(config.backgroundMode) && !editor) {
@@ -230,12 +230,33 @@ public final class HudCanvasView extends View {
                 : "DIM".equals(config.backgroundMode) ? 0xDD101218 : 0xFF090B10;
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(color);
-        canvas.drawRect(geometry.content, paint);
+        if (editor) canvas.drawRect(geometry.content, paint);
+        else drawPanelColorWithMapCutout(canvas, geometry);
     }
 
-    private void drawElement(Canvas canvas, HudElementConfig item, RectF bounds, float scale) {
+    /** Leaves the direct TextureView map visible below this Canvas and below system-mask PNGs. */
+    private void drawPanelColorWithMapCutout(Canvas canvas, Geometry geometry) {
+        HudElementConfig map = HudDirectMapGeometry.find(config);
+        if (map == null) {
+            canvas.drawRect(geometry.content, paint);
+            return;
+        }
+        RectF mapBounds = bounds(map, geometry);
+        float radius = Math.max(0f, Math.min(
+                map.options.optInt("cornerRadiusPx", 0),
+                Math.min(mapBounds.width(), mapBounds.height()) / 2f));
+        path.reset();
+        path.setFillType(Path.FillType.EVEN_ODD);
+        path.addRect(geometry.content, Path.Direction.CW);
+        path.addRoundRect(mapBounds, radius, radius, Path.Direction.CW);
+        canvas.drawPath(path, paint);
+        path.setFillType(Path.FillType.WINDING);
+    }
+
+    private void drawElement(Canvas canvas, HudElementConfig item, RectF bounds, float scale,
+                             Geometry geometry) {
         if (item.type == HudElementType.BACKDROP) {
-            drawBackdrop(canvas, item, bounds);
+            drawBackdrop(canvas, item, bounds, geometry);
             return;
         }
         AutomationState automation = data.automation(item);
@@ -253,6 +274,9 @@ public final class HudCanvasView extends View {
         switch (item.type) {
             case HORIZONTAL_GROUP:
                 // Geometry-only container. A background is always an independent BACKDROP.
+                return;
+            case NAV_MAP:
+                if (editor) drawMapPlaceholder(canvas, item, bounds, scale);
                 return;
             case MEDIA_ARTWORK:
                 drawBitmap(canvas, data.media() == null ? null : data.media().artwork, bounds);
@@ -296,7 +320,21 @@ public final class HudCanvasView extends View {
         }
     }
 
-    private void drawBackdrop(Canvas canvas, HudElementConfig item, RectF bounds) {
+    private void drawBackdrop(Canvas canvas, HudElementConfig item, RectF bounds,
+                              Geometry geometry) {
+        int clipped = canvas.save();
+        if (!editor) {
+            HudElementConfig map = HudDirectMapGeometry.find(config);
+            if (map != null) {
+                RectF mapBounds = bounds(map, geometry);
+                float mapRadius = Math.max(0f, Math.min(
+                        map.options.optInt("cornerRadiusPx", 0),
+                        Math.min(mapBounds.width(), mapBounds.height()) / 2f));
+                path.reset();
+                path.addRoundRect(mapBounds, mapRadius, mapRadius, Path.Direction.CW);
+                canvas.clipOutPath(path);
+            }
+        }
         float radius = Math.max(0f, Math.min(item.cornerRadiusPx,
                 Math.min(bounds.width(), bounds.height()) / 2f));
         int fill = parseColor(null, item.backgroundColor, 0xFF121923);
@@ -307,18 +345,52 @@ public final class HudCanvasView extends View {
         paint.setColor(withAlpha(fill, fillAlpha));
         canvas.drawRoundRect(bounds, radius, radius, paint);
 
-        if (item.borderWidthPx <= 0 || item.borderOpacityPercent <= 0) return;
-        int border = parseColor(null, item.borderColor, Color.WHITE);
-        int borderAlpha = Math.round(Color.alpha(border)
-                * item.borderOpacityPercent / 100f);
-        float half = item.borderWidthPx / 2f;
-        RectF borderBounds = new RectF(bounds);
-        borderBounds.inset(half, half);
+        if (item.borderWidthPx > 0 && item.borderOpacityPercent > 0) {
+            int border = parseColor(null, item.borderColor, Color.WHITE);
+            int borderAlpha = Math.round(Color.alpha(border)
+                    * item.borderOpacityPercent / 100f);
+            float half = item.borderWidthPx / 2f;
+            RectF borderBounds = new RectF(bounds);
+            borderBounds.inset(half, half);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(item.borderWidthPx);
+            paint.setColor(withAlpha(border, borderAlpha));
+            canvas.drawRoundRect(borderBounds, Math.max(0f, radius - half),
+                    Math.max(0f, radius - half), paint);
+        }
+        canvas.restoreToCount(clipped);
+    }
+
+    private void drawMapPlaceholder(Canvas canvas, HudElementConfig item,
+                                    RectF bounds, float scale) {
+        float radius = Math.max(0f, Math.min(
+                item.options.optInt("cornerRadiusPx", 0) * scale,
+                Math.min(bounds.width(), bounds.height()) / 2f));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF162333);
+        canvas.drawRoundRect(bounds, radius, radius, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(item.borderWidthPx);
-        paint.setColor(withAlpha(border, borderAlpha));
-        canvas.drawRoundRect(borderBounds, Math.max(0f, radius - half),
-                Math.max(0f, radius - half), paint);
+        paint.setStrokeWidth(Math.max(1f, 2f * scale));
+        paint.setColor(0xFF3D7FC4);
+        float step = Math.max(14f * scale, Math.min(bounds.width(), bounds.height()) / 5f);
+        for (float x = bounds.left + step; x < bounds.right; x += step) {
+            canvas.drawLine(x, bounds.top, x, bounds.bottom, paint);
+        }
+        for (float y = bounds.top + step; y < bounds.bottom; y += step) {
+            canvas.drawLine(bounds.left, y, bounds.right, y, paint);
+        }
+        paint.setStrokeWidth(Math.max(3f, 5f * scale));
+        paint.setColor(0xFFFFC400);
+        path.reset();
+        path.moveTo(bounds.left + bounds.width() * .08f, bounds.bottom - bounds.height() * .2f);
+        path.cubicTo(bounds.centerX(), bounds.top + bounds.height() * .25f,
+                bounds.centerX(), bounds.bottom - bounds.height() * .15f,
+                bounds.right - bounds.width() * .08f, bounds.top + bounds.height() * .22f);
+        canvas.drawPath(path, paint);
+        drawSimpleText(canvas, "КАРТА HUD · DIRECT SURFACE",
+                new RectF(bounds.left, bounds.top, bounds.right,
+                        Math.min(bounds.bottom, bounds.top + Math.max(22f, 30f * scale))),
+                Color.WHITE, Math.max(9f, 13f * scale), Layout.Alignment.ALIGN_CENTER);
     }
 
     private void drawManeuver(Canvas canvas, HudElementConfig item, RectF bounds, int color) {

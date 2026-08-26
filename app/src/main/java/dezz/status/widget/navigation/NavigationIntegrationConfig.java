@@ -107,7 +107,7 @@ public final class NavigationIntegrationConfig {
         @NonNull
         public static MapProfile defaults(@NonNull Target target) {
             MapProfile result = new MapProfile(target);
-            result.enabled = target == Target.MAIN;
+            result.enabled = true;
             result.maximumFps = target == Target.HUD ? 20 : 30;
             if (target == Target.HUD) {
                 result.showPois = false;

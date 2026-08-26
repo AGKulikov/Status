@@ -33,6 +33,9 @@ public final class YandexWindowLauncher {
             new Target(MAPS_PACKAGE, "ru.yandex.yandexmaps.app.TransparentSplashActivity")
     };
     private static final Target[] NAVIGATOR_WINDOW_TARGETS = {
+            // New Natro Navigator 30.3.0: hit the hooked Activity first so no splash layer can
+            // drop ddnavwin/deep-link extras. Other known builds remain ordered fallbacks.
+            new Target(NAVIGATOR_PACKAGE, "ru.yandex.yandexmaps.app.MapActivity"),
             // Standalone Navigator used on Monjaro. This is the exact mSaver HOME entry point.
             new Target(NAVIGATOR_PACKAGE,
                     "ru.yandex.yandexmaps.app.TransparentSplashActivity"),
@@ -40,10 +43,6 @@ public final class YandexWindowLauncher {
                     "ru.yandex.yandexnavi.TransparentSplashActivity"),
             new Target(NAVIGATOR_PACKAGE,
                     "ru.yandex.yandexnavi.app.TransparentSplashActivity"),
-            // Natro Navigator 30.3.0 keeps its manifest byte-identical to the proven protection
-            // baseline. Its exported MapActivity consumes the same ddnavwin contract directly,
-            // so existing Natro window shortcuts do not depend on adding a new manifest entry.
-            new Target(NAVIGATOR_PACKAGE, "ru.yandex.yandexmaps.app.MapActivity"),
             // Recent releases fold navigation into the Maps package.
             new Target(MAPS_PACKAGE, "ru.yandex.yandexmaps.TransparentSplashActivity"),
             new Target(MAPS_PACKAGE, "ru.yandex.yandexmaps.app.TransparentSplashActivity")
@@ -53,6 +52,10 @@ public final class YandexWindowLauncher {
             new Target(MAPS_PACKAGE, "ru.yandex.yandexmaps.MapActivity")
     };
     private static final Target[] NAVIGATOR_FULL_TARGETS = {
+            // Same exported Activity as the floating path. ddnavforcewinfull has priority over
+            // ddnavwin inside the shared controller, so Natro can expand an already running 30.3
+            // task without relying on a package launch-intent fallback.
+            new Target(NAVIGATOR_PACKAGE, "ru.yandex.yandexmaps.app.MapActivity"),
             new Target(NAVIGATOR_PACKAGE, "ru.yandex.yandexnavi.core.NavigatorActivity"),
             new Target(NAVIGATOR_PACKAGE, "ru.yandex.yandexmaps.core.NavigatorActivity"),
             new Target(MAPS_PACKAGE, "ru.yandex.yandexmaps.app.MapActivity")

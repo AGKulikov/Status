@@ -99,23 +99,27 @@ final class FloatingWindowController {
     }
 
     void consumeIntent(Intent intent) {
-        if (destroyed || intent == null || !profile.enabled) return;
+        if (destroyed || intent == null) return;
         boolean forceFull = intent.getBooleanExtra(EXTRA_FORCE_FULLSCREEN, false);
+        if (forceFull) {
+            setWindowMode(MODE_FULLSCREEN);
+            return;
+        }
+        if (!profile.enabled) return;
         boolean requestsWindow = intent.getBooleanExtra(EXTRA_WINDOWED, false)
                 || ACTION_FLOATING.equals(intent.getAction());
-        if (forceFull) setWindowMode(MODE_FULLSCREEN);
-        else if (requestsWindow) setWindowMode(MODE_FLOATING);
+        if (requestsWindow) setWindowMode(MODE_FLOATING);
     }
 
     void applyConfiguration(String rawConfiguration) {
         profile = FloatingWindowProfile.fromConfiguration(rawConfiguration);
-        updateControls();
-        if (!profile.enabled && floating) setWindowMode(MODE_FULLSCREEN);
+        if (!profile.enabled && floating) applyFullscreenAttributes();
         else if (floating) applyFloatingAttributes(false);
+        else updateControls();
     }
 
     void setWindowMode(int mode) {
-        if (destroyed || !profile.enabled) return;
+        if (destroyed || (!profile.enabled && mode != MODE_FULLSCREEN)) return;
         boolean next = mode == MODE_TOGGLE ? !floating : mode == MODE_FLOATING;
         if (next == floating) {
             updateControls();
@@ -259,7 +263,8 @@ final class FloatingWindowController {
         mode.setMargins(margin, margin, margin, margin);
         modeButton.setLayoutParams(mode);
         modeButton.setAlpha(profile.modeButtonOpacityPercent / 100f);
-        modeButton.setVisibility(profile.modeButtonVisible ? View.VISIBLE : View.GONE);
+        modeButton.setVisibility(profile.enabled && profile.modeButtonVisible
+                ? View.VISIBLE : View.GONE);
         modeButton.setText(floating ? "□" : "▣");
         modeButton.setContentDescription(floating
                 ? "Развернуть Навигатор на весь экран"

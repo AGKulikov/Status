@@ -99,4 +99,51 @@ public final class HudPanelConfigTest {
             assertEquals(HudElementType.CLOCK, item.type);
         }
     }
+
+    @Test public void directSurfaceMapRoundTripsOnlyInSchemaSix() throws Exception {
+        HudPanelConfig value = HudPanelConfig.defaults();
+        HudElementConfig map = HudElementConfig.create(
+                HudElementType.NAV_MAP, 1, value.gridColumns, value.gridRows);
+        map.x = 5;
+        map.width = 30;
+        map.options.put("cornerRadiusPx", 17);
+        value.elements.add(map);
+
+        HudPanelConfig restored = HudPanelConfig.fromJson(value.toJson().toString());
+        HudElementConfig decoded = null;
+        for (HudElementConfig item : restored.elements) {
+            if (item.type == HudElementType.NAV_MAP) decoded = item;
+        }
+
+        assertTrue(decoded != null);
+        assertEquals(5, decoded.x);
+        assertEquals(30, decoded.width);
+        assertEquals(17, decoded.options.optInt("cornerRadiusPx"));
+        assertEquals(HudElementConfig.DIRECT_MAP_RENDERER,
+                decoded.options.optString("renderer"));
+    }
+
+    @Test public void schemaSixMapWithoutDirectRendererMarkerIsRejected() {
+        HudPanelConfig restored = HudPanelConfig.fromJson("{"
+                + "\"schema\":6,"
+                + "\"elements\":[{\"id\":\"map\",\"type\":\"NAV_MAP\","
+                + "\"options\":{\"renderer\":\"FRAME_COPY\"}}]"
+                + "}");
+        assertTrue(restored.elements.isEmpty());
+    }
+
+    @Test public void onlyOneDirectMapCanOwnThePhysicalHudSurface() {
+        HudPanelConfig value = HudPanelConfig.defaults();
+        value.elements.add(HudElementConfig.create(
+                HudElementType.NAV_MAP, 1, value.gridColumns, value.gridRows));
+        value.elements.add(HudElementConfig.create(
+                HudElementType.NAV_MAP, 2, value.gridColumns, value.gridRows));
+        value.normalize();
+
+        int maps = 0;
+        for (HudElementConfig item : value.elements) {
+            if (item.type == HudElementType.NAV_MAP) maps++;
+        }
+        assertEquals(1, maps);
+    }
 }

@@ -314,6 +314,16 @@
             android:process=":hud"
             android:stopWithTask="false" />
 
+        <!-- Settings cross the process boundary through a separate non-exported component. The
+             exported Navigator Binder endpoint never accepts startService configuration data. -->
+        <service
+            android:name=".navigation.NavigationConfigurationRelayService"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false"
+            android:process=":hud"
+            android:stopWithTask="false" />
+
         <service
             android:name=".diagnostics.ActionRecorderOverlayService"
             android:enabled="true"

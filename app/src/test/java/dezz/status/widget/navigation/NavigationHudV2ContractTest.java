@@ -45,11 +45,11 @@ public final class NavigationHudV2ContractTest {
 
     @Test public void bridgeRequiresDirectSurfaceAndSnapshotCapabilities() {
         long required = NavigationBridgeContract.CAP_NAVIGATION_SNAPSHOT
-                | NavigationBridgeContract.CAP_HUD_OFFSCREEN_MAP
+                | NavigationBridgeContract.CAP_HUD_INDEPENDENT_MAP_WINDOW
                 | NavigationBridgeContract.CAP_HUD_DIRECT_SURFACE;
         assertEquals(2, NavigationBridgeContract.PROTOCOL_VERSION);
         assertTrue((required & NavigationBridgeContract.CAP_NAVIGATION_SNAPSHOT) != 0L);
-        assertTrue((required & NavigationBridgeContract.CAP_HUD_OFFSCREEN_MAP) != 0L);
+        assertTrue((required & NavigationBridgeContract.CAP_HUD_INDEPENDENT_MAP_WINDOW) != 0L);
         assertTrue((required & NavigationBridgeContract.CAP_HUD_DIRECT_SURFACE) != 0L);
     }
 
@@ -67,14 +67,33 @@ public final class NavigationHudV2ContractTest {
         assertEquals(2, NavigationBridgeContract.WINDOW_MODE_TOGGLE);
     }
 
+    @Test public void natroTargetsTheSameNewMapActivityForWindowAndFullscreen()
+            throws Exception {
+        String launcher = read(projectRoot().resolve(
+                "app/src/main/java/dezz/status/widget/launcher/YandexWindowLauncher.java"));
+        String compact = launcher.replaceAll("\\s+", "");
+        String exactTarget = "newTarget(NAVIGATOR_PACKAGE,"
+                + "\"ru.yandex.yandexmaps.app.MapActivity\")";
+        assertTrue(compact.indexOf(exactTarget) >= 0);
+        assertTrue(compact.indexOf(exactTarget) != compact.lastIndexOf(exactTarget));
+        assertTrue(compact.indexOf(exactTarget)
+                < compact.indexOf("newTarget(NAVIGATOR_PACKAGE,"
+                + "\"ru.yandex.yandexmaps.app.TransparentSplashActivity\")"));
+        assertTrue(launcher.contains("putExtra(\"ddnavwin\", true)"));
+        assertTrue(launcher.contains("putExtra(\"ddnavforcewinfull\", true)"));
+    }
+
     @Test public void exportedNatroEndpointAuthenticatesEveryMessengerTransaction()
             throws Exception {
         Path project = projectRoot();
         String manifest = read(project.resolve("app/src/main/AndroidManifest.xml"));
         String service = read(sourceRoot().resolve(
                 "navigation/NavigationHudEndpointService.java"));
+        String relay = read(sourceRoot().resolve(
+                "navigation/NavigationConfigurationRelayService.java"));
         String verifier = read(sourceRoot().resolve(
                 "navigation/NavigationBridgeCallerVerifier.java"));
+        String compactManifest = manifest.replaceAll("\\s+", "");
 
         assertTrue(manifest.contains(".navigation.NavigationHudEndpointService"));
         assertTrue(manifest.contains("android:exported=\"true\""));
@@ -83,8 +102,17 @@ public final class NavigationHudV2ContractTest {
         assertTrue(service.contains("NATRO_BIND_ACTION.equals(intent.getAction())"));
         assertTrue(verifier.contains("getPackagesForUid(sendingUid)"));
         assertTrue(verifier.contains("checkSignatures("));
-        assertFalse(service.contains(
+        assertTrue(service.contains(
                 "| NavigationBridgeContract.CAP_NATRO_HUD_SURFACE_PROVIDER"));
+        assertTrue(service.contains("data.putParcelable("));
+        assertTrue(service.contains("supportsDirectHudMap(current)"));
+        assertFalse(service.contains("getStringExtra("));
+        assertTrue(compactManifest.contains("android:name=\".navigation."
+                + "NavigationConfigurationRelayService\"android:directBootAware=\"true\""
+                + "android:enabled=\"true\"android:exported=\"false\""
+                + "android:process=\":hud\""));
+        assertTrue(relay.contains("getStringExtra(EXTRA_CONFIGURATION_JSON)"));
+        assertTrue(relay.contains("acceptRelayedConfiguration(raw)"));
     }
 
     @Test public void navigatorPatchHasButtonAndConsumesExistingNatroWindowContract()
@@ -94,15 +122,29 @@ public final class NavigationHudV2ContractTest {
         String controller = read(patchRoot.resolve("FloatingWindowController.java"));
         String entry = read(patchRoot.resolve("NatroEntryPoint.java"));
         String client = read(patchRoot.resolve("NavigationBridgeClient.java"));
+        String renderer = read(patchRoot.resolve("HudMapRenderer.java"));
 
         assertTrue(controller.contains("ACTION_FLOATING = \"navi_win/ru.yandex.yandexnavi\""));
         assertTrue(controller.contains("EXTRA_WINDOWED = \"ddnavwin\""));
         assertTrue(controller.contains("EXTRA_FORCE_FULLSCREEN = \"ddnavforcewinfull\""));
         assertTrue(controller.contains("modeButton.setOnClickListener"));
         assertTrue(controller.contains("Развернуть Навигатор на весь экран"));
+        assertTrue(controller.contains("profile.enabled && profile.modeButtonVisible"));
+        assertTrue(controller.contains("mode != MODE_FULLSCREEN"));
         assertTrue(entry.contains("NavigationBridgeClient.ensureStarted"));
         assertTrue(client.contains("getPackagesForUid(sendingUid)"));
         assertTrue(client.contains("checkSignatures(NAVIGATOR_PACKAGE, NATRO_PACKAGE)"));
+        assertTrue(client.contains("MSG_ATTACH_HUD_SURFACE"));
+        assertTrue(renderer.contains("createOffscreenMapWindow"));
+        assertTrue(renderer.contains("com.yandex.runtime.view.SurfaceFactory"));
+        assertTrue(renderer.contains("addSurface"));
+        assertTrue(renderer.contains("removeSurface"));
+        assertTrue(renderer.contains("createTrafficLayer"));
+        assertTrue(renderer.contains("createUserLocationLayer"));
+        assertTrue(renderer.contains("applyStyleSlot"));
+        assertTrue(renderer.contains("visibilityStyleJson"));
+        assertFalse(renderer.contains("captureScreenshot("));
+        assertFalse(renderer.contains("PlatformGLSurface"));
         assertFalse(controller.contains("ImageReader"));
         assertFalse(controller.contains("MediaProjection"));
         assertFalse(controller.contains("Bitmap"));
@@ -136,11 +178,17 @@ public final class NavigationHudV2ContractTest {
         String runtime = read(root.resolve("hud/HudRuntimeData.java"));
         String canvas = read(root.resolve("hud/HudCanvasView.java"));
         String elementTypes = read(root.resolve("hud/HudElementType.java"));
+        String composite = read(root.resolve("hud/HudCompositeView.java"));
 
         assertFalse(Files.exists(root.resolve("hud/NavigatorMapFrameProvider.java")));
         assertFalse(runtime.contains("NavigatorMapFrameProvider"));
         assertFalse(canvas.contains("navigatorMapFrame"));
-        assertFalse(elementTypes.contains("NAV_MAP("));
+        assertTrue(elementTypes.contains("NAV_MAP("));
+        assertTrue(composite.contains("TextureView"));
+        assertTrue(composite.contains("publishHudSurface"));
+        assertFalse(composite.contains("Bitmap"));
+        assertFalse(composite.contains("ImageReader"));
+        assertFalse(composite.contains("MediaProjection"));
         assertFalse(runtime.contains("ImageReader"));
         assertFalse(runtime.contains("NavigatorHudBridgeService"));
     }
@@ -152,6 +200,17 @@ public final class NavigationHudV2ContractTest {
         assertTrue(elementTypes.contains("NAV_LANES"));
         assertTrue(elementTypes.contains("NAV_SPEED_LIMIT"));
         assertTrue(elementTypes.contains("NAV_TRAFFIC_LIGHTS"));
+    }
+
+    @Test public void settingsExposeIndependentMapsAndNavigatorWindowButton() throws Exception {
+        String settings = read(projectRoot().resolve(
+                "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
+        assertTrue(settings.contains("Независимая карта HUD"));
+        assertTrue(settings.contains("Основная карта и окно Навигатора"));
+        assertTrue(settings.contains("Кнопка окно / полный экран"));
+        assertTrue(settings.contains("navigation.hudMap"));
+        assertTrue(settings.contains("navigation.mainMap"));
+        assertTrue(settings.contains("navigation.mainFloatingWindow"));
     }
 
     private static Path sourceRoot() {

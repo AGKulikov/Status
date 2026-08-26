@@ -14,6 +14,7 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.view.Surface;
 
 import java.util.UUID;
 
@@ -29,10 +30,15 @@ final class NavigationBridgeClient {
     private static final int MSG_HELLO = 1;
     private static final int MSG_CAPABILITIES = 2;
     private static final int MSG_APPLY_CONFIGURATION = 3;
+    private static final int MSG_ATTACH_HUD_SURFACE = 4;
+    private static final int MSG_DETACH_HUD_SURFACE = 5;
     private static final int MSG_SET_MAIN_WINDOW_MODE = 11;
+    private static final int MSG_HUD_SURFACE_LOST = 12;
     private static final int MSG_HEARTBEAT = 13;
 
     private static final long CAP_MAIN_FLOATING_WINDOW = 1L << 5;
+    private static final long CAP_HUD_INDEPENDENT_MAP_WINDOW = 1L << 6;
+    private static final long CAP_HUD_DIRECT_SURFACE = 1L << 7;
     private static final long CAP_NAVIGATOR_WINDOW_BUTTON = 1L << 8;
     private static final long CAP_LEGACY_WINDOW_INTENTS = 1L << 9;
 
@@ -41,6 +47,11 @@ final class NavigationBridgeClient {
     private static final String KEY_CLIENT_PACKAGE = "client_package";
     private static final String KEY_CAPABILITIES = "capabilities";
     private static final String KEY_CONFIGURATION_JSON = "configuration_json";
+    private static final String KEY_SURFACE = "surface";
+    private static final String KEY_SURFACE_WIDTH = "surface_width";
+    private static final String KEY_SURFACE_HEIGHT = "surface_height";
+    private static final String KEY_SURFACE_GENERATION = "surface_generation";
+    private static final String KEY_ERROR_DETAIL = "error_detail";
     private static final String KEY_WINDOW_MODE = "window_mode";
 
     private static final long MIN_RETRY_MS = 1_000L;
@@ -50,6 +61,7 @@ final class NavigationBridgeClient {
     private final Context context;
     private final Handler main;
     private final Messenger callbacks;
+    private final HudMapRenderer hudMapRenderer;
     private final String sessionId = UUID.randomUUID().toString();
     private Messenger remote;
     private boolean binding;
@@ -89,6 +101,7 @@ final class NavigationBridgeClient {
         this.context = context.getApplicationContext();
         main = new Handler(Looper.getMainLooper());
         callbacks = new Messenger(new Handler(Looper.getMainLooper(), this::onMessage));
+        hudMapRenderer = new HudMapRenderer(this.context, this::sendSurfaceLost);
     }
 
     private void start() {
@@ -111,13 +124,23 @@ final class NavigationBridgeClient {
         if (!isTrustedNatro(message.sendingUid)) return true;
         switch (message.what) {
             case MSG_CAPABILITIES:
-                // The first implementation intentionally waits for a real Surface capability;
-                // receiving capabilities alone never enables a bitmap/frame-copy fallback.
+                // A capability announcement never starts rendering by itself. Only a validated
+                // MSG_ATTACH_HUD_SURFACE can create the independent MapWindow.
                 break;
             case MSG_APPLY_CONFIGURATION:
                 if (sessionMatches(message.getData())) {
-                    NatroEntryPoint.applyConfiguration(message.getData().getString(
-                            KEY_CONFIGURATION_JSON, ""));
+                    String raw = message.getData().getString(KEY_CONFIGURATION_JSON, "");
+                    NatroEntryPoint.applyConfiguration(raw);
+                    hudMapRenderer.applyConfiguration(raw);
+                }
+                break;
+            case MSG_ATTACH_HUD_SURFACE:
+                if (sessionMatches(message.getData())) attachHudSurface(message.getData());
+                break;
+            case MSG_DETACH_HUD_SURFACE:
+                if (sessionMatches(message.getData())) {
+                    hudMapRenderer.detach(message.getData().getLong(
+                            KEY_SURFACE_GENERATION, -1L));
                 }
                 break;
             case MSG_SET_MAIN_WINDOW_MODE:
@@ -143,6 +166,8 @@ final class NavigationBridgeClient {
         data.putString(KEY_CLIENT_PACKAGE, NAVIGATOR_PACKAGE);
         data.putLong(KEY_CAPABILITIES,
                 CAP_MAIN_FLOATING_WINDOW
+                        | CAP_HUD_INDEPENDENT_MAP_WINDOW
+                        | CAP_HUD_DIRECT_SURFACE
                         | CAP_NAVIGATOR_WINDOW_BUTTON
                         | CAP_LEGACY_WINDOW_INTENTS);
         Message hello = Message.obtain(null, MSG_HELLO);
@@ -157,6 +182,37 @@ final class NavigationBridgeClient {
 
     private boolean sessionMatches(Bundle data) {
         return sessionId.equals(data.getString(KEY_SESSION_ID, ""));
+    }
+
+    private void attachHudSurface(Bundle data) {
+        data.setClassLoader(Surface.class.getClassLoader());
+        Surface surface;
+        try {
+            surface = data.getParcelable(KEY_SURFACE);
+        } catch (RuntimeException invalidParcel) {
+            surface = null;
+        }
+        hudMapRenderer.attach(surface,
+                data.getInt(KEY_SURFACE_WIDTH, 0),
+                data.getInt(KEY_SURFACE_HEIGHT, 0),
+                data.getLong(KEY_SURFACE_GENERATION, -1L));
+    }
+
+    private void sendSurfaceLost(long generation, String detail) {
+        Messenger current = remote;
+        if (current == null) return;
+        Bundle data = new Bundle();
+        data.putString(KEY_SESSION_ID, sessionId);
+        data.putLong(KEY_SURFACE_GENERATION, generation);
+        data.putString(KEY_ERROR_DETAIL, detail == null ? "" : detail);
+        Message lost = Message.obtain(null, MSG_HUD_SURFACE_LOST);
+        lost.replyTo = callbacks;
+        lost.setData(data);
+        try {
+            current.send(lost);
+        } catch (RemoteException failure) {
+            disconnectAndRetry();
+        }
     }
 
     private boolean isTrustedNatro(int sendingUid) {
@@ -184,6 +240,7 @@ final class NavigationBridgeClient {
     }
 
     private void disconnectAndRetry() {
+        hudMapRenderer.disconnect();
         remote = null;
         binding = false;
         if (bound) {

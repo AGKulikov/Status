@@ -30,6 +30,7 @@ import dezz.status.widget.StatusWidgetApplication;
 import dezz.status.widget.StartupWorkCoordinator;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.navigation.NavigationHudEndpointService;
 
 /** Foreground owner of the stable-id external HUD presentation. */
 public final class HudPresentationService extends Service
@@ -268,6 +269,7 @@ public final class HudPresentationService extends Service
             config = store.load();
         }
         if (data != null) data.updateConfig(config);
+        NavigationHudEndpointService.notifyConfigurationChanged();
         reconcileStockHudCarPreference();
         reconcilePresentation();
     }

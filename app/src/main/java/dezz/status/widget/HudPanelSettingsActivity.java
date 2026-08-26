@@ -51,6 +51,8 @@ import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.navigation.NavigationIntegrationConfig;
+import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /**
@@ -185,6 +187,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Button backdrop = button("+ Подложка");
         backdrop.setOnClickListener(view -> addBackdrop());
         row.addView(backdrop);
+        Button navigator = button("Навигатор 30.3");
+        navigator.setOnClickListener(view -> editNavigatorIntegration());
+        row.addView(navigator);
         Button options = button("Параметры");
         options.setOnClickListener(view -> editGlobalOptions());
         row.addView(options);
@@ -270,6 +275,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         new AlertDialog.Builder(this).setTitle("Добавить на HUD")
                 .setItems(labels, (dialog, which) -> {
                     HudElementType type = types.get(which);
+                    if (type == HudElementType.NAV_MAP && findMapElement() != null) {
+                        Toast.makeText(this,
+                                "На HUD может быть только одна независимая карта",
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     int ordinal = 1;
                     HudElementConfig item;
                     do {
@@ -307,6 +318,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         }
         if (item.type == HudElementType.HORIZONTAL_GROUP) {
             editHorizontalGroup(item);
+            return;
+        }
+        if (item.type == HudElementType.NAV_MAP) {
+            editMapSurface(item);
             return;
         }
         ScrollView scroll = new ScrollView(this);
@@ -428,6 +443,392 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     }
                 }));
         showSafeDialog(dialog);
+    }
+
+    /** Geometry belongs to the HUD element; rendering settings belong to the HUD MapProfile. */
+    private void editMapSurface(@NonNull HudElementConfig item) {
+        NavigationIntegrationConfig navigation = loadNavigationIntegrationConfig();
+        NavigationIntegrationConfig.MapProfile profile = navigation.hudMap;
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = column();
+        form.setPadding(dp(18), dp(8), dp(18), dp(24));
+        scroll.addView(form);
+
+        EditText title = field(form, "Название", item.title, false);
+        LinearLayout geometry = new LinearLayout(this);
+        EditText x = compactNumber("X", item.x);
+        EditText y = compactNumber("Y", item.y);
+        EditText width = compactNumber("W", item.width);
+        EditText height = compactNumber("H", item.height);
+        geometry.addView(x, weighted());
+        geometry.addView(y, weighted());
+        geometry.addView(width, weighted());
+        geometry.addView(height, weighted());
+        form.addView(label("Положение и размер карты на HUD"), marginTop(10));
+        form.addView(geometry);
+        Switch elementEnabled = switchView("Показывать область карты", item.enabled);
+        Switch rendererEnabled = switchView("Рендерить независимую карту HUD", profile.enabled);
+        form.addView(elementEnabled, marginTop(8));
+        form.addView(rendererEnabled, marginTop(4));
+        EditText radius = field(form, "Скругление карты, px",
+                Integer.toString(item.options.optInt("cornerRadiusPx", 0)), true);
+        EditText opacity = field(form, "Непрозрачность карты, %",
+                Integer.toString(item.options.optInt("opacityPercent", 100)), true);
+
+        form.addView(section("Камера HUD"), marginTop(16));
+        Spinner cameraMode = spinner(
+                new String[]{"FOLLOW_ROUTE", "NORTH_UP", "HEADING_UP", "FREE"},
+                profile.cameraMode);
+        form.addView(label("Режим камеры"), marginTop(8));
+        form.addView(cameraMode);
+        EditText zoom = field(form, "Поправка масштаба −8…8",
+                Double.toString(profile.zoomDelta), false);
+        EditText tilt = field(form, "Наклон 0…80°",
+                Integer.toString(profile.tiltDegrees), true);
+        EditText focusX = field(form, "Точка фокуса X, %",
+                Integer.toString(profile.focusXPercent), true);
+        EditText focusY = field(form, "Точка фокуса Y, %",
+                Integer.toString(profile.focusYPercent), true);
+        EditText mapScale = field(form, "Масштаб элементов карты, %",
+                Integer.toString(profile.mapScalePercent), true);
+        EditText maximumFps = field(form, "Максимальная частота кадров",
+                Integer.toString(profile.maximumFps), true);
+
+        form.addView(section("Состав и цвет карты HUD"), marginTop(16));
+        Switch automaticDayNight = switchView("Автоматический день / ночь",
+                profile.automaticDayNight);
+        Switch nightMode = switchView("Принудительно ночной режим", profile.nightMode);
+        Switch showRoute = switchView("Маршрут", profile.showRoute);
+        Switch showTraffic = switchView("Пробки", profile.showTraffic);
+        Switch showLabels = switchView("Подписи", profile.showLabels);
+        Switch showPois = switchView("Объекты POI", profile.showPois);
+        Switch showBuildings = switchView("Здания", profile.showBuildings);
+        Switch showParks = switchView("Парки", profile.showParks);
+        Switch showWater = switchView("Вода", profile.showWater);
+        Switch showModels = switchView("3D-модели", profile.showModels);
+        Switch showCursor = switchView("Курсор автомобиля", profile.showCursor);
+        for (Switch control : new Switch[]{automaticDayNight, nightMode, showRoute,
+                showTraffic, showLabels, showPois, showBuildings, showParks, showWater,
+                showModels, showCursor}) {
+            form.addView(control, marginTop(4));
+        }
+        EditText cursorScale = field(form, "Размер курсора, %",
+                Integer.toString(profile.cursorScalePercent), true);
+        EditText cursorColor = field(form, "Цвет курсора ARGB",
+                profile.cursorColor, false);
+        EditText cursorOutline = field(form, "Контур курсора ARGB",
+                profile.cursorOutlineColor, false);
+        EditText routeColor = field(form, "Цвет маршрута ARGB",
+                profile.routeColor, false);
+        EditText routeOutline = field(form, "Контур маршрута ARGB",
+                profile.routeOutlineColor, false);
+        EditText routeWidth = field(form, "Толщина маршрута",
+                Double.toString(profile.routeWidth), false);
+        EditText routeOutlineWidth = field(form, "Толщина контура маршрута",
+                Double.toString(profile.routeOutlineWidth), false);
+        EditText dayStyle = field(form, "JSON-стиль дневной карты",
+                profile.dayStyleJson, false);
+        dayStyle.setSingleLine(false);
+        dayStyle.setMinLines(3);
+        EditText nightStyle = field(form, "JSON-стиль ночной карты",
+                profile.nightStyleJson, false);
+        nightStyle.setSingleLine(false);
+        nightStyle.setMinLines(3);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Независимая карта HUD")
+                .setView(scroll)
+                .setPositiveButton("Применить", null)
+                .setNegativeButton("Отмена", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    try {
+                        item.title = value(title);
+                        item.x = integer(x, item.x);
+                        item.y = integer(y, item.y);
+                        item.width = integer(width, item.width);
+                        item.height = integer(height, item.height);
+                        item.enabled = elementEnabled.isChecked();
+                        item.options.put("renderer", HudElementConfig.DIRECT_MAP_RENDERER);
+                        item.options.put("cornerRadiusPx", integer(radius, 0));
+                        item.options.put("opacityPercent", integer(opacity, 100));
+
+                        profile.enabled = rendererEnabled.isChecked();
+                        profile.cameraMode = String.valueOf(cameraMode.getSelectedItem());
+                        profile.zoomDelta = decimal(zoom, profile.zoomDelta);
+                        profile.tiltDegrees = integer(tilt, profile.tiltDegrees);
+                        profile.focusXPercent = integer(focusX, profile.focusXPercent);
+                        profile.focusYPercent = integer(focusY, profile.focusYPercent);
+                        profile.mapScalePercent = integer(mapScale, profile.mapScalePercent);
+                        profile.maximumFps = integer(maximumFps, profile.maximumFps);
+                        profile.automaticDayNight = automaticDayNight.isChecked();
+                        profile.nightMode = nightMode.isChecked();
+                        profile.showRoute = showRoute.isChecked();
+                        profile.showTraffic = showTraffic.isChecked();
+                        profile.showLabels = showLabels.isChecked();
+                        profile.showPois = showPois.isChecked();
+                        profile.showBuildings = showBuildings.isChecked();
+                        profile.showParks = showParks.isChecked();
+                        profile.showWater = showWater.isChecked();
+                        profile.showModels = showModels.isChecked();
+                        profile.showCursor = showCursor.isChecked();
+                        profile.cursorScalePercent = integer(
+                                cursorScale, profile.cursorScalePercent);
+                        profile.cursorColor = value(cursorColor);
+                        profile.cursorOutlineColor = value(cursorOutline);
+                        profile.routeColor = value(routeColor);
+                        profile.routeOutlineColor = value(routeOutline);
+                        profile.routeWidth = decimal(routeWidth, profile.routeWidth);
+                        profile.routeOutlineWidth = decimal(
+                                routeOutlineWidth, profile.routeOutlineWidth);
+                        profile.dayStyleJson = value(dayStyle);
+                        profile.nightStyleJson = value(nightStyle);
+
+                        item.normalize(config.gridColumns, config.gridRows);
+                        navigation.normalize();
+                        preferences.navigationIntegrationConfigJson.set(
+                                navigation.toJson().toString());
+                        NavigationHudEndpointService.requestConfigurationRefresh(this);
+                        config.normalize();
+                        canvas.updateConfig(config);
+                        updateSelection(item);
+                        persist(false);
+                        dialog.dismiss();
+                    } catch (Exception error) {
+                        Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                    }
+                }));
+        showSafeDialog(dialog);
+    }
+
+    /** Main-map and floating-window profile; HUD map stays independent in its own element dialog. */
+    private void editNavigatorIntegration() {
+        NavigationIntegrationConfig navigation = loadNavigationIntegrationConfig();
+        NavigationIntegrationConfig.MapProfile map = navigation.mainMap;
+        NavigationIntegrationConfig.FloatingWindowProfile window =
+                navigation.mainFloatingWindow;
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = column();
+        form.setPadding(dp(18), dp(8), dp(18), dp(24));
+        scroll.addView(form);
+
+        form.addView(text("Профиль основной карты не связан с профилем HUD. Одна навигационная "
+                + "сессия передаёт данные обоим рендерам, но камера, стиль и масштаб хранятся "
+                + "отдельно.", 12, 0xFF95A0AF));
+        Switch mapEnabled = switchView("Применять профиль основной карты", map.enabled);
+        form.addView(mapEnabled, marginTop(8));
+        Spinner cameraMode = spinner(
+                new String[]{"FOLLOW_ROUTE", "NORTH_UP", "HEADING_UP", "FREE"},
+                map.cameraMode);
+        form.addView(label("Режим камеры основной карты"), marginTop(8));
+        form.addView(cameraMode);
+        EditText zoom = field(form, "Поправка масштаба −8…8",
+                Double.toString(map.zoomDelta), false);
+        EditText tilt = field(form, "Наклон 0…80°",
+                Integer.toString(map.tiltDegrees), true);
+        EditText focusX = field(form, "Точка фокуса X, %",
+                Integer.toString(map.focusXPercent), true);
+        EditText focusY = field(form, "Точка фокуса Y, %",
+                Integer.toString(map.focusYPercent), true);
+        EditText mapScale = field(form, "Масштаб элементов карты, %",
+                Integer.toString(map.mapScalePercent), true);
+        EditText maximumFps = field(form, "Максимальная частота кадров",
+                Integer.toString(map.maximumFps), true);
+        Switch automaticDayNight = switchView("Автоматический день / ночь",
+                map.automaticDayNight);
+        Switch nightMode = switchView("Принудительно ночной режим", map.nightMode);
+        Switch showRoute = switchView("Маршрут", map.showRoute);
+        Switch showTraffic = switchView("Пробки", map.showTraffic);
+        Switch showLabels = switchView("Подписи", map.showLabels);
+        Switch showPois = switchView("Объекты POI", map.showPois);
+        Switch showBuildings = switchView("Здания", map.showBuildings);
+        Switch showParks = switchView("Парки", map.showParks);
+        Switch showWater = switchView("Вода", map.showWater);
+        Switch showModels = switchView("3D-модели", map.showModels);
+        Switch showCursor = switchView("Курсор автомобиля", map.showCursor);
+        for (Switch control : new Switch[]{automaticDayNight, nightMode, showRoute,
+                showTraffic, showLabels, showPois, showBuildings, showParks, showWater,
+                showModels, showCursor}) {
+            form.addView(control, marginTop(4));
+        }
+        EditText cursorScale = field(form, "Размер курсора, %",
+                Integer.toString(map.cursorScalePercent), true);
+        EditText cursorColor = field(form, "Цвет курсора ARGB", map.cursorColor, false);
+        EditText cursorOutline = field(form, "Контур курсора ARGB",
+                map.cursorOutlineColor, false);
+        EditText routeColor = field(form, "Цвет маршрута ARGB", map.routeColor, false);
+        EditText routeOutline = field(form, "Контур маршрута ARGB",
+                map.routeOutlineColor, false);
+        EditText routeWidth = field(form, "Толщина маршрута",
+                Double.toString(map.routeWidth), false);
+        EditText routeOutlineWidth = field(form, "Толщина контура маршрута",
+                Double.toString(map.routeOutlineWidth), false);
+        EditText dayStyle = field(form, "JSON-стиль дневной карты", map.dayStyleJson, false);
+        dayStyle.setSingleLine(false);
+        dayStyle.setMinLines(3);
+        EditText nightStyle = field(form, "JSON-стиль ночной карты",
+                map.nightStyleJson, false);
+        nightStyle.setSingleLine(false);
+        nightStyle.setMinLines(3);
+
+        form.addView(section("Плавающее окно Навигатора"), marginTop(18));
+        Switch windowEnabled = switchView("Разрешить оконный режим", window.enabled);
+        Switch movementLocked = switchView("Зафиксировать перемещение",
+                window.movementLocked);
+        Switch resizeLocked = switchView("Зафиксировать изменение размера",
+                window.resizeLocked);
+        Switch aspectLocked = switchView("Зафиксировать пропорции",
+                window.aspectRatioLocked);
+        Switch rememberGeometry = switchView("Запоминать позицию и размер",
+                window.rememberGeometry);
+        for (Switch control : new Switch[]{windowEnabled, movementLocked, resizeLocked,
+                aspectLocked, rememberGeometry}) {
+            form.addView(control, marginTop(4));
+        }
+        EditText left = field(form, "Позиция слева, %",
+                Integer.toString(window.leftPercent), true);
+        EditText top = field(form, "Позиция сверху, %",
+                Integer.toString(window.topPercent), true);
+        EditText width = field(form, "Ширина окна, %",
+                Integer.toString(window.widthPercent), true);
+        EditText height = field(form, "Высота окна, %",
+                Integer.toString(window.heightPercent), true);
+        EditText corner = field(form, "Скругление окна, dp",
+                Integer.toString(window.cornerRadiusDp), true);
+        EditText opacity = field(form, "Непрозрачность окна, %",
+                Integer.toString(window.opacityPercent), true);
+        EditText background = field(form, "Фон окна ARGB", window.backgroundColor, false);
+        EditText borderWidth = field(form, "Толщина рамки, dp",
+                Integer.toString(window.borderWidthDp), true);
+        EditText borderColor = field(form, "Цвет рамки ARGB", window.borderColor, false);
+        EditText shadowRadius = field(form, "Радиус тени, dp",
+                Integer.toString(window.shadowRadiusDp), true);
+        EditText shadowColor = field(form, "Цвет тени ARGB", window.shadowColor, false);
+
+        form.addView(section("Кнопки окна"), marginTop(16));
+        Switch modeButtonVisible = switchView("Кнопка окно / полный экран",
+                window.modeButtonVisible);
+        Switch dragHandleVisible = switchView("Ручка перемещения",
+                window.dragHandleVisible);
+        Switch resizeHandleVisible = switchView("Ручка размера",
+                window.resizeHandleVisible);
+        Switch closeButtonVisible = switchView("Кнопка закрытия",
+                window.closeButtonVisible);
+        for (Switch control : new Switch[]{modeButtonVisible, dragHandleVisible,
+                resizeHandleVisible, closeButtonVisible}) {
+            form.addView(control, marginTop(4));
+        }
+        Spinner buttonPosition = spinner(new String[]{
+                "TOP_LEFT", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_RIGHT"},
+                window.modeButtonPosition);
+        form.addView(label("Положение кнопки оконного режима"), marginTop(8));
+        form.addView(buttonPosition);
+        EditText buttonSize = field(form, "Размер кнопки, dp",
+                Integer.toString(window.modeButtonSizeDp), true);
+        EditText buttonOpacity = field(form, "Непрозрачность кнопки, %",
+                Integer.toString(window.modeButtonOpacityPercent), true);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Основная карта и окно Навигатора")
+                .setView(scroll)
+                .setPositiveButton("Применить", null)
+                .setNegativeButton("Отмена", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    try {
+                        map.enabled = mapEnabled.isChecked();
+                        map.cameraMode = String.valueOf(cameraMode.getSelectedItem());
+                        map.zoomDelta = decimal(zoom, map.zoomDelta);
+                        map.tiltDegrees = integer(tilt, map.tiltDegrees);
+                        map.focusXPercent = integer(focusX, map.focusXPercent);
+                        map.focusYPercent = integer(focusY, map.focusYPercent);
+                        map.mapScalePercent = integer(mapScale, map.mapScalePercent);
+                        map.maximumFps = integer(maximumFps, map.maximumFps);
+                        map.automaticDayNight = automaticDayNight.isChecked();
+                        map.nightMode = nightMode.isChecked();
+                        map.showRoute = showRoute.isChecked();
+                        map.showTraffic = showTraffic.isChecked();
+                        map.showLabels = showLabels.isChecked();
+                        map.showPois = showPois.isChecked();
+                        map.showBuildings = showBuildings.isChecked();
+                        map.showParks = showParks.isChecked();
+                        map.showWater = showWater.isChecked();
+                        map.showModels = showModels.isChecked();
+                        map.showCursor = showCursor.isChecked();
+                        map.cursorScalePercent = integer(cursorScale, map.cursorScalePercent);
+                        map.cursorColor = value(cursorColor);
+                        map.cursorOutlineColor = value(cursorOutline);
+                        map.routeColor = value(routeColor);
+                        map.routeOutlineColor = value(routeOutline);
+                        map.routeWidth = decimal(routeWidth, map.routeWidth);
+                        map.routeOutlineWidth = decimal(
+                                routeOutlineWidth, map.routeOutlineWidth);
+                        map.dayStyleJson = value(dayStyle);
+                        map.nightStyleJson = value(nightStyle);
+
+                        window.enabled = windowEnabled.isChecked();
+                        window.movementLocked = movementLocked.isChecked();
+                        window.resizeLocked = resizeLocked.isChecked();
+                        window.aspectRatioLocked = aspectLocked.isChecked();
+                        window.rememberGeometry = rememberGeometry.isChecked();
+                        window.leftPercent = integer(left, window.leftPercent);
+                        window.topPercent = integer(top, window.topPercent);
+                        window.widthPercent = integer(width, window.widthPercent);
+                        window.heightPercent = integer(height, window.heightPercent);
+                        window.cornerRadiusDp = integer(corner, window.cornerRadiusDp);
+                        window.opacityPercent = integer(opacity, window.opacityPercent);
+                        window.backgroundColor = value(background);
+                        window.borderWidthDp = integer(borderWidth, window.borderWidthDp);
+                        window.borderColor = value(borderColor);
+                        window.shadowRadiusDp = integer(shadowRadius, window.shadowRadiusDp);
+                        window.shadowColor = value(shadowColor);
+                        window.modeButtonVisible = modeButtonVisible.isChecked();
+                        window.dragHandleVisible = dragHandleVisible.isChecked();
+                        window.resizeHandleVisible = resizeHandleVisible.isChecked();
+                        window.closeButtonVisible = closeButtonVisible.isChecked();
+                        window.modeButtonPosition = String.valueOf(
+                                buttonPosition.getSelectedItem());
+                        window.modeButtonSizeDp = integer(buttonSize, window.modeButtonSizeDp);
+                        window.modeButtonOpacityPercent = integer(
+                                buttonOpacity, window.modeButtonOpacityPercent);
+
+                        navigation.normalize();
+                        preferences.navigationIntegrationConfigJson.set(
+                                navigation.toJson().toString());
+                        NavigationHudEndpointService.requestConfigurationRefresh(this);
+                        dialog.dismiss();
+                        Toast.makeText(this, "Настройки Навигатора сохранены",
+                                Toast.LENGTH_SHORT).show();
+                    } catch (Exception error) {
+                        Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                    }
+                }));
+        showSafeDialog(dialog);
+    }
+
+    @NonNull
+    private NavigationIntegrationConfig loadNavigationIntegrationConfig() {
+        String raw = preferences.navigationIntegrationConfigJson.get();
+        if (raw == null || raw.trim().isEmpty()) return new NavigationIntegrationConfig();
+        try {
+            return NavigationIntegrationConfig.fromJson(raw);
+        } catch (IllegalArgumentException invalid) {
+            return new NavigationIntegrationConfig();
+        }
+    }
+
+    @Nullable
+    private HudElementConfig findMapElement() {
+        for (HudElementConfig value : config.elements) {
+            if (value.type == HudElementType.NAV_MAP) return value;
+        }
+        return null;
     }
 
     private void addVisualElementOptions(@NonNull LinearLayout form,
@@ -701,7 +1102,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         for (String id : current) {
             HudElementConfig value = findElement(id);
             if (value != null && value.type != HudElementType.BACKDROP
-                    && value.type != HudElementType.HORIZONTAL_GROUP) {
+                    && value.type != HudElementType.HORIZONTAL_GROUP
+                    && value.type != HudElementType.NAV_MAP) {
                 result.add(value);
             }
         }
@@ -709,6 +1111,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             if (value.id.equals(editedGroup.id) || result.contains(value)
                     || value.type == HudElementType.BACKDROP
                     || value.type == HudElementType.HORIZONTAL_GROUP
+                    || value.type == HudElementType.NAV_MAP
                     || belongsToOtherHudHorizontalGroup(value.id, editedGroup.id)) {
                 continue;
             }
@@ -1139,6 +1542,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
     private void duplicateSelected() {
         HudElementConfig source = canvas.selected();
         if (source == null) return;
+        if (source.type == HudElementType.NAV_MAP) {
+            Toast.makeText(this, "Для одного HUD доступна только одна карта",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
         try {
             HudElementConfig copy = HudElementConfig.fromJson(source.toJson(),
                     config.gridColumns, config.gridRows);

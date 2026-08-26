@@ -20,13 +20,13 @@ import androidx.annotation.NonNull;
  */
 final class HudOverlayWindow {
     @NonNull private final WindowManager manager;
-    @NonNull private final HudCanvasView canvas;
+    @NonNull private final HudCompositeView content;
     private boolean attached = true;
 
     private HudOverlayWindow(@NonNull WindowManager manager,
-                             @NonNull HudCanvasView canvas) {
+                             @NonNull HudCompositeView content) {
         this.manager = manager;
-        this.canvas = canvas;
+        this.content = content;
     }
 
     @NonNull
@@ -43,8 +43,8 @@ final class HudOverlayWindow {
                 Context.WINDOW_SERVICE);
         if (manager == null) throw new IllegalStateException("HUD WindowManager unavailable");
 
-        HudCanvasView canvas = new HudCanvasView(
-                displayContext, config, data, false, null, true);
+        HudCompositeView content = new HudCompositeView(
+                displayContext, config, data, true);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 HudViewportPolicy.SAFE_WIDTH,
                 HudViewportPolicy.SAFE_HEIGHT,
@@ -67,26 +67,26 @@ final class HudOverlayWindow {
             params.setFitInsetsTypes(0);
             params.setFitInsetsSides(0);
         }
-        manager.addView(canvas, params);
-        return new HudOverlayWindow(manager, canvas);
+        manager.addView(content, params);
+        return new HudOverlayWindow(manager, content);
     }
 
     void updateConfig(@NonNull HudPanelConfig config) {
-        if (attached) canvas.updateConfig(config);
+        if (attached) content.updateConfig(config);
     }
 
     void invalidateHud() {
-        if (attached) canvas.invalidate();
+        if (attached) content.invalidateHud();
     }
 
     void dismiss() {
         if (!attached) return;
         attached = false;
         try {
-            manager.removeViewImmediate(canvas);
+            manager.removeViewImmediate(content);
         } catch (RuntimeException ignored) {
             try {
-                manager.removeView(canvas);
+                manager.removeView(content);
             } catch (RuntimeException ignoredAgain) {
                 // Display removal may detach the view before the service receives its callback.
             }

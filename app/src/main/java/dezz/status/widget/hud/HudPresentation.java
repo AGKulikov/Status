@@ -17,7 +17,7 @@ import androidx.annotation.NonNull;
 final class HudPresentation extends Presentation {
     @NonNull private HudPanelConfig config;
     @NonNull private final HudRuntimeData data;
-    private HudCanvasView canvas;
+    private HudCompositeView content;
 
     HudPresentation(@NonNull Context context, @NonNull Display display,
                     @NonNull HudPanelConfig config, @NonNull HudRuntimeData data) {
@@ -44,16 +44,16 @@ final class HudPresentation extends Presentation {
                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                     | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
-        canvas = new HudCanvasView(getContext(), config, data, false, null);
-        setContentView(canvas);
+        content = new HudCompositeView(getContext(), config, data, false);
+        setContentView(content);
     }
 
     void updateConfig(@NonNull HudPanelConfig next) {
         config = next;
-        if (canvas != null) canvas.updateConfig(next);
+        if (content != null) content.updateConfig(next);
     }
 
     void invalidateHud() {
-        if (canvas != null) canvas.invalidate();
+        if (content != null) content.invalidateHud();
     }
 }
