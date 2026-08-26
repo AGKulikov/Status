@@ -158,7 +158,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("mode != MODE_FULLSCREEN"));
         assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY"));
         assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_SYSTEM_ALERT"));
-        assertTrue(controller.contains("existing navi_win/ddnavwin launch path"));
+        assertTrue(controller.contains("navi_service_open_voice_search"));
+        assertTrue(controller.contains("guidance_open_voice_search"));
+        assertTrue(controller.contains("host.addView(modeButton, 0"));
         assertTrue(entry.contains("NavigationBridgeClient.attachActivity"));
         assertTrue(entry.contains("NavigationBridgeClient.detachActivity"));
         assertTrue(client.contains("getPackagesForUid(sendingUid)"));
