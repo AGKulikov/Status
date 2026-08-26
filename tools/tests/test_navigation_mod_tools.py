@@ -126,6 +126,9 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn('Main Natro content area: 1760x720', verifier)
         self.assertIn('plane 728x190 @ (0,720)', verifier)
         self.assertIn('probe_api = 24 if scheme == "v2"', verifier)
+        self.assertIn('b"navi_win/"', verifier)
+        self.assertIn('b"Lru/natro/navigation/NatroEntryPoint;"', verifier)
+        self.assertIn('b"ddnavforcewinfull"', verifier)
         self.assertIn('verify_kx11_navigation_pair.py', pair)
         self.assertIn('KX11-COMPATIBILITY.txt', pair)
 

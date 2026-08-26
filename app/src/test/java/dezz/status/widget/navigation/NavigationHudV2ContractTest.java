@@ -156,6 +156,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("Развернуть Навигатор на весь экран"));
         assertTrue(controller.contains("profile.enabled && profile.modeButtonVisible"));
         assertTrue(controller.contains("mode != MODE_FULLSCREEN"));
+        assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY"));
+        assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_SYSTEM_ALERT"));
+        assertTrue(controller.contains("existing navi_win/ddnavwin launch path"));
         assertTrue(entry.contains("NavigationBridgeClient.attachActivity"));
         assertTrue(entry.contains("NavigationBridgeClient.detachActivity"));
         assertTrue(client.contains("getPackagesForUid(sendingUid)"));

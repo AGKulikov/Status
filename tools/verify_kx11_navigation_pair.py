@@ -104,6 +104,20 @@ def zip_entry(apk: Path, name: str) -> bytes:
             raise VerificationError(f"{apk.name} has no required {name}") from error
 
 
+def require_dex_strings(apk: Path, expected: Iterable[bytes]) -> None:
+    remaining = set(expected)
+    with zipfile.ZipFile(apk) as archive:
+        for name in archive.namelist():
+            if not re.fullmatch(r"classes(?:[2-9]|[1-9][0-9]+)?\.dex", name):
+                continue
+            payload = archive.read(name)
+            remaining = {needle for needle in remaining if needle not in payload}
+            if not remaining:
+                return
+    rendered = ", ".join(value.decode("ascii", "replace") for value in sorted(remaining))
+    raise VerificationError(f"{apk.name}: missing DEX window contract strings: {rendered}")
+
+
 def verify_signer(apksigner: Path, apk: Path, schemes: Iterable[str]) -> str:
     output = run([
         str(apksigner), "verify", "--verbose", "--print-certs",
@@ -159,6 +173,11 @@ def verify_natro(aapt: Path, apksigner: Path, zipalign: Path, apk: Path) -> str:
         raise VerificationError("Natro candidate is debuggable")
     if native_abis(apk):
         raise VerificationError("Natro unexpectedly contains architecture-specific native code")
+    require_dex_strings(apk, (
+        b"navi_win/",
+        b"ddnavwin",
+        b"ru.yandex.yandexmaps.app.MapActivity",
+    ))
     verify_zipalign(zipalign, apk)
     verify_signer(apksigner, apk, ("v2", "v3"))
     return value
@@ -206,6 +225,16 @@ def verify_navigator(
         )
     if zip_entry(baseline, "AndroidManifest.xml") != zip_entry(apk, "AndroidManifest.xml"):
         raise VerificationError("Navigator binary AndroidManifest.xml changed")
+    classes4 = zip_entry(apk, "classes4.dex")
+    classes19 = zip_entry(apk, "classes19.dex")
+    if b"Lru/natro/navigation/NatroEntryPoint;" not in classes4:
+        raise VerificationError("Navigator classes4.dex has no Natro lifecycle hook")
+    for required in (b"navi_win/ru.yandex.yandexnavi", b"ddnavwin", b"ddnavforcewinfull"):
+        if required not in classes19:
+            raise VerificationError(
+                "Navigator classes19.dex has no legacy KX11 window contract: "
+                + required.decode("ascii")
+            )
     verify_zipalign(zipalign, apk)
     verify_signer(apksigner, apk, ("v3",))
     boundary = run([
@@ -270,6 +299,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"Navigator APK SHA-256: {navigator_sha}\n"
             "Navigator AndroidManifest.xml and aapt badging: byte/logically identical to baseline\n"
             "Navigator sharedUserId: absent (original Yandex Music is not signature-coupled)\n"
+            "Window launch contract: Natro and Navigator contain navi_win/ddnavwin/MapActivity; "
+            "the protected Navigator manifest remains unchanged\n"
             "Navigator content boundary:\n"
             + "\n".join(f"  {line}" for line in boundary.strip().splitlines())
             + "\n\n"

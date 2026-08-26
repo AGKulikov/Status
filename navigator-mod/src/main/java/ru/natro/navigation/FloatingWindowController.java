@@ -155,6 +155,10 @@ final class FloatingWindowController {
             geometryLoaded = true;
         }
         clampGeometry(attributes, screen);
+        // The working KX11 Navigator 29.4.2 window mod uses 2038/2003 on this Activity-owned
+        // Window without adding SYSTEM_ALERT_WINDOW to the protected manifest. ECARX grants the
+        // Yandex Navigator package that OEM window lane. Keep this exact contract so Natro's
+        // existing navi_win/ddnavwin launch path still works on the head unit.
         attributes.type = Build.VERSION.SDK_INT >= 26
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
