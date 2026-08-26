@@ -197,14 +197,14 @@ public final class NavigationIntegrationConfig {
         void normalize() {
             cameraMode = enumText(cameraMode, "FOLLOW_ROUTE",
                     "FOLLOW_ROUTE", "NORTH_UP", "HEADING_UP", "FREE");
-            zoomDelta = clamp(zoomDelta, -8d, 8d);
+            zoomDelta = clamp(zoomDelta, -8d, 8d, 0d);
             tiltDegrees = clamp(tiltDegrees, 0, 80);
             focusXPercent = clamp(focusXPercent, 0, 100);
             focusYPercent = clamp(focusYPercent, 0, 100);
             mapScalePercent = clamp(mapScalePercent, 50, 300);
             cursorScalePercent = clamp(cursorScalePercent, 25, 300);
-            routeWidth = clamp(routeWidth, 1d, 40d);
-            routeOutlineWidth = clamp(routeOutlineWidth, 0d, 20d);
+            routeWidth = clamp(routeWidth, 1d, 40d, 8d);
+            routeOutlineWidth = clamp(routeOutlineWidth, 0d, 20d, 2d);
             maximumFps = clamp(maximumFps, 1, 60);
             cursorColor = color(cursorColor, "#FFFFC400");
             cursorOutlineColor = color(cursorOutlineColor, "#FF17191E");
@@ -344,8 +344,8 @@ public final class NavigationIntegrationConfig {
         return Math.max(minimum, Math.min(maximum, value));
     }
 
-    private static double clamp(double value, double minimum, double maximum) {
-        return Double.isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : minimum;
+    private static double clamp(double value, double minimum, double maximum, double fallback) {
+        return Double.isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : fallback;
     }
 
     @NonNull

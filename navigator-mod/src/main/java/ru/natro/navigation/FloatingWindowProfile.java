@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package ru.natro.navigation;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 /** Defensive parser for the mainFloatingWindow block owned by Natro. */
@@ -72,7 +73,7 @@ final class FloatingWindowProfile {
                     "modeButtonOpacityPercent", result.modeButtonOpacityPercent);
             result.closeButtonVisible = source.optBoolean(
                     "closeButtonVisible", result.closeButtonVisible);
-        } catch (RuntimeException ignored) {}
+        } catch (JSONException | RuntimeException ignored) {}
         result.normalize();
         return result;
     }

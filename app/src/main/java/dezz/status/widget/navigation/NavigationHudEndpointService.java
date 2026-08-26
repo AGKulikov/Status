@@ -229,6 +229,7 @@ public final class NavigationHudEndpointService extends Service {
         NavigationBridgeStateStore.beginSession(session);
         replyCapabilities(reply);
         sendConfiguration(reply, session);
+        requestNavigationState(client);
         sendPublishedSurface();
         Log.i(TAG, "Authenticated Navigator bridge session started");
     }
@@ -289,6 +290,19 @@ public final class NavigationHudEndpointService extends Service {
             lease = publishedSurface;
         }
         if (lease != null) sendSurface(lease);
+    }
+
+    private void requestNavigationState(@NonNull Client current) {
+        Bundle data = new Bundle();
+        data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
+        if ((current.capabilities & NavigationBridgeContract.CAP_NAVIGATION_SNAPSHOT) != 0L) {
+            send(current.messenger, NavigationBridgeContract.MSG_REQUEST_SNAPSHOT, data);
+        }
+        if ((current.capabilities & NavigationBridgeContract.CAP_ROUTE_GEOMETRY) != 0L) {
+            Bundle routeData = new Bundle(data);
+            send(current.messenger, NavigationBridgeContract.MSG_REQUEST_ROUTE_GEOMETRY,
+                    routeData);
+        }
     }
 
     private void sendSurface(@NonNull SurfaceLease lease) {

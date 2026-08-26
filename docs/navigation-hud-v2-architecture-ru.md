@@ -66,6 +66,33 @@ level/zipalign допустима, а изменение любого защищ
 - Natro размещает карту как один из элементов HUD, а манёвр, дистанцию, полосы, скорость,
   светофоры, ETA и любые будущие элементы — независимо, любого размера и в любом месте HUD.
 
+### Проверенные точки данных 30.3.0
+
+Адаптер не перебирает приватные поля и не привязывается к случайному объекту из Dagger-графа.
+В точном DEX 30.3.0 подтверждена следующая цепочка публичных методов:
+
+1. `MapActivity.x()` → `MapWithControlsView.getMapWindow()` → `MapWindow.getMap()` — основная
+   камера; её `CameraListener` передаёт target/zoom/azimuth/tilt.
+2. application component `c()` → `getGuidance()` → NaviKit `Guidance.navigation()` →
+   automotive `Navigation.getGuidance()` — та же активная навигационная сессия, которую уже
+   использует Навигатор.
+3. `Guidance.getCurrentRoute()` и `DrivingRoute.getRoutePosition()` дают актуальные
+   `distanceToFinish()`/`timeToFinish()`, а не полный вес первоначально построенного маршрута.
+4. `Guidance.getWindshield()` даёт ближайший манёвр, полосы и светофоры; положение и скорость
+   берутся из `Guidance.getLocation()`, улица и лимит — из `getRoadName()`/`getSpeedLimit()`.
+   Значение `LocalizedValue.getValue()` задано в СИ, поэтому обе скорости переводятся из м/с
+   в км/ч перед публикацией.
+
+Камера передаётся не чаще 10 раз/с с coalescing. Быстрый snapshot идёт отдельно от геометрии:
+маршрут кодируется polyline E5 и пересылается только при смене `routeEpoch` или явном запросе
+Natro. Внутри процесса Навигатора второй MapWindow получает сам `DrivingRoute.getGeometry()` и
+рисует его через отдельную `MapObjectCollection`, поэтому IPC-кодирование не участвует в кадрах.
+
+Публичные основания решения: [automotive Guidance](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/navigation/automotive/Guidance.html),
+[RoutePosition](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/navigation/RoutePosition.html),
+[LocalizedValue](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/LocalizedValue.html) и
+[Map/CameraListener](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/Map.html).
+
 ## IPC и граница доверия
 
 Направление соединения выбрано как в устойчивой функциональной схеме YanaviHUD, но реализуется с
@@ -151,10 +178,11 @@ Manifest baseline не меняется. Для package нового Навиг�
 3. `FloatingWindowController`, внутренняя кнопка и полная совместимость оконных запусков Natro —
    выполнено.
 4. Безопасный Natro endpoint, snapshot/route callbacks и восстановление соединения — выполнено;
-   публикация данных из внутренних объектов 30.3.0 продолжается.
+   endpoint после HELLO явно запрашивает свежий snapshot и геометрию.
 5. Отдельный `OffscreenMapWindow`, настоящий Surface-элемент HUD и независимые
-   редакторы обоих `MapProfile` — базовый lifecycle и хранение настроек выполнены; применение
-   внутренних слоёв основной карты и синхронизация камеры/маршрута продолжаются.
+   редакторы обоих `MapProfile` — базовый lifecycle, синхронизация основной камеры, активной
+   геометрии маршрута, zoomDelta/наклона/focus/цвета/толщины маршрута выполнены. Цветовые сегменты
+   пробок, полный custom cursor и применение всех параметров к основной карте ещё продолжаются.
 6. Редактор HUD, где карта и каждый навигационный элемент свободно перемещаются/масштабируются.
 7. Стендовые тесты, затем KX11: загрузка офлайн-карт, совместное наличие Яндекс Музыки, QuickBoot,
    холодный старт, оконный deep link, сворачивание, перестроение маршрута, day/night, 30 минут

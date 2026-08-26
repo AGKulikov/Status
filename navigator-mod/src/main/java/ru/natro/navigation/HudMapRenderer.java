@@ -3,10 +3,12 @@ package ru.natro.navigation;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.PointF;
 import android.util.Log;
 import android.view.Surface;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.reflect.Method;
@@ -42,6 +44,12 @@ final class HudMapRenderer {
     private Object map;
     private Object trafficLayer;
     private Object userLocationLayer;
+    private Object routeCollection;
+    private Object routePolyline;
+    private Object activeRoute;
+    private long activeRouteEpoch = -1L;
+    private NavigatorStatePublisher.CameraState primaryCamera;
+    private boolean freeCameraInitialized;
     private HudProfile profile = new HudProfile();
 
     HudMapRenderer(Context context, FailureReporter reporter) {
@@ -52,7 +60,9 @@ final class HudMapRenderer {
     void applyConfiguration(String raw) {
         HudProfile next = HudProfile.fromConfiguration(raw);
         boolean enabledChanged = profile.enabled != next.enabled;
+        boolean cameraModeChanged = !profile.cameraMode.equals(next.cameraMode);
         profile = next;
+        if (cameraModeChanged) freeCameraInitialized = false;
         if (surface == null) return;
         if (enabledChanged) {
             if (profile.enabled) startRenderer();
@@ -89,6 +99,20 @@ final class HudMapRenderer {
 
     void disconnect() {
         stopRenderer(true);
+    }
+
+    void updatePrimaryCamera(NavigatorStatePublisher.CameraState state) {
+        if (state == null || !state.isValid()) return;
+        primaryCamera = state;
+        applyCamera();
+    }
+
+    void updateRoute(long routeEpoch, Object drivingRoute) {
+        if (routeEpoch < activeRouteEpoch) return;
+        boolean changed = routeEpoch != activeRouteEpoch || drivingRoute != activeRoute;
+        activeRouteEpoch = routeEpoch;
+        activeRoute = drivingRoute;
+        if (changed) rebuildRoute();
     }
 
     private void startRenderer() {
@@ -160,12 +184,10 @@ final class HudMapRenderer {
                 invoke(currentLocation, "setVisible", new Class<?>[]{boolean.class},
                         profile.showCursor);
                 boolean free = "FREE".equals(profile.cameraMode);
-                boolean heading = "FOLLOW_ROUTE".equals(profile.cameraMode)
-                        || "HEADING_UP".equals(profile.cameraMode);
                 invoke(currentLocation, "setAutoZoomEnabled",
-                        new Class<?>[]{boolean.class}, !free);
+                        new Class<?>[]{boolean.class}, false);
                 invoke(currentLocation, "setHeadingModeActive",
-                        new Class<?>[]{boolean.class}, heading);
+                        new Class<?>[]{boolean.class}, false);
                 if (free) {
                     invoke(currentLocation, "resetAnchor", new Class<?>[0]);
                 } else {
@@ -195,8 +217,72 @@ final class HudMapRenderer {
             applyStyleSlot(currentMap, CUSTOM_STYLE_ID, style);
             applyStyleSlot(currentMap, VISIBILITY_STYLE_ID,
                     profile.visibilityStyleJson());
+            applyCamera();
+            rebuildRoute();
         } catch (Throwable failure) {
             Log.w(TAG, "Some HUD MapProfile fields could not be applied", failure);
+        }
+    }
+
+    /** Mirrors only navigation state; all HUD camera parameters remain independently editable. */
+    private void applyCamera() {
+        Object currentMap = map;
+        NavigatorStatePublisher.CameraState source = primaryCamera;
+        if (currentMap == null || source == null || !source.isValid()) return;
+        boolean free = "FREE".equals(profile.cameraMode);
+        if (free && freeCameraInitialized) return;
+        try {
+            Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
+            Object target = pointClass.getConstructor(double.class, double.class)
+                    .newInstance(source.latitude, source.longitude);
+            float zoom = (float) Math.max(0d, Math.min(23d,
+                    source.zoom + profile.zoomDelta));
+            float azimuth = "NORTH_UP".equals(profile.cameraMode) ? 0f : source.azimuth;
+            float tilt = profile.tiltDegrees;
+            Class<?> cameraClass = Class.forName("com.yandex.mapkit.map.CameraPosition");
+            Object camera = cameraClass.getConstructor(
+                    pointClass, float.class, float.class, float.class)
+                    .newInstance(target, zoom, azimuth, tilt);
+            invoke(currentMap, "move", new Class<?>[]{cameraClass}, camera);
+            if (free) freeCameraInitialized = true;
+        } catch (Throwable failure) {
+            Log.w(TAG, "HUD camera synchronization failed", failure);
+        }
+    }
+
+    /** Renders the exact active DrivingRoute geometry into this independent MapWindow. */
+    private void rebuildRoute() {
+        Object currentMap = map;
+        if (currentMap == null) return;
+        try {
+            Object collection = routeCollection;
+            if (collection == null) {
+                Object root = invoke(currentMap, "getMapObjects", new Class<?>[0]);
+                collection = invoke(root, "addCollection", new Class<?>[0]);
+                routeCollection = collection;
+            }
+            invoke(collection, "clear", new Class<?>[0]);
+            routePolyline = null;
+            Object route = activeRoute;
+            if (!profile.showRoute || route == null) return;
+            Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
+            if (geometry == null) return;
+            Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
+            Object line = invoke(collection, "addPolyline",
+                    new Class<?>[]{polylineClass}, geometry);
+            routePolyline = line;
+            invoke(line, "setStrokeColor", new Class<?>[]{int.class},
+                    Color.parseColor(profile.routeColor));
+            invoke(line, "setOutlineColor", new Class<?>[]{int.class},
+                    Color.parseColor(profile.routeOutlineColor));
+            invoke(line, "setStrokeWidth", new Class<?>[]{float.class},
+                    (float) profile.routeWidth);
+            invoke(line, "setOutlineWidth", new Class<?>[]{float.class},
+                    (float) profile.routeOutlineWidth);
+            invoke(line, "setZIndex", new Class<?>[]{float.class}, 100f);
+            invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
+        } catch (Throwable failure) {
+            Log.w(TAG, "Active route could not be rendered in the HUD MapWindow", failure);
         }
     }
 
@@ -242,6 +328,9 @@ final class HudMapRenderer {
         map = null;
         trafficLayer = null;
         userLocationLayer = null;
+        routeCollection = null;
+        routePolyline = null;
+        freeCameraInitialized = false;
         if (releaseSurface && currentSurface != null) {
             try { currentSurface.release(); } catch (RuntimeException ignored) {}
             surface = null;
@@ -277,13 +366,20 @@ final class HudMapRenderer {
         boolean showParks = true;
         boolean showWater = true;
         boolean showModels;
+        boolean showRoute = true;
         boolean showTraffic = true;
         boolean showCursor = true;
         String cameraMode = "FOLLOW_ROUTE";
+        double zoomDelta;
+        int tiltDegrees = 60;
         int focusXPercent = 50;
         int focusYPercent = 72;
         int mapScalePercent = 100;
         int maximumFps = 20;
+        String routeColor = "#FFFFC400";
+        String routeOutlineColor = "#FF16181D";
+        double routeWidth = 8d;
+        double routeOutlineWidth = 2d;
         String dayStyleJson = "";
         String nightStyleJson = "";
 
@@ -305,18 +401,29 @@ final class HudMapRenderer {
                 result.showParks = source.optBoolean("showParks", true);
                 result.showWater = source.optBoolean("showWater", true);
                 result.showModels = source.optBoolean("showModels", false);
+                result.showRoute = source.optBoolean("showRoute", true);
                 result.showTraffic = source.optBoolean("showTraffic", true);
                 result.showCursor = source.optBoolean("showCursor", true);
                 result.cameraMode = enumText(source.optString(
                         "cameraMode", "FOLLOW_ROUTE"));
+                result.zoomDelta = clamp(source.optDouble("zoomDelta", 0d), -8d, 8d, 0d);
+                result.tiltDegrees = clamp(source.optInt("tiltDegrees", 60), 0, 80);
                 result.focusXPercent = clamp(source.optInt("focusXPercent", 50), 0, 100);
                 result.focusYPercent = clamp(source.optInt("focusYPercent", 72), 0, 100);
                 result.mapScalePercent = clamp(
                         source.optInt("mapScalePercent", 100), 50, 300);
                 result.maximumFps = clamp(source.optInt("maximumFps", 20), 1, 60);
+                result.routeColor = color(source.optString(
+                        "routeColor", "#FFFFC400"), "#FFFFC400");
+                result.routeOutlineColor = color(source.optString(
+                        "routeOutlineColor", "#FF16181D"), "#FF16181D");
+                result.routeWidth = clamp(
+                        source.optDouble("routeWidth", 8d), 1d, 40d, 8d);
+                result.routeOutlineWidth = clamp(source.optDouble(
+                        "routeOutlineWidth", 2d), 0d, 20d, 2d);
                 result.dayStyleJson = bounded(source.optString("dayStyleJson", ""));
                 result.nightStyleJson = bounded(source.optString("nightStyleJson", ""));
-            } catch (RuntimeException ignored) {}
+            } catch (JSONException | RuntimeException ignored) {}
             return result;
         }
 
@@ -354,6 +461,22 @@ final class HudMapRenderer {
 
         private static int clamp(int value, int minimum, int maximum) {
             return Math.max(minimum, Math.min(maximum, value));
+        }
+
+        private static double clamp(double value, double minimum, double maximum,
+                                    double fallback) {
+            return Double.isNaN(value) || Double.isInfinite(value)
+                    ? fallback : Math.max(minimum, Math.min(maximum, value));
+        }
+
+        private static String color(String raw, String fallback) {
+            String value = raw == null ? "" : raw.trim();
+            try {
+                Color.parseColor(value);
+                return value;
+            } catch (IllegalArgumentException invalid) {
+                return fallback;
+            }
         }
 
         private static String bounded(String raw) {

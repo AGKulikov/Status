@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package ru.natro.navigation;
 
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -32,10 +33,17 @@ final class NavigationBridgeClient {
     private static final int MSG_APPLY_CONFIGURATION = 3;
     private static final int MSG_ATTACH_HUD_SURFACE = 4;
     private static final int MSG_DETACH_HUD_SURFACE = 5;
+    private static final int MSG_REQUEST_SNAPSHOT = 6;
+    private static final int MSG_NAVIGATION_SNAPSHOT = 7;
+    private static final int MSG_REQUEST_ROUTE_GEOMETRY = 8;
+    private static final int MSG_ROUTE_GEOMETRY = 9;
     private static final int MSG_SET_MAIN_WINDOW_MODE = 11;
     private static final int MSG_HUD_SURFACE_LOST = 12;
     private static final int MSG_HEARTBEAT = 13;
 
+    private static final long CAP_NAVIGATION_SNAPSHOT = 1L;
+    private static final long CAP_ROUTE_GEOMETRY = 1L << 1;
+    private static final long CAP_LANES = 1L << 2;
     private static final long CAP_MAIN_FLOATING_WINDOW = 1L << 5;
     private static final long CAP_HUD_INDEPENDENT_MAP_WINDOW = 1L << 6;
     private static final long CAP_HUD_DIRECT_SURFACE = 1L << 7;
@@ -47,6 +55,8 @@ final class NavigationBridgeClient {
     private static final String KEY_CLIENT_PACKAGE = "client_package";
     private static final String KEY_CAPABILITIES = "capabilities";
     private static final String KEY_CONFIGURATION_JSON = "configuration_json";
+    private static final String KEY_SNAPSHOT_JSON = "snapshot_json";
+    private static final String KEY_ROUTE_GEOMETRY_JSON = "route_geometry_json";
     private static final String KEY_SURFACE = "surface";
     private static final String KEY_SURFACE_WIDTH = "surface_width";
     private static final String KEY_SURFACE_HEIGHT = "surface_height";
@@ -62,6 +72,7 @@ final class NavigationBridgeClient {
     private final Handler main;
     private final Messenger callbacks;
     private final HudMapRenderer hudMapRenderer;
+    private final NavigatorStatePublisher statePublisher;
     private final String sessionId = UUID.randomUUID().toString();
     private Messenger remote;
     private boolean binding;
@@ -97,11 +108,35 @@ final class NavigationBridgeClient {
         instance.start();
     }
 
+    static synchronized void attachActivity(Activity activity) {
+        if (activity == null) return;
+        ensureStarted(activity.getApplicationContext());
+        instance.statePublisher.attach(activity);
+    }
+
+    static synchronized void detachActivity(Activity activity) {
+        if (instance != null) instance.statePublisher.detach(activity);
+    }
+
     private NavigationBridgeClient(Context context) {
         this.context = context.getApplicationContext();
         main = new Handler(Looper.getMainLooper());
         callbacks = new Messenger(new Handler(Looper.getMainLooper(), this::onMessage));
         hudMapRenderer = new HudMapRenderer(this.context, this::sendSurfaceLost);
+        statePublisher = new NavigatorStatePublisher(new NavigatorStatePublisher.Sink() {
+            @Override public void onPrimaryCamera(NavigatorStatePublisher.CameraState state) {
+                hudMapRenderer.updatePrimaryCamera(state);
+            }
+
+            @Override public void onNavigationState(String snapshotJson, String routeJson,
+                                                     Object drivingRoute, long routeEpoch) {
+                hudMapRenderer.updateRoute(routeEpoch, drivingRoute);
+                sendState(MSG_NAVIGATION_SNAPSHOT, KEY_SNAPSHOT_JSON, snapshotJson);
+                if (routeJson != null) {
+                    sendState(MSG_ROUTE_GEOMETRY, KEY_ROUTE_GEOMETRY_JSON, routeJson);
+                }
+            }
+        });
     }
 
     private void start() {
@@ -143,6 +178,12 @@ final class NavigationBridgeClient {
                             KEY_SURFACE_GENERATION, -1L));
                 }
                 break;
+            case MSG_REQUEST_SNAPSHOT:
+                if (sessionMatches(message.getData())) statePublisher.requestSnapshot();
+                break;
+            case MSG_REQUEST_ROUTE_GEOMETRY:
+                if (sessionMatches(message.getData())) statePublisher.requestRoute();
+                break;
             case MSG_SET_MAIN_WINDOW_MODE:
                 if (sessionMatches(message.getData())) {
                     NatroEntryPoint.setWindowMode(message.getData().getInt(KEY_WINDOW_MODE, 2));
@@ -165,7 +206,10 @@ final class NavigationBridgeClient {
         data.putString(KEY_SESSION_ID, sessionId);
         data.putString(KEY_CLIENT_PACKAGE, NAVIGATOR_PACKAGE);
         data.putLong(KEY_CAPABILITIES,
-                CAP_MAIN_FLOATING_WINDOW
+                CAP_NAVIGATION_SNAPSHOT
+                        | CAP_ROUTE_GEOMETRY
+                        | CAP_LANES
+                        | CAP_MAIN_FLOATING_WINDOW
                         | CAP_HUD_INDEPENDENT_MAP_WINDOW
                         | CAP_HUD_DIRECT_SURFACE
                         | CAP_NAVIGATOR_WINDOW_BUTTON
@@ -210,6 +254,22 @@ final class NavigationBridgeClient {
         lost.setData(data);
         try {
             current.send(lost);
+        } catch (RemoteException failure) {
+            disconnectAndRetry();
+        }
+    }
+
+    private void sendState(int what, String key, String value) {
+        Messenger current = remote;
+        if (current == null || value == null || value.isEmpty()) return;
+        Bundle data = new Bundle();
+        data.putString(KEY_SESSION_ID, sessionId);
+        data.putString(key, value);
+        Message state = Message.obtain(null, what);
+        state.replyTo = callbacks;
+        state.setData(data);
+        try {
+            current.send(state);
         } catch (RemoteException failure) {
             disconnectAndRetry();
         }

@@ -43,6 +43,19 @@ public final class NavigationHudV2ContractTest {
         assertEquals(52, restored.mainFloatingWindow.modeButtonSizeDp);
     }
 
+    @Test public void nonFiniteMapValuesRestoreFieldDefaults() {
+        NavigationIntegrationConfig config = new NavigationIntegrationConfig();
+        config.hudMap.zoomDelta = Double.NaN;
+        config.hudMap.routeWidth = Double.POSITIVE_INFINITY;
+        config.hudMap.routeOutlineWidth = Double.NEGATIVE_INFINITY;
+
+        config.normalize();
+
+        assertEquals(0d, config.hudMap.zoomDelta, 0d);
+        assertEquals(8d, config.hudMap.routeWidth, 0d);
+        assertEquals(2d, config.hudMap.routeOutlineWidth, 0d);
+    }
+
     @Test public void bridgeRequiresDirectSurfaceAndSnapshotCapabilities() {
         long required = NavigationBridgeContract.CAP_NAVIGATION_SNAPSHOT
                 | NavigationBridgeContract.CAP_HUD_INDEPENDENT_MAP_WINDOW
@@ -123,6 +136,7 @@ public final class NavigationHudV2ContractTest {
         String entry = read(patchRoot.resolve("NatroEntryPoint.java"));
         String client = read(patchRoot.resolve("NavigationBridgeClient.java"));
         String renderer = read(patchRoot.resolve("HudMapRenderer.java"));
+        String publisher = read(patchRoot.resolve("NavigatorStatePublisher.java"));
 
         assertTrue(controller.contains("ACTION_FLOATING = \"navi_win/ru.yandex.yandexnavi\""));
         assertTrue(controller.contains("EXTRA_WINDOWED = \"ddnavwin\""));
@@ -131,10 +145,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("Развернуть Навигатор на весь экран"));
         assertTrue(controller.contains("profile.enabled && profile.modeButtonVisible"));
         assertTrue(controller.contains("mode != MODE_FULLSCREEN"));
-        assertTrue(entry.contains("NavigationBridgeClient.ensureStarted"));
+        assertTrue(entry.contains("NavigationBridgeClient.attachActivity"));
+        assertTrue(entry.contains("NavigationBridgeClient.detachActivity"));
         assertTrue(client.contains("getPackagesForUid(sendingUid)"));
         assertTrue(client.contains("checkSignatures(NAVIGATOR_PACKAGE, NATRO_PACKAGE)"));
         assertTrue(client.contains("MSG_ATTACH_HUD_SURFACE"));
+        assertTrue(client.contains("MSG_REQUEST_SNAPSHOT"));
+        assertTrue(client.contains("MSG_REQUEST_ROUTE_GEOMETRY"));
+        assertTrue(client.contains("CAP_NAVIGATION_SNAPSHOT"));
         assertTrue(renderer.contains("createOffscreenMapWindow"));
         assertTrue(renderer.contains("com.yandex.runtime.view.SurfaceFactory"));
         assertTrue(renderer.contains("addSurface"));
@@ -143,11 +161,35 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("createUserLocationLayer"));
         assertTrue(renderer.contains("applyStyleSlot"));
         assertTrue(renderer.contains("visibilityStyleJson"));
+        assertTrue(renderer.contains("updatePrimaryCamera"));
+        assertTrue(renderer.contains("getGeometry"));
+        assertTrue(renderer.contains("addPolyline"));
+        assertTrue(publisher.contains("MapActivity.x()"));
+        assertTrue(publisher.contains("getMapWindow"));
+        assertTrue(publisher.contains("getGuidance"));
+        assertTrue(publisher.contains("distanceToFinish"));
+        assertTrue(publisher.contains("timeToFinish"));
+        assertTrue(publisher.contains("getManoeuvres"));
+        assertTrue(publisher.contains("getLaneSigns"));
+        assertTrue(publisher.contains("getTrafficLightsWithSignal"));
+        assertTrue(publisher.contains("addCameraListener"));
+        assertTrue(publisher.contains("getValue\"), 0d) * 3.6d"));
+        assertFalse(publisher.contains("getDeclaredField"));
         assertFalse(renderer.contains("captureScreenshot("));
         assertFalse(renderer.contains("PlatformGLSurface"));
         assertFalse(controller.contains("ImageReader"));
         assertFalse(controller.contains("MediaProjection"));
         assertFalse(controller.contains("Bitmap"));
+    }
+
+    @Test public void endpointRequestsFreshStateAfterAuthenticatedHello() throws Exception {
+        String endpoint = read(sourceRoot().resolve(
+                "navigation/NavigationHudEndpointService.java"));
+        assertTrue(endpoint.contains("requestNavigationState(client)"));
+        assertTrue(endpoint.contains("MSG_REQUEST_SNAPSHOT"));
+        assertTrue(endpoint.contains("MSG_REQUEST_ROUTE_GEOMETRY"));
+        assertTrue(endpoint.contains("current.capabilities"
+                + " & NavigationBridgeContract.CAP_NAVIGATION_SNAPSHOT"));
     }
 
     @Test public void fastSnapshotAndRouteGeometryUseSeparateVersionedPayloads()

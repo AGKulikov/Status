@@ -24,7 +24,7 @@ public final class NatroEntryPoint {
             controller.install();
         }
         controller.consumeIntent(activity.getIntent());
-        NavigationBridgeClient.ensureStarted(activity.getApplicationContext());
+        NavigationBridgeClient.attachActivity(activity);
     }
 
     public static void onNewIntent(Activity activity, Intent intent) {
@@ -39,6 +39,7 @@ public final class NatroEntryPoint {
     }
 
     public static void onActivityDestroyed(Activity activity) {
+        NavigationBridgeClient.detachActivity(activity);
         FloatingWindowController controller = CONTROLLERS.remove(activity);
         if (controller != null) controller.destroy();
     }
