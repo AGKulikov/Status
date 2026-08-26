@@ -3,6 +3,8 @@ name: Build Natro 2.3.9 and Navigator HUD v2 candidate
 on:
   push:
     branches: ['feature/navigation-hud-v2']
+  pull_request:
+    branches: ['main']
   workflow_dispatch:
 
 permissions:
