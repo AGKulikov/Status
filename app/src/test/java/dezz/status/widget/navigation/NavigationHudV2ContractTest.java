@@ -287,6 +287,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(state.contains("parseRuns"));
         assertTrue(publisher.contains("getMetadata"));
         assertTrue(publisher.contains("laneDistanceMeters"));
+        assertTrue(publisher.contains(
+                "activeRouteTotalDistanceMeters = readRouteTotalDistance"));
+        assertTrue(publisher.contains("readDestination(route)"));
+        assertTrue(publisher.contains("getRequestPoints"));
+        assertTrue(canvas.contains("HudNavigationVisuals.maneuver"));
+        assertTrue(canvas.contains("HudNavigationVisuals.lane"));
+        assertTrue(canvas.contains("drawTrafficArrow"));
+        assertTrue(canvas.contains("isTrafficArrow"));
     }
 
     @Test public void settingsExposeIndependentMapsAndNavigatorWindowButton() throws Exception {
@@ -298,6 +306,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("navigation.hudMap"));
         assertTrue(settings.contains("navigation.mainMap"));
         assertTrue(settings.contains("navigation.mainFloatingWindow"));
+        assertTrue(settings.contains("Цвет рекомендуемой полосы"));
+        assertTrue(settings.contains("Красный сигнал ARGB"));
+        assertTrue(settings.contains("Тяжёлая пробка ARGB"));
     }
 
     private static Path sourceRoot() {

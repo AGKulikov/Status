@@ -18,6 +18,7 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Clean-room adapter from the exact 30.3.0 Navigator runtime to Natro's versioned state stream.
@@ -88,6 +89,9 @@ final class NavigatorStatePublisher {
     private String activeRouteKey;
     private Object activeRoute;
     private String encodedRoute = "";
+    // MapKit may report metadata weight for only the remaining route after position updates.
+    // Freeze the first positive distance per route epoch so HUD trip progress has a stable base.
+    private int activeRouteTotalDistanceMeters = -1;
     private Object conditionsRoute;
     private Object conditionsListener;
     private long resolveRetryMs = MIN_RESOLVE_RETRY_MS;
@@ -285,6 +289,9 @@ final class NavigatorStatePublisher {
     private boolean updateRoute(Object nextRoute, boolean routeMayHaveChanged) throws Exception {
         if (conditionsRoute != nextRoute) attachRouteConditions(nextRoute);
         if (activeRouteKey != null && nextRoute == activeRoute && !routeMayHaveChanged) {
+            if (activeRouteTotalDistanceMeters <= 0 && nextRoute != null) {
+                activeRouteTotalDistanceMeters = readRouteTotalDistance(nextRoute);
+            }
             return false;
         }
         String nextEncoded = nextRoute == null ? "" : encodeRoute(nextRoute);
@@ -298,6 +305,9 @@ final class NavigatorStatePublisher {
         activeRoute = nextRoute;
         activeRouteKey = nextKey;
         encodedRoute = nextEncoded;
+        if (initial || changed || activeRouteTotalDistanceMeters <= 0) {
+            activeRouteTotalDistanceMeters = readRouteTotalDistance(nextRoute);
+        }
         return initial || changed;
     }
 
@@ -328,7 +338,7 @@ final class NavigatorStatePublisher {
                 number(invoke(routePosition, "distanceToFinish"), -1d));
         int remainingDuration = routePosition == null ? -1 : nonNegativeInt(
                 number(invoke(routePosition, "timeToFinish"), -1d));
-        int routeTotalDistance = readRouteTotalDistance(route);
+        int routeTotalDistance = activeRouteTotalDistanceMeters;
         long arrival = remainingDuration < 0 ? 0L
                 : now + Math.min(31_536_000, remainingDuration) * 1_000L;
 
@@ -349,7 +359,7 @@ final class NavigatorStatePublisher {
                 .put("maneuverTitle", manoeuvre.title)
                 .put("maneuverSubtext", manoeuvre.subtext)
                 .put("street", text(invoke(currentGuidance, "getRoadName")))
-                .put("destination", "")
+                .put("destination", readDestination(route))
                 .put("maneuverDistanceMeters", manoeuvre.distanceMeters)
                 .put("routeTotalDistanceMeters", routeTotalDistance)
                 .put("remainingDistanceMeters", remainingDistance)
@@ -380,6 +390,37 @@ final class NavigatorStatePublisher {
         String subtext = title.equals(toponym) ? "" : toponym;
         int distance = nonNegativeInt(distance(routePosition, position));
         return new Manoeuvre(type, title, subtext, distance);
+    }
+
+    private String readDestination(Object route) {
+        String fallback = "";
+        try {
+            for (Object upcoming : invokeList(windshield, "getManoeuvres")) {
+                Object annotation = invoke(upcoming, "getAnnotation");
+                if (annotation == null) continue;
+                String action = enumName(invoke(annotation, "getAction"));
+                if (!"FINISH".equals(action) && !"WAYPOINT".equals(action)) continue;
+                String description = text(invoke(annotation, "getDescriptionText"));
+                String toponym = text(invoke(annotation, "getToponym"));
+                String candidate = description.isEmpty() ? toponym : description;
+                if (!candidate.isEmpty()) fallback = candidate;
+            }
+        } catch (Throwable ignored) {}
+        if (!fallback.isEmpty() || route == null) return fallback;
+        try {
+            List<?> points = invokeList(route, "getRequestPoints");
+            for (int index = points.size() - 1; index >= 0; index--) {
+                Object requestPoint = points.get(index);
+                if (!"WAYPOINT".equals(enumName(invoke(requestPoint, "getType")))) continue;
+                Object point = invoke(requestPoint, "getPoint");
+                double latitude = number(invoke(point, "getLatitude"), Double.NaN);
+                double longitude = number(invoke(point, "getLongitude"), Double.NaN);
+                if (finite(latitude) && finite(longitude)) {
+                    return String.format(Locale.ROOT, "%.5f, %.5f", latitude, longitude);
+                }
+            }
+        } catch (Throwable ignored) {}
+        return fallback;
     }
 
     private LaneState readLanes(Object routePosition) throws Exception {

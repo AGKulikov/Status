@@ -120,6 +120,7 @@ public final class HudElementConfig {
                     options.put("laneDistancePosition", "BOTTOM");
                     options.put("laneThresholdMeters", 700);
                     options.put("preferSourceImage", true);
+                    options.put("highlightColor", "#FF34C759");
                     options.put("hideWhenInactive", true);
                     break;
                 case NAV_SPEED_LIMIT:
@@ -135,6 +136,10 @@ public final class HudElementConfig {
                     options.put("countdownSide", "BOTTOM");
                     options.put("showFrame", true);
                     options.put("arrowAnimation", true);
+                    options.put("redColor", "#FFFF3B30");
+                    options.put("yellowColor", "#FFFFCC00");
+                    options.put("greenColor", "#FF34C759");
+                    options.put("unknownColor", "#FF6B7280");
                     break;
                 case NAV_TRIP_PROGRESS:
                     options.put("progressMode", "COMBINED");
@@ -142,12 +147,20 @@ public final class HudElementConfig {
                     break;
                 case NAV_JAM_PROGRESS:
                     options.put("orientation", "HORIZONTAL");
-                    options.put("freeColor", 0xFF34C759);
-                    options.put("lightColor", 0xFFFFCC00);
-                    options.put("hardColor", 0xFFFF3B30);
-                    options.put("veryHardColor", 0xFFB00020);
-                    options.put("blockedColor", 0xFF7A1FA2);
-                    options.put("unknownColor", 0xFF8E8E93);
+                    options.put("freeColor", "#FF34C759");
+                    options.put("lightColor", "#FFFFCC00");
+                    options.put("hardColor", "#FFFF3B30");
+                    options.put("veryHardColor", "#FFB00020");
+                    options.put("blockedColor", "#FF7A1FA2");
+                    options.put("unknownColor", "#FF8E8E93");
+                    break;
+                case NAV_ROUTE_GRAPHIC:
+                    options.put("freeColor", "#FF34C759");
+                    options.put("lightColor", "#FFFFCC00");
+                    options.put("hardColor", "#FFFF3B30");
+                    options.put("veryHardColor", "#FFB00020");
+                    options.put("blockedColor", "#FF7A1FA2");
+                    options.put("unknownColor", "#FF8E8E93");
                     break;
                 case TURN_SIGNAL_LEFT:
                 case TURN_SIGNAL_RIGHT:

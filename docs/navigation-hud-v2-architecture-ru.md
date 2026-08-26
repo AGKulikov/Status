@@ -216,13 +216,21 @@ Manifest baseline не меняется. Для package нового Навиг�
 6. Редактор HUD, где карта и каждый навигационный элемент свободно перемещаются/масштабируются —
    выполнено. Манёвр, полосы, светофоры, скорость, ETA, прогресс поездки и RLE-сегменты пробок
    получают прямой state bridge; notification/file snapshot оставлен только fallback для других
-   навигационных приложений и старых сборок.
+   навигационных приложений и старых сборок. Все значения публичных `Action`,
+   `DirectionSignDirection` и `RouteDirectionArrow` имеют собственную векторную визуализацию;
+   рекомендуемая полоса, сигналы светофора и шесть состояний пробок настраиваются независимо.
 7. Стендовые тесты, затем KX11: загрузка офлайн-карт, совместное наличие Яндекс Музыки, QuickBoot,
    холодный старт, оконный deep link, сворачивание, перестроение маршрута, day/night, 30 минут
    движения и серия перезагрузок.
 
 ## Публичные основания решения
 
+- Полный набор манёвров `Action` и направлений полос `DirectionSignDirection` берётся из
+  официальных enum MapKit, без строковых догадок:
+  https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/directions/driving/Action.html и
+  https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/directions/driving/DirectionSignDirection.html
+- `DrivingRoute` публично предоставляет metadata, геометрию, пробки, route position и точки
+  маршрута: https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/directions/driving/DrivingRoute.html
 - Yandex MapKit External Surfaces предупреждает, что дополнительный Surface того же MapWindow
   дублирует его камеру и стили: https://yandex.com/maps-api/docs/mapkit/android/static/tutorials/map_surface.html
 - `OffscreenMapWindow` и External Surfaces — штатный путь отдельного рендера без `MapView`:

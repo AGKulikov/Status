@@ -918,6 +918,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 visualSpinner(form, controls, "string:laneDistancePosition",
                         "Расстояние до полос", new String[]{"BOTTOM", "TOP", "OFF"},
                         item.options.optString("laneDistancePosition", "BOTTOM"));
+                visualColor(form, controls, item, "highlightColor",
+                        "Цвет рекомендуемой полосы", "#FF34C759");
                 break;
             case NAV_SPEED_LIMIT:
                 visualSwitch(form, controls, "bool:whiteSign",
@@ -951,6 +953,14 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 visualSwitch(form, controls, "bool:arrowAnimation",
                         "Анимация стрелки",
                         item.options.optBoolean("arrowAnimation", true));
+                visualColor(form, controls, item, "redColor",
+                        "Красный сигнал ARGB", "#FFFF3B30");
+                visualColor(form, controls, item, "yellowColor",
+                        "Жёлтый сигнал ARGB", "#FFFFCC00");
+                visualColor(form, controls, item, "greenColor",
+                        "Зелёный сигнал ARGB", "#FF34C759");
+                visualColor(form, controls, item, "unknownColor",
+                        "Нет данных ARGB", "#FF6B7280");
                 break;
             case NAV_TRIP_PROGRESS:
                 visualSpinner(form, controls, "string:progressMode", "Данные прогресса",
@@ -964,6 +974,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 visualSpinner(form, controls, "string:orientation", "Ориентация",
                         new String[]{"HORIZONTAL", "VERTICAL"},
                         item.options.optString("orientation", "HORIZONTAL"));
+                addTrafficPaletteOptions(form, controls, item);
+                break;
+            case NAV_ROUTE_GRAPHIC:
+                addTrafficPaletteOptions(form, controls, item);
                 break;
             default:
                 break;
@@ -980,6 +994,32 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
     private void visualInt(LinearLayout form, Map<String, View> controls, String key,
             String title, int value) {
         controls.put(key, field(form, title, Integer.toString(value), true));
+    }
+
+    private void visualColor(LinearLayout form, Map<String, View> controls,
+            HudElementConfig item, String key, String title, String fallback) {
+        controls.put("color:" + key, field(form, title,
+                optionColorText(item, key, fallback), false));
+    }
+
+    private void addTrafficPaletteOptions(LinearLayout form, Map<String, View> controls,
+            HudElementConfig item) {
+        visualColor(form, controls, item, "freeColor", "Свободно ARGB", "#FF34C759");
+        visualColor(form, controls, item, "lightColor", "Небольшая пробка ARGB", "#FFFFCC00");
+        visualColor(form, controls, item, "hardColor", "Затруднение ARGB", "#FFFF3B30");
+        visualColor(form, controls, item, "veryHardColor", "Тяжёлая пробка ARGB", "#FFB00020");
+        visualColor(form, controls, item, "blockedColor", "Перекрыто ARGB", "#FF7A1FA2");
+        visualColor(form, controls, item, "unknownColor", "Нет данных ARGB", "#FF8E8E93");
+    }
+
+    @NonNull
+    private static String optionColorText(HudElementConfig item, String key, String fallback) {
+        Object value = item.options.opt(key);
+        if (value instanceof Number) {
+            return String.format(Locale.ROOT, "#%08X", ((Number) value).intValue());
+        }
+        String text = value == null ? "" : String.valueOf(value).trim();
+        return text.isEmpty() ? fallback : text;
     }
 
     private void visualSpinner(LinearLayout form, Map<String, View> controls, String key,
@@ -1003,6 +1043,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 output.put(key, ((Switch) control).isChecked());
             } else if ("int".equals(kind) && control instanceof EditText) {
                 output.put(key, integer((EditText) control, output.optInt(key, 0)));
+            } else if ("color".equals(kind) && control instanceof EditText) {
+                String color = value((EditText) control);
+                Color.parseColor(color);
+                output.put(key, color);
             } else if ("string".equals(kind) && control instanceof Spinner) {
                 output.put(key, String.valueOf(((Spinner) control).getSelectedItem()));
             }

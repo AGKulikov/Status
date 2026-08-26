@@ -34,3 +34,12 @@ jobs:
             tools/repack_apk_entries.py
           python3 tools/tests/test_verify_navigation_mod_baseline.py
           python3 tools/tests/test_navigation_mod_tools.py
+      - name: Upload HUD v2 test outputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: navigation-hud-v2-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            app/build/outputs/apk/geely/debug/*.apk
+            build/navigation-mod-ci/classes19.dex

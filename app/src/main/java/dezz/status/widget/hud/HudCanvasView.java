@@ -299,7 +299,7 @@ public final class HudCanvasView extends View {
                 drawJamProgress(canvas, item, bounds, textColor, scale);
                 return;
             case NAV_ROUTE_GRAPHIC:
-                drawRouteGraphic(canvas, bounds);
+                drawRouteGraphic(canvas, item, bounds);
                 return;
             case TURN_SIGNAL_LEFT:
                 drawTurnSignal(canvas, item, bounds, textColor, true);
@@ -401,46 +401,210 @@ public final class HudCanvasView extends View {
             drawBitmap(canvas, nav.maneuverImage, bounds);
             return;
         }
-        String maneuverType = nav == null ? "" : nav.maneuverType.toUpperCase(Locale.ROOT);
         String hint = nav == null ? "" : (nav.maneuverTitle + " " + nav.maneuverText)
                 .toLowerCase(Locale.ROOT);
-        boolean right = maneuverType.contains("RIGHT")
-                || (maneuverType.isEmpty() && (hint.contains("направ") || hint.contains("right")));
-        boolean left = maneuverType.contains("LEFT")
-                || (maneuverType.isEmpty() && (hint.contains("налев") || hint.contains("left")));
-        boolean uturn = maneuverType.contains("UTURN")
-                || (maneuverType.isEmpty() && (hint.contains("развор") || hint.contains("u-turn")));
+        HudNavigationVisuals.Maneuver visual = HudNavigationVisuals.maneuver(
+                nav == null ? "" : nav.maneuverType);
+        if (visual.shape == HudNavigationVisuals.ManeuverShape.UNKNOWN) {
+            int direction = hint.contains("направ") || hint.contains("right") ? 1
+                    : hint.contains("налев") || hint.contains("left") ? -1 : 0;
+            visual = new HudNavigationVisuals.Maneuver(
+                    hint.contains("развор") || hint.contains("u-turn")
+                            ? HudNavigationVisuals.ManeuverShape.UTURN
+                            : direction == 0 ? HudNavigationVisuals.ManeuverShape.STRAIGHT
+                            : HudNavigationVisuals.ManeuverShape.TURN,
+                    direction);
+        }
         float stroke = Math.max(5f, Math.min(bounds.width(), bounds.height()) * .095f);
         paint.setColor(color);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(stroke);
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
+        switch (visual.shape) {
+            case TURN:
+            case SLIGHT:
+            case HARD:
+            case EXIT:
+                drawDirectionalManeuver(canvas, bounds, color, stroke, visual);
+                break;
+            case FORK:
+                drawForkManeuver(canvas, bounds, color, stroke, visual.direction);
+                break;
+            case UTURN:
+                drawUturnManeuver(canvas, bounds, color, stroke, visual.direction);
+                break;
+            case ROUNDABOUT:
+                drawRoundaboutManeuver(canvas, bounds, color, stroke);
+                break;
+            case FINISH:
+                drawFinishManeuver(canvas, bounds, color, stroke);
+                break;
+            case WAYPOINT:
+                drawWaypointManeuver(canvas, bounds, color, stroke);
+                break;
+            case FERRY:
+                drawFerryManeuver(canvas, bounds, color, stroke);
+                break;
+            case STRAIGHT:
+            case UNKNOWN:
+            default:
+                float cx = bounds.centerX();
+                float top = bounds.top + stroke;
+                canvas.drawLine(cx, bounds.bottom - stroke, cx,
+                        top + bounds.height() * .12f, paint);
+                drawVectorArrowHead(canvas, cx, top, 0f, -1f, color, stroke);
+                break;
+        }
+    }
+
+    private void drawDirectionalManeuver(Canvas canvas, RectF bounds, int color, float stroke,
+                                         HudNavigationVisuals.Maneuver visual) {
+        float direction = visual.direction < 0 ? -1f : 1f;
         float cx = bounds.centerX();
         float bottom = bounds.bottom - stroke;
         float top = bounds.top + stroke;
+        float endX;
+        float endY;
         path.reset();
-        if (uturn) {
-            path.moveTo(cx + bounds.width() * .22f, bottom);
-            path.lineTo(cx + bounds.width() * .22f, bounds.centerY());
-            path.cubicTo(cx + bounds.width() * .22f, top, cx - bounds.width() * .22f, top,
-                    cx - bounds.width() * .22f, bounds.centerY());
+        path.moveTo(cx, bottom);
+        if (visual.shape == HudNavigationVisuals.ManeuverShape.SLIGHT) {
+            endX = cx + direction * bounds.width() * .28f;
+            endY = top + bounds.height() * .08f;
+            path.cubicTo(cx, bounds.centerY(), endX, bounds.centerY(), endX, endY);
             canvas.drawPath(path, paint);
-            drawArrowHead(canvas, cx - bounds.width() * .22f, bounds.centerY(),
-                    false, color, stroke);
-        } else if (left || right) {
-            float direction = right ? 1f : -1f;
-            path.moveTo(cx, bottom);
-            path.lineTo(cx, bounds.centerY());
-            path.lineTo(cx + direction * bounds.width() * .28f, bounds.centerY());
+            drawVectorArrowHead(canvas, endX, endY, direction * .45f, -1f,
+                    color, stroke);
+            return;
+        }
+        if (visual.shape == HudNavigationVisuals.ManeuverShape.HARD) {
+            endX = cx + direction * bounds.width() * .34f;
+            endY = bounds.centerY() + bounds.height() * .17f;
+            path.lineTo(cx, bounds.centerY() - bounds.height() * .08f);
+            path.cubicTo(cx, top, endX, top, endX, endY);
             canvas.drawPath(path, paint);
-            drawArrowHead(canvas, cx + direction * bounds.width() * .28f, bounds.centerY(),
-                    right, color, stroke);
-        } else {
-            path.moveTo(cx, bottom);
-            path.lineTo(cx, top + bounds.height() * .12f);
+            drawVectorArrowHead(canvas, endX, endY, 0f, 1f, color, stroke);
+            return;
+        }
+        endX = cx + direction * bounds.width() * .34f;
+        endY = bounds.centerY();
+        path.lineTo(cx, endY);
+        path.lineTo(endX, endY);
+        canvas.drawPath(path, paint);
+        if (visual.shape == HudNavigationVisuals.ManeuverShape.EXIT) {
+            paint.setColor(withAlpha(color, 75));
+            canvas.drawLine(cx, endY, cx, top, paint);
+            paint.setColor(color);
+        }
+        drawVectorArrowHead(canvas, endX, endY, direction, 0f, color, stroke);
+    }
+
+    private void drawForkManeuver(Canvas canvas, RectF bounds, int color, float stroke,
+                                  int selectedDirection) {
+        float cx = bounds.centerX();
+        float joint = bounds.centerY() + bounds.height() * .08f;
+        float top = bounds.top + stroke;
+        float dx = bounds.width() * .27f;
+        canvas.drawLine(cx, bounds.bottom - stroke, cx, joint, paint);
+        for (int direction : new int[]{-1, 1}) {
+            int branchColor = direction == selectedDirection ? color : withAlpha(color, 75);
+            paint.setColor(branchColor);
+            path.reset();
+            path.moveTo(cx, joint);
+            path.cubicTo(cx, joint - bounds.height() * .14f,
+                    cx + direction * dx, joint - bounds.height() * .18f,
+                    cx + direction * dx, top);
             canvas.drawPath(path, paint);
-            drawUpArrowHead(canvas, cx, top, color, stroke);
+            drawVectorArrowHead(canvas, cx + direction * dx, top,
+                    direction * .25f, -1f, branchColor, stroke);
+        }
+    }
+
+    private void drawUturnManeuver(Canvas canvas, RectF bounds, int color, float stroke,
+                                   int selectedDirection) {
+        float direction = selectedDirection < 0 ? -1f : 1f;
+        float cx = bounds.centerX() - direction * bounds.width() * .16f;
+        float otherX = cx + direction * bounds.width() * .34f;
+        float top = bounds.top + stroke;
+        float endY = bounds.centerY() + bounds.height() * .13f;
+        path.reset();
+        path.moveTo(otherX, bounds.bottom - stroke);
+        path.lineTo(otherX, bounds.centerY());
+        path.cubicTo(otherX, top, cx, top, cx, bounds.centerY());
+        path.lineTo(cx, endY);
+        canvas.drawPath(path, paint);
+        drawVectorArrowHead(canvas, cx, endY, 0f, 1f, color, stroke);
+    }
+
+    private void drawRoundaboutManeuver(Canvas canvas, RectF bounds, int color, float stroke) {
+        float radius = Math.min(bounds.width(), bounds.height()) * .25f;
+        float cx = bounds.centerX();
+        float cy = bounds.centerY() - bounds.height() * .06f;
+        RectF circle = new RectF(cx - radius, cy - radius, cx + radius, cy + radius);
+        path.reset();
+        path.addArc(circle, 75f, 300f);
+        canvas.drawPath(path, paint);
+        canvas.drawLine(cx, bounds.bottom - stroke, cx, cy + radius, paint);
+        float angle = (float) Math.toRadians(15d);
+        float x = cx + (float) Math.cos(angle) * radius;
+        float y = cy + (float) Math.sin(angle) * radius;
+        drawVectorArrowHead(canvas, x, y, .35f, -1f, color, stroke);
+    }
+
+    private void drawFinishManeuver(Canvas canvas, RectF bounds, int color, float stroke) {
+        float poleX = bounds.left + bounds.width() * .34f;
+        float top = bounds.top + stroke;
+        float flagWidth = bounds.width() * .38f;
+        float flagHeight = bounds.height() * .34f;
+        canvas.drawLine(poleX, top, poleX, bounds.bottom - stroke, paint);
+        paint.setStyle(Paint.Style.FILL);
+        float cellW = flagWidth / 3f;
+        float cellH = flagHeight / 2f;
+        for (int row = 0; row < 2; row++) for (int column = 0; column < 3; column++) {
+            paint.setColor((row + column) % 2 == 0 ? color : withAlpha(color, 45));
+            canvas.drawRect(poleX + column * cellW, top + row * cellH,
+                    poleX + (column + 1) * cellW, top + (row + 1) * cellH, paint);
+        }
+    }
+
+    private void drawWaypointManeuver(Canvas canvas, RectF bounds, int color, float stroke) {
+        float radius = Math.min(bounds.width(), bounds.height()) * .22f;
+        float cx = bounds.centerX();
+        float cy = bounds.centerY() - radius * .35f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        paint.setColor(color);
+        canvas.drawCircle(cx, cy, radius, paint);
+        path.reset();
+        path.moveTo(cx - radius * .55f, cy + radius * .82f);
+        path.lineTo(cx, bounds.bottom - stroke);
+        path.lineTo(cx + radius * .55f, cy + radius * .82f);
+        canvas.drawPath(path, paint);
+        paint.setStyle(Paint.Style.FILL);
+        canvas.drawCircle(cx, cy, Math.max(2f, radius * .28f), paint);
+    }
+
+    private void drawFerryManeuver(Canvas canvas, RectF bounds, int color, float stroke) {
+        paint.setColor(color);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        float top = bounds.top + bounds.height() * .24f;
+        RectF cabin = new RectF(bounds.left + bounds.width() * .34f, top,
+                bounds.right - bounds.width() * .34f, bounds.centerY());
+        canvas.drawRect(cabin, paint);
+        path.reset();
+        path.moveTo(bounds.left + bounds.width() * .18f, bounds.centerY());
+        path.lineTo(bounds.right - bounds.width() * .18f, bounds.centerY());
+        path.lineTo(bounds.right - bounds.width() * .3f,
+                bounds.centerY() + bounds.height() * .25f);
+        path.lineTo(bounds.left + bounds.width() * .3f,
+                bounds.centerY() + bounds.height() * .25f);
+        path.close();
+        canvas.drawPath(path, paint);
+        for (int wave = 0; wave < 2; wave++) {
+            float y = bounds.centerY() + bounds.height() * (.34f + wave * .14f);
+            canvas.drawLine(bounds.left + bounds.width() * .2f, y,
+                    bounds.right - bounds.width() * .2f, y, paint);
         }
     }
 
@@ -500,7 +664,7 @@ public final class HudCanvasView extends View {
                 boolean highlighted = direction.equals(lane.highlightedDirection)
                         && !"UNKNOWN_DIRECTION".equals(direction);
                 int laneColor = highlighted
-                        ? item.options.optInt("highlightColor", 0xFF34C759) : color;
+                        ? optionColor(item, "highlightColor", 0xFF34C759) : color;
                 float directionX = cx
                         + (directionIndex - (directionCount - 1) / 2f) * spacing;
                 drawLaneDirection(canvas, directionX, bounds, direction, laneColor,
@@ -518,14 +682,12 @@ public final class HudCanvasView extends View {
 
     private void drawLaneDirection(Canvas canvas, float cx, RectF bounds, String direction,
                                    int color, float stroke) {
-        String value = direction == null ? "" : direction.toUpperCase(Locale.ROOT);
+        HudNavigationVisuals.Lane visual = HudNavigationVisuals.lane(direction);
+        float side = visual.direction < 0 ? -1f : 1f;
         float startY = bounds.bottom - stroke;
         float jointY = bounds.top + bounds.height() * .48f;
         float endX = cx;
         float endY = bounds.top + stroke;
-        if (value.contains("LEFT")) endX -= bounds.width() * .055f;
-        else if (value.contains("RIGHT")) endX += bounds.width() * .055f;
-        if (value.contains("180")) endY = jointY + bounds.height() * .17f;
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(stroke);
         paint.setStrokeCap(Paint.Cap.ROUND);
@@ -533,11 +695,58 @@ public final class HudCanvasView extends View {
         paint.setColor(color);
         path.reset();
         path.moveTo(cx, startY);
-        path.lineTo(cx, jointY);
-        path.lineTo(endX, endY);
+        switch (visual.shape) {
+            case TURN_45:
+                endX = cx + side * bounds.width() * .055f;
+                path.cubicTo(cx, jointY, endX, jointY, endX, endY);
+                break;
+            case TURN_90:
+                endX = cx + side * bounds.width() * .075f;
+                endY = jointY;
+                path.lineTo(cx, jointY);
+                path.lineTo(endX, endY);
+                break;
+            case TURN_135:
+                endX = cx + side * bounds.width() * .07f;
+                endY = jointY + bounds.height() * .14f;
+                path.lineTo(cx, jointY - bounds.height() * .06f);
+                path.cubicTo(cx, bounds.top + bounds.height() * .18f,
+                        endX, bounds.top + bounds.height() * .18f, endX, endY);
+                break;
+            case UTURN:
+                endX = cx - side * bounds.width() * .045f;
+                endY = jointY + bounds.height() * .13f;
+                float outerX = cx + side * bounds.width() * .045f;
+                path.lineTo(outerX, jointY);
+                path.cubicTo(outerX, bounds.top + bounds.height() * .12f,
+                        endX, bounds.top + bounds.height() * .12f, endX, jointY);
+                path.lineTo(endX, endY);
+                break;
+            case MERGE:
+                endX = cx + side * bounds.width() * .05f;
+                path.cubicTo(cx, jointY + bounds.height() * .12f,
+                        endX, jointY, endX, endY);
+                break;
+            case SHIFT:
+                endX = cx + side * bounds.width() * .055f;
+                path.cubicTo(cx, jointY + bounds.height() * .15f,
+                        endX, jointY + bounds.height() * .08f, endX, jointY);
+                path.lineTo(endX, endY);
+                break;
+            case STRAIGHT:
+            case UNKNOWN:
+            default:
+                path.lineTo(endX, endY);
+                break;
+        }
         canvas.drawPath(path, paint);
-        if (Math.abs(endX - cx) < 1f) drawUpArrowHead(canvas, endX, endY, color, stroke);
-        else drawArrowHead(canvas, endX, endY, endX > cx, color, stroke);
+        float dx = endX - cx;
+        float dy = endY - jointY;
+        if (visual.shape == HudNavigationVisuals.LaneShape.TURN_90) dy = 0f;
+        else if (visual.shape == HudNavigationVisuals.LaneShape.TURN_135
+                || visual.shape == HudNavigationVisuals.LaneShape.UTURN) dy = 1f;
+        else dy = -1f;
+        drawVectorArrowHead(canvas, endX, endY, dx, dy, color, stroke);
     }
 
     private void drawSpeedLimit(Canvas canvas, HudElementConfig item, RectF bounds,
@@ -613,24 +822,79 @@ public final class HudCanvasView extends View {
             float radius = Math.min(bounds.width(), bounds.height()) * .23f;
             canvas.drawRoundRect(bounds, radius, radius, paint);
         }
-        int active = trafficColor(state);
-        float diameter = Math.min(bounds.width() * .55f, bounds.height() * .34f);
-        float cx = bounds.centerX();
-        float cy = bounds.top + bounds.height() * .32f;
+        int active = optionColor(item, "unknownColor", 0xFF6B7280);
         String lower = state == null ? "" : state.toLowerCase(Locale.ROOT);
-        if (lower.contains("red") || lower.contains("крас")) active = 0xFFFF3B30;
-        else if (lower.contains("yellow") || lower.contains("жел")) active = 0xFFFFCC00;
-        else if (lower.contains("green") || lower.contains("зел")) active = 0xFF34C759;
+        if (lower.contains("red") || lower.contains("крас")) {
+            active = optionColor(item, "redColor", 0xFFFF3B30);
+        } else if (lower.contains("yellow") || lower.contains("жел")) {
+            active = optionColor(item, "yellowColor", 0xFFFFCC00);
+        } else if (lower.contains("green") || lower.contains("зел")) {
+            active = optionColor(item, "greenColor", 0xFF34C759);
+        }
+        String countdownSide = item.options.optString("countdownSide", "BOTTOM");
+        RectF signalBounds = new RectF(bounds);
+        RectF text = new RectF(bounds);
+        if ("TOP".equals(countdownSide)) {
+            text.bottom = bounds.top + bounds.height() * .36f;
+            signalBounds.top = text.bottom;
+        } else if ("LEFT".equals(countdownSide)) {
+            text.right = bounds.left + bounds.width() * .42f;
+            signalBounds.left = text.right;
+        } else if ("RIGHT".equals(countdownSide)) {
+            signalBounds.right = bounds.left + bounds.width() * .58f;
+            text.left = signalBounds.right;
+        } else {
+            signalBounds.bottom = bounds.top + bounds.height() * .6f;
+            text.top = signalBounds.bottom;
+        }
+        float diameter = Math.min(signalBounds.width(), signalBounds.height()) * .7f;
+        float cx = signalBounds.centerX();
+        float cy = signalBounds.centerY();
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(active);
         canvas.drawCircle(cx, cy, diameter * .45f, paint);
+        drawTrafficArrow(canvas, cx, cy, diameter * .48f, arrow,
+                lower.contains("red") ? Color.WHITE : Color.BLACK,
+                Math.max(2f, 2.2f * scale));
         String line = countdown == null || countdown.trim().isEmpty() ? "—" : countdown.trim();
-        if (arrow != null && !arrow.trim().isEmpty()) line += " " + arrow.trim();
-        RectF text = new RectF(bounds.left, bounds.top + bounds.height() * .56f,
-                bounds.right, bounds.bottom);
         drawSimpleText(canvas, line, text, fallbackColor,
                 Math.max(9f, Math.min(text.height() * .62f, text.width() * .28f)),
                 Layout.Alignment.ALIGN_CENTER);
+    }
+
+    private void drawTrafficArrow(Canvas canvas, float cx, float cy, float size,
+                                  @Nullable String arrow, int color, float stroke) {
+        String value = arrow == null ? "" : arrow.trim();
+        if (!HudNavigationVisuals.isTrafficArrow(value)) return;
+        if (HudNavigationVisuals.isTrafficUturn(value)) {
+            RectF arc = new RectF(cx - size * .42f, cy - size * .42f,
+                    cx + size * .42f, cy + size * .42f);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(stroke);
+            paint.setColor(color);
+            path.reset();
+            path.addArc(arc, 40f, -250f);
+            canvas.drawPath(path, paint);
+            drawVectorArrowHead(canvas, arc.left, cy, 0f, 1f, color, stroke);
+            return;
+        }
+        int direction = HudNavigationVisuals.trafficArrowDirection(value);
+        float dx = direction * size * .32f;
+        float startY = cy + size * .32f;
+        float endY = direction == 0 ? cy - size * .36f : cy;
+        float endX = cx + dx;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(color);
+        path.reset();
+        path.moveTo(cx, startY);
+        path.lineTo(cx, cy);
+        path.lineTo(endX, endY);
+        canvas.drawPath(path, paint);
+        drawVectorArrowHead(canvas, endX, endY,
+                direction == 0 ? 0f : direction, direction == 0 ? -1f : 0f,
+                color, stroke);
     }
 
     private void drawProgress(Canvas canvas, HudElementConfig item, RectF bounds,
@@ -693,7 +957,7 @@ public final class HudCanvasView extends View {
                 Layout.Alignment.ALIGN_CENTER);
     }
 
-    private void drawRouteGraphic(Canvas canvas, RectF bounds) {
+    private void drawRouteGraphic(Canvas canvas, HudElementConfig item, RectF bounds) {
         HudNavigationState nav = data.navigation();
         Bitmap bitmap = nav == null ? null
                 : nav.rainbowImage != null ? nav.rainbowImage : nav.jamImage;
@@ -712,7 +976,7 @@ public final class HudCanvasView extends View {
         for (HudNavigationState.TrafficRun run : nav.trafficRuns) {
             float top = bounds.bottom - bounds.height() * run.to / maximum;
             float bottom = bounds.bottom - bounds.height() * run.from / maximum;
-            paint.setColor(jamColor(null, run.type));
+            paint.setColor(jamColor(item, run.type));
             canvas.drawLine(x, bottom, x, top, paint);
         }
     }
@@ -726,7 +990,7 @@ public final class HudCanvasView extends View {
         else if ("LIGHT".equals(type)) { key = "lightColor"; fallback = 0xFFFFCC00; }
         else if ("FREE".equals(type)) { key = "freeColor"; fallback = 0xFF34C759; }
         else { key = "unknownColor"; fallback = 0xFF8E8E93; }
-        return item == null ? fallback : item.options.optInt(key, fallback);
+        return item == null ? fallback : optionColor(item, key, fallback);
     }
 
     private void drawTurnSignal(Canvas canvas, HudElementConfig item, RectF bounds,
@@ -1173,6 +1437,28 @@ public final class HudCanvasView extends View {
         canvas.drawPath(path, paint);
     }
 
+    private void drawVectorArrowHead(Canvas canvas, float x, float y, float dx, float dy,
+                                     int color, float stroke) {
+        float length = (float) Math.sqrt(dx * dx + dy * dy);
+        if (length < .001f) return;
+        float ux = dx / length;
+        float uy = dy / length;
+        float px = -uy;
+        float py = ux;
+        float back = stroke * 2.5f;
+        float side = stroke * 1.65f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(color);
+        path.reset();
+        path.moveTo(x - ux * back + px * side, y - uy * back + py * side);
+        path.lineTo(x, y);
+        path.lineTo(x - ux * back - px * side, y - uy * back - py * side);
+        canvas.drawPath(path, paint);
+    }
+
     private static RectF fitCenter(float sourceWidth, float sourceHeight, RectF target) {
         if (sourceWidth <= 0 || sourceHeight <= 0) return new RectF(target);
         float scale = Math.min(target.width() / sourceWidth, target.height() / sourceHeight);
@@ -1235,12 +1521,11 @@ public final class HudCanvasView extends View {
         catch (IllegalArgumentException ignored) { return defaultColor; }
     }
 
-    private static int trafficColor(@Nullable String state) {
-        String value = state == null ? "" : state.toLowerCase(Locale.ROOT);
-        if (value.contains("red") || value.contains("крас")) return 0xFFFF3B30;
-        if (value.contains("yellow") || value.contains("жел")) return 0xFFFFCC00;
-        if (value.contains("green") || value.contains("зел")) return 0xFF34C759;
-        return 0xFF6B7280;
+    private static int optionColor(@NonNull HudElementConfig item, @NonNull String key,
+                                   @ColorInt int fallback) {
+        Object value = item.options.opt(key);
+        if (value instanceof Number) return ((Number) value).intValue();
+        return parseColor(null, value == null ? "" : String.valueOf(value), fallback);
     }
 
     private static int withAlpha(int color, int alpha) {
