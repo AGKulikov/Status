@@ -32,7 +32,6 @@ import java.util.Locale;
 
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.launcher.HorizontalGroupLayout;
-import dezz.status.widget.launcher.NavigationDataRepository;
 
 /**
  * Resolution-independent renderer shared byte-for-byte by the live editor and HUD Presentation.
@@ -154,7 +153,7 @@ public final class HudCanvasView extends View {
         if (state.present && !state.visible) return false;
         if (item.options.optBoolean("hideWhenInactive", false)) {
             if (isNavigation(item.type)) {
-                NavigationDataRepository.Snapshot nav = data.navigation();
+                HudNavigationState nav = data.navigation();
                 if (nav == null || (!nav.routeActive && !nav.laneAvailable
                         && !nav.trafficAvailable)) return false;
             } else if (!data.active(item)) {
@@ -170,12 +169,12 @@ public final class HudCanvasView extends View {
         }
         if ((item.type == HudElementType.NAV_SPEED_LIMIT)
                 && item.options.optBoolean("routeOnly", false)) {
-            NavigationDataRepository.Snapshot nav = data.navigation();
+            HudNavigationState nav = data.navigation();
             if (nav == null || !nav.routeActive) return false;
         }
         if (item.type == HudElementType.NAV_SPEED_LIMIT
                 && item.options.optBoolean("onlyWhenExceeded", false)) {
-            NavigationDataRepository.Snapshot nav = data.navigation();
+            HudNavigationState nav = data.navigation();
             double current = data.numericValue(item);
             double limit = nav == null ? Double.NaN : parseNumber(nav.speedLimit);
             double delta = item.options.optDouble("overspeedDelta", 0d);
@@ -202,7 +201,7 @@ public final class HudCanvasView extends View {
             return false;
         }
         if (item.type == HudElementType.NAV_LANES) {
-            NavigationDataRepository.Snapshot nav = data.navigation();
+            HudNavigationState nav = data.navigation();
             int threshold = item.options.optInt("laneThresholdMeters",
                     config.navigationDisplayThresholdMeters);
             if (nav != null && Double.isFinite(nav.laneDistanceMeters)
@@ -294,8 +293,10 @@ public final class HudCanvasView extends View {
                 drawTrafficLights(canvas, item, bounds, textColor, scale);
                 return;
             case NAV_TRIP_PROGRESS:
-            case NAV_JAM_PROGRESS:
                 drawProgress(canvas, item, bounds, textColor, scale);
+                return;
+            case NAV_JAM_PROGRESS:
+                drawJamProgress(canvas, item, bounds, textColor, scale);
                 return;
             case NAV_ROUTE_GRAPHIC:
                 drawRouteGraphic(canvas, bounds);
@@ -394,17 +395,21 @@ public final class HudCanvasView extends View {
     }
 
     private void drawManeuver(Canvas canvas, HudElementConfig item, RectF bounds, int color) {
-        NavigationDataRepository.Snapshot nav = data.navigation();
+        HudNavigationState nav = data.navigation();
         if (item.options.optBoolean("preferSourceImage", true)
                 && nav != null && nav.maneuverImage != null) {
             drawBitmap(canvas, nav.maneuverImage, bounds);
             return;
         }
+        String maneuverType = nav == null ? "" : nav.maneuverType.toUpperCase(Locale.ROOT);
         String hint = nav == null ? "" : (nav.maneuverTitle + " " + nav.maneuverText)
                 .toLowerCase(Locale.ROOT);
-        boolean right = hint.contains("направ") || hint.contains("right");
-        boolean left = hint.contains("налев") || hint.contains("left");
-        boolean uturn = hint.contains("развор") || hint.contains("u-turn");
+        boolean right = maneuverType.contains("RIGHT")
+                || (maneuverType.isEmpty() && (hint.contains("направ") || hint.contains("right")));
+        boolean left = maneuverType.contains("LEFT")
+                || (maneuverType.isEmpty() && (hint.contains("налев") || hint.contains("left")));
+        boolean uturn = maneuverType.contains("UTURN")
+                || (maneuverType.isEmpty() && (hint.contains("развор") || hint.contains("u-turn")));
         float stroke = Math.max(5f, Math.min(bounds.width(), bounds.height()) * .095f);
         paint.setColor(color);
         paint.setStyle(Paint.Style.STROKE);
@@ -468,26 +473,39 @@ public final class HudCanvasView extends View {
     }
 
     private void drawLanes(Canvas canvas, HudElementConfig item, RectF bounds, int color) {
-        NavigationDataRepository.Snapshot nav = data.navigation();
+        HudNavigationState nav = data.navigation();
         if (item.options.optBoolean("preferSourceImage", true)
                 && nav != null && nav.lanesImage != null) {
             drawBitmap(canvas, nav.lanesImage, bounds);
             return;
         }
         String lanes = nav == null ? "" : nav.lanes;
-        int count = lanes.isEmpty() ? 3 : Math.max(1,
+        int count = nav != null && !nav.laneItems.isEmpty() ? nav.laneItems.size()
+                : lanes.isEmpty() ? 3 : Math.max(1,
                 Math.min(8, lanes.split("[,;| ]+").length));
         float cell = bounds.width() / count;
         float stroke = Math.max(3f, Math.min(cell, bounds.height()) * .09f);
         for (int index = 0; index < count; index++) {
             float cx = bounds.left + cell * (index + .5f);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(stroke);
-            paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setColor(color);
-            canvas.drawLine(cx, bounds.bottom - stroke, cx,
-                    bounds.top + bounds.height() * .24f, paint);
-            drawUpArrowHead(canvas, cx, bounds.top + stroke, color, stroke);
+            HudNavigationState.Lane lane = nav != null && index < nav.laneItems.size()
+                    ? nav.laneItems.get(index) : null;
+            if (lane == null || lane.directions.isEmpty()) {
+                drawLaneDirection(canvas, cx, bounds, "STRAIGHT_AHEAD", color, stroke);
+                continue;
+            }
+            int directionCount = Math.min(3, lane.directions.size());
+            float spacing = Math.min(cell * .22f, stroke * 2.2f);
+            for (int directionIndex = 0; directionIndex < directionCount; directionIndex++) {
+                String direction = lane.directions.get(directionIndex);
+                boolean highlighted = direction.equals(lane.highlightedDirection)
+                        && !"UNKNOWN_DIRECTION".equals(direction);
+                int laneColor = highlighted
+                        ? item.options.optInt("highlightColor", 0xFF34C759) : color;
+                float directionX = cx
+                        + (directionIndex - (directionCount - 1) / 2f) * spacing;
+                drawLaneDirection(canvas, directionX, bounds, direction, laneColor,
+                        Math.max(2f, stroke * .8f));
+            }
         }
         if (nav != null && !"OFF".equals(item.options.optString(
                 "laneDistancePosition", "BOTTOM")) && !nav.laneDistance.isEmpty()) {
@@ -496,6 +514,30 @@ public final class HudCanvasView extends View {
             drawSimpleText(canvas, nav.laneDistance, label, color,
                     Math.max(10f, label.height() * .65f), Layout.Alignment.ALIGN_CENTER);
         }
+    }
+
+    private void drawLaneDirection(Canvas canvas, float cx, RectF bounds, String direction,
+                                   int color, float stroke) {
+        String value = direction == null ? "" : direction.toUpperCase(Locale.ROOT);
+        float startY = bounds.bottom - stroke;
+        float jointY = bounds.top + bounds.height() * .48f;
+        float endX = cx;
+        float endY = bounds.top + stroke;
+        if (value.contains("LEFT")) endX -= bounds.width() * .055f;
+        else if (value.contains("RIGHT")) endX += bounds.width() * .055f;
+        if (value.contains("180")) endY = jointY + bounds.height() * .17f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(color);
+        path.reset();
+        path.moveTo(cx, startY);
+        path.lineTo(cx, jointY);
+        path.lineTo(endX, endY);
+        canvas.drawPath(path, paint);
+        if (Math.abs(endX - cx) < 1f) drawUpArrowHead(canvas, endX, endY, color, stroke);
+        else drawArrowHead(canvas, endX, endY, endX > cx, color, stroke);
     }
 
     private void drawSpeedLimit(Canvas canvas, HudElementConfig item, RectF bounds,
@@ -527,8 +569,8 @@ public final class HudCanvasView extends View {
 
     private void drawTrafficLights(Canvas canvas, HudElementConfig item, RectF bounds,
                                    int fallbackColor, float scale) {
-        NavigationDataRepository.Snapshot nav = data.navigation();
-        List<NavigationDataRepository.TrafficLight> lights =
+        HudNavigationState nav = data.navigation();
+        List<HudNavigationState.TrafficLight> lights =
                 nav == null ? Collections.emptyList() : nav.trafficLights;
         if (lights.isEmpty() && nav != null && nav.trafficAvailable) {
             drawOneTrafficLight(canvas, item, bounds, nav.trafficColor,
@@ -554,7 +596,7 @@ public final class HudCanvasView extends View {
                 cell = new RectF(bounds.left, bounds.top + height * index,
                         bounds.right, bounds.top + height * (index + 1));
             }
-            NavigationDataRepository.TrafficLight light = lights.get(index);
+            HudNavigationState.TrafficLight light = lights.get(index);
             drawOneTrafficLight(canvas, item, inset(cell, 2f * scale), light.color,
                     light.countdown, light.arrow, fallbackColor, scale);
         }
@@ -601,8 +643,7 @@ public final class HudCanvasView extends View {
         canvas.drawRoundRect(bounds, radius, radius, paint);
         double progress = data.numericValue(item);
         if (!Double.isFinite(progress)) {
-            NavigationDataRepository.Snapshot nav = data.navigation();
-            progress = nav != null && nav.routeActive ? .55d : 0d;
+            progress = 0d;
         }
         progress = Math.max(0d, Math.min(1d, progress));
         RectF fill = new RectF(bounds);
@@ -615,11 +656,77 @@ public final class HudCanvasView extends View {
                 Layout.Alignment.ALIGN_CENTER);
     }
 
+    private void drawJamProgress(Canvas canvas, HudElementConfig item, RectF bounds,
+                                 int textColor, float scale) {
+        HudNavigationState nav = data.navigation();
+        List<HudNavigationState.TrafficRun> runs = nav == null
+                ? Collections.emptyList() : nav.trafficRuns;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0x443F4653);
+        float radius = Math.min(bounds.width(), bounds.height()) * .35f;
+        canvas.drawRoundRect(bounds, radius, radius, paint);
+        if (!runs.isEmpty()) {
+            int maximum = runs.get(runs.size() - 1).to;
+            boolean vertical = "VERTICAL".equals(item.options.optString(
+                    "orientation", "HORIZONTAL"));
+            int clip = canvas.save();
+            canvas.clipRect(bounds);
+            for (HudNavigationState.TrafficRun run : runs) {
+                if (maximum <= 0) break;
+                float from = run.from / (float) maximum;
+                float to = run.to / (float) maximum;
+                RectF part = new RectF(bounds);
+                if (vertical) {
+                    part.bottom = bounds.bottom - bounds.height() * from;
+                    part.top = bounds.bottom - bounds.height() * to;
+                } else {
+                    part.left = bounds.left + bounds.width() * from;
+                    part.right = bounds.left + bounds.width() * to;
+                }
+                paint.setColor(jamColor(item, run.type));
+                canvas.drawRect(part, paint);
+            }
+            canvas.restoreToCount(clip);
+        }
+        drawSimpleText(canvas, data.textFor(item), bounds, textColor,
+                Math.max(9f, Math.min(bounds.height() * .55f, 26f * scale)),
+                Layout.Alignment.ALIGN_CENTER);
+    }
+
     private void drawRouteGraphic(Canvas canvas, RectF bounds) {
-        NavigationDataRepository.Snapshot nav = data.navigation();
+        HudNavigationState nav = data.navigation();
         Bitmap bitmap = nav == null ? null
                 : nav.rainbowImage != null ? nav.rainbowImage : nav.jamImage;
-        if (bitmap != null) drawBitmap(canvas, bitmap, bounds);
+        if (bitmap != null) {
+            drawBitmap(canvas, bitmap, bounds);
+            return;
+        }
+        if (nav == null || nav.trafficRuns.isEmpty()) return;
+        int maximum = nav.trafficRuns.get(nav.trafficRuns.size() - 1).to;
+        if (maximum <= 0) return;
+        float stroke = Math.max(4f, Math.min(bounds.width(), bounds.height()) * .11f);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        float x = bounds.centerX();
+        for (HudNavigationState.TrafficRun run : nav.trafficRuns) {
+            float top = bounds.bottom - bounds.height() * run.to / maximum;
+            float bottom = bounds.bottom - bounds.height() * run.from / maximum;
+            paint.setColor(jamColor(null, run.type));
+            canvas.drawLine(x, bottom, x, top, paint);
+        }
+    }
+
+    private static int jamColor(@Nullable HudElementConfig item, String type) {
+        String key;
+        int fallback;
+        if ("BLOCKED".equals(type)) { key = "blockedColor"; fallback = 0xFF7A1FA2; }
+        else if ("VERY_HARD".equals(type)) { key = "veryHardColor"; fallback = 0xFFB00020; }
+        else if ("HARD".equals(type)) { key = "hardColor"; fallback = 0xFFFF3B30; }
+        else if ("LIGHT".equals(type)) { key = "lightColor"; fallback = 0xFFFFCC00; }
+        else if ("FREE".equals(type)) { key = "freeColor"; fallback = 0xFF34C759; }
+        else { key = "unknownColor"; fallback = 0xFF8E8E93; }
+        return item == null ? fallback : item.options.optInt(key, fallback);
     }
 
     private void drawTurnSignal(Canvas canvas, HudElementConfig item, RectF bounds,

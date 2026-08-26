@@ -221,7 +221,8 @@ public final class NavigationHudV2ContractTest {
         NavigationSnapshotV2 snapshot = new NavigationSnapshotV2(
                 17L, 4L, 123_456L, true, 55.751d, 37.617d, 361d, 42d,
                 "TURN_RIGHT", "Направо", "через 200 м", "Тверская", "Дом",
-                200, 12_300, 1_020, 234_567L, 60, "[{\"active\":true}]", "[]");
+                200, 20_000, 12_300, 1_020, 234_567L, 60, 350,
+                "[{\"active\":true}]", "[]");
         NavigationSnapshotV2 restoredSnapshot = NavigationSnapshotV2.fromJson(
                 snapshot.toJson().toString());
         NavigationRouteGeometryV2 route = new NavigationRouteGeometryV2(
@@ -233,6 +234,8 @@ public final class NavigationHudV2ContractTest {
         assertEquals(4L, restoredSnapshot.routeEpoch);
         assertEquals(1d, restoredSnapshot.bearingDegrees, 0d);
         assertEquals("TURN_RIGHT", restoredSnapshot.maneuverType);
+        assertEquals(20_000, restoredSnapshot.routeTotalDistanceMeters);
+        assertEquals(350, restoredSnapshot.laneDistanceMeters);
         assertEquals(4L, restoredRoute.routeEpoch);
         assertEquals("encoded-route", restoredRoute.encodedPolyline);
         assertTrue(NavigationBridgeContract.MSG_ROUTE_GEOMETRY
@@ -268,6 +271,24 @@ public final class NavigationHudV2ContractTest {
         assertTrue(elementTypes.contains("NAV_TRAFFIC_LIGHTS"));
     }
 
+    @Test public void independentHudElementsConsumeDirectBridgeState() throws Exception {
+        Path root = sourceRoot();
+        String runtime = read(root.resolve("hud/HudRuntimeData.java"));
+        String canvas = read(root.resolve("hud/HudCanvasView.java"));
+        String state = read(root.resolve("hud/HudNavigationState.java"));
+        String publisher = read(navigatorModRoot().resolve("NavigatorStatePublisher.java"));
+
+        assertTrue(runtime.contains("NavigationBridgeStateStore.addListener"));
+        assertTrue(runtime.contains("HudNavigationState.fromBridge"));
+        assertFalse(canvas.contains("NavigationDataRepository.Snapshot"));
+        assertTrue(state.contains("source.routeTotalDistanceMeters"));
+        assertTrue(state.contains("parseLanes"));
+        assertTrue(state.contains("parseLights"));
+        assertTrue(state.contains("parseRuns"));
+        assertTrue(publisher.contains("getMetadata"));
+        assertTrue(publisher.contains("laneDistanceMeters"));
+    }
+
     @Test public void settingsExposeIndependentMapsAndNavigatorWindowButton() throws Exception {
         String settings = read(projectRoot().resolve(
                 "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
@@ -288,6 +309,11 @@ public final class NavigationHudV2ContractTest {
     private static Path projectRoot() {
         Path root = Paths.get("app", "src", "main", "AndroidManifest.xml");
         return Files.isRegularFile(root) ? Paths.get("") : Paths.get("..");
+    }
+
+    private static Path navigatorModRoot() {
+        return projectRoot().resolve(
+                "navigator-mod/src/main/java/ru/natro/navigation");
     }
 
     private static String read(Path path) throws Exception {

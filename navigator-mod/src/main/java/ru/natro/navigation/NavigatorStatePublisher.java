@@ -328,11 +328,12 @@ final class NavigatorStatePublisher {
                 number(invoke(routePosition, "distanceToFinish"), -1d));
         int remainingDuration = routePosition == null ? -1 : nonNegativeInt(
                 number(invoke(routePosition, "timeToFinish"), -1d));
+        int routeTotalDistance = readRouteTotalDistance(route);
         long arrival = remainingDuration < 0 ? 0L
                 : now + Math.min(31_536_000, remainingDuration) * 1_000L;
 
         Manoeuvre manoeuvre = readManoeuvre(routePosition);
-        String lanes = readLanes(routePosition).toString();
+        LaneState lanes = readLanes(routePosition);
         String trafficLights = readTrafficLights(routePosition).toString();
         Object speedLimitValue = invoke(currentGuidance, "getSpeedLimit");
         int speedLimit = speedLimitValue == null ? 0 : nonNegativeInt(
@@ -350,11 +351,13 @@ final class NavigatorStatePublisher {
                 .put("street", text(invoke(currentGuidance, "getRoadName")))
                 .put("destination", "")
                 .put("maneuverDistanceMeters", manoeuvre.distanceMeters)
+                .put("routeTotalDistanceMeters", routeTotalDistance)
                 .put("remainingDistanceMeters", remainingDistance)
                 .put("remainingDurationSeconds", remainingDuration)
                 .put("arrivalEpochMs", arrival)
                 .put("speedLimitKmh", Math.min(300, speedLimit))
-                .put("lanesJson", lanes)
+                .put("laneDistanceMeters", lanes.distanceMeters)
+                .put("lanesJson", lanes.values.toString())
                 .put("trafficLightsJson", trafficLights);
         if (finite(latitude)) result.put("latitude", latitude);
         if (finite(longitude)) result.put("longitude", longitude);
@@ -379,11 +382,13 @@ final class NavigatorStatePublisher {
         return new Manoeuvre(type, title, subtext, distance);
     }
 
-    private JSONArray readLanes(Object routePosition) throws Exception {
+    private LaneState readLanes(Object routePosition) throws Exception {
         JSONArray result = new JSONArray();
         Object upcoming = nearest(invokeList(windshield, "getLaneSigns"),
                 routePosition, "getPosition");
-        if (upcoming == null) return result;
+        if (upcoming == null) return new LaneState(result, -1);
+        int distanceMeters = nonNegativeInt(distance(routePosition,
+                invoke(upcoming, "getPosition")));
         Object sign = invoke(upcoming, "getLaneSign");
         for (Object lane : invokeList(sign, "getLanes")) {
             JSONArray directions = new JSONArray();
@@ -396,7 +401,19 @@ final class NavigatorStatePublisher {
                             enumName(invoke(lane, "getHighlightedDirection")))
                     .put("directions", directions));
         }
-        return result;
+        return new LaneState(result, distanceMeters);
+    }
+
+    private static int readRouteTotalDistance(Object route) {
+        if (route == null) return -1;
+        try {
+            Object metadata = invoke(route, "getMetadata");
+            Object weight = invoke(metadata, "getWeight");
+            Object localizedDistance = invoke(weight, "getDistance");
+            return nonNegativeInt(number(invoke(localizedDistance, "getValue"), -1d));
+        } catch (Throwable ignored) {
+            return -1;
+        }
     }
 
     private JSONArray readTrafficLights(Object routePosition) throws Exception {
@@ -726,6 +743,16 @@ final class NavigatorStatePublisher {
             this.type = type;
             this.title = title;
             this.subtext = subtext;
+            this.distanceMeters = distanceMeters;
+        }
+    }
+
+    private static final class LaneState {
+        final JSONArray values;
+        final int distanceMeters;
+
+        LaneState(JSONArray values, int distanceMeters) {
+            this.values = values;
             this.distanceMeters = distanceMeters;
         }
     }

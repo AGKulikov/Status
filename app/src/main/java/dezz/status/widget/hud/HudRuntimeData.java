@@ -41,6 +41,9 @@ import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.launcher.LauncherMediaController;
 import dezz.status.widget.launcher.NavigationDataRepository;
+import dezz.status.widget.navigation.NavigationBridgeStateStore;
+import dezz.status.widget.navigation.NavigationRouteGeometryV2;
+import dezz.status.widget.navigation.NavigationSnapshotV2;
 
 /**
  * Shared live-data controller used by both the main-display editor and the external Presentation.
@@ -66,7 +69,7 @@ public final class HudRuntimeData {
     @NonNull private final Map<String, CarIntegration.TelemetryValue> telemetry = new HashMap<>();
     @NonNull private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
     @NonNull private HudPanelConfig config;
-    @Nullable private NavigationDataRepository.Snapshot navigation;
+    @Nullable private HudNavigationState navigation;
     @Nullable private LauncherMediaController.Snapshot media;
     @Nullable private WidgetService attachedHost;
     @Nullable private String cachedAppVersion;
@@ -93,6 +96,8 @@ public final class HudRuntimeData {
             }
         }
     };
+    private final NavigationBridgeStateStore.Listener directNavigationListener =
+            () -> runOnMain(this::refreshNavigation);
     /** Main-process editor only: retry promptly until its already-started WidgetService appears. */
     private final Runnable hostProbe = new Runnable() {
         @Override public void run() {
@@ -132,6 +137,7 @@ public final class HudRuntimeData {
         if (started) return;
         started = true;
         navigationWorker = newNavigationWorker();
+        NavigationBridgeStateStore.addListener(directNavigationListener);
         mediaController.start();
         try {
             ContextCompat.registerReceiver(context, navigationReceiver,
@@ -159,6 +165,7 @@ public final class HudRuntimeData {
         main.removeCallbacks(hostProbe);
         main.removeCallbacks(clockTick);
         mediaController.stop();
+        NavigationBridgeStateStore.removeListener(directNavigationListener);
         carIntegration.unsubscribeTelemetry(telemetryListener);
         WidgetService host = attachedHost;
         attachedHost = null;
@@ -194,7 +201,7 @@ public final class HudRuntimeData {
         });
     }
 
-    @Nullable public NavigationDataRepository.Snapshot navigation() { return navigation; }
+    @Nullable public HudNavigationState navigation() { return navigation; }
     @Nullable public LauncherMediaController.Snapshot media() { return media; }
 
     @NonNull
@@ -287,6 +294,10 @@ public final class HudRuntimeData {
                 if (navigation == null) return "—";
                 return join(navigation.trafficColor, navigation.trafficCountdown, " ");
             case NAV_SPEED:
+                if (navigation != null && Double.isFinite(navigation.speedKmh)) {
+                    return applyFormat(item.textFormat, navigation.speedKmh,
+                            item.unit.isEmpty() ? "км/ч" : item.unit);
+                }
                 return telemetryText(item);
             case NAV_JAM_PROGRESS:
                 return navigation == null ? "—" : join(navigation.duration,
@@ -305,6 +316,13 @@ public final class HudRuntimeData {
     }
 
     public double numericValue(@NonNull HudElementConfig item) {
+        if (item.type == HudElementType.NAV_TRIP_PROGRESS && navigation != null) {
+            return navigation.tripProgress;
+        }
+        if (item.type == HudElementType.NAV_SPEED && navigation != null
+                && Double.isFinite(navigation.speedKmh)) {
+            return navigation.speedKmh;
+        }
         if (item.type == HudElementType.MEDIA_TIMER && media != null && media.durationMs > 0) {
             return Math.max(0d, Math.min(1d, media.positionMs / (double) media.durationMs));
         }
@@ -544,6 +562,13 @@ public final class HudRuntimeData {
     }
 
     private void refreshNavigation() {
+        NavigationSnapshotV2 direct = NavigationBridgeStateStore.snapshot();
+        if (direct != null) {
+            NavigationRouteGeometryV2 route = NavigationBridgeStateStore.routeGeometry();
+            navigation = HudNavigationState.fromBridge(direct, route);
+            notifyChanged();
+            return;
+        }
         if (!started || !navigationReadQueued.compareAndSet(false, true)) return;
         ExecutorService worker = navigationWorker;
         if (worker == null) {
@@ -559,7 +584,13 @@ public final class HudRuntimeData {
                 main.post(() -> {
                     navigationReadQueued.set(false);
                     if (!started) return;
-                    navigation = result;
+                    NavigationSnapshotV2 latest = NavigationBridgeStateStore.snapshot();
+                    if (latest != null) {
+                        navigation = HudNavigationState.fromBridge(latest,
+                                NavigationBridgeStateStore.routeGeometry());
+                    } else {
+                        navigation = result == null ? null : HudNavigationState.fromLegacy(result);
+                    }
                     notifyChanged();
                 });
             });

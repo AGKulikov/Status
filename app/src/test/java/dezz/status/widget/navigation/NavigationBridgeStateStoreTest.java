@@ -53,6 +53,22 @@ public final class NavigationBridgeStateStoreTest {
         assertFalse(NavigationBridgeStateStore.publishSnapshot(SESSION_A, snapshot(2, 2)));
     }
 
+    @Test public void listenersReceiveOnlyAcceptedStateChanges() {
+        int[] changes = {0};
+        NavigationBridgeStateStore.Listener listener = () -> changes[0]++;
+        NavigationBridgeStateStore.addListener(listener);
+        try {
+            NavigationBridgeStateStore.beginSession(SESSION_A);
+            assertTrue(NavigationBridgeStateStore.publishSnapshot(SESSION_A, snapshot(1, 3)));
+            assertFalse(NavigationBridgeStateStore.publishSnapshot(SESSION_A, snapshot(1, 3)));
+            assertTrue(NavigationBridgeStateStore.publishRouteGeometry(SESSION_A,
+                    new NavigationRouteGeometryV2(3, "route", "[]")));
+            assertEquals(3, changes[0]);
+        } finally {
+            NavigationBridgeStateStore.removeListener(listener);
+        }
+    }
+
     private static NavigationSnapshotV2 snapshot(long sequence, long routeEpoch) {
         return new NavigationSnapshotV2(
                 sequence, routeEpoch, 123L, true, 55.75d, 37.61d, 10d, 40d,

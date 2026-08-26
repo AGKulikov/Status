@@ -142,6 +142,12 @@ public final class HudElementConfig {
                     break;
                 case NAV_JAM_PROGRESS:
                     options.put("orientation", "HORIZONTAL");
+                    options.put("freeColor", 0xFF34C759);
+                    options.put("lightColor", 0xFFFFCC00);
+                    options.put("hardColor", 0xFFFF3B30);
+                    options.put("veryHardColor", 0xFFB00020);
+                    options.put("blockedColor", 0xFF7A1FA2);
+                    options.put("unknownColor", 0xFF8E8E93);
                     break;
                 case TURN_SIGNAL_LEFT:
                 case TURN_SIGNAL_RIGHT:

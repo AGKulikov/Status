@@ -25,10 +25,12 @@ public final class NavigationSnapshotV2 {
     @NonNull public final String street;
     @NonNull public final String destination;
     public final int maneuverDistanceMeters;
+    public final int routeTotalDistanceMeters;
     public final int remainingDistanceMeters;
     public final int remainingDurationSeconds;
     public final long arrivalEpochMs;
     public final int speedLimitKmh;
+    public final int laneDistanceMeters;
     @NonNull public final String lanesJson;
     @NonNull public final String trafficLightsJson;
 
@@ -39,6 +41,22 @@ public final class NavigationSnapshotV2 {
             @NonNull String destination, int maneuverDistanceMeters,
             int remainingDistanceMeters, int remainingDurationSeconds, long arrivalEpochMs,
             int speedLimitKmh, @NonNull String lanesJson,
+            @NonNull String trafficLightsJson) {
+        this(sequence, routeEpoch, sourceTimestampMs, routeActive, latitude, longitude,
+                bearingDegrees, speedKmh, maneuverType, maneuverTitle, maneuverSubtext, street,
+                destination, maneuverDistanceMeters, -1, remainingDistanceMeters,
+                remainingDurationSeconds, arrivalEpochMs, speedLimitKmh, -1, lanesJson,
+                trafficLightsJson);
+    }
+
+    public NavigationSnapshotV2(long sequence, long routeEpoch, long sourceTimestampMs,
+            boolean routeActive, double latitude, double longitude, double bearingDegrees,
+            double speedKmh, @NonNull String maneuverType, @NonNull String maneuverTitle,
+            @NonNull String maneuverSubtext, @NonNull String street,
+            @NonNull String destination, int maneuverDistanceMeters,
+            int routeTotalDistanceMeters, int remainingDistanceMeters,
+            int remainingDurationSeconds, long arrivalEpochMs, int speedLimitKmh,
+            int laneDistanceMeters, @NonNull String lanesJson,
             @NonNull String trafficLightsJson) {
         this.sequence = Math.max(0L, sequence);
         this.routeEpoch = Math.max(0L, routeEpoch);
@@ -54,10 +72,12 @@ public final class NavigationSnapshotV2 {
         this.street = bounded(street, 4_096);
         this.destination = bounded(destination, 4_096);
         this.maneuverDistanceMeters = nonNegative(maneuverDistanceMeters);
+        this.routeTotalDistanceMeters = nonNegative(routeTotalDistanceMeters);
         this.remainingDistanceMeters = nonNegative(remainingDistanceMeters);
         this.remainingDurationSeconds = nonNegative(remainingDurationSeconds);
         this.arrivalEpochMs = Math.max(0L, arrivalEpochMs);
         this.speedLimitKmh = Math.max(0, Math.min(300, speedLimitKmh));
+        this.laneDistanceMeters = nonNegative(laneDistanceMeters);
         this.lanesJson = bounded(lanesJson, 32_768);
         this.trafficLightsJson = bounded(trafficLightsJson, 32_768);
     }
@@ -76,10 +96,12 @@ public final class NavigationSnapshotV2 {
                 .put("street", street)
                 .put("destination", destination)
                 .put("maneuverDistanceMeters", maneuverDistanceMeters)
+                .put("routeTotalDistanceMeters", routeTotalDistanceMeters)
                 .put("remainingDistanceMeters", remainingDistanceMeters)
                 .put("remainingDurationSeconds", remainingDurationSeconds)
                 .put("arrivalEpochMs", arrivalEpochMs)
                 .put("speedLimitKmh", speedLimitKmh)
+                .put("laneDistanceMeters", laneDistanceMeters)
                 .put("lanesJson", lanesJson)
                 .put("trafficLightsJson", trafficLightsJson);
         if (finite(latitude)) result.put("latitude", latitude);
@@ -116,10 +138,12 @@ public final class NavigationSnapshotV2 {
                     source.optString("street", ""),
                     source.optString("destination", ""),
                     source.optInt("maneuverDistanceMeters", -1),
+                    source.optInt("routeTotalDistanceMeters", -1),
                     source.optInt("remainingDistanceMeters", -1),
                     source.optInt("remainingDurationSeconds", -1),
                     source.optLong("arrivalEpochMs", 0L),
                     source.optInt("speedLimitKmh", 0),
+                    source.optInt("laneDistanceMeters", -1),
                     source.optString("lanesJson", ""),
                     source.optString("trafficLightsJson", ""));
         } catch (JSONException error) {
