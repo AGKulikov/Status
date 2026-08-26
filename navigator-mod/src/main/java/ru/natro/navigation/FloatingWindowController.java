@@ -198,6 +198,11 @@ final class FloatingWindowController {
             }
             host.setClipChildren(false);
             host.setClipToPadding(false);
+            if (host.getParent() instanceof ViewGroup) {
+                ViewGroup parent = (ViewGroup) host.getParent();
+                parent.setClipChildren(false);
+                parent.setClipToPadding(false);
+            }
             modeButtonHost = host;
         }
         updateModeButton();
