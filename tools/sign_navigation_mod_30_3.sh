@@ -12,7 +12,7 @@ OUTPUT_APK="$3"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APKSIGNER="${APKSIGNER:-$(command -v apksigner || true)}"
 KEYSTORE_FILE="${KEYSTORE_FILE:-}"
-KEY_ALIAS="${KEY_ALIAS:-natro}"
+KEY_ALIAS="${KEY_ALIAS:-status-widget-ha}"
 
 if [ -z "$APKSIGNER" ] || [ ! -x "$APKSIGNER" ]; then
   printf 'Set APKSIGNER to an executable Android SDK apksigner\n' >&2

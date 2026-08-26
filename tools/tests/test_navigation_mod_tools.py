@@ -90,6 +90,43 @@ class NavigationModToolsTest(unittest.TestCase):
                 self.assertEqual(b"new", archive.read("classes4.dex"))
                 self.assertEqual(b"isolated", archive.read("classes19.dex"))
 
+    def test_pair_signer_requires_one_stable_certificate_and_exact_baseline(self):
+        pair = (TOOLS / "sign_navigation_hud_v2_pair.sh").read_text()
+        navigator = (TOOLS / "sign_navigation_mod_30_3.sh").read_text()
+
+        self.assertIn(
+            "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+            pair,
+        )
+        self.assertIn(
+            "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f",
+            pair,
+        )
+        self.assertIn('KEY_ALIAS="${KEY_ALIAS:-status-widget-ha}"', pair)
+        self.assertIn('KEY_ALIAS="${KEY_ALIAS:-status-widget-ha}"', navigator)
+        self.assertIn("--v2-signing-enabled true", pair)
+        self.assertIn("--v3-signing-enabled true", pair)
+        self.assertIn("build_navigation_mod_30_3.sh", pair)
+        self.assertIn("sign_navigation_mod_30_3.sh", pair)
+        self.assertIn("'AGKulikov/Status'", pair)
+        self.assertIn("test \"$VERSION_NAME\" = '2.3.9'", pair)
+        self.assertIn("test \"$VERSION_CODE\" = '208021263'", pair)
+        self.assertNotIn('cp "$BASELINE_APK"', pair)
+
+    def test_kx11_pair_gate_freezes_device_identity_and_hud_plane(self):
+        verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
+        pair = (TOOLS / "sign_navigation_hud_v2_pair.sh").read_text()
+
+        self.assertIn('KX11_ANDROID_API = 28', verifier)
+        self.assertIn('KX11_NAVIGATOR_ABIS = {"arm64-v8a"}', verifier)
+        self.assertIn('"name": NATRO_PACKAGE', verifier)
+        self.assertIn('Navigator binary AndroidManifest.xml changed', verifier)
+        self.assertIn('android:sharedUserId', verifier)
+        self.assertIn('Main Natro content area: 1760x720', verifier)
+        self.assertIn('plane 728x190 @ (0,720)', verifier)
+        self.assertIn('verify_kx11_navigation_pair.py', pair)
+        self.assertIn('KX11-COMPATIBILITY.txt', pair)
+
 
 if __name__ == "__main__":
     unittest.main()
