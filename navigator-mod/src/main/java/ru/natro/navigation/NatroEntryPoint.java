@@ -15,7 +15,7 @@ public final class NatroEntryPoint {
 
     private NatroEntryPoint() {}
 
-    public static void onActivityReady(Activity activity) {
+    public static void onActivityResumed(Activity activity) {
         if (activity == null || activity.isFinishing()) return;
         FloatingWindowController controller = CONTROLLERS.get(activity);
         if (controller == null) {
@@ -29,11 +29,25 @@ public final class NatroEntryPoint {
 
     public static void onNewIntent(Activity activity, Intent intent) {
         if (activity == null || intent == null) return;
+        activity.setIntent(intent);
         FloatingWindowController controller = CONTROLLERS.get(activity);
         if (controller == null) {
             controller = new FloatingWindowController(activity);
             CONTROLLERS.put(activity, controller);
             controller.install();
+        }
+        boolean requestsWindow = intent.getBooleanExtra("ddnavwin", false)
+                || "navi_win/ru.yandex.yandexnavi".equals(intent.getAction());
+        boolean requestsFullscreen = intent.getBooleanExtra("ddnavforcewinfull", false);
+        if ((requestsWindow && !controller.isFloating())
+                || (requestsFullscreen && controller.isFloating())) {
+            // The working 29.4.2 mod recreates MapActivity when its window identity changes.
+            // Reusing the existing Activity leaves the OEM Window token in the previous lane.
+            Intent restart = new Intent(intent).setClass(activity, activity.getClass())
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            activity.finish();
+            activity.startActivity(restart);
+            return;
         }
         controller.consumeIntent(intent);
     }

@@ -33,8 +33,8 @@ public final class YandexWindowLauncher {
             new Target(MAPS_PACKAGE, "ru.yandex.yandexmaps.app.TransparentSplashActivity")
     };
     private static final Target[] NAVIGATOR_WINDOW_TARGETS = {
-            // New Natro Navigator 30.3.0: hit the hooked Activity first so no splash layer can
-            // drop ddnavwin/deep-link extras. Other known builds remain ordered fallbacks.
+            // The working 29.4.2 reference launches MapActivity itself with ddnavwin. The
+            // Activity then recreates itself before applying the overlay window after resume.
             new Target(NAVIGATOR_PACKAGE, "ru.yandex.yandexmaps.app.MapActivity"),
             // Standalone Navigator used on Monjaro. This is the exact mSaver HOME entry point.
             new Target(NAVIGATOR_PACKAGE,

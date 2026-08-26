@@ -38,6 +38,8 @@ public final class NavigationBridgeContract {
     public static final int MSG_SET_MAIN_WINDOW_MODE = 11;
     public static final int MSG_HUD_SURFACE_LOST = 12;
     public static final int MSG_HEARTBEAT = 13;
+    /** Human-readable runtime milestones forwarded into Natro's exportable journal. */
+    public static final int MSG_DIAGNOSTIC = 14;
 
     public static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     public static final long CAP_ROUTE_GEOMETRY = 1L << 1;

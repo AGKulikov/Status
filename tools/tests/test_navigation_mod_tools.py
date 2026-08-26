@@ -40,6 +40,18 @@ class NavigationModToolsTest(unittest.TestCase):
     invoke-super {p0, p1}, Landroidx/activity/t;->onNewIntent(Landroid/content/Intent;)V
     return-void
 .end method
+
+.method public final onResumeFragments()V
+    .locals 2
+    invoke-virtual {v1, v0}, Lio/reactivex/disposables/a;->c(Lio/reactivex/disposables/b;)Z
+
+    return-void
+.end method
+
+.method public final onSaveInstanceState(Landroid/os/Bundle;)V
+    .locals 0
+    return-void
+.end method
 """
         original_digest = PATCHER.EXPECTED_SMALI_SHA256
         PATCHER.EXPECTED_SMALI_SHA256 = hashlib.sha256(
@@ -51,7 +63,7 @@ class NavigationModToolsTest(unittest.TestCase):
             PATCHER.EXPECTED_SMALI_SHA256 = original_digest
 
         self.assertEqual(3, result.count(PATCHER.ENTRY_POINT))
-        self.assertIn("onActivityReady(Landroid/app/Activity;)V", result)
+        self.assertIn("onActivityResumed(Landroid/app/Activity;)V", result)
         self.assertIn("onActivityDestroyed(Landroid/app/Activity;)V", result)
         self.assertIn("onNewIntent(Landroid/app/Activity;Landroid/content/Intent;)V", result)
         with self.assertRaisesRegex(ValueError, "already contains"):

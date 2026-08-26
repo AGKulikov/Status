@@ -31,8 +31,8 @@ final class FloatingWindowController {
     private static final int MODE_TOGGLE = 2;
     private static final int FLOATING_FLAGS =
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
 
     private final Activity activity;
     private final Window window;
@@ -72,12 +72,13 @@ final class FloatingWindowController {
 
     void install() {
         if (destroyed || controlLayer != null) return;
-        View decor = window.getDecorView();
-        if (!(decor instanceof ViewGroup)) return;
+        ViewGroup host = findControlHost();
+        if (host == null) return;
         controlLayer = new FrameLayout(activity);
         controlLayer.setClipChildren(false);
         controlLayer.setClipToPadding(false);
-        ((ViewGroup) decor).addView(controlLayer, new ViewGroup.LayoutParams(
+        controlLayer.setElevation(dp(100));
+        host.addView(controlLayer, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         dragHandle = control("⋮⋮", "Переместить окно Навигатора");
@@ -92,8 +93,8 @@ final class FloatingWindowController {
         closeButton.setOnClickListener(view -> activity.finish());
         controlLayer.addView(closeButton);
 
-        modeButton = control("▣", "Открыть Навигатор в окне");
-        modeButton.setOnClickListener(view -> setWindowMode(MODE_TOGGLE));
+        modeButton = control("◲", "Открыть Навигатор в окне");
+        modeButton.setOnClickListener(view -> restartInMode(!floating));
         controlLayer.addView(modeButton);
         updateControls();
     }
@@ -129,6 +130,33 @@ final class FloatingWindowController {
         else applyFullscreenAttributes();
     }
 
+    boolean isFloating() {
+        return floating;
+    }
+
+    private void restartInMode(boolean nextFloating) {
+        if (destroyed || (!profile.enabled && nextFloating)) return;
+        Intent restart = new Intent(activity, activity.getClass())
+                .addFlags(0x04008000);
+        if (nextFloating) restart.putExtra(EXTRA_WINDOWED, true);
+        activity.finish();
+        activity.startActivity(restart);
+    }
+
+    /**
+     * The working 29.4.2 mod adds its window controls to the Navigator map root. Keeping the
+     * controls inside that root prevents MapWithControlsView from covering them during its late
+     * post-resume layout pass. The decor fallback keeps the patch tolerant of resource renames.
+     */
+    private ViewGroup findControlHost() {
+        int rootId = activity.getResources().getIdentifier(
+                "map_activity_root", "id", activity.getPackageName());
+        View mapRoot = rootId == 0 ? null : activity.findViewById(rootId);
+        if (mapRoot instanceof ViewGroup) return (ViewGroup) mapRoot;
+        View decor = window.getDecorView();
+        return decor instanceof ViewGroup ? (ViewGroup) decor : null;
+    }
+
     void destroy() {
         destroyed = true;
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
@@ -155,10 +183,8 @@ final class FloatingWindowController {
             geometryLoaded = true;
         }
         clampGeometry(attributes, screen);
-        // The working KX11 Navigator 29.4.2 window mod uses 2038/2003 on this Activity-owned
-        // Window without adding SYSTEM_ALERT_WINDOW to the protected manifest. ECARX grants the
-        // Yandex Navigator package that OEM window lane. Keep this exact contract so Natro's
-        // existing navi_win/ddnavwin launch path still works on the head unit.
+        // Exact working 29.4.2 KX11 contract, applied only after onResumeFragments when the
+        // Activity window and OEM token are attached. Applying it from onPostCreate is too early.
         attributes.type = Build.VERSION.SDK_INT >= 26
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
@@ -236,6 +262,7 @@ final class FloatingWindowController {
 
     private void updateControls() {
         if (controlLayer == null) return;
+        controlLayer.bringToFront();
         int handle = dp(36);
         int margin = dp(8);
 
@@ -269,7 +296,7 @@ final class FloatingWindowController {
         modeButton.setAlpha(profile.modeButtonOpacityPercent / 100f);
         modeButton.setVisibility(profile.enabled && profile.modeButtonVisible
                 ? View.VISIBLE : View.GONE);
-        modeButton.setText(floating ? "□" : "▣");
+        modeButton.setText(floating ? "◱" : "◲");
         modeButton.setContentDescription(floating
                 ? "Развернуть Навигатор на весь экран"
                 : "Открыть Навигатор в окне");

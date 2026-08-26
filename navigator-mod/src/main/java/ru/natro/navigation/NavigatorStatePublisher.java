@@ -37,6 +37,8 @@ final class NavigatorStatePublisher {
 
         void onNavigationState(String snapshotJson, String routeJson, Object drivingRoute,
                                long routeEpoch);
+
+        void onDiagnostic(String detail);
     }
 
     static final class CameraState {
@@ -95,6 +97,8 @@ final class NavigatorStatePublisher {
     private Object conditionsRoute;
     private Object conditionsListener;
     private long resolveRetryMs = MIN_RESOLVE_RETRY_MS;
+    private String lastPrimaryMapFailure = "";
+    private String lastGuidanceFailure = "";
 
     NavigatorStatePublisher(Sink sink) {
         this.sink = sink;
@@ -148,8 +152,15 @@ final class NavigatorStatePublisher {
                 sink.onPrimaryMap(mapWindow, nextMap);
                 resolvedSomething = true;
                 Log.i(TAG, "Primary Navigator MapWindow resolved");
+                lastPrimaryMapFailure = "";
+                sink.onDiagnostic("primary Navigator MapWindow resolved");
             } catch (Throwable failure) {
-                Log.d(TAG, "Primary map is not ready yet: " + shortMessage(failure));
+                String detail = shortMessage(failure);
+                Log.d(TAG, "Primary map is not ready yet: " + detail);
+                if (!detail.equals(lastPrimaryMapFailure)) {
+                    lastPrimaryMapFailure = detail;
+                    sink.onDiagnostic("primary MapWindow not ready: " + detail);
+                }
             }
         }
         if (guidance == null) {
@@ -172,8 +183,15 @@ final class NavigatorStatePublisher {
                 }
                 resolvedSomething = true;
                 Log.i(TAG, "Active NaviKit Guidance session resolved");
+                lastGuidanceFailure = "";
+                sink.onDiagnostic("active NaviKit Guidance session resolved");
             } catch (Throwable failure) {
-                Log.d(TAG, "Guidance is not ready yet: " + shortMessage(failure));
+                String detail = shortMessage(failure);
+                Log.d(TAG, "Guidance is not ready yet: " + detail);
+                if (!detail.equals(lastGuidanceFailure)) {
+                    lastGuidanceFailure = detail;
+                    sink.onDiagnostic("Guidance not ready: " + detail);
+                }
             }
         }
         if (guidance != null && (resolvedSomething || primaryMap != null)) {

@@ -40,6 +40,7 @@ final class NavigationBridgeClient {
     private static final int MSG_SET_MAIN_WINDOW_MODE = 11;
     private static final int MSG_HUD_SURFACE_LOST = 12;
     private static final int MSG_HEARTBEAT = 13;
+    private static final int MSG_DIAGNOSTIC = 14;
 
     private static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     private static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -89,6 +90,7 @@ final class NavigationBridgeClient {
             retryMs = MIN_RETRY_MS;
             lastConnectedElapsedMs = SystemClock.elapsedRealtime();
             sendHello();
+            sendDiagnostic("Navigator hook connected to Natro endpoint");
         }
 
         @Override public void onServiceDisconnected(ComponentName name) {
@@ -144,6 +146,10 @@ final class NavigationBridgeClient {
                 if (routeJson != null) {
                     sendState(MSG_ROUTE_GEOMETRY, KEY_ROUTE_GEOMETRY_JSON, routeJson);
                 }
+            }
+
+            @Override public void onDiagnostic(String detail) {
+                sendDiagnostic(detail);
             }
         });
     }
@@ -280,6 +286,22 @@ final class NavigationBridgeClient {
         state.setData(data);
         try {
             current.send(state);
+        } catch (RemoteException failure) {
+            disconnectAndRetry();
+        }
+    }
+
+    private void sendDiagnostic(String detail) {
+        Messenger current = remote;
+        if (current == null || detail == null || detail.isEmpty()) return;
+        Bundle data = new Bundle();
+        data.putString(KEY_SESSION_ID, sessionId);
+        data.putString(KEY_ERROR_DETAIL, detail);
+        Message diagnostic = Message.obtain(null, MSG_DIAGNOSTIC);
+        diagnostic.replyTo = callbacks;
+        diagnostic.setData(data);
+        try {
+            current.send(diagnostic);
         } catch (RemoteException failure) {
             disconnectAndRetry();
         }

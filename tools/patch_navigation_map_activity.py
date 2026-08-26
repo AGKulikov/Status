@@ -55,22 +55,24 @@ def patch(source: str) -> str:
         "onNewIntent",
     )
 
-    new_intent_method = ".method public final onNewIntent(Landroid/content/Intent;)V\n"
-    post_create = (
-        ".method protected final onPostCreate(Landroid/os/Bundle;)V\n"
-        "    .locals 0\n\n"
-        "    invoke-super {p0, p1}, "
-        "Landroidx/appcompat/app/s;->onPostCreate(Landroid/os/Bundle;)V\n\n"
-        "    invoke-static {p0}, " + ENTRY_POINT
-        + "->onActivityReady(Landroid/app/Activity;)V\n\n"
+    resume_tail = (
+        "    invoke-virtual {v1, v0}, "
+        "Lio/reactivex/disposables/a;->c(Lio/reactivex/disposables/b;)Z\n\n"
         "    return-void\n"
         ".end method\n\n"
+        ".method public final onSaveInstanceState(Landroid/os/Bundle;)V\n"
     )
     source = replace_once(
         source,
-        new_intent_method,
-        post_create + new_intent_method,
-        "onPostCreate insertion",
+        resume_tail,
+        "    invoke-virtual {v1, v0}, "
+        "Lio/reactivex/disposables/a;->c(Lio/reactivex/disposables/b;)Z\n\n"
+        "    invoke-static {p0}, " + ENTRY_POINT
+        + "->onActivityResumed(Landroid/app/Activity;)V\n\n"
+        "    return-void\n"
+        ".end method\n\n"
+        ".method public final onSaveInstanceState(Landroid/os/Bundle;)V\n",
+        "onResumeFragments insertion",
     )
     return source
 

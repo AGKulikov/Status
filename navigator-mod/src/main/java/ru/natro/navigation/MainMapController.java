@@ -93,7 +93,9 @@ final class MainMapController {
         if (state == null || !state.isValid()) return false;
         if (consumeExpectedCamera(state)) return true;
         sourceCamera = state;
-        if (profile.enabled) applyCamera();
+        // Navigator owns follow-mode on its primary MapWindow. Writing a second CameraPosition
+        // from the listener races its guidance camera and produces visible jumping on KX11.
+        // Independent camera transforms belong to the HUD MapWindow only.
         return false;
     }
 
@@ -139,18 +141,11 @@ final class MainMapController {
                     night ? profile.nightStyleJson : profile.dayStyleJson);
             applyStyleSlot(currentMap, VISIBILITY_STYLE_ID, profile.visibilityStyleJson());
 
-            ensureManagedSublayers();
-            try {
-                ensureUserLocationLayer();
-                configureUserLocation(width, height);
-                setManagedVisibility(cursorSublayers, false);
-            } catch (Throwable cursorFailure) {
-                restoreManaged(cursorSublayers);
-                Log.w(TAG, "Custom main-map cursor unavailable", cursorFailure);
-            }
-            rebuildRoute();
-            applyCamera();
-            Log.i(TAG, "Independent main MapProfile applied");
+            // Do not create a second UserLocationLayer or route collection on Navigator's own
+            // map. They duplicate the stock arrow/route, and hiding obfuscated 30.3 sublayers is
+            // not an atomic replacement. Safe visual fields above remain supported while the
+            // stock navigation presentation stays the single owner of cursor, route and camera.
+            Log.i(TAG, "Stable main MapProfile applied without cursor/camera replacement");
         } catch (Throwable failure) {
             Log.w(TAG, "Some main MapProfile fields could not be applied", failure);
         }

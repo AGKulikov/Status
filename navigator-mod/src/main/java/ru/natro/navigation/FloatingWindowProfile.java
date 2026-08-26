@@ -25,8 +25,8 @@ final class FloatingWindowProfile {
     boolean dragHandleVisible = true;
     boolean resizeHandleVisible = true;
     boolean modeButtonVisible = true;
-    String modeButtonPosition = "TOP_RIGHT";
-    int modeButtonSizeDp = 44;
+    String modeButtonPosition = "TOP_LEFT";
+    int modeButtonSizeDp = 50;
     int modeButtonOpacityPercent = 85;
     boolean closeButtonVisible = true;
 
@@ -96,7 +96,7 @@ final class FloatingWindowProfile {
                 && !"TOP_RIGHT".equals(modeButtonPosition)
                 && !"BOTTOM_LEFT".equals(modeButtonPosition)
                 && !"BOTTOM_RIGHT".equals(modeButtonPosition)) {
-            modeButtonPosition = "TOP_RIGHT";
+            modeButtonPosition = "TOP_LEFT";
         }
     }
 

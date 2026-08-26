@@ -271,8 +271,8 @@ public final class NavigationIntegrationConfig {
         public boolean dragHandleVisible = true;
         public boolean resizeHandleVisible = true;
         public boolean modeButtonVisible = true;
-        @NonNull public String modeButtonPosition = "TOP_RIGHT";
-        public int modeButtonSizeDp = 44;
+        @NonNull public String modeButtonPosition = "TOP_LEFT";
+        public int modeButtonSizeDp = 50;
         public int modeButtonOpacityPercent = 85;
         public boolean closeButtonVisible = true;
         public boolean keepAboveLauncher = true;
@@ -368,7 +368,7 @@ public final class NavigationIntegrationConfig {
             shadowRadiusDp = clamp(shadowRadiusDp, 0, 96);
             shadowColor = color(shadowColor, "#66000000");
             backgroundColor = color(backgroundColor, "#FF101216");
-            modeButtonPosition = enumText(modeButtonPosition, "TOP_RIGHT",
+            modeButtonPosition = enumText(modeButtonPosition, "TOP_LEFT",
                     "TOP_LEFT", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_RIGHT");
             modeButtonSizeDp = clamp(modeButtonSizeDp, 28, 96);
             modeButtonOpacityPercent = clamp(modeButtonOpacityPercent, 20, 100);

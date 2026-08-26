@@ -19,6 +19,7 @@ import androidx.annotation.Nullable;
 import org.json.JSONException;
 
 import dezz.status.widget.Preferences;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 
 /**
  * Explicit-only Natro endpoint to which the patched Navigator process connects.
@@ -124,6 +125,7 @@ public final class NavigationHudEndpointService extends Service {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        DiagnosticJournal.info("navigation-bridge", "HUD endpoint process created");
     }
 
     @Nullable
@@ -132,8 +134,10 @@ public final class NavigationHudEndpointService extends Service {
         if (intent == null
                 || !NavigationBridgeContract.NATRO_BIND_ACTION.equals(intent.getAction())) {
             Log.w(TAG, "Rejected bind without the exact v2 action");
+            DiagnosticJournal.warn("navigation-bridge", "rejected bind: wrong action");
             return null;
         }
+        DiagnosticJournal.info("navigation-bridge", "Navigator requested endpoint bind");
         return endpoint.getBinder();
     }
 
@@ -154,6 +158,8 @@ public final class NavigationHudEndpointService extends Service {
         final int sendingUid = message.sendingUid;
         if (!NavigationBridgeCallerVerifier.isTrustedNavigator(this, sendingUid)) {
             Log.w(TAG, "Rejected bridge message from uid=" + sendingUid);
+            DiagnosticJournal.warn("navigation-bridge",
+                    "rejected message: Navigator package/signature mismatch; uid=" + sendingUid);
             return true;
         }
         if (message.what == NavigationBridgeContract.MSG_HELLO) {
@@ -185,6 +191,11 @@ public final class NavigationHudEndpointService extends Service {
                     break;
                 case NavigationBridgeContract.MSG_HEARTBEAT:
                     replyCapabilities(current.messenger);
+                    break;
+                case NavigationBridgeContract.MSG_DIAGNOSTIC:
+                    DiagnosticJournal.info("navigation-runtime",
+                            message.getData().getString(
+                                    NavigationBridgeContract.KEY_ERROR_DETAIL, "empty event"));
                     break;
                 default:
                     replyError(current.messenger, "UNKNOWN_MESSAGE",
@@ -232,6 +243,9 @@ public final class NavigationHudEndpointService extends Service {
         requestNavigationState(client);
         sendPublishedSurface();
         Log.i(TAG, "Authenticated Navigator bridge session started");
+        DiagnosticJournal.info("navigation-bridge",
+                "authenticated Navigator session started; capabilities="
+                        + Long.toHexString(client.capabilities));
     }
 
     private void acceptSnapshot(@NonNull Client current, @NonNull Message message) {
@@ -240,6 +254,9 @@ public final class NavigationHudEndpointService extends Service {
         NavigationSnapshotV2 next = NavigationSnapshotV2.fromJson(raw);
         if (!NavigationBridgeStateStore.publishSnapshot(current.sessionId, next)) {
             replyError(current.messenger, "STALE_SNAPSHOT", "Sequence did not advance");
+        } else if (next.sequence == 1L) {
+            DiagnosticJournal.info("navigation-bridge",
+                    "first navigation snapshot received; routeEpoch=" + next.routeEpoch);
         }
     }
 
@@ -350,6 +367,7 @@ public final class NavigationHudEndpointService extends Service {
         } catch (RuntimeException ignored) {}
         NavigationBridgeStateStore.endSession(current.sessionId);
         Log.i(TAG, "Navigator bridge session ended");
+        DiagnosticJournal.warn("navigation-bridge", "Navigator bridge session ended");
     }
 
     @NonNull
