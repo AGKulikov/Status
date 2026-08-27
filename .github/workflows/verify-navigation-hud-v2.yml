@@ -150,9 +150,7 @@ jobs:
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.sign_pair) ||
       (github.event_name == 'push' &&
-       github.ref == 'refs/heads/release/natro-2.4.4-signing-handoff') ||
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.head.ref == 'feature/navigation-hud-v2')
+       github.ref == 'refs/heads/release/natro-2.4.4-signing-handoff')
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     permissions:
