@@ -237,8 +237,9 @@ jobs:
           mkdir -p "$TRANSPORT/chunks" "$SIGNING"
           PRIVATE="$TRANSPORT/private.pem"
           PUBLIC="$TRANSPORT/public.pem"
-          ENCRYPTED="$TRANSPORT/signing-url.enc"
-          URL_FILE="$TRANSPORT/signing-url.txt"
+          ENCRYPTED="$TRANSPORT/release-urls.enc"
+          URL_FILE="$TRANSPORT/release-urls.txt"
+          BASELINE_URL_FILE="$RUNNER_TEMP/natro243-baseline-url.txt"
           ARCHIVE="$TRANSPORT/signing-bundle.tar.gz"
           PREFIX="natro243-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           PUBLIC_PATH="release-handoff/${PREFIX}.pub"
@@ -284,9 +285,13 @@ jobs:
               -pkeyopt rsa_mgf1_md:sha256 \
               -in "$chunk" >> "$URL_FILE"
           done
-          SIGNING_URL=$(tr -d '\r\n' < "$URL_FILE")
+          SIGNING_URL=$(sed -n '1p' "$URL_FILE" | tr -d '\r')
+          BASELINE_URL=$(sed -n '2p' "$URL_FILE" | tr -d '\r')
           test -n "$SIGNING_URL"
+          test -n "$BASELINE_URL"
           echo "::add-mask::$SIGNING_URL"
+          echo "::add-mask::$BASELINE_URL"
+          printf '%s' "$BASELINE_URL" > "$BASELINE_URL_FILE"
           curl --fail --location --retry 8 --retry-all-errors \
             --silent --show-error --output "$ARCHIVE" "$SIGNING_URL"
           test "$(sha256sum "$ARCHIVE" | awk '{print $1}')" = \
@@ -326,19 +331,13 @@ jobs:
           SIGNING="$RUNNER_TEMP/natro243-signing"
           KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
           PASSWORD_FILE=''
-          PKCS12="$RUNNER_TEMP/stable-update-keystore.p12"
-          PRIVATE_KEY="$RUNNER_TEMP/stable-update-private.pem"
-          URL_KEY_ENCRYPTED="$RUNNER_TEMP/baseline-url.key.enc"
-          URL_KEY="$RUNNER_TEMP/baseline-url.key"
-          URL_IV="$RUNNER_TEMP/baseline-url.iv"
-          URL_CIPHERTEXT="$RUNNER_TEMP/baseline-url.enc"
-          URL_FILE="$RUNNER_TEMP/baseline-url.txt"
+          BASELINE_URL_FILE="$RUNNER_TEMP/natro243-baseline-url.txt"
           BASELINE="$RUNNER_TEMP/YN_30.3.0_T2_.apk"
           OUTPUT="$RUNNER_TEMP/signed-pair"
           cleanup_files=("$KEYSTORE")
           cleanup() {
-            shred -u -- "${cleanup_files[@]}" "$PKCS12" "$PRIVATE_KEY" \
-              "$URL_KEY" "$URL_FILE" "$BASELINE" 2>/dev/null || true
+            shred -u -- "${cleanup_files[@]}" "$BASELINE_URL_FILE" \
+              "$BASELINE" 2>/dev/null || true
           }
           trap cleanup EXIT HUP INT TERM
           case "$configured" in
@@ -360,28 +359,8 @@ jobs:
           esac
           export KEY_PASSWORD
           if [ "$GITHUB_EVENT_NAME" = 'push' ]; then
-            printf '%s' "$BASELINE_URL_KEY_B64" | base64 --decode > "$URL_KEY_ENCRYPTED"
-            printf '%s' "$BASELINE_URL_IV_B64" | base64 --decode > "$URL_IV"
-            printf '%s' "$BASELINE_URL_CIPHERTEXT_B64" | base64 --decode > "$URL_CIPHERTEXT"
-            keytool -importkeystore -noprompt \
-              -srckeystore "$KEYSTORE" \
-              -srcstorepass "$KEY_PASSWORD" \
-              -srcalias "$KEY_ALIAS" \
-              -destkeystore "$PKCS12" \
-              -deststoretype PKCS12 \
-              -deststorepass "$KEY_PASSWORD" \
-              -destkeypass "$KEY_PASSWORD"
-            openssl pkcs12 -in "$PKCS12" -nodes -nocerts \
-              -passin env:KEY_PASSWORD -out "$PRIVATE_KEY"
-            openssl pkeyutl -decrypt -inkey "$PRIVATE_KEY" \
-              -pkeyopt rsa_padding_mode:oaep \
-              -pkeyopt rsa_oaep_md:sha256 \
-              -in "$URL_KEY_ENCRYPTED" -out "$URL_KEY"
-            key_hex=$(od -An -tx1 "$URL_KEY" | tr -d ' \n')
-            iv_hex=$(od -An -tx1 "$URL_IV" | tr -d ' \n')
-            openssl enc -d -aes-256-ctr -K "$key_hex" -iv "$iv_hex" \
-              -in "$URL_CIPHERTEXT" -out "$URL_FILE"
-            BASELINE_URL=$(tr -d '\r\n' < "$URL_FILE")
+            test -s "$BASELINE_URL_FILE"
+            IFS= read -r BASELINE_URL < "$BASELINE_URL_FILE"
             test -n "$BASELINE_URL"
             echo "::add-mask::$BASELINE_URL"
             curl --fail --location --retry 8 --retry-all-errors \
