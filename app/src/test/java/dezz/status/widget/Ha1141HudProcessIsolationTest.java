@@ -13,16 +13,17 @@ import java.nio.file.Paths;
 
 /** Regression boundary for the hardware crash triggered when Navigator opens with HUD enabled. */
 public final class Ha1141HudProcessIsolationTest {
-    @Test public void hudRendererCannotTerminateTheStatusRowProcess() throws Exception {
+    @Test public void hudRendererSharesStatusRowProcessToPreserveRuntimeState()
+            throws Exception {
         String manifest = resource("AndroidManifest.xml");
-        String application = source("StatusWidgetApplication.java");
+        String service = source("hud/HudPresentationService.java");
 
         assertTrue(manifest.contains("android:name=\".hud.HudPresentationService\""));
-        assertTrue(manifest.contains("android:process=\":hud\""));
-        assertTrue(application.contains("AppProcessPolicy.isHudProcess()"));
-        assertTrue(application.contains("if (hudProcess)"));
-        assertTrue(application.contains("HUD_CRASH_FILE"));
-        assertTrue(application.contains("return;"));
+        assertFalse(manifest.contains("android:process=\":hud\""));
+        assertTrue(service.contains("HUD service создан в основном процессе Natro"));
+        assertTrue(service.contains("if (current == null)"));
+        assertTrue(service.contains("apply(app)"));
+        assertTrue(service.contains("DiagnosticJournal.info(\"hud-runtime\""));
     }
 
     @Test public void androidNineNeverMaterializesNavigatorAccessibilityWindows()
@@ -38,22 +39,18 @@ public final class Ha1141HudProcessIsolationTest {
                 + "                && serviceConnected"));
     }
 
-    @Test public void hudCommandsAndDiagnosticsStillCrossTheProcessBoundary()
+    @Test public void hudCommandsAndDiagnosticsFollowTheSameProcessLifecycle()
             throws Exception {
         String service = source("hud/HudPresentationService.java");
         String settings = source("HudPanelSettingsActivity.java");
-        String preferences = source("Preferences.java");
 
         assertTrue(service.contains("ContextCompat.startForegroundService(app, command)"));
         assertTrue(service.contains("EXTRA_CONFIG_JSON"));
         assertTrue(service.contains("MAX_COMMAND_CONFIG_CHARS"));
         assertTrue(service.contains("HudRuntimeStatusStore.read(context)"));
+        assertTrue(service.contains("hud-runtime"));
         assertTrue(settings.contains("HudPresentationService.runtimeDetail(this)"));
-        assertTrue(preferences.contains("AppProcessPolicy.preferenceMode()"));
-        assertFalse(service.contains("if (current != null) {\n"
-                + "                try {\n"
-                + "                    app.startService(new Intent(app, HudPresentationService.class)\n"
-                + "                            .setAction(ACTION_STOP))"));
+        assertFalse(service.contains("android:process=\":hud\""));
     }
 
     private static String source(String relative) throws Exception {

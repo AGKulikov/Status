@@ -79,7 +79,10 @@ public final class Natro238RoadLogFixContractTest {
         String widget = read("app/src/main/java/dezz/status/widget/WidgetService.java");
         assertTrue(policy.contains("parkingDistanceStatus == 2"));
         assertFalse(policy.contains("parkingDistanceStatus == 3"));
-        assertTrue(widget.contains("if (changed) phoneExternalOverlayDeadlineBypass = false"));
+        assertFalse(widget.contains("phoneExternalOverlayDeadlineBypass"));
+        assertTrue(widget.contains("boolean changed = phoneExternalOverlayActive != active"));
+        assertTrue(widget.contains("syncPhoneNotificationExternalOverlayPause()"));
+        assertTrue(widget.contains("if (changed) onPhoneNotificationForegroundChanged()"));
         assertTrue(widget.contains("DiagnosticJournal.debug(\"navigator-window\","));
         assertFalse(widget.contains("DiagnosticJournal.warn(\"navigator-window\",\n"
                 + "                        \"windowed vendor confirmation lease expired\"") );

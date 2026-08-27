@@ -48,8 +48,11 @@ public final class Natro236NotificationMediaRecoveryContractTest {
         assertTrue(widget.contains("prefs.phoneNotificationDelayInPackages.get()"));
         assertTrue(widget.contains(
                 "setPhoneExternalOverlayActive(phoneVehicleOverlayActive)"));
-        assertTrue(widget.contains("phoneExternalOverlayDeadlineBypass = true"));
-        assertTrue(widget.contains("vehicle overlay maximum wait reached"));
+        assertFalse(widget.contains("phoneExternalOverlayDeadlineBypass"));
+        assertFalse(widget.contains("vehicle overlay maximum wait reached"));
+        assertTrue(widget.contains(
+                "if (shouldPausePhoneNotificationForExternalOverlay()) return;"));
+        assertTrue(widget.contains("deferred delivery released key="));
         assertFalse(tracking.contains("phoneNotificationDelayForExternalOverlays"));
         assertFalse(accessibility.contains("ExternalOverlayWindowPolicy"));
         assertFalse(accessibility.contains("externalOverlayWindows"));
