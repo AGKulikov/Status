@@ -49,14 +49,12 @@ public final class HudAndroidApiContractTest {
         assertTrue(client.contains("runLongRunningCommand"));
         assertFalse(client.contains(">/dev/null 2>&1 &)"));
         assertTrue(service.contains("showWindowManagerFallback(display)"));
+        assertTrue(service.contains("Exactly one compositor owns the 728x190 HUD plane"));
+        assertTrue(service.contains("direct SurfaceFlinger is now strictly a fallback"));
         assertTrue(service.contains(
-                "private void showOnDisplay(@NonNull Display display) {\n"
-                        + "        // The direct SurfaceFlinger lane"));
-        assertTrue(service.contains(
-                "startSystemSurface(display);\n"
-                        + "        if (overlayWindow == null && presentation == null)"));
-        assertTrue(service.contains(
-                "HUD fallback недоступен; прямой SurfaceFlinger-канал продолжает запуск"));
+                "if (systemSurfaceWindow != null || overlayWindow != null "
+                        + "|| presentation != null"));
+        assertTrue(service.contains("единственный compositor owner"));
         assertFalse(service.contains("dismissFallbackOnly(\"system HUD surface ready\")"));
         assertTrue(service.contains("кадр принят SurfaceFlinger"));
         assertTrue(service.contains("systemSurfaceRetryAfter"));

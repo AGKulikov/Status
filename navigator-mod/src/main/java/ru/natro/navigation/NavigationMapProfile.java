@@ -197,3 +197,4 @@ final class NavigationMapProfile {
                 || "FREE".equals(value) ? value : "FOLLOW_ROUTE";
     }
 }
+

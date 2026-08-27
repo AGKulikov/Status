@@ -346,3 +346,4 @@ public final class HudPanelConfig {
         return Math.max(minimum, Math.min(maximum, value));
     }
 }
+

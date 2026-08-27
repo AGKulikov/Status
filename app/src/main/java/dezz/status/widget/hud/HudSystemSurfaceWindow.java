@@ -614,3 +614,4 @@ final class HudSystemSurfaceWindow {
         byte[] buffer() { return buf; }
     }
 }
+

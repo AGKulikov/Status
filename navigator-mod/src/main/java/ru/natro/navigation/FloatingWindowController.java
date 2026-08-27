@@ -5,7 +5,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
@@ -14,6 +13,7 @@ import android.graphics.Typeface;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -34,10 +34,9 @@ final class FloatingWindowController {
     private static final int MODE_FULLSCREEN = 0;
     private static final int MODE_FLOATING = 1;
     private static final int MODE_TOGGLE = 2;
-    private static final int FLOATING_FLAGS =
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                    | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
+    private static final int FLOATING_FLAGS = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
+    private static final int SURFACE_READY_MAX_ATTEMPTS = 40;
+    private static final long SURFACE_READY_RETRY_MS = 50L;
     private static final int MUTATED_FLAGS =
             FLOATING_FLAGS
                     | WindowManager.LayoutParams.FLAG_DIM_BEHIND
@@ -69,6 +68,7 @@ final class FloatingWindowController {
     private boolean floating;
     private boolean destroyed;
     private boolean geometryLoaded;
+    private int pendingModeGeneration;
 
     FloatingWindowController(Activity activity) {
         this.activity = activity;
@@ -138,7 +138,45 @@ final class FloatingWindowController {
         if (!profile.enabled) return;
         boolean requestsWindow = intent.getBooleanExtra(EXTRA_WINDOWED, false)
                 || ACTION_FLOATING.equals(intent.getAction());
-        if (requestsWindow) setWindowMode(MODE_FLOATING);
+        if (requestsWindow) {
+            int generation = ++pendingModeGeneration;
+            scheduleFloatingWhenSurfaceReady(generation, 0);
+        }
+    }
+
+    /** Wait for the live MapKit SurfaceView instead of guessing that one UI frame is enough. */
+    private void scheduleFloatingWhenSurfaceReady(int generation, int attempt) {
+        View decor = window.getDecorView();
+        decor.post(() -> {
+            if (destroyed || activity.isFinishing() || generation != pendingModeGeneration) {
+                return;
+            }
+            boolean ready = containsReadySurface(decor);
+            if (!ready && attempt < SURFACE_READY_MAX_ATTEMPTS) {
+                mainHandler.postDelayed(
+                        () -> scheduleFloatingWhenSurfaceReady(generation, attempt + 1),
+                        SURFACE_READY_RETRY_MS);
+                return;
+            }
+            decor.postOnAnimation(() -> {
+                if (!destroyed && !activity.isFinishing()
+                        && generation == pendingModeGeneration) {
+                    setWindowMode(MODE_FLOATING);
+                }
+            });
+        });
+    }
+
+    private static boolean containsReadySurface(View view) {
+        if (view instanceof SurfaceView) {
+            return view.isAttachedToWindow() && view.getWidth() > 0 && view.getHeight() > 0;
+        }
+        if (!(view instanceof ViewGroup)) return false;
+        ViewGroup group = (ViewGroup) view;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            if (containsReadySurface(group.getChildAt(index))) return true;
+        }
+        return false;
     }
 
     void applyConfiguration(String rawConfiguration) {
@@ -151,6 +189,7 @@ final class FloatingWindowController {
     void setWindowMode(int mode) {
         if (destroyed || (!profile.enabled && mode != MODE_FULLSCREEN)) return;
         boolean next = mode == MODE_TOGGLE ? !floating : mode == MODE_FLOATING;
+        if (!next) pendingModeGeneration++;
         if (next == floating) {
             if (floating) enforceFloatingWindowContract();
             updateControls();
@@ -243,6 +282,7 @@ final class FloatingWindowController {
 
     void destroy() {
         destroyed = true;
+        pendingModeGeneration++;
         mainHandler.removeCallbacks(modeButtonPoller);
         detachModeButtonFromNavigator();
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
@@ -269,8 +309,9 @@ final class FloatingWindowController {
             geometryLoaded = true;
         }
         clampGeometry(attributes, screen);
-        // Exact working 29.4.2 KX11 contract, applied only after onResumeFragments when the
-        // Activity window and OEM token are attached. Applying it from onPostCreate is too early.
+        // Apply only after the Activity token and MapKit SurfaceView are both attached. Changing
+        // geometry while SurfaceView is being created makes Android 9 tear down MapActivity
+        // without a Java FATAL EXCEPTION.
         // Keep MapActivity's original application-window identity. The installed Navigator
         // manifest intentionally has no overlay permission; switching an attached Activity to an
         // overlay/system-alert identity causes WindowManager to reject its token on the user's
@@ -283,18 +324,29 @@ final class FloatingWindowController {
                 | WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
                 & ~(WindowManager.LayoutParams.FLAG_DIM_BEHIND
                         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        attributes.format = PixelFormat.TRANSLUCENT;
+        // Changing an attached SurfaceView window from its manifest-selected format to
+        // TRANSLUCENT destroys the Android-9 MapKit surface without a Java FATAL EXCEPTION. Keep
+        // the original pixel format; transparency outside the resized bounds comes from the
+        // activity window geometry and transparent decor background.
+        attributes.format = originalFormat;
         try {
             window.setAttributes(attributes);
             floating = true;
             applyFloatingDecoration();
             updateControls();
+            NavigationBridgeClient.reportDiagnostic("floating window applied type="
+                    + attributes.type + ", format=" + attributes.format + ", bounds="
+                    + attributes.width + "x" + attributes.height + "@"
+                    + attributes.x + "," + attributes.y + ", flags=0x"
+                    + Integer.toHexString(attributes.flags));
         } catch (RuntimeException failure) {
             floating = false;
             restoreWindowIdentity(attributes);
             try { window.setAttributes(attributes); } catch (RuntimeException ignored) {}
             Toast.makeText(activity,
                     "Оконный режим не разрешён прошивкой ГУ", Toast.LENGTH_SHORT).show();
+            NavigationBridgeClient.reportDiagnostic("floating window rejected: "
+                    + failure.getClass().getSimpleName() + ": " + failure.getMessage());
         }
     }
 
@@ -374,12 +426,12 @@ final class FloatingWindowController {
         boolean changed = attributes.type != expectedType
                 || attributes.gravity != (Gravity.TOP | Gravity.START)
                 || attributes.flags != expectedFlags
-                || attributes.format != PixelFormat.TRANSLUCENT;
+                || attributes.format != originalFormat;
         if (changed) {
             attributes.type = expectedType;
             attributes.gravity = Gravity.TOP | Gravity.START;
             attributes.flags = expectedFlags;
-            attributes.format = PixelFormat.TRANSLUCENT;
+            attributes.format = originalFormat;
             try { window.setAttributes(attributes); }
             catch (RuntimeException ignored) { return; }
         }

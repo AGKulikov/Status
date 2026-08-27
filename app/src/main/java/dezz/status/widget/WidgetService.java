@@ -4845,10 +4845,8 @@ public class WidgetService extends Service {
 
     private int phoneBatteryColor(@Nullable Integer battery, boolean charging) {
         Context context = themedContext != null ? themedContext : this;
-        return battery != null && battery <= 10
+        return battery != null && battery < 20
                 ? ContextCompat.getColor(context, R.color.iphone_battery_critical)
-                : battery != null && battery <= 20
-                ? ContextCompat.getColor(context, R.color.iphone_battery_low)
                 : charging
                 ? ContextCompat.getColor(context, R.color.iphone_battery_charging)
                 : ContextCompat.getColor(context, android.R.color.white);

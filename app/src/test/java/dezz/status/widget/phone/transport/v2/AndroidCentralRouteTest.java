@@ -179,7 +179,7 @@ public final class AndroidCentralRouteTest {
         assertTrue(scan.effects.get(0).detail.contains("exact saved public identity"));
     }
 
-    @Test public void registered133ReassertsSameWrapperThenWaitsForStackRecovery() {
+    @Test public void registered133ReassertsThenRetiresExactlyOneSilentWrapper() {
         AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 31L));
         state = AndroidCentralRoute.startupQuietElapsed(
                 state, state.expected, true).state;
@@ -229,13 +229,22 @@ public final class AndroidCentralRouteTest {
         assertTrue(hasEffect(recovery, BleRouteEffect.Type.REASSERT_SAME_GATT));
         assertFalse(hasEffect(recovery, BleRouteEffect.Type.CONNECT_GATT));
 
-        BleRouteTransition<AndroidCentralRoute.State> stillRetained =
+        BleRouteTransition<AndroidCentralRoute.State> retired =
                 AndroidCentralRoute.registeredConnectionError133(
                         recovery.state, ownerCallback);
-        assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION,
-                stillRetained.state.phase);
-        assertEquals(owner, stillRetained.state.activeOwnerId);
-        assertFalse(hasEffect(stillRetained, BleRouteEffect.Type.CLOSE_GATT));
+        assertEquals(AndroidCentralRoute.Phase.RETRY_DRAINING, retired.state.phase);
+        assertTrue(hasEffect(retired, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(retired, BleRouteEffect.Type.CONNECT_GATT));
+        assertFalse(hasEffect(retired, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+
+        AndroidCentralRoute.State draining = AndroidCentralRoute.attemptTeardownComplete(
+                retired.state, retired.state.expected).state;
+        assertEquals(AndroidCentralRoute.Phase.RETRY_WAIT, draining.phase);
+        BleRouteTransition<AndroidCentralRoute.State> replacement =
+                AndroidCentralRoute.retryElapsed(draining, draining.expected, true);
+        assertNotEquals(owner, replacement.state.activeOwnerId);
+        assertEquals(1, countEffects(replacement,
+                BleRouteEffect.Type.CONNECT_SELECTED_BOND));
     }
 
     @Test public void provenSilentRegistrationReassertsSameWrapperWithoutClientChurn() {

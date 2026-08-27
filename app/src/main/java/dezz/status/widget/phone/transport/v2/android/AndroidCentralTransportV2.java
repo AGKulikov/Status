@@ -80,6 +80,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 
@@ -237,6 +239,20 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
     }
 
+    /** Immutable result of the only Keystore-backed enrollment read for one route epoch. */
+    private static final class EnrollmentRecords {
+        final IphoneLeEnrollmentRecordV2 pending;
+        final IphoneLeEnrollmentRecordV2 active;
+        final String failure;
+
+        EnrollmentRecords(IphoneLeEnrollmentRecordV2 pending,
+                          IphoneLeEnrollmentRecordV2 active, String failure) {
+            this.pending = pending;
+            this.active = active;
+            this.failure = failure == null ? "" : failure;
+        }
+    }
+
     private static final class PendingHelperIdentity {
         final BleRouteToken token;
         final IphoneBlePeerProof proof;
@@ -286,6 +302,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private final Context context;
     private final Preferences preferences;
     private final Handler main;
+    /** Android Keystore can block for seconds on KX11; it must never run in a BLE/UI callback. */
+    private final ExecutorService enrollmentIo = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "NatroAncsEnrollment");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final BluetoothManager manager;
     private final BluetoothAdapter adapter;
     private final SelectedBondAttributionV2 bondAttribution;
@@ -362,6 +384,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private boolean processGateDrainRetained;
     private PendingHelperIdentity pendingHelperIdentity;
     private boolean selectedPhonePresencePending;
+    private long enrollmentLoadGeneration;
     private boolean closed;
 
     public AndroidCentralTransportV2(Context context) {
@@ -403,6 +426,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         Objects.requireNonNull(epoch, "epoch");
         Objects.requireNonNull(reason, "reason");
         main.post(() -> {
+            enrollmentLoadGeneration++;
             stopOnMain(epoch, reason);
         });
     }
@@ -478,6 +502,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     @Override public void close() {
         main.post(() -> {
             closed = true;
+            enrollmentLoadGeneration++;
+            enrollmentIo.shutdownNow();
             selectedPhonePresencePending = false;
             ProcessGattRegistrationGateV2.cancelWaiter(restorationGateWaiter);
             ProcessGattRegistrationGateV2.cancelWaiter(processGateDrainWaiter);
@@ -679,7 +705,46 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         this.deferredStopTerminalEpoch = null;
         this.selectedPhonePresencePending = false;
         cancelHelperIdentityCommit();
-        apply(AndroidCentralRoute.start(request));
+        startRouteAfterEnrollmentLoad(request, newListener);
+    }
+
+    /**
+     * Reads the encrypted LE enrollment exactly once per route epoch on a private worker.
+     *
+     * <p>The field log captured Android Keystore blocking the main looper for eight seconds from
+     * {@code handleScanResult}. Besides freezing the UI, that also delayed GATT deadlines. Route
+     * state therefore starts only after an immutable snapshot has returned to the main FIFO; all
+     * later connect and scan callbacks consume that snapshot without touching preferences.</p>
+     */
+    private void startRouteAfterEnrollmentLoad(
+            IphoneTransportStartRequest request,
+            IphoneTransportSessionListenerV2 exactListener) {
+        long generation = ++enrollmentLoadGeneration;
+        if (request.acquisitionMode != IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            apply(AndroidCentralRoute.start(request));
+            return;
+        }
+        try {
+            enrollmentIo.execute(() -> {
+                EnrollmentRecords records = readEnrollmentRecords(
+                        request.selectedSystemBondAddress, request.helperInstallationId);
+                main.post(() -> {
+                    if (closed || generation != enrollmentLoadGeneration
+                            || startRequest != request || listener != exactListener) return;
+                    installEnrollmentRecords(records);
+                    apply(AndroidCentralRoute.start(request));
+                    if (!records.failure.isEmpty()) {
+                        reportError(IphoneTransportErrorV2.Kind.PROTOCOL,
+                                "encrypted LE enrollment read failed: " + records.failure,
+                                false);
+                    }
+                });
+            });
+        } catch (RuntimeException unavailable) {
+            installEnrollmentRecords(new EnrollmentRecords(null, null,
+                    unavailable.getClass().getSimpleName()));
+            apply(AndroidCentralRoute.start(request));
+        }
     }
 
     private void apply(BleRouteTransition<AndroidCentralRoute.State> transition) {
@@ -959,9 +1024,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                         "selected Classic bond is not uniquely present; enrollment blocked");
                 return;
             }
-            IphoneLeEnrollmentRecordV2 record = loadEnrollmentRecord(
-                    startRequest.selectedSystemBondAddress,
-                    startRequest.helperInstallationId);
+            // The encrypted record was loaded before this route epoch started. Never ask
+            // Android Keystore from a connection or scan callback on the main looper.
+            IphoneLeEnrollmentRecordV2 record = enrollmentRecord;
             if (record == null) {
                 failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
                         "no exact device-local LE enrollment record; explicit enrollment required");
@@ -1156,6 +1221,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             reportError(IphoneTransportErrorV2.Kind.TEARDOWN,
                     "OWNER_UNPROVABLE retained; close/new-wrapper churn forbidden", false);
             return;
+        }
+        // A proven but silent Android-P registration is safe to close, yet native clientIf
+        // release can trail BluetoothGatt.close(). Hold the process gate for one bounded settle
+        // interval so the replacement owner cannot overlap it.
+        if (owner.registrationProven && !owner.connected) {
+            owner.retirementSettleRequested = true;
         }
         owner.closing = true;
         failPendingRouteControl();
@@ -1508,13 +1579,14 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     /**
      * Android 9 can finish native GATT client registration yet withhold the public connection
      * callback. Once {@code mClientIf > 0} is observable, the wrapper is a proven public owner.
-     * Keep and reassert that exact wrapper; refreshing/closing it here creates the clientIf churn
-     * seen immediately after an in-place APK replacement.
+     * This remains true after a late status-133 callback: excluding callback-observed wrappers
+     * here left them in an endless CONNECTING/WAIT_SYSTEM_CONNECTION loop. The reducer keeps the
+     * same owner for its bounded ladder, then retires it before one replacement is allocated.
      */
     private boolean recoverRegisteredSilentGatt(AndroidCentralRoute.State current,
                                                  BleRouteToken token) {
         GattOwner exact = owner;
-        if (exact == null || exact.gatt == null || exact.callbackObserved
+        if (exact == null || exact.gatt == null
                 || !exact.ownerToken.sameOwner(token)
                 || !ProcessGattRegistrationGateV2.owns(exact)) return false;
         Integer clientIf = registeredClientIf(exact.gatt);
@@ -2528,23 +2600,35 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 frame.telemetrySupported(), frame.ancsSupported(), true);
     }
 
-    private IphoneLeEnrollmentRecordV2 loadEnrollmentRecord(
+    private EnrollmentRecords readEnrollmentRecords(
             String selectedClassicAddress, String helperInstallationId) {
-        String androidInstallationId = preferences.phoneBleV2AndroidInstallationId();
-        IphoneLeEnrollmentRecordV2 pending = IphoneLeEnrollmentRecordV2.validForSelectedClassic(
-                preferences.phoneBleV2PendingEnrollmentRecord(), selectedClassicAddress);
-        if (!recordMatchesEnrollmentContext(pending, selectedClassicAddress,
-                helperInstallationId, androidInstallationId)) pending = null;
-        pendingEnrollmentRecord = pending;
-        IphoneLeEnrollmentRecordV2 active = IphoneLeEnrollmentRecordV2.validForSelectedClassic(
-                preferences.phoneBleV2EnrollmentRecord(), selectedClassicAddress);
-        if (!recordMatchesEnrollmentContext(active, selectedClassicAddress,
-                helperInstallationId, androidInstallationId)) active = null;
-        activeEnrollmentRecord = active;
-        enrollmentRecord = pending != null ? pending : active;
-        enrollmentRecordPending = enrollmentRecord != null && enrollmentRecord == pending;
+        try {
+            String androidInstallationId = preferences.phoneBleV2AndroidInstallationId();
+            IphoneLeEnrollmentRecordV2 pending =
+                    IphoneLeEnrollmentRecordV2.validForSelectedClassic(
+                            preferences.phoneBleV2PendingEnrollmentRecord(),
+                            selectedClassicAddress);
+            if (!recordMatchesEnrollmentContext(pending, selectedClassicAddress,
+                    helperInstallationId, androidInstallationId)) pending = null;
+            IphoneLeEnrollmentRecordV2 active =
+                    IphoneLeEnrollmentRecordV2.validForSelectedClassic(
+                            preferences.phoneBleV2EnrollmentRecord(), selectedClassicAddress);
+            if (!recordMatchesEnrollmentContext(active, selectedClassicAddress,
+                    helperInstallationId, androidInstallationId)) active = null;
+            return new EnrollmentRecords(pending, active, "");
+        } catch (RuntimeException failure) {
+            return new EnrollmentRecords(null, null,
+                    failure.getClass().getSimpleName());
+        }
+    }
+
+    private void installEnrollmentRecords(EnrollmentRecords records) {
+        pendingEnrollmentRecord = records.pending;
+        activeEnrollmentRecord = records.active;
+        enrollmentRecord = records.pending != null ? records.pending : records.active;
+        enrollmentRecordPending = enrollmentRecord != null
+                && enrollmentRecord == records.pending;
         clearStalePendingAfterActiveProof = false;
-        return enrollmentRecord;
     }
 
     private static boolean recordMatchesEnrollmentContext(
@@ -2839,9 +2923,19 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (!isCurrentScanAttempt(attempt)) return;
         BleRouteToken token = attempt.token;
         retireScanAttempt(attempt);
-        reportError(IphoneTransportErrorV2.Kind.GATT,
-                "bootstrap scan failed: " + errorCode, true);
-        if (!retainsEnrolledSystemOwner(token)) postRouteDeadline(token);
+        if (retainsEnrolledSystemOwner(token)) {
+            // Presence scanning is optional once the exact registered GATT owner is retained.
+            // Android P commonly returns SCAN_FAILED_APPLICATION_REGISTRATION_FAILED while that
+            // owner still holds native clientIf; rendering this expected side-channel failure as
+            // a red transport error obscures the actual registered-owner recovery state.
+            reportPlatformDiagnostic(token,
+                    "optional_presence_scan unavailable code=" + errorCode
+                            + "; retained GATT recovery continues");
+        } else {
+            reportError(IphoneTransportErrorV2.Kind.GATT,
+                    "bootstrap scan failed: " + errorCode, true);
+            postRouteDeadline(token);
+        }
         maybeCompleteTeardown();
     }
 
@@ -2855,9 +2949,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                     request.selectedSystemBondAddress);
             if (selected.matches != 1 || selected.device == null
                     || selected.device.getBondState() != BluetoothDevice.BOND_BONDED) return;
-            IphoneLeEnrollmentRecordV2 record = enrollmentRecord != null
-                    ? enrollmentRecord : loadEnrollmentRecord(
-                    request.selectedSystemBondAddress, request.helperInstallationId);
+            // Immutable epoch snapshot: scan callbacks must never block the main looper in
+            // SecretStore/Android Keystore while the route deadline is armed.
+            IphoneLeEnrollmentRecordV2 record = enrollmentRecord;
             BluetoothDevice device = result.getDevice();
             if (record == null || device == null
                     || !samePublicAddress(device.getAddress(), record.leIdentityAddress)

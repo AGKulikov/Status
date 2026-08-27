@@ -2,22 +2,47 @@
 package dezz.status.widget.phone.transport.v2.android;
 
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
-import dezz.status.widget.phone.transport.v2.IphoneDualTransportRuntimeV2;
+
 import java.util.Objects;
 
-/** Main-FIFO scheduler shared by both Android BLE framework adapters and the switch runtime. */
+import dezz.status.widget.phone.transport.v2.IphoneDualTransportRuntimeV2;
+
+/**
+ * Process-wide FIFO for the role-switch coordinator and its durable write-ahead snapshots.
+ *
+ * <p>The Android adapters still serialize every framework/GATT operation on the main looper.
+ * Coordinator state, however, can call synchronous {@code SharedPreferences.commit()} before a
+ * Bluetooth effect is released. Field watchdogs captured that fsync blocking the KX11 main
+ * thread for almost ten seconds. A single process-lifetime HandlerThread preserves the exact
+ * commit-before-effect order without freezing UI, display or Bluetooth callback deadlines.</p>
+ */
 public final class AndroidMainBleSchedulerV2
         implements IphoneDualTransportRuntimeV2.SerializedScheduler {
-    private final Handler main;
+    private static final Object SHARED_LOCK = new Object();
+    private static Handler sharedHandler;
+
+    private final Handler fifo;
 
     public AndroidMainBleSchedulerV2() {
-        this(new Handler(Looper.getMainLooper()));
+        this(sharedFifo());
     }
 
-    AndroidMainBleSchedulerV2(Handler main) {
-        this.main = Objects.requireNonNull(main, "main");
+    AndroidMainBleSchedulerV2(Handler fifo) {
+        this.fifo = Objects.requireNonNull(fifo, "fifo");
+    }
+
+    private static Handler sharedFifo() {
+        synchronized (SHARED_LOCK) {
+            if (sharedHandler == null) {
+                HandlerThread thread = new HandlerThread("NatroAncsCoordinator");
+                thread.start();
+                sharedHandler = new Handler(thread.getLooper());
+            }
+            return sharedHandler;
+        }
     }
 
     @Override public long nowMillis() {
@@ -25,12 +50,12 @@ public final class AndroidMainBleSchedulerV2
     }
 
     @Override public boolean isCurrent() {
-        return Looper.myLooper() == main.getLooper();
+        return Looper.myLooper() == fifo.getLooper();
     }
 
-    /** Always posts, even from main, so an EffectsPort callback cannot re-enter a commit batch. */
+    /** Always posts so an EffectsPort callback cannot re-enter a coordinator commit batch. */
     @Override public void execute(Runnable action) {
-        main.post(Objects.requireNonNull(action, "action"));
+        fifo.post(Objects.requireNonNull(action, "action"));
     }
 
     @Override public IphoneDualTransportRuntimeV2.Cancellable scheduleAt(
@@ -38,7 +63,7 @@ public final class AndroidMainBleSchedulerV2
         Objects.requireNonNull(action, "action");
         long now = SystemClock.elapsedRealtime();
         long delay = absoluteDeadlineMillis > now ? absoluteDeadlineMillis - now : 0L;
-        main.postDelayed(action, delay);
-        return () -> main.removeCallbacks(action);
+        fifo.postDelayed(action, delay);
+        return () -> fifo.removeCallbacks(action);
     }
 }

@@ -37,6 +37,8 @@ public final class AndroidCentralRoute {
     public static final int MAX_ATTEMPTS_PER_EPOCH = 6;
     private static final long[] SAME_OWNER_REASSERT_MS = {30_000L, 60_000L, 120_000L};
     private static final long[] REGISTERED_ERROR_REASSERT_MS = {1_000L, 3_000L};
+    /** Two fast reassertions plus one stack-recovery window, then retire the proven wrapper. */
+    private static final int REGISTERED_ERROR_RETIRE_AFTER_REASSERTIONS = 3;
 
     public enum Phase {
         WAIT_RADIO,
@@ -253,6 +255,14 @@ public final class AndroidCentralRoute {
             return BleRouteTransition.ignored(state);
         }
         BleRouteToken completed = state.expected;
+        if (state.sameOwnerReassertions >= REGISTERED_ERROR_RETIRE_AFTER_REASSERTIONS) {
+            // mClientIf>0 or status=133 proves that close() can unregister this exact public
+            // wrapper. Keeping it forever after an in-place APK update creates a permanent
+            // CONNECTING→WAIT_SYSTEM_CONNECTION loop. Retire it once, wait for adapter teardown,
+            // then let the ordinary bounded retry path allocate exactly one replacement owner.
+            return retry(state, completed,
+                    failureDetail + "; bounded registered wrapper retirement");
+        }
         if (state.sameOwnerReassertions < REGISTERED_ERROR_REASSERT_MS.length) {
             int retryIndex = state.sameOwnerReassertions;
             BleRouteToken timer = nextOperation(completed);

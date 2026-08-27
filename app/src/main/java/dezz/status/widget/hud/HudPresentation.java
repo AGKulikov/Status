@@ -57,3 +57,4 @@ final class HudPresentation extends Presentation {
         if (content != null) content.invalidateHud();
     }
 }
+

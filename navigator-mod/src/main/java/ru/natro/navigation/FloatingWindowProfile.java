@@ -111,3 +111,4 @@ final class FloatingWindowProfile {
         return value.matches("#[0-9A-F]{8}") ? value : fallback;
     }
 }
+

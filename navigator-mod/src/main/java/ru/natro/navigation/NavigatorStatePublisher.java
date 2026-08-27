@@ -895,3 +895,4 @@ final class NavigatorStatePublisher {
         return result.length() > 240 ? result.substring(0, 240) : result;
     }
 }
+

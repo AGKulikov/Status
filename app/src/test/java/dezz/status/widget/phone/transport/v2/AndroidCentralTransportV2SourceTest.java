@@ -82,6 +82,40 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(retained.contains("WAIT_SYSTEM_CONNECTION"));
         assertTrue(retained.contains("ENROLLED_LE_IDENTITY"));
         assertTrue(retained.contains("exact.ownerToken.sameOwner(token)"));
+
+        String failure = between(source, "private void handleScanFailure",
+                "private void handleScanResult");
+        assertTrue(failure.contains("optional_presence_scan unavailable"));
+        assertTrue(failure.contains("if (retainsEnrolledSystemOwner(token))"));
+        assertTrue(failure.contains("postRouteDeadline(token)"));
+    }
+
+    @Test public void encryptedEnrollmentIsLoadedOffMainBeforeRouteCallbacks()
+            throws Exception {
+        String source = source();
+        String start = between(source,
+                "private void startRouteAfterEnrollmentLoad",
+                "private void apply(BleRouteTransition");
+        assertTrue(start.contains("enrollmentIo.execute("));
+        assertTrue(start.contains("readEnrollmentRecords("));
+        assertTrue(start.contains("main.post("));
+        assertTrue(start.indexOf("readEnrollmentRecords(") < start.indexOf("main.post("));
+        assertTrue(start.contains("installEnrollmentRecords(records)"));
+        assertTrue(start.contains("apply(AndroidCentralRoute.start(request))"));
+
+        String scan = between(source,
+                "private void handleScanResult",
+                "private final BluetoothGattCallback");
+        assertTrue(scan.contains("IphoneLeEnrollmentRecordV2 record = enrollmentRecord;"));
+        assertFalse(scan.contains("loadEnrollmentRecord"));
+        assertFalse(scan.contains("phoneBleV2EnrollmentRecord"));
+        assertFalse(scan.contains("phoneBleV2PendingEnrollmentRecord"));
+
+        String connect = between(source,
+                "private void connectSelectedBond",
+                "private void connectMatchedBootstrap");
+        assertTrue(connect.contains("IphoneLeEnrollmentRecordV2 record = enrollmentRecord;"));
+        assertFalse(connect.contains("phoneBleV2EnrollmentRecord"));
     }
 
     @Test public void selectedBondUsesOneActiveOwnerAndBootstrapIsExplicitDirect()
@@ -186,6 +220,7 @@ public final class AndroidCentralTransportV2SourceTest {
                 "private static Integer registeredClientIf");
         assertTrue(silent.contains("registeredSilentConnection(current, token)"));
         assertTrue(silent.contains("action=retain_reassert_same_wrapper"));
+        assertFalse(silent.contains("exact.callbackObserved"));
         assertFalse(silent.contains("cacheRefreshRequested = true"));
         assertFalse(silent.contains("retirementSettleRequested = true"));
 

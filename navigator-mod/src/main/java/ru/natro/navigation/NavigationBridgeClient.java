@@ -138,14 +138,17 @@ final class NavigationBridgeClient {
             }
 
             @Override public void onPrimaryCamera(NavigatorStatePublisher.CameraState state) {
-                if (!mainMapController.updatePrimaryCamera(state)) {
-                    hudMapRenderer.updatePrimaryCamera(state);
-                }
+                mainMapController.updatePrimaryCamera(state);
+                // Main-map gestures must never drive the independent HUD camera. The renderer may
+                // consume only its first camera as a cold-start fallback; live following comes
+                // from canonical Guidance location snapshots below.
+                hudMapRenderer.updateInitialCamera(state);
             }
 
             @Override public void onNavigationState(String snapshotJson, String routeJson,
                                                      Object drivingRoute, long routeEpoch) {
                 mainMapController.updateRoute(routeEpoch, drivingRoute);
+                hudMapRenderer.updateNavigationState(snapshotJson);
                 hudMapRenderer.updateRoute(routeEpoch, drivingRoute);
                 sendState(MSG_NAVIGATION_SNAPSHOT, KEY_SNAPSHOT_JSON, snapshotJson);
                 if (routeJson != null) {

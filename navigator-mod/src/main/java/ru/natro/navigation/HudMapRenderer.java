@@ -7,6 +7,8 @@ import android.graphics.PointF;
 import android.util.Log;
 import android.view.Surface;
 
+import org.json.JSONObject;
+
 import java.lang.reflect.Method;
 
 /**
@@ -46,7 +48,8 @@ final class HudMapRenderer {
     private Object activeRoute;
     private long activeRouteEpoch = -1L;
     private long activeJamFingerprint;
-    private NavigatorStatePublisher.CameraState primaryCamera;
+    private NavigatorStatePublisher.CameraState initialCamera;
+    private NavigatorStatePublisher.CameraState navigationCamera;
     private boolean freeCameraInitialized;
     private NavigationMapProfile profile = new NavigationMapProfile();
 
@@ -100,10 +103,44 @@ final class HudMapRenderer {
         stopRenderer(true);
     }
 
-    void updatePrimaryCamera(NavigatorStatePublisher.CameraState state) {
-        if (state == null || !state.isValid()) return;
-        primaryCamera = state;
+    /**
+     * Uses one primary-camera sample only to avoid a blank cold-start map before Guidance emits
+     * its first location. Subsequent pan/zoom/rotation gestures on the main map are ignored.
+     */
+    void updateInitialCamera(NavigatorStatePublisher.CameraState state) {
+        if (state == null || !state.isValid() || initialCamera != null
+                || navigationCamera != null) return;
+        initialCamera = state;
         applyCamera();
+    }
+
+    /** Canonical navigation location, independent from every visual operation on the main map. */
+    void updateNavigationState(String snapshotJson) {
+        if (snapshotJson == null || snapshotJson.length() > 256 * 1024) return;
+        try {
+            JSONObject snapshot = new JSONObject(snapshotJson);
+            if (!snapshot.has("latitude") || !snapshot.has("longitude")) return;
+            double latitude = snapshot.optDouble("latitude", Double.NaN);
+            double longitude = snapshot.optDouble("longitude", Double.NaN);
+            double bearing = snapshot.optDouble("bearingDegrees", 0d);
+            double speed = snapshot.optDouble("speedKmh", 0d);
+            boolean routeActive = snapshot.optBoolean("routeActive", false);
+            float baseZoom = routeActive
+                    ? speed >= 90d ? 14.5f : speed >= 50d ? 15.2f : 16f
+                    : 15.5f;
+            NavigatorStatePublisher.CameraState next =
+                    new NavigatorStatePublisher.CameraState(latitude, longitude, baseZoom,
+                            finite(bearing) ? (float) bearing : 0f, profile.tiltDegrees);
+            if (!next.isValid()) return;
+            navigationCamera = next;
+            applyCamera();
+        } catch (Exception invalid) {
+            Log.w(TAG, "Rejected invalid Guidance camera snapshot", invalid);
+        }
+    }
+
+    private static boolean finite(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     void updateRoute(long routeEpoch, Object drivingRoute) {
@@ -240,10 +277,11 @@ final class HudMapRenderer {
         }
     }
 
-    /** Mirrors only navigation state; all HUD camera parameters remain independently editable. */
+    /** Follows Guidance location only; all HUD camera parameters remain independently editable. */
     private void applyCamera() {
         Object currentMap = map;
-        NavigatorStatePublisher.CameraState source = primaryCamera;
+        NavigatorStatePublisher.CameraState source = navigationCamera != null
+                ? navigationCamera : initialCamera;
         if (currentMap == null || source == null || !source.isValid()) return;
         boolean free = "FREE".equals(profile.cameraMode);
         if (free && freeCameraInitialized) return;

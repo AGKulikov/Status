@@ -4688,3 +4688,4 @@ final class GeelyCarIntegration implements CarIntegration {
         externalOverlayActive = false;
     }
 }
+

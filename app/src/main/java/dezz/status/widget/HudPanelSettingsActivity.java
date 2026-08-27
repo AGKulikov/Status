@@ -17,6 +17,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -343,21 +344,20 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         EditText unit = field(form, "Единица", item.unit, false);
         EditText textColor = field(form, "Цвет текста", item.textColor, false);
         EditText unitColor = field(form, "Цвет единицы", item.unitColor, false);
-        EditText fontSize = field(form, "Размер текста", Integer.toString(item.fontSizeSp), true);
-        EditText fontWeight = field(form, "Насыщенность шрифта 100–900",
-                Integer.toString(item.fontWeight), true);
+        SliderField fontSize = slider(form, "Размер текста",
+                item.fontSizeSp, 8, 96, 1, " sp");
+        SliderField fontWeight = slider(form, "Насыщенность шрифта",
+                item.fontWeight, 100, 900, 100, "");
 
-        LinearLayout geometry = new LinearLayout(this);
-        EditText x = compactNumber("Слева", item.x);
-        EditText y = compactNumber("Сверху", item.y);
-        EditText width = compactNumber("Ширина", item.width);
-        EditText height = compactNumber("Высота", item.height);
-        geometry.addView(x, weighted());
-        geometry.addView(y, weighted());
-        geometry.addView(width, weighted());
-        geometry.addView(height, weighted());
-        form.addView(label("Ячейки сетки"), marginTop(10));
-        form.addView(geometry);
+        form.addView(section("Положение в сетке HUD"), marginTop(12));
+        SliderField x = slider(form, "Слева", item.x,
+                0, Math.max(0, config.gridColumns - 1), 1, " яч.");
+        SliderField y = slider(form, "Сверху", item.y,
+                0, Math.max(0, config.gridRows - 1), 1, " яч.");
+        SliderField width = slider(form, "Ширина", item.width,
+                1, Math.max(1, config.gridColumns), 1, " яч.");
+        SliderField height = slider(form, "Высота", item.height,
+                1, Math.max(1, config.gridRows), 1, " яч.");
 
         Spinner alignment = spinner(new String[]{"LEFT", "CENTER", "RIGHT"}, item.alignment);
         form.addView(label("Выравнивание"), marginTop(10));
@@ -386,7 +386,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 item.sourceBinding == null ? "" : item.sourceBinding.valuePath, false);
 
         form.addView(section("Дополнительные настройки элемента"), marginTop(16));
-        Map<String, View> visualOptions = new LinkedHashMap<>();
+        Map<String, Object> visualOptions = new LinkedHashMap<>();
         addVisualElementOptions(form, item, visualOptions);
         EditText options = field(form,
                 "Расширенные параметры JSON (визуальные поля выше имеют приоритет)",
@@ -411,12 +411,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.textColor = value(textColor);
                         item.unitColor = value(unitColor);
                         item.backgroundColor = "#00000000";
-                        item.fontSizeSp = integer(fontSize, item.fontSizeSp);
-                        item.fontWeight = integer(fontWeight, item.fontWeight);
-                        item.x = integer(x, item.x);
-                        item.y = integer(y, item.y);
-                        item.width = integer(width, item.width);
-                        item.height = integer(height, item.height);
+                        item.fontSizeSp = fontSize.intValue();
+                        item.fontWeight = fontWeight.intValue();
+                        item.x = x.intValue();
+                        item.y = y.intValue();
+                        item.width = width.intValue();
+                        item.height = height.intValue();
                         item.alignment = String.valueOf(alignment.getSelectedItem());
                         item.enabled = itemEnabled.isChecked();
                         item.wrapText = wrap.isChecked();
@@ -459,43 +459,43 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         scroll.addView(form);
 
         EditText title = field(form, "Название", item.title, false);
-        LinearLayout geometry = new LinearLayout(this);
-        EditText x = compactNumber("X", item.x);
-        EditText y = compactNumber("Y", item.y);
-        EditText width = compactNumber("W", item.width);
-        EditText height = compactNumber("H", item.height);
-        geometry.addView(x, weighted());
-        geometry.addView(y, weighted());
-        geometry.addView(width, weighted());
-        geometry.addView(height, weighted());
-        form.addView(label("Положение в сетке HUD. Проще перетащить и растянуть карту прямо "
-                + "на предпросмотре."), marginTop(10));
-        form.addView(geometry);
+        form.addView(text("Положение в сетке HUD. Карту также можно перетащить и растянуть "
+                + "прямо на предпросмотре.", 12, 0xFF95A0AF), marginTop(10));
+        SliderField x = slider(form, "Слева", item.x,
+                0, Math.max(0, config.gridColumns - 1), 1, " яч.");
+        SliderField y = slider(form, "Сверху", item.y,
+                0, Math.max(0, config.gridRows - 1), 1, " яч.");
+        SliderField width = slider(form, "Ширина", item.width,
+                1, Math.max(1, config.gridColumns), 1, " яч.");
+        SliderField height = slider(form, "Высота", item.height,
+                1, Math.max(1, config.gridRows), 1, " яч.");
         Switch elementEnabled = switchView("Показывать область карты", item.enabled);
         Switch rendererEnabled = switchView("Рендерить независимую карту HUD", profile.enabled);
         form.addView(elementEnabled, marginTop(8));
         form.addView(rendererEnabled, marginTop(4));
-        EditText radius = field(form, "Скругление карты, px",
-                Integer.toString(item.options.optInt("cornerRadiusPx", 0)), true);
-        EditText opacity = field(form, "Непрозрачность карты, %",
-                Integer.toString(item.options.optInt("opacityPercent", 100)), true);
+        SliderField radius = slider(form, "Скругление карты",
+                item.options.optInt("cornerRadiusPx", 0), 0, 80, 1, " px");
+        SliderField opacity = slider(form, "Непрозрачность карты",
+                item.options.optInt("opacityPercent", 100), 20, 100, 1, " %");
 
         form.addView(section("Камера HUD"), marginTop(16));
         Spinner cameraMode = navigationCameraModeSpinner(profile.cameraMode);
         form.addView(label("Как карта следует за автомобилем"), marginTop(8));
         form.addView(cameraMode);
-        EditText zoom = field(form, "Приближение: 0 — стандартное, + ближе, − дальше",
-                Double.toString(profile.zoomDelta), false);
-        EditText tilt = field(form, "Наклон карты: 0° — сверху, 60° — перспектива",
-                Integer.toString(profile.tiltDegrees), true);
-        EditText focusX = field(form, "Положение автомобиля по горизонтали, %",
-                Integer.toString(profile.focusXPercent), true);
-        EditText focusY = field(form, "Положение автомобиля по вертикали, %",
-                Integer.toString(profile.focusYPercent), true);
-        EditText mapScale = field(form, "Размер подписей и объектов карты, %",
-                Integer.toString(profile.mapScalePercent), true);
-        EditText maximumFps = field(form, "Плавность карты, кадров/с (для HUD достаточно 20)",
-                Integer.toString(profile.maximumFps), true);
+        SliderField zoom = slider(form,
+                "Приближение: 0 — стандартное, + ближе, − дальше",
+                profile.zoomDelta, -8, 8, 0.25, "");
+        SliderField tilt = slider(form, "Наклон карты: 0° — сверху, 60° — перспектива",
+                profile.tiltDegrees, 0, 80, 1, "°");
+        SliderField focusX = slider(form, "Автомобиль по горизонтали",
+                profile.focusXPercent, 0, 100, 1, " %");
+        SliderField focusY = slider(form, "Автомобиль по вертикали",
+                profile.focusYPercent, 0, 100, 1, " %");
+        SliderField mapScale = slider(form, "Размер подписей и объектов карты",
+                profile.mapScalePercent, 50, 300, 5, " %");
+        SliderField maximumFps = slider(form,
+                "Плавность карты (для HUD обычно достаточно 20)",
+                profile.maximumFps, 5, 60, 1, " кадр/с");
 
         form.addView(section("Состав и цвет карты HUD"), marginTop(16));
         Switch automaticDayNight = switchView("Автоматический день / ночь",
@@ -515,18 +515,18 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 showModels, showCursor}) {
             form.addView(control, marginTop(4));
         }
-        EditText cursorScale = field(form, "Размер курсора, %",
-                Integer.toString(profile.cursorScalePercent), true);
+        SliderField cursorScale = slider(form, "Размер курсора",
+                profile.cursorScalePercent, 25, 300, 5, " %");
         ColorField cursorColor = colorField(form, "Цвет автомобиля", profile.cursorColor);
         ColorField cursorOutline = colorField(form, "Контур автомобиля",
                 profile.cursorOutlineColor);
         ColorField routeColor = colorField(form, "Цвет маршрута", profile.routeColor);
         ColorField routeOutline = colorField(form, "Контур маршрута",
                 profile.routeOutlineColor);
-        EditText routeWidth = field(form, "Толщина маршрута",
-                Double.toString(profile.routeWidth), false);
-        EditText routeOutlineWidth = field(form, "Толщина контура маршрута",
-                Double.toString(profile.routeOutlineWidth), false);
+        SliderField routeWidth = slider(form, "Толщина маршрута",
+                profile.routeWidth, 1, 40, 0.5, " px");
+        SliderField routeOutlineWidth = slider(form, "Толщина контура маршрута",
+                profile.routeOutlineWidth, 0, 20, 0.5, " px");
         form.addView(section("Цвета загруженности дорог"), marginTop(16));
         ColorField trafficFreeColor = colorField(form, "Дорога свободна",
                 profile.trafficFreeColor);
@@ -540,8 +540,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 profile.trafficBlockedColor);
         ColorField trafficUnknownColor = colorField(form, "Нет данных",
                 profile.trafficUnknownColor);
-        EditText trafficGradient = field(form, "Длина перехода цветов пробок",
-                Double.toString(profile.trafficGradientLength), false);
+        SliderField trafficGradient = slider(form, "Длина перехода цветов пробок",
+                profile.trafficGradientLength, 0, 100, 1, " %");
         form.addView(text("Технические JSON-стили скрыты из обычных настроек. Цвета и состав "
                 + "карты меняются элементами выше.", 12, 0xFF95A0AF), marginTop(12));
 
@@ -555,24 +555,24 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 .setOnClickListener(view -> {
                     try {
                         item.title = value(title);
-                        item.x = integer(x, item.x);
-                        item.y = integer(y, item.y);
-                        item.width = integer(width, item.width);
-                        item.height = integer(height, item.height);
+                        item.x = x.intValue();
+                        item.y = y.intValue();
+                        item.width = width.intValue();
+                        item.height = height.intValue();
                         item.enabled = elementEnabled.isChecked();
                         item.options.put("renderer", HudElementConfig.DIRECT_MAP_RENDERER);
-                        item.options.put("cornerRadiusPx", integer(radius, 0));
-                        item.options.put("opacityPercent", integer(opacity, 100));
+                        item.options.put("cornerRadiusPx", radius.intValue());
+                        item.options.put("opacityPercent", opacity.intValue());
 
                         profile.enabled = rendererEnabled.isChecked();
                         profile.cameraMode = navigationCameraModeValue(
                                 cameraMode.getSelectedItemPosition());
-                        profile.zoomDelta = decimal(zoom, profile.zoomDelta);
-                        profile.tiltDegrees = integer(tilt, profile.tiltDegrees);
-                        profile.focusXPercent = integer(focusX, profile.focusXPercent);
-                        profile.focusYPercent = integer(focusY, profile.focusYPercent);
-                        profile.mapScalePercent = integer(mapScale, profile.mapScalePercent);
-                        profile.maximumFps = integer(maximumFps, profile.maximumFps);
+                        profile.zoomDelta = zoom.value();
+                        profile.tiltDegrees = tilt.intValue();
+                        profile.focusXPercent = focusX.intValue();
+                        profile.focusYPercent = focusY.intValue();
+                        profile.mapScalePercent = mapScale.intValue();
+                        profile.maximumFps = maximumFps.intValue();
                         profile.automaticDayNight = automaticDayNight.isChecked();
                         profile.nightMode = nightMode.isChecked();
                         profile.showRoute = showRoute.isChecked();
@@ -584,23 +584,20 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showWater = showWater.isChecked();
                         profile.showModels = showModels.isChecked();
                         profile.showCursor = showCursor.isChecked();
-                        profile.cursorScalePercent = integer(
-                                cursorScale, profile.cursorScalePercent);
+                        profile.cursorScalePercent = cursorScale.intValue();
                         profile.cursorColor = cursorColor.value;
                         profile.cursorOutlineColor = cursorOutline.value;
                         profile.routeColor = routeColor.value;
                         profile.routeOutlineColor = routeOutline.value;
-                        profile.routeWidth = decimal(routeWidth, profile.routeWidth);
-                        profile.routeOutlineWidth = decimal(
-                                routeOutlineWidth, profile.routeOutlineWidth);
+                        profile.routeWidth = routeWidth.value();
+                        profile.routeOutlineWidth = routeOutlineWidth.value();
                         profile.trafficFreeColor = trafficFreeColor.value;
                         profile.trafficLightColor = trafficLightColor.value;
                         profile.trafficHardColor = trafficHardColor.value;
                         profile.trafficVeryHardColor = trafficVeryHardColor.value;
                         profile.trafficBlockedColor = trafficBlockedColor.value;
                         profile.trafficUnknownColor = trafficUnknownColor.value;
-                        profile.trafficGradientLength = decimal(
-                                trafficGradient, profile.trafficGradientLength);
+                        profile.trafficGradientLength = trafficGradient.value();
 
                         item.normalize(config.gridColumns, config.gridRows);
                         navigation.normalize();
@@ -638,14 +635,14 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 + "настраиваются в элементе «Карта HUD».", 12, 0xFF95A0AF));
         Switch mapEnabled = switchView("Изменять оформление основной карты", map.enabled);
         form.addView(mapEnabled, marginTop(8));
-        EditText focusX = field(form, "Точка фокуса по горизонтали, %",
-                Integer.toString(map.focusXPercent), true);
-        EditText focusY = field(form, "Точка фокуса по вертикали, %",
-                Integer.toString(map.focusYPercent), true);
-        EditText mapScale = field(form, "Размер подписей и объектов карты, %",
-                Integer.toString(map.mapScalePercent), true);
-        EditText maximumFps = field(form, "Плавность карты, кадров/с (обычно 30)",
-                Integer.toString(map.maximumFps), true);
+        SliderField focusX = slider(form, "Точка фокуса по горизонтали",
+                map.focusXPercent, 0, 100, 1, " %");
+        SliderField focusY = slider(form, "Точка фокуса по вертикали",
+                map.focusYPercent, 0, 100, 1, " %");
+        SliderField mapScale = slider(form, "Размер подписей и объектов карты",
+                map.mapScalePercent, 50, 300, 5, " %");
+        SliderField maximumFps = slider(form, "Плавность основной карты",
+                map.maximumFps, 5, 60, 1, " кадр/с");
         Switch automaticDayNight = switchView("Автоматический день / ночь",
                 map.automaticDayNight);
         Switch nightMode = switchView("Принудительно ночной режим", map.nightMode);
@@ -677,26 +674,26 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 aspectLocked, rememberGeometry}) {
             form.addView(control, marginTop(4));
         }
-        EditText left = field(form, "Позиция слева, %",
-                Integer.toString(window.leftPercent), true);
-        EditText top = field(form, "Позиция сверху, %",
-                Integer.toString(window.topPercent), true);
-        EditText width = field(form, "Ширина окна, %",
-                Integer.toString(window.widthPercent), true);
-        EditText height = field(form, "Высота окна, %",
-                Integer.toString(window.heightPercent), true);
-        EditText corner = field(form, "Скругление окна, dp",
-                Integer.toString(window.cornerRadiusDp), true);
-        EditText opacity = field(form, "Непрозрачность окна, %",
-                Integer.toString(window.opacityPercent), true);
+        SliderField left = slider(form, "Позиция слева",
+                window.leftPercent, 0, 100, 1, " %");
+        SliderField top = slider(form, "Позиция сверху",
+                window.topPercent, 0, 100, 1, " %");
+        SliderField width = slider(form, "Ширина окна",
+                window.widthPercent, 20, 100, 1, " %");
+        SliderField height = slider(form, "Высота окна",
+                window.heightPercent, 20, 100, 1, " %");
+        SliderField corner = slider(form, "Скругление окна",
+                window.cornerRadiusDp, 0, 160, 1, " dp");
+        SliderField opacity = slider(form, "Непрозрачность окна",
+                window.opacityPercent, 20, 100, 1, " %");
         form.addView(text("Фон снаружи карты всегда прозрачный — элементы главного экрана и "
                 + "системные панели остаются видимыми вокруг окна.",
                 12, 0xFF95A0AF), marginTop(8));
-        EditText borderWidth = field(form, "Толщина рамки, dp",
-                Integer.toString(window.borderWidthDp), true);
+        SliderField borderWidth = slider(form, "Толщина рамки",
+                window.borderWidthDp, 0, 24, 1, " dp");
         ColorField borderColor = colorField(form, "Цвет рамки", window.borderColor);
-        EditText shadowRadius = field(form, "Радиус тени, dp",
-                Integer.toString(window.shadowRadiusDp), true);
+        SliderField shadowRadius = slider(form, "Радиус тени",
+                window.shadowRadiusDp, 0, 96, 1, " dp");
         ColorField shadowColor = colorField(form, "Цвет тени", window.shadowColor);
 
         form.addView(section("Кнопки окна"), marginTop(16));
@@ -718,10 +715,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         form.addView(label("Угол кнопки возврата в оконном режиме"), marginTop(8));
         Spinner buttonPosition = windowButtonPositionSpinner(window.modeButtonPosition);
         form.addView(buttonPosition);
-        EditText buttonSize = field(form, "Размер кнопки, dp",
-                Integer.toString(window.modeButtonSizeDp), true);
-        EditText buttonOpacity = field(form, "Непрозрачность кнопки, %",
-                Integer.toString(window.modeButtonOpacityPercent), true);
+        SliderField buttonSize = slider(form, "Размер кнопки",
+                window.modeButtonSizeDp, 28, 96, 1, " dp");
+        SliderField buttonOpacity = slider(form, "Непрозрачность кнопки",
+                window.modeButtonOpacityPercent, 20, 100, 1, " %");
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Основная карта и окно Навигатора")
@@ -733,10 +730,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 .setOnClickListener(view -> {
                     try {
                         map.enabled = mapEnabled.isChecked();
-                        map.focusXPercent = integer(focusX, map.focusXPercent);
-                        map.focusYPercent = integer(focusY, map.focusYPercent);
-                        map.mapScalePercent = integer(mapScale, map.mapScalePercent);
-                        map.maximumFps = integer(maximumFps, map.maximumFps);
+                        map.focusXPercent = focusX.intValue();
+                        map.focusYPercent = focusY.intValue();
+                        map.mapScalePercent = mapScale.intValue();
+                        map.maximumFps = maximumFps.intValue();
                         map.automaticDayNight = automaticDayNight.isChecked();
                         map.nightMode = nightMode.isChecked();
                         map.showLabels = showLabels.isChecked();
@@ -750,15 +747,15 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         window.resizeLocked = resizeLocked.isChecked();
                         window.aspectRatioLocked = aspectLocked.isChecked();
                         window.rememberGeometry = rememberGeometry.isChecked();
-                        window.leftPercent = integer(left, window.leftPercent);
-                        window.topPercent = integer(top, window.topPercent);
-                        window.widthPercent = integer(width, window.widthPercent);
-                        window.heightPercent = integer(height, window.heightPercent);
-                        window.cornerRadiusDp = integer(corner, window.cornerRadiusDp);
-                        window.opacityPercent = integer(opacity, window.opacityPercent);
-                        window.borderWidthDp = integer(borderWidth, window.borderWidthDp);
+                        window.leftPercent = left.intValue();
+                        window.topPercent = top.intValue();
+                        window.widthPercent = width.intValue();
+                        window.heightPercent = height.intValue();
+                        window.cornerRadiusDp = corner.intValue();
+                        window.opacityPercent = opacity.intValue();
+                        window.borderWidthDp = borderWidth.intValue();
                         window.borderColor = borderColor.value;
-                        window.shadowRadiusDp = integer(shadowRadius, window.shadowRadiusDp);
+                        window.shadowRadiusDp = shadowRadius.intValue();
                         window.shadowColor = shadowColor.value;
                         window.modeButtonVisible = modeButtonVisible.isChecked();
                         window.modeButtonPosition = windowButtonPositionValue(
@@ -766,9 +763,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         window.dragHandleVisible = dragHandleVisible.isChecked();
                         window.resizeHandleVisible = resizeHandleVisible.isChecked();
                         window.closeButtonVisible = closeButtonVisible.isChecked();
-                        window.modeButtonSizeDp = integer(buttonSize, window.modeButtonSizeDp);
-                        window.modeButtonOpacityPercent = integer(
-                                buttonOpacity, window.modeButtonOpacityPercent);
+                        window.modeButtonSizeDp = buttonSize.intValue();
+                        window.modeButtonOpacityPercent = buttonOpacity.intValue();
 
                         navigation.normalize();
                         preferences.navigationIntegrationConfigJson.set(
@@ -805,7 +801,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
     }
 
     private void addVisualElementOptions(@NonNull LinearLayout form,
-            @NonNull HudElementConfig item, @NonNull Map<String, View> controls) {
+            @NonNull HudElementConfig item, @NonNull Map<String, Object> controls) {
         if (item.type.name().startsWith("NAV_")) {
             visualSwitch(form, controls, "bool:hideWhenInactive",
                     "Скрывать без активного маршрута",
@@ -913,25 +909,28 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         }
     }
 
-    private void visualSwitch(LinearLayout form, Map<String, View> controls, String key,
+    private void visualSwitch(LinearLayout form, Map<String, Object> controls, String key,
             String title, boolean checked) {
         Switch control = switchView(title, checked);
         form.addView(control, marginTop(4));
         controls.put(key, control);
     }
 
-    private void visualInt(LinearLayout form, Map<String, View> controls, String key,
+    private void visualInt(LinearLayout form, Map<String, Object> controls, String key,
             String title, int value) {
-        controls.put(key, field(form, title, Integer.toString(value), true));
+        boolean distance = key.endsWith("laneThresholdMeters");
+        controls.put(key, slider(form, title, value,
+                0, distance ? 2_000 : 50, distance ? 50 : 1,
+                distance ? " м" : " км/ч"));
     }
 
-    private void visualColor(LinearLayout form, Map<String, View> controls,
+    private void visualColor(LinearLayout form, Map<String, Object> controls,
             HudElementConfig item, String key, String title, String fallback) {
         controls.put("color:" + key, field(form, title,
                 optionColorText(item, key, fallback), false));
     }
 
-    private void addTrafficPaletteOptions(LinearLayout form, Map<String, View> controls,
+    private void addTrafficPaletteOptions(LinearLayout form, Map<String, Object> controls,
             HudElementConfig item) {
         visualColor(form, controls, item, "freeColor", "Свободно ARGB", "#FF34C759");
         visualColor(form, controls, item, "lightColor", "Небольшая пробка ARGB", "#FFFFCC00");
@@ -951,7 +950,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         return text.isEmpty() ? fallback : text;
     }
 
-    private void visualSpinner(LinearLayout form, Map<String, View> controls, String key,
+    private void visualSpinner(LinearLayout form, Map<String, Object> controls, String key,
             String title, String[] choices, String selected) {
         form.addView(label(title), marginTop(8));
         Spinner control = spinner(choices, selected);
@@ -960,18 +959,18 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
     }
 
     private static void applyVisualElementOptions(JSONObject output,
-            Map<String, View> controls) throws JSONException {
-        for (Map.Entry<String, View> entry : controls.entrySet()) {
+            Map<String, Object> controls) throws JSONException {
+        for (Map.Entry<String, Object> entry : controls.entrySet()) {
             String encoded = entry.getKey();
             int separator = encoded.indexOf(':');
             if (separator <= 0 || separator >= encoded.length() - 1) continue;
             String kind = encoded.substring(0, separator);
             String key = encoded.substring(separator + 1);
-            View control = entry.getValue();
+            Object control = entry.getValue();
             if ("bool".equals(kind) && control instanceof Switch) {
                 output.put(key, ((Switch) control).isChecked());
-            } else if ("int".equals(kind) && control instanceof EditText) {
-                output.put(key, integer((EditText) control, output.optInt(key, 0)));
+            } else if ("int".equals(kind) && control instanceof SliderField) {
+                output.put(key, ((SliderField) control).intValue());
             } else if ("color".equals(kind) && control instanceof EditText) {
                 String color = value((EditText) control);
                 Color.parseColor(color);
@@ -990,36 +989,35 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         scroll.addView(form);
 
         EditText title = field(form, "Название", group.title, false);
-        LinearLayout geometry = new LinearLayout(this);
-        EditText x = compactNumber("X", group.x);
-        EditText y = compactNumber("Y", group.y);
-        EditText width = compactNumber("W", group.width);
-        EditText height = compactNumber("H", group.height);
-        geometry.addView(x, weighted());
-        geometry.addView(y, weighted());
-        geometry.addView(width, weighted());
-        geometry.addView(height, weighted());
-        form.addView(label("Положение и размер фрейма"), marginTop(10));
-        form.addView(geometry);
+        form.addView(section("Положение и размер фрейма"), marginTop(12));
+        SliderField x = slider(form, "Слева", group.x,
+                0, Math.max(0, config.gridColumns - 1), 1, " яч.");
+        SliderField y = slider(form, "Сверху", group.y,
+                0, Math.max(0, config.gridRows - 1), 1, " яч.");
+        SliderField width = slider(form, "Ширина", group.width,
+                1, Math.max(1, config.gridColumns), 1, " яч.");
+        SliderField height = slider(form, "Высота", group.height,
+                1, Math.max(1, config.gridRows), 1, " яч.");
 
-        EditText gap = field(form, "Расстояние между элементами, px",
-                Integer.toString(HudHorizontalGroup.gapPx(group)), true);
-        EditText paddingLeft = field(form, "Внутренний отступ слева, px",
-                Integer.toString(HudHorizontalGroup.paddingLeftPx(group)), true);
-        EditText paddingTop = field(form, "Внутренний отступ сверху, px",
-                Integer.toString(HudHorizontalGroup.paddingTopPx(group)), true);
-        EditText paddingRight = field(form, "Внутренний отступ справа, px",
-                Integer.toString(HudHorizontalGroup.paddingRightPx(group)), true);
-        EditText paddingBottom = field(form, "Внутренний отступ снизу, px",
-                Integer.toString(HudHorizontalGroup.paddingBottomPx(group)), true);
-        EditText marginLeft = field(form, "Внешний отступ слева, px",
-                Integer.toString(HudHorizontalGroup.marginLeftPx(group)), true);
-        EditText marginTop = field(form, "Внешний отступ сверху, px",
-                Integer.toString(HudHorizontalGroup.marginTopPx(group)), true);
-        EditText marginRight = field(form, "Внешний отступ справа, px",
-                Integer.toString(HudHorizontalGroup.marginRightPx(group)), true);
-        EditText marginBottom = field(form, "Внешний отступ снизу, px",
-                Integer.toString(HudHorizontalGroup.marginBottomPx(group)), true);
+        form.addView(section("Отступы"), marginTop(14));
+        SliderField gap = slider(form, "Между элементами",
+                HudHorizontalGroup.gapPx(group), 0, 200, 1, " px");
+        SliderField paddingLeft = slider(form, "Внутри слева",
+                HudHorizontalGroup.paddingLeftPx(group), 0, 200, 1, " px");
+        SliderField paddingTop = slider(form, "Внутри сверху",
+                HudHorizontalGroup.paddingTopPx(group), 0, 200, 1, " px");
+        SliderField paddingRight = slider(form, "Внутри справа",
+                HudHorizontalGroup.paddingRightPx(group), 0, 200, 1, " px");
+        SliderField paddingBottom = slider(form, "Внутри снизу",
+                HudHorizontalGroup.paddingBottomPx(group), 0, 200, 1, " px");
+        SliderField marginLeft = slider(form, "Снаружи слева",
+                HudHorizontalGroup.marginLeftPx(group), 0, 200, 1, " px");
+        SliderField marginTop = slider(form, "Снаружи сверху",
+                HudHorizontalGroup.marginTopPx(group), 0, 200, 1, " px");
+        SliderField marginRight = slider(form, "Снаружи справа",
+                HudHorizontalGroup.marginRightPx(group), 0, 200, 1, " px");
+        SliderField marginBottom = slider(form, "Снаружи снизу",
+                HudHorizontalGroup.marginBottomPx(group), 0, 200, 1, " px");
 
         Spinner distribution = spinner(new String[]{"Компактно", "Равные ячейки"},
                 HudHorizontalGroup.distribution(group) == 1
@@ -1076,21 +1074,21 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                             return;
                         }
                         group.title = value(title);
-                        group.x = integer(x, group.x);
-                        group.y = integer(y, group.y);
-                        group.width = integer(width, group.width);
-                        group.height = integer(height, group.height);
+                        group.x = x.intValue();
+                        group.y = y.intValue();
+                        group.width = width.intValue();
+                        group.height = height.intValue();
                         group.enabled = itemEnabled.isChecked();
                         HudHorizontalGroup.setMemberIds(group, memberIds);
-                        putHudGroupOption(group, "gapPx", integer(gap, 0));
-                        putHudGroupOption(group, "paddingLeftPx", integer(paddingLeft, 0));
-                        putHudGroupOption(group, "paddingTopPx", integer(paddingTop, 0));
-                        putHudGroupOption(group, "paddingRightPx", integer(paddingRight, 0));
-                        putHudGroupOption(group, "paddingBottomPx", integer(paddingBottom, 0));
-                        putHudGroupOption(group, "marginLeftPx", integer(marginLeft, 0));
-                        putHudGroupOption(group, "marginTopPx", integer(marginTop, 0));
-                        putHudGroupOption(group, "marginRightPx", integer(marginRight, 0));
-                        putHudGroupOption(group, "marginBottomPx", integer(marginBottom, 0));
+                        putHudGroupOption(group, "gapPx", gap.intValue());
+                        putHudGroupOption(group, "paddingLeftPx", paddingLeft.intValue());
+                        putHudGroupOption(group, "paddingTopPx", paddingTop.intValue());
+                        putHudGroupOption(group, "paddingRightPx", paddingRight.intValue());
+                        putHudGroupOption(group, "paddingBottomPx", paddingBottom.intValue());
+                        putHudGroupOption(group, "marginLeftPx", marginLeft.intValue());
+                        putHudGroupOption(group, "marginTopPx", marginTop.intValue());
+                        putHudGroupOption(group, "marginRightPx", marginRight.intValue());
+                        putHudGroupOption(group, "marginBottomPx", marginBottom.intValue());
                         putHudGroupOption(group, "distribution",
                                 distribution.getSelectedItemPosition());
                         putHudGroupOption(group, "horizontalAlignment",
@@ -1220,28 +1218,26 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         scroll.addView(form);
 
         EditText title = field(form, "Название", item.title, false);
-        LinearLayout geometry = new LinearLayout(this);
-        EditText x = compactNumber("X", item.x);
-        EditText y = compactNumber("Y", item.y);
-        EditText width = compactNumber("W", item.width);
-        EditText height = compactNumber("H", item.height);
-        geometry.addView(x, weighted());
-        geometry.addView(y, weighted());
-        geometry.addView(width, weighted());
-        geometry.addView(height, weighted());
-        form.addView(label("Положение и размер"), marginTop(10));
-        form.addView(geometry);
+        form.addView(section("Положение и размер"), marginTop(12));
+        SliderField x = slider(form, "Слева", item.x,
+                0, Math.max(0, config.gridColumns - 1), 1, " яч.");
+        SliderField y = slider(form, "Сверху", item.y,
+                0, Math.max(0, config.gridRows - 1), 1, " яч.");
+        SliderField width = slider(form, "Ширина", item.width,
+                1, Math.max(1, config.gridColumns), 1, " яч.");
+        SliderField height = slider(form, "Высота", item.height,
+                1, Math.max(1, config.gridRows), 1, " яч.");
 
         EditText color = field(form, "Цвет подложки", item.backgroundColor, false);
-        EditText opacity = field(form, "Прозрачность заливки 0–100 %",
-                Integer.toString(item.backgroundOpacityPercent), true);
-        EditText corner = field(form, "Скругление, px",
-                Integer.toString(item.cornerRadiusPx), true);
+        SliderField opacity = slider(form, "Непрозрачность заливки",
+                item.backgroundOpacityPercent, 0, 100, 1, " %");
+        SliderField corner = slider(form, "Скругление",
+                item.cornerRadiusPx, 0, 80, 1, " px");
         EditText borderColor = field(form, "Цвет рамки", item.borderColor, false);
-        EditText borderOpacity = field(form, "Прозрачность рамки 0–100 %",
-                Integer.toString(item.borderOpacityPercent), true);
-        EditText borderWidth = field(form, "Толщина рамки, px",
-                Integer.toString(item.borderWidthPx), true);
+        SliderField borderOpacity = slider(form, "Непрозрачность рамки",
+                item.borderOpacityPercent, 0, 100, 1, " %");
+        SliderField borderWidth = slider(form, "Толщина рамки",
+                item.borderWidthPx, 0, 20, 1, " px");
         Switch itemEnabled = switchView("Показывать подложку", item.enabled);
         form.addView(itemEnabled, marginTop(8));
         form.addView(text("Подложка всегда рисуется ниже всех HUD-виджетов. "
@@ -1257,18 +1253,16 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(view -> {
                     item.title = value(title);
-                    item.x = integer(x, item.x);
-                    item.y = integer(y, item.y);
-                    item.width = integer(width, item.width);
-                    item.height = integer(height, item.height);
+                    item.x = x.intValue();
+                    item.y = y.intValue();
+                    item.width = width.intValue();
+                    item.height = height.intValue();
                     item.backgroundColor = value(color);
-                    item.backgroundOpacityPercent =
-                            integer(opacity, item.backgroundOpacityPercent);
-                    item.cornerRadiusPx = integer(corner, item.cornerRadiusPx);
+                    item.backgroundOpacityPercent = opacity.intValue();
+                    item.cornerRadiusPx = corner.intValue();
                     item.borderColor = value(borderColor);
-                    item.borderOpacityPercent =
-                            integer(borderOpacity, item.borderOpacityPercent);
-                    item.borderWidthPx = integer(borderWidth, item.borderWidthPx);
+                    item.borderOpacityPercent = borderOpacity.intValue();
+                    item.borderWidthPx = borderWidth.intValue();
                     item.enabled = itemEnabled.isChecked();
                     item.normalize(config.gridColumns, config.gridRows);
                     canvas.updateConfig(config);
@@ -1284,8 +1278,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         LinearLayout form = column();
         form.setPadding(dp(18), dp(8), dp(18), dp(18));
         scroll.addView(form);
-        EditText columns = field(form, "Колонки сетки", Integer.toString(config.gridColumns), true);
-        EditText rows = field(form, "Строки сетки", Integer.toString(config.gridRows), true);
+        SliderField columns = slider(form, "Колонки сетки",
+                config.gridColumns, 4, 200, 1, "");
+        SliderField rows = slider(form, "Строки сетки",
+                config.gridRows, 2, 100, 1, "");
         TextView hardwareBounds = text("Аппаратная область (зафиксирована): "
                 + HudViewportPolicy.SAFE_WIDTH + "×" + HudViewportPolicy.SAFE_HEIGHT
                 + " px, X=" + HudViewportPolicy.SAFE_LEFT
@@ -1298,18 +1294,18 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 config.backgroundMode);
         form.addView(label("Фон"), marginTop(10));
         form.addView(background);
-        EditText brightness = field(form, "Общая яркость 0–100",
-                Integer.toString(config.globalBrightness), true);
+        SliderField brightness = slider(form, "Общая яркость",
+                config.globalBrightness, 0, 100, 1, " %");
         EditText globalColor = field(form, "Общий цвет текста", config.globalTextColor, false);
         EditText globalUnit = field(form, "Общий цвет единиц", config.globalUnitColor, false);
-        EditText fontWeight = field(form, "Общая насыщенность шрифта",
-                Integer.toString(config.globalFontWeight), true);
+        SliderField fontWeight = slider(form, "Общая насыщенность шрифта",
+                config.globalFontWeight, 100, 900, 100, "");
         EditText fontUri = field(form, "URI пользовательского шрифта",
                 config.customFontUri, false);
-        EditText navThreshold = field(form, "Показывать навигацию до расстояния, м",
-                Integer.toString(config.navigationDisplayThresholdMeters), true);
-        EditText navDelay = field(form, "Задержка скрытия навигации, с",
-                Integer.toString(config.navigationHideDelaySeconds), true);
+        SliderField navThreshold = slider(form, "Показывать навигацию до расстояния",
+                config.navigationDisplayThresholdMeters, 0, 5_000, 100, " м");
+        SliderField navDelay = slider(form, "Задержка скрытия навигации",
+                config.navigationHideDelaySeconds, 0, 60, 1, " с");
         Switch showGrid = switchView("Показывать сетку в редакторе", config.showGrid);
         Switch free = switchView("Свободное перемещение между линиями", config.freeMovement);
         Switch maskStockHud = switchView(
@@ -1357,18 +1353,16 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(view -> {
-                    config.gridColumns = integer(columns, config.gridColumns);
-                    config.gridRows = integer(rows, config.gridRows);
+                    config.gridColumns = columns.intValue();
+                    config.gridRows = rows.intValue();
                     config.backgroundMode = String.valueOf(background.getSelectedItem());
-                    config.globalBrightness = integer(brightness, config.globalBrightness);
+                    config.globalBrightness = brightness.intValue();
                     config.globalTextColor = value(globalColor);
                     config.globalUnitColor = value(globalUnit);
-                    config.globalFontWeight = integer(fontWeight, config.globalFontWeight);
+                    config.globalFontWeight = fontWeight.intValue();
                     config.customFontUri = value(fontUri);
-                    config.navigationDisplayThresholdMeters =
-                            integer(navThreshold, config.navigationDisplayThresholdMeters);
-                    config.navigationHideDelaySeconds =
-                            integer(navDelay, config.navigationHideDelaySeconds);
+                    config.navigationDisplayThresholdMeters = navThreshold.intValue();
+                    config.navigationHideDelaySeconds = navDelay.intValue();
                     config.showGrid = showGrid.isChecked();
                     config.freeMovement = free.isChecked();
                     config.maskStockHud = maskStockHud.isChecked();
@@ -1731,15 +1725,74 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         return field;
     }
 
-    private EditText compactNumber(String hint, int value) {
-        EditText field = new EditText(this);
-        field.setHint(hint);
-        field.setText(Integer.toString(value));
-        field.setTextColor(Color.WHITE);
-        field.setHintTextColor(0xFF778190);
-        field.setGravity(Gravity.CENTER);
-        field.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
-        return field;
+    /** A bounded control for common HUD visual values; no keyboard or malformed numbers. */
+    private SliderField slider(@NonNull LinearLayout parent, @NonNull String title,
+                               double initial, double minimum, double maximum,
+                               double step, @NonNull String suffix) {
+        TextView valueLabel = label("");
+        parent.addView(valueLabel, marginTop(8));
+        SeekBar control = new SeekBar(this);
+        int steps = Math.max(1, (int) Math.round((maximum - minimum) / step));
+        control.setMax(steps);
+        int initialProgress = (int) Math.round((initial - minimum) / step);
+        control.setProgress(Math.max(0, Math.min(steps, initialProgress)));
+        SliderField result = new SliderField(
+                title, suffix, minimum, step, control, valueLabel);
+        result.updateLabel();
+        control.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                    boolean fromUser) {
+                result.updateLabel();
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        parent.addView(control, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return result;
+    }
+
+    private static final class SliderField {
+        @NonNull private final String title;
+        @NonNull private final String suffix;
+        private final double minimum;
+        private final double step;
+        @NonNull private final SeekBar control;
+        @NonNull private final TextView valueLabel;
+
+        SliderField(@NonNull String title, @NonNull String suffix,
+                    double minimum, double step, @NonNull SeekBar control,
+                    @NonNull TextView valueLabel) {
+            this.title = title;
+            this.suffix = suffix;
+            this.minimum = minimum;
+            this.step = step;
+            this.control = control;
+            this.valueLabel = valueLabel;
+        }
+
+        double value() {
+            return minimum + control.getProgress() * step;
+        }
+
+        int intValue() {
+            return (int) Math.round(value());
+        }
+
+        void updateLabel() {
+            double current = value();
+            String rendered;
+            if (Math.abs(current - Math.rint(current)) < 0.0001) {
+                rendered = Integer.toString((int) Math.rint(current));
+            } else if (Math.abs(current * 2 - Math.rint(current * 2)) < 0.0001) {
+                rendered = String.format(Locale.ROOT, "%.1f", current);
+            } else {
+                rendered = String.format(Locale.ROOT, "%.2f", current);
+            }
+            valueLabel.setText(title + ": " + rendered + suffix);
+        }
     }
 
     private Spinner spinner(String[] choices, String selected) {
@@ -1856,10 +1909,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         return new LinearLayout.LayoutParams(dp(widthDp), ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
-    private LinearLayout.LayoutParams weighted() {
-        return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-    }
-
     private LinearLayout.LayoutParams marginTop(int dp) {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1869,16 +1918,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
 
     private static String value(EditText field) {
         return field.getText() == null ? "" : field.getText().toString().trim();
-    }
-
-    private static int integer(EditText field, int fallback) {
-        try { return Integer.parseInt(value(field)); }
-        catch (NumberFormatException ignored) { return fallback; }
-    }
-
-    private static double decimal(EditText field, double fallback) {
-        try { return Double.parseDouble(value(field).replace(',', '.')); }
-        catch (NumberFormatException ignored) { return fallback; }
     }
 
     /**

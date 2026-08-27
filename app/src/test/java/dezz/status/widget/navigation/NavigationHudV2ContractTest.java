@@ -158,9 +158,12 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("profile.enabled && profile.modeButtonVisible"));
         assertTrue(controller.contains("mode != MODE_FULLSCREEN"));
         assertTrue(controller.contains("attributes.type = originalType"));
+        assertTrue(controller.contains("attributes.format = originalFormat"));
+        assertFalse(controller.contains("PixelFormat.TRANSLUCENT"));
+        assertFalse(controller.contains("FLAG_LAYOUT_NO_LIMITS"));
         assertFalse(controller.contains("WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY"));
         assertFalse(controller.contains("WindowManager.LayoutParams.TYPE_SYSTEM_ALERT"));
-        assertTrue(controller.contains("FLAG_WATCH_OUTSIDE_TOUCH"));
+        assertFalse(controller.contains("FLAG_WATCH_OUTSIDE_TOUCH"));
         assertTrue(controller.contains("FLAG_FORCE_NOT_FULLSCREEN"));
         assertTrue(controller.contains("FLAG_FULLSCREEN"));
         assertTrue(controller.contains("enforceFloatingWindowContract()"));
@@ -170,6 +173,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("decor.setClipToOutline(false)"));
         assertFalse(controller.contains("decor.setClipToOutline(profile.cornerRadiusDp > 0)"));
         assertFalse(controller.contains("View.SYSTEM_UI_FLAG_HIDE_NAVIGATION"));
+        assertTrue(controller.contains("containsReadySurface"));
+        assertTrue(controller.contains("view instanceof SurfaceView"));
+        assertTrue(controller.contains("decor.postOnAnimation"));
         assertTrue(windowProfile.contains("backgroundColor = \"#00000000\""));
         assertTrue(controller.contains("navi_service_open_voice_search"));
         assertTrue(controller.contains("guidance_open_voice_search"));
@@ -196,7 +202,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("createUserLocationLayer"));
         assertTrue(renderer.contains("applyStyleSlot"));
         assertTrue(renderer.contains("visibilityStyleJson"));
-        assertTrue(renderer.contains("updatePrimaryCamera"));
+        assertTrue(renderer.contains("updateInitialCamera"));
+        assertTrue(renderer.contains("updateNavigationState"));
+        assertTrue(client.contains("hudMapRenderer.updateNavigationState(snapshotJson)"));
+        assertFalse(client.contains("hudMapRenderer.updatePrimaryCamera"));
         assertTrue(renderer.contains("getGeometry"));
         assertTrue(renderer.contains("addPolyline"));
         assertTrue(routeStyler.contains("getJamSegments"));
@@ -335,6 +344,20 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("Цвет рекомендуемой полосы"));
         assertTrue(settings.contains("Красный сигнал ARGB"));
         assertTrue(settings.contains("Тяжёлая пробка ARGB"));
+        assertTrue(settings.contains("SeekBar control = new SeekBar(this)"));
+        assertTrue(settings.contains("SliderField fontSize = slider"));
+        assertTrue(settings.contains("SliderField brightness = slider"));
+        assertTrue(settings.contains("SliderField borderOpacity = slider"));
+        assertTrue(settings.contains("SliderField zoom = slider"));
+        assertTrue(settings.contains("SliderField focusX = slider"));
+        assertTrue(settings.contains("SliderField width = slider"));
+        assertTrue(settings.contains("SliderField columns = slider"));
+        assertTrue(settings.contains("SliderField gap = slider"));
+        assertTrue(settings.contains("SliderField marginBottom = slider"));
+        assertTrue(settings.contains("SliderField buttonOpacity = slider"));
+        assertFalse(settings.contains("EditText focusX = field"));
+        assertFalse(settings.contains("EditText buttonOpacity = field"));
+        assertFalse(settings.contains("compactNumber("));
     }
 
     private static Path sourceRoot() {

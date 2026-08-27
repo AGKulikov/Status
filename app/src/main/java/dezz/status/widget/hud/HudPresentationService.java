@@ -403,10 +403,6 @@ public final class HudPresentationService extends Service
             if (systemSurfaceWindow != null) systemSurfaceWindow.updateConfig(config);
             if (overlayWindow != null) overlayWindow.updateConfig(config);
             if (presentation != null) presentation.updateConfig(config);
-            Display display = HudDisplaySelector.display(candidate);
-            if (systemSurfaceWindow == null && display != null && display.isValid()) {
-                startSystemSurface(display);
-            }
             setRuntimeDetail(runtimeDetail(candidate));
             updateNotification(runtimeDetail);
             return;
@@ -441,20 +437,19 @@ public final class HudPresentationService extends Service
     }
 
     private void showOnDisplay(@NonNull Display display) {
-        // The direct SurfaceFlinger lane is the primary KX11 output path and must be started
-        // independently. A broken WindowManager fallback used to throw first and prevented even
-        // clocks and other standalone HUD elements from reaching the physical display.
-        startSystemSurface(display);
-        if (overlayWindow == null && presentation == null) {
-            try {
-                showWindowManagerFallback(display);
-            } catch (RuntimeException failure) {
-                Log.w(TAG, "Could not start HUD fallback; direct surface remains active",
-                        failure);
-                DiagnosticJournal.error("hud-runtime",
-                        "HUD fallback недоступен; прямой SurfaceFlinger-канал продолжает запуск",
-                        failure);
-            }
+        // Exactly one compositor owns the 728x190 HUD plane. Running the MapWindow overlay and
+        // the PNG SurfaceFlinger mask simultaneously presents two independently paced buffers and
+        // produces the bright horizontal tear visible in the device video. WindowManager is the
+        // preferred path because it contains the independent TextureView map; direct SurfaceFlinger
+        // is now strictly a fallback for firmware that rejects the display overlay.
+        try {
+            showWindowManagerFallback(display);
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Could not start HUD WindowManager path; trying direct surface", failure);
+            DiagnosticJournal.error("hud-runtime",
+                    "HUD WindowManager недоступен; пробуем один прямой SurfaceFlinger-канал",
+                    failure);
+            startSystemSurface(display);
         }
         if (systemSurfaceWindow == null && overlayWindow == null && presentation == null) {
             throw new IllegalStateException("No HUD output path started");
@@ -462,7 +457,8 @@ public final class HudPresentationService extends Service
     }
 
     private void startSystemSurface(@NonNull Display display) {
-        if (systemSurfaceWindow != null || shownUniqueId == null || !display.isValid()) return;
+        if (systemSurfaceWindow != null || overlayWindow != null || presentation != null
+                || shownUniqueId == null || !display.isValid()) return;
         if (SystemClock.elapsedRealtime() < systemSurfaceRetryAfter) {
             scheduleSystemSurfaceRetry();
             return;
@@ -478,10 +474,6 @@ public final class HudPresentationService extends Service
                                 readyWindow.dismiss();
                                 return;
                             }
-                            // Keep the lower WindowManager copy alive as a fail-safe. It is
-                            // visually hidden by the identical direct surface when SurfaceFlinger
-                            // presents correctly, but prevents the custom panel from disappearing
-                            // if an OEM compositor accepts a buffer on the wrong physical output.
                             systemSurfaceRetryAfter = 0L;
                             main.removeCallbacks(retrySystemSurface);
                             setCustomFrameReady(true);
@@ -538,7 +530,8 @@ public final class HudPresentationService extends Service
 
     private void scheduleSystemSurfaceRetry() {
         main.removeCallbacks(retrySystemSurface);
-        if (!runtimeInitialized || shownUniqueId == null || systemSurfaceWindow != null) return;
+        if (!runtimeInitialized || shownUniqueId == null || systemSurfaceWindow != null
+                || overlayWindow != null || presentation != null) return;
         long delay = Math.max(0L,
                 systemSurfaceRetryAfter - SystemClock.elapsedRealtime());
         main.postDelayed(retrySystemSurface, delay);
@@ -549,9 +542,12 @@ public final class HudPresentationService extends Service
             try {
                 overlayWindow = HudOverlayWindow.show(this, display, config, data);
                 presentation = null;
+                systemSurfaceRetryAfter = 0L;
+                main.removeCallbacks(retrySystemSurface);
+                setCustomFrameReady(true);
                 DiagnosticJournal.info("hud-runtime",
                         "WindowManager HUD overlay создан на display id="
-                                + display.getDisplayId());
+                                + display.getDisplayId() + "; единственный compositor owner");
                 return;
             } catch (RuntimeException overlayFailure) {
                 overlayWindow = null;
@@ -564,8 +560,12 @@ public final class HudPresentationService extends Service
         HudPresentation fallback = createPresentation(display);
         fallback.show();
         presentation = fallback;
+        systemSurfaceRetryAfter = 0L;
+        main.removeCallbacks(retrySystemSurface);
+        setCustomFrameReady(true);
         DiagnosticJournal.info("hud-runtime",
-                "HUD Presentation создан на display id=" + display.getDisplayId());
+                "HUD Presentation создан на display id=" + display.getDisplayId()
+                        + "; единственный compositor owner");
     }
 
     @NonNull

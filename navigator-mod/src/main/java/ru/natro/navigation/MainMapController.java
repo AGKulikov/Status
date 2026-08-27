@@ -64,7 +64,7 @@ final class MainMapController {
         originalFocusPoint = null;
     }
 
-    /** Primary callbacks always continue to the independent HUD camera renderer. */
+    /** The stock Navigator remains the only consumer of primary-camera callbacks. */
     boolean updatePrimaryCamera(NavigatorStatePublisher.CameraState state) {
         return false;
     }

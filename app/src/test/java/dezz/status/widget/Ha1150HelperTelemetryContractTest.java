@@ -43,6 +43,21 @@ public final class Ha1150HelperTelemetryContractTest {
         assertTrue(widget.contains("SourceBinding.DEFAULT_CONNECTOR_ID"));
     }
 
+    @Test public void phoneBatteryTurnsRedBelowTwentyBeforeChargingTintIsConsidered()
+            throws Exception {
+        String widget = source("WidgetService.java");
+        String colors = resource("values/colors.xml");
+        int helper = widget.indexOf("private int phoneBatteryColor(");
+        int nextMethod = widget.indexOf("private void applyPhoneCellularInternalSpacing", helper);
+        assertTrue(helper >= 0 && nextMethod > helper);
+        String body = widget.substring(helper, nextMethod);
+        assertTrue(body.contains("battery != null && battery < 20"));
+        assertTrue(body.contains("R.color.iphone_battery_critical"));
+        assertTrue(body.indexOf("battery < 20") < body.indexOf("charging"));
+        assertTrue(colors.contains("name=\"iphone_battery_critical\">#FF453A"));
+        assertTrue(widget.contains("iconTint = phoneBatteryColor(battery, batteryCharging)"));
+    }
+
     private static String source(String relative) throws Exception {
         return read(Paths.get("java", "dezz", "status", "widget").resolve(relative));
     }

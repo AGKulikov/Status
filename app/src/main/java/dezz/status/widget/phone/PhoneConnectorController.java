@@ -1549,7 +1549,11 @@ public final class PhoneConnectorController {
                         selectedBondAddress,
                         v2Mode(startBleRole),
                         initialRadioEnabled,
-                        prefs.phoneBleV2HelperInstallationId().trim().isEmpty(),
+                        // Explicit LE enrollment has its own foreground flow. Routine startup
+                        // must not decrypt the enrollment record on the main looper merely to
+                        // derive this hint; the runtime's serialized worker accepts a first
+                        // identity when none exists and otherwise preserves the learned peer.
+                        false,
                         true,
                         allowExperimentalRouteB),
                 new V2TransportListener(token, transportSession));
