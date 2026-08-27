@@ -6,12 +6,24 @@ on:
   pull_request:
     branches: ['main']
   workflow_dispatch:
+    inputs:
+      sign_pair:
+        description: 'Sign the verified Natro and Navigator pair'
+        required: true
+        default: false
+        type: boolean
+      baseline_url:
+        description: 'Short-lived private URL for the exact reviewed Navigator baseline'
+        required: false
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   android:
+    if: github.event_name != 'workflow_dispatch' || !inputs.sign_pair
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
@@ -126,3 +138,100 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: ${{ steps.candidate.outputs.path }}/*
+
+  sign-pair:
+    if: github.event_name == 'workflow_dispatch' && inputs.sign_pair
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      EXPECTED_SOURCE_SHA: '2c3b1ae4bf585c54dcc7cd48da283de0ec89cbbb'
+      EXPECTED_SOURCE_TREE: '4bb6bb30c4f85ce72ebdc4068c7861561457a4b8'
+      EXPECTED_BASELINE_SHA256: '663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f'
+      EXPECTED_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.EXPECTED_SOURCE_SHA }}
+          persist-credentials: false
+      - name: Download the exact successful release-branch candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: navigation-hud-v2-pair-candidate-24
+          path: ${{ runner.temp }}/candidate
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: AGKulikov/Status
+          run-id: '33054523774'
+      - name: Verify immutable source and unsigned handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_SOURCE_TREE"
+          CANDIDATE="$RUNNER_TEMP/candidate"
+          (cd "$CANDIDATE" && sha256sum -c SHA256SUMS.txt)
+          test "$(jq -er '.sourceSha' "$CANDIDATE/candidate.json")" = \
+            "$EXPECTED_SOURCE_SHA"
+          test "$(jq -er '.sourceTree' "$CANDIDATE/candidate.json")" = \
+            "$EXPECTED_SOURCE_TREE"
+          test "$(jq -er '.natro.versionName' "$CANDIDATE/candidate.json")" = '2.4.1'
+          test "$(jq -er '.natro.versionCode' "$CANDIDATE/candidate.json")" = '208021265'
+      - name: Fetch and verify the exact private Navigator baseline
+        shell: bash
+        env:
+          BASELINE_URL: ${{ inputs.baseline_url }}
+        run: |
+          set -euo pipefail
+          test -n "$BASELINE_URL"
+          echo "::add-mask::$BASELINE_URL"
+          BASELINE="$RUNNER_TEMP/YN_30.3.0_T2_.apk"
+          curl --fail --location --retry 5 --retry-all-errors \
+            --silent --show-error --output "$BASELINE" "$BASELINE_URL"
+          test "$(sha256sum "$BASELINE" | awk '{print $1}')" = \
+            "$EXPECTED_BASELINE_SHA256"
+      - name: Sign and fully verify Natro and Navigator
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -n "${!required:-}" || {
+              echo "::error::Required stable signing secret $required is not configured"
+              exit 1
+            }
+          done
+          CANDIDATE="$RUNNER_TEMP/candidate"
+          BUILD_TOOLS_ROOT="$RUNNER_TEMP/android-build-tools"
+          KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
+          OUTPUT="$RUNNER_TEMP/signed-pair"
+          cleanup() {
+            shred -u -- "$KEYSTORE" 2>/dev/null || true
+          }
+          trap cleanup EXIT HUP INT TERM
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          mkdir -p "$BUILD_TOOLS_ROOT"
+          tar -xzf "$CANDIDATE/android-build-tools-36.0.0.tar.gz" \
+            -C "$BUILD_TOOLS_ROOT"
+          KEYSTORE_FILE="$KEYSTORE" \
+            KEY_PASSWORD="$KEY_PASSWORD" \
+            KEY_ALIAS="$KEY_ALIAS" \
+            bash tools/sign_navigation_hud_v2_pair.sh \
+              "$RUNNER_TEMP/YN_30.3.0_T2_.apk" \
+              "$CANDIDATE" \
+              "$BUILD_TOOLS_ROOT/36.0.0" \
+              "$OUTPUT"
+          test "$(jq -er '.source.commit' "$OUTPUT/release-report.json")" = \
+            "$EXPECTED_SOURCE_SHA"
+          test "$(jq -er '.source.tree' "$OUTPUT/release-report.json")" = \
+            "$EXPECTED_SOURCE_TREE"
+          test "$(jq -er '.certificateSha256' "$OUTPUT/release-report.json")" = \
+            "$EXPECTED_CERT_SHA256"
+      - name: Upload only the verified signed pair
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: navigation-hud-v2-signed-2.4.1-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/signed-pair/*
