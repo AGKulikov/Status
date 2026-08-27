@@ -106,15 +106,7 @@ public final class HudPresentationService extends Service
 
     public static void notifyAutomationChanged(@NonNull Context context) {
         HudPresentationService current = instance;
-        if (current != null) current.main.post(() -> {
-            if (current.data != null) current.data.refreshCrossProcessState();
-            if (current.systemSurfaceWindow != null) {
-                current.systemSurfaceWindow.invalidateHud();
-            }
-            if (current.overlayWindow != null) current.overlayWindow.invalidateHud();
-            if (current.presentation != null) current.presentation.invalidateHud();
-        });
-        else {
+        if (current == null) {
             Context app = applicationContext(context);
             Preferences prefs = new Preferences(app);
             if (prefs.hudPanelEnabled.get()) {
@@ -124,7 +116,16 @@ public final class HudPresentationService extends Service
                 // Navigator frames. An existing instance still takes the cheap in-process path.
                 apply(app);
             }
+            return;
         }
+        current.main.post(() -> {
+            if (current.data != null) current.data.refreshCrossProcessState();
+            if (current.systemSurfaceWindow != null) {
+                current.systemSurfaceWindow.invalidateHud();
+            }
+            if (current.overlayWindow != null) current.overlayWindow.invalidateHud();
+            if (current.presentation != null) current.presentation.invalidateHud();
+        });
     }
 
     /** Rebuilds only HUD surfaces after QuickBoot; a cold service start already builds them. */
