@@ -17,8 +17,8 @@ public final class Ha1142IphoneStatusIconTest {
         String policy = source("phone/PhoneStatusBarPolicy.java");
         String icon = source("OutlineImageView.java");
 
-        assertTrue(widget.contains("battery != null && battery <= 10"));
-        assertTrue(widget.contains("battery != null && battery <= 20"));
+        assertTrue(widget.contains("battery != null && battery < 20"));
+        assertTrue(widget.contains("R.color.iphone_battery_critical"));
         assertTrue(count(widget, "phoneBatteryColor(battery, batteryCharging)") >= 1);
         assertTrue(widget.contains("phoneBatteryColor(battery, charging)"));
         assertTrue(widget.contains("phoneBoolean(\"battery.charging\")"));
@@ -74,3 +74,4 @@ public final class Ha1142IphoneStatusIconTest {
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }
 }
+

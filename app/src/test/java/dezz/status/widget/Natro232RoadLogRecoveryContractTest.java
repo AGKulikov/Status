@@ -44,7 +44,8 @@ public final class Natro232RoadLogRecoveryContractTest {
                 + "android/AndroidCentralTransportV2.java");
         String failure = between(transport, "private void handleScanFailure(",
                 "private void handleScanResult(");
-        assertTrue(failure.contains("!retainsEnrolledSystemOwner(token)"));
+        assertTrue(failure.contains("if (retainsEnrolledSystemOwner(token))"));
+        assertTrue(failure.contains("optional_presence_scan unavailable"));
         assertTrue(failure.contains("postRouteDeadline(token)"));
     }
 

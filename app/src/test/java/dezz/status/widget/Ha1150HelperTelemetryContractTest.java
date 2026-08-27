@@ -53,7 +53,7 @@ public final class Ha1150HelperTelemetryContractTest {
         String body = widget.substring(helper, nextMethod);
         assertTrue(body.contains("battery != null && battery < 20"));
         assertTrue(body.contains("R.color.iphone_battery_critical"));
-        assertTrue(body.indexOf("battery < 20") < body.indexOf("charging"));
+        assertTrue(body.indexOf("battery < 20") < body.indexOf(": charging"));
         assertTrue(colors.contains("name=\"iphone_battery_critical\">#FF453A"));
         assertTrue(widget.contains("iconTint = phoneBatteryColor(battery, batteryCharging)"));
     }

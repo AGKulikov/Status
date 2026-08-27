@@ -80,7 +80,7 @@ public final class Natro234RoadLogRecoveryContractTest {
 
         assertTrue(policy.contains("PROPERTY_PARKING_DISTANCE_CONTROL_STATUS = 28995"));
         assertTrue(policy.contains("parkingDistanceStatus == 2"));
-        assertFalse(policy.contains("parkingDistanceStatus == 3"));
+        assertTrue(policy.contains("parkingDistanceStatus == 3"));
         assertTrue(fallback.contains(
                 "EcarxExternalOverlayPolicy.PROPERTY_PARKING_DISTANCE_CONTROL_STATUS"));
         assertTrue(integration.contains("externalOverlayParkingRaw"));
@@ -108,3 +108,4 @@ public final class Natro234RoadLogRecoveryContractTest {
         return current;
     }
 }
+

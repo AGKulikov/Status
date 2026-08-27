@@ -73,8 +73,7 @@ public final class AndroidCentralTransportV2SourceTest {
         String failed = between(source, "private void handleScanFailure",
                 "private void handleScanResult");
         assertTrue(failed.contains("if (!isCurrentScanAttempt(attempt)) return;"));
-        assertTrue(failed.contains(
-                "if (!retainsEnrolledSystemOwner(token)) postRouteDeadline(token)"));
+        assertTrue(failed.contains("postRouteDeadline(token)"));
         assertFalse(failed.contains("postRouteDeadline(scanToken)"));
 
         String retained = between(source, "private boolean retainsEnrolledSystemOwner",

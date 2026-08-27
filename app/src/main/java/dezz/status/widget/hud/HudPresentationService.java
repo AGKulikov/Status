@@ -440,8 +440,8 @@ public final class HudPresentationService extends Service
         // Exactly one compositor owns the 728x190 HUD plane. Running the MapWindow overlay and
         // the PNG SurfaceFlinger mask simultaneously presents two independently paced buffers and
         // produces the bright horizontal tear visible in the device video. WindowManager is the
-        // preferred path because it contains the independent TextureView map; direct SurfaceFlinger
-        // is now strictly a fallback for firmware that rejects the display overlay.
+        // The direct SurfaceFlinger is now strictly a fallback when firmware rejects the
+        // preferred WindowManager path containing the independent TextureView map.
         try {
             showWindowManagerFallback(display);
         } catch (RuntimeException failure) {

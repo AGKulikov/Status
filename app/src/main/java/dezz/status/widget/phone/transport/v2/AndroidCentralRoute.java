@@ -362,6 +362,26 @@ public final class AndroidCentralRoute {
                                                                 IphoneGattInventoryV2 inventory) {
         if (!expects(state, Phase.DISCOVERING, token)) return BleRouteTransition.ignored(state);
         if (inventory == null || !inventory.completeHelperV2()) {
+            // Android 9 can deliver the first discovery callback while the updated Helper's
+            // database is still being rebuilt.  Closing this proven owner immediately starts the
+            // clientIf churn seen in the road log.  Give the exact wrapper one serialized
+            // rediscovery before the ordinary bounded replacement path is allowed to run.
+            if (state.invalidHandleRediscoveries == 0) {
+                BleRouteToken rediscover = nextOperation(token);
+                if (rediscover == null) return counterExhausted(state, token, "operation");
+                State rediscovering = copyPolicy(state, Phase.DISCOVERING, rediscover,
+                        token.ownerId, state.nextOwnerId, state.consecutiveFailures,
+                        AuthorizationStep.NONE, 0, 1,
+                        "incomplete Helper-v2 graph; one same-owner rediscovery");
+                return BleRouteTransition.accepted(rediscovering,
+                        op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
+                                "incomplete service graph"),
+                        op(BleRouteEffect.Type.RESET_SESSION_STATE, token,
+                                "discard partial discovered objects"),
+                        op(BleRouteEffect.Type.DISCOVER_SERVICES, rediscover,
+                                "single same-owner incomplete-graph recovery"),
+                        BleRouteEffect.deadline(rediscover, DISCOVERY_TIMEOUT_MS));
+            }
             return retry(state, token, "incomplete Helper-v2 service graph");
         }
         State discovered = withGattInventory(state, inventory.completeAncs(), false);

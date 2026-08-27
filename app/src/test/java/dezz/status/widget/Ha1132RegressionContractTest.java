@@ -109,8 +109,8 @@ public final class Ha1132RegressionContractTest {
         assertTrue(canvas.contains("private RectF groupedBounds"));
         assertTrue(canvas.contains("HorizontalGroupLayout.layout("));
         assertTrue(settings.contains("editHorizontalGroup(item)"));
-        assertTrue(settings.contains("Внутренний отступ снизу, px"));
-        assertTrue(settings.contains("Внешний отступ снизу, px"));
+        assertTrue(settings.contains("SliderField paddingBottom = slider(form, \"Внутри снизу\""));
+        assertTrue(settings.contains("SliderField marginBottom = slider(form, \"Снаружи снизу\""));
         assertTrue(settings.contains("rebuildHudHorizontalGroupMembers"));
         assertTrue(element.contains("type == HudElementType.HORIZONTAL_GROUP"));
         assertTrue(group.contains("group.options.optInt(\"gapPx\", 0)"));
@@ -159,3 +159,4 @@ public final class Ha1132RegressionContractTest {
         return source.substring(from, to);
     }
 }
+

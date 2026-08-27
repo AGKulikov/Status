@@ -621,6 +621,32 @@ public final class AndroidCentralRouteTest {
                         indication.state, proofToken).state.phase);
     }
 
+    @Test public void incompleteHelperGraphRediscoveredOnceOnSameOwnerBeforeReplacement() {
+        AndroidCentralRoute.State state = startSelected(new BleRouteEpoch(19L, 4L));
+        state = AndroidCentralRoute.startupQuietElapsed(
+                state, state.expected, true).state;
+        state = AndroidCentralRoute.connected(state, state.expected, true).state;
+        long owner = state.activeOwnerId;
+        IphoneGattInventoryV2 incomplete = new IphoneGattInventoryV2(
+                true, true, true, false, false,
+                false, false, false, false, true);
+
+        BleRouteTransition<AndroidCentralRoute.State> rediscover =
+                AndroidCentralRoute.servicesDiscovered(
+                        state, state.expected, incomplete);
+        assertEquals(AndroidCentralRoute.Phase.DISCOVERING, rediscover.state.phase);
+        assertEquals(owner, rediscover.state.activeOwnerId);
+        assertTrue(hasEffect(rediscover, BleRouteEffect.Type.RESET_SESSION_STATE));
+        assertTrue(hasEffect(rediscover, BleRouteEffect.Type.DISCOVER_SERVICES));
+        assertFalse(hasEffect(rediscover, BleRouteEffect.Type.CLOSE_GATT));
+
+        BleRouteTransition<AndroidCentralRoute.State> exhausted =
+                AndroidCentralRoute.servicesDiscovered(
+                        rediscover.state, rediscover.state.expected, incomplete);
+        assertEquals(AndroidCentralRoute.Phase.RETRY_DRAINING, exhausted.state.phase);
+        assertTrue(hasEffect(exhausted, BleRouteEffect.Type.CLOSE_GATT));
+    }
+
     @Test public void absentAncsAndTelemetryFailureStillWaitsForServiceChanged() {
         AndroidCentralRoute.State state = startSelected(new BleRouteEpoch(19L, 3L));
         state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;

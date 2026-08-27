@@ -58,8 +58,8 @@ public final class Ha1139RegressionContractTest {
 
         assertTrue(widget.contains("phonePercent(\"network.signal\")"));
         assertTrue(widget.contains("phonePercent(\"battery.level\")"));
-        assertTrue(widget.contains("battery != null && battery <= 10"));
-        assertTrue(widget.contains("battery != null && battery <= 20"));
+        assertTrue(widget.contains("battery != null && battery < 20"));
+        assertTrue(widget.contains("R.color.iphone_battery_critical"));
         assertTrue(layout.contains("@+id/phoneCellularStatusIcon"));
         assertTrue(layout.contains("@+id/phoneBatteryStatusIcon"));
         assertTrue(catalog.contains("BrickType.PHONE_CELLULAR"));
@@ -121,3 +121,4 @@ public final class Ha1139RegressionContractTest {
         return source.substring(from, to);
     }
 }
+
