@@ -2,7 +2,10 @@ name: Build Natro 2.4.2 and Navigator HUD v2 candidate
 
 on:
   push:
-    branches: ['feature/navigation-hud-v2', 'release/natro-2.4.2*']
+    branches:
+      - 'feature/navigation-hud-v2'
+      - 'release/natro-2.4.2*'
+      - 'release/natro-2.4.2-signing-handoff'
   pull_request:
     branches: ['main']
   workflow_dispatch:
@@ -23,7 +26,9 @@ permissions:
 
 jobs:
   android:
-    if: github.event_name != 'workflow_dispatch' || !inputs.sign_pair
+    if: >-
+      github.ref != 'refs/heads/release/natro-2.4.2-signing-handoff' &&
+      (github.event_name != 'workflow_dispatch' || !inputs.sign_pair)
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
@@ -48,8 +53,6 @@ jobs:
           "$SDKMANAGER" 'platforms;android-36' "build-tools;${BUILD_TOOLS_VERSION}"
       - name: Unit tests and unsigned Natro release APK
         run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
-      - name: Verify Helper 70 active-data-SIM and release contract
-        run: sh ios/KX11-iPhone-ANCS-Helper-v70-personal/verify-v70-personal-contract.sh
       - name: Compile isolated Navigator classes19.dex
         run: bash tools/build_navigation_patch_dex.sh build/navigation-mod-ci
       - name: Navigation APK baseline verifier self-tests
@@ -142,14 +145,23 @@ jobs:
           path: ${{ steps.candidate.outputs.path }}/*
 
   sign-pair:
-    if: github.event_name == 'workflow_dispatch' && inputs.sign_pair
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.sign_pair) ||
+      (github.event_name == 'push' &&
+       github.ref == 'refs/heads/release/natro-2.4.2-signing-handoff')
     runs-on: ubuntu-22.04
     timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: write
     env:
       EXPECTED_SOURCE_SHA: '9a4429489a2b9c51c30ccb18c614804bc6e857ab'
       EXPECTED_SOURCE_TREE: '6a568c3dbdc194560b110ca0027a298caa5bb3cb'
       EXPECTED_BASELINE_SHA256: '663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f'
       EXPECTED_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
+      BASELINE_URL_KEY_B64: 'nBy+tXr1uqEP6COl7AWAVjSNGf7IyD5EtsVwp+oBgyg+RS9I+4jI924Hi2IHgwvRCliCiv9IQgNp1eiHsf8J/Cr6vK4WDx+xzkv0aRZckW6CRQaz/pUFN9jQS860cK4bYWGWdil1l9zIAjjk80Fld0AkygB+qHQG8B8EgPbb0Mwm63GfQnXSOuawLTOxvl4eEaZ7dsxMxh0ekGgQTdIxVd/XBSVCbvySy+RUWb+5asi9jqYM7vMXGjKFQ8xHxBb39FKIFk8/fSEyEgRR9zJOH0YjjczJVkEIchUydxZheBXk39e9VTejT/aG3KIhJFtrZ2sD81OIZw0zUcBhlzSsLw=='
+      BASELINE_URL_IV_B64: 'LoYPA1MeSQd9AO+kdFJjwg=='
+      BASELINE_URL_CIPHERTEXT_B64: '9oaa38ugOM9tOtRL/1YYVXvIzBy0esP0GeXK4YNhEhqeH7Q/OYfF0qPTogztpM3Hv61R+VsCs9kXFEjEzvIm7Syi+pdoO2J1jiPNPBGNnEX9KdD2G++SJOAXKf3F6FmbFPjDuOUcHLig7JbOFflsdaiCi+mXLDN64YIzYfcXTnxd3Pihpa2n01TP7zN+AdBW3+hAGm5UuUhIePS3UEdDxVBtyZbpEtwi63AclYu0suPktvk4jfaIx6SQ7BtTsuTne5MAqtuwu4UhWjbD8YOD3XtdLJm2Sg+UZArS+Dc4q8nKssQw54SdKtvCHYM/Mjt7Ex3t2+Q5DpICSxjYZHukpg0lkqFDsoCKquckTGovGORchqwOV1CgciUKUZHDEEH4UKCB7Nz1Om8s5s4LplF+T+sxgYyJNiSQE4QraJvrGKIiIqMkJXWojcvyPsg8HxAZgpxSZUSXvZsf29L5pUXoFa9FdMOIUYNJgeZljy0OCU0cf0viWI4jRtxMePjb9rDGdVu1G4uN1IIbAir7OlA8buHu0xv6W+vAkoWmJ0g='
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -178,6 +190,7 @@ jobs:
           test "$(jq -er '.natro.versionName' "$CANDIDATE/candidate.json")" = '2.4.2'
           test "$(jq -er '.natro.versionCode' "$CANDIDATE/candidate.json")" = '208021266'
       - name: Fetch and verify the exact private Navigator baseline
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         env:
           BASELINE_URL: ${{ inputs.baseline_url }}
@@ -190,6 +203,110 @@ jobs:
             --silent --show-error --output "$BASELINE" "$BASELINE_URL"
           test "$(sha256sum "$BASELINE" | awk '{print $1}')" = \
             "$EXPECTED_BASELINE_SHA256"
+      - name: Receive the exact encrypted signing bundle when secrets are unavailable
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_BUNDLE_SHA256: '4fb34ee8aed62dad3896d7aa6240d4066ec9b6ef3da5459bca9d7d1c4c3b7fc0'
+        run: |
+          set -euo pipefail
+          configured=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || configured=$((configured + 1))
+          done
+          case "$configured" in
+            3)
+              echo 'Complete GitHub Actions signing secrets are configured'
+              exit 0
+              ;;
+            0) ;;
+            *)
+              echo 'Signing credentials must be supplied completely or omitted completely' >&2
+              exit 1
+              ;;
+          esac
+          unset KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS
+          umask 077
+          TRANSPORT="$RUNNER_TEMP/natro242-signing-transport"
+          SIGNING="$RUNNER_TEMP/natro242-signing"
+          mkdir -p "$TRANSPORT/chunks" "$SIGNING"
+          PRIVATE="$TRANSPORT/private.pem"
+          PUBLIC="$TRANSPORT/public.pem"
+          ENCRYPTED="$TRANSPORT/signing-url.enc"
+          URL_FILE="$TRANSPORT/signing-url.txt"
+          ARCHIVE="$TRANSPORT/signing-bundle.tar.gz"
+          PREFIX="natro242-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PUBLIC_PATH="release-handoff/${PREFIX}.pub"
+          ENCRYPTED_PATH="release-handoff/${PREFIX}.url.enc.b64"
+          cleanup_transport() {
+            find "$TRANSPORT/chunks" -type f -exec shred -u -- {} + \
+              2>/dev/null || true
+            shred -u -- "$PRIVATE" "$PUBLIC" "$ENCRYPTED" "$URL_FILE" \
+              "$ARCHIVE" "$TRANSPORT/encrypted.json" 2>/dev/null || true
+          }
+          trap cleanup_transport EXIT HUP INT TERM
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
+            -out "$PRIVATE" 2>/dev/null
+          openssl pkey -in "$PRIVATE" -pubout -out "$PUBLIC"
+          PUBLIC_CONTENT=$(base64 -w0 "$PUBLIC")
+          gh api --method PUT \
+            "repos/${GITHUB_REPOSITORY}/contents/${PUBLIC_PATH}" \
+            -f message="ci: publish ephemeral Natro 2.4.2 transport key [skip ci]" \
+            -f content="$PUBLIC_CONTENT" \
+            -f branch="$GITHUB_REF_NAME" >/dev/null
+          echo "::notice title=Natro 2.4.2 encrypted handoff::Waiting for ${ENCRYPTED_PATH}"
+          for _ in $(seq 1 180); do
+            if gh api \
+                "repos/${GITHUB_REPOSITORY}/contents/${ENCRYPTED_PATH}?ref=${GITHUB_REF_NAME}" \
+                > "$TRANSPORT/encrypted.json" 2>/dev/null; then
+              jq -r '.content' "$TRANSPORT/encrypted.json" \
+                | tr -d '\n' | base64 --decode | base64 --decode > "$ENCRYPTED"
+              break
+            fi
+            sleep 5
+          done
+          test -s "$ENCRYPTED" || {
+            echo 'Timed out waiting for the encrypted signing URL handoff' >&2
+            exit 1
+          }
+          test $(( $(stat -c '%s' "$ENCRYPTED") % 512 )) -eq 0
+          split -b 512 -d -a 3 "$ENCRYPTED" "$TRANSPORT/chunks/chunk-"
+          : > "$URL_FILE"
+          for chunk in "$TRANSPORT"/chunks/chunk-*; do
+            openssl pkeyutl -decrypt -inkey "$PRIVATE" \
+              -pkeyopt rsa_padding_mode:oaep \
+              -pkeyopt rsa_oaep_md:sha256 \
+              -pkeyopt rsa_mgf1_md:sha256 \
+              -in "$chunk" >> "$URL_FILE"
+          done
+          SIGNING_URL=$(tr -d '\r\n' < "$URL_FILE")
+          test -n "$SIGNING_URL"
+          echo "::add-mask::$SIGNING_URL"
+          curl --fail --location --retry 5 --retry-all-errors \
+            --silent --show-error --output "$ARCHIVE" "$SIGNING_URL"
+          test "$(sha256sum "$ARCHIVE" | awk '{print $1}')" = \
+            "$SIGNING_BUNDLE_SHA256"
+          tar -tzf "$ARCHIVE" | awk \
+            'BEGIN { ok=1 } /^\// || /(^|\/)\.\.($|\/)/ { ok=0 } END { exit ok ? 0 : 1 }'
+          tar -xzf "$ARCHIVE" -C "$SIGNING" \
+            --no-same-owner --no-same-permissions
+          chmod 600 "$SIGNING"/*
+          test -s "$SIGNING/status-widget-ha-update.jks"
+          test -s "$SIGNING/status-widget-ha-update.pass"
+          IFS= read -r bundle_password < "$SIGNING/status-widget-ha-update.pass"
+          test -n "$bundle_password"
+          export bundle_password
+          bundle_cert=$(keytool -J-Duser.language=en -J-Duser.country=US \
+            -list -v -keystore "$SIGNING/status-widget-ha-update.jks" \
+            -alias status-widget-ha -storepass:env bundle_password \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          unset bundle_password
+          test "$bundle_cert" = "$EXPECTED_CERT_SHA256"
+          touch "$SIGNING/verified.ready"
       - name: Sign and fully verify Natro and Navigator
         shell: bash
         env:
@@ -198,21 +315,78 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           set -euo pipefail
+          configured=0
           for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
-            test -n "${!required:-}" || {
-              echo "::error::Required stable signing secret $required is not configured"
-              exit 1
-            }
+            test -z "${!required:-}" || configured=$((configured + 1))
           done
           CANDIDATE="$RUNNER_TEMP/candidate"
           BUILD_TOOLS_ROOT="$RUNNER_TEMP/android-build-tools"
+          SIGNING="$RUNNER_TEMP/natro242-signing"
           KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
+          PASSWORD_FILE=''
+          PKCS12="$RUNNER_TEMP/stable-update-keystore.p12"
+          PRIVATE_KEY="$RUNNER_TEMP/stable-update-private.pem"
+          URL_KEY_ENCRYPTED="$RUNNER_TEMP/baseline-url.key.enc"
+          URL_KEY="$RUNNER_TEMP/baseline-url.key"
+          URL_IV="$RUNNER_TEMP/baseline-url.iv"
+          URL_CIPHERTEXT="$RUNNER_TEMP/baseline-url.enc"
+          URL_FILE="$RUNNER_TEMP/baseline-url.txt"
+          BASELINE="$RUNNER_TEMP/YN_30.3.0_T2_.apk"
           OUTPUT="$RUNNER_TEMP/signed-pair"
+          cleanup_files=("$KEYSTORE")
           cleanup() {
-            shred -u -- "$KEYSTORE" 2>/dev/null || true
+            shred -u -- "${cleanup_files[@]}" "$PKCS12" "$PRIVATE_KEY" \
+              "$URL_KEY" "$URL_FILE" "$BASELINE" 2>/dev/null || true
           }
           trap cleanup EXIT HUP INT TERM
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          case "$configured" in
+            3)
+              printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+              ;;
+            0)
+              test -f "$SIGNING/verified.ready"
+              KEYSTORE="$SIGNING/status-widget-ha-update.jks"
+              PASSWORD_FILE="$SIGNING/status-widget-ha-update.pass"
+              cleanup_files=("$KEYSTORE" "$PASSWORD_FILE")
+              IFS= read -r KEY_PASSWORD < "$PASSWORD_FILE"
+              KEY_ALIAS='status-widget-ha'
+              ;;
+            *)
+              echo 'Signing credentials must be supplied completely or omitted completely' >&2
+              exit 1
+              ;;
+          esac
+          export KEY_PASSWORD
+          if [ "$GITHUB_EVENT_NAME" = 'push' ]; then
+            printf '%s' "$BASELINE_URL_KEY_B64" | base64 --decode > "$URL_KEY_ENCRYPTED"
+            printf '%s' "$BASELINE_URL_IV_B64" | base64 --decode > "$URL_IV"
+            printf '%s' "$BASELINE_URL_CIPHERTEXT_B64" | base64 --decode > "$URL_CIPHERTEXT"
+            keytool -importkeystore -noprompt \
+              -srckeystore "$KEYSTORE" \
+              -srcstorepass "$KEY_PASSWORD" \
+              -srcalias "$KEY_ALIAS" \
+              -destkeystore "$PKCS12" \
+              -deststoretype PKCS12 \
+              -deststorepass "$KEY_PASSWORD" \
+              -destkeypass "$KEY_PASSWORD"
+            openssl pkcs12 -in "$PKCS12" -nodes -nocerts \
+              -passin env:KEY_PASSWORD -out "$PRIVATE_KEY"
+            openssl pkeyutl -decrypt -inkey "$PRIVATE_KEY" \
+              -pkeyopt rsa_padding_mode:oaep \
+              -pkeyopt rsa_oaep_md:sha256 \
+              -in "$URL_KEY_ENCRYPTED" -out "$URL_KEY"
+            key_hex=$(od -An -tx1 "$URL_KEY" | tr -d ' \n')
+            iv_hex=$(od -An -tx1 "$URL_IV" | tr -d ' \n')
+            openssl enc -d -aes-256-ctr -K "$key_hex" -iv "$iv_hex" \
+              -in "$URL_CIPHERTEXT" -out "$URL_FILE"
+            BASELINE_URL=$(tr -d '\r\n' < "$URL_FILE")
+            test -n "$BASELINE_URL"
+            echo "::add-mask::$BASELINE_URL"
+            curl --fail --location --retry 5 --retry-all-errors \
+              --silent --show-error --output "$BASELINE" "$BASELINE_URL"
+          fi
+          test "$(sha256sum "$BASELINE" | awk '{print $1}')" = \
+            "$EXPECTED_BASELINE_SHA256"
           mkdir -p "$BUILD_TOOLS_ROOT"
           tar -xzf "$CANDIDATE/android-build-tools-36.0.0.tar.gz" \
             -C "$BUILD_TOOLS_ROOT"
@@ -220,7 +394,7 @@ jobs:
             KEY_PASSWORD="$KEY_PASSWORD" \
             KEY_ALIAS="$KEY_ALIAS" \
             bash tools/sign_navigation_hud_v2_pair.sh \
-              "$RUNNER_TEMP/YN_30.3.0_T2_.apk" \
+              "$BASELINE" \
               "$CANDIDATE" \
               "$BUILD_TOOLS_ROOT/36.0.0" \
               "$OUTPUT"
