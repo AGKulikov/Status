@@ -121,6 +121,11 @@ final class NavigationBridgeClient {
         if (instance != null) instance.statePublisher.detach(activity);
     }
 
+    /** Best-effort diagnostics from the host lifecycle hook; it must never throw into Navigator. */
+    static synchronized void reportDiagnostic(String detail) {
+        if (instance != null) instance.sendDiagnostic(detail);
+    }
+
     private NavigationBridgeClient(Context context) {
         this.context = context.getApplicationContext();
         main = new Handler(Looper.getMainLooper());

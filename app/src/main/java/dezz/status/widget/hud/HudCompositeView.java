@@ -2,7 +2,6 @@
 package dezz.status.widget.hud;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
@@ -45,7 +44,9 @@ final class HudCompositeView extends FrameLayout
 
         mapTexture = new TextureView(context);
         mapTexture.setOpaque(true);
-        mapTexture.setBackgroundColor(Color.BLACK);
+        // TextureView rejects every background Drawable on Android 9, including the Drawable
+        // produced by setBackgroundColor(). Its opaque producer surface is already black before
+        // Navigator submits the first frame, so no View background is needed here.
         mapTexture.setSurfaceTextureListener(this);
         addView(mapTexture, new LayoutParams(1, 1));
 

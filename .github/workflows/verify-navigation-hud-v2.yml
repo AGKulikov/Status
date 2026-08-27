@@ -1,8 +1,8 @@
-name: Build Natro 2.4.2 and Navigator HUD v2 candidate
+name: Build Natro 2.4.3 and Navigator HUD v2 candidate
 
 on:
   push:
-    branches: ['feature/navigation-hud-v2', 'release/natro-2.4.2*']
+    branches: ['feature/navigation-hud-v2', 'release/natro-2.4.3*']
   pull_request:
     branches: ['main']
   workflow_dispatch:
@@ -27,8 +27,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '2.4.2'
-      VERSION_CODE: '208021266'
+      VERSION_NAME: '2.4.3'
+      VERSION_CODE: '208021267'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
@@ -175,8 +175,8 @@ jobs:
             "$EXPECTED_SOURCE_SHA"
           test "$(jq -er '.sourceTree' "$CANDIDATE/candidate.json")" = \
             "$EXPECTED_SOURCE_TREE"
-          test "$(jq -er '.natro.versionName' "$CANDIDATE/candidate.json")" = '2.4.2'
-          test "$(jq -er '.natro.versionCode' "$CANDIDATE/candidate.json")" = '208021266'
+          test "$(jq -er '.natro.versionName' "$CANDIDATE/candidate.json")" = '2.4.3'
+          test "$(jq -er '.natro.versionCode' "$CANDIDATE/candidate.json")" = '208021267'
       - name: Fetch and verify the exact private Navigator baseline
         shell: bash
         env:
@@ -233,7 +233,7 @@ jobs:
       - name: Upload only the verified signed pair
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: navigation-hud-v2-signed-2.4.2-${{ github.run_number }}
+          name: navigation-hud-v2-signed-2.4.3-${{ github.run_number }}
           if-no-files-found: error
           retention-days: 14
           path: ${{ runner.temp }}/signed-pair/*

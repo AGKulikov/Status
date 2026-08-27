@@ -441,10 +441,24 @@ public final class HudPresentationService extends Service
     }
 
     private void showOnDisplay(@NonNull Display display) {
-        if (overlayWindow == null && presentation == null) {
-            showWindowManagerFallback(display);
-        }
+        // The direct SurfaceFlinger lane is the primary KX11 output path and must be started
+        // independently. A broken WindowManager fallback used to throw first and prevented even
+        // clocks and other standalone HUD elements from reaching the physical display.
         startSystemSurface(display);
+        if (overlayWindow == null && presentation == null) {
+            try {
+                showWindowManagerFallback(display);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Could not start HUD fallback; direct surface remains active",
+                        failure);
+                DiagnosticJournal.error("hud-runtime",
+                        "HUD fallback недоступен; прямой SurfaceFlinger-канал продолжает запуск",
+                        failure);
+            }
+        }
+        if (systemSurfaceWindow == null && overlayWindow == null && presentation == null) {
+            throw new IllegalStateException("No HUD output path started");
+        }
     }
 
     private void startSystemSurface(@NonNull Display display) {

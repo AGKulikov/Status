@@ -49,6 +49,14 @@ public final class HudAndroidApiContractTest {
         assertTrue(client.contains("runLongRunningCommand"));
         assertFalse(client.contains(">/dev/null 2>&1 &)"));
         assertTrue(service.contains("showWindowManagerFallback(display)"));
+        assertTrue(service.contains(
+                "private void showOnDisplay(@NonNull Display display) {\n"
+                        + "        // The direct SurfaceFlinger lane"));
+        assertTrue(service.contains(
+                "startSystemSurface(display);\n"
+                        + "        if (overlayWindow == null && presentation == null)"));
+        assertTrue(service.contains(
+                "HUD fallback недоступен; прямой SurfaceFlinger-канал продолжает запуск"));
         assertFalse(service.contains("dismissFallbackOnly(\"system HUD surface ready\")"));
         assertTrue(service.contains("кадр принят SurfaceFlinger"));
         assertTrue(service.contains("systemSurfaceRetryAfter"));
@@ -63,6 +71,14 @@ public final class HudAndroidApiContractTest {
         assertTrue(service.contains("DiagnosticJournal.error(\"hud-runtime\""));
         assertTrue(service.contains("HUD service создан в основном процессе Natro"));
         assertTrue(service.contains("elements=\" + config.elements.size()"));
+    }
+
+    @Test public void textureViewNeverReceivesUnsupportedBackgroundDrawable()
+            throws Exception {
+        String composite = read("HudCompositeView.java");
+        assertTrue(composite.contains("mapTexture.setOpaque(true)"));
+        assertFalse(composite.contains("mapTexture.setBackgroundColor"));
+        assertFalse(composite.contains("mapTexture.setBackground("));
     }
 
     @Test public void hudOwnersStayInMainProcessForKx11LifecycleReliability()

@@ -167,6 +167,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("View.SYSTEM_UI_FLAG_VISIBLE"));
         assertTrue(controller.contains("natro_floating_window_v3"));
         assertTrue(controller.contains("background.setColor(Color.TRANSPARENT)"));
+        assertTrue(controller.contains("decor.setClipToOutline(false)"));
+        assertFalse(controller.contains("decor.setClipToOutline(profile.cornerRadiusDp > 0)"));
         assertFalse(controller.contains("View.SYSTEM_UI_FLAG_HIDE_NAVIGATION"));
         assertTrue(windowProfile.contains("backgroundColor = \"#00000000\""));
         assertTrue(controller.contains("navi_service_open_voice_search"));
@@ -177,6 +179,9 @@ public final class NavigationHudV2ContractTest {
         assertFalse(controller.contains("restartInMode("));
         assertTrue(entry.contains("NavigationBridgeClient.attachActivity"));
         assertTrue(entry.contains("NavigationBridgeClient.detachActivity"));
+        assertFalse(entry.contains("activity.finish()"));
+        assertFalse(entry.contains("activity.startActivity(restart)"));
+        assertTrue(entry.contains("controller.consumeIntent(intent)"));
         assertTrue(client.contains("getPackagesForUid(sendingUid)"));
         assertTrue(client.contains("checkSignatures(NAVIGATOR_PACKAGE, NATRO_PACKAGE)"));
         assertTrue(client.contains("MSG_ATTACH_HUD_SURFACE"));

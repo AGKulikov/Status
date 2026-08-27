@@ -8,7 +8,6 @@ import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.graphics.Typeface;
@@ -66,6 +65,7 @@ final class FloatingWindowController {
     private TextView resizeHandle;
     private ViewGroup modeButtonHost;
     private Drawable floatingBackground;
+    private Drawable floatingFrame;
     private boolean floating;
     private boolean destroyed;
     private boolean geometryLoaded;
@@ -312,6 +312,8 @@ final class FloatingWindowController {
         decor.setAlpha(1f);
         decor.setBackground(originalBackground);
         floatingBackground = null;
+        floatingFrame = null;
+        if (controlLayer != null) controlLayer.setBackground(null);
         decor.setClipToOutline(false);
         decor.setElevation(originalElevation);
         decor.setSystemUiVisibility(originalSystemUi);
@@ -333,20 +335,23 @@ final class FloatingWindowController {
         // background leaves a full-screen black plane behind the resized map on KX11 even when
         // WindowManager reports the expected floating bounds.
         background.setColor(Color.TRANSPARENT);
-        background.setCornerRadius(dp(profile.cornerRadiusDp));
-        if (profile.borderWidthDp > 0) {
-            background.setStroke(dp(profile.borderWidthDp),
-                    Color.parseColor(profile.borderColor));
-        }
         floatingBackground = background;
         decor.setBackground(floatingBackground);
-        decor.setClipToOutline(profile.cornerRadiusDp > 0);
-        decor.setElevation(dp(profile.shadowRadiusDp));
-        if (Build.VERSION.SDK_INT >= 28) {
-            int shadow = Color.parseColor(profile.shadowColor);
-            decor.setOutlineAmbientShadowColor(shadow);
-            decor.setOutlineSpotShadowColor(shadow);
+
+        // MapActivity contains a SurfaceView. Rounding or clipping the activity decor clips that
+        // surface on Android 9 and can make the vendor renderer tear down the activity. Draw the
+        // optional frame in our transparent control layer instead; never clip the map surface.
+        GradientDrawable frame = new GradientDrawable();
+        frame.setColor(Color.TRANSPARENT);
+        frame.setCornerRadius(dp(profile.cornerRadiusDp));
+        if (profile.borderWidthDp > 0) {
+            frame.setStroke(dp(profile.borderWidthDp),
+                    Color.parseColor(profile.borderColor));
         }
+        floatingFrame = frame;
+        if (controlLayer != null) controlLayer.setBackground(floatingFrame);
+        decor.setClipToOutline(false);
+        decor.setElevation(0f);
         decor.setAlpha(profile.opacityPercent / 100f);
         // Reference default: both KX11 system bars stay visible while the map is windowed.
         decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
@@ -385,6 +390,11 @@ final class FloatingWindowController {
         if (floatingBackground != null && decor.getBackground() != floatingBackground) {
             decor.setBackground(floatingBackground);
         }
+        if (controlLayer != null && floatingFrame != null
+                && controlLayer.getBackground() != floatingFrame) {
+            controlLayer.setBackground(floatingFrame);
+        }
+        if (decor.getClipToOutline()) decor.setClipToOutline(false);
     }
 
     private void updateControls() {
