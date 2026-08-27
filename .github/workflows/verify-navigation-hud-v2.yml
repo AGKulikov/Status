@@ -291,7 +291,7 @@ jobs:
           test -n "$BASELINE_URL"
           echo "::add-mask::$SIGNING_URL"
           echo "::add-mask::$BASELINE_URL"
-          printf '%s' "$BASELINE_URL" > "$BASELINE_URL_FILE"
+          printf '%s\n' "$BASELINE_URL" > "$BASELINE_URL_FILE"
           curl --fail --location --retry 8 --retry-all-errors \
             --silent --show-error --output "$ARCHIVE" "$SIGNING_URL"
           test "$(sha256sum "$ARCHIVE" | awk '{print $1}')" = \
@@ -360,7 +360,7 @@ jobs:
           export KEY_PASSWORD
           if [ "$GITHUB_EVENT_NAME" = 'push' ]; then
             test -s "$BASELINE_URL_FILE"
-            IFS= read -r BASELINE_URL < "$BASELINE_URL_FILE"
+            IFS= read -r BASELINE_URL < "$BASELINE_URL_FILE" || test -n "$BASELINE_URL"
             test -n "$BASELINE_URL"
             echo "::add-mask::$BASELINE_URL"
             curl --fail --location --retry 8 --retry-all-errors \
