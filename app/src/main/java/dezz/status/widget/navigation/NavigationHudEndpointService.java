@@ -45,7 +45,7 @@ public final class NavigationHudEndpointService extends Service {
     @NonNull private final Messenger endpoint = new Messenger(handler);
     @Nullable private Client client;
 
-    /** Called by the HUD TextureView in this same isolated process. Ownership stays with it. */
+    /** Called by the HUD TextureView in this same Natro process. Ownership stays with it. */
     public static void publishHudSurface(@NonNull Surface surface,
                                          int width, int height, int dpi) {
         if (!surface.isValid() || width <= 0 || height <= 0) return;
@@ -83,7 +83,7 @@ public final class NavigationHudEndpointService extends Service {
         });
     }
 
-    /** Cross-process wake used by the settings UI after it persists either MapProfile. */
+    /** Explicit settings wake used by the UI after it persists either MapProfile. */
     public static void requestConfigurationRefresh(@NonNull android.content.Context context) {
         Intent command = new Intent(context, NavigationConfigurationRelayService.class)
                 .setAction(NavigationConfigurationRelayService.ACTION_REFRESH_CONFIGURATION);
@@ -125,7 +125,7 @@ public final class NavigationHudEndpointService extends Service {
     public void onCreate() {
         super.onCreate();
         instance = this;
-        DiagnosticJournal.info("navigation-bridge", "HUD endpoint process created");
+        DiagnosticJournal.info("navigation-bridge", "HUD endpoint service created in main Natro process");
     }
 
     @Nullable

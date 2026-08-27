@@ -30,6 +30,7 @@ import dezz.status.widget.StatusWidgetApplication;
 import dezz.status.widget.StartupWorkCoordinator;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 
 /** Foreground owner of the stable-id external HUD presentation. */
@@ -99,7 +100,7 @@ public final class HudPresentationService extends Service
         Preferences prefs = new Preferences(app);
         if (!prefs.hudPanelEnabled.get()) return;
         // The caller's in-memory SharedPreferences already contains the just-saved document.
-        // Passing it with the command avoids an apply()/disk race in the isolated :hud process.
+        // Passing it with the command avoids an apply()/disk race during service startup.
         sendCommand(app, ACTION_CONFIG_CHANGED, prefs.hudPanelConfigJson.get());
     }
 
@@ -117,7 +118,11 @@ public final class HudPresentationService extends Service
             Context app = applicationContext(context);
             Preferences prefs = new Preferences(app);
             if (prefs.hudPanelEnabled.get()) {
-                sendCommand(app, ACTION_DATA_CHANGED, null);
+                // The first HUD-related callback after boot/package replacement must construct
+                // the presentation owner. 2.4.1 treated it as a data-only invalidation even when
+                // no service existed; the physical HUD then received neither the clock nor
+                // Navigator frames. An existing instance still takes the cheap in-process path.
+                apply(app);
             }
         }
     }
@@ -138,7 +143,7 @@ public final class HudPresentationService extends Service
         return instance != null;
     }
 
-    /** Cross-process liveness check used by the main status process without cold-starting HUD. */
+    /** Service liveness check used without cold-starting HUD. */
     public static boolean isRunning(@NonNull Context context) {
         if (instance != null) return true;
         ActivityManager manager = context.getSystemService(ActivityManager.class);
@@ -171,6 +176,8 @@ public final class HudPresentationService extends Service
             ContextCompat.startForegroundService(app, command);
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not send HUD command " + action, failure);
+            DiagnosticJournal.error("hud-runtime",
+                    "не удалось запустить HUD command=" + action, failure);
         }
     }
 
@@ -180,6 +187,7 @@ public final class HudPresentationService extends Service
         instance = this;
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, notification("Подключение к HUD…"));
+        DiagnosticJournal.info("hud-runtime", "HUD service создан в основном процессе Natro");
     }
 
     private void initializeRuntime() {
@@ -188,11 +196,18 @@ public final class HudPresentationService extends Service
         preferences = new Preferences(this);
         store = new HudPanelStore(preferences);
         config = store.load();
+        DiagnosticJournal.info("hud-runtime",
+                "инициализация: enabled=" + preferences.hudPanelEnabled.get()
+                        + ", autostart=" + preferences.hudPanelAutostart.get()
+                        + ", displayId=" + config.displayId
+                        + ", elements=" + config.elements.size());
         displayManager = getSystemService(DisplayManager.class);
         if (displayManager != null) {
             try { displayManager.registerDisplayListener(this, main); }
             catch (RuntimeException failure) {
                 Log.w(TAG, "Could not register display listener", failure);
+                DiagnosticJournal.error("hud-runtime",
+                        "не удалось зарегистрировать DisplayListener", failure);
             }
         }
         data = new HudRuntimeData(this, config, () -> {
@@ -206,14 +221,17 @@ public final class HudPresentationService extends Service
         data.start();
         reconcileStockHudCarPreference();
         reconcilePresentation();
-        // The isolated process has now paid its own HUD construction cost; enable only its
-        // diagnostic preference layer after that useful surface attempt, never from Application.
+        // Enable the diagnostic preference layer only after a useful HUD construction attempt,
+        // never from Application startup.
         StatusWidgetApplication.notifyFirstUsefulSurface(this);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
+        DiagnosticJournal.info("hud-runtime",
+                "onStartCommand action=" + (action == null ? "sticky" : action)
+                        + ", startId=" + startId);
         dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
                 getClass().getName(), action, startId);
         if (ACTION_STOP.equals(action)) {
@@ -229,8 +247,8 @@ public final class HudPresentationService extends Service
         initializeRuntime();
         boolean commandHasConfig = applyCommandConfig(intent);
         if (ACTION_LIFECYCLE_RECONCILE.equals(action)) {
-            // WindowManager/SurfaceFlinger can recreate their state while the :hud process and
-            // Java references survive QuickBoot. Drop only visual owners and reselect the exact
+            // WindowManager/SurfaceFlinger can recreate their state while the service and Java
+            // references survive QuickBoot. Drop only visual owners and reselect the exact
             // display; data/connectors remain alive.
             dismissPresentation("automatic lifecycle reconcile");
             systemSurfaceRetryAfter = 0L;
@@ -248,6 +266,7 @@ public final class HudPresentationService extends Service
 
     @Override
     public void onDestroy() {
+        DiagnosticJournal.warn("hud-runtime", "HUD service уничтожается");
         instance = null;
         runtimeInitialized = false;
         setRuntimeDetail("HUD не запущен");
@@ -264,9 +283,18 @@ public final class HudPresentationService extends Service
     @Nullable
     @Override public IBinder onBind(Intent intent) { return null; }
 
-    @Override public void onDisplayAdded(int displayId) { reloadAndReconcile(); }
-    @Override public void onDisplayRemoved(int displayId) { reconcilePresentation(); }
-    @Override public void onDisplayChanged(int displayId) { reconcilePresentation(); }
+    @Override public void onDisplayAdded(int displayId) {
+        DiagnosticJournal.info("hud-runtime", "display added id=" + displayId);
+        reloadAndReconcile();
+    }
+    @Override public void onDisplayRemoved(int displayId) {
+        DiagnosticJournal.warn("hud-runtime", "display removed id=" + displayId);
+        reconcilePresentation();
+    }
+    @Override public void onDisplayChanged(int displayId) {
+        DiagnosticJournal.info("hud-runtime", "display changed id=" + displayId);
+        reconcilePresentation();
+    }
 
     private void reloadAndReconcile() {
         reloadAndReconcile(true);
@@ -274,8 +302,8 @@ public final class HudPresentationService extends Service
 
     private void reloadAndReconcile(boolean reloadPreferences) {
         if (reloadPreferences) {
-            // Constructing a new wrapper with MODE_MULTI_PROCESS asks API 28 to reload the
-            // device-protected preference file after an explicit command from the main process.
+            // Recreate the wrapper after an explicit settings command so API 28 reloads the
+            // device-protected preference file before rebuilding the visual owner.
             preferences = new Preferences(this);
             store = new HudPanelStore(preferences);
             config = store.load();
@@ -295,7 +323,8 @@ public final class HudPresentationService extends Service
             if (data != null) data.updateConfig(config);
             return true;
         } catch (RuntimeException invalid) {
-            Log.w(TAG, "Rejected invalid cross-process HUD configuration", invalid);
+            Log.w(TAG, "Rejected invalid HUD configuration", invalid);
+            DiagnosticJournal.error("hud-runtime", "отклонена конфигурация HUD", invalid);
             return false;
         }
     }
@@ -351,6 +380,7 @@ public final class HudPresentationService extends Service
                     ? "HUD не привязан — выберите точный Display ID в настройках"
                     : "Ожидание HUD с Display ID " + config.displayId);
             updateNotification(runtimeDetail);
+            DiagnosticJournal.warn("hud-runtime", runtimeDetail);
             return;
         }
         if (!HudViewportPolicy.containsCompleteHudPlane(
@@ -363,6 +393,7 @@ public final class HudPresentationService extends Service
                     + HudViewportPolicy.MIN_SURFACE_HEIGHT
                     + "; вывод заблокирован");
             updateNotification(runtimeDetail);
+            DiagnosticJournal.warn("hud-runtime", runtimeDetail);
             return;
         }
         String identity = candidate.uniqueId + "|" + candidate.id;
@@ -382,12 +413,20 @@ public final class HudPresentationService extends Service
         dismissPresentation("display selection changed");
         systemSurfaceRetryAfter = 0L;
         Display display = HudDisplaySelector.display(candidate);
-        if (display == null || !display.isValid()) return;
+        if (display == null || !display.isValid()) {
+            DiagnosticJournal.warn("hud-runtime",
+                    "выбранный HUD display недействителен: id=" + candidate.id);
+            return;
+        }
         try {
             shownUniqueId = identity;
+            DiagnosticJournal.info("hud-runtime",
+                    "создаём HUD на display id=" + candidate.id + " "
+                            + candidate.width + "×" + candidate.height);
             showOnDisplay(display);
             setRuntimeDetail(runtimeDetail(candidate));
             updateNotification(runtimeDetail);
+            DiagnosticJournal.info("hud-runtime", runtimeDetail);
         } catch (RuntimeException failure) {
             systemSurfaceWindow = null;
             presentation = null;
@@ -395,6 +434,8 @@ public final class HudPresentationService extends Service
             setRuntimeDetail("HUD найден, но окно пока недоступно");
             updateNotification(runtimeDetail);
             Log.w(TAG, "Could not show HUD presentation", failure);
+            DiagnosticJournal.error("hud-runtime",
+                    "не удалось создать HUD presentation", failure);
         }
     }
 
@@ -434,6 +475,7 @@ public final class HudPresentationService extends Service
                                     + " · кадр принят SurfaceFlinger"
                                     + " · окно 728×190 @ (0,720)");
                             updateNotification(runtimeDetail);
+                            DiagnosticJournal.info("hud-runtime", runtimeDetail);
                         }
 
                         @Override
@@ -452,12 +494,16 @@ public final class HudPresentationService extends Service
                                 } catch (RuntimeException fallbackFailure) {
                                     Log.w(TAG, "Could not restore HUD fallback",
                                             fallbackFailure);
+                                    DiagnosticJournal.error("hud-runtime",
+                                            "не удалось восстановить HUD fallback",
+                                            fallbackFailure);
                                 }
                             }
                             setRuntimeDetail(
                                     "HUD: обычный overlay; системная маска недоступна — "
                                             + detail + "; повтор через 15 с");
                             updateNotification(runtimeDetail);
+                            DiagnosticJournal.warn("hud-runtime", runtimeDetail);
                             scheduleSystemSurfaceRetry();
                         }
                     });
@@ -469,6 +515,8 @@ public final class HudPresentationService extends Service
                     + SYSTEM_SURFACE_RETRY_MS;
             Log.w(TAG, "Could not start direct HUD surface; keeping WindowManager fallback",
                     failure);
+            DiagnosticJournal.error("hud-runtime",
+                    "не удалось запустить прямой HUD surface; оставлен fallback", failure);
             scheduleSystemSurfaceRetry();
         }
     }
@@ -486,16 +534,23 @@ public final class HudPresentationService extends Service
             try {
                 overlayWindow = HudOverlayWindow.show(this, display, config, data);
                 presentation = null;
+                DiagnosticJournal.info("hud-runtime",
+                        "WindowManager HUD overlay создан на display id="
+                                + display.getDisplayId());
                 return;
             } catch (RuntimeException overlayFailure) {
                 overlayWindow = null;
                 Log.w(TAG, "Exact HUD application overlay unavailable; using Presentation",
                         overlayFailure);
+                DiagnosticJournal.error("hud-runtime",
+                        "HUD overlay недоступен; пробуем Presentation", overlayFailure);
             }
         }
         HudPresentation fallback = createPresentation(display);
         fallback.show();
         presentation = fallback;
+        DiagnosticJournal.info("hud-runtime",
+                "HUD Presentation создан на display id=" + display.getDisplayId());
     }
 
     @NonNull
@@ -514,6 +569,9 @@ public final class HudPresentationService extends Service
     }
 
     private void dismissPresentation(@NonNull String reason) {
+        if (systemSurfaceWindow != null || overlayWindow != null || presentation != null) {
+            DiagnosticJournal.warn("hud-runtime", "закрываем HUD surfaces: " + reason);
+        }
         main.removeCallbacks(retrySystemSurface);
         HudSystemSurfaceWindow currentSystemSurface = systemSurfaceWindow;
         HudOverlayWindow currentOverlay = overlayWindow;
@@ -530,6 +588,8 @@ public final class HudPresentationService extends Service
             try { current.dismiss(); }
             catch (RuntimeException failure) {
                 Log.w(TAG, "Could not dismiss HUD presentation: " + reason, failure);
+                DiagnosticJournal.error("hud-runtime",
+                        "не удалось закрыть HUD presentation: " + reason, failure);
             }
         }
     }

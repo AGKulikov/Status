@@ -8,10 +8,10 @@ import android.os.IBinder;
 import androidx.annotation.Nullable;
 
 /**
- * Non-exported cross-process relay for settings written by Natro itself.
+ * Non-exported relay for settings written by Natro itself.
  *
  * <p>The public Navigator endpoint must remain exported for its explicit Binder connection, so it
- * never accepts startService payloads. This separate component runs in the same :hud process but
+ * never accepts startService payloads. This separate component runs in the same Natro process but
  * is visible only to Natro's UID, preventing another app from injecting a map profile.</p>
  */
 public final class NavigationConfigurationRelayService extends Service {

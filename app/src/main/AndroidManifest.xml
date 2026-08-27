@@ -299,7 +299,6 @@
             android:directBootAware="true"
             android:enabled="true"
             android:exported="false"
-            android:process=":hud"
             android:stopWithTask="false" />
 
         <!-- Explicit-only bridge. The exported Binder validates the sending UID, exact Navigator
@@ -311,17 +310,15 @@
             android:directBootAware="true"
             android:enabled="true"
             android:exported="true"
-            android:process=":hud"
             android:stopWithTask="false" />
 
-        <!-- Settings cross the process boundary through a separate non-exported component. The
-             exported Navigator Binder endpoint never accepts startService configuration data. -->
+        <!-- Settings use a separate non-exported component. The exported Navigator Binder
+             endpoint never accepts startService configuration data. -->
         <service
             android:name=".navigation.NavigationConfigurationRelayService"
             android:directBootAware="true"
             android:enabled="true"
             android:exported="false"
-            android:process=":hud"
             android:stopWithTask="false" />
 
         <service

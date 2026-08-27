@@ -130,8 +130,8 @@ public final class NavigationHudV2ContractTest {
         assertFalse(service.contains("getStringExtra("));
         assertTrue(compactManifest.contains("android:name=\".navigation."
                 + "NavigationConfigurationRelayService\"android:directBootAware=\"true\""
-                + "android:enabled=\"true\"android:exported=\"false\""
-                + "android:process=\":hud\""));
+                + "android:enabled=\"true\"android:exported=\"false\""));
+        assertFalse(compactManifest.contains("android:process=\":hud\""));
         assertTrue(relay.contains("getStringExtra(EXTRA_CONFIGURATION_JSON)"));
         assertTrue(relay.contains("acceptRelayedConfiguration(raw)"));
     }
@@ -157,8 +157,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("Развернуть Навигатор на весь экран"));
         assertTrue(controller.contains("profile.enabled && profile.modeButtonVisible"));
         assertTrue(controller.contains("mode != MODE_FULLSCREEN"));
-        assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY"));
-        assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_SYSTEM_ALERT"));
+        assertTrue(controller.contains("attributes.type = originalType"));
+        assertFalse(controller.contains("WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY"));
+        assertFalse(controller.contains("WindowManager.LayoutParams.TYPE_SYSTEM_ALERT"));
         assertTrue(controller.contains("FLAG_WATCH_OUTSIDE_TOUCH"));
         assertTrue(controller.contains("FLAG_FORCE_NOT_FULLSCREEN"));
         assertTrue(controller.contains("FLAG_FULLSCREEN"));
@@ -172,7 +173,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("guidance_open_voice_search"));
         assertTrue(controller.contains("host.addView(modeButton, 0"));
         assertTrue(controller.contains("controlLayer.addView(floatingModeButton)"));
-        assertTrue(controller.contains("restartInMode(false)"));
+        assertTrue(controller.contains("setWindowMode(MODE_FULLSCREEN)"));
+        assertFalse(controller.contains("restartInMode("));
         assertTrue(entry.contains("NavigationBridgeClient.attachActivity"));
         assertTrue(entry.contains("NavigationBridgeClient.detachActivity"));
         assertTrue(client.contains("getPackagesForUid(sendingUid)"));

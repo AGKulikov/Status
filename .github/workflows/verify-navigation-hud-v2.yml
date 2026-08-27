@@ -1,8 +1,8 @@
-name: Build Natro 2.4.1 and Navigator HUD v2 candidate
+name: Build Natro 2.4.2 and Navigator HUD v2 candidate
 
 on:
   push:
-    branches: ['feature/navigation-hud-v2', 'release/natro-2.4.1*']
+    branches: ['feature/navigation-hud-v2', 'release/natro-2.4.2*']
   pull_request:
     branches: ['main']
   workflow_dispatch:
@@ -27,8 +27,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '2.4.1'
-      VERSION_CODE: '208021265'
+      VERSION_NAME: '2.4.2'
+      VERSION_CODE: '208021266'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
@@ -48,6 +48,8 @@ jobs:
           "$SDKMANAGER" 'platforms;android-36' "build-tools;${BUILD_TOOLS_VERSION}"
       - name: Unit tests and unsigned Natro release APK
         run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+      - name: Verify Helper 70 active-data-SIM and release contract
+        run: sh ios/KX11-iPhone-ANCS-Helper-v70-personal/verify-v70-personal-contract.sh
       - name: Compile isolated Navigator classes19.dex
         run: bash tools/build_navigation_patch_dex.sh build/navigation-mod-ci
       - name: Navigation APK baseline verifier self-tests
@@ -173,8 +175,8 @@ jobs:
             "$EXPECTED_SOURCE_SHA"
           test "$(jq -er '.sourceTree' "$CANDIDATE/candidate.json")" = \
             "$EXPECTED_SOURCE_TREE"
-          test "$(jq -er '.natro.versionName' "$CANDIDATE/candidate.json")" = '2.4.1'
-          test "$(jq -er '.natro.versionCode' "$CANDIDATE/candidate.json")" = '208021265'
+          test "$(jq -er '.natro.versionName' "$CANDIDATE/candidate.json")" = '2.4.2'
+          test "$(jq -er '.natro.versionCode' "$CANDIDATE/candidate.json")" = '208021266'
       - name: Fetch and verify the exact private Navigator baseline
         shell: bash
         env:
@@ -231,7 +233,7 @@ jobs:
       - name: Upload only the verified signed pair
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: navigation-hud-v2-signed-2.4.1-${{ github.run_number }}
+          name: navigation-hud-v2-signed-2.4.2-${{ github.run_number }}
           if-no-files-found: error
           retention-days: 14
           path: ${{ runner.temp }}/signed-pair/*

@@ -111,7 +111,10 @@ final class FloatingWindowController {
         modeButton = control("◲", "Открыть Навигатор в окне");
         modeButton.setTextSize(32f);
         modeButton.setTypeface(Typeface.DEFAULT_BOLD);
-        modeButton.setOnClickListener(view -> restartInMode(true));
+        // Resizing the already attached application window is stable on KX11. Restarting
+        // MapActivity while changing its type made Navigator disappear before the replacement
+        // activity obtained a token.
+        modeButton.setOnClickListener(view -> setWindowMode(MODE_FLOATING));
 
         // In 29.4.2 the return control belongs to the floating header itself.  Reusing the
         // full-screen button leaves it under Navigator's hidden voice-search hierarchy and makes
@@ -119,7 +122,7 @@ final class FloatingWindowController {
         floatingModeButton = control("◱", "Развернуть Навигатор на весь экран");
         floatingModeButton.setTextSize(32f);
         floatingModeButton.setTypeface(Typeface.DEFAULT_BOLD);
-        floatingModeButton.setOnClickListener(view -> restartInMode(false));
+        floatingModeButton.setOnClickListener(view -> setWindowMode(MODE_FULLSCREEN));
         controlLayer.addView(floatingModeButton);
         mainHandler.post(modeButtonPoller);
         updateControls();
@@ -159,15 +162,6 @@ final class FloatingWindowController {
 
     boolean isFloating() {
         return floating;
-    }
-
-    private void restartInMode(boolean nextFloating) {
-        if (destroyed || (!profile.enabled && nextFloating)) return;
-        Intent restart = new Intent(activity, activity.getClass())
-                .addFlags(0x04008000);
-        if (nextFloating) restart.putExtra(EXTRA_WINDOWED, true);
-        activity.finish();
-        activity.startActivity(restart);
     }
 
     /**
@@ -277,7 +271,12 @@ final class FloatingWindowController {
         clampGeometry(attributes, screen);
         // Exact working 29.4.2 KX11 contract, applied only after onResumeFragments when the
         // Activity window and OEM token are attached. Applying it from onPostCreate is too early.
-        attributes.type = floatingWindowType();
+        // Keep MapActivity's original application-window identity. The installed Navigator
+        // manifest intentionally has no overlay permission; switching an attached Activity to an
+        // overlay/system-alert identity causes WindowManager to reject its token on the user's
+        // Android 9 KX11. Historical device logs confirm that the working windowed frame used
+        // type=1.
+        attributes.type = originalType;
         attributes.gravity = Gravity.TOP | Gravity.START;
         attributes.flags = (attributes.flags
                 | FLOATING_FLAGS
@@ -366,7 +365,7 @@ final class FloatingWindowController {
                 | WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
                 & ~(WindowManager.LayoutParams.FLAG_DIM_BEHIND
                         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        int expectedType = floatingWindowType();
+        int expectedType = originalType;
         boolean changed = attributes.type != expectedType
                 || attributes.gravity != (Gravity.TOP | Gravity.START)
                 || attributes.flags != expectedFlags
@@ -386,12 +385,6 @@ final class FloatingWindowController {
         if (floatingBackground != null && decor.getBackground() != floatingBackground) {
             decor.setBackground(floatingBackground);
         }
-    }
-
-    private int floatingWindowType() {
-        return Build.VERSION.SDK_INT >= 26
-                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                : WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
     }
 
     private void updateControls() {

@@ -57,6 +57,24 @@ public final class HudAndroidApiContractTest {
         assertTrue(service.contains("setCustomFrameReady(false)"));
         assertTrue(service.contains("HudStockMaskPolicy.shouldHideStockCar"));
         assertTrue(service.contains("SYSTEM_SURFACE_RETRY_MS = 15_000L"));
+        assertTrue(service.contains("apply(app);"));
+        assertFalse(service.contains("sendCommand(app, ACTION_DATA_CHANGED, null);"));
+        assertTrue(service.contains("DiagnosticJournal.info(\"hud-runtime\""));
+        assertTrue(service.contains("DiagnosticJournal.error(\"hud-runtime\""));
+        assertTrue(service.contains("HUD service создан в основном процессе Natro"));
+        assertTrue(service.contains("elements=\" + config.elements.size()"));
+    }
+
+    @Test public void hudOwnersStayInMainProcessForKx11LifecycleReliability()
+            throws Exception {
+        Path fromRoot = Paths.get("app", "src", "main", "AndroidManifest.xml");
+        Path fromApp = Paths.get("src", "main", "AndroidManifest.xml");
+        Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
+        String manifest = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+        assertTrue(manifest.contains(".hud.HudPresentationService"));
+        assertTrue(manifest.contains(".navigation.NavigationHudEndpointService"));
+        assertTrue(manifest.contains(".navigation.NavigationConfigurationRelayService"));
+        assertFalse(manifest.contains("android:process=\":hud\""));
     }
 
     private static String read(String name) throws Exception {

@@ -476,8 +476,6 @@ public class WidgetService extends Service {
     /** Confirmed ECARX 360°-camera / parktronic ownership of the vehicle display. */
     private boolean phoneExternalOverlayActive;
     private boolean phoneVehicleOverlayActive;
-    /** Fail-open once the oldest held item reaches its configured maximum wait. */
-    private boolean phoneExternalOverlayDeadlineBypass;
     private boolean phoneVehicleOverlayListenerInstalled;
     private final CarIntegration.ExternalOverlayListener phoneVehicleOverlayListener =
             this::onVehicleExternalOverlayChanged;
@@ -493,8 +491,9 @@ public class WidgetService extends Service {
     private boolean phoneNotificationBurstActive;
     private long activePhoneNotificationExpiresAt;
     private long activePhonePopupNotificationExpiresAt;
+    @Nullable
+    private PhoneStatusBarPolicy.NotificationPresentation activePhonePopupNotification;
     private boolean phoneNotificationOverlayPaused;
-    private long phoneExternalOverlayPauseStartedElapsed;
     private long pausedPhoneNotificationRemainingMs;
     private long pausedPhonePopupRemainingMs;
     private boolean pausedPhoneNotificationQueueAdvance;
@@ -582,14 +581,6 @@ public class WidgetService extends Service {
     /** Exactly one callback is armed for the oldest (therefore nearest) hold deadline. */
     private final Runnable phoneNotificationDeferralDeadline =
             this::reconcileDeferredPhoneNotifications;
-    private final Runnable phoneExternalOverlayPauseDeadline = () -> {
-        if (destroyed || !phoneExternalOverlayActive || !phoneNotificationOverlayPaused) return;
-        phoneExternalOverlayDeadlineBypass = true;
-        DiagnosticJournal.info("phone-notification",
-                "vehicle overlay pause deadline reached; fail-open delivery enabled");
-        syncPhoneNotificationExternalOverlayPause();
-        reconcileDeferredPhoneNotifications();
-    };
     private final Runnable crossSourceRuleRefresh = () -> {
         crossSourceRuleRefreshScheduled.set(false);
         if (destroyed) return;
@@ -4187,6 +4178,11 @@ public class WidgetService extends Service {
                         deferredPhoneNotificationOverflowCount);
                 return false;
             }
+            DiagnosticJournal.info("phone-notification",
+                    "delivery deferred reason="
+                            + (phoneExternalOverlayActive
+                            ? "vehicle-overlay" : "foreground-app")
+                            + " key=" + phoneNotificationDeliveryKey(delivery));
             schedulePhoneNotificationDeferralDeadline();
             return true;
         }
@@ -4253,8 +4249,7 @@ public class WidgetService extends Service {
     private boolean phoneNotificationBlockedByForeground() {
         if (prefs == null || !prefs.phoneNotificationDelayInAppsEnabled.get()) return false;
         if (prefs.phoneNotificationDelayForExternalOverlays.get()
-                && phoneExternalOverlayActive
-                && !phoneExternalOverlayDeadlineBypass) return true;
+                && phoneExternalOverlayActive) return true;
         if (prefs.phoneNotificationDelayInPackages.get().isEmpty()) return false;
         // Foreground identity can be briefly unknown while Accessibility reconnects, before the
         // first UsageStats sample, or after its permission is revoked. Showing immediately would
@@ -4274,17 +4269,13 @@ public class WidgetService extends Service {
         return prefs != null
                 && prefs.phoneNotificationDelayInAppsEnabled.get()
                 && prefs.phoneNotificationDelayForExternalOverlays.get()
-                && phoneExternalOverlayActive
-                && !phoneExternalOverlayDeadlineBypass;
+                && phoneExternalOverlayActive;
     }
 
     /** Keeps an already-rendered delivery alive while 360/PAS is confirmed active. */
     private void syncPhoneNotificationExternalOverlayPause() {
         boolean shouldPause = shouldPausePhoneNotificationForExternalOverlay();
-        if (shouldPause == phoneNotificationOverlayPaused) {
-            if (shouldPause) schedulePhoneExternalOverlayPauseDeadline();
-            return;
-        }
+        if (shouldPause == phoneNotificationOverlayPaused) return;
         if (shouldPause) pausePhoneNotificationForExternalOverlay();
         else resumePhoneNotificationAfterExternalOverlay();
     }
@@ -4292,7 +4283,6 @@ public class WidgetService extends Service {
     private void pausePhoneNotificationForExternalOverlay() {
         phoneNotificationOverlayPaused = true;
         long now = SystemClock.elapsedRealtime();
-        phoneExternalOverlayPauseStartedElapsed = now;
         pausedPhoneNotificationRemainingMs = hasActivePhoneStatusAlert()
                 && activePhoneNotificationExpiresAt > 0L
                 ? Math.max(1L, activePhoneNotificationExpiresAt - now) : 0L;
@@ -4318,24 +4308,10 @@ public class WidgetService extends Service {
                 "phone-notification-external", "PAUSED",
                 "statusRemainingMs=" + pausedPhoneNotificationRemainingMs
                         + ", popupRemainingMs=" + pausedPhonePopupRemainingMs);
-        schedulePhoneExternalOverlayPauseDeadline();
-    }
-
-    private void schedulePhoneExternalOverlayPauseDeadline() {
-        mainHandler.removeCallbacks(phoneExternalOverlayPauseDeadline);
-        if (prefs == null || !phoneNotificationOverlayPaused
-                || phoneExternalOverlayPauseStartedElapsed <= 0L) return;
-        long deadline = PhoneNotificationDeferralPolicy.deadline(
-                phoneExternalOverlayPauseStartedElapsed,
-                prefs.phoneNotificationDelayMaxWaitSeconds.get());
-        mainHandler.postDelayed(phoneExternalOverlayPauseDeadline,
-                Math.max(1L, deadline - SystemClock.elapsedRealtime()));
     }
 
     private void resumePhoneNotificationAfterExternalOverlay() {
         phoneNotificationOverlayPaused = false;
-        phoneExternalOverlayPauseStartedElapsed = 0L;
-        mainHandler.removeCallbacks(phoneExternalOverlayPauseDeadline);
         long now = SystemClock.elapsedRealtime();
         long statusRemaining = pausedPhoneNotificationRemainingMs;
         long popupRemaining = pausedPhonePopupRemainingMs;
@@ -4343,6 +4319,18 @@ public class WidgetService extends Service {
         pausedPhoneNotificationRemainingMs = 0L;
         pausedPhonePopupRemainingMs = 0L;
         pausedPhoneNotificationQueueAdvance = false;
+        boolean staleStatus = activePhoneNotification != null
+                && !phoneNotificationStillCurrent(activePhoneNotification);
+        boolean stalePopup = activePhonePopupNotification != null
+                && !phoneNotificationStillCurrent(activePhonePopupNotification);
+        if (staleStatus) {
+            statusRemaining = 0L;
+            clearPhoneStatusNotification(true);
+        }
+        if (stalePopup) {
+            popupRemaining = 0L;
+            clearPhonePopupNotification();
+        }
         if (statusRemaining > 0L && hasActivePhoneStatusAlert()) {
             activePhoneNotificationExpiresAt = now + statusRemaining;
             mainHandler.postDelayed(phoneNotificationExpiry, statusRemaining);
@@ -4360,7 +4348,9 @@ public class WidgetService extends Service {
         DiagnosticJournal.info("phone-notification",
                 "external overlay resume statusRemainingMs=" + statusRemaining
                         + " popupRemainingMs=" + popupRemaining
-                        + " queue=" + resumeQueue);
+                        + " queue=" + resumeQueue
+                        + " staleStatus=" + staleStatus
+                        + " stalePopup=" + stalePopup);
         dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
                 "phone-notification-external", "RESUMED",
                 "statusRemainingMs=" + statusRemaining
@@ -4410,6 +4400,10 @@ public class WidgetService extends Service {
             cancelPhoneNotificationQueue();
             return;
         }
+        // Camera/360 and PAS are safety-owned vehicle surfaces. Their hold is released only by
+        // the authoritative vehicle close transition; the configurable foreground-app timeout
+        // must never punch through them while they are still visible.
+        if (shouldPausePhoneNotificationForExternalOverlay()) return;
         if (!phoneNotificationBlockedByForeground()) {
             releaseAllDeferredPhoneNotifications();
             return;
@@ -4420,14 +4414,14 @@ public class WidgetService extends Service {
         boolean overflowDue = deferredPhoneNotificationOverflowCount > 0
                 && now >= PhoneNotificationDeferralPolicy.deadline(
                 deferredPhoneNotificationOverflowStartedElapsed, seconds);
-        if ((!due.isEmpty() || overflowDue) && phoneExternalOverlayActive
-                && !phoneExternalOverlayDeadlineBypass) {
-            phoneExternalOverlayDeadlineBypass = true;
-            syncPhoneNotificationExternalOverlayPause();
-            DiagnosticJournal.info("phone-notification",
-                    "vehicle overlay maximum wait reached; fail-open delivery enabled");
-        }
         for (QueuedPhoneNotification delivery : due) {
+            if (!phoneNotificationStillCurrent(delivery)) {
+                DiagnosticJournal.info("phone-notification",
+                        "deferred delivery dropped stale key="
+                                + phoneNotificationDeliveryKey(delivery));
+                onPhoneNotificationDeliveryDropped(delivery);
+                continue;
+            }
             if (!enqueuePhoneNotificationNow(delivery)) {
                 onPhoneNotificationDeliveryDropped(delivery);
             }
@@ -4445,6 +4439,16 @@ public class WidgetService extends Service {
     private void releaseAllDeferredPhoneNotifications() {
         mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
         for (QueuedPhoneNotification delivery : deferredPhoneNotifications.drainAll()) {
+            if (!phoneNotificationStillCurrent(delivery)) {
+                DiagnosticJournal.info("phone-notification",
+                        "deferred delivery dropped stale key="
+                                + phoneNotificationDeliveryKey(delivery));
+                onPhoneNotificationDeliveryDropped(delivery);
+                continue;
+            }
+            DiagnosticJournal.info("phone-notification",
+                    "deferred delivery released key="
+                            + phoneNotificationDeliveryKey(delivery));
             if (!enqueuePhoneNotificationNow(delivery)) {
                 onPhoneNotificationDeliveryDropped(delivery);
             }
@@ -4463,6 +4467,7 @@ public class WidgetService extends Service {
     private void schedulePhoneNotificationDeferralDeadline() {
         mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
         if (prefs == null || !phoneNotificationBlockedByForeground()) return;
+        if (shouldPausePhoneNotificationForExternalOverlay()) return;
         long deadline = deferredPhoneNotifications.nextDeadline(
                 prefs.phoneNotificationDelayMaxWaitSeconds.get());
         if (deferredPhoneNotificationOverflowCount > 0) {
@@ -4508,7 +4513,44 @@ public class WidgetService extends Service {
             applyBrickVisibility(currentBrickSet());
         }
         schedulePopupRefresh();
-        return presentedInStatusRow || presentedInPopup;
+        boolean presented = presentedInStatusRow || presentedInPopup;
+        if (presented) {
+            DiagnosticJournal.info("phone-notification",
+                    "delivery shown key=" + phoneNotificationDeliveryKey(delivery)
+                            + " status=" + presentedInStatusRow
+                            + " popup=" + presentedInPopup);
+        }
+        return presented;
+    }
+
+    private boolean phoneNotificationStillCurrent(
+            @NonNull QueuedPhoneNotification delivery) {
+        return delivery.presentation == null
+                || phoneNotificationStillCurrent(delivery.presentation);
+    }
+
+    /** A fresh ANCS item list is authoritative; missing/stale telemetry must fail open. */
+    private boolean phoneNotificationStillCurrent(
+            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation) {
+        String key = presentation.key;
+        if (TextUtils.isEmpty(key) || key.startsWith("overflow+")) return true;
+        ConnectorValue items = phoneStatusValues.get("notifications.items");
+        if (items == null || !items.fresh || !items.available || !items.readable
+                || !(items.rawValue instanceof List<?>)) return true;
+        // The connector may publish latest before its accompanying list snapshot. An older list
+        // cannot prove the new delivery stale and therefore deliberately fails open.
+        if (items.updatedAt < presentation.receivedAt) return true;
+        for (Object item : (List<?>) items.rawValue) {
+            if (key.equals(PhoneStatusBarPolicy.notificationKey(item))) return true;
+        }
+        return false;
+    }
+
+    @NonNull
+    private static String phoneNotificationDeliveryKey(
+            @NonNull QueuedPhoneNotification delivery) {
+        if (delivery.presentation != null) return delivery.presentation.key;
+        return "low-battery-" + delivery.lowBatteryStage;
     }
 
     private boolean isPhoneLowBatteryAlertPending(int stage) {
@@ -6078,6 +6120,7 @@ public class WidgetService extends Service {
                     shownOverlay, overlay);
             onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
                     shownOverlay);
+            activePhonePopupNotification = presentation;
             if (phoneNotificationOverlayPaused) {
                 pausedPhonePopupRemainingMs = seconds * 1_000L;
                 activePhonePopupNotificationExpiresAt = Long.MAX_VALUE;
@@ -6100,6 +6143,7 @@ public class WidgetService extends Service {
     private void clearPhonePopupNotification() {
         mainHandler.removeCallbacks(phonePopupNotificationExpiry);
         activePhonePopupNotificationExpiresAt = 0L;
+        activePhonePopupNotification = null;
         pausedPhonePopupRemainingMs = 0L;
         activePhoneLowBatteryPopup = false;
         if (automationStates == null) return;
@@ -6231,6 +6275,7 @@ public class WidgetService extends Service {
                         SystemClock.elapsedRealtime() + seconds * 1_000L;
             }
             activePhoneLowBatteryPopup = true;
+            activePhonePopupNotification = null;
             mainHandler.removeCallbacks(phonePopupNotificationExpiry);
             if (!phoneNotificationOverlayPaused) {
                 mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
@@ -7054,7 +7099,6 @@ public class WidgetService extends Service {
 
     private void setPhoneExternalOverlayActive(boolean active) {
         boolean changed = phoneExternalOverlayActive != active;
-        if (changed) phoneExternalOverlayDeadlineBypass = false;
         phoneExternalOverlayActive = active;
         syncPhoneNotificationExternalOverlayPause();
         if (changed) onPhoneNotificationForegroundChanged();
@@ -7859,9 +7903,7 @@ public class WidgetService extends Service {
         phoneLowBatteryAlertPending2 = false;
         phoneExternalOverlayActive = false;
         phoneVehicleOverlayActive = false;
-        phoneExternalOverlayDeadlineBypass = false;
         phoneNotificationOverlayPaused = false;
-        phoneExternalOverlayPauseStartedElapsed = 0L;
         pausedPhoneNotificationRemainingMs = 0L;
         pausedPhonePopupRemainingMs = 0L;
         pausedPhoneNotificationQueueAdvance = false;

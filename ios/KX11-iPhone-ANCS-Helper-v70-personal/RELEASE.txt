@@ -1,0 +1,71 @@
+KX11 ANCS Helper v70 Personal Team — entitlement-clean direct Live Activity controls
+Bundle ID: ru.natro.kx11ancshelper
+Build: 70
+Marketing version: 70.0
+
+Helper 70 active data-SIM telemetry fix:
+- uses CTTelephonyNetworkInfo.dataServiceIdentifier as the only active packet-data line key;
+- never aggregates radio technologies from inactive SIMs;
+- implements CTTelephonyNetworkInfoDelegate and refreshes on data-SIM changes without restart;
+- performs bounded 0/250/1000 ms settling reads and records privacy-safe telemetry diagnostics.
+Minimum iOS: 14.0 (Live Activity requires iOS 16.2)
+Paired runtime: Natro 2.2.19
+Status: source candidate; Apple-SDK CI and physical-device checks are release gates
+
+Personal Team differences:
+
+- removes Push Notifications, aps-environment and App Groups from both signed targets;
+- creates strictly local Live Activities with pushType nil;
+- never exports or advertises push-to-start/activity push tokens to Natro;
+- adds separate Shortcuts actions to start and stop both Live Activities;
+- start opens Helper for Apple's required foreground Activity.request path;
+- on iOS 17+, Lock Screen controls use LiveActivityIntent and finite Darwin notifications without
+  opening Helper; the card-level URL is retained only as a confirmed fallback.
+
+Behavior retained from v63:
+
+- starts both local cards only when the authenticated C5 route to the selected car is connected;
+- ends both cards immediately when that route disconnects;
+- retains 500 ms unsolicited coalescing and immediate command-driven ActivityKit updates;
+- keeps optimistic control state, timeout rollback and accumulated temperature taps;
+- keeps the full Bluetooth vehicle-control and ANCS runtime unchanged.
+
+Helper 70 road-log stability fixes:
+
+- starts and provisions Live Activity only on the exact C5 disconnected-to-connected edge;
+- removes the Helper 68 retry storm which attempted local Activity.request and resent C5
+  provisioning on every catalog/state callback while the app was backgrounded;
+- retries the foreground-only ActivityKit start once when Helper becomes active and fences a
+  concurrent creation attempt;
+- spaces pre-sync C5 HELLO retries to five seconds so Bluetooth main-queue recovery has priority.
+
+Launch cleanup retained:
+
+- never probes an App Group container or suite-backed UserDefaults in the Personal Team product;
+- fixes the repeated sandbox `client is not entitled` diagnostics without changing signing;
+- keeps Lock Screen button delivery on the direct finite Darwin notification channel;
+- statically audits every authored UIColor/SwiftUI sRGB literal for components outside 0...1.
+
+Reconnect and C5 changes retained:
+
+- holds a bounded iOS background task across the exact owner-zero/drain/new-owner transition so
+  the 750 ms same-role drain cannot stretch to tens of seconds after the app backgrounds;
+- journals the planned and actual drain duration, deadline lateness, owner-zero gap, target-start
+  gap and background-task lifetime without logging identifiers, tokens or payloads;
+- exposes encrypted C5 with write-without-response in addition to the legacy write property, so
+  Natro can pace optional vehicle frames locally and never tear down a healthy ANCS owner while
+  waiting for an optional characteristic-write callback.
+
+Helper 66 recovery changes retained:
+
+- drains an incompatible restored Route-A namespace automatically after the bounded grace;
+- no longer leaves `ingressFreezeFailed` waiting for the manual Retry button after relaunch;
+- keeps explicit role changes and Route-B migration fail-closed;
+- writes the actual bundle marketing/build version into every exported ANCS journal.
+
+Apple platform boundary: a Personal Team cannot perform a background-first Live Activity start.
+The Shortcut start action therefore opens Helper; the stop action can end existing cards directly.
+No signed IPA is produced by this repository; the Xcode project is the deliverable.
+
+Do not call this candidate stable until Apple-SDK CI and the physical iPhone/KX11 acceptance
+matrix pass, including Shortcut start/stop, locked-screen controls and Bluetooth reconnect/loss.
