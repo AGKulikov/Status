@@ -159,7 +159,8 @@ jobs:
       actions: read
       contents: write
     env:
-      EXPECTED_SOURCE_SHA: '49c7e3dd80bcf45abe131f91c05f3f77d4b582d4'
+      EXPECTED_SOURCE_SHA: '08940a55361fbcf0cc1fe27e968365dfdc487b09'
+      PUBLISHED_SOURCE_SHA: '49c7e3dd80bcf45abe131f91c05f3f77d4b582d4'
       EXPECTED_SOURCE_TREE: 'ee581dcf0b5ed81755a8ef7b6dbee9b4ca615501'
       EXPECTED_BASELINE_SHA256: '663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f'
       EXPECTED_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
@@ -171,6 +172,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ env.EXPECTED_SOURCE_SHA }}
+          fetch-depth: 2
           persist-credentials: false
       - name: Download the exact successful release-branch candidate
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -186,6 +188,8 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_SOURCE_TREE"
+          test "$(git rev-parse "${PUBLISHED_SOURCE_SHA}^{tree}")" = \
+            "$EXPECTED_SOURCE_TREE"
           CANDIDATE="$RUNNER_TEMP/candidate"
           (cd "$CANDIDATE" && sha256sum -c SHA256SUMS.txt)
           test "$(jq -er '.sourceSha' "$CANDIDATE/candidate.json")" = \
@@ -361,7 +365,7 @@ jobs:
               ;;
           esac
           export KEY_PASSWORD
-          if [ "$GITHUB_EVENT_NAME" = 'push' ]; then
+          if [ "$GITHUB_EVENT_NAME" != 'workflow_dispatch' ]; then
             test -s "$BASELINE_URL_FILE"
             IFS= read -r BASELINE_URL < "$BASELINE_URL_FILE" || test -n "$BASELINE_URL"
             test -n "$BASELINE_URL"
