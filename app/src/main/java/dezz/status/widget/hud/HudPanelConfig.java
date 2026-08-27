@@ -159,6 +159,18 @@ public final class HudPanelConfig {
         normalizeHorizontalGroups(ids);
     }
 
+    /** True when Natro can draw something useful without the separate Navigator map surface. */
+    public boolean hasStandaloneDrawableElement() {
+        for (HudElementConfig item : elements) {
+            if (item.enabled
+                    && item.type != HudElementType.HORIZONTAL_GROUP
+                    && item.type != HudElementType.NAV_MAP) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Keeps group membership deterministic and prevents nested or duplicate ownership. */
     private void normalizeHorizontalGroups(@NonNull Set<String> ids) {
         Set<String> claimed = new HashSet<>();
@@ -292,6 +304,10 @@ public final class HudPanelConfig {
                         // Preserve every valid element if one imported future/invalid item exists.
                     }
                 }
+            } else {
+                // Early HUD documents did not own an elements array. Treating that as an
+                // intentional empty layout produced an accepted all-black mask with no clock.
+                out.elements.addAll(defaults().elements);
             }
             out.normalize();
             return out;

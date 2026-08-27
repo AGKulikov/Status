@@ -181,6 +181,14 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(callback.contains("status == 133"));
         assertTrue(callback.contains("registeredConnectionError133("));
 
+        String silent = between(source,
+                "private boolean recoverRegisteredSilentGatt",
+                "private static Integer registeredClientIf");
+        assertTrue(silent.contains("registeredSilentConnection(current, token)"));
+        assertTrue(silent.contains("action=retain_reassert_same_wrapper"));
+        assertFalse(silent.contains("cacheRefreshRequested = true"));
+        assertFalse(silent.contains("retirementSettleRequested = true"));
+
         String reporter = between(source,
                 "private void reportPlatformDiagnostic",
                 "private void assertMain");

@@ -126,6 +126,7 @@ import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.IntentScenarioController;
 import dezz.status.widget.integration.LocalScenarioController;
+import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.launcher.LauncherShortcutStore;
@@ -4766,19 +4767,38 @@ public class WidgetService extends Service {
 
     @Nullable
     private Integer phonePercent(@NonNull String resourceId) {
-        return PhoneStatusBarPolicy.percentValue(resourceId, phoneStatusValues.get(resourceId));
+        return PhoneStatusBarPolicy.percentValue(resourceId, currentPhoneValue(resourceId));
     }
 
     @Nullable
     private Boolean phoneBoolean(@NonNull String resourceId) {
-        return PhoneStatusBarPolicy.booleanValue(resourceId, phoneStatusValues.get(resourceId));
+        return PhoneStatusBarPolicy.booleanValue(resourceId, currentPhoneValue(resourceId));
     }
 
     @NonNull
     private String phoneText(@NonNull String resourceId) {
         String value = PhoneStatusBarPolicy.textValue(
-                resourceId, phoneStatusValues.get(resourceId));
+                resourceId, currentPhoneValue(resourceId));
         return value == null ? "" : value;
+    }
+
+    /**
+     * Reads the authoritative connector snapshot instead of relying on the UI projection map.
+     *
+     * <p>The map remains the event/notification bookkeeping owner, but its callback is posted to
+     * the main thread. A HOME surface can render between registry publication and that posted
+     * projection. Direct registry reads close that race and also recover when a visual surface is
+     * created after the first Helper telemetry burst.</p>
+     */
+    @Nullable
+    private ConnectorValue currentPhoneValue(@NonNull String resourceId) {
+        ConnectorValueRegistry current = connectorValues;
+        if (current != null) {
+            ConnectorValue value = current.get(ConnectorType.PHONE,
+                    SourceBinding.DEFAULT_CONNECTOR_ID, resourceId);
+            if (value != null) return value;
+        }
+        return phoneStatusValues.get(resourceId);
     }
 
     private int phoneBatteryColor(@Nullable Integer battery, boolean charging) {
@@ -7986,7 +8006,15 @@ public class WidgetService extends Service {
      */
     @Nullable
     public StatusBrickSnapshot statusBrickSnapshot(@NonNull BrickType type) {
-        if (destroyed || prefs == null || binding == null) return null;
+        if (destroyed || prefs == null) return null;
+        // PHONE telemetry belongs to the service runtime, not to the optional status-row
+        // WindowManager root. Launcher/driver information tiles must keep receiving signal,
+        // battery and radio generation while the status overlay itself is disabled, detached or
+        // still retrying its attachment. Other brick snapshots still read live binding views.
+        boolean headlessPhoneSnapshot = type == BrickType.PHONE_CELLULAR
+                || type == BrickType.PHONE_BATTERY
+                || type == BrickType.PHONE_NETWORK_TYPE;
+        if (binding == null && !headlessPhoneSnapshot) return null;
         String text = "";
         int iconResource = 0;
         int iconTint = ContextCompat.getColor(

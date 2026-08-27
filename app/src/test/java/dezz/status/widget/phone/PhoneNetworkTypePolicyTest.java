@@ -12,6 +12,7 @@ public final class PhoneNetworkTypePolicyTest {
         assertEquals("5G UW", PhoneNetworkTypePolicy.display("5g-uw"));
         assertEquals("LTE", PhoneNetworkTypePolicy.display("LTE"));
         assertEquals("3G", PhoneNetworkTypePolicy.display("3G"));
+        assertEquals("2G", PhoneNetworkTypePolicy.display("2g"));
         assertEquals("E", PhoneNetworkTypePolicy.display("EDGE"));
         assertEquals("G", PhoneNetworkTypePolicy.display("GPRS"));
         assertEquals("1x", PhoneNetworkTypePolicy.display("1X"));

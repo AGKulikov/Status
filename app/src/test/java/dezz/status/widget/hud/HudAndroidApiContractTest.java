@@ -52,6 +52,11 @@ public final class HudAndroidApiContractTest {
         assertFalse(service.contains("dismissFallbackOnly(\"system HUD surface ready\")"));
         assertTrue(service.contains("кадр принят SurfaceFlinger"));
         assertTrue(service.contains("systemSurfaceRetryAfter"));
+        assertTrue(service.contains("scheduleSystemSurfaceRetry()"));
+        assertTrue(service.contains("setCustomFrameReady(true)"));
+        assertTrue(service.contains("setCustomFrameReady(false)"));
+        assertTrue(service.contains("HudStockMaskPolicy.shouldHideStockCar"));
+        assertTrue(service.contains("SYSTEM_SURFACE_RETRY_MS = 15_000L"));
     }
 
     private static String read(String name) throws Exception {

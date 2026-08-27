@@ -53,7 +53,7 @@ public final class HudPresentationService extends Service
     private static final int NOTIFICATION_ID = 0x485544;
     /** Stay well below Android's process-wide Binder transaction limit. */
     private static final int MAX_COMMAND_CONFIG_CHARS = 240_000;
-    private static final long SYSTEM_SURFACE_RETRY_MS = 60_000L;
+    private static final long SYSTEM_SURFACE_RETRY_MS = 15_000L;
     @Nullable private static volatile HudPresentationService instance;
     @NonNull private static volatile String runtimeDetail = "HUD не запущен";
 
@@ -68,8 +68,19 @@ public final class HudPresentationService extends Service
     private HudSystemSurfaceWindow systemSurfaceWindow;
     private long systemSurfaceRetryAfter;
     private boolean runtimeInitialized;
+    private boolean customFrameReady;
     @Nullable private String shownUniqueId;
     @Nullable private Boolean requestedStockHudCarHidden;
+    @NonNull private final Runnable retrySystemSurface = new Runnable() {
+        @Override public void run() {
+            if (!runtimeInitialized || config == null || shownUniqueId == null
+                    || systemSurfaceWindow != null) {
+                return;
+            }
+            systemSurfaceRetryAfter = 0L;
+            reconcilePresentation();
+        }
+    };
 
     public static void apply(@NonNull Context context) {
         Context app = applicationContext(context);
@@ -238,6 +249,7 @@ public final class HudPresentationService extends Service
     @Override
     public void onDestroy() {
         instance = null;
+        runtimeInitialized = false;
         setRuntimeDetail("HUD не запущен");
         dismissPresentation("service stopped");
         if (data != null) data.stop();
@@ -298,13 +310,15 @@ public final class HudPresentationService extends Service
      * Pair the visual mask option with the removed stock Settings AR preference.
      *
      * <p>The ECARX implementation preserves the complete active profile and changes only its
-     * legacy AR key. We intentionally do not restore it merely because this service is destroyed:
-     * Android may recreate the foreground service during boot/display churn. An explicit switch
-     * from mask on to mask off sends the restoring value.</p>
+     * legacy AR key. The stock layer is hidden only after SurfaceFlinger acknowledges a useful
+     * Natro frame. Any display, bridge or service failure restores it immediately.</p>
      */
     private void reconcileStockHudCarPreference() {
         if (config == null) return;
-        boolean hidden = config.maskStockHud;
+        boolean hidden = HudStockMaskPolicy.shouldHideStockCar(
+                config.maskStockHud,
+                customFrameReady,
+                config.hasStandaloneDrawableElement());
         if (requestedStockHudCarHidden != null
                 && requestedStockHudCarHidden.booleanValue() == hidden) {
             return;
@@ -320,6 +334,12 @@ public final class HudPresentationService extends Service
                 requestedStockHudCarHidden = null;
             }
         });
+    }
+
+    private void setCustomFrameReady(boolean ready) {
+        if (customFrameReady == ready) return;
+        customFrameReady = ready;
+        reconcileStockHudCarPreference();
     }
 
     private void reconcilePresentation() {
@@ -351,6 +371,10 @@ public final class HudPresentationService extends Service
             if (systemSurfaceWindow != null) systemSurfaceWindow.updateConfig(config);
             if (overlayWindow != null) overlayWindow.updateConfig(config);
             if (presentation != null) presentation.updateConfig(config);
+            Display display = HudDisplaySelector.display(candidate);
+            if (systemSurfaceWindow == null && display != null && display.isValid()) {
+                startSystemSurface(display);
+            }
             setRuntimeDetail(runtimeDetail(candidate));
             updateNotification(runtimeDetail);
             return;
@@ -375,8 +399,19 @@ public final class HudPresentationService extends Service
     }
 
     private void showOnDisplay(@NonNull Display display) {
-        showWindowManagerFallback(display);
-        if (SystemClock.elapsedRealtime() < systemSurfaceRetryAfter) return;
+        if (overlayWindow == null && presentation == null) {
+            showWindowManagerFallback(display);
+        }
+        startSystemSurface(display);
+    }
+
+    private void startSystemSurface(@NonNull Display display) {
+        if (systemSurfaceWindow != null || shownUniqueId == null || !display.isValid()) return;
+        if (SystemClock.elapsedRealtime() < systemSurfaceRetryAfter) {
+            scheduleSystemSurfaceRetry();
+            return;
+        }
+        main.removeCallbacks(retrySystemSurface);
         try {
             HudSystemSurfaceWindow window = HudSystemSurfaceWindow.show(
                     this, display, config, data, new HudSystemSurfaceWindow.Listener() {
@@ -391,7 +426,9 @@ public final class HudPresentationService extends Service
                             // visually hidden by the identical direct surface when SurfaceFlinger
                             // presents correctly, but prevents the custom panel from disappearing
                             // if an OEM compositor accepts a buffer on the wrong physical output.
-                            // The direct opaque frame still masks the stock HUD.
+                            systemSurfaceRetryAfter = 0L;
+                            main.removeCallbacks(retrySystemSurface);
+                            setCustomFrameReady(true);
                             setRuntimeDetail("HUD: ID " + display.getDisplayId()
                                     + " · системный слой " + readyWindow.layerStack()
                                     + " · кадр принят SurfaceFlinger"
@@ -405,6 +442,7 @@ public final class HudPresentationService extends Service
                             if (systemSurfaceWindow != failedWindow) return;
                             systemSurfaceWindow = null;
                             failedWindow.dismiss();
+                            setCustomFrameReady(false);
                             systemSurfaceRetryAfter = SystemClock.elapsedRealtime()
                                     + SYSTEM_SURFACE_RETRY_MS;
                             if (overlayWindow == null && presentation == null
@@ -418,18 +456,29 @@ public final class HudPresentationService extends Service
                             }
                             setRuntimeDetail(
                                     "HUD: обычный overlay; системная маска недоступна — "
-                                            + detail);
+                                            + detail + "; повтор через 15 с");
                             updateNotification(runtimeDetail);
+                            scheduleSystemSurfaceRetry();
                         }
                     });
             systemSurfaceWindow = window;
         } catch (RuntimeException failure) {
             systemSurfaceWindow = null;
+            setCustomFrameReady(false);
             systemSurfaceRetryAfter = SystemClock.elapsedRealtime()
                     + SYSTEM_SURFACE_RETRY_MS;
             Log.w(TAG, "Could not start direct HUD surface; keeping WindowManager fallback",
                     failure);
+            scheduleSystemSurfaceRetry();
         }
+    }
+
+    private void scheduleSystemSurfaceRetry() {
+        main.removeCallbacks(retrySystemSurface);
+        if (!runtimeInitialized || shownUniqueId == null || systemSurfaceWindow != null) return;
+        long delay = Math.max(0L,
+                systemSurfaceRetryAfter - SystemClock.elapsedRealtime());
+        main.postDelayed(retrySystemSurface, delay);
     }
 
     private void showWindowManagerFallback(@NonNull Display display) {
@@ -457,12 +506,15 @@ public final class HudPresentationService extends Service
             if (presentation == next) {
                 presentation = null;
                 shownUniqueId = null;
+                setCustomFrameReady(false);
+                if (runtimeInitialized) main.post(this::reconcilePresentation);
             }
         });
         return next;
     }
 
     private void dismissPresentation(@NonNull String reason) {
+        main.removeCallbacks(retrySystemSurface);
         HudSystemSurfaceWindow currentSystemSurface = systemSurfaceWindow;
         HudOverlayWindow currentOverlay = overlayWindow;
         HudPresentation current = presentation;
@@ -470,6 +522,8 @@ public final class HudPresentationService extends Service
         overlayWindow = null;
         presentation = null;
         shownUniqueId = null;
+        systemSurfaceRetryAfter = 0L;
+        setCustomFrameReady(false);
         if (currentSystemSurface != null) currentSystemSurface.dismiss();
         if (currentOverlay != null) currentOverlay.dismiss();
         if (current != null) {

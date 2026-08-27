@@ -141,6 +141,7 @@ public final class NavigationHudV2ContractTest {
         Path patchRoot = projectRoot().resolve(
                 "navigator-mod/src/main/java/ru/natro/navigation");
         String controller = read(patchRoot.resolve("FloatingWindowController.java"));
+        String windowProfile = read(patchRoot.resolve("FloatingWindowProfile.java"));
         String entry = read(patchRoot.resolve("NatroEntryPoint.java"));
         String client = read(patchRoot.resolve("NavigationBridgeClient.java"));
         String renderer = read(patchRoot.resolve("HudMapRenderer.java"));
@@ -159,6 +160,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY"));
         assertTrue(controller.contains("WindowManager.LayoutParams.TYPE_SYSTEM_ALERT"));
         assertTrue(controller.contains("FLAG_WATCH_OUTSIDE_TOUCH"));
+        assertTrue(controller.contains("FLAG_FORCE_NOT_FULLSCREEN"));
+        assertTrue(controller.contains("FLAG_FULLSCREEN"));
+        assertTrue(controller.contains("enforceFloatingWindowContract()"));
+        assertTrue(controller.contains("View.SYSTEM_UI_FLAG_VISIBLE"));
+        assertTrue(controller.contains("natro_floating_window_v3"));
+        assertTrue(controller.contains("background.setColor(Color.TRANSPARENT)"));
+        assertFalse(controller.contains("View.SYSTEM_UI_FLAG_HIDE_NAVIGATION"));
+        assertTrue(windowProfile.contains("backgroundColor = \"#00000000\""));
         assertTrue(controller.contains("navi_service_open_voice_search"));
         assertTrue(controller.contains("guidance_open_voice_search"));
         assertTrue(controller.contains("host.addView(modeButton, 0"));

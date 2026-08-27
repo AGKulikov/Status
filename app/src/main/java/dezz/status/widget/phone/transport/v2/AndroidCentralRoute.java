@@ -32,7 +32,7 @@ public final class AndroidCentralRoute {
     public static final long WAIT_SYSTEM_RECOVERY_MS = 180_000L;
     /** Enrolled Route A must recover during one ignition cycle, not after multi-minute silence. */
     public static final long ENROLLED_WAIT_SYSTEM_RECOVERY_MS = 5_000L;
-    /** A registered Android-P wrapper with status 133 is retried without allocating clientIf. */
+    /** A registered Android-P wrapper is retried without allocating another clientIf. */
     public static final long REGISTERED_ERROR_RECOVERY_MS = 5_000L;
     public static final int MAX_ATTEMPTS_PER_EPOCH = 6;
     private static final long[] SAME_OWNER_REASSERT_MS = {30_000L, 60_000L, 120_000L};
@@ -222,14 +222,26 @@ public final class AndroidCentralRoute {
                 DISCOVERY_TIMEOUT_MS, "discover exact public GATT database");
     }
 
-    /**
-     * Android 9 status 133 proves that this exact wrapper has a registered clientIf, but it does
-     * not prove that replacing the wrapper will help.  Reassert the same BluetoothGatt twice,
-     * then retain it behind a five-second recovery/presence loop.  No CLOSE_GATT or new public
-     * owner is allowed on this path; a real status-0 disconnect or radio reset remains terminal.
-     */
+    /** Android 9 status 133 proves that this exact wrapper owns a registered clientIf. */
     public static BleRouteTransition<State> registeredConnectionError133(
             State state, BleRouteToken ownerCallback) {
+        return registeredConnectionFailure(state, ownerCallback,
+                "Android GATT status 133");
+    }
+
+    /**
+     * Android 9 can also register {@code mClientIf} while withholding every public callback.
+     * Treat that positive registration proof exactly like status 133: retain and reassert the
+     * sole wrapper instead of refreshing the cache, closing it, and allocating another client.
+     */
+    public static BleRouteTransition<State> registeredSilentConnection(
+            State state, BleRouteToken ownerCallback) {
+        return registeredConnectionFailure(state, ownerCallback,
+                "Android registered GATT privately but withheld its callback");
+    }
+
+    private static BleRouteTransition<State> registeredConnectionFailure(
+            State state, BleRouteToken ownerCallback, String failureDetail) {
         if (state == null || ownerCallback == null || state.expected == null
                 || ownerCallback.mode != IphoneBleMode.ANDROID_CENTRAL
                 || !state.epoch.equals(ownerCallback.epoch)
@@ -248,13 +260,13 @@ public final class AndroidCentralRoute {
             State waiting = copyWithReassertions(state, Phase.WAIT_REASSERT, timer,
                     ownerCallback.ownerId, state.nextOwnerId, state.consecutiveFailures,
                     retryIndex + 1,
-                    "registered Android GATT status 133; same-wrapper retry scheduled");
+                    failureDetail + "; same-wrapper retry scheduled");
             List<BleRouteEffect> effects = new ArrayList<>();
             effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, completed,
-                    "registered status 133"));
+                    "registered connection recovery"));
             if (retryIndex == 0) {
                 effects.add(op(BleRouteEffect.Type.REPORT_ERROR, completed,
-                        "Android GATT status 133; retaining the registered wrapper"));
+                        failureDetail + "; retaining the registered wrapper"));
             }
             effects.add(BleRouteEffect.retry(timer,
                     REGISTERED_ERROR_REASSERT_MS[retryIndex],
@@ -267,10 +279,10 @@ public final class AndroidCentralRoute {
         State waiting = copyWithReassertions(state, Phase.WAIT_SYSTEM_CONNECTION, recovery,
                 ownerCallback.ownerId, state.nextOwnerId, state.consecutiveFailures,
                 state.sameOwnerReassertions,
-                "registered status 133 persists; retain one wrapper for stack recovery");
+                failureDetail + " persists; retain one wrapper for stack recovery");
         List<BleRouteEffect> effects = new ArrayList<>();
         effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, completed,
-                "registered status 133 recovery"));
+                "registered connection recovery"));
         if (state.sameOwnerReassertions == REGISTERED_ERROR_REASSERT_MS.length) {
             effects.add(op(BleRouteEffect.Type.REPORT_DOWN, completed,
                     "Android Bluetooth stack is retaining the old registration; "
@@ -509,6 +521,13 @@ public final class AndroidCentralRoute {
             return BleRouteTransition.ignored(state);
         }
         if (result != GattResultV2.SUCCESS) {
+            if (result == null || result == GattResultV2.TRANSIENT_FAILURE) {
+                return retryAncsSubscriptionOnSameOwner(state, token,
+                        AuthorizationStep.NOTIFICATION_SOURCE_CCCD,
+                        Phase.SUBSCRIBING_NOTIFICATION_SOURCE,
+                        BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE,
+                        "Notification Source", "transient Notification Source CCCD failure");
+            }
             return gattFailure(state, token, result,
                     AuthorizationStep.NOTIFICATION_SOURCE_CCCD);
         }
@@ -528,8 +547,11 @@ public final class AndroidCentralRoute {
         }
         if (result != GattResultV2.SUCCESS) {
             if (result == null || result == GattResultV2.TRANSIENT_FAILURE) {
-                return retryDataSourceOnSameOwner(state, token,
-                        "transient Data Source CCCD failure");
+                return retryAncsSubscriptionOnSameOwner(state, token,
+                        AuthorizationStep.DATA_SOURCE_CCCD,
+                        Phase.SUBSCRIBING_DATA_SOURCE,
+                        BleRouteEffect.Type.SUBSCRIBE_ANCS_DATA_SOURCE,
+                        "Data Source", "transient Data Source CCCD failure");
             }
             return gattFailure(state, token, result, AuthorizationStep.DATA_SOURCE_CCCD);
         }
@@ -592,9 +614,19 @@ public final class AndroidCentralRoute {
         if (state.expected == null || !state.expected.equals(token)) {
             return BleRouteTransition.ignored(state);
         }
+        if (state.phase == Phase.SUBSCRIBING_NOTIFICATION_SOURCE) {
+            return retryAncsSubscriptionOnSameOwner(state, token,
+                    AuthorizationStep.NOTIFICATION_SOURCE_CCCD,
+                    Phase.SUBSCRIBING_NOTIFICATION_SOURCE,
+                    BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE,
+                    "Notification Source", "Notification Source CCCD callback timeout");
+        }
         if (state.phase == Phase.SUBSCRIBING_DATA_SOURCE) {
-            return retryDataSourceOnSameOwner(state, token,
-                    "Data Source CCCD callback timeout");
+            return retryAncsSubscriptionOnSameOwner(state, token,
+                    AuthorizationStep.DATA_SOURCE_CCCD,
+                    Phase.SUBSCRIBING_DATA_SOURCE,
+                    BleRouteEffect.Type.SUBSCRIBE_ANCS_DATA_SOURCE,
+                    "Data Source", "Data Source CCCD callback timeout");
         }
         if (state.phase == Phase.CONNECTING) {
             // A saved enrolled locator can be stale after iOS rotates its RPA.  Do not spend
@@ -1056,41 +1088,42 @@ public final class AndroidCentralRoute {
     }
 
     /**
-     * Android 9 can return one late 133 while enabling ANCS Data Source even though the
-     * authenticated CONTROL/telemetry owner is still usable.  Re-serialize that exact CCCD once
-     * on the same owner.  A repeated failure remains explicitly down and waits for Service
-     * Changed, but must not close the working GATT or manufacture a false READY transition.
+     * Android 9 can return one late transient result while enabling either mandatory ANCS CCCD,
+     * even though the authenticated CONTROL/telemetry owner is still usable. Re-serialize that
+     * exact operation once. A repeated failure stays explicitly down without closing the owner
+     * or manufacturing a false READY transition.
      */
-    private static BleRouteTransition<State> retryDataSourceOnSameOwner(
-            State state, BleRouteToken completed, String reason) {
-        int retries = state.authorizationStep == AuthorizationStep.DATA_SOURCE_CCCD
+    private static BleRouteTransition<State> retryAncsSubscriptionOnSameOwner(
+            State state, BleRouteToken completed, AuthorizationStep step, Phase retryPhase,
+            BleRouteEffect.Type retryEffect, String sourceName, String reason) {
+        int retries = state.authorizationStep == step
                 ? state.authorizationRetries : 0;
         if (retries >= 1) {
             State waiting = copyPolicy(state, Phase.WAIT_ANCS, null,
                     completed.ownerId, state.nextOwnerId, state.consecutiveFailures,
-                    AuthorizationStep.DATA_SOURCE_CCCD, 1,
+                    step, 1,
                     state.invalidHandleRediscoveries,
                     reason + "; exact owner retained for Service Changed recovery");
             return BleRouteTransition.accepted(waiting,
                     op(BleRouteEffect.Type.CANCEL_DEADLINE, completed,
-                            "bounded Data Source retry exhausted"),
+                            "bounded " + sourceName + " retry exhausted"),
                     op(BleRouteEffect.Type.REPORT_ERROR, completed,
                             reason + "; CONTROL/telemetry retained; ANCS remains down"),
                     op(BleRouteEffect.Type.REPORT_DOWN, completed,
-                            "ANCS Data Source unavailable; wait for Service Changed"));
+                            "ANCS " + sourceName + " unavailable; wait for Service Changed"));
         }
         BleRouteToken retry = nextOperation(completed);
         if (retry == null) return counterExhausted(state, completed, "operation");
-        State retrying = copyPolicy(state, Phase.SUBSCRIBING_DATA_SOURCE, retry,
+        State retrying = copyPolicy(state, retryPhase, retry,
                 completed.ownerId, state.nextOwnerId, state.consecutiveFailures,
-                AuthorizationStep.DATA_SOURCE_CCCD, 1,
+                step, 1,
                 state.invalidHandleRediscoveries,
                 reason + "; one same-owner retry");
         return BleRouteTransition.accepted(retrying,
                 op(BleRouteEffect.Type.CANCEL_DEADLINE, completed,
-                        "serialize same-owner Data Source retry"),
-                op(BleRouteEffect.Type.SUBSCRIBE_ANCS_DATA_SOURCE, retry,
-                        "one bounded Data Source CCCD retry on existing owner"),
+                        "serialize same-owner " + sourceName + " retry"),
+                op(retryEffect, retry,
+                        "one bounded " + sourceName + " CCCD retry on existing owner"),
                 BleRouteEffect.deadline(retry, CCCD_TIMEOUT_MS));
     }
 

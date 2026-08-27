@@ -40,7 +40,9 @@ public final class Natro233FastStartupOverlayContractTest {
         assertTrue(transport.contains("recoverRegisteredSilentGatt"));
         assertTrue(transport.contains("getDeclaredField(\"mClientIf\")"));
         assertTrue(transport.contains("exact.registrationProven = true"));
-        assertTrue(transport.contains("exact.cacheRefreshRequested = true"));
+        assertTrue(transport.contains("registeredSilentConnection(current, token)"));
+        assertTrue(transport.contains("action=retain_reassert_same_wrapper"));
+        assertFalse(transport.contains("action=guarded_refresh_retire_settle_retry"));
         assertFalse(transport.contains("removeBond("));
     }
 

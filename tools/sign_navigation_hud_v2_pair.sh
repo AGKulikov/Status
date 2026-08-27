@@ -71,8 +71,8 @@ VERSION_NAME=$(jq -er '.natro.versionName' "$MANIFEST")
 VERSION_CODE=$(jq -er '.natro.versionCode' "$MANIFEST")
 test "$(jq -er '.schema' "$MANIFEST")" = 'natro-navigation-hud-v2-candidate/v1'
 test "$(jq -er '.repository' "$MANIFEST")" = 'AGKulikov/Status'
-test "$VERSION_NAME" = '2.4.0'
-test "$VERSION_CODE" = '208021264'
+test "$VERSION_NAME" = '2.4.1'
+test "$VERSION_CODE" = '208021265'
 test "$(jq -er '.navigator.baselineSha256' "$MANIFEST")" = \
   "$EXPECTED_BASELINE_SHA256"
 test "$(jq -er '.toolchain.apktoolSha256' "$MANIFEST")" = \

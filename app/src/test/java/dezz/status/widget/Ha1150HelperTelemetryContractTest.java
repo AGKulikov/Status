@@ -27,6 +27,22 @@ public final class Ha1150HelperTelemetryContractTest {
         assertTrue(icon.contains("drawBatteryCharging"));
     }
 
+    @Test public void phoneInformationDoesNotDependOnTheStatusOverlayWindow()
+            throws Exception {
+        String widget = source("WidgetService.java");
+        assertFalse(widget.contains(
+                "if (destroyed || prefs == null || binding == null) return null;"));
+        assertTrue(widget.contains("boolean headlessPhoneSnapshot"));
+        assertTrue(widget.contains("type == BrickType.PHONE_CELLULAR"));
+        assertTrue(widget.contains("type == BrickType.PHONE_BATTERY"));
+        assertTrue(widget.contains("type == BrickType.PHONE_NETWORK_TYPE"));
+        assertTrue(widget.contains(
+                "if (binding == null && !headlessPhoneSnapshot) return null;"));
+        assertTrue(widget.contains("currentPhoneValue(resourceId)"));
+        assertTrue(widget.contains("current.get(ConnectorType.PHONE,"));
+        assertTrue(widget.contains("SourceBinding.DEFAULT_CONNECTOR_ID"));
+    }
+
     private static String source(String relative) throws Exception {
         return read(Paths.get("java", "dezz", "status", "widget").resolve(relative));
     }

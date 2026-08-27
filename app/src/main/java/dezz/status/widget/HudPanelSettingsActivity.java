@@ -689,7 +689,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 Integer.toString(window.cornerRadiusDp), true);
         EditText opacity = field(form, "Непрозрачность окна, %",
                 Integer.toString(window.opacityPercent), true);
-        ColorField background = colorField(form, "Фон вокруг карты", window.backgroundColor);
+        form.addView(text("Фон снаружи карты всегда прозрачный — элементы главного экрана и "
+                + "системные панели остаются видимыми вокруг окна.",
+                12, 0xFF95A0AF), marginTop(8));
         EditText borderWidth = field(form, "Толщина рамки, dp",
                 Integer.toString(window.borderWidthDp), true);
         ColorField borderColor = colorField(form, "Цвет рамки", window.borderColor);
@@ -754,7 +756,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         window.heightPercent = integer(height, window.heightPercent);
                         window.cornerRadiusDp = integer(corner, window.cornerRadiusDp);
                         window.opacityPercent = integer(opacity, window.opacityPercent);
-                        window.backgroundColor = background.value;
                         window.borderWidthDp = integer(borderWidth, window.borderWidthDp);
                         window.borderColor = borderColor.value;
                         window.shadowRadiusDp = integer(shadowRadius, window.shadowRadiusDp);

@@ -122,8 +122,8 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn("test \"$VERSION_NAME\" = '2.4.0'", pair)
-        self.assertIn("test \"$VERSION_CODE\" = '208021264'", pair)
+        self.assertIn("test \"$VERSION_NAME\" = '2.4.1'", pair)
+        self.assertIn("test \"$VERSION_CODE\" = '208021265'", pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
     def test_kx11_pair_gate_freezes_device_identity_and_hud_plane(self):

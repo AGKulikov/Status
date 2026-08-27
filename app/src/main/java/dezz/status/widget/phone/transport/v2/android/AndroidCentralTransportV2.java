@@ -1507,10 +1507,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
 
     /**
      * Android 9 can finish native GATT client registration yet withhold the public connection
-     * callback until its fixed 30-second status-133 timeout. Once {@code mClientIf > 0} is
-     * observable, retiring this exact wrapper is safe: close() has a concrete native client to
-     * unregister. This turns the existing eight-second watchdog into a bounded cache-refresh and
-     * retry path without ever creating a second unregistered wrapper.
+     * callback. Once {@code mClientIf > 0} is observable, the wrapper is a proven public owner.
+     * Keep and reassert that exact wrapper; refreshing/closing it here creates the clientIf churn
+     * seen immediately after an in-place APK replacement.
      */
     private boolean recoverRegisteredSilentGatt(AndroidCentralRoute.State current,
                                                  BleRouteToken token) {
@@ -1526,15 +1525,13 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             return false;
         }
         exact.registrationProven = true;
-        exact.cacheRefreshRequested = true;
-        exact.retirementSettleRequested = true;
         reportPlatformDiagnostic(token,
                 "silent_registration_probe result=registered, clientIfPositive=true, "
-                        + "action=guarded_refresh_retire_settle_retry");
-        reportError(IphoneTransportErrorV2.Kind.GATT,
-                "Android registered GATT privately but withheld its callback; retrying exact "
-                        + "enrolled identity after guarded cache refresh", true);
-        apply(AndroidCentralRoute.connected(current, token, false));
+                        + "action=retain_reassert_same_wrapper");
+        BleRouteTransition<AndroidCentralRoute.State> retained =
+                AndroidCentralRoute.registeredSilentConnection(current, token);
+        if (!retained.accepted) return false;
+        apply(retained);
         return true;
     }
 

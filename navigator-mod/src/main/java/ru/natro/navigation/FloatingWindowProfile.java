@@ -19,7 +19,7 @@ final class FloatingWindowProfile {
     String borderColor = "#00000000";
     int shadowRadiusDp = 20;
     String shadowColor = "#66000000";
-    String backgroundColor = "#FF101216";
+    String backgroundColor = "#00000000";
     boolean aspectRatioLocked;
     boolean rememberGeometry = true;
     boolean dragHandleVisible = true;
@@ -91,7 +91,9 @@ final class FloatingWindowProfile {
         modeButtonOpacityPercent = clamp(modeButtonOpacityPercent, 20, 100);
         borderColor = color(borderColor, "#00000000");
         shadowColor = color(shadowColor, "#66000000");
-        backgroundColor = color(backgroundColor, "#FF101216");
+        // Kept in the wire schema for compatibility; KX11 requires the outer window plane to be
+        // transparent so launcher/status controls remain visible around the resized map.
+        backgroundColor = "#00000000";
         if (!"TOP_LEFT".equals(modeButtonPosition)
                 && !"TOP_RIGHT".equals(modeButtonPosition)
                 && !"BOTTOM_LEFT".equals(modeButtonPosition)

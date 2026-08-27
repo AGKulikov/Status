@@ -29,7 +29,9 @@ final class FloatingWindowController {
     private static final String ACTION_FLOATING = "navi_win/ru.yandex.yandexnavi";
     private static final String EXTRA_WINDOWED = "ddnavwin";
     private static final String EXTRA_FORCE_FULLSCREEN = "ddnavforcewinfull";
-    private static final String PREFS = "natro_floating_window_v2";
+    // v2 could persist 1920×720 after Navigator reapplied fullscreen flags. A separate namespace
+    // resets that poisoned geometry once; subsequent window moves remain remembered.
+    private static final String PREFS = "natro_floating_window_v3";
     private static final int MODE_FULLSCREEN = 0;
     private static final int MODE_FLOATING = 1;
     private static final int MODE_TOGGLE = 2;
@@ -38,7 +40,10 @@ final class FloatingWindowController {
                     | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                     | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
     private static final int MUTATED_FLAGS =
-            FLOATING_FLAGS | WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+            FLOATING_FLAGS
+                    | WindowManager.LayoutParams.FLAG_DIM_BEHIND
+                    | WindowManager.LayoutParams.FLAG_FULLSCREEN
+                    | WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN;
 
     private final Activity activity;
     private final Window window;
@@ -60,6 +65,7 @@ final class FloatingWindowController {
     private TextView dragHandle;
     private TextView resizeHandle;
     private ViewGroup modeButtonHost;
+    private Drawable floatingBackground;
     private boolean floating;
     private boolean destroyed;
     private boolean geometryLoaded;
@@ -143,6 +149,7 @@ final class FloatingWindowController {
         if (destroyed || (!profile.enabled && mode != MODE_FULLSCREEN)) return;
         boolean next = mode == MODE_TOGGLE ? !floating : mode == MODE_FLOATING;
         if (next == floating) {
+            if (floating) enforceFloatingWindowContract();
             updateControls();
             return;
         }
@@ -234,6 +241,7 @@ final class FloatingWindowController {
 
     private final Runnable modeButtonPoller = new Runnable() {
         @Override public void run() {
+            if (floating) enforceFloatingWindowContract();
             attachModeButtonToNavigator();
             if (!destroyed) mainHandler.postDelayed(this, 1000L);
         }
@@ -269,12 +277,13 @@ final class FloatingWindowController {
         clampGeometry(attributes, screen);
         // Exact working 29.4.2 KX11 contract, applied only after onResumeFragments when the
         // Activity window and OEM token are attached. Applying it from onPostCreate is too early.
-        attributes.type = Build.VERSION.SDK_INT >= 26
-                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                : WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
+        attributes.type = floatingWindowType();
         attributes.gravity = Gravity.TOP | Gravity.START;
-        attributes.flags = (attributes.flags | FLOATING_FLAGS)
-                & ~WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+        attributes.flags = (attributes.flags
+                | FLOATING_FLAGS
+                | WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
+                & ~(WindowManager.LayoutParams.FLAG_DIM_BEHIND
+                        | WindowManager.LayoutParams.FLAG_FULLSCREEN);
         attributes.format = PixelFormat.TRANSLUCENT;
         try {
             window.setAttributes(attributes);
@@ -303,6 +312,7 @@ final class FloatingWindowController {
         View decor = window.getDecorView();
         decor.setAlpha(1f);
         decor.setBackground(originalBackground);
+        floatingBackground = null;
         decor.setClipToOutline(false);
         decor.setElevation(originalElevation);
         decor.setSystemUiVisibility(originalSystemUi);
@@ -320,13 +330,17 @@ final class FloatingWindowController {
     private void applyFloatingDecoration() {
         View decor = window.getDecorView();
         GradientDrawable background = new GradientDrawable();
-        background.setColor(Color.parseColor(profile.backgroundColor));
+        // The working 29.4.2 contract uses a transparent activity/decor surface. An opaque
+        // background leaves a full-screen black plane behind the resized map on KX11 even when
+        // WindowManager reports the expected floating bounds.
+        background.setColor(Color.TRANSPARENT);
         background.setCornerRadius(dp(profile.cornerRadiusDp));
         if (profile.borderWidthDp > 0) {
             background.setStroke(dp(profile.borderWidthDp),
                     Color.parseColor(profile.borderColor));
         }
-        decor.setBackground(background);
+        floatingBackground = background;
+        decor.setBackground(floatingBackground);
         decor.setClipToOutline(profile.cornerRadiusDp > 0);
         decor.setElevation(dp(profile.shadowRadiusDp));
         if (Build.VERSION.SDK_INT >= 28) {
@@ -335,13 +349,49 @@ final class FloatingWindowController {
             decor.setOutlineSpotShadowColor(shadow);
         }
         decor.setAlpha(profile.opacityPercent / 100f);
-        decor.setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        // Reference default: both KX11 system bars stay visible while the map is windowed.
+        decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+    }
+
+    /**
+     * Navigator applies its own immersive flags again after late resume/layout callbacks. Keep
+     * the floating contract alive without touching the remembered geometry or restarting the
+     * activity every time that happens.
+     */
+    private void enforceFloatingWindowContract() {
+        if (destroyed || !floating) return;
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        int expectedFlags = (attributes.flags
+                | FLOATING_FLAGS
+                | WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
+                & ~(WindowManager.LayoutParams.FLAG_DIM_BEHIND
+                        | WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        int expectedType = floatingWindowType();
+        boolean changed = attributes.type != expectedType
+                || attributes.gravity != (Gravity.TOP | Gravity.START)
+                || attributes.flags != expectedFlags
+                || attributes.format != PixelFormat.TRANSLUCENT;
+        if (changed) {
+            attributes.type = expectedType;
+            attributes.gravity = Gravity.TOP | Gravity.START;
+            attributes.flags = expectedFlags;
+            attributes.format = PixelFormat.TRANSLUCENT;
+            try { window.setAttributes(attributes); }
+            catch (RuntimeException ignored) { return; }
+        }
+        View decor = window.getDecorView();
+        if (decor.getSystemUiVisibility() != View.SYSTEM_UI_FLAG_VISIBLE) {
+            decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+        }
+        if (floatingBackground != null && decor.getBackground() != floatingBackground) {
+            decor.setBackground(floatingBackground);
+        }
+    }
+
+    private int floatingWindowType() {
+        return Build.VERSION.SDK_INT >= 26
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                : WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
     }
 
     private void updateControls() {

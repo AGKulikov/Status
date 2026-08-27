@@ -211,7 +211,7 @@ public final class HudCanvasView extends View {
     }
 
     private void drawPanelBackground(Canvas canvas, Geometry geometry) {
-        if (config.maskStockHud && !editor) {
+        if (config.maskStockHud && config.hasStandaloneDrawableElement() && !editor) {
             // Opaque pixels are required here: alpha or CLEAR would let the OEM HUD layer show
             // through. The hard clip established by onDraw prevents this mask from touching the
             // cluster and DIM regions that share displayId=2.

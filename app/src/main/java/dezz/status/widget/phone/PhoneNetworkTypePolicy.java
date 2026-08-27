@@ -24,6 +24,7 @@ public final class PhoneNetworkTypePolicy {
             case "LTE": return "LTE";
             case "4G": return "4G";
             case "3G": return "3G";
+            case "2G": return "2G";
             case "EDGE":
             case "E": return "E";
             case "GPRS":

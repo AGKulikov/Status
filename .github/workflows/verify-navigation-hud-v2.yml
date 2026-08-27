@@ -1,8 +1,8 @@
-name: Build Natro 2.4.0 and Navigator HUD v2 candidate
+name: Build Natro 2.4.1 and Navigator HUD v2 candidate
 
 on:
   push:
-    branches: ['feature/navigation-hud-v2', 'release/natro-2.4.0*']
+    branches: ['feature/navigation-hud-v2', 'release/natro-2.4.1*']
   pull_request:
     branches: ['main']
   workflow_dispatch:
@@ -15,8 +15,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '2.4.0'
-      VERSION_CODE: '208021264'
+      VERSION_NAME: '2.4.1'
+      VERSION_CODE: '208021265'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'

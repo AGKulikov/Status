@@ -45,6 +45,14 @@ public final class HudPanelConfigTest {
         assertFalse(restored.elements.isEmpty());
     }
 
+    @Test public void legacyDocumentWithoutElementsRestoresVisibleDefaults() {
+        HudPanelConfig restored = HudPanelConfig.fromJson("{\"schema\":1}");
+
+        assertFalse(restored.elements.isEmpty());
+        assertTrue(restored.hasStandaloneDrawableElement());
+        assertEquals(HudElementType.CLOCK, restored.elements.get(0).type);
+    }
+
     @Test public void backdropRoundTripKeepsDecorationAndAlwaysDrawsBelowWidgets()
             throws Exception {
         HudPanelConfig value = HudPanelConfig.defaults();

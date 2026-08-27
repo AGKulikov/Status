@@ -31,18 +31,18 @@ public final class Natro235RoadLogRecoveryContractTest {
                 + "f964b7ac658a837a1592647a08365c75"));
     }
 
-    @Test public void registeredSilentGattRetiresBehindOneOwnerFence() throws Exception {
+    @Test public void registeredSilentGattStaysBehindOneOwnerFence() throws Exception {
         String route = read("app/src/main/java/dezz/status/widget/phone/transport/v2/"
                 + "AndroidCentralRoute.java");
         String transport = read("app/src/main/java/dezz/status/widget/phone/transport/v2/"
                 + "android/AndroidCentralTransportV2.java");
 
         assertTrue(route.contains("STARTUP_QUIET_MS = 3_000L"));
-        assertTrue(transport.contains("REGISTERED_GATT_RETIRE_SETTLE_MS = 2_000L"));
         assertTrue(transport.contains("clientIfPositive=true"));
-        assertTrue(transport.contains("retirementSettleRequested = true"));
-        assertTrue(transport.contains("gatt_retirement_settle phase=armed"));
-        assertTrue(transport.contains("ProcessGattRegistrationGateV2.release(closing)"));
+        assertTrue(transport.contains("registeredSilentConnection(current, token)"));
+        assertTrue(transport.contains("action=retain_reassert_same_wrapper"));
+        assertTrue(route.contains("same registered wrapper; no clientIf churn"));
+        assertFalse(transport.contains("action=guarded_refresh_retire_settle_retry"));
         assertTrue(transport.contains("never creates a second simultaneous wrapper"));
         assertFalse(transport.contains("removeBond("));
     }

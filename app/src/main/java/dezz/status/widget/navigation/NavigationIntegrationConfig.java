@@ -265,7 +265,7 @@ public final class NavigationIntegrationConfig {
         @NonNull public String borderColor = "#00000000";
         public int shadowRadiusDp = 20;
         @NonNull public String shadowColor = "#66000000";
-        @NonNull public String backgroundColor = "#FF101216";
+        @NonNull public String backgroundColor = "#00000000";
         public boolean aspectRatioLocked;
         public boolean rememberGeometry = true;
         public boolean dragHandleVisible = true;
@@ -367,7 +367,9 @@ public final class NavigationIntegrationConfig {
             borderColor = color(borderColor, "#00000000");
             shadowRadiusDp = clamp(shadowRadiusDp, 0, 96);
             shadowColor = color(shadowColor, "#66000000");
-            backgroundColor = color(backgroundColor, "#FF101216");
+            // The field remains serialized for old Navigator builds, but an opaque outer plane
+            // is invalid for the KX11 floating-window contract.
+            backgroundColor = "#00000000";
             modeButtonPosition = enumText(modeButtonPosition, "TOP_LEFT",
                     "TOP_LEFT", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_RIGHT");
             modeButtonSizeDp = clamp(modeButtonSizeDp, 28, 96);
