@@ -108,6 +108,7 @@ public final class HudElementConfig {
                     options.put("renderer", DIRECT_MAP_RENDERER);
                     options.put("cornerRadiusPx", 0);
                     options.put("opacityPercent", 100);
+                    options.put("transparentBackground", false);
                     break;
                 case NAV_MANEUVER_ARROW:
                 case NAV_COMBINED:
@@ -254,6 +255,8 @@ public final class HudElementConfig {
                         options.optInt("cornerRadiusPx", 0), 0, 500));
                 options.put("opacityPercent", clamp(
                         options.optInt("opacityPercent", 100), 20, 100));
+                options.put("transparentBackground",
+                        options.optBoolean("transparentBackground", false));
             } catch (JSONException impossible) {
                 throw new IllegalStateException(impossible);
             }

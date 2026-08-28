@@ -75,6 +75,8 @@ public final class HudAndroidApiContractTest {
             throws Exception {
         String composite = read("HudCompositeView.java");
         assertTrue(composite.contains("mapTexture.setOpaque(true)"));
+        assertTrue(composite.contains("mapTexture.setOpaque(!transparentMap)"));
+        assertTrue(composite.contains("transparentBackground"));
         assertFalse(composite.contains("mapTexture.setBackgroundColor"));
         assertFalse(composite.contains("mapTexture.setBackground("));
     }

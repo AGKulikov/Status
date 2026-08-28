@@ -70,6 +70,29 @@ def manifest_tree(aapt: Path, apk: Path) -> str:
     ]).replace("\r\n", "\n")
 
 
+def activity_block(tree: str, class_name: str) -> str:
+    lines = tree.splitlines()
+    name_marker = f'android:name(0x01010003)="{class_name}"'
+    matches = [index for index, line in enumerate(lines) if name_marker in line]
+    if len(matches) != 1:
+        raise VerificationError(
+            f"expected exactly one manifest activity {class_name}, found {len(matches)}"
+        )
+    name_index = matches[0]
+    start = name_index
+    while start >= 0 and not lines[start].startswith("      E: activity "):
+        start -= 1
+    if start < 0:
+        raise VerificationError(f"cannot locate manifest block for {class_name}")
+    end = start + 1
+    while end < len(lines) and not (
+        lines[end].startswith("      E: ")
+        and not lines[end].startswith("        ")
+    ):
+        end += 1
+    return "\n".join(lines[start:end])
+
+
 def package_fields(value: str) -> dict[str, str]:
     first = next((line for line in value.splitlines() if line.startswith("package: ")), "")
     if not first:
@@ -177,6 +200,8 @@ def verify_natro(aapt: Path, apksigner: Path, zipalign: Path, apk: Path) -> str:
         b"navi_win/",
         b"ddnavwin",
         b"ru.yandex.yandexmaps.app.MapActivity",
+        b"transparentBackground",
+        b"roadsOnly",
     ))
     verify_zipalign(zipalign, apk)
     verify_signer(apksigner, apk, ("v2", "v3"))
@@ -202,10 +227,7 @@ def verify_navigator(
         raise VerificationError(f"unexpected Navigator package: {fields.get('name')!r}")
     if fields.get("versionCode") != NAVIGATOR_VERSION_CODE:
         raise VerificationError(f"unexpected Navigator versionCode: {fields.get('versionCode')!r}")
-    baseline_tree = manifest_tree(aapt, baseline)
     candidate_tree = manifest_tree(aapt, apk)
-    if candidate_tree != baseline_tree:
-        raise VerificationError("Navigator decoded manifest differs from baseline")
     if "android:sharedUserId" in candidate_tree:
         raise VerificationError(
             "Navigator still declares sharedUserId and could force other Yandex apps "
@@ -223,13 +245,21 @@ def verify_navigator(
             "Navigator ABI drift: "
             f"baseline={sorted(baseline_abis)}, candidate={sorted(candidate_abis)}"
         )
-    if zip_entry(baseline, "AndroidManifest.xml") != zip_entry(apk, "AndroidManifest.xml"):
-        raise VerificationError("Navigator binary AndroidManifest.xml changed")
+    map_activity = activity_block(
+        candidate_tree, "ru.yandex.yandexmaps.app.MapActivity"
+    )
+    if "android:theme(0x01010000)=@0x7f160023" not in map_activity:
+        raise VerificationError(
+            "Navigator MapActivity does not use the reviewed translucent theme"
+        )
     classes4 = zip_entry(apk, "classes4.dex")
     classes19 = zip_entry(apk, "classes19.dex")
     if b"Lru/natro/navigation/NatroEntryPoint;" not in classes4:
         raise VerificationError("Navigator classes4.dex has no Natro lifecycle hook")
-    for required in (b"navi_win/ru.yandex.yandexnavi", b"ddnavwin", b"ddnavforcewinfull"):
+    for required in (
+        b"navi_win/ru.yandex.yandexnavi", b"ddnavwin", b"ddnavforcewinfull",
+        b"setTransparentBackgroundEnabled", b"road_surface",
+    ):
         if required not in classes19:
             raise VerificationError(
                 "Navigator classes19.dex has no legacy KX11 window contract: "
@@ -297,10 +327,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"Shared release signer SHA-256: {STABLE_CERT_SHA256}\n"
             f"Natro APK SHA-256: {natro_sha}\n"
             f"Navigator APK SHA-256: {navigator_sha}\n"
-            "Navigator AndroidManifest.xml and aapt badging: byte/logically identical to baseline\n"
+            "Navigator aapt badging: logically identical to baseline\n"
+            "Navigator MapActivity: reviewed NatroTransparentAppTheme (transparent, no dim)\n"
             "Navigator sharedUserId: absent (original Yandex Music is not signature-coupled)\n"
             "Window launch contract: Natro and Navigator contain navi_win/ddnavwin/MapActivity; "
-            "the protected Navigator manifest remains unchanged\n"
+            "only its reviewed translucent theme differs from baseline\n"
             "Navigator content boundary:\n"
             + "\n".join(f"  {line}" for line in boundary.strip().splitlines())
             + "\n\n"

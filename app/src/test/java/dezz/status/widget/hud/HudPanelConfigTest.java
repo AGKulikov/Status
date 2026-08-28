@@ -115,6 +115,7 @@ public final class HudPanelConfigTest {
         map.x = 5;
         map.width = 30;
         map.options.put("cornerRadiusPx", 17);
+        map.options.put("transparentBackground", true);
         value.elements.add(map);
 
         HudPanelConfig restored = HudPanelConfig.fromJson(value.toJson().toString());
@@ -127,6 +128,7 @@ public final class HudPanelConfigTest {
         assertEquals(5, decoded.x);
         assertEquals(30, decoded.width);
         assertEquals(17, decoded.options.optInt("cornerRadiusPx"));
+        assertTrue(decoded.options.optBoolean("transparentBackground"));
         assertEquals(HudElementConfig.DIRECT_MAP_RENDERER,
                 decoded.options.optString("renderer"));
     }

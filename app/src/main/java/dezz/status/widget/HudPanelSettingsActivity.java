@@ -510,9 +510,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showWater = switchView("Вода", profile.showWater);
         Switch showModels = switchView("3D-модели", profile.showModels);
         Switch showCursor = switchView("Курсор автомобиля", profile.showCursor);
+        Switch roadsOnly = switchView(
+                "Только дороги — прозрачный фон", profile.roadsOnly);
         for (Switch control : new Switch[]{automaticDayNight, nightMode, showRoute,
                 showTraffic, showLabels, showPois, showBuildings, showParks, showWater,
-                showModels, showCursor}) {
+                showModels, showCursor, roadsOnly}) {
             form.addView(control, marginTop(4));
         }
         SliderField cursorScale = slider(form, "Размер курсора",
@@ -563,6 +565,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.options.put("renderer", HudElementConfig.DIRECT_MAP_RENDERER);
                         item.options.put("cornerRadiusPx", radius.intValue());
                         item.options.put("opacityPercent", opacity.intValue());
+                        item.options.put("transparentBackground", roadsOnly.isChecked());
 
                         profile.enabled = rendererEnabled.isChecked();
                         profile.cameraMode = navigationCameraModeValue(
@@ -584,6 +587,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showWater = showWater.isChecked();
                         profile.showModels = showModels.isChecked();
                         profile.showCursor = showCursor.isChecked();
+                        profile.roadsOnly = roadsOnly.isChecked();
                         profile.cursorScalePercent = cursorScale.intValue();
                         profile.cursorColor = cursorColor.value;
                         profile.cursorOutlineColor = cursorOutline.value;

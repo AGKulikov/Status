@@ -3,7 +3,8 @@
 
 The verifier compares uncompressed ZIP entry bytes, so zipalign, compression level and the APK
 Signing Block may change without hiding a resource/native-library change. The exact input baseline
-hash is mandatory. A release is allowed to replace only classes4.dex and add classes19.dex.
+hash is mandatory. A release may replace only the reviewed MapActivity theme resources and
+classes4.dex, and may add classes19.dex.
 """
 
 from __future__ import annotations
@@ -72,6 +73,22 @@ def _as_string_set(config: Mapping[str, object], key: str) -> Set[str]:
     if not isinstance(raw, list) or any(not isinstance(value, str) for value in raw):
         raise VerificationError(f"configuration field {key!r} must be a string array")
     return set(raw)
+
+
+def _as_digest_map(config: Mapping[str, object], key: str) -> Dict[str, str]:
+    raw = config.get(key, {})
+    if not isinstance(raw, dict):
+        raise VerificationError(f"configuration field {key!r} must be an object")
+    result: Dict[str, str] = {}
+    for name, digest in raw.items():
+        if not isinstance(name, str) or not isinstance(digest, str) or not re.fullmatch(
+            r"[0-9a-fA-F]{64}", digest
+        ):
+            raise VerificationError(
+                f"configuration field {key!r} must map entry names to SHA-256 digests"
+            )
+        result[name] = digest.lower()
+    return result
 
 
 def _is_signing_entry(name: str) -> bool:
@@ -171,6 +188,13 @@ def verify_zip_contents(
             raise VerificationError(
                 "release is missing required new entries: " + ", ".join(missing_new)
             )
+        expected_digests = _as_digest_map(config, "release_entry_sha256")
+        for name, expected in expected_digests.items():
+            actual = candidate_entries.get(name)
+            if actual != expected:
+                raise VerificationError(
+                    f"reviewed release entry {name!r} has SHA-256 {actual}, expected {expected}"
+                )
 
     return changed, new_entries, len(protected)
 

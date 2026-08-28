@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -57,6 +58,9 @@ final class FloatingWindowController {
     private final int originalSystemUi;
     private final Drawable originalBackground;
     private final float originalElevation;
+    private final float originalDimAmount;
+    private final int originalStatusBarColor;
+    private final int originalNavigationBarColor;
 
     private FloatingWindowProfile profile = new FloatingWindowProfile();
     private FrameLayout controlLayer;
@@ -68,10 +72,39 @@ final class FloatingWindowController {
     private ViewGroup modeButtonHost;
     private Drawable floatingBackground;
     private Drawable floatingFrame;
+    private View contentRoot;
+    private View mapRoot;
+    private View mapWithControls;
+    private Drawable originalContentBackground;
+    private Drawable originalMapRootBackground;
+    private Drawable originalMapWithControlsBackground;
+    private Drawable transparentContentBackground;
+    private Drawable transparentMapRootBackground;
+    private Drawable transparentMapWithControlsBackground;
     private boolean floating;
     private boolean floatingIdentityRejected;
     private boolean destroyed;
     private boolean geometryLoaded;
+    private boolean transparentLayersCaptured;
+
+    private final Runnable floatingSurfaceCommitter = new Runnable() {
+        @Override public void run() {
+            if (destroyed || !floating || activity.isFinishing()) return;
+            WindowManager.LayoutParams attributes = window.getAttributes();
+            try {
+                // setFormat commits the 2038 identity. A following setLayout guarantees that the
+                // compositor also receives the bounded frame instead of retaining SplashAppTheme's
+                // original full-screen surface.
+                window.setLayout(attributes.width, attributes.height);
+                window.setFormat(PixelFormat.TRANSLUCENT);
+                enforceTransparentLayers();
+                reportCommittedFrame();
+            } catch (RuntimeException failure) {
+                NavigationBridgeClient.reportDiagnostic("floating surface commit rejected: "
+                        + failure.getClass().getSimpleName() + ": " + failure.getMessage());
+            }
+        }
+    };
 
     FloatingWindowController(Activity activity) {
         this.activity = activity;
@@ -86,6 +119,9 @@ final class FloatingWindowController {
         originalSystemUi = decor.getSystemUiVisibility();
         originalBackground = decor.getBackground();
         originalElevation = decor.getElevation();
+        originalDimAmount = initial.dimAmount;
+        originalStatusBarColor = window.getStatusBarColor();
+        originalNavigationBarColor = window.getNavigationBarColor();
     }
 
     void install() {
@@ -272,6 +308,7 @@ final class FloatingWindowController {
     void destroy() {
         destroyed = true;
         mainHandler.removeCallbacks(modeButtonPoller);
+        window.getDecorView().removeCallbacks(floatingSurfaceCommitter);
         detachModeButtonFromNavigator();
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
         if (parent != null) parent.removeView(controlLayer);
@@ -307,6 +344,7 @@ final class FloatingWindowController {
                 & ~(WindowManager.LayoutParams.FLAG_DIM_BEHIND
                         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
         attributes.format = PixelFormat.TRANSLUCENT;
+        attributes.dimAmount = 0f;
         try {
             floatingIdentityRejected = false;
             floating = true;
@@ -315,6 +353,9 @@ final class FloatingWindowController {
             // uses this ordering and does not call setAttributes before the overlay token exists.
             window.setFormat(PixelFormat.TRANSLUCENT);
             if (!entering) window.setAttributes(attributes);
+            View decor = window.getDecorView();
+            decor.removeCallbacks(floatingSurfaceCommitter);
+            decor.postOnAnimation(floatingSurfaceCommitter);
             updateControls();
             NavigationBridgeClient.reportDiagnostic("floating window applied type="
                     + attributes.type + ", format=" + attributes.format + ", bounds="
@@ -353,6 +394,9 @@ final class FloatingWindowController {
         decor.setClipToOutline(false);
         decor.setElevation(originalElevation);
         decor.setSystemUiVisibility(originalSystemUi);
+        window.setStatusBarColor(originalStatusBarColor);
+        window.setNavigationBarColor(originalNavigationBarColor);
+        restoreTransparentLayers();
         updateControls();
     }
 
@@ -360,20 +404,23 @@ final class FloatingWindowController {
         attributes.type = originalType;
         attributes.gravity = originalGravity;
         attributes.format = originalFormat;
+        attributes.dimAmount = originalDimAmount;
         attributes.flags = (attributes.flags & ~MUTATED_FLAGS)
                 | (originalFlags & MUTATED_FLAGS);
     }
 
     private void applyFloatingDecoration() {
         View decor = window.getDecorView();
-        GradientDrawable background = new GradientDrawable();
+        ColorDrawable background = new ColorDrawable(Color.TRANSPARENT);
         // The working 29.4.2 contract uses a transparent activity/decor surface. An opaque
         // background leaves a full-screen black plane behind the resized map on KX11 even when
         // WindowManager reports the expected floating bounds.
-        background.setColor(Color.TRANSPARENT);
         floatingBackground = background;
         window.setBackgroundDrawable(floatingBackground);
         decor.setBackground(floatingBackground);
+        captureTransparentLayers(decor);
+        enforceTransparentLayers();
+        window.setStatusBarColor(Color.TRANSPARENT);
 
         // MapActivity contains a SurfaceView. Rounding or clipping the activity decor clips that
         // surface on Android 9 and can make the vendor renderer tear down the activity. Draw the
@@ -395,6 +442,73 @@ final class FloatingWindowController {
     }
 
     /**
+     * The reviewed APK theme makes the Activity translucent before launch, as in working 29.4.2.
+     * Navigator can still assign opaque drawable backgrounds during its late layout passes, so
+     * keep the content and both map containers transparent while the bounded window is active.
+     */
+    private void captureTransparentLayers(View decor) {
+        if (transparentLayersCaptured) return;
+        contentRoot = decor.findViewById(android.R.id.content);
+        int mapRootId = activity.getResources().getIdentifier(
+                "map_activity_root", "id", activity.getPackageName());
+        mapRoot = mapRootId == 0 ? null : activity.findViewById(mapRootId);
+        int mapViewId = activity.getResources().getIdentifier(
+                "activity_search_map_view", "id", activity.getPackageName());
+        mapWithControls = mapViewId == 0 ? null : activity.findViewById(mapViewId);
+        originalContentBackground = backgroundOf(contentRoot);
+        originalMapRootBackground = backgroundOf(mapRoot);
+        originalMapWithControlsBackground = backgroundOf(mapWithControls);
+        transparentContentBackground = new ColorDrawable(Color.TRANSPARENT);
+        transparentMapRootBackground = new ColorDrawable(Color.TRANSPARENT);
+        transparentMapWithControlsBackground = new ColorDrawable(Color.TRANSPARENT);
+        transparentLayersCaptured = true;
+    }
+
+    private void enforceTransparentLayers() {
+        View decor = window.getDecorView();
+        if (!transparentLayersCaptured) captureTransparentLayers(decor);
+        if (floatingBackground != null && decor.getBackground() != floatingBackground) {
+            window.setBackgroundDrawable(floatingBackground);
+            decor.setBackground(floatingBackground);
+        }
+        setBackground(contentRoot, transparentContentBackground);
+        setBackground(mapRoot, transparentMapRootBackground);
+        setBackground(mapWithControls, transparentMapWithControlsBackground);
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        if (attributes.dimAmount != 0f) attributes.dimAmount = 0f;
+    }
+
+    private void restoreTransparentLayers() {
+        if (!transparentLayersCaptured) return;
+        if (contentRoot != null) contentRoot.setBackground(originalContentBackground);
+        if (mapRoot != null) mapRoot.setBackground(originalMapRootBackground);
+        if (mapWithControls != null) {
+            mapWithControls.setBackground(originalMapWithControlsBackground);
+        }
+    }
+
+    private static Drawable backgroundOf(View view) {
+        return view == null ? null : view.getBackground();
+    }
+
+    private static void setBackground(View view, Drawable background) {
+        if (view != null && background != null && view.getBackground() != background) {
+            view.setBackground(background);
+        }
+    }
+
+    private void reportCommittedFrame() {
+        View decor = window.getDecorView();
+        int[] location = new int[2];
+        decor.getLocationOnScreen(location);
+        NavigationBridgeClient.reportDiagnostic("floating surface committed decor="
+                + decor.getWidth() + "x" + decor.getHeight() + "@"
+                + location[0] + "," + location[1] + ", transparent roots="
+                + (contentRoot != null) + "/" + (mapRoot != null) + "/"
+                + (mapWithControls != null));
+    }
+
+    /**
      * Navigator applies its own immersive flags again after late resume/layout callbacks. Keep
      * the floating contract alive without touching the remembered geometry or restarting the
      * activity every time that happens.
@@ -409,11 +523,13 @@ final class FloatingWindowController {
                         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
         boolean changed = attributes.gravity != (Gravity.TOP | Gravity.START)
                 || attributes.flags != expectedFlags
-                || attributes.format != PixelFormat.TRANSLUCENT;
+                || attributes.format != PixelFormat.TRANSLUCENT
+                || attributes.dimAmount != 0f;
         if (changed) {
             attributes.gravity = Gravity.TOP | Gravity.START;
             attributes.flags = expectedFlags;
             attributes.format = PixelFormat.TRANSLUCENT;
+            attributes.dimAmount = 0f;
             try {
                 window.setAttributes(attributes);
                 window.setFormat(PixelFormat.TRANSLUCENT);
@@ -424,9 +540,7 @@ final class FloatingWindowController {
         if (decor.getSystemUiVisibility() != View.SYSTEM_UI_FLAG_VISIBLE) {
             decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
         }
-        if (floatingBackground != null && decor.getBackground() != floatingBackground) {
-            decor.setBackground(floatingBackground);
-        }
+        enforceTransparentLayers();
         if (controlLayer != null && floatingFrame != null
                 && controlLayer.getBackground() != floatingFrame) {
             controlLayer.setBackground(floatingFrame);

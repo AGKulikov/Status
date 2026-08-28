@@ -12,6 +12,18 @@ import java.util.Locale;
 final class NavigationMapProfile {
     private static final int MAX_CONFIGURATION_CHARS = 384 * 1024;
     private static final int MAX_STYLE_CHARS = 128 * 1024;
+    /**
+     * The official MapKit substrate taxonomy marks every road with at least one of these tags.
+     * Hiding objects that have none of them preserves the complete road geometry while removing
+     * land, water, buildings, boundaries, transit, POI and every other substrate object.
+     */
+    private static final String ROADS_ONLY_STYLE = "["
+            + "{\"tags\":{\"none\":[\"road\",\"road_1\",\"road_2\",\"road_3\","
+            + "\"road_4\",\"road_5\",\"road_6\",\"road_7\",\"road_limited\","
+            + "\"road_unclassified\",\"road_minor\",\"road_construction\",\"ferry\","
+            + "\"ice_road\",\"path\",\"crosswalk\",\"underpass\",\"road_surface\","
+            + "\"road_marking\"]},\"stylers\":{\"visibility\":\"off\"}},"
+            + "{\"elements\":\"label\",\"stylers\":{\"visibility\":\"off\"}}]";
 
     boolean enabled;
     boolean automaticDayNight = true;
@@ -25,6 +37,7 @@ final class NavigationMapProfile {
     boolean showRoute = true;
     boolean showTraffic = true;
     boolean showCursor = true;
+    boolean roadsOnly;
     String cameraMode = "FOLLOW_ROUTE";
     double zoomDelta;
     int tiltDegrees = 60;
@@ -71,6 +84,7 @@ final class NavigationMapProfile {
             result.showRoute = source.optBoolean("showRoute", true);
             result.showTraffic = source.optBoolean("showTraffic", true);
             result.showCursor = source.optBoolean("showCursor", true);
+            result.roadsOnly = source.optBoolean("roadsOnly", false);
             result.cameraMode = enumText(source.optString(
                     "cameraMode", "FOLLOW_ROUTE"));
             result.zoomDelta = clamp(source.optDouble("zoomDelta", 0d), -8d, 8d, 0d);
@@ -121,6 +135,7 @@ final class NavigationMapProfile {
     }
 
     String visibilityStyleJson() {
+        if (roadsOnly) return ROADS_ONLY_STYLE;
         StringBuilder rules = new StringBuilder(384).append('[');
         boolean needsComma = false;
         if (!showLabels) {
@@ -197,4 +212,3 @@ final class NavigationMapProfile {
                 || "FREE".equals(value) ? value : "FOLLOW_ROUTE";
     }
 }
-

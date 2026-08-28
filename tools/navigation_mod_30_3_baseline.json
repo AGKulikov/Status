@@ -10,20 +10,26 @@
     "v3"
   ],
   "mutable_entries": [
+    "AndroidManifest.xml",
+    "resources.arsc",
     "classes4.dex"
   ],
   "allowed_new_entries": [
     "classes19.dex"
   ],
   "release_required_changed_entries": [
+    "AndroidManifest.xml",
+    "resources.arsc",
     "classes4.dex"
   ],
   "release_required_new_entries": [
     "classes19.dex"
   ],
+  "release_entry_sha256": {
+    "AndroidManifest.xml": "b19b232a44be053bf214aa4b25706d0eccb667c567beadd1b9b6d3ef2718c7be",
+    "resources.arsc": "b30e8907f3bbecec7d333072b68754bf5867369af453858a5b72fe290e9ab76c"
+  },
   "critical_entries": [
-    "AndroidManifest.xml",
-    "resources.arsc",
     "classes14.dex",
     "classes18.dex"
   ],

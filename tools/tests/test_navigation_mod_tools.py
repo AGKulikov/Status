@@ -23,9 +23,28 @@ def load(name):
 
 
 PATCHER = load("patch_navigation_map_activity.py")
+THEME_PATCHER = load("patch_navigation_transparent_theme.py")
 
 
 class NavigationModToolsTest(unittest.TestCase):
+    def test_transparent_theme_patch_is_scoped_to_map_activity(self):
+        manifest = (
+            '<activity android:name="ru.yandex.yandexmaps.app.MapActivity" '
+            'android:theme="@style/SplashAppTheme"/>\n'
+            '<activity android:name="panorama" '
+            'android:theme="@style/SplashAppTheme"/>\n'
+        )
+        styles = "<resources>\n</resources>\n"
+
+        patched_manifest = THEME_PATCHER.patch_manifest(manifest)
+        patched_styles = THEME_PATCHER.patch_styles(styles)
+
+        self.assertIn('@style/NatroTransparentAppTheme', patched_manifest)
+        self.assertEqual(1, patched_manifest.count('@style/SplashAppTheme'))
+        self.assertIn('parent="@style/AppTheme"', patched_styles)
+        self.assertIn('android:windowIsTranslucent">true', patched_styles)
+        self.assertIn('android:backgroundDimEnabled">false', patched_styles)
+
     def test_map_activity_patch_has_only_three_reviewed_hooks(self):
         source = """.class public final Lru/yandex/yandexmaps/app/MapActivity;
 .super Landroidx/appcompat/app/s;
@@ -139,7 +158,7 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn('KX11_ANDROID_API = 28', verifier)
         self.assertIn('KX11_NAVIGATOR_ABIS = {"arm64-v8a"}', verifier)
         self.assertIn('"name": NATRO_PACKAGE', verifier)
-        self.assertIn('Navigator binary AndroidManifest.xml changed', verifier)
+        self.assertIn('MapActivity does not use the reviewed translucent theme', verifier)
         self.assertIn('android:sharedUserId', verifier)
         self.assertIn('Main Natro content area: 1760x720', verifier)
         self.assertIn('plane 728x190 @ (0,720)', verifier)

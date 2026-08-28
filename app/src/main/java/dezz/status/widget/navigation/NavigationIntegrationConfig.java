@@ -89,6 +89,8 @@ public final class NavigationIntegrationConfig {
         public boolean showWater = true;
         public boolean showModels;
         public boolean showCursor = true;
+        /** HUD-only substrate mode: keep road geometry and make every other map pixel alpha. */
+        public boolean roadsOnly;
         public int cursorScalePercent = 100;
         @NonNull public String cursorColor = "#FFFFC400";
         @NonNull public String cursorOutlineColor = "#FF17191E";
@@ -147,6 +149,7 @@ public final class NavigationIntegrationConfig {
                     .put("showWater", showWater)
                     .put("showModels", showModels)
                     .put("showCursor", showCursor)
+                    .put("roadsOnly", roadsOnly)
                     .put("cursorScalePercent", cursorScalePercent)
                     .put("cursorColor", cursorColor)
                     .put("cursorOutlineColor", cursorOutlineColor)
@@ -190,6 +193,7 @@ public final class NavigationIntegrationConfig {
             result.showWater = source.optBoolean("showWater", result.showWater);
             result.showModels = source.optBoolean("showModels", result.showModels);
             result.showCursor = source.optBoolean("showCursor", result.showCursor);
+            result.roadsOnly = source.optBoolean("roadsOnly", result.roadsOnly);
             result.cursorScalePercent = source.optInt(
                     "cursorScalePercent", result.cursorScalePercent);
             result.cursorColor = source.optString("cursorColor", result.cursorColor);

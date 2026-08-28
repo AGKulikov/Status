@@ -24,6 +24,7 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.trafficBlockedColor = "#FF550011";
         config.hudMap.trafficGradientLength = 24d;
         config.hudMap.enabled = true;
+        config.hudMap.roadsOnly = true;
         config.mainFloatingWindow.movementLocked = true;
         config.mainFloatingWindow.cornerRadiusDp = 38;
         config.mainFloatingWindow.modeButtonVisible = true;
@@ -42,6 +43,7 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FF550011", restored.hudMap.trafficBlockedColor);
         assertEquals(24d, restored.hudMap.trafficGradientLength, 0d);
         assertTrue(restored.hudMap.enabled);
+        assertTrue(restored.hudMap.roadsOnly);
         assertTrue(restored.mainFloatingWindow.movementLocked);
         assertEquals(38, restored.mainFloatingWindow.cornerRadiusDp);
         assertTrue(restored.mainFloatingWindow.modeButtonVisible);
@@ -149,6 +151,7 @@ public final class NavigationHudV2ContractTest {
         String mainMap = read(patchRoot.resolve("MainMapController.java"));
         String cursor = read(patchRoot.resolve("MapCursorStyler.java"));
         String routeStyler = read(patchRoot.resolve("RoutePolylineStyler.java"));
+        String mapProfile = read(patchRoot.resolve("NavigationMapProfile.java"));
 
         assertTrue(controller.contains("ACTION_FLOATING = \"navi_win/ru.yandex.yandexnavi\""));
         assertTrue(controller.contains("EXTRA_WINDOWED = \"ddnavwin\""));
@@ -168,7 +171,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("enforceFloatingWindowContract()"));
         assertTrue(controller.contains("View.SYSTEM_UI_FLAG_VISIBLE"));
         assertTrue(controller.contains("natro_floating_window_v3"));
-        assertTrue(controller.contains("background.setColor(Color.TRANSPARENT)"));
+        assertTrue(controller.contains("new ColorDrawable(Color.TRANSPARENT)"));
+        assertTrue(controller.contains("activity_search_map_view"));
+        assertTrue(controller.contains("map_activity_root"));
+        assertTrue(controller.contains("android.R.id.content"));
+        assertFalse(controller.contains("convertToTranslucent"));
+        assertTrue(controller.contains("window.setLayout(attributes.width, attributes.height)"));
+        assertTrue(controller.contains("attributes.dimAmount = 0f"));
+        assertTrue(controller.contains("floating surface committed decor="));
         assertTrue(controller.contains("decor.setClipToOutline(false)"));
         assertFalse(controller.contains("decor.setClipToOutline(profile.cornerRadiusDp > 0)"));
         assertFalse(controller.contains("View.SYSTEM_UI_FLAG_HIDE_NAVIGATION"));
@@ -214,6 +224,13 @@ public final class NavigationHudV2ContractTest {
         assertFalse(routeStyler.contains("Double.doubleToLongBits"));
         assertTrue(renderer.contains("applyStyleSlot"));
         assertTrue(renderer.contains("visibilityStyleJson"));
+        assertTrue(renderer.contains("profile.roadsOnly"));
+        assertTrue(renderer.contains("setTransparentBackgroundEnabled"));
+        assertTrue(renderer.contains("profile.showModels && !profile.roadsOnly"));
+        assertTrue(renderer.contains("profile.roadsOnly || !profile.showPois"));
+        assertTrue(mapProfile.contains("ROADS_ONLY_STYLE"));
+        assertTrue(mapProfile.contains("road_surface"));
+        assertTrue(mapProfile.contains("if (roadsOnly) return ROADS_ONLY_STYLE"));
         assertTrue(renderer.contains("updateInitialCamera"));
         assertTrue(renderer.contains("updateNavigationState"));
         assertTrue(client.contains("hudMapRenderer.updateNavigationState(snapshotJson)"));
@@ -302,6 +319,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(elementTypes.contains("NAV_MAP("));
         assertTrue(composite.contains("TextureView"));
         assertTrue(composite.contains("publishHudSurface"));
+        assertTrue(composite.contains("mapTexture.setOpaque(!transparentMap)"));
+        assertTrue(composite.contains("transparentBackground"));
         assertFalse(composite.contains("Bitmap"));
         assertFalse(composite.contains("ImageReader"));
         assertFalse(composite.contains("MediaProjection"));
@@ -353,6 +372,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("navigation.hudMap"));
         assertTrue(settings.contains("navigation.mainMap"));
         assertTrue(settings.contains("navigation.mainFloatingWindow"));
+        assertTrue(settings.contains("Только дороги — прозрачный фон"));
+        assertTrue(settings.contains("profile.roadsOnly = roadsOnly.isChecked()"));
         assertTrue(settings.contains("Цвет рекомендуемой полосы"));
         assertTrue(settings.contains("Красный сигнал ARGB"));
         assertTrue(settings.contains("Тяжёлая пробка ARGB"));

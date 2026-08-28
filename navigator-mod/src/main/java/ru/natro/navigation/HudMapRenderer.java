@@ -255,13 +255,13 @@ final class HudMapRenderer {
             boolean night = profile.automaticDayNight ? systemNight : profile.nightMode;
             invoke(currentMap, "setNightModeEnabled", new Class<?>[]{boolean.class}, night);
             invoke(currentMap, "setModelsEnabled", new Class<?>[]{boolean.class},
-                    profile.showModels);
+                    profile.showModels && !profile.roadsOnly);
             invoke(currentMap, "setAwesomeModelsEnabled", new Class<?>[]{boolean.class},
-                    profile.showModels);
+                    profile.showModels && !profile.roadsOnly);
             invoke(currentMap, "setPoiLimit", new Class<?>[]{Integer.class},
-                    profile.showPois ? null : Integer.valueOf(0));
+                    profile.roadsOnly || !profile.showPois ? Integer.valueOf(0) : null);
             invoke(currentMap, "setTransparentBackgroundEnabled",
-                    new Class<?>[]{boolean.class}, false);
+                    new Class<?>[]{boolean.class}, profile.roadsOnly);
             invoke(currentMap, "setRotateGesturesEnabled", new Class<?>[]{boolean.class}, false);
             invoke(currentMap, "setScrollGesturesEnabled", new Class<?>[]{boolean.class}, false);
             invoke(currentMap, "setTiltGesturesEnabled", new Class<?>[]{boolean.class}, false);

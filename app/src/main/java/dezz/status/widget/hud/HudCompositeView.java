@@ -86,6 +86,11 @@ final class HudCompositeView extends FrameLayout
             return;
         }
         mapTexture.setVisibility(View.VISIBLE);
+        // MapKit emits an alpha substrate in the roads-only mode. TextureView must advertise the
+        // same contract or SurfaceFlinger deliberately replaces every alpha pixel with black.
+        boolean transparentMap = activeMap.options.optBoolean(
+                "transparentBackground", false);
+        mapTexture.setOpaque(!transparentMap);
         mapTexture.setAlpha(activeMap.options.optInt("opacityPercent", 100) / 100f);
         int radius = activeMap.options.optInt("cornerRadiusPx", 0);
         mapTexture.setOutlineProvider(new RoundedOutline(radius));

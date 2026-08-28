@@ -35,13 +35,17 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
         )
         self.config = {
             "baseline_apk_sha256": MODULE.sha256_file(self.baseline),
-            "mutable_entries": ["classes4.dex"],
+            "mutable_entries": ["AndroidManifest.xml", "resources.arsc", "classes4.dex"],
             "allowed_new_entries": ["classes19.dex"],
-            "release_required_changed_entries": ["classes4.dex"],
+            "release_required_changed_entries": [
+                "AndroidManifest.xml", "resources.arsc", "classes4.dex"
+            ],
             "release_required_new_entries": ["classes19.dex"],
+            "release_entry_sha256": {
+                "AndroidManifest.xml": MODULE._sha256_bytes(b"patched manifest"),
+                "resources.arsc": MODULE._sha256_bytes(b"patched resources"),
+            },
             "critical_entries": [
-                "AndroidManifest.xml",
-                "resources.arsc",
                 "classes14.dex",
                 "classes18.dex",
             ],
@@ -60,8 +64,8 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
     def _candidate(self, *, protected=b"working passport boundary", extra=None):
         path = self.root / f"candidate-{len(list(self.root.glob('candidate-*')))}.apk"
         entries = {
-            "AndroidManifest.xml": b"manifest",
-            "resources.arsc": b"resources",
+            "AndroidManifest.xml": b"patched manifest",
+            "resources.arsc": b"patched resources",
             "classes4.dex": b"activity plus one reviewed hook",
             "classes14.dex": protected,
             "classes18.dex": b"working 30.3 additions",
@@ -78,9 +82,20 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
         changed, new_entries, protected = MODULE.verify_zip_contents(
             self.config, self.baseline, self._candidate(), release=True
         )
-        self.assertEqual({"classes4.dex"}, changed)
+        self.assertEqual(
+            {"AndroidManifest.xml", "resources.arsc", "classes4.dex"}, changed
+        )
         self.assertEqual({"classes19.dex"}, new_entries)
-        self.assertGreaterEqual(protected, 6)
+        self.assertGreaterEqual(protected, 4)
+
+    def test_unreviewed_transparent_theme_payload_is_rejected(self):
+        with self.assertRaisesRegex(MODULE.VerificationError, "reviewed release entry"):
+            MODULE.verify_zip_contents(
+                self.config,
+                self.baseline,
+                self._candidate(extra={"resources.arsc": b"different theme"}),
+                release=True,
+            )
 
     def test_passport_or_native_drift_is_rejected(self):
         with self.assertRaisesRegex(MODULE.VerificationError, "protected entries"):

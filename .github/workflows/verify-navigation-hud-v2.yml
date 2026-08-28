@@ -62,6 +62,7 @@ jobs:
           python3 -m py_compile \
             tools/verify_navigation_mod_baseline.py \
             tools/patch_navigation_map_activity.py \
+            tools/patch_navigation_transparent_theme.py \
             tools/repack_apk_entries.py
           python3 tools/tests/test_verify_navigation_mod_baseline.py
           python3 tools/tests/test_navigation_mod_tools.py
@@ -126,7 +127,8 @@ jobs:
               sourceTree: $sourceTree, natro: {versionName: $versionName,
               versionCode: $versionCode, unsigned: true}, navigator: {
               baselineSha256: "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f",
-              patchDex: "classes19.dex"}, toolchain: {apktoolSha256: $apktoolSha256,
+              patchDex: "classes19.dex", themePatch: "NatroTransparentAppTheme"},
+              toolchain: {apktoolSha256: $apktoolSha256,
               androidBuildTools: $buildTools}}' > "$OUT/candidate.json"
           (
             cd "$OUT"
