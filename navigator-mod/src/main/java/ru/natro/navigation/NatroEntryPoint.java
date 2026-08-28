@@ -17,10 +17,25 @@ public final class NatroEntryPoint {
 
     private NatroEntryPoint() {}
 
+    /**
+     * Applies the floating Window identity before Navigator creates its MapKit SurfaceView.
+     * Changing type/format after that SurfaceView is attached tears the Android-9 vendor surface
+     * down; applying the same 2038/translucent contract before content creation is stable.
+     */
+    public static void onActivityPreCreate(Activity activity) {
+        if (activity == null || activity.isFinishing()) return;
+        try {
+            controllerFor(activity).prepareWindowBeforeContent(activity.getIntent());
+        } catch (Throwable failure) {
+            reportFailure("onActivityPreCreate", failure);
+        }
+    }
+
     public static void onActivityResumed(Activity activity) {
         if (activity == null || activity.isFinishing()) return;
         try {
             FloatingWindowController controller = controllerFor(activity);
+            controller.install();
             controller.consumeIntent(activity.getIntent());
             NavigationBridgeClient.attachActivity(activity);
         } catch (Throwable failure) {
@@ -33,11 +48,12 @@ public final class NatroEntryPoint {
         try {
             activity.setIntent(intent);
             FloatingWindowController controller = controllerFor(activity);
-            // Keep the already attached MapActivity and its OEM window token. The previous restart
-            // path called finish() before the replacement obtained a token; device logs show the
-            // authenticated Navigator bridge disappearing less than a second later. The controller
-            // is specifically designed to resize the attached application window in place.
-            controller.consumeIntent(intent);
+            boolean requestedFloating = controller.requestsFloating(intent);
+            if (requestedFloating != controller.isFloating()) {
+                controller.restartInMode(requestedFloating, intent);
+            } else {
+                controller.consumeIntent(intent);
+            }
         } catch (Throwable failure) {
             reportFailure("onNewIntent", failure);
         }
@@ -82,7 +98,6 @@ public final class NatroEntryPoint {
         if (controller != null) return controller;
         controller = new FloatingWindowController(activity);
         CONTROLLERS.put(activity, controller);
-        controller.install();
         return controller;
     }
 

@@ -3,7 +3,6 @@ package ru.natro.navigation;
 
 import android.content.Context;
 import android.content.res.Configuration;
-import android.graphics.PointF;
 import android.util.Log;
 import android.view.Surface;
 
@@ -50,6 +49,7 @@ final class HudMapRenderer {
     private long activeJamFingerprint;
     private NavigatorStatePublisher.CameraState initialCamera;
     private NavigatorStatePublisher.CameraState navigationCamera;
+    private AppliedCamera lastAppliedCamera;
     private boolean freeCameraInitialized;
     private NavigationMapProfile profile = new NavigationMapProfile();
 
@@ -111,7 +111,7 @@ final class HudMapRenderer {
         if (state == null || !state.isValid() || initialCamera != null
                 || navigationCamera != null) return;
         initialCamera = state;
-        applyCamera();
+        applyCamera(false);
     }
 
     /** Canonical navigation location, independent from every visual operation on the main map. */
@@ -133,7 +133,7 @@ final class HudMapRenderer {
                             finite(bearing) ? (float) bearing : 0f, profile.tiltDegrees);
             if (!next.isValid()) return;
             navigationCamera = next;
-            applyCamera();
+            applyCamera(true);
         } catch (Exception invalid) {
             Log.w(TAG, "Rejected invalid Guidance camera snapshot", invalid);
         }
@@ -231,19 +231,15 @@ final class HudMapRenderer {
                     invoke(currentLocation, "setDefaultSource", new Class<?>[0]);
                     invoke(currentLocation, "setVisible", new Class<?>[]{boolean.class},
                             profile.showCursor);
-                    boolean free = "FREE".equals(profile.cameraMode);
                     invoke(currentLocation, "setAutoZoomEnabled",
                             new Class<?>[]{boolean.class}, false);
                     invoke(currentLocation, "setHeadingModeActive",
                             new Class<?>[]{boolean.class}, false);
-                    if (free) {
-                        invoke(currentLocation, "resetAnchor", new Class<?>[0]);
-                    } else {
-                        PointF anchor = new PointF(width * profile.focusXPercent / 100f,
-                                height * profile.focusYPercent / 100f);
-                        invoke(currentLocation, "setAnchor",
-                                new Class<?>[]{PointF.class, PointF.class}, anchor, anchor);
-                    }
+                    // The HUD camera has exactly one owner: Guidance snapshots below. setAnchor
+                    // turns UserLocationLayer into a second camera controller, which made MapKit
+                    // alternate between its GPS camera and our route-matched camera every second.
+                    // The MapWindow focus point already positions the visible cursor correctly.
+                    invoke(currentLocation, "resetAnchor", new Class<?>[0]);
                     cursorStyler.apply(profile.showCursor, profile.cursorScalePercent,
                             profile.cursorColor, profile.cursorOutlineColor);
                 } catch (Throwable cursorFailure) {
@@ -270,7 +266,7 @@ final class HudMapRenderer {
             applyStyleSlot(currentMap, CUSTOM_STYLE_ID, style);
             applyStyleSlot(currentMap, VISIBILITY_STYLE_ID,
                     profile.visibilityStyleJson());
-            applyCamera();
+            applyCamera(false);
             rebuildRoute();
         } catch (Throwable failure) {
             Log.w(TAG, "Some HUD MapProfile fields could not be applied", failure);
@@ -278,7 +274,7 @@ final class HudMapRenderer {
     }
 
     /** Follows Guidance location only; all HUD camera parameters remain independently editable. */
-    private void applyCamera() {
+    private void applyCamera(boolean animate) {
         Object currentMap = map;
         NavigatorStatePublisher.CameraState source = navigationCamera != null
                 ? navigationCamera : initialCamera;
@@ -293,11 +289,26 @@ final class HudMapRenderer {
                     source.zoom + profile.zoomDelta));
             float azimuth = "NORTH_UP".equals(profile.cameraMode) ? 0f : source.azimuth;
             float tilt = profile.tiltDegrees;
+            AppliedCamera next = new AppliedCamera(
+                    source.latitude, source.longitude, zoom, azimuth, tilt);
+            if (next.nearlyEquals(lastAppliedCamera)) return;
             Class<?> cameraClass = Class.forName("com.yandex.mapkit.map.CameraPosition");
             Object camera = cameraClass.getConstructor(
                     pointClass, float.class, float.class, float.class)
                     .newInstance(target, zoom, azimuth, tilt);
-            invoke(currentMap, "move", new Class<?>[]{cameraClass}, camera);
+            if (animate && lastAppliedCamera != null) {
+                Class<?> animationTypeClass = Class.forName(
+                        "com.yandex.mapkit.Animation$Type");
+                Object smooth = animationTypeClass.getField("SMOOTH").get(null);
+                Class<?> animationClass = Class.forName("com.yandex.mapkit.Animation");
+                Object animation = animationClass.getConstructor(
+                        animationTypeClass, float.class).newInstance(smooth, 0.65f);
+                invoke(currentMap, "move",
+                        new Class<?>[]{cameraClass, animationClass}, camera, animation);
+            } else {
+                invoke(currentMap, "move", new Class<?>[]{cameraClass}, camera);
+            }
+            lastAppliedCamera = next;
             if (free) freeCameraInitialized = true;
         } catch (Throwable failure) {
             Log.w(TAG, "HUD camera synchronization failed", failure);
@@ -377,6 +388,7 @@ final class HudMapRenderer {
         routeCollection = null;
         routePolyline = null;
         freeCameraInitialized = false;
+        lastAppliedCamera = null;
         if (releaseSurface && currentSurface != null) {
             try { currentSurface.release(); } catch (RuntimeException ignored) {}
             surface = null;
@@ -400,6 +412,37 @@ final class HudMapRenderer {
         String result = value.getClass().getSimpleName()
                 + (detail == null || detail.isEmpty() ? "" : ": " + detail);
         return result.length() > 240 ? result.substring(0, 240) : result;
+    }
+
+    /** Output-space camera comparison: profile changes are included, duplicate snapshots are not. */
+    private static final class AppliedCamera {
+        final double latitude;
+        final double longitude;
+        final float zoom;
+        final float azimuth;
+        final float tilt;
+
+        AppliedCamera(double latitude, double longitude, float zoom, float azimuth, float tilt) {
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.zoom = zoom;
+            this.azimuth = azimuth;
+            this.tilt = tilt;
+        }
+
+        boolean nearlyEquals(AppliedCamera other) {
+            return other != null
+                    && Math.abs(latitude - other.latitude) < 0.0000001d
+                    && Math.abs(longitude - other.longitude) < 0.0000001d
+                    && Math.abs(zoom - other.zoom) < 0.01f
+                    && angularDistance(azimuth, other.azimuth) < 0.25f
+                    && Math.abs(tilt - other.tilt) < 0.25f;
+        }
+
+        private static float angularDistance(float first, float second) {
+            float delta = Math.abs(first - second) % 360f;
+            return Math.min(delta, 360f - delta);
+        }
     }
 
 }

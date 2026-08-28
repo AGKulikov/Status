@@ -26,9 +26,14 @@ PATCHER = load("patch_navigation_map_activity.py")
 
 
 class NavigationModToolsTest(unittest.TestCase):
-    def test_map_activity_patch_has_only_three_reviewed_hooks(self):
+    def test_map_activity_patch_has_only_four_reviewed_hooks(self):
         source = """.class public final Lru/yandex/yandexmaps/app/MapActivity;
 .super Landroidx/appcompat/app/s;
+
+.method public final onCreate(Landroid/os/Bundle;)V
+    .locals 22
+    return-void
+.end method
 
 .method public final onDestroy()V
     .locals 3
@@ -62,7 +67,9 @@ class NavigationModToolsTest(unittest.TestCase):
         finally:
             PATCHER.EXPECTED_SMALI_SHA256 = original_digest
 
-        self.assertEqual(3, result.count(PATCHER.ENTRY_POINT))
+        self.assertEqual(4, result.count(PATCHER.ENTRY_POINT))
+        self.assertIn("invoke-static/range {p0 .. p0}", result)
+        self.assertIn("onActivityPreCreate(Landroid/app/Activity;)V", result)
         self.assertIn("onActivityResumed(Landroid/app/Activity;)V", result)
         self.assertIn("onActivityDestroyed(Landroid/app/Activity;)V", result)
         self.assertIn("onNewIntent(Landroid/app/Activity;Landroid/content/Intent;)V", result)
