@@ -185,7 +185,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("activity.finish()"));
         assertTrue(controller.contains("activity.startActivity(restart)"));
         assertFalse(entry.contains("onActivityPreCreate"));
-        assertTrue(controller.contains("tail of onResumeFragments"));
+        assertTrue(controller.contains("end of onResumeFragments"));
         assertTrue(entry.contains("NavigationBridgeClient.attachActivity"));
         assertTrue(entry.contains("NavigationBridgeClient.detachActivity"));
         assertFalse(entry.contains("activity.finish()"));
