@@ -21,6 +21,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
+import org.json.JSONException;
+
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
 import dezz.status.widget.settings.AppleColorPickerDialog;
@@ -189,7 +191,13 @@ public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
         window.modeButtonSizeDp = buttonSize.value();
         window.modeButtonOpacityPercent = buttonOpacity.value();
         navigation.normalize();
-        preferences.navigationIntegrationConfigJson.set(navigation.toJson().toString());
+        try {
+            preferences.navigationIntegrationConfigJson.set(navigation.toJson().toString());
+        } catch (JSONException error) {
+            Toast.makeText(this, "Не удалось сохранить настройки окна",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
         NavigationHudEndpointService.requestConfigurationRefresh(this);
         Toast.makeText(this, fullyLocked
                         ? "Окно зафиксировано, ручки скрыты"
