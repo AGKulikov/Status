@@ -174,7 +174,7 @@ public final class NavigationHudV2ContractTest {
         assertFalse(controller.contains("View.SYSTEM_UI_FLAG_HIDE_NAVIGATION"));
         assertFalse(controller.contains("containsReadySurface"));
         assertFalse(controller.contains("view instanceof SurfaceView"));
-        assertTrue(controller.contains("prepareWindowBeforeContent"));
+        assertFalse(controller.contains("prepareWindowBeforeContent"));
         assertTrue(controller.contains("floatingIdentityRejected"));
         assertTrue(windowProfile.contains("backgroundColor = \"#00000000\""));
         assertTrue(controller.contains("navi_service_open_voice_search"));
@@ -184,7 +184,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("restartInMode("));
         assertTrue(controller.contains("activity.finish()"));
         assertTrue(controller.contains("activity.startActivity(restart)"));
-        assertTrue(entry.contains("onActivityPreCreate"));
+        assertFalse(entry.contains("onActivityPreCreate"));
+        assertTrue(controller.contains("tail of onResumeFragments"));
         assertTrue(entry.contains("NavigationBridgeClient.attachActivity"));
         assertTrue(entry.contains("NavigationBridgeClient.detachActivity"));
         assertFalse(entry.contains("activity.finish()"));
@@ -207,6 +208,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("com.yandex.mapkit.Animation$Type"));
         assertTrue(renderer.contains("\"SMOOTH\""));
         assertTrue(renderer.contains("lastAppliedCamera"));
+        assertTrue(renderer.contains("else if (jamsChanged) restyleRoute()"));
+        assertTrue(renderer.contains("Updates traffic colours in place"));
+        assertFalse(renderer.contains("drivingRoute != activeRoute"));
+        assertFalse(routeStyler.contains("Double.doubleToLongBits"));
         assertTrue(renderer.contains("applyStyleSlot"));
         assertTrue(renderer.contains("visibilityStyleJson"));
         assertTrue(renderer.contains("updateInitialCamera"));

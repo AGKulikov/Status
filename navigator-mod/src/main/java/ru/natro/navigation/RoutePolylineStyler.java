@@ -35,11 +35,7 @@ final class RoutePolylineStyler {
             long result = 0xcbf29ce484222325L;
             for (Object segment : segments) {
                 Object type = invoke(segment, "getJamType", new Class<?>[0]);
-                long speed = Double.doubleToLongBits(number(
-                        invoke(segment, "getSpeed", new Class<?>[0])));
                 result ^= type == null ? 0L : type.toString().hashCode();
-                result *= 0x100000001b3L;
-                result ^= speed;
                 result *= 0x100000001b3L;
             }
             return result ^ segments.size();

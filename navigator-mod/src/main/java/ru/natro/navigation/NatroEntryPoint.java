@@ -17,20 +17,6 @@ public final class NatroEntryPoint {
 
     private NatroEntryPoint() {}
 
-    /**
-     * Applies the floating Window identity before Navigator creates its MapKit SurfaceView.
-     * Changing type/format after that SurfaceView is attached tears the Android-9 vendor surface
-     * down; applying the same 2038/translucent contract before content creation is stable.
-     */
-    public static void onActivityPreCreate(Activity activity) {
-        if (activity == null || activity.isFinishing()) return;
-        try {
-            controllerFor(activity).prepareWindowBeforeContent(activity.getIntent());
-        } catch (Throwable failure) {
-            reportFailure("onActivityPreCreate", failure);
-        }
-    }
-
     public static void onActivityResumed(Activity activity) {
         if (activity == null || activity.isFinishing()) return;
         try {

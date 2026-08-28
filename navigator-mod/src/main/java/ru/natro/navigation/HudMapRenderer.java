@@ -146,12 +146,16 @@ final class HudMapRenderer {
     void updateRoute(long routeEpoch, Object drivingRoute) {
         if (routeEpoch < activeRouteEpoch) return;
         long jamFingerprint = RoutePolylineStyler.jamFingerprint(drivingRoute);
-        boolean changed = routeEpoch != activeRouteEpoch || drivingRoute != activeRoute;
+        // MapKit may hand out a new Java wrapper for the same DrivingRoute on every Guidance
+        // callback. Object identity is therefore not a route identity; routeEpoch is.
+        boolean changed = routeEpoch != activeRouteEpoch
+                || (drivingRoute == null) != (activeRoute == null);
         boolean jamsChanged = jamFingerprint != activeJamFingerprint;
         activeRouteEpoch = routeEpoch;
         activeRoute = drivingRoute;
         activeJamFingerprint = jamFingerprint;
-        if (changed || jamsChanged) rebuildRoute();
+        if (changed) rebuildRoute();
+        else if (jamsChanged) restyleRoute();
     }
 
     private void startRenderer() {
@@ -339,6 +343,22 @@ final class HudMapRenderer {
             RoutePolylineStyler.apply(line, route, profile);
         } catch (Throwable failure) {
             Log.w(TAG, "Active route could not be rendered in the HUD MapWindow", failure);
+        }
+    }
+
+    /** Updates traffic colours in place so MapKit never presents a frame without the route. */
+    private void restyleRoute() {
+        Object line = routePolyline;
+        Object route = activeRoute;
+        if (!profile.showRoute || route == null) return;
+        if (line == null) {
+            rebuildRoute();
+            return;
+        }
+        try {
+            RoutePolylineStyler.apply(line, route, profile);
+        } catch (Throwable failure) {
+            Log.w(TAG, "HUD route traffic palette could not be updated", failure);
         }
     }
 

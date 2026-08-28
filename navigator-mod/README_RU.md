@@ -6,7 +6,8 @@
 ## Уже реализовано в исходниках патча
 
 - один lifecycle/intent entry point с четырьмя точечными вызовами без нового компонента в
-  manifest; pre-create задаёт прозрачный overlay до создания MapKit `SurfaceView`;
+  manifest; окно включается в конце `onResumeFragments`, как в рабочем 29.4.2,
+  после создания оконного токена Activity и MapKit;
 - оконный контроллер собственной `MapActivity`;
 - внутренняя кнопка «окно / полный экран»;
 - перемещение, resize, независимые locks, сохранение геометрии, aspect lock;

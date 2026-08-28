@@ -32,16 +32,6 @@ def patch(source: str) -> str:
             "MapActivity smali is not the reviewed 30.3.0 baseline; refusing fuzzy patch"
         )
 
-    create = ".method public final onCreate(Landroid/os/Bundle;)V\n    .locals 22\n"
-    source = replace_once(
-        source,
-        create,
-        create
-        + "\n    invoke-static/range {p0 .. p0}, " + ENTRY_POINT
-        + "->onActivityPreCreate(Landroid/app/Activity;)V\n",
-        "onCreate pre-content insertion",
-    )
-
     destroy = ".method public final onDestroy()V\n    .locals 3\n"
     source = replace_once(
         source,

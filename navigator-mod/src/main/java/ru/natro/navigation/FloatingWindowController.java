@@ -140,14 +140,12 @@ final class FloatingWindowController {
             updateControls();
             return;
         }
-        restartInMode(requestedFloating, intent);
-    }
-
-    /** Called from the first instruction of MapActivity.onCreate, before MapKit owns a surface. */
-    void prepareWindowBeforeContent(Intent intent) {
-        if (destroyed || !requestsFloating(intent) || floating) return;
-        floatingIdentityRejected = false;
-        applyFloatingAttributes(true);
+        // The working 29.4.2 mod enters its overlay from onResumeFragments, after AppCompat and
+        // MapKit have finished creating the Activity window. Applying type 2038 from the first
+        // instruction of onCreate gives Android 9 an Activity window without a valid app token
+        // and crashes the KX11 process before our Java exception guard can recover it.
+        if (requestedFloating) applyFloatingAttributes(true);
+        else applyFullscreenAttributes();
     }
 
     boolean requestsFloating(Intent intent) {
@@ -165,8 +163,8 @@ final class FloatingWindowController {
         restart.removeExtra(EXTRA_FORCE_FULLSCREEN);
         if (nextFloating) restart.putExtra(EXTRA_WINDOWED, true);
         else restart.putExtra(EXTRA_FORCE_FULLSCREEN, true);
-        // Same hand-off flags as the working 29.4.2 implementation. The replacement Activity's
-        // pre-create hook selects its Window lane before MapKit creates a SurfaceView.
+        // Same hand-off flags as the working 29.4.2 implementation. The replacement Activity
+        // consumes ddnavwin at the end of onResumeFragments, not before Activity.onCreate.
         restart.addFlags(0x04008000);
         activity.finish();
         activity.startActivity(restart);
@@ -299,8 +297,8 @@ final class FloatingWindowController {
             geometryLoaded = true;
         }
         clampGeometry(attributes, screen);
-        // Match working 29.4.2 exactly. This runs from onActivityPreCreate, before MapKit creates
-        // the SurfaceView, so Android 9 never has to migrate an attached opaque surface.
+        // Match the working 29.4.2 lifecycle: this method is called only from the tail of
+        // onResumeFragments, after the Activity token and MapKit content are attached.
         attributes.type = floatingWindowType();
         attributes.gravity = Gravity.TOP | Gravity.START;
         attributes.flags = (attributes.flags
@@ -310,11 +308,13 @@ final class FloatingWindowController {
                         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
         attributes.format = PixelFormat.TRANSLUCENT;
         try {
-            window.setAttributes(attributes);
-            window.setFormat(PixelFormat.TRANSLUCENT);
             floatingIdentityRejected = false;
             floating = true;
             applyFloatingDecoration();
+            // PhoneWindow.setFormat dispatches the already-mutated LayoutParams. The reference
+            // uses this ordering and does not call setAttributes before the overlay token exists.
+            window.setFormat(PixelFormat.TRANSLUCENT);
+            if (!entering) window.setAttributes(attributes);
             updateControls();
             NavigationBridgeClient.reportDiagnostic("floating window applied type="
                     + attributes.type + ", format=" + attributes.format + ", bounds="
@@ -407,13 +407,10 @@ final class FloatingWindowController {
                 | WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
                 & ~(WindowManager.LayoutParams.FLAG_DIM_BEHIND
                         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        int expectedType = floatingWindowType();
-        boolean changed = attributes.type != expectedType
-                || attributes.gravity != (Gravity.TOP | Gravity.START)
+        boolean changed = attributes.gravity != (Gravity.TOP | Gravity.START)
                 || attributes.flags != expectedFlags
                 || attributes.format != PixelFormat.TRANSLUCENT;
         if (changed) {
-            attributes.type = expectedType;
             attributes.gravity = Gravity.TOP | Gravity.START;
             attributes.flags = expectedFlags;
             attributes.format = PixelFormat.TRANSLUCENT;
