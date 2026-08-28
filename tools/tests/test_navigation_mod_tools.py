@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 from pathlib import Path
+import struct
 import subprocess
 import sys
 import tempfile
@@ -23,27 +24,35 @@ def load(name):
 
 
 PATCHER = load("patch_navigation_map_activity.py")
-THEME_PATCHER = load("patch_navigation_transparent_theme.py")
+MANIFEST_PATCHER = load("patch_navigation_manifest_theme.py")
 
 
 class NavigationModToolsTest(unittest.TestCase):
-    def test_transparent_theme_patch_is_scoped_to_map_activity(self):
-        manifest = (
-            '<activity android:name="ru.yandex.yandexmaps.app.MapActivity" '
-            'android:theme="@style/SplashAppTheme"/>\n'
-            '<activity android:name="panorama" '
-            'android:theme="@style/SplashAppTheme"/>\n'
+    def test_binary_theme_patch_is_scoped_to_map_activity(self):
+        splash = struct.pack("<I", MANIFEST_PATCHER.SPLASH_APP_THEME)
+        bootstrap = struct.pack("<I", MANIFEST_PATCHER.TRANSLUCENT_BOOTSTRAP_THEME)
+        manifest = b"HEAD" + splash + b"MIDL" + splash + b"TAIL"
+        expected = b"HEAD" + bootstrap + b"MIDL" + splash + b"TAIL"
+
+        original = (
+            MANIFEST_PATCHER.EXPECTED_MANIFEST_SHA256,
+            MANIFEST_PATCHER.EXPECTED_PATCHED_SHA256,
+            MANIFEST_PATCHER.EXPECTED_SPLASH_OFFSETS,
+            MANIFEST_PATCHER.MAP_ACTIVITY_THEME_OFFSET,
         )
-        styles = "<resources>\n</resources>\n"
-
-        patched_manifest = THEME_PATCHER.patch_manifest(manifest)
-        patched_styles = THEME_PATCHER.patch_styles(styles)
-
-        self.assertIn('@style/NatroTransparentAppTheme', patched_manifest)
-        self.assertEqual(1, patched_manifest.count('@style/SplashAppTheme'))
-        self.assertIn('parent="@style/AppTheme"', patched_styles)
-        self.assertIn('android:windowIsTranslucent">true', patched_styles)
-        self.assertIn('android:backgroundDimEnabled">false', patched_styles)
+        MANIFEST_PATCHER.EXPECTED_MANIFEST_SHA256 = hashlib.sha256(manifest).hexdigest()
+        MANIFEST_PATCHER.EXPECTED_PATCHED_SHA256 = hashlib.sha256(expected).hexdigest()
+        MANIFEST_PATCHER.EXPECTED_SPLASH_OFFSETS = (4, 12)
+        MANIFEST_PATCHER.MAP_ACTIVITY_THEME_OFFSET = 4
+        try:
+            self.assertEqual(expected, MANIFEST_PATCHER.patch(manifest))
+        finally:
+            (
+                MANIFEST_PATCHER.EXPECTED_MANIFEST_SHA256,
+                MANIFEST_PATCHER.EXPECTED_PATCHED_SHA256,
+                MANIFEST_PATCHER.EXPECTED_SPLASH_OFFSETS,
+                MANIFEST_PATCHER.MAP_ACTIVITY_THEME_OFFSET,
+            ) = original
 
     def test_map_activity_patch_has_only_three_reviewed_hooks(self):
         source = """.class public final Lru/yandex/yandexmaps/app/MapActivity;
@@ -51,6 +60,8 @@ class NavigationModToolsTest(unittest.TestCase):
 
 .method public final onCreate(Landroid/os/Bundle;)V
     .locals 22
+
+    move-object/from16 v3, p0
     return-void
 .end method
 
@@ -87,6 +98,8 @@ class NavigationModToolsTest(unittest.TestCase):
             PATCHER.EXPECTED_SMALI_SHA256 = original_digest
 
         self.assertEqual(3, result.count(PATCHER.ENTRY_POINT))
+        self.assertIn("const v0, 0x7f1605a2", result)
+        self.assertIn("Landroid/app/Activity;->setTheme(I)V", result)
         self.assertNotIn("onActivityPreCreate(Landroid/app/Activity;)V", result)
         self.assertIn("onActivityResumed(Landroid/app/Activity;)V", result)
         self.assertIn("onActivityDestroyed(Landroid/app/Activity;)V", result)
@@ -158,7 +171,7 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn('KX11_ANDROID_API = 28', verifier)
         self.assertIn('KX11_NAVIGATOR_ABIS = {"arm64-v8a"}', verifier)
         self.assertIn('"name": NATRO_PACKAGE', verifier)
-        self.assertIn('MapActivity does not use the reviewed translucent theme', verifier)
+        self.assertIn('MapActivity does not use the reviewed translucent bootstrap theme', verifier)
         self.assertIn('android:sharedUserId', verifier)
         self.assertIn('Main Natro content area: 1760x720', verifier)
         self.assertIn('plane 728x190 @ (0,720)', verifier)

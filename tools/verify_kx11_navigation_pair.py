@@ -248,9 +248,9 @@ def verify_navigator(
     map_activity = activity_block(
         candidate_tree, "ru.yandex.yandexmaps.app.MapActivity"
     )
-    if "android:theme(0x01010000)=@0x7f160023" not in map_activity:
+    if "android:theme(0x01010000)=@0x7f160242" not in map_activity:
         raise VerificationError(
-            "Navigator MapActivity does not use the reviewed translucent theme"
+            "Navigator MapActivity does not use the reviewed translucent bootstrap theme"
         )
     classes4 = zip_entry(apk, "classes4.dex")
     classes19 = zip_entry(apk, "classes19.dex")
@@ -328,7 +328,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"Natro APK SHA-256: {natro_sha}\n"
             f"Navigator APK SHA-256: {navigator_sha}\n"
             "Navigator aapt badging: logically identical to baseline\n"
-            "Navigator MapActivity: reviewed NatroTransparentAppTheme (transparent, no dim)\n"
+            "Navigator MapActivity: reviewed existing translucent bootstrap theme; "
+            "original SplashAppTheme restored before onCreate\n"
+            "Navigator resources.arsc and res/: byte-for-byte identical to baseline\n"
             "Navigator sharedUserId: absent (original Yandex Music is not signature-coupled)\n"
             "Window launch contract: Natro and Navigator contain navi_win/ddnavwin/MapActivity; "
             "only its reviewed translucent theme differs from baseline\n"

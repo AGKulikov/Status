@@ -79,17 +79,17 @@
        build/navigation-mod/YN_30.3.0_Natro-signed.apk
    ```
 
-Последняя команда завершается успешно только если manifest/resources совпадают с закреплёнными
-SHA-256 прозрачной темы, `classes14.dex`, `classes18.dex`, assets и native libraries остались
-побайтно равны рабочему 30.3.0, изменён `classes4.dex`, добавлен `classes19.dex`, а итоговая подпись
-совпала с сертификатом Natro.
+Последняя команда завершается успешно только если бинарный manifest и `classes4.dex` совпадают
+с закреплёнными SHA-256, а `resources.arsc`, все `res/`, `classes14.dex`, `classes18.dex`, assets
+и native libraries остались побайтно равны рабочему 30.3.0; добавляется только `classes19.dex`,
+а итоговая подпись совпадает с сертификатом Natro.
 
 Для парной подписи Natro и Навигатора одним стабильным сертификатом используется
 `tools/sign_navigation_hud_v2_pair.sh`. Скрипт принимает только unsigned-кандидат из CI,
 проверяет его `SHA256SUMS.txt`, не копирует baseline Навигатора в результат и требует сертификат
 SHA-256 `6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75`.
 Финальная парная сборка дополнительно создаёт `KX11-COMPATIBILITY.txt`: там проверяются
-Android 9/API 28, ABI `arm64-v8a`, точные хэши прозрачной theme пары manifest/resources,
+Android 9/API 28, ABI `arm64-v8a`, точные хэши manifest/classes4 и неизменность ресурсов,
 геометрия основного окна `1760×720` и HUD `728×190 @ (0,720)` на Display ID 2.
 Порядок безопасной установки и аппаратный чек-лист находятся в
 `docs/KX11_NAVIGATION_HUD_V2_INSTALL_RU.md`.

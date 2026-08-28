@@ -47,25 +47,16 @@ BUILD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/natro-navigation-apk.XXXXXX")"
 trap 'rm -rf "$BUILD_ROOT"' EXIT HUP INT TERM
 DECODED="$BUILD_ROOT/decoded"
 DEX_PROJECT="$BUILD_ROOT/dex-project"
-RESOURCE_PROJECT="$BUILD_ROOT/resource-project"
 
 XDG_DATA_HOME="$BUILD_ROOT/apktool-data" \
   java -jar "$APKTOOL_JAR" d -f -r -o "$DECODED" "$BASELINE_APK"
 
-# Window translucency is decided from the Activity theme before any Java lifecycle hook runs.
-# Build only the reviewed manifest/resource pair in a separate no-source project; every baseline
-# DEX, asset and native library still comes directly from the original APK below.
-XDG_DATA_HOME="$BUILD_ROOT/apktool-data" \
-  java -jar "$APKTOOL_JAR" d -f -s -o "$RESOURCE_PROJECT" "$BASELINE_APK"
-python3 "$SCRIPT_DIR/patch_navigation_transparent_theme.py" "$RESOURCE_PROJECT"
-XDG_DATA_HOME="$BUILD_ROOT/apktool-data" \
-  java -jar "$APKTOOL_JAR" b --no-apk "$RESOURCE_PROJECT"
-PATCHED_MANIFEST="$RESOURCE_PROJECT/build/apk/AndroidManifest.xml"
-PATCHED_RESOURCES="$RESOURCE_PROJECT/build/apk/resources.arsc"
-if [ ! -f "$PATCHED_MANIFEST" ] || [ ! -f "$PATCHED_RESOURCES" ]; then
-  printf 'apktool did not produce the reviewed transparent theme resources\n' >&2
-  exit 1
-fi
+# Window translucency is decided from the manifest Activity theme before lifecycle code runs.
+# Patch only MapActivity's four-byte theme resource ID in the exact binary manifest. The existing
+# translucent bootstrap style is already in the baseline; resources.arsc and every res/ payload
+# therefore remain byte-for-byte original.
+PATCHED_MANIFEST="$DECODED/AndroidManifest.xml"
+python3 "$SCRIPT_DIR/patch_navigation_manifest_theme.py" "$PATCHED_MANIFEST"
 
 mkdir -p "$DEX_PROJECT"
 cp "$DECODED/apktool.yml" "$DEX_PROJECT/apktool.yml"
@@ -88,7 +79,6 @@ python3 "$SCRIPT_DIR/repack_apk_entries.py" \
   --baseline "$BASELINE_APK" \
   --output "$UNALIGNED" \
   --replace "AndroidManifest.xml=$PATCHED_MANIFEST" \
-  --replace "resources.arsc=$PATCHED_RESOURCES" \
   --replace "classes4.dex=$CLASSES4_DEX" \
   --replace "classes19.dex=$CLASSES19_DEX"
 

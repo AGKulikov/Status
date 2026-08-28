@@ -3,8 +3,8 @@
 
 The verifier compares uncompressed ZIP entry bytes, so zipalign, compression level and the APK
 Signing Block may change without hiding a resource/native-library change. The exact input baseline
-hash is mandatory. A release may replace only the reviewed MapActivity theme resources and
-classes4.dex, and may add classes19.dex.
+hash is mandatory. A release may replace only the reviewed binary manifest and classes4.dex, and
+may add classes19.dex. resources.arsc and every res/ entry must remain original.
 """
 
 from __future__ import annotations

@@ -206,7 +206,7 @@ jq -n \
     navigator: {versionName: "30.3.0", package: "ru.yandex.yandexnavi",
       apk: $navigatorApk, sha256: $navigatorSha256,
       baselineSha256: $navigatorBaselineSha256, signatureSchemes: ["v3"],
-      changedEntries: ["AndroidManifest.xml", "resources.arsc", "classes4.dex"],
+      changedEntries: ["AndroidManifest.xml", "classes4.dex"],
       newEntries: ["classes19.dex"]},
     compatibility: {headUnit: "ECARX KX11", androidApi: 28,
       mainContent: {width: 1760, height: 720}, navigatorAbi: "arm64-v8a",

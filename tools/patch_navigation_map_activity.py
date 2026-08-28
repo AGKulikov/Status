@@ -32,6 +32,24 @@ def patch(source: str) -> str:
             "MapActivity smali is not the reviewed 30.3.0 baseline; refusing fuzzy patch"
         )
 
+    # ActivityTaskManager reads the translucent bootstrap theme from the manifest before launch.
+    # Reapply Navigator's original theme before any onCreate work so its AppTheme attributes and
+    # views are unchanged; the system's already-established translucent window classification is
+    # retained for the later floating-window background clear.
+    create = (
+        ".method public final onCreate(Landroid/os/Bundle;)V\n"
+        "    .locals 22\n\n"
+        "    move-object/from16 v3, p0\n"
+    )
+    source = replace_once(
+        source,
+        create,
+        create
+        + "\n    const v0, 0x7f1605a2\n\n"
+        + "    invoke-virtual {v3, v0}, Landroid/app/Activity;->setTheme(I)V\n",
+        "onCreate original theme restore",
+    )
+
     destroy = ".method public final onDestroy()V\n    .locals 3\n"
     source = replace_once(
         source,

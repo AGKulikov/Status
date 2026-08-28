@@ -31,25 +31,29 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
                 "classes18.dex": b"working 30.3 additions",
                 "assets/map/data": b"offline map assets",
                 "lib/arm64-v8a/libmaps-mobile.so": b"native mapkit",
+                "res/drawable/icon.xml": b"original compiled resource",
             },
         )
         self.config = {
             "baseline_apk_sha256": MODULE.sha256_file(self.baseline),
-            "mutable_entries": ["AndroidManifest.xml", "resources.arsc", "classes4.dex"],
+            "mutable_entries": ["AndroidManifest.xml", "classes4.dex"],
             "allowed_new_entries": ["classes19.dex"],
             "release_required_changed_entries": [
-                "AndroidManifest.xml", "resources.arsc", "classes4.dex"
+                "AndroidManifest.xml", "classes4.dex"
             ],
             "release_required_new_entries": ["classes19.dex"],
             "release_entry_sha256": {
                 "AndroidManifest.xml": MODULE._sha256_bytes(b"patched manifest"),
-                "resources.arsc": MODULE._sha256_bytes(b"patched resources"),
+                "classes4.dex": MODULE._sha256_bytes(
+                    b"activity plus one reviewed hook"
+                ),
             },
             "critical_entries": [
+                "resources.arsc",
                 "classes14.dex",
                 "classes18.dex",
             ],
-            "critical_prefixes": ["assets/", "lib/"],
+            "critical_prefixes": ["assets/", "lib/", "res/"],
         }
 
     def tearDown(self):
@@ -65,13 +69,14 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
         path = self.root / f"candidate-{len(list(self.root.glob('candidate-*')))}.apk"
         entries = {
             "AndroidManifest.xml": b"patched manifest",
-            "resources.arsc": b"patched resources",
+            "resources.arsc": b"resources",
             "classes4.dex": b"activity plus one reviewed hook",
             "classes14.dex": protected,
             "classes18.dex": b"working 30.3 additions",
             "classes19.dex": b"new isolated Natro bridge",
             "assets/map/data": b"offline map assets",
             "lib/arm64-v8a/libmaps-mobile.so": b"native mapkit",
+            "res/drawable/icon.xml": b"original compiled resource",
         }
         if extra:
             entries.update(extra)
@@ -83,17 +88,17 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
             self.config, self.baseline, self._candidate(), release=True
         )
         self.assertEqual(
-            {"AndroidManifest.xml", "resources.arsc", "classes4.dex"}, changed
+            {"AndroidManifest.xml", "classes4.dex"}, changed
         )
         self.assertEqual({"classes19.dex"}, new_entries)
         self.assertGreaterEqual(protected, 4)
 
-    def test_unreviewed_transparent_theme_payload_is_rejected(self):
-        with self.assertRaisesRegex(MODULE.VerificationError, "reviewed release entry"):
+    def test_resource_table_rebuild_is_rejected(self):
+        with self.assertRaisesRegex(MODULE.VerificationError, "protected entries"):
             MODULE.verify_zip_contents(
                 self.config,
                 self.baseline,
-                self._candidate(extra={"resources.arsc": b"different theme"}),
+                self._candidate(extra={"resources.arsc": b"rebuilt resource table"}),
                 release=True,
             )
 
