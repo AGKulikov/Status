@@ -152,6 +152,8 @@ public final class NavigationHudV2ContractTest {
         String cursor = read(patchRoot.resolve("MapCursorStyler.java"));
         String routeStyler = read(patchRoot.resolve("RoutePolylineStyler.java"));
         String mapProfile = read(patchRoot.resolve("NavigationMapProfile.java"));
+        String mapViewPatch = read(projectRoot().resolve(
+                "tools/patch_navigation_map_view.py"));
 
         assertTrue(controller.contains("ACTION_FLOATING = \"navi_win/ru.yandex.yandexnavi\""));
         assertTrue(controller.contains("EXTRA_WINDOWED = \"ddnavwin\""));
@@ -180,6 +182,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("attributes.dimAmount = 0f"));
         assertTrue(controller.contains("floating surface committed decor="));
         assertTrue(controller.contains("decor.setClipToOutline(false)"));
+        assertTrue(controller.contains("decor.setClipToOutline(true)"));
+        assertTrue(controller.contains("roundedOutlineProvider"));
+        assertTrue(controller.contains("NatroEntryPoint.usesMovableMap(activity)"));
         assertFalse(controller.contains("decor.setClipToOutline(profile.cornerRadiusDp > 0)"));
         assertFalse(controller.contains("View.SYSTEM_UI_FLAG_HIDE_NAVIGATION"));
         assertFalse(controller.contains("containsReadySurface"));
@@ -201,6 +206,10 @@ public final class NavigationHudV2ContractTest {
         assertFalse(entry.contains("activity.finish()"));
         assertFalse(entry.contains("activity.startActivity(restart)"));
         assertTrue(entry.contains("controller.consumeIntent(intent)"));
+        assertTrue(entry.contains("shouldUseMovableMap(Context context)"));
+        assertTrue(entry.contains("MOVABLE_MAP_ACTIVITIES"));
+        assertTrue(mapViewPatch.contains("PlatformViewFactory$Attribute;->MOVABLE"));
+        assertTrue(mapViewPatch.contains("shouldUseMovableMap(Landroid/content/Context;)Z"));
         assertTrue(client.contains("getPackagesForUid(sendingUid)"));
         assertTrue(client.contains("checkSignatures(NAVIGATOR_PACKAGE, NATRO_PACKAGE)"));
         assertTrue(client.contains("MSG_ATTACH_HUD_SURFACE"));
@@ -366,6 +375,8 @@ public final class NavigationHudV2ContractTest {
     @Test public void settingsExposeIndependentMapsAndNavigatorWindowButton() throws Exception {
         String settings = read(projectRoot().resolve(
                 "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
+        String windowSettings = read(projectRoot().resolve(
+                "app/src/main/java/dezz/status/widget/NavigatorWindowSettingsActivity.java"));
         assertTrue(settings.contains("Независимая карта HUD"));
         assertTrue(settings.contains("Основная карта и окно Навигатора"));
         assertTrue(settings.contains("Кнопка окно / полный экран"));
@@ -391,6 +402,13 @@ public final class NavigationHudV2ContractTest {
         assertFalse(settings.contains("EditText focusX = field"));
         assertFalse(settings.contains("EditText buttonOpacity = field"));
         assertFalse(settings.contains("compactNumber("));
+        assertTrue(windowSettings.contains("Оконный режим Навигатора"));
+        assertTrue(windowSettings.contains("Скругление углов"));
+        assertTrue(windowSettings.contains("Зафиксировать окно"));
+        assertTrue(windowSettings.contains("window.movementLocked = fullyLocked"));
+        assertTrue(windowSettings.contains("window.resizeLocked = fullyLocked"));
+        assertTrue(windowSettings.contains("window.dragHandleVisible"));
+        assertTrue(windowSettings.contains("window.resizeHandleVisible"));
     }
 
     private static Path sourceRoot() {

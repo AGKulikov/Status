@@ -34,6 +34,7 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.LauncherSettingsActivity",
             "dezz.status.widget.MainActivity",
             "dezz.status.widget.MqttSettingsActivity",
+            "dezz.status.widget.NavigatorWindowSettingsActivity",
             "dezz.status.widget.PhoneConnectorSettingsActivity",
             "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
             "dezz.status.widget.PopupSettingsActivity",
@@ -104,6 +105,8 @@ public final class SettingsDestinationCatalogTest {
         assertSearchContains("размеры", "home_behavior");
         assertSearchContains("позиции кнопок", "home_behavior");
         assertSearchContains("столбцы", "home_behavior");
+        assertSearchContains("скругление", "navigator_window");
+        assertSearchContains("зафиксировать", "navigator_window");
         assertEquals(SettingsDestinationCatalog.all().size(),
                 SettingsDestinationCatalog.search("  ").size());
         assertTrue(SettingsDestinationCatalog.search("несуществующий-запрос").isEmpty());

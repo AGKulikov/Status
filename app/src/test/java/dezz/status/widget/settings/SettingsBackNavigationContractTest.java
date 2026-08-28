@@ -41,6 +41,7 @@ public final class SettingsBackNavigationContractTest {
             "LiveActivityApnsSettingsActivity.java",
             "MediaPanelSettingsActivity.java",
             "NavigationPanelSettingsActivity.java",
+            "NavigatorWindowSettingsActivity.java",
             "PanelElementSettingsActivity.java",
             "PhoneConnectorSettingsActivity.java",
             "VehicleInfoPanelSettingsActivity.java"

@@ -24,6 +24,7 @@ def load(name):
 
 
 PATCHER = load("patch_navigation_map_activity.py")
+MAP_VIEW_PATCHER = load("patch_navigation_map_view.py")
 MANIFEST_PATCHER = load("patch_navigation_manifest_theme.py")
 
 
@@ -106,6 +107,37 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("onNewIntent(Landroid/app/Activity;Landroid/content/Intent;)V", result)
         with self.assertRaisesRegex(ValueError, "already contains"):
             PATCHER.patch(result)
+
+    def test_map_view_patch_selects_movable_renderer_only_for_floating_launch(self):
+        source = """.class public Lcom/yandex/mapkit/mapview/MapView;
+.super Landroid/widget/RelativeLayout;
+
+.method public constructor <init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V
+    .locals 0
+
+    invoke-static {p1, p2}, Lcom/yandex/runtime/view/PlatformViewFactory;->convertAttributeSet(Landroid/content/Context;Landroid/util/AttributeSet;)Ljava/util/Set;
+
+    move-result-object p2
+
+    invoke-static {p1, p2}, Lcom/yandex/runtime/view/PlatformViewFactory;->getPlatformView(Landroid/content/Context;Ljava/util/Set;)Lcom/yandex/runtime/view/PlatformView;
+    return-void
+.end method
+"""
+        original_digest = MAP_VIEW_PATCHER.EXPECTED_SMALI_SHA256
+        MAP_VIEW_PATCHER.EXPECTED_SMALI_SHA256 = hashlib.sha256(
+            source.encode("utf-8")
+        ).hexdigest()
+        try:
+            result = MAP_VIEW_PATCHER.patch(source)
+        finally:
+            MAP_VIEW_PATCHER.EXPECTED_SMALI_SHA256 = original_digest
+
+        self.assertIn("shouldUseMovableMap(Landroid/content/Context;)Z", result)
+        self.assertIn("PlatformViewFactory$Attribute;->MOVABLE", result)
+        self.assertIn("if-eqz p3, :natro_renderer_ready", result)
+        self.assertEqual(1, result.count(MAP_VIEW_PATCHER.ENTRY_POINT))
+        with self.assertRaisesRegex(ValueError, "already contains"):
+            MAP_VIEW_PATCHER.patch(result)
 
     def test_repacker_replaces_and_appends_without_changing_other_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:

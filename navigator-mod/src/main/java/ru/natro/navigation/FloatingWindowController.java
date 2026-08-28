@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -18,6 +19,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
@@ -61,6 +63,8 @@ final class FloatingWindowController {
     private final float originalDimAmount;
     private final int originalStatusBarColor;
     private final int originalNavigationBarColor;
+    private final ViewOutlineProvider originalOutlineProvider;
+    private final boolean originalClipToOutline;
 
     private FloatingWindowProfile profile = new FloatingWindowProfile();
     private FrameLayout controlLayer;
@@ -86,6 +90,16 @@ final class FloatingWindowController {
     private boolean destroyed;
     private boolean geometryLoaded;
     private boolean transparentLayersCaptured;
+    private int roundedOutlineWidth = -1;
+    private int roundedOutlineHeight = -1;
+    private int roundedOutlineRadius = -1;
+    private final ViewOutlineProvider roundedOutlineProvider = new ViewOutlineProvider() {
+        @Override public void getOutline(View view, Outline outline) {
+            int radius = Math.max(0, Math.round(profile.cornerRadiusDp
+                    * activity.getResources().getDisplayMetrics().density));
+            outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+        }
+    };
 
     private final Runnable floatingSurfaceCommitter = new Runnable() {
         @Override public void run() {
@@ -98,6 +112,7 @@ final class FloatingWindowController {
                 window.setLayout(attributes.width, attributes.height);
                 window.setFormat(PixelFormat.TRANSLUCENT);
                 enforceTransparentLayers();
+                applyRoundedClip();
                 reportCommittedFrame();
             } catch (RuntimeException failure) {
                 NavigationBridgeClient.reportDiagnostic("floating surface commit rejected: "
@@ -122,6 +137,8 @@ final class FloatingWindowController {
         originalDimAmount = initial.dimAmount;
         originalStatusBarColor = window.getStatusBarColor();
         originalNavigationBarColor = window.getNavigationBarColor();
+        originalOutlineProvider = decor.getOutlineProvider();
+        originalClipToOutline = decor.getClipToOutline();
     }
 
     void install() {
@@ -391,7 +408,8 @@ final class FloatingWindowController {
         floatingBackground = null;
         floatingFrame = null;
         if (controlLayer != null) controlLayer.setBackground(null);
-        decor.setClipToOutline(false);
+        decor.setOutlineProvider(originalOutlineProvider);
+        decor.setClipToOutline(originalClipToOutline);
         decor.setElevation(originalElevation);
         decor.setSystemUiVisibility(originalSystemUi);
         window.setStatusBarColor(originalStatusBarColor);
@@ -411,7 +429,10 @@ final class FloatingWindowController {
 
     private void applyFloatingDecoration() {
         View decor = window.getDecorView();
-        ColorDrawable background = new ColorDrawable(Color.TRANSPARENT);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.TRANSPARENT);
+        background.setCornerRadius(Math.max(0, Math.round(profile.cornerRadiusDp
+                * activity.getResources().getDisplayMetrics().density)));
         // The working 29.4.2 contract uses a transparent activity/decor surface. An opaque
         // background leaves a full-screen black plane behind the resized map on KX11 even when
         // WindowManager reports the expected floating bounds.
@@ -422,9 +443,9 @@ final class FloatingWindowController {
         enforceTransparentLayers();
         window.setStatusBarColor(Color.TRANSPARENT);
 
-        // MapActivity contains a SurfaceView. Rounding or clipping the activity decor clips that
-        // surface on Android 9 and can make the vendor renderer tear down the activity. Draw the
-        // optional frame in our transparent control layer instead; never clip the map surface.
+        // The classes12 hook selects MapKit's own movable TextureView before this Activity is
+        // created in floating mode. Keep clipping disabled until WindowManager commits the
+        // bounded translucent surface, then clip the normal view hierarchy safely.
         GradientDrawable frame = new GradientDrawable();
         frame.setColor(Color.TRANSPARENT);
         frame.setCornerRadius(dp(profile.cornerRadiusDp));
@@ -434,6 +455,7 @@ final class FloatingWindowController {
         }
         floatingFrame = frame;
         if (controlLayer != null) controlLayer.setBackground(floatingFrame);
+        decor.setOutlineProvider(originalOutlineProvider);
         decor.setClipToOutline(false);
         decor.setElevation(0f);
         decor.setAlpha(profile.opacityPercent / 100f);
@@ -505,7 +527,43 @@ final class FloatingWindowController {
                 + decor.getWidth() + "x" + decor.getHeight() + "@"
                 + location[0] + "," + location[1] + ", transparent roots="
                 + (contentRoot != null) + "/" + (mapRoot != null) + "/"
-                + (mapWithControls != null));
+                + (mapWithControls != null) + ", movableMap="
+                + NatroEntryPoint.usesMovableMap(activity) + ", rounded="
+                + decor.getClipToOutline());
+    }
+
+    /** Clips only the TextureView-backed floating launch; SurfaceView clipping stays forbidden. */
+    private void applyRoundedClip() {
+        View decor = window.getDecorView();
+        boolean enabled = profile.cornerRadiusDp > 0
+                && NatroEntryPoint.usesMovableMap(activity);
+        if (!enabled) {
+            if (decor.getClipToOutline()) decor.setClipToOutline(false);
+            if (decor.getOutlineProvider() != originalOutlineProvider) {
+                decor.setOutlineProvider(originalOutlineProvider);
+            }
+            roundedOutlineWidth = -1;
+            roundedOutlineHeight = -1;
+            roundedOutlineRadius = -1;
+            return;
+        }
+        boolean changed = false;
+        if (decor.getOutlineProvider() != roundedOutlineProvider) {
+            decor.setOutlineProvider(roundedOutlineProvider);
+            changed = true;
+        }
+        int radius = Math.max(0, Math.round(profile.cornerRadiusDp
+                * activity.getResources().getDisplayMetrics().density));
+        if (roundedOutlineWidth != decor.getWidth()
+                || roundedOutlineHeight != decor.getHeight()
+                || roundedOutlineRadius != radius) {
+            roundedOutlineWidth = decor.getWidth();
+            roundedOutlineHeight = decor.getHeight();
+            roundedOutlineRadius = radius;
+            changed = true;
+        }
+        if (changed) decor.invalidateOutline();
+        if (!decor.getClipToOutline()) decor.setClipToOutline(true);
     }
 
     /**
@@ -545,7 +603,7 @@ final class FloatingWindowController {
                 && controlLayer.getBackground() != floatingFrame) {
             controlLayer.setBackground(floatingFrame);
         }
-        if (decor.getClipToOutline()) decor.setClipToOutline(false);
+        applyRoundedClip();
     }
 
     private int floatingWindowType() {
@@ -657,6 +715,7 @@ final class FloatingWindowController {
         attributes.height = height;
         clampGeometry(attributes, realDisplayMetrics());
         try { window.setAttributes(attributes); } catch (RuntimeException ignored) {}
+        window.getDecorView().invalidateOutline();
     }
 
     private void clampGeometry(WindowManager.LayoutParams attributes, DisplayMetrics screen) {

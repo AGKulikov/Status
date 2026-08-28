@@ -666,15 +666,13 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
 
         form.addView(section("Плавающее окно Навигатора"), marginTop(18));
         Switch windowEnabled = switchView("Разрешить оконный режим", window.enabled);
-        Switch movementLocked = switchView("Зафиксировать перемещение",
-                window.movementLocked);
-        Switch resizeLocked = switchView("Зафиксировать изменение размера",
-                window.resizeLocked);
+        Switch windowLocked = switchView("Зафиксировать окно и скрыть обе ручки",
+                window.movementLocked && window.resizeLocked);
         Switch aspectLocked = switchView("Зафиксировать пропорции",
                 window.aspectRatioLocked);
         Switch rememberGeometry = switchView("Запоминать позицию и размер",
                 window.rememberGeometry);
-        for (Switch control : new Switch[]{windowEnabled, movementLocked, resizeLocked,
+        for (Switch control : new Switch[]{windowEnabled, windowLocked,
                 aspectLocked, rememberGeometry}) {
             form.addView(control, marginTop(4));
         }
@@ -747,8 +745,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         map.showWater = showWater.isChecked();
                         map.showModels = showModels.isChecked();
                         window.enabled = windowEnabled.isChecked();
-                        window.movementLocked = movementLocked.isChecked();
-                        window.resizeLocked = resizeLocked.isChecked();
+                        window.movementLocked = windowLocked.isChecked();
+                        window.resizeLocked = windowLocked.isChecked();
                         window.aspectRatioLocked = aspectLocked.isChecked();
                         window.rememberGeometry = rememberGeometry.isChecked();
                         window.leftPercent = left.intValue();

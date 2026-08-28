@@ -253,9 +253,15 @@ def verify_navigator(
             "Navigator MapActivity does not use the reviewed translucent bootstrap theme"
         )
     classes4 = zip_entry(apk, "classes4.dex")
+    classes12 = zip_entry(apk, "classes12.dex")
     classes19 = zip_entry(apk, "classes19.dex")
     if b"Lru/natro/navigation/NatroEntryPoint;" not in classes4:
         raise VerificationError("Navigator classes4.dex has no Natro lifecycle hook")
+    if (b"Lru/natro/navigation/NatroEntryPoint;" not in classes12
+            or b"shouldUseMovableMap" not in classes12):
+        raise VerificationError(
+            "Navigator classes12.dex has no reviewed floating TextureView selector"
+        )
     for required in (
         b"navi_win/ru.yandex.yandexnavi", b"ddnavwin", b"ddnavforcewinfull",
         b"setTransparentBackgroundEnabled", b"road_surface",

@@ -2,6 +2,8 @@
 package ru.natro.navigation;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
 import android.util.Log;
 
@@ -12,7 +14,12 @@ import java.util.WeakHashMap;
 /** The only class referenced by the one-method MapActivity smali hook. */
 public final class NatroEntryPoint {
     private static final String TAG = "NatroNavigatorHook";
+    private static final String ACTION_FLOATING = "navi_win/ru.yandex.yandexnavi";
+    private static final String EXTRA_WINDOWED = "ddnavwin";
+    private static final String EXTRA_FORCE_FULLSCREEN = "ddnavforcewinfull";
     private static final Map<Activity, FloatingWindowController> CONTROLLERS =
+            new WeakHashMap<>();
+    private static final Map<Activity, Boolean> MOVABLE_MAP_ACTIVITIES =
             new WeakHashMap<>();
 
     private NatroEntryPoint() {}
@@ -49,6 +56,9 @@ public final class NatroEntryPoint {
         try {
             NavigationBridgeClient.detachActivity(activity);
             FloatingWindowController controller = CONTROLLERS.remove(activity);
+            synchronized (MOVABLE_MAP_ACTIVITIES) {
+                MOVABLE_MAP_ACTIVITIES.remove(activity);
+            }
             if (controller != null) controller.destroy();
         } catch (Throwable failure) {
             reportFailure("onActivityDestroyed", failure);
@@ -77,6 +87,44 @@ public final class NatroEntryPoint {
                 reportFailure("setWindowMode", failure);
             }
         }
+    }
+
+    /**
+     * Called while MapKit constructs its platform view. A floating launch must use MapKit's
+     * built-in movable TextureView renderer: unlike SurfaceView/Vulkan it remains in the Android
+     * view hierarchy and Android 9 can safely clip it to a rounded decor outline.
+     */
+    public static boolean shouldUseMovableMap(Context context) {
+        Activity activity = activityFrom(context);
+        if (activity == null) return false;
+        Intent intent = activity.getIntent();
+        boolean movable = intent != null
+                && !intent.getBooleanExtra(EXTRA_FORCE_FULLSCREEN, false)
+                && (intent.getBooleanExtra(EXTRA_WINDOWED, false)
+                        || ACTION_FLOATING.equals(intent.getAction()));
+        synchronized (MOVABLE_MAP_ACTIVITIES) {
+            if (movable) MOVABLE_MAP_ACTIVITIES.put(activity, Boolean.TRUE);
+            else MOVABLE_MAP_ACTIVITIES.remove(activity);
+        }
+        return movable;
+    }
+
+    static boolean usesMovableMap(Activity activity) {
+        synchronized (MOVABLE_MAP_ACTIVITIES) {
+            return Boolean.TRUE.equals(MOVABLE_MAP_ACTIVITIES.get(activity));
+        }
+    }
+
+    private static Activity activityFrom(Context context) {
+        Context current = context;
+        for (int depth = 0; current != null && depth < 12; depth++) {
+            if (current instanceof Activity) return (Activity) current;
+            if (!(current instanceof ContextWrapper)) return null;
+            Context base = ((ContextWrapper) current).getBaseContext();
+            if (base == current) return null;
+            current = base;
+        }
+        return null;
     }
 
     private static FloatingWindowController controllerFor(Activity activity) {

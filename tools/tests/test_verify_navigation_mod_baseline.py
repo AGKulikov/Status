@@ -27,6 +27,7 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
                 "AndroidManifest.xml": b"manifest",
                 "resources.arsc": b"resources",
                 "classes4.dex": b"original activity",
+                "classes12.dex": b"original map view",
                 "classes14.dex": b"working passport boundary",
                 "classes18.dex": b"working 30.3 additions",
                 "assets/map/data": b"offline map assets",
@@ -36,16 +37,21 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
         )
         self.config = {
             "baseline_apk_sha256": MODULE.sha256_file(self.baseline),
-            "mutable_entries": ["AndroidManifest.xml", "classes4.dex"],
+            "mutable_entries": [
+                "AndroidManifest.xml", "classes4.dex", "classes12.dex"
+            ],
             "allowed_new_entries": ["classes19.dex"],
             "release_required_changed_entries": [
-                "AndroidManifest.xml", "classes4.dex"
+                "AndroidManifest.xml", "classes4.dex", "classes12.dex"
             ],
             "release_required_new_entries": ["classes19.dex"],
             "release_entry_sha256": {
                 "AndroidManifest.xml": MODULE._sha256_bytes(b"patched manifest"),
                 "classes4.dex": MODULE._sha256_bytes(
                     b"activity plus one reviewed hook"
+                ),
+                "classes12.dex": MODULE._sha256_bytes(
+                    b"map view plus movable renderer hook"
                 ),
             },
             "critical_entries": [
@@ -71,6 +77,7 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
             "AndroidManifest.xml": b"patched manifest",
             "resources.arsc": b"resources",
             "classes4.dex": b"activity plus one reviewed hook",
+            "classes12.dex": b"map view plus movable renderer hook",
             "classes14.dex": protected,
             "classes18.dex": b"working 30.3 additions",
             "classes19.dex": b"new isolated Natro bridge",
@@ -88,7 +95,7 @@ class NavigationBaselineVerifierTest(unittest.TestCase):
             self.config, self.baseline, self._candidate(), release=True
         )
         self.assertEqual(
-            {"AndroidManifest.xml", "classes4.dex"}, changed
+            {"AndroidManifest.xml", "classes4.dex", "classes12.dex"}, changed
         )
         self.assertEqual({"classes19.dex"}, new_entries)
         self.assertGreaterEqual(protected, 4)

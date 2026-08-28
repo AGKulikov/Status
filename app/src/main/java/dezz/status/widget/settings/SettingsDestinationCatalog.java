@@ -152,6 +152,13 @@ public final class SettingsDestinationCatalog {
                 "hud", "dezz.status.widget.HudPanelSettingsActivity",
                 "hud", "проекция", "внешний дисплей", "стрелки", "светофоры",
                 "полосы", "телеметрия", "умный дом", "сценарии", "сетка"));
+        values.add(activity("navigator_window", Group.PANELS,
+                "Оконный режим Навигатора",
+                "Размер, положение, скругление, прозрачный фон и фиксация окна",
+                "popup", "dezz.status.widget.NavigatorWindowSettingsActivity",
+                "навигатор", "яндекс навигатор", "оконный режим", "окно",
+                "скругление", "углы", "фиксация", "зафиксировать", "ручка",
+                "перетаскивание", "уголок", "прозрачный фон"));
         values.add(activity("driver_panel", Group.PANELS, "Панель водителя",
                 "Единая боковая панель: до 10 кнопок, Домой, Назад и штатный климат",
                 "apps", "dezz.status.widget.DriverPanelSettingsActivity",
