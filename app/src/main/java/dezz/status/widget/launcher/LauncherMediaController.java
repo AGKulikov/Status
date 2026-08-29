@@ -308,9 +308,8 @@ public final class LauncherMediaController {
                     select(controllers == null ? Collections.emptyList() : controllers);
                 } catch (RuntimeException ignored) {
                     // Several ECARX builds expose a short-lived dead MediaSession binder while
-                    // switching players. Keep the broadcast source alive instead of crashing HOME.
-                    replace(null);
-                    sessionState = null;
+                    // switching players. Keep the last callback-tracked controller: clearing it
+                    // here would send the next steering command into the expensive global scan.
                     publish();
                 }
             };
@@ -447,13 +446,12 @@ public final class LauncherMediaController {
             try {
                 select(controllers == null ? Collections.emptyList() : controllers);
             } catch (RuntimeException staleSession) {
-                replace(null);
-                sessionState = null;
+                // A malformed entry in the fresh list must not evict the already selected player.
                 publish();
             }
         } else {
-            replace(null);
-            sessionState = null;
+            // An OEM Binder timeout/failure is transient. The existing controller is still the
+            // lowest-latency command route and its callbacks will invalidate it if truly dead.
             publish();
         }
         if (sessionQueryPending) {

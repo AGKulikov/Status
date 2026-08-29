@@ -134,7 +134,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(launcher.contains("putExtra(\"ddnavforcewinfull\", true)"));
     }
 
-    @Test public void exportedNatroEndpointAuthenticatesEveryMessengerTransaction()
+    @Test public void exportedNatroEndpointAuthenticatesHelloThenPinsUidAndSession()
             throws Exception {
         Path project = projectRoot();
         String manifest = read(project.resolve("app/src/main/AndroidManifest.xml"));
@@ -152,6 +152,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(manifest.contains("android:exported=\"true\""));
         assertTrue(service.contains("message.sendingUid"));
         assertTrue(service.contains("isTrustedNavigator(this, sendingUid)"));
+        assertEquals(service.indexOf("isTrustedNavigator(this, sendingUid)"),
+                service.lastIndexOf("isTrustedNavigator(this, sendingUid)"));
+        assertTrue(service.contains("message.what == NavigationBridgeContract.MSG_HELLO"));
+        assertTrue(service.contains("current.uid != sendingUid"));
+        assertTrue(service.contains("current.sessionId.equals(sessionFrom(message))"));
         assertTrue(service.contains("NATRO_BIND_ACTION.equals(intent.getAction())"));
         assertTrue(verifier.contains("getPackagesForUid(sendingUid)"));
         assertTrue(verifier.contains("checkSignatures("));

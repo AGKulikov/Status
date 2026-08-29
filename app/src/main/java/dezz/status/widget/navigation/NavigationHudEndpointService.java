@@ -215,13 +215,14 @@ public final class NavigationHudEndpointService extends Service {
 
     private boolean onMessage(@NonNull Message message) {
         final int sendingUid = message.sendingUid;
-        if (!NavigationBridgeCallerVerifier.isTrustedNavigator(this, sendingUid)) {
-            Log.w(TAG, "Rejected bridge message from uid=" + sendingUid);
-            DiagnosticJournal.warn("navigation-bridge",
-                    "rejected message: Navigator package/signature mismatch; uid=" + sendingUid);
-            return true;
-        }
         if (message.what == NavigationBridgeContract.MSG_HELLO) {
+            // PackageManager/signature checks cross Binder and are intentionally paid only when a
+            // session is established. Every later message is bound to the already authenticated
+            // UID, random session id and death-linked Messenger below.
+            if (!NavigationBridgeCallerVerifier.isTrustedNavigator(this, sendingUid)) {
+                rejectUntrustedUid(sendingUid);
+                return true;
+            }
             acceptHello(message, sendingUid);
             return true;
         }
@@ -279,6 +280,12 @@ public final class NavigationHudEndpointService extends Service {
             replyError(current.messenger, "INVALID_PAYLOAD", failure.getMessage());
         }
         return true;
+    }
+
+    private static void rejectUntrustedUid(int sendingUid) {
+        Log.w(TAG, "Rejected bridge message from uid=" + sendingUid);
+        DiagnosticJournal.warn("navigation-bridge",
+                "rejected message: Navigator package/signature mismatch; uid=" + sendingUid);
     }
 
     private void acceptHello(@NonNull Message message, int sendingUid) {

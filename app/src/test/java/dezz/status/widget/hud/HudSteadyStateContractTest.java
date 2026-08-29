@@ -58,6 +58,15 @@ public final class HudSteadyStateContractTest {
         assertTrue(source.contains("if (cachedAppVersion != null) return cachedAppVersion"));
         assertTrue(source.contains("telemetryListener = value -> runOnMain"));
         assertTrue(source.contains("Process.THREAD_PRIORITY_BACKGROUND"));
+        assertTrue(source.contains("reconcileMediaController()"));
+        assertTrue(source.contains("item.enabled && isMediaElement(item.type)"));
+        assertTrue(source.contains("mediaSnapshotChanged(previous, next, mediaTimelineVisible)"));
+        assertTrue(source.contains("includeTimeline && before.positionMs != after.positionMs"));
+        assertTrue(source.contains("if (!navigationDataNeeded) return"));
+        assertTrue(source.contains("item.type != HudElementType.NAV_MAP"));
+        assertTrue(source.contains("item.type.name().startsWith(\"NAV_\")"));
+        assertFalse(source.contains("NavigationBridgeStateStore.addListener(directNavigationListener);\n"
+                + "        mediaController.start();"));
     }
 
     private static String between(String source, String start, String end) {

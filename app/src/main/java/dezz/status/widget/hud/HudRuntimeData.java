@@ -62,6 +62,7 @@ public final class HudRuntimeData {
     @NonNull private final Handler main = new Handler(Looper.getMainLooper());
     @Nullable private ExecutorService navigationWorker;
     @NonNull private final AtomicBoolean navigationReadQueued = new AtomicBoolean();
+    private boolean navigationReadPending;
     @NonNull private final AtomicBoolean directNavigationWakePosted = new AtomicBoolean();
     @NonNull private final LauncherMediaController mediaController;
     @NonNull private final CarIntegration carIntegration;
@@ -74,9 +75,11 @@ public final class HudRuntimeData {
     @NonNull private HudPanelConfig config;
     @Nullable private HudNavigationState navigation;
     @Nullable private LauncherMediaController.Snapshot media;
+    private boolean mediaTimelineVisible;
     @Nullable private WidgetService attachedHost;
     @Nullable private String cachedAppVersion;
     private final boolean isolatedHudProcess;
+    private volatile boolean navigationDataNeeded;
     private boolean started;
     private boolean navigationReceiverRegistered;
     private final CarIntegration.TelemetryListener telemetryListener = value -> runOnMain(() -> {
@@ -101,9 +104,10 @@ public final class HudRuntimeData {
     };
     private final Runnable directNavigationWake = () -> {
         directNavigationWakePosted.set(false);
-        if (started) refreshNavigation();
+        if (started && navigationDataNeeded) refreshNavigation();
     };
     private final NavigationBridgeStateStore.Listener directNavigationListener = () -> {
+        if (!navigationDataNeeded) return;
         if (!directNavigationWakePosted.compareAndSet(false, true)) return;
         if (!main.post(directNavigationWake)) directNavigationWakePosted.set(false);
     };
@@ -133,11 +137,8 @@ public final class HudRuntimeData {
         this.config = config;
         this.listener = listener;
         isolatedHudProcess = AppProcessPolicy.isHudProcess();
-        mediaController = new LauncherMediaController(this.context, state -> runOnMain(() -> {
-            if (!started) return;
-            media = state;
-            notifyChanged();
-        }));
+        mediaController = new LauncherMediaController(this.context,
+                state -> runOnMain(() -> acceptMediaSnapshot(state)));
         carIntegration = CarIntegrations.get(this.context);
         retainedAutomation = new AutomationStateStore(this.context);
     }
@@ -145,9 +146,10 @@ public final class HudRuntimeData {
     public void start() {
         if (started) return;
         started = true;
+        navigationDataNeeded = hasEnabledNavigationData();
         navigationWorker = newNavigationWorker();
         NavigationBridgeStateStore.addListener(directNavigationListener);
-        mediaController.start();
+        reconcileMediaController();
         try {
             ContextCompat.registerReceiver(context, navigationReceiver,
                     new IntentFilter(NavigationDataRepository.ACTION_UPDATED),
@@ -156,7 +158,7 @@ public final class HudRuntimeData {
         } catch (RuntimeException ignored) {
             navigationReceiverRegistered = false;
         }
-        refreshNavigation();
+        if (navigationDataNeeded) refreshNavigation();
         reconfigureVehicleSubscription();
         WidgetServiceStarter.startIfNeeded(context);
         if (!isolatedHudProcess) {
@@ -171,6 +173,7 @@ public final class HudRuntimeData {
     public void stop() {
         if (!started) return;
         started = false;
+        navigationDataNeeded = false;
         main.removeCallbacks(hostProbe);
         main.removeCallbacks(clockTick);
         main.removeCallbacks(directNavigationWake);
@@ -189,17 +192,96 @@ public final class HudRuntimeData {
         ExecutorService worker = navigationWorker;
         navigationWorker = null;
         navigationReadQueued.set(false);
+        navigationReadPending = false;
         if (worker != null) worker.shutdownNow();
         retainedAutomationCache.clear();
     }
 
     public void updateConfig(@NonNull HudPanelConfig next) {
         config = next;
+        navigationDataNeeded = hasEnabledNavigationData();
+        if (!navigationDataNeeded) {
+            navigation = null;
+            navigationReadPending = false;
+            main.removeCallbacks(directNavigationWake);
+            directNavigationWakePosted.set(false);
+        }
         if (started) {
+            reconcileMediaController();
+            if (navigationDataNeeded) refreshNavigation();
             reconfigureVehicleSubscription();
             scheduleClockTick();
         }
         notifyChanged();
+    }
+
+    /** Do not query the OEM MediaSession service when this HUD layout renders no media data. */
+    private void reconcileMediaController() {
+        if (!started) {
+            mediaTimelineVisible = false;
+            mediaController.stop();
+            return;
+        }
+        boolean hasMedia = false;
+        boolean hasTimeline = false;
+        for (HudElementConfig item : config.elements) {
+            if (item.enabled && isMediaElement(item.type)) {
+                hasMedia = true;
+                hasTimeline |= item.type == HudElementType.MEDIA_TIMER;
+            }
+        }
+        mediaTimelineVisible = hasTimeline;
+        if (hasMedia) {
+            mediaController.start();
+            return;
+        }
+        media = null;
+        mediaController.stop();
+    }
+
+    private void acceptMediaSnapshot(@NonNull LauncherMediaController.Snapshot next) {
+        if (!started) return;
+        LauncherMediaController.Snapshot previous = media;
+        media = next;
+        if (previous == null || mediaSnapshotChanged(previous, next, mediaTimelineVisible)) {
+            notifyChanged();
+        }
+    }
+
+    /** Ignore the one-second playback-position tick when no timeline is drawn on this HUD. */
+    private static boolean mediaSnapshotChanged(
+            @NonNull LauncherMediaController.Snapshot before,
+            @NonNull LauncherMediaController.Snapshot after,
+            boolean includeTimeline) {
+        return !before.title.equals(after.title)
+                || !before.artist.equals(after.artist)
+                || !before.album.equals(after.album)
+                || !before.application.equals(after.application)
+                || before.artwork != after.artwork
+                || before.durationMs != after.durationMs
+                || (includeTimeline && before.positionMs != after.positionMs)
+                || before.playing != after.playing
+                || before.available != after.available
+                || before.likeAvailable != after.likeAvailable
+                || (before.liked == null ? after.liked != null
+                        : !before.liked.equals(after.liked))
+                || before.volumePercent != after.volumePercent;
+    }
+
+    private static boolean isMediaElement(@NonNull HudElementType type) {
+        switch (type) {
+            case MEDIA_ARTWORK:
+            case MEDIA_COMBINED:
+            case MEDIA_TITLE:
+            case MEDIA_ARTIST:
+            case MEDIA_ALBUM:
+            case MEDIA_APPLICATION:
+            case MEDIA_TIMER:
+            case MEDIA_VOLUME:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /** Reloads file-backed automation state after a command crosses into the isolated HUD process. */
@@ -610,40 +692,48 @@ public final class HudRuntimeData {
     }
 
     private void refreshNavigation() {
-        NavigationSnapshotV2 direct = NavigationBridgeStateStore.snapshot();
-        if (direct != null) {
-            NavigationRouteGeometryV2 route = NavigationBridgeStateStore.routeGeometry();
-            navigation = HudNavigationState.fromBridge(direct, route, navigation);
-            notifyChanged();
+        if (!started || !navigationDataNeeded) return;
+        if (!navigationReadQueued.compareAndSet(false, true)) {
+            navigationReadPending = true;
             return;
         }
-        if (!started || !navigationReadQueued.compareAndSet(false, true)) return;
+        navigationReadPending = false;
         ExecutorService worker = navigationWorker;
         if (worker == null) {
             navigationReadQueued.set(false);
             return;
         }
+        NavigationSnapshotV2 direct = NavigationBridgeStateStore.snapshot();
+        NavigationRouteGeometryV2 directRoute = direct == null
+                ? null : NavigationBridgeStateStore.routeGeometry();
+        HudNavigationState previous = navigation;
         try {
             worker.execute(() -> {
-                NavigationDataRepository.Snapshot next = null;
-                try { next = NavigationDataRepository.read(context); }
-                catch (RuntimeException ignored) {}
-                NavigationDataRepository.Snapshot result = next;
+                HudNavigationState resolved = null;
+                if (direct != null) {
+                    resolved = HudNavigationState.fromBridge(
+                            direct, directRoute, previous);
+                } else {
+                    NavigationDataRepository.Snapshot legacy = null;
+                    try { legacy = NavigationDataRepository.read(context); }
+                    catch (RuntimeException ignored) {}
+                    if (legacy != null) resolved = HudNavigationState.fromLegacy(legacy);
+                }
+                HudNavigationState result = resolved;
                 main.post(() -> {
                     navigationReadQueued.set(false);
-                    if (!started) return;
-                    NavigationSnapshotV2 latest = NavigationBridgeStateStore.snapshot();
-                    if (latest != null) {
-                        navigation = HudNavigationState.fromBridge(latest,
-                                NavigationBridgeStateStore.routeGeometry(), navigation);
-                    } else {
-                        navigation = result == null ? null : HudNavigationState.fromLegacy(result);
+                    if (!started || !navigationDataNeeded) {
+                        navigationReadPending = false;
+                        return;
                     }
+                    navigation = result;
                     notifyChanged();
+                    if (navigationReadPending) refreshNavigation();
                 });
             });
         } catch (RuntimeException stopped) {
             navigationReadQueued.set(false);
+            navigationReadPending = false;
         }
     }
 
@@ -665,6 +755,15 @@ public final class HudRuntimeData {
     private boolean hasEnabledClock() {
         for (HudElementConfig item : config.elements) {
             if (item.enabled && item.type == HudElementType.CLOCK) return true;
+        }
+        return false;
+    }
+
+    /** The native NAV_MAP Surface does not consume the text/lanes/traffic Canvas model. */
+    private boolean hasEnabledNavigationData() {
+        for (HudElementConfig item : config.elements) {
+            if (item.enabled && item.type != HudElementType.NAV_MAP
+                    && item.type.name().startsWith("NAV_")) return true;
         }
         return false;
     }

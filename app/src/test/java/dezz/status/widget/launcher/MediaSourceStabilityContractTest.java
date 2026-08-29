@@ -5,6 +5,7 @@
 
 package dezz.status.widget.launcher;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -65,6 +66,18 @@ public final class MediaSourceStabilityContractTest {
         assertTrue(replace.contains("duplicateArtwork.recycle()"));
         assertTrue(replace.indexOf("broadcastState = next")
                 < replace.indexOf("duplicateArtwork.recycle()"));
+    }
+
+    @Test public void transientSessionQueryFailureKeepsDirectSteeringCommandRoute()
+            throws IOException {
+        String source = controllerSource();
+        int start = source.indexOf("private void completeSessionQuery(");
+        int end = source.indexOf("public void playPause()", start);
+        String completion = source.substring(start, end);
+        assertFalse(completion.contains("replace(null)"));
+        assertFalse(completion.contains("sessionState = null"));
+        assertTrue(source.contains("dispatchCurrentSkip(target, true)"));
+        assertTrue(source.contains("dispatchCurrentPlayPause(target)"));
     }
 
     private static String controllerSource() throws IOException {
