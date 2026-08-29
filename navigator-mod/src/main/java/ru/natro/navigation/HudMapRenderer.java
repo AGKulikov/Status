@@ -9,6 +9,8 @@ import android.view.Surface;
 import org.json.JSONObject;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Clean-room owner of the second MapKit MapWindow rendered directly into Natro's HUD Surface.
@@ -47,6 +49,9 @@ final class HudMapRenderer {
     private Object activeRoute;
     private long activeRouteEpoch = -1L;
     private long activeJamFingerprint;
+    private int renderedRouteSegmentIndex;
+    private double renderedRouteSegmentPosition = Double.NaN;
+    private int renderedRouteSegmentCount;
     private NavigatorStatePublisher.CameraState initialCamera;
     private NavigatorStatePublisher.CameraState navigationCamera;
     private AppliedCamera lastAppliedCamera;
@@ -134,6 +139,7 @@ final class HudMapRenderer {
             if (!next.isValid()) return;
             navigationCamera = next;
             applyCamera(true);
+            updateRouteProgress();
         } catch (Exception invalid) {
             Log.w(TAG, "Rejected invalid Guidance camera snapshot", invalid);
         }
@@ -151,6 +157,11 @@ final class HudMapRenderer {
         boolean changed = routeEpoch != activeRouteEpoch
                 || (drivingRoute == null) != (activeRoute == null);
         boolean jamsChanged = jamFingerprint != activeJamFingerprint;
+        if (changed) {
+            renderedRouteSegmentIndex = 0;
+            renderedRouteSegmentPosition = Double.NaN;
+            renderedRouteSegmentCount = 0;
+        }
         activeRouteEpoch = routeEpoch;
         activeRoute = drivingRoute;
         activeJamFingerprint = jamFingerprint;
@@ -334,13 +345,17 @@ final class HudMapRenderer {
             routePolyline = null;
             Object route = activeRoute;
             if (!profile.showRoute || route == null) return;
-            Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
-            if (geometry == null) return;
+            RouteSlice slice = remainingRoute(route);
+            if (slice == null) return;
             Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
             Object line = invoke(collection, "addPolyline",
-                    new Class<?>[]{polylineClass}, geometry);
+                    new Class<?>[]{polylineClass}, slice.geometry);
             routePolyline = line;
-            RoutePolylineStyler.apply(line, route, profile);
+            renderedRouteSegmentIndex = slice.firstSegmentIndex;
+            renderedRouteSegmentPosition = slice.segmentPosition;
+            renderedRouteSegmentCount = slice.segmentCount;
+            RoutePolylineStyler.apply(line, route, profile, slice.firstSegmentIndex,
+                    slice.segmentCount);
         } catch (Throwable failure) {
             Log.w(TAG, "Active route could not be rendered in the HUD MapWindow", failure);
         }
@@ -356,9 +371,93 @@ final class HudMapRenderer {
             return;
         }
         try {
-            RoutePolylineStyler.apply(line, route, profile);
+            RoutePolylineStyler.apply(line, route, profile, renderedRouteSegmentIndex,
+                    renderedRouteSegmentCount);
         } catch (Throwable failure) {
             Log.w(TAG, "HUD route traffic palette could not be updated", failure);
+        }
+    }
+
+    /** Advances the visible route in place; it never re-adds the polyline or moves backwards. */
+    private void updateRouteProgress() {
+        Object line = routePolyline;
+        Object route = activeRoute;
+        if (line == null || route == null || !profile.showRoute) return;
+        try {
+            RouteSlice slice = remainingRoute(route);
+            if (slice == null || !isForwardProgress(slice)) return;
+            Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
+            invoke(line, "setGeometry", new Class<?>[]{polylineClass}, slice.geometry);
+            renderedRouteSegmentIndex = slice.firstSegmentIndex;
+            renderedRouteSegmentPosition = slice.segmentPosition;
+            renderedRouteSegmentCount = slice.segmentCount;
+            RoutePolylineStyler.apply(line, route, profile, slice.firstSegmentIndex,
+                    slice.segmentCount);
+        } catch (Throwable failure) {
+            Log.w(TAG, "HUD route progress could not be advanced", failure);
+        }
+    }
+
+    private boolean isForwardProgress(RouteSlice slice) {
+        if (slice.firstSegmentIndex > renderedRouteSegmentIndex) return true;
+        if (slice.firstSegmentIndex < renderedRouteSegmentIndex) return false;
+        return Double.isNaN(renderedRouteSegmentPosition)
+                || slice.segmentPosition > renderedRouteSegmentPosition + 0.002d;
+    }
+
+    private static RouteSlice remainingRoute(Object route) throws Exception {
+        Object fullGeometry = invoke(route, "getGeometry", new Class<?>[0]);
+        if (fullGeometry == null) return null;
+        List<?> points = list(invoke(fullGeometry, "getPoints", new Class<?>[0]));
+        if (points.size() < 2) return null;
+
+        int segmentIndex = 0;
+        double segmentPosition = 0d;
+        Object currentPoint = null;
+        Object routePosition = invoke(route, "getRoutePosition", new Class<?>[0]);
+        if (routePosition != null) {
+            String routeId = String.valueOf(invoke(route, "getRouteId", new Class<?>[0]));
+            Object polylinePosition = invoke(routePosition, "positionOnRoute",
+                    new Class<?>[]{String.class}, routeId);
+            if (polylinePosition != null) {
+                segmentIndex = ((Number) invoke(polylinePosition, "getSegmentIndex",
+                        new Class<?>[0])).intValue();
+                segmentPosition = ((Number) invoke(polylinePosition, "getSegmentPosition",
+                        new Class<?>[0])).doubleValue();
+                currentPoint = invoke(routePosition, "getPoint", new Class<?>[0]);
+            }
+        }
+        segmentIndex = Math.max(0, Math.min(points.size() - 2, segmentIndex));
+        segmentPosition = Math.max(0d, Math.min(1d, segmentPosition));
+        if (currentPoint == null) currentPoint = points.get(segmentIndex);
+
+        ArrayList<Object> remaining = new ArrayList<>(points.size() - segmentIndex);
+        remaining.add(currentPoint);
+        for (int index = segmentIndex + 1; index < points.size(); index++) {
+            remaining.add(points.get(index));
+        }
+        Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
+        Object geometry = polylineClass.getConstructor(List.class).newInstance(remaining);
+        return new RouteSlice(geometry, segmentIndex, segmentPosition,
+                Math.max(0, remaining.size() - 1));
+    }
+
+    private static List<?> list(Object value) {
+        return value instanceof List<?> ? (List<?>) value : new ArrayList<>();
+    }
+
+    private static final class RouteSlice {
+        final Object geometry;
+        final int firstSegmentIndex;
+        final double segmentPosition;
+        final int segmentCount;
+
+        RouteSlice(Object geometry, int firstSegmentIndex, double segmentPosition,
+                   int segmentCount) {
+            this.geometry = geometry;
+            this.firstSegmentIndex = firstSegmentIndex;
+            this.segmentPosition = segmentPosition;
+            this.segmentCount = segmentCount;
         }
     }
 
@@ -407,6 +506,9 @@ final class HudMapRenderer {
         userLocationLayer = null;
         routeCollection = null;
         routePolyline = null;
+        renderedRouteSegmentIndex = 0;
+        renderedRouteSegmentPosition = Double.NaN;
+        renderedRouteSegmentCount = 0;
         freeCameraInitialized = false;
         lastAppliedCamera = null;
         if (releaseSurface && currentSurface != null) {

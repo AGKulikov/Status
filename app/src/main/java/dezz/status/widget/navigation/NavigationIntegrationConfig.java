@@ -81,6 +81,8 @@ public final class NavigationIntegrationConfig {
         public boolean automaticDayNight = true;
         public boolean nightMode;
         public boolean showRoute = true;
+        /** Colour the active route by congestion independently from the background traffic layer. */
+        public boolean showRouteTraffic = true;
         public boolean showTraffic = true;
         public boolean showLabels = true;
         public boolean showPois = true;
@@ -141,6 +143,7 @@ public final class NavigationIntegrationConfig {
                     .put("automaticDayNight", automaticDayNight)
                     .put("nightMode", nightMode)
                     .put("showRoute", showRoute)
+                    .put("showRouteTraffic", showRouteTraffic)
                     .put("showTraffic", showTraffic)
                     .put("showLabels", showLabels)
                     .put("showPois", showPois)
@@ -186,6 +189,8 @@ public final class NavigationIntegrationConfig {
             result.nightMode = source.optBoolean("nightMode", result.nightMode);
             result.showRoute = source.optBoolean("showRoute", result.showRoute);
             result.showTraffic = source.optBoolean("showTraffic", result.showTraffic);
+            result.showRouteTraffic = source.optBoolean(
+                    "showRouteTraffic", result.showTraffic);
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
             result.showPois = source.optBoolean("showPois", result.showPois);
             result.showBuildings = source.optBoolean("showBuildings", result.showBuildings);

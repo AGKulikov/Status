@@ -1,1959 +1,58 @@
-/* SPDX-License-Identifier: GPL-3.0-or-later */
-package dezz.status.widget;
-
-import android.content.Intent;
-import android.graphics.Color;
-import android.net.Uri;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.text.InputType;
-import android.view.Gravity;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.SeekBar;
-import android.widget.Spinner;
-import android.widget.Switch;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
-
-import com.google.android.material.button.MaterialButton;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
-import dezz.status.widget.hud.HudCanvasView;
-import dezz.status.widget.hud.HudDisplaySelector;
-import dezz.status.widget.hud.HudElementConfig;
-import dezz.status.widget.hud.HudElementType;
-import dezz.status.widget.hud.HudHorizontalGroup;
-import dezz.status.widget.hud.HudPanelConfig;
-import dezz.status.widget.hud.HudPanelStore;
-import dezz.status.widget.hud.HudPresentationService;
-import dezz.status.widget.hud.HudRuntimeData;
-import dezz.status.widget.hud.HudViewportPolicy;
-import dezz.status.widget.car.CarIntegration;
-import dezz.status.widget.car.CarIntegrations;
-import dezz.status.widget.integration.ConnectorType;
-import dezz.status.widget.integration.SourceBinding;
-import dezz.status.widget.navigation.NavigationIntegrationConfig;
-import dezz.status.widget.navigation.NavigationHudEndpointService;
-import dezz.status.widget.settings.AppleColorPickerDialog;
-import dezz.status.widget.settings.SettingsBackNavigation;
-
-/**
- * Main-display, live HUD editor. Dragging/resizing is projected onto the selected external display
- * after a short write debounce; the HUD itself never hosts editor controls or receives touch.
- */
-public final class HudPanelSettingsActivity extends AppCompatActivity {
-    private static final int PICK_FONT = 0x4846;
-    @NonNull private final Handler main = new Handler(Looper.getMainLooper());
-    private Preferences preferences;
-    private HudPanelStore store;
-    private HudPanelConfig config;
-    private HudRuntimeData runtime;
-    private HudCanvasView canvas;
-    private TextView status;
-    private TextView selection;
-    private Switch enabled;
-    private final Runnable persistLive = () -> persist(false);
-    private final Runnable statusTick = new Runnable() {
-        @Override public void run() {
-            updateStatus();
-            main.postDelayed(this, 1_000L);
-        }
-    };
-
-    @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        preferences = new Preferences(this);
-        store = new HudPanelStore(preferences);
-        config = store.load();
-        runtime = new HudRuntimeData(this, config, () -> {
-            if (canvas != null) canvas.invalidate();
-        });
-
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF0B0D12);
-        int driverInset = driverPanelInset();
-        boolean driverOnRight = preferences.driverPanelSide.get() == 1;
-        root.setPadding(dp(12) + (driverOnRight ? 0 : driverInset), dp(10),
-                dp(12) + (driverOnRight ? driverInset : 0), dp(10));
-        root.addView(toolbar(), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        status = text("HUD Ğ½Ğµ Ğ·Ğ°Ğ¿ÑƒÑ‰ĞµĞ½", 13, 0xFFB7C2D2);
-        root.addView(status, marginTop(6));
-
-        FrameLayout preview = new FrameLayout(this);
-        preview.setBackgroundColor(Color.BLACK);
-        canvas = new HudCanvasView(this, config, runtime, true,
-                new HudCanvasView.EditorListener() {
-                    @Override public void onSelectionChanged(
-                            @Nullable HudElementConfig selected) {
-                        updateSelection(selected);
-                    }
-
-                    @Override public void onGeometryChanged(
-                            @NonNull HudElementConfig item, boolean committed) {
-                        updateSelection(item);
-                        main.removeCallbacks(persistLive);
-                        main.postDelayed(persistLive, committed ? 0L : 55L);
-                    }
-
-                    @Override public void onConfigure(@NonNull HudElementConfig item) {
-                        editElement(item);
-                    }
-                });
-        preview.addView(canvas, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-        previewParams.topMargin = dp(8);
-        root.addView(preview, previewParams);
-
-        root.addView(selectionBar(), marginTop(8));
-        TextView hint = text("ĞšĞ¾ÑĞ½Ğ¸Ñ‚ĞµÑÑŒ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ğ°, Ğ¿ĞµÑ€ĞµÑ‚Ğ°Ñ‰Ğ¸Ñ‚Ğµ ĞµĞ³Ğ¾ Ğ¿Ğ¾ ÑĞµÑ‚ĞºĞµ; ÑĞ¸Ğ½Ğ¸Ğ¹ Ğ¼Ğ°Ñ€ĞºĞµÑ€ "
-                + "Ğ² Ğ¿Ñ€Ğ°Ğ²Ğ¾Ğ¼ Ğ½Ğ¸Ğ¶Ğ½ĞµĞ¼ ÑƒĞ³Ğ»Ñƒ Ğ¼ĞµĞ½ÑĞµÑ‚ Ñ€Ğ°Ğ·Ğ¼ĞµÑ€. Ğ˜Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ñ ÑÑ€Ğ°Ğ·Ñƒ Ğ²Ğ¸Ğ´Ğ½Ñ‹ Ğ½Ğ° HUD.",
-                12, 0xFF8F9AA9);
-        root.addView(hint, marginTop(6));
-        setContentView(root);
-        SettingsBackNavigation.applySafeTopInset(this, root);
-        enabled.setChecked(preferences.hudPanelEnabled.get());
-    }
-
-    @Override protected void onStart() {
-        super.onStart();
-        runtime.start();
-        main.removeCallbacks(statusTick);
-        main.post(statusTick);
-    }
-
-    @Override protected void onStop() {
-        main.removeCallbacks(statusTick);
-        main.removeCallbacks(persistLive);
-        persist(false);
-        runtime.stop();
-        super.onStop();
-    }
-
-    private View toolbar() {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        Button back = button("â†");
-        back.setOnClickListener(view -> finish());
-        row.addView(back, fixed(54));
-
-        TextView title = text("HUD-Ğ´Ğ¸ÑĞ¿Ğ»ĞµĞ¹", 20, Color.WHITE);
-        title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        titleParams.leftMargin = dp(8);
-        row.addView(title, titleParams);
-
-        enabled = switchView("HUD", preferences != null && preferences.hudPanelEnabled.get());
-        enabled.setOnCheckedChangeListener((button, checked) -> {
-            preferences.hudPanelEnabled.set(checked);
-            if (checked) WidgetServiceStarter.startIfNeeded(this);
-            HudPresentationService.apply(this);
-            WidgetService host = WidgetService.getInstance();
-            if (host != null) host.applyPreferences();
-            updateStatus();
-        });
-        row.addView(enabled);
-
-        Button display = button("HUD Â· ID 2");
-        display.setOnClickListener(view -> chooseDisplay());
-        row.addView(display);
-        Button add = button("+ Ğ­Ğ»ĞµĞ¼ĞµĞ½Ñ‚");
-        add.setOnClickListener(view -> addElement());
-        row.addView(add);
-        Button backdrop = button("+ ĞŸĞ¾Ğ´Ğ»Ğ¾Ğ¶ĞºĞ°");
-        backdrop.setOnClickListener(view -> addBackdrop());
-        row.addView(backdrop);
-        Button navigator = button("ĞĞ°Ğ²Ğ¸Ğ³Ğ°Ñ‚Ğ¾Ñ€ 30.3");
-        navigator.setOnClickListener(view -> editNavigatorIntegration());
-        row.addView(navigator);
-        Button options = button("ĞŸĞ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ‹");
-        options.setOnClickListener(view -> editGlobalOptions());
-        row.addView(options);
-        Button save = button("Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ");
-        save.setOnClickListener(view -> persist(true));
-        row.addView(save);
-        return row;
-    }
-
-    private View selectionBar() {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        selection = text("Ğ­Ğ»ĞµĞ¼ĞµĞ½Ñ‚ Ğ½Ğµ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½", 13, 0xFFD5DCE6);
-        row.addView(selection, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        Button edit = button("ĞĞ°ÑÑ‚Ñ€Ğ¾Ğ¸Ñ‚ÑŒ");
-        edit.setOnClickListener(view -> {
-            HudElementConfig item = canvas.selected();
-            if (item != null) editElement(item);
-        });
-        row.addView(edit);
-        Button duplicate = button("ĞšĞ¾Ğ¿Ğ¸Ñ");
-        duplicate.setOnClickListener(view -> duplicateSelected());
-        row.addView(duplicate);
-        Button down = button("â†“ ÑĞ»Ğ¾Ğ¹");
-        down.setOnClickListener(view -> changeLayer(-1));
-        row.addView(down);
-        Button up = button("â†‘ ÑĞ»Ğ¾Ğ¹");
-        up.setOnClickListener(view -> changeLayer(1));
-        row.addView(up);
-        Button delete = button("Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ");
-        delete.setOnClickListener(view -> deleteSelected());
-        row.addView(delete);
-        return row;
-    }
-
-    private void chooseDisplay() {
-        List<HudDisplaySelector.Candidate> available = HudDisplaySelector.available(this);
-        ArrayList<HudDisplaySelector.Candidate> external = new ArrayList<>();
-        for (HudDisplaySelector.Candidate item : available) {
-            if (!item.defaultDisplay
-                    && item.id == HudViewportPolicy.VERIFIED_DISPLAY_ID) {
-                external.add(item);
-            }
-        }
-        if (external.isEmpty()) {
-            new AlertDialog.Builder(this)
-                    .setTitle("HUD Â· Display ID 2")
-                    .setMessage("Ğ’ Ğ´Ğ°Ğ¼Ğ¿Ğµ Ğ¼Ğ°Ğ³Ğ½Ğ¸Ñ‚Ğ¾Ğ»Ñ‹ HUD Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´Ñ‘Ğ½ ĞºĞ°Ğº Ğ¿Ğ¾ÑÑ‚Ğ¾ÑĞ½Ğ½Ñ‹Ğ¹ Display ID 2 "
-                            + "Ñ Ğ¿Ğ¾Ğ²ĞµÑ€Ñ…Ğ½Ğ¾ÑÑ‚ÑŒÑ 1920Ã—1080. Ğ¡ĞµĞ¹Ñ‡Ğ°Ñ Android ĞµĞ³Ğ¾ Ğ½Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰Ğ°ĞµÑ‚; "
-                            + "Ğ¿Ñ€Ğ¸Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ Ğ¶Ğ´Ñ‘Ñ‚ Ğ¸Ğ¼ĞµĞ½Ğ½Ğ¾ ID 2 Ğ¸ Ğ½Ğµ Ğ¿ĞµÑ€ĞµĞ¹Ğ´Ñ‘Ñ‚ Ğ½Ğ° Ğ´Ñ€ÑƒĞ³Ğ¾Ğ¹ ÑĞºÑ€Ğ°Ğ½.")
-                    .setPositiveButton("ĞŸĞ¾Ğ½ÑÑ‚Ğ½Ğ¾", null).show();
-            return;
-        }
-        String[] labels = new String[external.size()];
-        int selected = -1;
-        for (int index = 0; index < external.size(); index++) {
-            HudDisplaySelector.Candidate item = external.get(index);
-            labels[index] = item.label();
-            if (config.displayId == item.id) {
-                selected = index;
-            }
-        }
-        new AlertDialog.Builder(this).setTitle("ĞŸĞ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´Ñ‘Ğ½Ğ½Ñ‹Ğ¹ HUD Â· ID 2")
-                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
-                    HudDisplaySelector.remember(config, external.get(which));
-                    persist(false);
-                    dialog.dismiss();
-                    updateStatus();
-                })
-                .setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null).show();
-    }
-
-    private void addElement() {
-        ArrayList<HudElementType> types = new ArrayList<>();
-        for (HudElementType type : HudElementType.values()) {
-            if (type != HudElementType.BACKDROP) types.add(type);
-        }
-        String[] labels = new String[types.size()];
-        for (int index = 0; index < types.size(); index++) {
-            labels[index] = types.get(index).category + " Â· " + types.get(index).label;
-        }
-        new AlertDialog.Builder(this).setTitle("Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ½Ğ° HUD")
-                .setItems(labels, (dialog, which) -> {
-                    HudElementType type = types.get(which);
-                    if (type == HudElementType.NAV_MAP && findMapElement() != null) {
-                        Toast.makeText(this,
-                                "ĞĞ° HUD Ğ¼Ğ¾Ğ¶ĞµÑ‚ Ğ±Ñ‹Ñ‚ÑŒ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ¾Ğ´Ğ½Ğ° Ğ½ĞµĞ·Ğ°Ğ²Ğ¸ÑĞ¸Ğ¼Ğ°Ñ ĞºĞ°Ñ€Ñ‚Ğ°",
-                                Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    int ordinal = 1;
-                    HudElementConfig item;
-                    do {
-                        item = HudElementConfig.create(type, ordinal++,
-                                config.gridColumns, config.gridRows);
-                    } while (containsId(item.id));
-                    item.zIndex = nextLayer();
-                    config.elements.add(item);
-                    canvas.select(item.id);
-                    canvas.updateConfig(config);
-                    persist(false);
-                    editElement(item);
-                }).setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null).show();
-    }
-
-    private void addBackdrop() {
-        int ordinal = 1;
-        HudElementConfig item;
-        do {
-            item = HudElementConfig.create(HudElementType.BACKDROP, ordinal++,
-                    config.gridColumns, config.gridRows);
-        } while (containsId(item.id));
-        item.zIndex = previousBackdropLayer();
-        config.elements.add(item);
-        canvas.updateConfig(config);
-        canvas.select(item.id);
-        persist(false);
-        editElement(item);
-    }
-
-    private void editElement(@NonNull HudElementConfig item) {
-        if (item.type == HudElementType.BACKDROP) {
-            editBackdrop(item);
-            return;
-        }
-        if (item.type == HudElementType.HORIZONTAL_GROUP) {
-            editHorizontalGroup(item);
-            return;
-        }
-        if (item.type == HudElementType.NAV_MAP) {
-            editMapSurface(item);
-            return;
-        }
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout form = column();
-        form.setPadding(dp(18), dp(8), dp(18), dp(18));
-        scroll.addView(form);
-
-        EditText title = field(form, "ĞĞ°Ğ·Ğ²Ğ°Ğ½Ğ¸Ğµ", item.title, false);
-        TextView immutableId = text("ID: " + item.id + "\nĞ¦ĞµĞ»ÑŒ ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸ĞµĞ²: "
-                + item.automationId, 12, 0xFF95A0AF);
-        form.addView(immutableId, marginTop(4));
-        EditText automation = field(form, "ID Ñ†ĞµĞ»Ğ¸ ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸ĞµĞ²", item.automationId, false);
-        EditText metric = field(form, "ID Ñ‚ĞµĞ»ĞµĞ¼ĞµÑ‚Ñ€Ğ¸Ğ¸ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ¾Ğ±Ğ¸Ğ»Ñ",
-                item.telemetryMetricId, false);
-        EditText format = field(form, "Ğ¤Ğ¾Ñ€Ğ¼Ğ°Ñ‚ (%s Ğ¸Ğ»Ğ¸ %.1f)", item.textFormat, false);
-        EditText unit = field(form, "Ğ•Ğ´Ğ¸Ğ½Ğ¸Ñ†Ğ°", item.unit, false);
-        EditText textColor = field(form, "Ğ¦Ğ²ĞµÑ‚ Ñ‚ĞµĞºÑÑ‚Ğ°", item.textColor, false);
-        EditText unitColor = field(form, "Ğ¦Ğ²ĞµÑ‚ ĞµĞ´Ğ¸Ğ½Ğ¸Ñ†Ñ‹", item.unitColor, false);
-        SliderField fontSize = slider(form, "Ğ Ğ°Ğ·Ğ¼ĞµÑ€ Ñ‚ĞµĞºÑÑ‚Ğ°",
-                item.fontSizeSp, 8, 96, 1, " sp");
-        SliderField fontWeight = slider(form, "ĞĞ°ÑÑ‹Ñ‰ĞµĞ½Ğ½Ğ¾ÑÑ‚ÑŒ ÑˆÑ€Ğ¸Ñ„Ñ‚Ğ°",
-                item.fontWeight, 100, 900, 100, "");
-
-        form.addView(section("ĞŸĞ¾Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ Ğ² ÑĞµÑ‚ĞºĞµ HUD"), marginTop(12));
-        SliderField x = slider(form, "Ğ¡Ğ»ĞµĞ²Ğ°", item.x,
-                0, Math.max(0, config.gridColumns - 1), 1, " ÑÑ‡.");
-        SliderField y = slider(form, "Ğ¡Ğ²ĞµÑ€Ñ…Ñƒ", item.y,
-                0, Math.max(0, config.gridRows - 1), 1, " ÑÑ‡.");
-        SliderField width = slider(form, "Ğ¨Ğ¸Ñ€Ğ¸Ğ½Ğ°", item.width,
-                1, Math.max(1, config.gridColumns), 1, " ÑÑ‡.");
-        SliderField height = slider(form, "Ğ’Ñ‹ÑĞ¾Ñ‚Ğ°", item.height,
-                1, Math.max(1, config.gridRows), 1, " ÑÑ‡.");
-
-        Spinner alignment = spinner(new String[]{"LEFT", "CENTER", "RIGHT"}, item.alignment);
-        form.addView(label("Ğ’Ñ‹Ñ€Ğ°Ğ²Ğ½Ğ¸Ğ²Ğ°Ğ½Ğ¸Ğµ"), marginTop(10));
-        form.addView(alignment);
-        Switch itemEnabled = switchView("ĞŸĞ¾ĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚", item.enabled);
-        Switch wrap = switchView("ĞŸĞµÑ€ĞµĞ½Ğ¾ÑĞ¸Ñ‚ÑŒ Ğ´Ğ»Ğ¸Ğ½Ğ½Ñ‹Ğ¹ Ñ‚ĞµĞºÑÑ‚", item.wrapText);
-        form.addView(itemEnabled, marginTop(8));
-        form.addView(wrap, marginTop(4));
-        form.addView(text("Ğ£ Ğ²Ğ¸Ğ´Ğ¶ĞµÑ‚Ğ° Ğ½ĞµÑ‚ ÑĞ¾Ğ±ÑÑ‚Ğ²ĞµĞ½Ğ½Ğ¾Ğ¹ Ğ¿Ğ¾Ğ´Ğ»Ğ¾Ğ¶ĞºĞ¸. Ğ Ğ°Ğ·Ğ¼ĞµÑ€ Ñ„Ñ€ĞµĞ¹Ğ¼Ğ° Ğ¼ĞµĞ½ÑĞµÑ‚ Ğ¼ĞµÑÑ‚Ğ¾ "
-                + "Ğ´Ğ»Ñ Ñ‚ĞµĞºÑÑ‚Ğ° Ğ¸ Ğ¼Ğ°ÑÑˆÑ‚Ğ°Ğ± Ğ³Ñ€Ğ°Ñ„Ğ¸ĞºĞ¸; Ñ€Ğ°Ğ·Ğ¼ĞµÑ€ Ñ‚ĞµĞºÑÑ‚Ğ° Ğ¼ĞµĞ½ÑĞµÑ‚ÑÑ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ·Ğ´ĞµÑÑŒ.",
-                12, 0xFF95A0AF), marginTop(6));
-
-        form.addView(section("Ğ£Ğ¼Ğ½Ñ‹Ğ¹ Ğ´Ğ¾Ğ¼ / Ğ²Ğ½ĞµÑˆĞ½Ğ¸Ğ¹ Ğ¸ÑÑ‚Ğ¾Ñ‡Ğ½Ğ¸Ğº"), marginTop(16));
-        String connectorName = item.sourceBinding == null
-                ? ConnectorType.HOME_ASSISTANT.name()
-                : item.sourceBinding.connectorType.name();
-        Spinner connector = spinner(new String[]{"HOME_ASSISTANT", "MQTT", "SPRUTHUB", "PHONE"},
-                connectorName);
-        form.addView(connector);
-        EditText connectorId = field(form, "ID Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ñ",
-                item.sourceBinding == null ? SourceBinding.DEFAULT_CONNECTOR_ID
-                        : item.sourceBinding.connectorId, false);
-        EditText resource = field(form, "Entity / topic / characteristic",
-                item.sourceBinding == null ? "" : item.sourceBinding.resourceId, false);
-        EditText valuePath = field(form, "ĞŸÑƒÑ‚ÑŒ Ğº Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ",
-                item.sourceBinding == null ? "" : item.sourceBinding.valuePath, false);
-
-        form.addView(section("Ğ”Ğ¾Ğ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ñ‹Ğµ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ğ°"), marginTop(16));
-        Map<String, Object> visualOptions = new LinkedHashMap<>();
-        addVisualElementOptions(form, item, visualOptions);
-        EditText options = field(form,
-                "Ğ Ğ°ÑÑˆĞ¸Ñ€ĞµĞ½Ğ½Ñ‹Ğµ Ğ¿Ğ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ‹ JSON (Ğ²Ğ¸Ğ·ÑƒĞ°Ğ»ÑŒĞ½Ñ‹Ğµ Ğ¿Ğ¾Ğ»Ñ Ğ²Ñ‹ÑˆĞµ Ğ¸Ğ¼ĞµÑÑ‚ Ğ¿Ñ€Ğ¸Ğ¾Ñ€Ğ¸Ñ‚ĞµÑ‚)",
-                item.options.toString(), false);
-        options.setMinLines(5);
-        options.setSingleLine(false);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(item.type.label)
-                .setView(scroll)
-                .setPositiveButton("ĞŸÑ€Ğ¸Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ", null)
-                .setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
-                    try {
-                        item.title = value(title);
-                        item.automationId = value(automation);
-                        item.telemetryMetricId = value(metric);
-                        item.textFormat = value(format);
-                        item.unit = value(unit);
-                        item.textColor = value(textColor);
-                        item.unitColor = value(unitColor);
-                        item.backgroundColor = "#00000000";
-                        item.fontSizeSp = fontSize.intValue();
-                        item.fontWeight = fontWeight.intValue();
-                        item.x = x.intValue();
-                        item.y = y.intValue();
-                        item.width = width.intValue();
-                        item.height = height.intValue();
-                        item.alignment = String.valueOf(alignment.getSelectedItem());
-                        item.enabled = itemEnabled.isChecked();
-                        item.wrapText = wrap.isChecked();
-                        String resourceId = value(resource);
-                        if (resourceId.isEmpty()) {
-                            item.sourceBinding = null;
-                        } else {
-                            item.sourceBinding = new SourceBinding(
-                                    ConnectorType.fromJsonName(
-                                            String.valueOf(connector.getSelectedItem()),
-                                            ConnectorType.HOME_ASSISTANT),
-                                    value(connectorId), resourceId, value(valuePath),
-                                    SourceBinding.PRESENTATION_AUTO, item.unit);
-                        }
-                        JSONObject parsedOptions = new JSONObject(value(options).isEmpty()
-                                ? "{}" : value(options));
-                        applyVisualElementOptions(parsedOptions, visualOptions);
-                        item.options = parsedOptions;
-                        item.normalize(config.gridColumns, config.gridRows);
-                        canvas.updateConfig(config);
-                        updateSelection(item);
-                        persist(false);
-                        dialog.dismiss();
-                    } catch (Exception error) {
-                        Toast.makeText(this, "ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ Ğ¿Ğ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ‹: " + error.getMessage(),
-                                Toast.LENGTH_LONG).show();
-                    }
-                }));
-        showSafeDialog(dialog);
-    }
-
-    /** Geometry belongs to the HUD element; rendering settings belong to the HUD MapProfile. */
-    private void editMapSurface(@NonNull HudElementConfig item) {
-        NavigationIntegrationConfig navigation = loadNavigationIntegrationConfig();
-        NavigationIntegrationConfig.MapProfile profile = navigation.hudMap;
-
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout form = column();
-        form.setPadding(dp(18), dp(8), dp(18), dp(24));
-        scroll.addView(form);
-
-        EditText title = field(form, "ĞĞ°Ğ·Ğ²Ğ°Ğ½Ğ¸Ğµ", item.title, false);
-        form.addView(text("ĞŸĞ¾Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ Ğ² ÑĞµÑ‚ĞºĞµ HUD. ĞšĞ°Ñ€Ñ‚Ñƒ Ñ‚Ğ°ĞºĞ¶Ğµ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ¿ĞµÑ€ĞµÑ‚Ğ°Ñ‰Ğ¸Ñ‚ÑŒ Ğ¸ Ñ€Ğ°ÑÑ‚ÑĞ½ÑƒÑ‚ÑŒ "
-                + "Ğ¿Ñ€ÑĞ¼Ğ¾ Ğ½Ğ° Ğ¿Ñ€ĞµĞ´Ğ¿Ñ€Ğ¾ÑĞ¼Ğ¾Ñ‚Ñ€Ğµ.", 12, 0xFF95A0AF), marginTop(10));
-        SliderField x = slider(form, "Ğ¡Ğ»ĞµĞ²Ğ°", item.x,
-                0, Math.max(0, config.gridColumns - 1), 1, " ÑÑ‡.");
-        SliderField y = slider(form, "Ğ¡Ğ²ĞµÑ€Ñ…Ñƒ", item.y,
-                0, Math.max(0, config.gridRows - 1), 1, " ÑÑ‡.");
-        SliderField width = slider(form, "Ğ¨Ğ¸Ñ€Ğ¸Ğ½Ğ°", item.width,
-                1, Math.max(1, config.gridColumns), 1, " ÑÑ‡.");
-        SliderField height = slider(form, "Ğ’Ñ‹ÑĞ¾Ñ‚Ğ°", item.height,
-                1, Math.max(1, config.gridRows), 1, " ÑÑ‡.");
-        Switch elementEnabled = switchView("ĞŸĞ¾ĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ğ±Ğ»Ğ°ÑÑ‚ÑŒ ĞºĞ°Ñ€Ñ‚Ñ‹", item.enabled);
-        Switch rendererEnabled = switchView("Ğ ĞµĞ½Ğ´ĞµÑ€Ğ¸Ñ‚ÑŒ Ğ½ĞµĞ·Ğ°Ğ²Ğ¸ÑĞ¸Ğ¼ÑƒÑ ĞºĞ°Ñ€Ñ‚Ñƒ HUD", profile.enabled);
-        form.addView(elementEnabled, marginTop(8));
-        form.addView(rendererEnabled, marginTop(4));
-        SliderField radius = slider(form, "Ğ¡ĞºÑ€ÑƒĞ³Ğ»ĞµĞ½Ğ¸Ğµ ĞºĞ°Ñ€Ñ‚Ñ‹",
-                item.options.optInt("cornerRadiusPx", 0), 0, 80, 1, " px");
-        SliderField opacity = slider(form, "ĞĞµĞ¿Ñ€Ğ¾Ğ·Ñ€Ğ°Ñ‡Ğ½Ğ¾ÑÑ‚ÑŒ ĞºĞ°Ñ€Ñ‚Ñ‹",
-                item.options.optInt("opacityPercent", 100), 20, 100, 1, " %");
-
-        form.addView(section("ĞšĞ°Ğ¼ĞµÑ€Ğ° HUD"), marginTop(16));
-        Spinner cameraMode = navigationCameraModeSpinner(profile.cameraMode);
-        form.addView(label("ĞšĞ°Ğº ĞºĞ°Ñ€Ñ‚Ğ° ÑĞ»ĞµĞ´ÑƒĞµÑ‚ Ğ·Ğ° Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ¾Ğ±Ğ¸Ğ»ĞµĞ¼"), marginTop(8));
-        form.addView(cameraMode);
-        SliderField zoom = slider(form,
-                "ĞŸÑ€Ğ¸Ğ±Ğ»Ğ¸Ğ¶ĞµĞ½Ğ¸Ğµ: 0 â€” ÑÑ‚Ğ°Ğ½Ğ´Ğ°Ñ€Ñ‚Ğ½Ğ¾Ğµ, + Ğ±Ğ»Ğ¸Ğ¶Ğµ, âˆ’ Ğ´Ğ°Ğ»ÑŒÑˆĞµ",
-                profile.zoomDelta, -8, 8, 0.25, "");
-        SliderField tilt = slider(form, "ĞĞ°ĞºĞ»Ğ¾Ğ½ ĞºĞ°Ñ€Ñ‚Ñ‹: 0Â° â€” ÑĞ²ĞµÑ€Ñ…Ñƒ, 60Â° â€” Ğ¿ĞµÑ€ÑĞ¿ĞµĞºÑ‚Ğ¸Ğ²Ğ°",
-                profile.tiltDegrees, 0, 80, 1, "Â°");
-        SliderField focusX = slider(form, "ĞĞ²Ñ‚Ğ¾Ğ¼Ğ¾Ğ±Ğ¸Ğ»ÑŒ Ğ¿Ğ¾ Ğ³Ğ¾Ñ€Ğ¸Ğ·Ğ¾Ğ½Ñ‚Ğ°Ğ»Ğ¸",
-                profile.focusXPercent, 0, 100, 1, " %");
-        SliderField focusY = slider(form, "ĞĞ²Ñ‚Ğ¾Ğ¼Ğ¾Ğ±Ğ¸Ğ»ÑŒ Ğ¿Ğ¾ Ğ²ĞµÑ€Ñ‚Ğ¸ĞºĞ°Ğ»Ğ¸",
-                profile.focusYPercent, 0, 100, 1, " %");
-        SliderField mapScale = slider(form, "Ğ Ğ°Ğ·Ğ¼ĞµÑ€ Ğ¿Ğ¾Ğ´Ğ¿Ğ¸ÑĞµĞ¹ Ğ¸ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ² ĞºĞ°Ñ€Ñ‚Ñ‹",
-                profile.mapScalePercent, 50, 300, 5, " %");
-        SliderField maximumFps = slider(form,
-                "ĞŸĞ»Ğ°Ğ²Ğ½Ğ¾ÑÑ‚ÑŒ ĞºĞ°Ñ€Ñ‚Ñ‹ (Ğ´Ğ»Ñ HUD Ğ¾Ğ±Ñ‹Ñ‡Ğ½Ğ¾ Ğ´Ğ¾ÑÑ‚Ğ°Ñ‚Ğ¾Ñ‡Ğ½Ğ¾ 20)",
-                profile.maximumFps, 5, 60, 1, " ĞºĞ°Ğ´Ñ€/Ñ");
-
-        form.addView(section("Ğ¡Ğ¾ÑÑ‚Ğ°Ğ² Ğ¸ Ñ†Ğ²ĞµÑ‚ ĞºĞ°Ñ€Ñ‚Ñ‹ HUD"), marginTop(16));
-        Switch automaticDayNight = switchView("ĞĞ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ´ĞµĞ½ÑŒ / Ğ½Ğ¾Ñ‡ÑŒ",
-                profile.automaticDayNight);
-        Switch nightMode = switchView("ĞŸÑ€Ğ¸Ğ½ÑƒĞ´Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ¾ Ğ½Ğ¾Ñ‡Ğ½Ğ¾Ğ¹ Ñ€ĞµĞ¶Ğ¸Ğ¼", profile.nightMode);
-        Switch showRoute = switchView("ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚", profile.showRoute);
-        Switch showTraffic = switchView("ĞŸÑ€Ğ¾Ğ±ĞºĞ¸", profile.showTraffic);
-        Switch showLabels = switchView("ĞŸĞ¾Ğ´Ğ¿Ğ¸ÑĞ¸", profile.showLabels);
-        Switch showPois = switchView("ĞŸĞ¾Ğ»ĞµĞ·Ğ½Ñ‹Ğµ Ğ¼ĞµÑÑ‚Ğ°", profile.showPois);
-        Switch showBuildings = switchView("Ğ—Ğ´Ğ°Ğ½Ğ¸Ñ", profile.showBuildings);
-        Switch showParks = switchView("ĞŸĞ°Ñ€ĞºĞ¸", profile.showParks);
-        Switch showWater = switchView("Ğ’Ğ¾Ğ´Ğ°", profile.showWater);
-        Switch showModels = switchView("3D-Ğ¼Ğ¾Ğ´ĞµĞ»Ğ¸", profile.showModels);
-        Switch showCursor = switchView("ĞšÑƒÑ€ÑĞ¾Ñ€ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ¾Ğ±Ğ¸Ğ»Ñ", profile.showCursor);
-        Switch roadsOnly = switchView(
-                "Ğ¢Ğ¾Ğ»ÑŒĞºĞ¾ Ğ´Ğ¾Ñ€Ğ¾Ğ³Ğ¸ â€” Ğ¿Ñ€Ğ¾Ğ·Ñ€Ğ°Ñ‡Ğ½Ñ‹Ğ¹ Ñ„Ğ¾Ğ½", profile.roadsOnly);
-        for (Switch control : new Switch[]{automaticDayNight, nightMode, showRoute,
-                showTraffic, showLabels, showPois, showBuildings, showParks, showWater,
-                showModels, showCursor, roadsOnly}) {
-            form.addView(control, marginTop(4));
-        }
-        SliderField cursorScale = slider(form, "Ğ Ğ°Ğ·Ğ¼ĞµÑ€ ĞºÑƒÑ€ÑĞ¾Ñ€Ğ°",
-                profile.cursorScalePercent, 25, 300, 5, " %");
-        ColorField cursorColor = colorField(form, "Ğ¦Ğ²ĞµÑ‚ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ¾Ğ±Ğ¸Ğ»Ñ", profile.cursorColor);
-        ColorField cursorOutline = colorField(form, "ĞšĞ¾Ğ½Ñ‚ÑƒÑ€ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ¾Ğ±Ğ¸Ğ»Ñ",
-                profile.cursorOutlineColor);
-        ColorField routeColor = colorField(form, "Ğ¦Ğ²ĞµÑ‚ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ°", profile.routeColor);
-        ColorField routeOutline = colorField(form, "ĞšĞ¾Ğ½Ñ‚ÑƒÑ€ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ°",
-                profile.routeOutlineColor);
-        SliderField routeWidth = slider(form, "Ğ¢Ğ¾Ğ»Ñ‰Ğ¸Ğ½Ğ° Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ°",
-                profile.routeWidth, 1, 40, 0.5, " px");
-        SliderField routeOutlineWidth = slider(form, "Ğ¢Ğ¾Ğ»Ñ‰Ğ¸Ğ½Ğ° ĞºĞ¾Ğ½Ñ‚ÑƒÑ€Ğ° Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ°",
-                profile.routeOutlineWidth, 0, 20, 0.5, " px");
-        form.addView(section("Ğ¦Ğ²ĞµÑ‚Ğ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ¶ĞµĞ½Ğ½Ğ¾ÑÑ‚Ğ¸ Ğ´Ğ¾Ñ€Ğ¾Ğ³"), marginTop(16));
-        ColorField trafficFreeColor = colorField(form, "Ğ”Ğ¾Ñ€Ğ¾Ğ³Ğ° ÑĞ²Ğ¾Ğ±Ğ¾Ğ´Ğ½Ğ°",
-                profile.trafficFreeColor);
-        ColorField trafficLightColor = colorField(form, "ĞĞµĞ±Ğ¾Ğ»ÑŒÑˆĞ¾Ğµ Ğ·Ğ°Ñ‚Ñ€ÑƒĞ´Ğ½ĞµĞ½Ğ¸Ğµ",
-                profile.trafficLightColor);
-        ColorField trafficHardColor = colorField(form, "ĞŸĞ»Ğ¾Ñ‚Ğ½Ğ¾Ğµ Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸Ğµ",
-                profile.trafficHardColor);
-        ColorField trafficVeryHardColor = colorField(form, "Ğ¡Ğ¸Ğ»ÑŒĞ½Ğ°Ñ Ğ¿Ñ€Ğ¾Ğ±ĞºĞ°",
-                profile.trafficVeryHardColor);
-        ColorField trafficBlockedColor = colorField(form, "Ğ”Ğ¾Ñ€Ğ¾Ğ³Ğ° Ğ¿ĞµÑ€ĞµĞºÑ€Ñ‹Ñ‚Ğ°",
-                profile.trafficBlockedColor);
-        ColorField trafficUnknownColor = colorField(form, "ĞĞµÑ‚ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…",
-                profile.trafficUnknownColor);
-        SliderField trafficGradient = slider(form, "Ğ”Ğ»Ğ¸Ğ½Ğ° Ğ¿ĞµÑ€ĞµÑ…Ğ¾Ğ´Ğ° Ñ†Ğ²ĞµÑ‚Ğ¾Ğ² Ğ¿Ñ€Ğ¾Ğ±Ğ¾Ğº",
-                profile.trafficGradientLength, 0, 100, 1, " %");
-        form.addView(text("Ğ¢ĞµÑ…Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğµ JSON-ÑÑ‚Ğ¸Ğ»Ğ¸ ÑĞºÑ€Ñ‹Ñ‚Ñ‹ Ğ¸Ğ· Ğ¾Ğ±Ñ‹Ñ‡Ğ½Ñ‹Ñ… Ğ½Ğ°ÑÑ‚Ñ€Ğ¾ĞµĞº. Ğ¦Ğ²ĞµÑ‚Ğ° Ğ¸ ÑĞ¾ÑÑ‚Ğ°Ğ² "
-                + "ĞºĞ°Ñ€Ñ‚Ñ‹ Ğ¼ĞµĞ½ÑÑÑ‚ÑÑ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ğ°Ğ¼Ğ¸ Ğ²Ñ‹ÑˆĞµ.", 12, 0xFF95A0AF), marginTop(12));
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("ĞĞµĞ·Ğ°Ğ²Ğ¸ÑĞ¸Ğ¼Ğ°Ñ ĞºĞ°Ñ€Ñ‚Ğ° HUD")
-                .setView(scroll)
-                .setPositiveButton("ĞŸÑ€Ğ¸Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ", null)
-                .setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
-                    try {
-                        item.title = value(title);
-                        item.x = x.intValue();
-                        item.y = y.intValue();
-                        item.width = width.intValue();
-                        item.height = height.intValue();
-                        item.enabled = elementEnabled.isChecked();
-                        item.options.put("renderer", HudElementConfig.DIRECT_MAP_RENDERER);
-                        item.options.put("cornerRadiusPx", radius.intValue());
-                        item.options.put("opacityPercent", opacity.intValue());
-                        item.options.put("transparentBackground", roadsOnly.isChecked());
-
-                        profile.enabled = rendererEnabled.isChecked();
-                        profile.cameraMode = navigationCameraModeValue(
-                                cameraMode.getSelectedItemPosition());
-                        profile.zoomDelta = zoom.value();
-                        profile.tiltDegrees = tilt.intValue();
-                        profile.focusXPercent = focusX.intValue();
-                        profile.focusYPercent = focusY.intValue();
-                        profile.mapScalePercent = mapScale.intValue();
-                        profile.maximumFps = maximumFps.intValue();
-                        profile.automaticDayNight = automaticDayNight.isChecked();
-                        profile.nightMode = nightMode.isChecked();
-                        profile.showRoute = showRoute.isChecked();
-                        profile.showTraffic = showTraffic.isChecked();
-                        profile.showLabels = showLabels.isChecked();
-                        profile.showPois = showPois.isChecked();
-                        profile.showBuildings = showBuildings.isChecked();
-                        profile.showParks = showParks.isChecked();
-                        profile.showWater = showWater.isChecked();
-                        profile.showModels = showModels.isChecked();
-                        profile.showCursor = showCursor.isChecked();
-                        profile.roadsOnly = roadsOnly.isChecked();
-                        profile.cursorScalePercent = cursorScale.intValue();
-                        profile.cursorColor = cursorColor.value;
-                        profile.cursorOutlineColor = cursorOutline.value;
-                        profile.routeColor = routeColor.value;
-                        profile.routeOutlineColor = routeOutline.value;
-                        profile.routeWidth = routeWidth.value();
-                        profile.routeOutlineWidth = routeOutlineWidth.value();
-                        profile.trafficFreeColor = trafficFreeColor.value;
-                        profile.trafficLightColor = trafficLightColor.value;
-                        profile.trafficHardColor = trafficHardColor.value;
-                        profile.trafficVeryHardColor = trafficVeryHardColor.value;
-                        profile.trafficBlockedColor = trafficBlockedColor.value;
-                        profile.trafficUnknownColor = trafficUnknownColor.value;
-                        profile.trafficGradientLength = trafficGradient.value();
-
-                        item.normalize(config.gridColumns, config.gridRows);
-                        navigation.normalize();
-                        preferences.navigationIntegrationConfigJson.set(
-                                navigation.toJson().toString());
-                        NavigationHudEndpointService.requestConfigurationRefresh(this);
-                        config.normalize();
-                        canvas.updateConfig(config);
-                        updateSelection(item);
-                        persist(false);
-                        dialog.dismiss();
-                    } catch (Exception error) {
-                        Toast.makeText(this, "ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ Ğ¿Ğ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ‹: " + error.getMessage(),
-                                Toast.LENGTH_LONG).show();
-                    }
-                }));
-        showSafeDialog(dialog);
-    }
-
-    /** Main-map and floating-window profile; HUD map stays independent in its own element dialog. */
-    private void editNavigatorIntegration() {
-        NavigationIntegrationConfig navigation = loadNavigationIntegrationConfig();
-        NavigationIntegrationConfig.MapProfile map = navigation.mainMap;
-        NavigationIntegrationConfig.FloatingWindowProfile window =
-                navigation.mainFloatingWindow;
-
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout form = column();
-        form.setPadding(dp(18), dp(8), dp(18), dp(24));
-        scroll.addView(form);
-
-        form.addView(text("ĞÑĞ½Ğ¾Ğ²Ğ½Ğ¾Ğ¹ ÑĞºÑ€Ğ°Ğ½ Ğ¸ÑĞ¿Ğ¾Ğ»ÑŒĞ·ÑƒĞµÑ‚ ÑˆÑ‚Ğ°Ñ‚Ğ½Ñ‹Ğµ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚, ÑÑ‚Ñ€ĞµĞ»ĞºÑƒ Ğ¸ Ğ²ĞµĞ´ĞµĞ½Ğ¸Ğµ ĞºĞ°Ğ¼ĞµÑ€Ñ‹ "
-                + "ĞĞ°Ğ²Ğ¸Ğ³Ğ°Ñ‚Ğ¾Ñ€Ğ° â€” ÑÑ‚Ğ¾ Ğ¸ÑĞºĞ»ÑÑ‡Ğ°ĞµÑ‚ Ğ²Ñ‚Ğ¾Ñ€ÑƒÑ ÑÑ‚Ñ€ĞµĞ»ĞºÑƒ Ğ¸ Ğ¿Ñ€Ñ‹Ğ¶ĞºĞ¸. Ğ—Ğ´ĞµÑÑŒ Ğ¼ĞµĞ½ÑĞµÑ‚ÑÑ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ "
-                + "Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾Ğµ Ğ¾Ñ„Ğ¾Ñ€Ğ¼Ğ»ĞµĞ½Ğ¸Ğµ. ĞŸĞ¾Ğ»Ğ½Ğ¾ÑÑ‚ÑŒÑ Ğ¾Ñ‚Ğ´ĞµĞ»ÑŒĞ½Ñ‹Ğµ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚, ĞºÑƒÑ€ÑĞ¾Ñ€ Ğ¸ ĞºĞ°Ğ¼ĞµÑ€Ğ° "
-                + "Ğ½Ğ°ÑÑ‚Ñ€Ğ°Ğ¸Ğ²Ğ°ÑÑ‚ÑÑ Ğ² ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ğµ Â«ĞšĞ°Ñ€Ñ‚Ğ° HUDÂ».", 12, 0xFF95A0AF));
-        Switch mapEnabled = switchView("Ğ˜Ğ·Ğ¼ĞµĞ½ÑÑ‚ÑŒ Ğ¾Ñ„Ğ¾Ñ€Ğ¼Ğ»ĞµĞ½Ğ¸Ğµ Ğ¾ÑĞ½Ğ¾Ğ²Ğ½Ğ¾Ğ¹ ĞºĞ°Ñ€Ñ‚Ñ‹", map.enabled);
-        form.addView(mapEnabled, marginTop(8));
-        SliderField focusX = slider(form, "Ğ¢Ğ¾Ñ‡ĞºĞ° Ñ„Ğ¾ĞºÑƒÑĞ° Ğ¿Ğ¾ Ğ³Ğ¾Ñ€Ğ¸Ğ·Ğ¾Ğ½Ñ‚Ğ°Ğ»Ğ¸",
-                map.focusXPercent, 0, 100, 1, " %");
-        SliderField focusY = slider(form, "Ğ¢Ğ¾Ñ‡ĞºĞ° Ñ„Ğ¾ĞºÑƒÑĞ° Ğ¿Ğ¾ Ğ²ĞµÑ€Ñ‚Ğ¸ĞºĞ°Ğ»Ğ¸",
-                map.focusYPercent, 0, 100, 1, " %");
-        SliderField mapScale = slider(form, "Ğ Ğ°Ğ·Ğ¼ĞµÑ€ Ğ¿Ğ¾Ğ´Ğ¿Ğ¸ÑĞµĞ¹ Ğ¸ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ² ĞºĞ°Ñ€Ñ‚Ñ‹",
-                map.mapScalePercent, 50, 300, 5, " %");
-        SliderField maximumFps = slider(form, "ĞŸĞ»Ğ°Ğ²Ğ½Ğ¾ÑÑ‚ÑŒ Ğ¾ÑĞ½Ğ¾Ğ²Ğ½Ğ¾Ğ¹ ĞºĞ°Ñ€Ñ‚Ñ‹",
-                map.maximumFps, 5, 60, 1, " ĞºĞ°Ğ´Ñ€/Ñ");
-        Switch automaticDayNight = switchView("ĞĞ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ´ĞµĞ½ÑŒ / Ğ½Ğ¾Ñ‡ÑŒ",
-                map.automaticDayNight);
-        Switch nightMode = switchView("ĞŸÑ€Ğ¸Ğ½ÑƒĞ´Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ¾ Ğ½Ğ¾Ñ‡Ğ½Ğ¾Ğ¹ Ñ€ĞµĞ¶Ğ¸Ğ¼", map.nightMode);
-        Switch showLabels = switchView("ĞŸĞ¾Ğ´Ğ¿Ğ¸ÑĞ¸", map.showLabels);
-        Switch showPois = switchView("ĞŸĞ¾Ğ»ĞµĞ·Ğ½Ñ‹Ğµ Ğ¼ĞµÑÑ‚Ğ°", map.showPois);
-        Switch showBuildings = switchView("Ğ—Ğ´Ğ°Ğ½Ğ¸Ñ", map.showBuildings);
-        Switch showParks = switchView("ĞŸĞ°Ñ€ĞºĞ¸", map.showParks);
-        Switch showWater = switchView("Ğ’Ğ¾Ğ´Ğ°", map.showWater);
-        Switch showModels = switchView("3D-Ğ¼Ğ¾Ğ´ĞµĞ»Ğ¸", map.showModels);
-        for (Switch control : new Switch[]{automaticDayNight, nightMode, showLabels,
-                showPois, showBuildings, showParks, showWater, showModels}) {
-            form.addView(control, marginTop(4));
-        }
-        form.addView(text("ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚, Ğ¿Ñ€Ğ¾Ğ±ĞºĞ¸ Ğ¸ ÑÑ‚Ñ€ĞµĞ»ĞºĞ° Ğ¾ÑĞ½Ğ¾Ğ²Ğ½Ğ¾Ğ¹ ĞºĞ°Ñ€Ñ‚Ñ‹ Ğ¾ÑÑ‚Ğ°ÑÑ‚ÑÑ ÑˆÑ‚Ğ°Ñ‚Ğ½Ñ‹Ğ¼Ğ¸. Ğ˜Ñ… "
-                + "Ğ¾Ñ‚Ğ´ĞµĞ»ÑŒĞ½Ğ¾Ğµ Ğ¾Ñ„Ğ¾Ñ€Ğ¼Ğ»ĞµĞ½Ğ¸Ğµ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ¾ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ´Ğ»Ñ ĞºĞ°Ñ€Ñ‚Ñ‹ HUD.",
-                12, 0xFF95A0AF), marginTop(12));
-
-        form.addView(section("ĞŸĞ»Ğ°Ğ²Ğ°ÑÑ‰ĞµĞµ Ğ¾ĞºĞ½Ğ¾ ĞĞ°Ğ²Ğ¸Ğ³Ğ°Ñ‚Ğ¾Ñ€Ğ°"), marginTop(18));
-        Switch windowEnabled = switchView("Ğ Ğ°Ğ·Ñ€ĞµÑˆĞ¸Ñ‚ÑŒ Ğ¾ĞºĞ¾Ğ½Ğ½Ñ‹Ğ¹ Ñ€ĞµĞ¶Ğ¸Ğ¼", window.enabled);
-        Switch windowLocked = switchView("Ğ—Ğ°Ñ„Ğ¸ĞºÑĞ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾ĞºĞ½Ğ¾ Ğ¸ ÑĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¾Ğ±Ğµ Ñ€ÑƒÑ‡ĞºĞ¸",
-                window.movementLocked && window.resizeLocked);
-        Switch aspectLocked = switchView("Ğ—Ğ°Ñ„Ğ¸ĞºÑĞ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ğ¿Ğ¾Ñ€Ñ†Ğ¸Ğ¸",
-                window.aspectRatioLocked);
-        Switch rememberGeometry = switchView("Ğ—Ğ°Ğ¿Ğ¾Ğ¼Ğ¸Ğ½Ğ°Ñ‚ÑŒ Ğ¿Ğ¾Ğ·Ğ¸Ñ†Ğ¸Ñ Ğ¸ Ñ€Ğ°Ğ·Ğ¼ĞµÑ€",
-                window.rememberGeometry);
-        for (Switch control : new Switch[]{windowEnabled, windowLocked,
-                aspectLocked, rememberGeometry}) {
-            form.addView(control, marginTop(4));
-        }
-        SliderField left = slider(form, "ĞŸĞ¾Ğ·Ğ¸Ñ†Ğ¸Ñ ÑĞ»ĞµĞ²Ğ°",
-                window.leftPercent, 0, 100, 1, " %");
-        SliderField top = slider(form, "ĞŸĞ¾Ğ·Ğ¸Ñ†Ğ¸Ñ ÑĞ²ĞµÑ€Ñ…Ñƒ",
-                window.topPercent, 0, 100, 1, " %");
-        SliderField width = slider(form, "Ğ¨Ğ¸Ñ€Ğ¸Ğ½Ğ° Ğ¾ĞºĞ½Ğ°",
-                window.widthPercent, 20, 100, 1, " %");
-        SliderField height = slider(form, "Ğ’Ñ‹ÑĞ¾Ñ‚Ğ° Ğ¾ĞºĞ½Ğ°",
-                window.heightPercent, 20, 100, 1, " %");
-        SliderField corner = slider(form, "Ğ¡ĞºÑ€ÑƒĞ³Ğ»ĞµĞ½Ğ¸Ğµ Ğ¾ĞºĞ½Ğ°",
-                window.cornerRadiusDp, 0, 160, 1, " dp");
-        SliderField opacity = slider(form, "ĞĞµĞ¿Ñ€Ğ¾Ğ·Ñ€Ğ°Ñ‡Ğ½Ğ¾ÑÑ‚ÑŒ Ğ¾ĞºĞ½Ğ°",
-                window.opacityPercent, 20, 100, 1, " %");
-        form.addView(text("Ğ¤Ğ¾Ğ½ ÑĞ½Ğ°Ñ€ÑƒĞ¶Ğ¸ ĞºĞ°Ñ€Ñ‚Ñ‹ Ğ²ÑĞµĞ³Ğ´Ğ° Ğ¿Ñ€Ğ¾Ğ·Ñ€Ğ°Ñ‡Ğ½Ñ‹Ğ¹ â€” ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ñ‹ Ğ³Ğ»Ğ°Ğ²Ğ½Ğ¾Ğ³Ğ¾ ÑĞºÑ€Ğ°Ğ½Ğ° Ğ¸ "
-                + "ÑĞ¸ÑÑ‚ĞµĞ¼Ğ½Ñ‹Ğµ Ğ¿Ğ°Ğ½ĞµĞ»Ğ¸ Ğ¾ÑÑ‚Ğ°ÑÑ‚ÑÑ Ğ²Ğ¸Ğ´Ğ¸Ğ¼Ñ‹Ğ¼Ğ¸ Ğ²Ğ¾ĞºÑ€ÑƒĞ³ Ğ¾ĞºĞ½Ğ°.",
-                12, 0xFF95A0AF), marginTop(8));
-        SliderField borderWidth = slider(form, "Ğ¢Ğ¾Ğ»Ñ‰Ğ¸Ğ½Ğ° Ñ€Ğ°Ğ¼ĞºĞ¸",
-                window.borderWidthDp, 0, 24, 1, " dp");
-        ColorField borderColor = colorField(form, "Ğ¦Ğ²ĞµÑ‚ Ñ€Ğ°Ğ¼ĞºĞ¸", window.borderColor);
-        SliderField shadowRadius = slider(form, "Ğ Ğ°Ğ´Ğ¸ÑƒÑ Ñ‚ĞµĞ½Ğ¸",
-                window.shadowRadiusDp, 0, 96, 1, " dp");
-        ColorField shadowColor = colorField(form, "Ğ¦Ğ²ĞµÑ‚ Ñ‚ĞµĞ½Ğ¸", window.shadowColor);
-
-        form.addView(section("ĞšĞ½Ğ¾Ğ¿ĞºĞ¸ Ğ¾ĞºĞ½Ğ°"), marginTop(16));
-        Switch modeButtonVisible = switchView("ĞšĞ½Ğ¾Ğ¿ĞºĞ° Ğ¾ĞºĞ½Ğ¾ / Ğ¿Ğ¾Ğ»Ğ½Ñ‹Ğ¹ ÑĞºÑ€Ğ°Ğ½",
-                window.modeButtonVisible);
-        Switch dragHandleVisible = switchView("Ğ ÑƒÑ‡ĞºĞ° Ğ¿ĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ¸Ñ",
-                window.dragHandleVisible);
-        Switch resizeHandleVisible = switchView("Ğ ÑƒÑ‡ĞºĞ° Ñ€Ğ°Ğ·Ğ¼ĞµÑ€Ğ°",
-                window.resizeHandleVisible);
-        Switch closeButtonVisible = switchView("ĞšĞ½Ğ¾Ğ¿ĞºĞ° Ğ·Ğ°ĞºÑ€Ñ‹Ñ‚Ğ¸Ñ",
-                window.closeButtonVisible);
-        for (Switch control : new Switch[]{modeButtonVisible, dragHandleVisible,
-                resizeHandleVisible, closeButtonVisible}) {
-            form.addView(control, marginTop(4));
-        }
-        form.addView(text("ĞšĞ½Ğ¾Ğ¿ĞºĞ° Ğ½Ğ°Ñ…Ğ¾Ğ´Ğ¸Ñ‚ÑÑ Ğ² ÑˆÑ‚Ğ°Ñ‚Ğ½Ğ¾Ğ¹ Ğ»ĞµĞ²Ğ¾Ğ¹ ĞºĞ¾Ğ»Ğ¾Ğ½ĞºĞµ ĞĞ°Ğ²Ğ¸Ğ³Ğ°Ñ‚Ğ¾Ñ€Ğ°, ĞºĞ°Ğº Ğ² "
-                + "Ñ€ĞµÑ„ĞµÑ€ĞµĞ½ÑĞµ 29.4.2. Ğ’ Ğ¾ĞºĞ¾Ğ½Ğ½Ğ¾Ğ¼ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ Ğ¾Ñ‚Ğ´ĞµĞ»ÑŒĞ½Ğ°Ñ ĞºĞ½Ğ¾Ğ¿ĞºĞ° Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ° Ğ¾ÑÑ‚Ğ°Ñ‘Ñ‚ÑÑ "
-                + "Ğ¿Ğ¾Ğ²ĞµÑ€Ñ… ĞºĞ°Ñ€Ñ‚Ñ‹.", 12, 0xFFB8C0CC), marginTop(8));
-        form.addView(label("Ğ£Ğ³Ğ¾Ğ» ĞºĞ½Ğ¾Ğ¿ĞºĞ¸ Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ° Ğ² Ğ¾ĞºĞ¾Ğ½Ğ½Ğ¾Ğ¼ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ"), marginTop(8));
-        Spinner buttonPosition = windowButtonPositionSpinner(window.modeButtonPosition);
-        form.addView(buttonPosition);
-        SliderField buttonSize = slider(form, "Ğ Ğ°Ğ·Ğ¼ĞµÑ€ ĞºĞ½Ğ¾Ğ¿ĞºĞ¸",
-                window.modeButtonSizeDp, 28, 96, 1, " dp");
-        SliderField buttonOpacity = slider(form, "ĞĞµĞ¿Ñ€Ğ¾Ğ·Ñ€Ğ°Ñ‡Ğ½Ğ¾ÑÑ‚ÑŒ ĞºĞ½Ğ¾Ğ¿ĞºĞ¸",
-                window.modeButtonOpacityPercent, 20, 100, 1, " %");
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("ĞÑĞ½Ğ¾Ğ²Ğ½Ğ°Ñ ĞºĞ°Ñ€Ñ‚Ğ° Ğ¸ Ğ¾ĞºĞ½Ğ¾ ĞĞ°Ğ²Ğ¸Ğ³Ğ°Ñ‚Ğ¾Ñ€Ğ°")
-                .setView(scroll)
-                .setPositiveButton("ĞŸÑ€Ğ¸Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ", null)
-                .setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
-                    try {
-                        map.enabled = mapEnabled.isChecked();
-                        map.focusXPercent = focusX.intValue();
-                        map.focusYPercent = focusY.intValue();
-                        map.mapScalePercent = mapScale.intValue();
-                        map.maximumFps = maximumFps.intValue();
-                        map.automaticDayNight = automaticDayNight.isChecked();
-                        map.nightMode = nightMode.isChecked();
-                        map.showLabels = showLabels.isChecked();
-                        map.showPois = showPois.isChecked();
-                        map.showBuildings = showBuildings.isChecked();
-                        map.showParks = showParks.isChecked();
-                        map.showWater = showWater.isChecked();
-                        map.showModels = showModels.isChecked();
-                        window.enabled = windowEnabled.isChecked();
-                        window.movementLocked = windowLocked.isChecked();
-                        window.resizeLocked = windowLocked.isChecked();
-                        window.aspectRatioLocked = aspectLocked.isChecked();
-                        window.rememberGeometry = rememberGeometry.isChecked();
-                        window.leftPercent = left.intValue();
-                        window.topPercent = top.intValue();
-                        window.widthPercent = width.intValue();
-                        window.heightPercent = height.intValue();
-                        window.cornerRadiusDp = corner.intValue();
-                        window.opacityPercent = opacity.intValue();
-                        window.borderWidthDp = borderWidth.intValue();
-                        window.borderColor = borderColor.value;
-                        window.shadowRadiusDp = shadowRadius.intValue();
-                        window.shadowColor = shadowColor.value;
-                        window.modeButtonVisible = modeButtonVisible.isChecked();
-                        window.modeButtonPosition = windowButtonPositionValue(
-                                buttonPosition.getSelectedItemPosition());
-                        window.dragHandleVisible = dragHandleVisible.isChecked();
-                        window.resizeHandleVisible = resizeHandleVisible.isChecked();
-                        window.closeButtonVisible = closeButtonVisible.isChecked();
-                        window.modeButtonSizeDp = buttonSize.intValue();
-                        window.modeButtonOpacityPercent = buttonOpacity.intValue();
-
-                        navigation.normalize();
-                        preferences.navigationIntegrationConfigJson.set(
-                                navigation.toJson().toString());
-                        NavigationHudEndpointService.requestConfigurationRefresh(this);
-                        dialog.dismiss();
-                        Toast.makeText(this, "ĞĞ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸ ĞĞ°Ğ²Ğ¸Ğ³Ğ°Ñ‚Ğ¾Ñ€Ğ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ñ‹",
-                                Toast.LENGTH_SHORT).show();
-                    } catch (Exception error) {
-                        Toast.makeText(this, "ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ Ğ¿Ğ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ‹: " + error.getMessage(),
-                                Toast.LENGTH_LONG).show();
-                    }
-                }));
-        showSafeDialog(dialog);
-    }
-
-    @NonNull
-    private NavigationIntegrationConfig loadNavigationIntegrationConfig() {
-        String raw = preferences.navigationIntegrationConfigJson.get();
-        if (raw == null || raw.trim().isEmpty()) return new NavigationIntegrationConfig();
-        try {
-            return NavigationIntegrationConfig.fromJson(raw);
-        } catch (IllegalArgumentException invalid) {
-            return new NavigationIntegrationConfig();
-        }
-    }
-
-    @Nullable
-    private HudElementConfig findMapElement() {
-        for (HudElementConfig value : config.elements) {
-            if (value.type == HudElementType.NAV_MAP) return value;
-        }
-        return null;
-    }
-
-    private void addVisualElementOptions(@NonNull LinearLayout form,
-            @NonNull HudElementConfig item, @NonNull Map<String, Object> controls) {
-        if (item.type.name().startsWith("NAV_")) {
-            visualSwitch(form, controls, "bool:hideWhenInactive",
-                    "Ğ¡ĞºÑ€Ñ‹Ğ²Ğ°Ñ‚ÑŒ Ğ±ĞµĞ· Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾Ğ³Ğ¾ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ°",
-                    item.options.optBoolean("hideWhenInactive", false));
-            if (item.type != HudElementType.NAV_MANEUVER_ARROW
-                    && item.type != HudElementType.NAV_LANES
-                    && item.type != HudElementType.NAV_TRAFFIC_LIGHTS
-                    && item.type != HudElementType.NAV_ROUTE_GRAPHIC) {
-                visualSwitch(form, controls, "bool:hideWhenEmpty",
-                        "Ğ¡ĞºÑ€Ñ‹Ğ²Ğ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¸ Ğ¾Ñ‚ÑÑƒÑ‚ÑÑ‚Ğ²Ğ¸Ğ¸ Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ",
-                        item.options.optBoolean("hideWhenEmpty", true));
-            }
-        }
-        switch (item.type) {
-            case CLOCK:
-                visualSpinner(form, controls, "string:clockMode", "Ğ¤Ğ¾Ñ€Ğ¼Ğ°Ñ‚ Ñ‡Ğ°ÑĞ¾Ğ²",
-                        new String[]{"SYSTEM", "24H", "12H"},
-                        item.options.optString("clockMode", "SYSTEM"));
-                break;
-            case NAV_MANEUVER_ARROW:
-            case NAV_COMBINED:
-                visualSwitch(form, controls, "bool:arrowAnimation",
-                        "ĞĞ½Ğ¸Ğ¼Ğ°Ñ†Ğ¸Ñ ÑÑ‚Ñ€ĞµĞ»ĞºĞ¸",
-                        item.options.optBoolean("arrowAnimation", true));
-                visualSwitch(form, controls, "bool:preferSourceImage",
-                        "Ğ˜ÑĞ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ÑŒ ÑˆÑ‚Ğ°Ñ‚Ğ½ÑƒÑ Ğ³Ñ€Ğ°Ñ„Ğ¸ĞºÑƒ Ğ¼Ğ°Ğ½Ñ‘Ğ²Ñ€Ğ°",
-                        item.options.optBoolean("preferSourceImage", true));
-                visualSpinner(form, controls, "string:arrowLayout",
-                        "ĞŸĞ¾Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ ÑÑ‚Ñ€ĞµĞ»ĞºĞ¸", new String[]{"LEFT", "RIGHT", "TOP", "BOTTOM"},
-                        item.options.optString("arrowLayout", "LEFT"));
-                break;
-            case NAV_LANES:
-                visualSwitch(form, controls, "bool:preferSourceImage",
-                        "Ğ˜ÑĞ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ÑŒ ÑˆÑ‚Ğ°Ñ‚Ğ½ÑƒÑ Ğ³Ñ€Ğ°Ñ„Ğ¸ĞºÑƒ Ğ¿Ğ¾Ğ»Ğ¾Ñ",
-                        item.options.optBoolean("preferSourceImage", true));
-                visualInt(form, controls, "int:laneThresholdMeters",
-                        "ĞŸĞ¾ĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ Ğ¿Ğ¾Ğ»Ğ¾ÑÑ‹ Ğ±Ğ»Ğ¸Ğ¶Ğµ, Ğ¼",
-                        item.options.optInt("laneThresholdMeters", 700));
-                visualSpinner(form, controls, "string:laneDistancePosition",
-                        "Ğ Ğ°ÑÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ Ğ´Ğ¾ Ğ¿Ğ¾Ğ»Ğ¾Ñ", new String[]{"BOTTOM", "TOP", "OFF"},
-                        item.options.optString("laneDistancePosition", "BOTTOM"));
-                visualColor(form, controls, item, "highlightColor",
-                        "Ğ¦Ğ²ĞµÑ‚ Ñ€ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´ÑƒĞµĞ¼Ğ¾Ğ¹ Ğ¿Ğ¾Ğ»Ğ¾ÑÑ‹", "#FF34C759");
-                break;
-            case NAV_SPEED_LIMIT:
-                visualSwitch(form, controls, "bool:whiteSign",
-                        "Ğ‘ĞµĞ»Ñ‹Ğ¹ Ñ„Ğ¾Ğ½ Ğ·Ğ½Ğ°ĞºĞ°", item.options.optBoolean("whiteSign", true));
-                visualSwitch(form, controls, "bool:routeOnly",
-                        "Ğ¢Ğ¾Ğ»ÑŒĞºĞ¾ Ğ¿Ñ€Ğ¸ Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾Ğ¼ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğµ",
-                        item.options.optBoolean("routeOnly", false));
-                visualSwitch(form, controls, "bool:onlyWhenExceeded",
-                        "ĞŸĞ¾ĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ¿Ñ€Ğ¸ Ğ¿Ñ€ĞµĞ²Ñ‹ÑˆĞµĞ½Ğ¸Ğ¸",
-                        item.options.optBoolean("onlyWhenExceeded", false));
-                visualInt(form, controls, "int:overspeedDelta",
-                        "Ğ”Ğ¾Ğ¿ÑƒÑĞº Ğ¿Ñ€ĞµĞ²Ñ‹ÑˆĞµĞ½Ğ¸Ñ, ĞºĞ¼/Ñ‡",
-                        item.options.optInt("overspeedDelta", 10));
-                visualSwitch(form, controls, "bool:overspeedBlink",
-                        "ĞœĞ¸Ğ³Ğ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¸ Ğ¿Ñ€ĞµĞ²Ñ‹ÑˆĞµĞ½Ğ¸Ğ¸",
-                        item.options.optBoolean("overspeedBlink", true));
-                break;
-            case NAV_TRAFFIC_LIGHTS:
-                visualSpinner(form, controls, "string:style", "Ğ¡Ñ‚Ğ¸Ğ»ÑŒ ÑĞ²ĞµÑ‚Ğ¾Ñ„Ğ¾Ñ€Ğ°",
-                        new String[]{"CAPSULE", "CLASSIC"},
-                        item.options.optString("style", "CAPSULE"));
-                visualSpinner(form, controls, "string:orientation", "ĞÑ€Ğ¸ĞµĞ½Ñ‚Ğ°Ñ†Ğ¸Ñ",
-                        new String[]{"VERTICAL", "HORIZONTAL"},
-                        item.options.optString("orientation", "VERTICAL"));
-                visualSpinner(form, controls, "string:countdownSide",
-                        "ĞŸĞ¾Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ½Ğ¾Ğ³Ğ¾ Ğ¾Ñ‚ÑÑ‡Ñ‘Ñ‚Ğ°",
-                        new String[]{"BOTTOM", "TOP", "LEFT", "RIGHT"},
-                        item.options.optString("countdownSide", "BOTTOM"));
-                visualSwitch(form, controls, "bool:showFrame",
-                        "Ğ Ğ°Ğ¼ĞºĞ° ÑĞ²ĞµÑ‚Ğ¾Ñ„Ğ¾Ñ€Ğ°", item.options.optBoolean("showFrame", true));
-                visualSwitch(form, controls, "bool:arrowAnimation",
-                        "ĞĞ½Ğ¸Ğ¼Ğ°Ñ†Ğ¸Ñ ÑÑ‚Ñ€ĞµĞ»ĞºĞ¸",
-                        item.options.optBoolean("arrowAnimation", true));
-                visualColor(form, controls, item, "redColor",
-                        "ĞšÑ€Ğ°ÑĞ½Ñ‹Ğ¹ ÑĞ¸Ğ³Ğ½Ğ°Ğ» ARGB", "#FFFF3B30");
-                visualColor(form, controls, item, "yellowColor",
-                        "Ğ–Ñ‘Ğ»Ñ‚Ñ‹Ğ¹ ÑĞ¸Ğ³Ğ½Ğ°Ğ» ARGB", "#FFFFCC00");
-                visualColor(form, controls, item, "greenColor",
-                        "Ğ—ĞµĞ»Ñ‘Ğ½Ñ‹Ğ¹ ÑĞ¸Ğ³Ğ½Ğ°Ğ» ARGB", "#FF34C759");
-                visualColor(form, controls, item, "unknownColor",
-                        "ĞĞµÑ‚ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… ARGB", "#FF6B7280");
-                break;
-            case NAV_TRIP_PROGRESS:
-                visualSpinner(form, controls, "string:progressMode", "Ğ”Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ¾Ğ³Ñ€ĞµÑÑĞ°",
-                        new String[]{"COMBINED", "DISTANCE", "TIME", "ARRIVAL"},
-                        item.options.optString("progressMode", "COMBINED"));
-                visualSpinner(form, controls, "string:orientation", "ĞÑ€Ğ¸ĞµĞ½Ñ‚Ğ°Ñ†Ğ¸Ñ",
-                        new String[]{"HORIZONTAL", "VERTICAL"},
-                        item.options.optString("orientation", "HORIZONTAL"));
-                break;
-            case NAV_JAM_PROGRESS:
-                visualSpinner(form, controls, "string:orientation", "ĞÑ€Ğ¸ĞµĞ½Ñ‚Ğ°Ñ†Ğ¸Ñ",
-                        new String[]{"HORIZONTAL", "VERTICAL"},
-                        item.options.optString("orientation", "HORIZONTAL"));
-                addTrafficPaletteOptions(form, controls, item);
-                break;
-            case NAV_ROUTE_GRAPHIC:
-                addTrafficPaletteOptions(form, controls, item);
-                break;
-            default:
-                break;
-        }
-    }
-
-    private void visualSwitch(LinearLayout form, Map<String, Object> controls, String key,
-            String title, boolean checked) {
-        Switch control = switchView(title, checked);
-        form.addView(control, marginTop(4));
-        controls.put(key, control);
-    }
-
-    private void visualInt(LinearLayout form, Map<String, Object> controls, String key,
-            String title, int value) {
-        boolean distance = key.endsWith("laneThresholdMeters");
-        controls.put(key, slider(form, title, value,
-                0, distance ? 2_000 : 50, distance ? 50 : 1,
-                distance ? " Ğ¼" : " ĞºĞ¼/Ñ‡"));
-    }
-
-    private void visualColor(LinearLayout form, Map<String, Object> controls,
-            HudElementConfig item, String key, String title, String fallback) {
-        controls.put("color:" + key, field(form, title,
-                optionColorText(item, key, fallback), false));
-    }
-
-    private void addTrafficPaletteOptions(LinearLayout form, Map<String, Object> controls,
-            HudElementConfig item) {
-        visualColor(form, controls, item, "freeColor", "Ğ¡Ğ²Ğ¾Ğ±Ğ¾Ğ´Ğ½Ğ¾ ARGB", "#FF34C759");
-        visualColor(form, controls, item, "lightColor", "ĞĞµĞ±Ğ¾Ğ»ÑŒÑˆĞ°Ñ Ğ¿Ñ€Ğ¾Ğ±ĞºĞ° ARGB", "#FFFFCC00");
-        visualColor(form, controls, item, "hardColor", "Ğ—Ğ°Ñ‚Ñ€ÑƒĞ´Ğ½ĞµĞ½Ğ¸Ğµ ARGB", "#FFFF3B30");
-        visualColor(form, controls, item, "veryHardColor", "Ğ¢ÑĞ¶Ñ‘Ğ»Ğ°Ñ Ğ¿Ñ€Ğ¾Ğ±ĞºĞ° ARGB", "#FFB00020");
-        visualColor(form, controls, item, "blockedColor", "ĞŸĞµÑ€ĞµĞºÑ€Ñ‹Ñ‚Ğ¾ ARGB", "#FF7A1FA2");
-        visualColor(form, controls, item, "unknownColor", "ĞĞµÑ‚ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… ARGB", "#FF8E8E93");
-    }
-
-    @NonNull
-    private static String optionColorText(HudElementConfig item, String key, String fallback) {
-        Object value = item.options.opt(key);
-        if (value instanceof Number) {
-            return String.format(Locale.ROOT, "#%08X", ((Number) value).intValue());
-        }
-        String text = value == null ? "" : String.valueOf(value).trim();
-        return text.isEmpty() ? fallback : text;
-    }
-
-    private void visualSpinner(LinearLayout form, Map<String, Object> controls, String key,
-            String title, String[] choices, String selected) {
-        form.addView(label(title), marginTop(8));
-        Spinner control = spinner(choices, selected);
-        form.addView(control);
-        controls.put(key, control);
-    }
-
-    private static void applyVisualElementOptions(JSONObject output,
-            Map<String, Object> controls) throws JSONException {
-        for (Map.Entry<String, Object> entry : controls.entrySet()) {
-            String encoded = entry.getKey();
-            int separator = encoded.indexOf(':');
-            if (separator <= 0 || separator >= encoded.length() - 1) continue;
-            String kind = encoded.substring(0, separator);
-            String key = encoded.substring(separator + 1);
-            Object control = entry.getValue();
-            if ("bool".equals(kind) && control instanceof Switch) {
-                output.put(key, ((Switch) control).isChecked());
-            } else if ("int".equals(kind) && control instanceof SliderField) {
-                output.put(key, ((SliderField) control).intValue());
-            } else if ("color".equals(kind) && control instanceof EditText) {
-                String color = value((EditText) control);
-                Color.parseColor(color);
-                output.put(key, color);
-            } else if ("string".equals(kind) && control instanceof Spinner) {
-                output.put(key, String.valueOf(((Spinner) control).getSelectedItem()));
-            }
-        }
-    }
-
-    /** Configures a real geometry container; it never paints its own surface or shadow. */
-    private void editHorizontalGroup(@NonNull HudElementConfig group) {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout form = column();
-        form.setPadding(dp(18), dp(8), dp(18), dp(24));
-        scroll.addView(form);
-
-        EditText title = field(form, "ĞĞ°Ğ·Ğ²Ğ°Ğ½Ğ¸Ğµ", group.title, false);
-        form.addView(section("ĞŸĞ¾Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ Ğ¸ Ñ€Ğ°Ğ·Ğ¼ĞµÑ€ Ñ„Ñ€ĞµĞ¹Ğ¼Ğ°"), marginTop(12));
-        SliderField x = slider(form, "Ğ¡Ğ»ĞµĞ²Ğ°", group.x,
-                0, Math.max(0, config.gridColumns - 1), 1, " ÑÑ‡.");
-        SliderField y = slider(form, "Ğ¡Ğ²ĞµÑ€Ñ…Ñƒ", group.y,
-                0, Math.max(0, config.gridRows - 1), 1, " ÑÑ‡.");
-        SliderField width = slider(form, "Ğ¨Ğ¸Ñ€Ğ¸Ğ½Ğ°", group.width,
-                1, Math.max(1, config.gridColumns), 1, " ÑÑ‡.");
-        SliderField height = slider(form, "Ğ’Ñ‹ÑĞ¾Ñ‚Ğ°", group.height,
-                1, Math.max(1, config.gridRows), 1, " ÑÑ‡.");
-
-        form.addView(section("ĞÑ‚ÑÑ‚ÑƒĞ¿Ñ‹"), marginTop(14));
-        SliderField gap = slider(form, "ĞœĞµĞ¶Ğ´Ñƒ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ğ°Ğ¼Ğ¸",
-                HudHorizontalGroup.gapPx(group), 0, 200, 1, " px");
-        SliderField paddingLeft = slider(form, "Ğ’Ğ½ÑƒÑ‚Ñ€Ğ¸ ÑĞ»ĞµĞ²Ğ°",
-                HudHorizontalGroup.paddingLeftPx(group), 0, 200, 1, " px");
-        SliderField paddingTop = slider(form, "Ğ’Ğ½ÑƒÑ‚Ñ€Ğ¸ ÑĞ²ĞµÑ€Ñ…Ñƒ",
-                HudHorizontalGroup.paddingTopPx(group), 0, 200, 1, " px");
-        SliderField paddingRight = slider(form, "Ğ’Ğ½ÑƒÑ‚Ñ€Ğ¸ ÑĞ¿Ñ€Ğ°Ğ²Ğ°",
-                HudHorizontalGroup.paddingRightPx(group), 0, 200, 1, " px");
-        SliderField paddingBottom = slider(form, "Ğ’Ğ½ÑƒÑ‚Ñ€Ğ¸ ÑĞ½Ğ¸Ğ·Ñƒ",
-                HudHorizontalGroup.paddingBottomPx(group), 0, 200, 1, " px");
-        SliderField marginLeft = slider(form, "Ğ¡Ğ½Ğ°Ñ€ÑƒĞ¶Ğ¸ ÑĞ»ĞµĞ²Ğ°",
-                HudHorizontalGroup.marginLeftPx(group), 0, 200, 1, " px");
-        SliderField marginTop = slider(form, "Ğ¡Ğ½Ğ°Ñ€ÑƒĞ¶Ğ¸ ÑĞ²ĞµÑ€Ñ…Ñƒ",
-                HudHorizontalGroup.marginTopPx(group), 0, 200, 1, " px");
-        SliderField marginRight = slider(form, "Ğ¡Ğ½Ğ°Ñ€ÑƒĞ¶Ğ¸ ÑĞ¿Ñ€Ğ°Ğ²Ğ°",
-                HudHorizontalGroup.marginRightPx(group), 0, 200, 1, " px");
-        SliderField marginBottom = slider(form, "Ğ¡Ğ½Ğ°Ñ€ÑƒĞ¶Ğ¸ ÑĞ½Ğ¸Ğ·Ñƒ",
-                HudHorizontalGroup.marginBottomPx(group), 0, 200, 1, " px");
-
-        Spinner distribution = spinner(new String[]{"ĞšĞ¾Ğ¼Ğ¿Ğ°ĞºÑ‚Ğ½Ğ¾", "Ğ Ğ°Ğ²Ğ½Ñ‹Ğµ ÑÑ‡ĞµĞ¹ĞºĞ¸"},
-                HudHorizontalGroup.distribution(group) == 1
-                        ? "Ğ Ğ°Ğ²Ğ½Ñ‹Ğµ ÑÑ‡ĞµĞ¹ĞºĞ¸" : "ĞšĞ¾Ğ¼Ğ¿Ğ°ĞºÑ‚Ğ½Ğ¾");
-        form.addView(label("Ğ Ğ°ÑĞ¿Ñ€ĞµĞ´ĞµĞ»ĞµĞ½Ğ¸Ğµ"), marginTop(10));
-        form.addView(distribution);
-        Spinner horizontal = spinner(new String[]{"Ğ¡Ğ»ĞµĞ²Ğ°", "ĞŸĞ¾ Ñ†ĞµĞ½Ñ‚Ñ€Ñƒ", "Ğ¡Ğ¿Ñ€Ğ°Ğ²Ğ°"},
-                horizontalGroupAlignmentLabel(
-                        HudHorizontalGroup.horizontalAlignment(group)));
-        form.addView(label("ĞŸĞ¾Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ ÑĞ¾Ğ´ĞµÑ€Ğ¶Ğ¸Ğ¼Ğ¾Ğ³Ğ¾ Ğ¿Ğ¾ Ğ³Ğ¾Ñ€Ğ¸Ğ·Ğ¾Ğ½Ñ‚Ğ°Ğ»Ğ¸"), marginTop(10));
-        form.addView(horizontal);
-        Spinner vertical = spinner(new String[]{"Ğ¡Ğ²ĞµÑ€Ñ…Ñƒ", "ĞŸĞ¾ Ñ†ĞµĞ½Ñ‚Ñ€Ñƒ", "Ğ¡Ğ½Ğ¸Ğ·Ñƒ"},
-                verticalGroupAlignmentLabel(HudHorizontalGroup.verticalAlignment(group)));
-        form.addView(label("Ğ’Ñ‹Ñ€Ğ°Ğ²Ğ½Ğ¸Ğ²Ğ°Ğ½Ğ¸Ğµ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ğ¾Ğ² Ğ¿Ğ¾ Ğ²ĞµÑ€Ñ‚Ğ¸ĞºĞ°Ğ»Ğ¸"), marginTop(10));
-        form.addView(vertical);
-        Switch itemEnabled = switchView("ĞŸĞ¾ĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ Ğ³Ñ€ÑƒĞ¿Ğ¿Ñƒ", group.enabled);
-        form.addView(itemEnabled, marginTop(8));
-
-        form.addView(section("Ğ­Ğ»ĞµĞ¼ĞµĞ½Ñ‚Ñ‹ ÑĞ»ĞµĞ²Ğ° Ğ½Ğ°Ğ¿Ñ€Ğ°Ğ²Ğ¾"), marginTop(16));
-        form.addView(text("ĞÑ‚Ğ¼ĞµÑ‚ÑŒÑ‚Ğµ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ñ‹. Ğ¡Ñ‚Ñ€ĞµĞ»ĞºĞ°Ğ¼Ğ¸ Ğ¼ĞµĞ½ÑĞµÑ‚ÑÑ Ğ¿Ğ¾Ñ€ÑĞ´Ğ¾Ğº; ĞºĞ½Ğ¾Ğ¿ĞºĞ° âš™ Ğ¾Ñ‚ĞºÑ€Ñ‹Ğ²Ğ°ĞµÑ‚ "
-                + "Ğ¸Ğ½Ğ´Ğ¸Ğ²Ğ¸Ğ´ÑƒĞ°Ğ»ÑŒĞ½Ñ‹Ğµ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸. Ğ Ğ°Ğ·Ğ¼ĞµÑ€Ñ‹ Ñ‚ĞµĞºÑÑ‚Ğ° Ğ¿Ñ€Ğ¸ Ñ€Ğ°ÑÑ‚ÑĞ¶ĞµĞ½Ğ¸Ğ¸ Ñ€ÑĞ´Ğ° Ğ½Ğµ Ğ¼ĞµĞ½ÑÑÑ‚ÑÑ.",
-                12, 0xFF95A0AF), marginTop(4));
-        List<HudElementConfig> candidates = hudHorizontalGroupCandidates(group);
-        Map<String, Boolean> selected = new LinkedHashMap<>();
-        List<String> existing = HudHorizontalGroup.memberIds(group);
-        for (HudElementConfig candidate : candidates) {
-            selected.put(candidate.id, existing.contains(candidate.id));
-        }
-        LinearLayout memberRows = column();
-        form.addView(memberRows, marginTop(6));
-        rebuildHudHorizontalGroupMembers(memberRows, candidates, selected);
-        form.addView(text("Ğ“Ñ€ÑƒĞ¿Ğ¿Ğ° Ğ¿Ñ€Ğ¾Ğ·Ñ€Ğ°Ñ‡Ğ½Ğ°. Ğ”Ğ»Ñ Ñ†Ğ²ĞµÑ‚Ğ°, Ñ€Ğ°Ğ¼ĞºĞ¸ Ğ¸ ÑĞºÑ€ÑƒĞ³Ğ»ĞµĞ½Ğ¸Ñ Ğ´Ğ¾Ğ±Ğ°Ğ²ÑŒÑ‚Ğµ Ğ¾Ñ‚Ğ´ĞµĞ»ÑŒĞ½ÑƒÑ "
-                + "Ğ¿Ğ¾Ğ´Ğ»Ğ¾Ğ¶ĞºÑƒ HUD. Ğ¢ĞµĞ½ÑŒ Ğ½Ğ° HUD Ğ½Ğµ Ğ¸ÑĞ¿Ğ¾Ğ»ÑŒĞ·ÑƒĞµÑ‚ÑÑ.",
-                12, 0xFF95A0AF), marginTop(10));
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Ğ“Ğ¾Ñ€Ğ¸Ğ·Ğ¾Ğ½Ñ‚Ğ°Ğ»ÑŒĞ½Ñ‹Ğ¹ Ñ€ÑĞ´ HUD")
-                .setView(scroll)
-                .setPositiveButton("ĞŸÑ€Ğ¸Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ", null)
-                .setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
-                    try {
-                        ArrayList<String> memberIds = new ArrayList<>();
-                        for (HudElementConfig candidate : candidates) {
-                            if (Boolean.TRUE.equals(selected.get(candidate.id))) {
-                                memberIds.add(candidate.id);
-                            }
-                        }
-                        if (memberIds.size() < 2) {
-                            Toast.makeText(this, "Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Ğ¼Ğ¸Ğ½Ğ¸Ğ¼ÑƒĞ¼ Ğ´Ğ²Ğ° ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ğ°",
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        group.title = value(title);
-                        group.x = x.intValue();
-                        group.y = y.intValue();
-                        group.width = width.intValue();
-                        group.height = height.intValue();
-                        group.enabled = itemEnabled.isChecked();
-                        HudHorizontalGroup.setMemberIds(group, memberIds);
-                        putHudGroupOption(group, "gapPx", gap.intValue());
-                        putHudGroupOption(group, "paddingLeftPx", paddingLeft.intValue());
-                        putHudGroupOption(group, "paddingTopPx", paddingTop.intValue());
-                        putHudGroupOption(group, "paddingRightPx", paddingRight.intValue());
-                        putHudGroupOption(group, "paddingBottomPx", paddingBottom.intValue());
-                        putHudGroupOption(group, "marginLeftPx", marginLeft.intValue());
-                        putHudGroupOption(group, "marginTopPx", marginTop.intValue());
-                        putHudGroupOption(group, "marginRightPx", marginRight.intValue());
-                        putHudGroupOption(group, "marginBottomPx", marginBottom.intValue());
-                        putHudGroupOption(group, "distribution",
-                                distribution.getSelectedItemPosition());
-                        putHudGroupOption(group, "horizontalAlignment",
-                                horizontal.getSelectedItemPosition());
-                        putHudGroupOption(group, "verticalAlignment",
-                                vertical.getSelectedItemPosition());
-                        group.normalize(config.gridColumns, config.gridRows);
-                        config.normalize();
-                        canvas.updateConfig(config);
-                        updateSelection(group);
-                        persist(false);
-                        dialog.dismiss();
-                    } catch (RuntimeException error) {
-                        Toast.makeText(this, "ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ Ğ¿Ğ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ‹: " + error.getMessage(),
-                                Toast.LENGTH_LONG).show();
-                    }
-                }));
-        showSafeDialog(dialog);
-    }
-
-    @NonNull
-    private List<HudElementConfig> hudHorizontalGroupCandidates(
-            @NonNull HudElementConfig editedGroup) {
-        ArrayList<HudElementConfig> result = new ArrayList<>();
-        List<String> current = HudHorizontalGroup.memberIds(editedGroup);
-        for (String id : current) {
-            HudElementConfig value = findElement(id);
-            if (value != null && value.type != HudElementType.BACKDROP
-                    && value.type != HudElementType.HORIZONTAL_GROUP
-                    && value.type != HudElementType.NAV_MAP) {
-                result.add(value);
-            }
-        }
-        for (HudElementConfig value : config.elements) {
-            if (value.id.equals(editedGroup.id) || result.contains(value)
-                    || value.type == HudElementType.BACKDROP
-                    || value.type == HudElementType.HORIZONTAL_GROUP
-                    || value.type == HudElementType.NAV_MAP
-                    || belongsToOtherHudHorizontalGroup(value.id, editedGroup.id)) {
-                continue;
-            }
-            result.add(value);
-        }
-        return result;
-    }
-
-    private boolean belongsToOtherHudHorizontalGroup(@NonNull String memberId,
-                                                     @NonNull String editedGroupId) {
-        for (HudElementConfig value : config.elements) {
-            if (value.type == HudElementType.HORIZONTAL_GROUP
-                    && !value.id.equals(editedGroupId)
-                    && HudHorizontalGroup.memberIds(value).contains(memberId)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void rebuildHudHorizontalGroupMembers(
-            @NonNull LinearLayout container,
-            @NonNull List<HudElementConfig> candidates,
-            @NonNull Map<String, Boolean> selected) {
-        container.removeAllViews();
-        for (int index = 0; index < candidates.size(); index++) {
-            HudElementConfig candidate = candidates.get(index);
-            LinearLayout row = new LinearLayout(this);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            Switch included = switchView(candidate.title,
-                    Boolean.TRUE.equals(selected.get(candidate.id)));
-            included.setOnCheckedChangeListener((button, checked) ->
-                    selected.put(candidate.id, checked));
-            row.addView(included, new LinearLayout.LayoutParams(
-                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            Button up = button("â†‘");
-            up.setEnabled(index > 0);
-            int from = index;
-            up.setOnClickListener(view -> {
-                Collections.swap(candidates, from, from - 1);
-                rebuildHudHorizontalGroupMembers(container, candidates, selected);
-            });
-            row.addView(up, fixed(48));
-            Button down = button("â†“");
-            down.setEnabled(index + 1 < candidates.size());
-            down.setOnClickListener(view -> {
-                Collections.swap(candidates, from, from + 1);
-                rebuildHudHorizontalGroupMembers(container, candidates, selected);
-            });
-            row.addView(down, fixed(48));
-            Button configure = button("âš™");
-            configure.setOnClickListener(view -> editElement(candidate));
-            row.addView(configure, fixed(54));
-            container.addView(row);
-        }
-    }
-
-    @Nullable
-    private HudElementConfig findElement(@NonNull String id) {
-        for (HudElementConfig value : config.elements) {
-            if (id.equals(value.id)) return value;
-        }
-        return null;
-    }
-
-    private static void putHudGroupOption(@NonNull HudElementConfig group,
-                                          @NonNull String key, int value) {
-        try {
-            group.options.put(key, value);
-        } catch (JSONException impossible) {
-            throw new IllegalStateException(impossible);
-        }
-    }
-
-    @NonNull
-    private static String horizontalGroupAlignmentLabel(int value) {
-        return value == 1 ? "ĞŸĞ¾ Ñ†ĞµĞ½Ñ‚Ñ€Ñƒ" : value == 2 ? "Ğ¡Ğ¿Ñ€Ğ°Ğ²Ğ°" : "Ğ¡Ğ»ĞµĞ²Ğ°";
-    }
-
-    @NonNull
-    private static String verticalGroupAlignmentLabel(int value) {
-        return value == 1 ? "ĞŸĞ¾ Ñ†ĞµĞ½Ñ‚Ñ€Ñƒ" : value == 2 ? "Ğ¡Ğ½Ğ¸Ğ·Ñƒ" : "Ğ¡Ğ²ĞµÑ€Ñ…Ñƒ";
-    }
-
-    private void editBackdrop(@NonNull HudElementConfig item) {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout form = column();
-        form.setPadding(dp(18), dp(8), dp(18), dp(24));
-        scroll.addView(form);
-
-        EditText title = field(form, "ĞĞ°Ğ·Ğ²Ğ°Ğ½Ğ¸Ğµ", item.title, false);
-        form.addView(section("ĞŸĞ¾Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ Ğ¸ Ñ€Ğ°Ğ·Ğ¼ĞµÑ€"), marginTop(12));
-        SliderField x = slider(form, "Ğ¡Ğ»ĞµĞ²Ğ°", item.x,
-                0, Math.max(0, config.gridColumns - 1), 1, " ÑÑ‡.");
-        SliderField y = slider(form, "Ğ¡Ğ²ĞµÑ€Ñ…Ñƒ", item.y,
-                0, Math.max(0, config.gridRows - 1), 1, " ÑÑ‡.");
-        SliderField width = slider(form, "Ğ¨Ğ¸Ñ€Ğ¸Ğ½Ğ°", item.width,
-                1, Math.max(1, config.gridColumns), 1, " ÑÑ‡.");
-        SliderField height = slider(form, "Ğ’Ñ‹ÑĞ¾Ñ‚Ğ°", item.height,
-                1, Math.max(1, config.gridRows), 1, " ÑÑ‡.");
-
-        EditText color = field(form, "Ğ¦Ğ²ĞµÑ‚ Ğ¿Ğ¾Ğ´Ğ»Ğ¾Ğ¶ĞºĞ¸", item.backgroundColor, false);
-        SliderField opacity = slider(form, "ĞĞµĞ¿Ñ€Ğ¾Ğ·Ñ€Ğ°Ñ‡Ğ½Ğ¾ÑÑ‚ÑŒ Ğ·Ğ°Ğ»Ğ¸Ğ²ĞºĞ¸",
-                item.backgroundOpacityPercent, 0, 100, 1, " %");
-        SliderField corner = slider(form, "Ğ¡ĞºÑ€ÑƒĞ³Ğ»ĞµĞ½Ğ¸Ğµ",
-                item.cornerRadiusPx, 0, 80, 1, " px");
-        EditText borderColor = field(form, "Ğ¦Ğ²ĞµÑ‚ Ñ€Ğ°Ğ¼ĞºĞ¸", item.borderColor, false);
-        SliderField borderOpacity = slider(form, "ĞĞµĞ¿Ñ€Ğ¾Ğ·Ñ€Ğ°Ñ‡Ğ½Ğ¾ÑÑ‚ÑŒ Ñ€Ğ°Ğ¼ĞºĞ¸",
-                item.borderOpacityPercent, 0, 100, 1, " %");
-        SliderField borderWidth = slider(form, "Ğ¢Ğ¾Ğ»Ñ‰Ğ¸Ğ½Ğ° Ñ€Ğ°Ğ¼ĞºĞ¸",
-                item.borderWidthPx, 0, 20, 1, " px");
-        Switch itemEnabled = switchView("ĞŸĞ¾ĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ Ğ¿Ğ¾Ğ´Ğ»Ğ¾Ğ¶ĞºÑƒ", item.enabled);
-        form.addView(itemEnabled, marginTop(8));
-        form.addView(text("ĞŸĞ¾Ğ´Ğ»Ğ¾Ğ¶ĞºĞ° Ğ²ÑĞµĞ³Ğ´Ğ° Ñ€Ğ¸ÑÑƒĞµÑ‚ÑÑ Ğ½Ğ¸Ğ¶Ğµ Ğ²ÑĞµÑ… HUD-Ğ²Ğ¸Ğ´Ğ¶ĞµÑ‚Ğ¾Ğ². "
-                + "Ğ¢ĞµĞ½ÑŒ Ğ½Ğ° HUD Ğ¾Ñ‚ĞºĞ»ÑÑ‡ĞµĞ½Ğ° Ğ¸ Ğ² Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ°Ñ… Ğ¾Ñ‚ÑÑƒÑ‚ÑÑ‚Ğ²ÑƒĞµÑ‚.",
-                12, 0xFF95A0AF), marginTop(6));
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("ĞŸĞ¾Ğ´Ğ»Ğ¾Ğ¶ĞºĞ° HUD")
-                .setView(scroll)
-                .setPositiveButton("ĞŸÑ€Ğ¸Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ", null)
-                .setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
-                    item.title = value(title);
-                    item.x = x.intValue();
-                    item.y = y.intValue();
-                    item.width = width.intValue();
-                    item.height = height.intValue();
-                    item.backgroundColor = value(color);
-                    item.backgroundOpacityPercent = opacity.intValue();
-                    item.cornerRadiusPx = corner.intValue();
-                    item.borderColor = value(borderColor);
-                    item.borderOpacityPercent = borderOpacity.intValue();
-                    item.borderWidthPx = borderWidth.intValue();
-                    item.enabled = itemEnabled.isChecked();
-                    item.normalize(config.gridColumns, config.gridRows);
-                    canvas.updateConfig(config);
-                    updateSelection(item);
-                    persist(false);
-                    dialog.dismiss();
-                }));
-        showSafeDialog(dialog);
-    }
-
-    private void editGlobalOptions() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout form = column();
-        form.setPadding(dp(18), dp(8), dp(18), dp(18));
-        scroll.addView(form);
-        SliderField columns = slider(form, "ĞšĞ¾Ğ»Ğ¾Ğ½ĞºĞ¸ ÑĞµÑ‚ĞºĞ¸",
-                config.gridColumns, 4, 200, 1, "");
-        SliderField rows = slider(form, "Ğ¡Ñ‚Ñ€Ğ¾ĞºĞ¸ ÑĞµÑ‚ĞºĞ¸",
-                config.gridRows, 2, 100, 1, "");
-        TextView hardwareBounds = text("ĞĞ¿Ğ¿Ğ°Ñ€Ğ°Ñ‚Ğ½Ğ°Ñ Ğ¾Ğ±Ğ»Ğ°ÑÑ‚ÑŒ (Ğ·Ğ°Ñ„Ğ¸ĞºÑĞ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ°): "
-                + HudViewportPolicy.SAFE_WIDTH + "Ã—" + HudViewportPolicy.SAFE_HEIGHT
-                + " px, X=" + HudViewportPolicy.SAFE_LEFT
-                + ", Y=" + HudViewportPolicy.SAFE_TOP + ".\n"
-                + "ĞŸĞ¾Ğ»Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ²ĞµÑ€Ñ…Ğ½Ğ¾ÑÑ‚ÑŒ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ğ¾Ğ³Ğ¾ Display ID Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ÑĞµÑ‚ÑÑ Ğ²Ğ¾ Ğ²Ñ€ĞµĞ¼Ñ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ñ‹. "
-                + "ĞŸĞ°Ğ½ĞµĞ»ÑŒ Ğ¸ ĞºĞ°Ğ¶Ğ´Ñ‹Ğ¹ Ğ²Ğ¸Ğ´Ğ¶ĞµÑ‚ Ğ¶Ñ‘ÑÑ‚ĞºĞ¾ Ğ¾Ğ±Ñ€ĞµĞ·Ğ°ÑÑ‚ÑÑ Ğ¿Ğ¾ ÑÑ‚Ğ¾Ğ¹ Ğ¾Ğ±Ğ»Ğ°ÑÑ‚Ğ¸.",
-                13, 0xFFFFCC66);
-        form.addView(hardwareBounds, marginTop(10));
-        Spinner background = spinner(new String[]{"TRANSPARENT", "BLACK", "DIM"},
-                config.backgroundMode);
-        form.addView(label("Ğ¤Ğ¾Ğ½"), marginTop(10));
-        form.addView(background);
-        SliderField brightness = slider(form, "ĞĞ±Ñ‰Ğ°Ñ ÑÑ€ĞºĞ¾ÑÑ‚ÑŒ",
-                config.globalBrightness, 0, 100, 1, " %");
-        EditText globalColor = field(form, "ĞĞ±Ñ‰Ğ¸Ğ¹ Ñ†Ğ²ĞµÑ‚ Ñ‚ĞµĞºÑÑ‚Ğ°", config.globalTextColor, false);
-        EditText globalUnit = field(form, "ĞĞ±Ñ‰Ğ¸Ğ¹ Ñ†Ğ²ĞµÑ‚ ĞµĞ´Ğ¸Ğ½Ğ¸Ñ†", config.globalUnitColor, false);
-        SliderField fontWeight = slider(form, "ĞĞ±Ñ‰Ğ°Ñ Ğ½Ğ°ÑÑ‹Ñ‰ĞµĞ½Ğ½Ğ¾ÑÑ‚ÑŒ ÑˆÑ€Ğ¸Ñ„Ñ‚Ğ°",
-                config.globalFontWeight, 100, 900, 100, "");
-        EditText fontUri = field(form, "URI Ğ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ĞµĞ»ÑŒÑĞºĞ¾Ğ³Ğ¾ ÑˆÑ€Ğ¸Ñ„Ñ‚Ğ°",
-                config.customFontUri, false);
-        SliderField navThreshold = slider(form, "ĞŸĞ¾ĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ Ğ½Ğ°Ğ²Ğ¸Ğ³Ğ°Ñ†Ğ¸Ñ Ğ´Ğ¾ Ñ€Ğ°ÑÑÑ‚Ğ¾ÑĞ½Ğ¸Ñ",
-                config.navigationDisplayThresholdMeters, 0, 5_000, 100, " Ğ¼");
-        SliderField navDelay = slider(form, "Ğ—Ğ°Ğ´ĞµÑ€Ğ¶ĞºĞ° ÑĞºÑ€Ñ‹Ñ‚Ğ¸Ñ Ğ½Ğ°Ğ²Ğ¸Ğ³Ğ°Ñ†Ğ¸Ğ¸",
-                config.navigationHideDelaySeconds, 0, 60, 1, " Ñ");
-        Switch showGrid = switchView("ĞŸĞ¾ĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ ÑĞµÑ‚ĞºÑƒ Ğ² Ñ€ĞµĞ´Ğ°ĞºÑ‚Ğ¾Ñ€Ğµ", config.showGrid);
-        Switch free = switchView("Ğ¡Ğ²Ğ¾Ğ±Ğ¾Ğ´Ğ½Ğ¾Ğµ Ğ¿ĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ¸Ğµ Ğ¼ĞµĞ¶Ğ´Ñƒ Ğ»Ğ¸Ğ½Ğ¸ÑĞ¼Ğ¸", config.freeMovement);
-        Switch maskStockHud = switchView(
-                "Ğ¡ĞºÑ€Ñ‹Ğ²Ğ°Ñ‚ÑŒ ÑˆÑ‚Ğ°Ñ‚Ğ½Ñ‹Ğµ Ğ¼Ğ°ÑˆĞ¸Ğ½ĞºÑƒ Ğ¸ ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ (AR + HUD-Ğ¼Ğ°ÑĞºĞ°)",
-                config.maskStockHud);
-        TextView maskHint = text(
-                "ĞœĞ°ÑˆĞ¸Ğ½ĞºĞ° Ğ¸ Ğ´Ğ¾Ñ€Ğ¾Ğ³Ğ° Ğ¾Ñ‚ĞºĞ»ÑÑ‡Ğ°ÑÑ‚ÑÑ ÑÑ‚Ğ°Ñ€Ñ‹Ğ¼ ÑˆÑ‚Ğ°Ñ‚Ğ½Ñ‹Ğ¼ AR-Ñ„Ğ»Ğ°Ğ³Ğ¾Ğ¼ Ñ‡ĞµÑ€ĞµĞ· Ğ¿Ğ¾Ğ»Ğ½Ñ‹Ğ¹ Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ñ‹Ğ¹ "
-                        + "Ğ¿Ñ€Ğ¾Ñ„Ğ¸Ğ»ÑŒ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ¾Ğ±Ğ¸Ğ»Ñ; Ñ†Ğ¸Ñ„Ñ€Ğ¾Ğ²Ğ°Ñ ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ Ğ·Ğ°ĞºÑ€Ñ‹Ğ²Ğ°ĞµÑ‚ÑÑ Ñ‡Ñ‘Ñ€Ğ½Ğ¾Ğ¹ Ğ¼Ğ°ÑĞºĞ¾Ğ¹. "
-                        + "AR-Ñ„Ğ»Ğ°Ğ³ Ğ¿Ñ€Ğ¸Ğ¼ĞµĞ½ÑĞµÑ‚ÑÑ Ğ¸ Ğ¿Ñ€Ğ¸ Ğ²Ñ‹ĞºĞ»ÑÑ‡ĞµĞ½Ğ½Ğ¾Ğ¹ Ğ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ĞµĞ»ÑŒÑĞºĞ¾Ğ¹ HUD-Ğ¿Ğ°Ğ½ĞµĞ»Ğ¸. "
-                        + "Ğ”Ğ»Ñ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ğ¾Ğ² ecarx_daemon Ğ´Ğ¾Ğ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ¾ Ğ¸ÑĞ¿Ğ¾Ğ»ÑŒĞ·ÑƒĞµÑ‚ÑÑ Ğ¾Ñ‚Ğ´ĞµĞ»ÑŒĞ½Ñ‹Ğ¹ "
-                        + "SurfaceFlinger-ÑĞ»Ğ¾Ğ¹ Ñ‡ĞµÑ€ĞµĞ· Ğ»Ğ¾ĞºĞ°Ğ»ÑŒĞ½Ñ‹Ğ¹ ADB/Telnet; Ğ¿Ñ€Ğ¸ ĞµĞ³Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ¾ÑÑ‚Ğ¸ "
-                        + "Ğ¾ÑÑ‚Ğ°Ñ‘Ñ‚ÑÑ Ğ¾Ğ±Ñ‹Ñ‡Ğ½Ñ‹Ğ¹ overlay.",
-                12, 0xFFB8C0CC);
-        Switch snow = switchView("Ğ¡Ğ½ĞµĞ¶Ğ½Ñ‹Ğ¹ Ñ€ĞµĞ¶Ğ¸Ğ¼", config.snowMode);
-        Switch sync = switchView("ĞĞ´Ğ¸Ğ½ Ñ†Ğ²ĞµÑ‚ Ğ´Ğ»Ñ Ğ²ÑĞµÑ… ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ğ¾Ğ²", config.syncElementColors);
-        Switch autostart = switchView("Ğ—Ğ°Ğ¿ÑƒÑĞºĞ°Ñ‚ÑŒ HUD Ğ¿Ğ¾ÑĞ»Ğµ Ğ¿ĞµÑ€ĞµĞ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸",
-                preferences.hudPanelAutostart.get());
-        form.addView(showGrid, marginTop(8));
-        form.addView(free);
-        form.addView(maskStockHud);
-        form.addView(maskHint);
-        Button stockHud = button("Ğ¨Ñ‚Ğ°Ñ‚Ğ½Ñ‹Ğµ Ñ€ĞµĞ¶Ğ¸Ğ¼Ñ‹ Ğ¸ Ñ€Ğ°Ğ·Ğ´ĞµĞ»Ñ‹ HUD");
-        stockHud.setOnClickListener(view -> editStockHudControls());
-        form.addView(stockHud, marginTop(10));
-        form.addView(snow);
-        form.addView(sync);
-        form.addView(autostart);
-        Button chooseFont = button("Ğ’Ñ‹Ğ±Ñ€Ğ°Ñ‚ÑŒ Ñ„Ğ°Ğ¹Ğ» ÑˆÑ€Ğ¸Ñ„Ñ‚Ğ°");
-        chooseFont.setOnClickListener(view -> {
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
-                    .addCategory(Intent.CATEGORY_OPENABLE)
-                    .setType("*/*");
-            startActivityForResult(intent, PICK_FONT);
-        });
-        form.addView(chooseFont, marginTop(10));
-        Button reset = button("Ğ¡Ğ±Ñ€Ğ¾ÑĞ¸Ñ‚ÑŒ HUD Ğº Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ğ¾Ğ¹ Ñ€Ğ°ÑĞºĞ»Ğ°Ğ´ĞºĞµ");
-        reset.setOnClickListener(view -> confirmReset());
-        form.addView(reset, marginTop(12));
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("ĞŸĞ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ‹ HUD")
-                .setView(scroll)
-                .setPositiveButton("ĞŸÑ€Ğ¸Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ", null)
-                .setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
-                    config.gridColumns = columns.intValue();
-                    config.gridRows = rows.intValue();
-                    config.backgroundMode = String.valueOf(background.getSelectedItem());
-                    config.globalBrightness = brightness.intValue();
-                    config.globalTextColor = value(globalColor);
-                    config.globalUnitColor = value(globalUnit);
-                    config.globalFontWeight = fontWeight.intValue();
-                    config.customFontUri = value(fontUri);
-                    config.navigationDisplayThresholdMeters = navThreshold.intValue();
-                    config.navigationHideDelaySeconds = navDelay.intValue();
-                    config.showGrid = showGrid.isChecked();
-                    config.freeMovement = free.isChecked();
-                    config.maskStockHud = maskStockHud.isChecked();
-                    if (!preferences.hudPanelEnabled.get()) {
-                        applyStockHudPreference(config.maskStockHud);
-                    }
-                    config.snowMode = snow.isChecked();
-                    config.syncElementColors = sync.isChecked();
-                    preferences.hudPanelAutostart.set(autostart.isChecked());
-                    config.normalize();
-                    canvas.updateConfig(config);
-                    persist(false);
-                    dialog.dismiss();
-                }));
-        showSafeDialog(dialog);
-    }
-
-    private void editStockHudControls() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout form = column();
-        form.setPadding(dp(18), dp(8), dp(18), dp(22));
-        scroll.addView(form);
-
-        form.addView(section("ProfileTransfer Â· CB33278"));
-        form.addView(text(
-                "Ğ§ĞµÑ‚Ñ‹Ñ€Ğµ ÑˆÑ‚Ğ°Ñ‚Ğ½Ñ‹Ñ… Ñ€ĞµĞ¶Ğ¸Ğ¼Ğ°, Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ½Ñ‹Ğµ Ğ² ECARX: 0 Guide, 1 Drive, 2 AR, "
-                        + "3 Simple. ĞšĞ¾Ğ¼Ğ°Ğ½Ğ´Ğ° Ğ¼ĞµĞ½ÑĞµÑ‚ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ñ‹Ğ¹ Ñ€ĞµĞ¶Ğ¸Ğ¼ Ğ¸ Ğ½Ğµ Ğ¿ĞµÑ€ĞµĞ´Ğ°Ñ‘Ñ‚ "
-                        + "Ğ½ÑƒĞ»ĞµĞ²ÑƒÑ HUD-Ğ¼Ğ°ÑĞºÑƒ.",
-                12, 0xFFB8C0CC), marginTop(5));
-        String[] modeChoices = {
-                "ĞĞµ Ğ¼ĞµĞ½ÑÑ‚ÑŒ",
-                "0 Â· Guide",
-                "1 Â· Drive",
-                "2 Â· AR",
-                "3 Â· Simple"
-        };
-        Spinner mode = spinner(modeChoices, "ĞĞµ Ğ¼ĞµĞ½ÑÑ‚ÑŒ");
-        int savedMode = preferences.hudStockProfileMode.get();
-        mode.setSelection(savedMode >= 0 && savedMode <= 3 ? savedMode + 1 : 0);
-        form.addView(mode, marginTop(7));
-        Switch autoRepeat = switchView(
-                "Ğ ĞµĞ·ĞµÑ€Ğ²Ğ½Ñ‹Ğ¹ Ğ°Ğ²Ñ‚Ğ¾Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ğ¾Ğ³Ğ¾ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğ°",
-                preferences.hudStockProfileModeAutoRepeat.get());
-        form.addView(autoRepeat, marginTop(6));
-        form.addView(text(
-                "ĞĞ²Ñ‚Ğ¾Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€ ÑÑ€Ğ°Ğ±Ğ°Ñ‚Ñ‹Ğ²Ğ°ĞµÑ‚ Ğ¿Ğ¾ÑĞ»Ğµ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸, ÑĞ¼ĞµĞ½Ñ‹ Ğ¿Ñ€Ğ¾Ñ„Ğ¸Ğ»Ñ, Ğ¿ĞµÑ€ĞµÑ…Ğ¾Ğ´Ğ¾Ğ² HUD/ADAS "
-                        + "Ğ¸ Ğ¿ĞµÑ€ĞµÑĞµÑ‡ĞµĞ½Ğ¸Ñ 20 ĞºĞ¼/Ñ‡. ĞĞµ Ñ‡Ğ°Ñ‰Ğµ 5 Ğ·Ğ°Ğ¿Ğ¸ÑĞµĞ¹ Ğ² Ğ¼Ğ¸Ğ½ÑƒÑ‚Ñƒ, Ñ circuit breaker. "
-                        + "ĞŸĞµÑ€ĞµĞ´Ğ°Ñ‘Ñ‚ÑÑ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ CB33278 ÑĞ¾ Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸ĞµĞ¼ 0â€¦3.",
-                12, 0xFFFFCC66), marginTop(4));
-
-        form.addView(section("Ğ Ğ°Ğ·Ğ´ĞµĞ»Ñ‹ ÑˆÑ‚Ğ°Ñ‚Ğ½Ğ¾Ğ³Ğ¾ HUD"), marginTop(14));
-        form.addView(text(
-                "ĞÑ‚Ğ´ĞµĞ»ÑŒĞ½Ñ‹Ğ¹ ÑˆÑ‚Ğ°Ñ‚Ğ½Ñ‹Ğ¹ Ğ¿ÑƒÑ‚ÑŒ ICarFunction.setFunctionValue. ĞĞ° Ğ¿Ñ€Ğ¾ÑˆĞ¸Ğ²ĞºĞ°Ñ…, Ğ³Ğ´Ğµ "
-                        + "Ñ€Ğ°Ğ·Ğ´ĞµĞ» Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿ĞµĞ½, Ğ¿Ñ€Ğ¸Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ Ğ¿Ğ¾ĞºĞ°Ğ¶ĞµÑ‚ Ñ„Ğ°ĞºÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ¾Ñ‚ĞºĞ°Ğ· ECARX.",
-                12, 0xFFB8C0CC), marginTop(4));
-        boolean originalDrive = preferences.hudStockDriveEnvironment.get();
-        boolean originalSafety = preferences.hudStockSafety.get();
-        boolean originalMedia = preferences.hudStockMedia.get();
-        boolean originalNavigation = preferences.hudStockNavigation.get();
-        boolean originalPhone = preferences.hudStockPhone.get();
-        Switch drive = switchView("Drive Environment Â· Ğ¼Ğ°ÑˆĞ¸Ğ½ĞºĞ° Ğ¸ Ğ¾ĞºÑ€ÑƒĞ¶ĞµĞ½Ğ¸Ğµ", originalDrive);
-        Switch safety = switchView("Safety Â· ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ Ğ¸ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ", originalSafety);
-        Switch media = switchView("Media Â· Ğ¼ÑƒĞ·Ñ‹ĞºĞ°", originalMedia);
-        Switch navigation = switchView("Navigation Â· Ğ½Ğ°Ğ²Ğ¸Ğ³Ğ°Ñ†Ğ¸Ñ", originalNavigation);
-        Switch phone = switchView("Phone Â· Ñ‚ĞµĞ»ĞµÑ„Ğ¾Ğ½", originalPhone);
-        final boolean[] forceAllCategories = {false};
-        form.addView(drive, marginTop(5));
-        form.addView(safety);
-        form.addView(media);
-        form.addView(navigation);
-        form.addView(phone);
-        Button restore = button("Ğ’ĞºĞ»ÑÑ‡Ğ¸Ñ‚ÑŒ Ğ²ÑĞµ Ğ¿ÑÑ‚ÑŒ Ñ€Ğ°Ğ·Ğ´ĞµĞ»Ğ¾Ğ²");
-        restore.setOnClickListener(view -> {
-            forceAllCategories[0] = true;
-            drive.setChecked(true);
-            safety.setChecked(true);
-            media.setChecked(true);
-            navigation.setChecked(true);
-            phone.setChecked(true);
-        });
-        form.addView(restore, marginTop(8));
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Ğ¨Ñ‚Ğ°Ñ‚Ğ½Ñ‹Ğ¹ HUD ECARX")
-                .setView(scroll)
-                .setPositiveButton("ĞŸÑ€Ğ¸Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ", null)
-                .setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
-                    int selectedMode = mode.getSelectedItemPosition() - 1;
-                    boolean repeat = selectedMode >= 0 && autoRepeat.isChecked();
-                    preferences.hudStockProfileMode.set(selectedMode);
-                    preferences.hudStockProfileModeAutoRepeat.set(repeat);
-                    CarIntegration integration = CarIntegrations.get(this);
-                    if (selectedMode >= 0) {
-                        integration.setStockHudProfileMode(selectedMode, repeat,
-                                (success, message) -> showStockHudResult(
-                                        "Ğ ĞµĞ¶Ğ¸Ğ¼ " + selectedMode, success, message));
-                    } else {
-                        integration.stopStockHudProfileModeAutoRepeat(
-                                (success, message) -> {
-                                    if (!success) showStockHudResult(
-                                            "ĞĞ²Ñ‚Ğ¾Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€", false, message);
-                                });
-                    }
-
-                    applyStockHudCategoryIfChanged(integration,
-                            CarIntegration.StockHudDisplayCategory.DRIVE_ENVIRONMENT,
-                            originalDrive, drive.isChecked(), forceAllCategories[0],
-                            preferences.hudStockDriveEnvironment);
-                    applyStockHudCategoryIfChanged(integration,
-                            CarIntegration.StockHudDisplayCategory.SAFETY,
-                            originalSafety, safety.isChecked(), forceAllCategories[0],
-                            preferences.hudStockSafety);
-                    applyStockHudCategoryIfChanged(integration,
-                            CarIntegration.StockHudDisplayCategory.MEDIA,
-                            originalMedia, media.isChecked(), forceAllCategories[0],
-                            preferences.hudStockMedia);
-                    applyStockHudCategoryIfChanged(integration,
-                            CarIntegration.StockHudDisplayCategory.NAVIGATION,
-                            originalNavigation, navigation.isChecked(), forceAllCategories[0],
-                            preferences.hudStockNavigation);
-                    applyStockHudCategoryIfChanged(integration,
-                            CarIntegration.StockHudDisplayCategory.PHONE,
-                            originalPhone, phone.isChecked(), forceAllCategories[0],
-                            preferences.hudStockPhone);
-                    dialog.dismiss();
-                }));
-        showSafeDialog(dialog);
-    }
-
-    private void applyStockHudCategoryIfChanged(
-            @NonNull CarIntegration integration,
-            @NonNull CarIntegration.StockHudDisplayCategory category,
-            boolean original, boolean desired, boolean force,
-            @NonNull Preferences.Bool preference) {
-        preference.set(desired);
-        if (!force && original == desired) return;
-        integration.setStockHudDisplayCategory(category, desired, (success, message) -> {
-            if (!success) showStockHudResult(category.name(), false, message);
-        });
-    }
-
-    private void showStockHudResult(String operation, boolean success,
-                                    @Nullable String message) {
-        String detail = message == null || message.trim().isEmpty()
-                ? (success ? "ĞºĞ¾Ğ¼Ğ°Ğ½Ğ´Ğ° Ğ¿Ñ€Ğ¸Ğ½ÑÑ‚Ğ°" : "ECARX Ğ½Ğµ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ´Ğ¸Ğ» ĞºĞ¾Ğ¼Ğ°Ğ½Ğ´Ñƒ")
-                : message.trim();
-        Toast.makeText(getApplicationContext(),
-                operation + ": " + detail, success ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG)
-                .show();
-    }
-
-    private void applyStockHudPreference(boolean hidden) {
-        CarIntegrations.get(this).setStockHudCarHidden(hidden, (success, message) -> {
-            if (success) return;
-            String detail = message == null || message.trim().isEmpty()
-                    ? "ECARX Ğ½Ğµ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ´Ğ¸Ğ» Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ğµ"
-                    : message.trim();
-            Toast.makeText(getApplicationContext(),
-                    "Ğ¨Ñ‚Ğ°Ñ‚Ğ½Ñ‹Ğ¹ HUD AR: " + detail, Toast.LENGTH_LONG).show();
-        });
-    }
-
-    private void confirmReset() {
-        new AlertDialog.Builder(this).setTitle("Ğ¡Ğ±Ñ€Ğ¾ÑĞ¸Ñ‚ÑŒ HUD?")
-                .setMessage("Ğ‘ÑƒĞ´ÑƒÑ‚ Ğ·Ğ°Ğ¼ĞµĞ½ĞµĞ½Ñ‹ ÑĞµÑ‚ĞºĞ° Ğ¸ Ğ²ÑĞµ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ñ‹ HUD. ĞÑÑ‚Ğ°Ğ»ÑŒĞ½Ñ‹Ğµ Ğ¿Ğ°Ğ½ĞµĞ»Ğ¸ "
-                        + "Ğ¿Ñ€Ğ¸Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ñ Ğ½Ğµ Ğ¸Ğ·Ğ¼ĞµĞ½ÑÑ‚ÑÑ.")
-                .setPositiveButton("Ğ¡Ğ±Ñ€Ğ¾ÑĞ¸Ñ‚ÑŒ", (dialog, which) -> {
-                    String displayUniqueId = config.displayUniqueId;
-                    int displayId = config.displayId;
-                    String displayName = config.displayName;
-                    int displayWidth = config.displayWidth;
-                    int displayHeight = config.displayHeight;
-                    config = HudPanelConfig.defaults();
-                    config.displayUniqueId = displayUniqueId;
-                    config.displayId = displayId;
-                    config.displayName = displayName;
-                    config.displayWidth = displayWidth;
-                    config.displayHeight = displayHeight;
-                    canvas.updateConfig(config);
-                    canvas.select(null);
-                    persist(false);
-                }).setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null).show();
-    }
-
-    private void duplicateSelected() {
-        HudElementConfig source = canvas.selected();
-        if (source == null) return;
-        if (source.type == HudElementType.NAV_MAP) {
-            Toast.makeText(this, "Ğ”Ğ»Ñ Ğ¾Ğ´Ğ½Ğ¾Ğ³Ğ¾ HUD Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ° Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ¾Ğ´Ğ½Ğ° ĞºĞ°Ñ€Ñ‚Ğ°",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-        try {
-            HudElementConfig copy = HudElementConfig.fromJson(source.toJson(),
-                    config.gridColumns, config.gridRows);
-            int suffix = 2;
-            String base = source.id;
-            while (containsId(base + "_" + suffix)) suffix++;
-            copy.id = base + "_" + suffix;
-            copy.automationId = copy.id;
-            copy.x = Math.min(config.gridColumns - copy.width, source.x + 1);
-            copy.y = Math.min(config.gridRows - copy.height, source.y + 1);
-            copy.zIndex = nextLayer();
-            copy.normalize(config.gridColumns, config.gridRows);
-            config.elements.add(copy);
-            canvas.updateConfig(config);
-            canvas.select(copy.id);
-            persist(false);
-        } catch (JSONException impossible) {
-            throw new IllegalStateException(impossible);
-        }
-    }
-
-    private void deleteSelected() {
-        HudElementConfig item = canvas.selected();
-        if (item == null) return;
-        new AlertDialog.Builder(this).setTitle("Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Â«" + item.title + "Â»?")
-                .setMessage("Ğ¦ĞµĞ»ÑŒ ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸ĞµĞ² " + item.automationId
-                        + " Ğ¾ÑÑ‚Ğ°Ğ½ĞµÑ‚ÑÑ Ğ² ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½Ğ½Ñ‹Ñ… ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸ÑÑ…, Ğ½Ğ¾ Ğ¿ĞµÑ€ĞµÑÑ‚Ğ°Ğ½ĞµÑ‚ Ğ¾Ñ‚Ğ¾Ğ±Ñ€Ğ°Ğ¶Ğ°Ñ‚ÑŒÑÑ.")
-                .setPositiveButton("Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ", (dialog, which) -> {
-                    config.elements.remove(item);
-                    canvas.select(null);
-                    canvas.updateConfig(config);
-                    persist(false);
-                }).setNegativeButton("ĞÑ‚Ğ¼ĞµĞ½Ğ°", null).show();
-    }
-
-    private void changeLayer(int delta) {
-        HudElementConfig item = canvas.selected();
-        if (item == null) return;
-        item.zIndex += delta;
-        canvas.invalidate();
-        persist(false);
-    }
-
-    private void persist(boolean toast) {
-        if (store == null || config == null) return;
-        main.removeCallbacks(persistLive);
-        config.normalize();
-        store.save(config);
-        if (runtime != null) runtime.updateConfig(config);
-        if (canvas != null) canvas.updateConfig(config);
-        HudPresentationService.notifyConfigChanged(this);
-        if (toast) Toast.makeText(this, "HUD ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½", Toast.LENGTH_SHORT).show();
-    }
-
-    private void updateStatus() {
-        if (status == null) return;
-        String selectedDisplay = "Display ID " + HudViewportPolicy.VERIFIED_DISPLAY_ID
-                + (config.displayName.isEmpty() ? "" : " Â· " + config.displayName)
-                + (config.displayUniqueId.isEmpty() ? "" : " Â· " + config.displayUniqueId)
-                + (config.displayWidth <= 0 || config.displayHeight <= 0 ? ""
-                : " Â· " + config.displayWidth + "Ã—" + config.displayHeight);
-        status.setText((preferences.hudPanelEnabled.get() ? "Ğ’ĞºĞ»ÑÑ‡Ñ‘Ğ½" : "Ğ’Ñ‹ĞºĞ»ÑÑ‡ĞµĞ½")
-                + " Â· " + selectedDisplay + "\n"
-                + HudPresentationService.runtimeDetail(this));
-    }
-
-    private void updateSelection(@Nullable HudElementConfig item) {
-        if (selection == null) return;
-        selection.setText(item == null ? "Ğ­Ğ»ĞµĞ¼ĞµĞ½Ñ‚ Ğ½Ğµ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½"
-                : item.title + " Â· " + item.type.label + " Â· "
-                + item.x + ":" + item.y + " Â· " + item.width + "Ã—" + item.height
-                + " Â· ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¸: " + item.automationId);
-    }
-
-    private boolean containsId(String id) {
-        for (HudElementConfig item : config.elements) if (id.equals(item.id)) return true;
-        return false;
-    }
-
-    private int nextLayer() {
-        int maximum = 0;
-        for (HudElementConfig item : config.elements) maximum = Math.max(maximum, item.zIndex);
-        return maximum + 1;
-    }
-
-    private int previousBackdropLayer() {
-        int minimum = 0;
-        for (HudElementConfig item : config.elements) {
-            if (item.type == HudElementType.BACKDROP) {
-                minimum = Math.min(minimum, item.zIndex);
-            }
-        }
-        return minimum - 1;
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != PICK_FONT || resultCode != RESULT_OK || data == null) return;
-        Uri uri = data.getData();
-        if (uri == null) return;
-        try {
-            getContentResolver().takePersistableUriPermission(uri,
-                    data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION));
-        } catch (RuntimeException ignored) {}
-        config.customFontUri = uri.toString();
-        persist(false);
-        Toast.makeText(this, "Ğ¨Ñ€Ğ¸Ñ„Ñ‚ HUD Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½", Toast.LENGTH_SHORT).show();
-    }
-
-    private LinearLayout column() {
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        return layout;
-    }
-
-    private TextView label(String value) { return text(value, 12, 0xFF98A4B3); }
-
-    private TextView section(String value) {
-        TextView view = text(value, 16, Color.WHITE);
-        view.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        return view;
-    }
-
-    private TextView text(String value, int sp, int color) {
-        TextView view = new TextView(this);
-        view.setText(value);
-        view.setTextSize(sp);
-        view.setTextColor(color);
-        return view;
-    }
-
-    private Button button(String value) {
-        Button button = new Button(this);
-        button.setText(value);
-        button.setAllCaps(false);
-        button.setMinWidth(0);
-        return button;
-    }
-
-    private Switch switchView(String label, boolean checked) {
-        Switch view = new Switch(this);
-        view.setText(label);
-        view.setTextColor(Color.WHITE);
-        view.setShowText(true);
-        view.setTextOn("Ğ’ĞºĞ»");
-        view.setTextOff("Ğ’Ñ‹ĞºĞ»");
-        view.setChecked(checked);
-        view.setPadding(dp(6), dp(5), dp(6), dp(5));
-        return view;
-    }
-
-    private EditText field(LinearLayout parent, String label, String value, boolean number) {
-        parent.addView(label(label), marginTop(8));
-        EditText field = new EditText(this);
-        field.setText(value);
-        field.setTextColor(Color.WHITE);
-        field.setHintTextColor(0xFF667080);
-        field.setSingleLine(true);
-        if (number) field.setInputType(InputType.TYPE_CLASS_NUMBER
-                | InputType.TYPE_NUMBER_FLAG_SIGNED);
-        parent.addView(field, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        return field;
-    }
-
-    /** A bounded control for common HUD visual values; no keyboard or malformed numbers. */
-    private SliderField slider(@NonNull LinearLayout parent, @NonNull String title,
-                               double initial, double minimum, double maximum,
-                               double step, @NonNull String suffix) {
-        TextView valueLabel = label("");
-        parent.addView(valueLabel, marginTop(8));
-        SeekBar control = new SeekBar(this);
-        int steps = Math.max(1, (int) Math.round((maximum - minimum) / step));
-        control.setMax(steps);
-        int initialProgress = (int) Math.round((initial - minimum) / step);
-        control.setProgress(Math.max(0, Math.min(steps, initialProgress)));
-        SliderField result = new SliderField(
-                title, suffix, minimum, step, control, valueLabel);
-        result.updateLabel();
-        control.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress,
-                                                    boolean fromUser) {
-                result.updateLabel();
-            }
-
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        parent.addView(control, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        return result;
-    }
-
-    private static final class SliderField {
-        @NonNull private final String title;
-        @NonNull private final String suffix;
-        private final double minimum;
-        private final double step;
-        @NonNull private final SeekBar control;
-        @NonNull private final TextView valueLabel;
-
-        SliderField(@NonNull String title, @NonNull String suffix,
-                    double minimum, double step, @NonNull SeekBar control,
-                    @NonNull TextView valueLabel) {
-            this.title = title;
-            this.suffix = suffix;
-            this.minimum = minimum;
-            this.step = step;
-            this.control = control;
-            this.valueLabel = valueLabel;
-        }
-
-        double value() {
-            return minimum + control.getProgress() * step;
-        }
-
-        int intValue() {
-            return (int) Math.round(value());
-        }
-
-        void updateLabel() {
-            double current = value();
-            String rendered;
-            if (Math.abs(current - Math.rint(current)) < 0.0001) {
-                rendered = Integer.toString((int) Math.rint(current));
-            } else if (Math.abs(current * 2 - Math.rint(current * 2)) < 0.0001) {
-                rendered = String.format(Locale.ROOT, "%.1f", current);
-            } else {
-                rendered = String.format(Locale.ROOT, "%.2f", current);
-            }
-            valueLabel.setText(title + ": " + rendered + suffix);
-        }
-    }
-
-    private Spinner spinner(String[] choices, String selected) {
-        Spinner spinner = new Spinner(this);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, choices);
-        spinner.setAdapter(adapter);
-        for (int index = 0; index < choices.length; index++) {
-            if (choices[index].equalsIgnoreCase(selected)) {
-                spinner.setSelection(index);
-                break;
-            }
-        }
-        return spinner;
-    }
-
-    private Spinner navigationCameraModeSpinner(@NonNull String mode) {
-        Spinner result = spinner(new String[]{
-                "ĞŸĞ¾ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ñƒ", "Ğ¡ĞµĞ²ĞµÑ€ Ğ²ÑĞµĞ³Ğ´Ğ° ÑĞ²ĞµÑ€Ñ…Ñƒ", "ĞŸĞ¾ Ğ½Ğ°Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ¸Ñ Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸Ñ",
-                "Ğ¡Ğ²Ğ¾Ğ±Ğ¾Ğ´Ğ½Ğ¾Ğµ Ğ¿Ğ¾Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ"
-        }, "");
-        int selected;
-        switch (mode) {
-            case "NORTH_UP": selected = 1; break;
-            case "HEADING_UP": selected = 2; break;
-            case "FREE": selected = 3; break;
-            case "FOLLOW_ROUTE":
-            default: selected = 0; break;
-        }
-        result.setSelection(selected);
-        return result;
-    }
-
-    @NonNull
-    private static String navigationCameraModeValue(int position) {
-        switch (position) {
-            case 1: return "NORTH_UP";
-            case 2: return "HEADING_UP";
-            case 3: return "FREE";
-            case 0:
-            default: return "FOLLOW_ROUTE";
-        }
-    }
-
-    private Spinner windowButtonPositionSpinner(@NonNull String position) {
-        Spinner result = spinner(new String[]{
-                "Ğ¡Ğ²ĞµÑ€Ñ…Ñƒ ÑĞ»ĞµĞ²Ğ°", "Ğ¡Ğ²ĞµÑ€Ñ…Ñƒ ÑĞ¿Ñ€Ğ°Ğ²Ğ°", "Ğ¡Ğ½Ğ¸Ğ·Ñƒ ÑĞ»ĞµĞ²Ğ°", "Ğ¡Ğ½Ğ¸Ğ·Ñƒ ÑĞ¿Ñ€Ğ°Ğ²Ğ°"
-        }, "");
-        int selected;
-        switch (position) {
-            case "TOP_RIGHT": selected = 1; break;
-            case "BOTTOM_LEFT": selected = 2; break;
-            case "BOTTOM_RIGHT": selected = 3; break;
-            case "TOP_LEFT":
-            default: selected = 0; break;
-        }
-        result.setSelection(selected);
-        return result;
-    }
-
-    @NonNull
-    private static String windowButtonPositionValue(int position) {
-        switch (position) {
-            case 1: return "TOP_RIGHT";
-            case 2: return "BOTTOM_LEFT";
-            case 3: return "BOTTOM_RIGHT";
-            case 0:
-            default: return "TOP_LEFT";
-        }
-    }
-
-    private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
-                                  @NonNull String initial) {
-        ColorField field = new ColorField(initial);
-        MaterialButton button = new MaterialButton(this);
-        button.setText(title);
-        button.setAllCaps(false);
-        field.button = button;
-        AppleColorPickerDialog.decorateButton(button, title, initial);
-        button.setOnClickListener(view -> AppleColorPickerDialog.show(
-                this, title, field.value, AppleColorPickerDialog.Options.standard(),
-                new AppleColorPickerDialog.Listener() {
-                    private void apply(@Nullable String selected) {
-                        if (selected == null || selected.trim().isEmpty()) return;
-                        field.value = selected;
-                        AppleColorPickerDialog.decorateButton(button, title, field.value);
-                    }
-
-                    @Override public void onPreview(@Nullable String selected) {
-                        apply(selected);
-                    }
-
-                    @Override public void onSelected(@Nullable String selected) {
-                        apply(selected);
-                    }
-                }));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
-        params.topMargin = dp(6);
-        parent.addView(button, params);
-        return field;
-    }
-
-    private static final class ColorField {
-        @NonNull String value;
-        @Nullable MaterialButton button;
-
-        ColorField(@NonNull String value) {
-            this.value = value;
-        }
-    }
-
-    private LinearLayout.LayoutParams fixed(int widthDp) {
-        return new LinearLayout.LayoutParams(dp(widthDp), ViewGroup.LayoutParams.WRAP_CONTENT);
-    }
-
-    private LinearLayout.LayoutParams marginTop(int dp) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.topMargin = dp(dp);
-        return params;
-    }
-
-    private static String value(EditText field) {
-        return field.getText() == null ? "" : field.getText().toString().trim();
-    }
-
-    /**
-     * Keeps every editor dialog below the live driver/status panel on the 1920x720 head unit.
-     * The content remains scrollable, so enlarged OEM font scaling cannot push Apply off-screen.
-     */
-    private void showSafeDialog(@NonNull AlertDialog dialog) {
-        dialog.show();
-        android.view.Window window = dialog.getWindow();
-        if (window == null) return;
-        android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        WidgetService host = WidgetService.getInstance();
-        int overlayTop = host == null ? 0 : host.getStatusBarOverlayHeight();
-        int reservedTop = Math.max(dp(72), overlayTop + dp(8));
-        int width = Math.max(dp(480), metrics.widthPixels - dp(32));
-        int height = Math.max(dp(300), metrics.heightPixels - reservedTop - dp(12));
-        width = Math.min(width, metrics.widthPixels);
-        height = Math.min(height, metrics.heightPixels);
-        window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        window.setLayout(width, height);
-        int driverInset = driverPanelInset();
-        boolean driverOnRight = preferences.driverPanelSide.get() == 1;
-        View decor = window.getDecorView();
-        decor.setPadding(driverOnRight ? 0 : driverInset, decor.getPaddingTop(),
-                driverOnRight ? driverInset : 0, decor.getPaddingBottom());
-    }
-
-    private int driverPanelInset() {
-        if (preferences == null || !preferences.driverPanelEnabled.get()) return 0;
-        return Math.max(dp(12), preferences.driverPanelWidthPx.get() + dp(12));
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
-}
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíß4í:-jZ.¶›­–)Ş³Rò¢5E‚ÔÆ–6Vç6RÔ–FVçF–f–W#¢uÂÓ2ãÖ÷"ÖÆFW"¢ğ§6¶vRFW§¢ç7FGW2çv–FvWC° ¦–×÷'BæG&ö–Bæ6öçFVçBä–çFVçC°¦–×÷'BæG&ö–Bæw&†–72ä6öÆ÷#°¦–×÷'BæG&ö–BææWBåW&“°¦–×÷'BæG&ö–Bæ÷2ä'VæFÆS°¦–×÷'BæG&ö–Bæ÷2ä†æFÆW#°¦–×÷'BæG&ö–Bæ÷2äÆö÷W#°¦–×÷'BæG&ö–BçFW‡Bä–çWEG—S°¦–×÷'BæG&ö–Bçf–Wräw&f—G“°¦–×÷'BæG&ö–Bçf–Wråf–Ws°¦–×÷'BæG&ö–Bçf–Wråf–Wtw&÷W°¦–×÷'BæG&ö–Bçv–FvWBä'&”FFW#°¦–×÷'BæG&ö–Bçv–FvWBä'WGFöã°¦–×÷'BæG&ö–Bçv–FvWBäVF—EFW‡C°¦–×÷'BæG&ö–Bçv–FvWBäg&ÖTÆ–÷WC°¦–×÷'BæG&ö–Bçv–FvWBäÆ–æV$Æ–÷WC°¦–×÷'BæG&ö–Bçv–FvWBå67&öÆÅf–Ws°¦–×÷'BæG&ö–Bçv–FvWBå6VV´&#°¦–×÷'BæG&ö–Bçv–FvWBå7–ææW#°¦–×÷'BæG&ö–Bçv–FvWBå7v—F6ƒ°¦–×÷'BæG&ö–Bçv–FvWBåFW‡Ef–Ws°¦–×÷'BæG&ö–Bçv–FvWBåFö7C° ¦–×÷'BæG&ö–G‚æææ÷FF–öâäæöäçVÆÃ°¦–×÷'BæG&ö–G‚æææ÷FF–öâäçVÆÆ&ÆS°¦–×÷'BæG&ö–G‚æ6ö×BæäÆW'DF–Æös°¦–×÷'BæG&ö–G‚æ6ö×Bæä6ö×D7F—f—G“° ¦–×÷'B6öÒævöövÆRææG&ö–BæÖFW&–Âæ'WGFöâäÖFW&–Ä'WGFöã° ¦–×÷'B÷&ræ§6öâä¥4ôäW†6WF–öã°¦–×÷'B÷&ræ§6öâä¥4ôäö&¦V7C° ¦–×÷'B¦fçWF–Âä'&”Æ—7C°¦–×÷'B¦fçWF–Âä6öÆÆV7F–öç3°¦–×÷'B¦fçWF–ÂäÆ–æ¶VD†6„Ö°¦–×÷'B¦fçWF–ÂäÆ—7C°¦–×÷'B¦fçWF–ÂäÆö6ÆS°¦–×÷'B¦fçWF–ÂäÖ° ¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VD6çf5f–Ws°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VDF—7Æ•6VÆV7F÷#°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VDVÆVÖVçD6öæf–s°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VDVÆVÖVçEG—S°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VD†÷&—¦öçFÄw&÷W°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VEæVÄ6öæf–s°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VEæVÅ7F÷&S°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VE&W6VçFF–öå6W'f–6S°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VE'VçF–ÖTFF°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ‡VBä‡VEf–Ww÷'EöÆ–7“°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ6"ä6$–çFVw&F–öã°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ6"ä6$–çFVw&F–öç3°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ–çFVw&F–öâä6öææV7F÷%G—S°¦–×÷'BFW§¢ç7FGW2çv–FvWBæ–çFVw&F–öâå6÷W&6T&–æF–æs°¦–×÷'BFW§¢ç7FGW2çv–FvWBææf–vF–öâäæf–vF–öä–çFVw&F–öä6öæf–s°¦–×÷'BFW§¢ç7FGW2çv–FvWBææf–vF–öâäæf–vF–öä‡VDVæGö–çE6W'f–6S°¦–×÷'BFW§¢ç7FGW2çv–FvWBç6WGF–æw2äÆT6öÆ÷%–6¶W$F–Æös°¦–×÷'BFW§¢ç7FGW2çv–FvWBç6WGF–æw2å6WGF–æw4&6´æf–vF–öã° ¢ò¢ ¢¢Ö–âÖF—7Æ’ÂÆ—fR…TBVF—F÷"âG&vv–ær÷&W6—¦–ær—2&ö¦V7FVBöçFòF†R6VÆV7FVBW‡FW&æÂF—7Æ¢¢gFW"6†÷'Bw&—FRFV&÷Væ6S²F†R…TB—G6VÆbæWfW"†÷7G2VF—F÷"6öçG&öÇ2÷"&V6V—fW2F÷V6‚à¢¢ğ§V&Æ–2f–æÂ6Æ72‡VEæVÅ6WGF–æw47F—f—G’W‡FVæG26ö×D7F—f—G’°¢&—fFR7FF–2f–æÂ–çB”4µôdôåBÒƒCƒCc°¢æöäçVÆÂ&—fFRf–æÂ†æFÆW"Ö–âÒæWr†æFÆW"„Æö÷W"ævWDÖ–äÆö÷W"‚’“°¢&—fFR&VfW&Væ6W2&VfW&Væ6W3°¢&—fFR‡VEæVÅ7F÷&R7F÷&S°¢&—fFR‡VEæVÄ6öæf–r6öæf–s°¢&—fFR‡VE'VçF–ÖTFF'VçF–ÖS°¢&—fFR‡VD6çf5f–Wr6çf3°¢&—fFRFW‡Ef–Wr7FGW3°¢&—fFRFW‡Ef–Wr6VÆV7F–öã°¢&—fFR7v—F6‚Væ&ÆVC°¢&—fFRf–æÂ'Vææ&ÆRW'6—7DÆ—fRÒ‚’ÓâW'6—7B†fÇ6R“°¢&—fFRf–æÂ'Vææ&ÆR7FGW5F–6²ÒæWr'Vææ&ÆR‚’°¢÷fW'&–FRV&Æ–2fö–B'Vâ‚’°¢WFFU7FGW2‚“°¢Ö–âç÷7DFVÆ–VB‡F†—2ÂóÂ“°¢Ğ¢Ó° ¢÷fW'&–FP¢&÷FV7FVBfö–Böä7&VFR„çVÆÆ&ÆR'VæFÆR6fVD–ç7Fæ6U7FFR’°¢7WW"æöä7&VFR‡6fVD–ç7Fæ6U7FFR“°¢&VfW&Væ6W2ÒæWr&VfW&Væ6W2‡F†—2“°¢7F÷&RÒæWr‡VEæVÅ7F÷&R‡&VfW&Væ6W2“°¢6öæf–rÒ7F÷&RæÆöB‚“°¢'VçF–ÖRÒæWr‡VE'VçF–ÖTFF‡F†—2Â6öæf–rÂ‚’Óâ°¢–b†6çf2ÒçVÆÂ’6çf2æ–çfÆ–FFR‚“°¢Ò“° ¢Æ–æV$Æ–÷WB&ö÷BÒæWrÆ–æV$Æ–÷WB‡F†—2“°¢&ö÷Bç6WD÷&–VçFF–öâ„Æ–æV$Æ–÷WBådU%D”4Â“°¢&ö÷Bç6WD&6¶w&÷VæD6öÆ÷"ƒ„dc#C"“°¢–çBG&—fW$–ç6WBÒG&—fW%æVÄ–ç6WB‚“°¢&ööÆVâG&—fW$öå&–v‡BÒ&VfW&Væ6W2æG&—fW%æVÅ6–FRævWB‚’ÓÒ°¢&ö÷Bç6WEFF–ær†Gƒ"’²†G&—fW$öå&–v‡Bò¢G&—fW$–ç6WB’ÂGƒ’À¢Gƒ"’²†G&—fW$öå&–v‡BòG&—fW$–ç6WB¢’ÂGƒ’“°¢&ö÷BæFEf–Wr‡FööÆ&"‚’ÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2€¢f–Wtw&÷WäÆ–÷WE&×2äÔD4…õ$TåBÂf–Wtw&÷WäÆ–÷WE&×2åu$ô4ôåDTåB’“° ¢7FGW2ÒFW‡B‚$…TBİR}ı=]Ò"Â2Â„dd#t3$C"“°¢&ö÷BæFEf–Wr‡7FGW2ÂÖ&v–åF÷ƒb’“° ¢g&ÖTÆ–÷WB&Wf–WrÒæWrg&ÖTÆ–÷WB‡F†—2“°¢&Wf–Wrç6WD&6¶w&÷VæD6öÆ÷"„6öÆ÷"ä$Ä4²“°¢6çf2ÒæWr‡VD6çf5f–Wr‡F†—2Â6öæf–rÂ'VçF–ÖRÂG'VRÀ¢æWr‡VD6çf5f–WräVF—F÷$Æ—7FVæW"‚’°¢÷fW'&–FRV&Æ–2fö–Böå6VÆV7F–öä6†ævVB€¢çVÆÆ&ÆR‡VDVÆVÖVçD6öæf–r6VÆV7FVB’°¢WFFU6VÆV7F–öâ‡6VÆV7FVB“°¢Ğ ¢÷fW'&–FRV&Æ–2fö–BöävVöÖWG'”6†ævVB€¢æöäçVÆÂ‡VDVÆVÖVçD6öæf–r—FVÒÂ&ööÆVâ6öÖÖ—GFVB’°¢WFFU6VÆV7F–öâ†—FVÒ“°¢Ö–âç&VÖ÷fT6ÆÆ&6·2‡W'6—7DÆ—fR“°¢Ö–âç÷7DFVÆ–VB‡W'6—7DÆ—fRÂ6öÖÖ—GFVBòÂ¢STÂ“°¢Ğ ¢÷fW'&–FRV&Æ–2fö–Böä6öæf–wW&R„æöäçVÆÂ‡VDVÆVÖVçD6öæf–r—FVÒ’°¢VF—DVÆVÖVçB†—FVÒ“°¢Ğ¢Ò“°¢&Wf–WræFEf–Wr†6çf2ÂæWrg&ÖTÆ–÷WBäÆ–÷WE&×2€¢f–Wtw&÷WäÆ–÷WE&×2äÔD4…õ$TåBÂf–Wtw&÷WäÆ–÷WE&×2äÔD4…õ$TåB’“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2&Wf–Wu&×2ÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2€¢f–Wtw&÷WäÆ–÷WE&×2äÔD4…õ$TåBÂÂb“°¢&Wf–Wu&×2çF÷Ö&v–âÒGƒ‚“°¢&ö÷BæFEf–Wr‡&Wf–WrÂ&Wf–Wu&×2“° ¢&ö÷BæFEf–Wr‡6VÆV7F–öä&"‚’ÂÖ&v–åF÷ƒ‚’“°¢FW‡Ef–Wr†–çBÒFW‡B‚-	­íİ-]Âİ½]Í]İ-Âı]]--R]=âıâ]-­S²İ’Í­] ¢²-"ı-íÂİmİ]Â==½2Í]İı]"}Í]â	}Í]İ]İò}2-Mİ²İ…TBâ"À¢"Â„dc„c”’“°¢&ö÷BæFEf–Wr††–çBÂÖ&v–åF÷ƒb’“°¢6WD6öçFVçEf–Wr‡&ö÷B“°¢6WGF–æw4&6´æf–vF–öâæÇ•6fUF÷–ç6WB‡F†—2Â&ö÷B“°¢Væ&ÆVBç6WD6†V6¶VB‡&VfW&Væ6W2æ‡VEæVÄVæ&ÆVBævWB‚’“°¢Ğ ¢÷fW'&–FR&÷FV7FVBfö–Böå7F'B‚’°¢7WW"æöå7F'B‚“°¢'VçF–ÖRç7F'B‚“°¢Ö–âç&VÖ÷fT6ÆÆ&6·2‡7FGW5F–6²“°¢Ö–âç÷7B‡7FGW5F–6²“°¢Ğ ¢÷fW'&–FR&÷FV7FVBfö–Böå7F÷‚’°¢Ö–âç&VÖ÷fT6ÆÆ&6·2‡7FGW5F–6²“°¢Ö–âç&VÖ÷fT6ÆÆ&6·2‡W'6—7DÆ—fR“°¢W'6—7B†fÇ6R“°¢'VçF–ÖRç7F÷‚“°¢7WW"æöå7F÷‚“°¢Ğ ¢&—fFRf–WrFööÆ&"‚’°¢Æ–æV$Æ–÷WB&÷rÒæWrÆ–æV$Æ–÷WB‡F†—2“°¢&÷rç6WDw&f—G’„w&f—G’ä4TåDU%õdU%D”4Â“°¢'WGFöâ&6²Ò'WGFöâ‚.(i"“°¢&6²ç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâf–æ—6‚‚’“°¢&÷ræFEf–Wr†&6²Âf—†VBƒSB’“° ¢FW‡Ef–WrF—FÆRÒFW‡B‚$…TBİMı½]’"Â#Â6öÆ÷"åt„•DR“°¢F—FÆRç6WEG—Vf6R†æG&ö–Bæw&†–72åG—Vf6RäDTdTÅEô$ôÄB“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2F—FÆU&×2ÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2ƒÀ¢f–Wtw&÷WäÆ–÷WE&×2åu$ô4ôåDTåBÂb“°¢F—FÆU&×2æÆVgDÖ&v–âÒGƒ‚“°¢&÷ræFEf–Wr‡F—FÆRÂF—FÆU&×2“° ¢Væ&ÆVBÒ7v—F6…f–Wr‚$…TB"Â&VfW&Væ6W2ÒçVÆÂbb&VfW&Væ6W2æ‡VEæVÄVæ&ÆVBævWB‚’“°¢Væ&ÆVBç6WDöä6†V6¶VD6†ævTÆ—7FVæW"‚†'WGFöâÂ6†V6¶VB’Óâ°¢&VfW&Væ6W2æ‡VEæVÄVæ&ÆVBç6WB†6†V6¶VB“°¢–b†6†V6¶VB’v–FvWE6W'f–6U7F'FW"ç7F'D–dæVVFVB‡F†—2“°¢‡VE&W6VçFF–öå6W'f–6RæÇ’‡F†—2“°¢v–FvWE6W'f–6R†÷7BÒv–FvWE6W'f–6RævWD–ç7Fæ6R‚“°¢–b††÷7BÒçVÆÂ’†÷7BæÇ•&VfW&Væ6W2‚“°¢WFFU7FGW2‚“°¢Ò“°¢&÷ræFEf–Wr†Væ&ÆVB“° ¢'WGFöâF—7Æ’Ò'WGFöâ‚$…TB+r”B""“°¢F—7Æ’ç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ6†ö÷6TF—7Æ’‚’“°¢&÷ræFEf–Wr†F—7Æ’“°¢'WGFöâFBÒ'WGFöâ‚"²
+İ½]Í]İ""“°¢FBç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâFDVÆVÖVçB‚’“°¢&÷ræFEf–Wr†FB“°¢'WGFöâ&6¶G&÷Ò'WGFöâ‚"²	ıíM½ím­"“°¢&6¶G&÷ç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâFD&6¶G&÷‚’“°¢&÷ræFEf–Wr†&6¶G&÷“°¢'WGFöâæf–vF÷"Ò'WGFöâ‚-	İ-=-í3ã2"“°¢æf–vF÷"ç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâVF—Dæf–vF÷$–çFVw&F–öâ‚’“°¢&÷ræFEf–Wr†æf–vF÷"“°¢'WGFöâ÷F–öç2Ò'WGFöâ‚-	ıÍ]-²"“°¢÷F–öç2ç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâVF—DvÆö&Ä÷F–öç2‚’“°¢&÷ræFEf–Wr†÷F–öç2“°¢'WGFöâ6fRÒ'WGFöâ‚-
+í]İ-Â"“°¢6fRç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâW'6—7B‡G'VR’“°¢&÷ræFEf–Wr‡6fR“°¢&WGW&â&÷s°¢Ğ ¢&—fFRf–Wr6VÆV7F–öä&"‚’°¢Æ–æV$Æ–÷WB&÷rÒæWrÆ–æV$Æ–÷WB‡F†—2“°¢&÷rç6WDw&f—G’„w&f—G’ä4TåDU%õdU%D”4Â“°¢6VÆV7F–öâÒFW‡B‚-
+İ½]Í]İ"İR-½Ò"Â2Â„ddCTD4Sb“°¢&÷ræFEf–Wr‡6VÆV7F–öâÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2ƒÀ¢f–Wtw&÷WäÆ–÷WE&×2åu$ô4ôåDTåBÂb’“°¢'WGFöâVF—BÒ'WGFöâ‚-	İ-í-Â"“°¢VF—Bç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ°¢‡VDVÆVÖVçD6öæf–r—FVÒÒ6çf2ç6VÆV7FVB‚“°¢–b†—FVÒÒçVÆÂ’VF—DVÆVÖVçB†—FVÒ“°¢Ò“°¢&÷ræFEf–Wr†VF—B“°¢'WGFöâGWÆ–6FRÒ'WGFöâ‚-	­íıò"“°¢GWÆ–6FRç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâGWÆ–6FU6VÆV7FVB‚’“°¢&÷ræFEf–Wr†GWÆ–6FR“°¢'WGFöâF÷vâÒ'WGFöâ‚.(i2½í’"“°¢F÷vâç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ6†ævTÆ–W"‚Ó’“°¢&÷ræFEf–Wr†F÷vâ“°¢'WGFöâWÒ'WGFöâ‚.(i½í’"“°¢Wç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ6†ævTÆ–W"ƒ’“°¢&÷ræFEf–Wr‡W“°¢'WGFöâFVÆWFRÒ'WGFöâ‚-
+=M½-Â"“°¢FVÆWFRç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâFVÆWFU6VÆV7FVB‚’“°¢&÷ræFEf–Wr†FVÆWFR“°¢&WGW&â&÷s°¢Ğ ¢&—fFRfö–B6†ö÷6TF—7Æ’‚’°¢Æ—7CÄ‡VDF—7Æ•6VÆV7F÷"ä6æF–FFSâf–Æ&ÆRÒ‡VDF—7Æ•6VÆV7F÷"æf–Æ&ÆR‡F†—2“°¢'&”Æ—7CÄ‡VDF—7Æ•6VÆV7F÷"ä6æF–FFSâW‡FW&æÂÒæWr'&”Æ—7CÃâ‚“°¢f÷"„‡VDF—7Æ•6VÆV7F÷"ä6æF–FFR—FVÒ¢f–Æ&ÆR’°¢–b‚—FVÒæFVfVÇDF—7Æ¢bb—FVÒæ–BÓÒ‡VEf–Ww÷'EöÆ–7’ådU$”d”TEôD•5Ä•ô”B’°¢W‡FW&æÂæFB†—FVÒ“°¢Ğ¢Ğ¢–b†W‡FW&æÂæ—4V×G’‚’’°¢æWrÆW'DF–Æörä'V–ÆFW"‡F†—2¢ç6WEF—FÆR‚$…TB+rF—7Æ’”B""¢ç6WDÖW76vR‚-	"MÍıRÍ=İ-í½²…TBıíM--]mMÒ­¢ıí-íıİİ½’F—7Æ’”B" ¢²-ıí-]]İí-Íâ“#9sƒâ
+]}æG&ö–B]=âİRíí]#² ¢²-ı½ím]İR]}íıİâmM"Í]İİâ”B"‚İRı]]M"İM==í’İ­Òâ"¢ç6WE÷6—F—fT'WGFöâ‚-	ıíİı-İâ"ÂçVÆÂ’ç6†÷r‚“°¢&WGW&ã°¢Ğ¢7G&–æuµÒÆ&VÇ2ÒæWr7G&–æu¶W‡FW&æÂç6—¦R‚•Ó°¢–çB6VÆV7FVBÒÓ°¢f÷"†–çB–æFW‚Ò²–æFW‚ÂW‡FW&æÂç6—¦R‚“²–æFW‚²²’°¢‡VDF—7Æ•6VÆV7F÷"ä6æF–FFR—FVÒÒW‡FW&æÂævWB†–æFW‚“°¢Æ&VÇ5¶–æFW…ÒÒ—FVÒæÆ&VÂ‚“°¢–b†6öæf–ræF—7Æ”–BÓÒ—FVÒæ–B’°¢6VÆV7FVBÒ–æFWƒ°¢Ğ¢Ğ¢æWrÆW'DF–Æörä'V–ÆFW"‡F†—2’ç6WEF—FÆR‚-	ıíM--]mMİİ½’…TB+r”B""¢ç6WE6–ævÆT6†ö–6T—FV×2†Æ&VÇ2Â6VÆV7FVBÂ†F–ÆörÂv†–6‚’Óâ°¢‡VDF—7Æ•6VÆV7F÷"ç&VÖVÖ&W"†6öæf–rÂW‡FW&æÂævWB‡v†–6‚’“°¢W'6—7B†fÇ6R“°¢F–ÆöræF—6Ö—72‚“°¢WFFU7FGW2‚“°¢Ò¢ç6WDæVvF—fT'WGFöâ‚-	í-Í]İ"ÂçVÆÂ’ç6†÷r‚“°¢Ğ ¢&—fFRfö–BFDVÆVÖVçB‚’°¢'&”Æ—7CÄ‡VDVÆVÖVçEG—SâG—W2ÒæWr'&”Æ—7CÃâ‚“°¢f÷"„‡VDVÆVÖVçEG—RG—R¢‡VDVÆVÖVçEG—RçfÇVW2‚’’°¢–b‡G—RÒ‡VDVÆVÖVçEG—Rä$4´E$õ’G—W2æFB‡G—R“°¢Ğ¢7G&–æuµÒÆ&VÇ2ÒæWr7G&–æu·G—W2ç6—¦R‚•Ó°¢f÷"†–çB–æFW‚Ò²–æFW‚ÂG—W2ç6—¦R‚“²–æFW‚²²’°¢Æ&VÇ5¶–æFW…ÒÒG—W2ævWB†–æFW‚’æ6FVv÷'’²"+r"²G—W2ævWB†–æFW‚’æÆ&VÃ°¢Ğ¢æWrÆW'DF–Æörä'V–ÆFW"‡F†—2’ç6WEF—FÆR‚-	Mí--Âİ…TB"¢ç6WD—FV×2†Æ&VÇ2Â†F–ÆörÂv†–6‚’Óâ°¢‡VDVÆVÖVçEG—RG—RÒG—W2ævWB‡v†–6‚“°¢–b‡G—RÓÒ‡VDVÆVÖVçEG—RääeôÔbbf–æDÖVÆVÖVçB‚’ÒçVÆÂ’°¢Fö7BæÖ¶UFW‡B‡F†—2À¢-	İ…TBÍím]"½-Â-í½Í­âíMİİ]}-Íò­-"À¢Fö7BäÄTäuD…õ4„õ%B’ç6†÷r‚“°¢&WGW&ã°¢Ğ¢–çB÷&F–æÂÒ°¢‡VDVÆVÖVçD6öæf–r—FVÓ°¢Fò°¢—FVÒÒ‡VDVÆVÖVçD6öæf–ræ7&VFR‡G—RÂ÷&F–æÂ²²À¢6öæf–ræw&–D6öÇVÖç2Â6öæf–ræw&–E&÷w2“°¢Òv†–ÆR†6öçF–ç4–B†—FVÒæ–B’“°¢—FVÒç¤–æFW‚ÒæW‡DÆ–W"‚“°¢6öæf–ræVÆVÖVçG2æFB†—FVÒ“°¢6çf2ç6VÆV7B†—FVÒæ–B“°¢6çf2çWFFT6öæf–r†6öæf–r“°¢W'6—7B†fÇ6R“°¢VF—DVÆVÖVçB†—FVÒ“°¢Ò’ç6WDæVvF—fT'WGFöâ‚-	í-Í]İ"ÂçVÆÂ’ç6†÷r‚“°¢Ğ ¢&—fFRfö–BFD&6¶G&÷‚’°¢–çB÷&F–æÂÒ°¢‡VDVÆVÖVçD6öæf–r—FVÓ°¢Fò°¢—FVÒÒ‡VDVÆVÖVçD6öæf–ræ7&VFR„‡VDVÆVÖVçEG—Rä$4´E$õÂ÷&F–æÂ²²À¢6öæf–ræw&–D6öÇVÖç2Â6öæf–ræw&–E&÷w2“°¢Òv†–ÆR†6öçF–ç4–B†—FVÒæ–B’“°¢—FVÒç¤–æFW‚Ò&Wf–÷W4&6¶G&÷Æ–W"‚“°¢6öæf–ræVÆVÖVçG2æFB†—FVÒ“°¢6çf2çWFFT6öæf–r†6öæf–r“°¢6çf2ç6VÆV7B†—FVÒæ–B“°¢W'6—7B†fÇ6R“°¢VF—DVÆVÖVçB†—FVÒ“°¢Ğ ¢&—fFRfö–BVF—DVÆVÖVçB„æöäçVÆÂ‡VDVÆVÖVçD6öæf–r—FVÒ’°¢–b†—FVÒçG—RÓÒ‡VDVÆVÖVçEG—Rä$4´E$õ’°¢VF—D&6¶G&÷†—FVÒ“°¢&WGW&ã°¢Ğ¢–b†—FVÒçG—RÓÒ‡VDVÆVÖVçEG—Rä„õ$•¤ôåDÅôu$õU’°¢VF—D†÷&—¦öçFÄw&÷W†—FVÒ“°¢&WGW&ã°¢Ğ¢–b†—FVÒçG—RÓÒ‡VDVÆVÖVçEG—RääeôÔ’°¢VF—DÖ7W&f6R†—FVÒ“°¢&WGW&ã°¢Ğ¢67&öÆÅf–Wr67&öÆÂÒæWr67&öÆÅf–Wr‡F†—2“°¢Æ–æV$Æ–÷WBf÷&ÒÒ6öÇVÖâ‚“°¢f÷&Òç6WEFF–ær†Gƒ‚’ÂGƒ‚’ÂGƒ‚’ÂGƒ‚’“°¢67&öÆÂæFEf–Wr†f÷&Ò“° ¢VF—EFW‡BF—FÆRÒf–VÆB†f÷&ÒÂ-	İ}-İR"Â—FVÒçF—FÆRÂfÇ6R“°¢FW‡Ef–Wr–Ö×WF&ÆT–BÒFW‡B‚$”C¢"²—FVÒæ–B²%Æí
+m]½Âm]İ]#¢ ¢²—FVÒæWFöÖF–öä–BÂ"Â„dc“Tb“°¢f÷&ÒæFEf–Wr†–Ö×WF&ÆT–BÂÖ&v–åF÷ƒB’“°¢VF—EFW‡BWFöÖF–öâÒf–VÆB†f÷&ÒÂ$”Bm]½‚m]İ]""Â—FVÒæWFöÖF–öä–BÂfÇ6R“°¢VF—EFW‡BÖWG&–2Òf–VÆB†f÷&ÒÂ$”B-]½]Í]-‚--íÍí½ò"À¢—FVÒçFVÆVÖWG'”ÖWG&–4–BÂfÇ6R“°¢VF—EFW‡Bf÷&ÖBÒf–VÆB†f÷&ÒÂ-
+MíÍ"‚W2½‚Rãb’"Â—FVÒçFW‡Df÷&ÖBÂfÇ6R“°¢VF—EFW‡BVæ—BÒf–VÆB†f÷&ÒÂ-	]Mİm"Â—FVÒçVæ—BÂfÇ6R“°¢VF—EFW‡BFW‡D6öÆ÷"Òf–VÆB†f÷&ÒÂ-
+m-]"-]­-"Â—FVÒçFW‡D6öÆ÷"ÂfÇ6R“°¢VF—EFW‡BVæ—D6öÆ÷"Òf–VÆB†f÷&ÒÂ-
+m-]"]Mİm²"Â—FVÒçVæ—D6öÆ÷"ÂfÇ6R“°¢6Æ–FW$f–VÆBföçE6—¦RÒ6Æ–FW"†f÷&ÒÂ-
+}Í]-]­-"À¢—FVÒæföçE6—¦U7Â‚Â“bÂÂ"7"“°¢6Æ–FW$f–VÆBföçEvV–v‡BÒ6Æ–FW"†f÷&ÒÂ-	İ½]İİí-ÂM-"À¢—FVÒæföçEvV–v‡BÂÂ“ÂÂ""“° ¢f÷&ÒæFEf–Wr‡6V7F–öâ‚-	ıí½ím]İR"]-­R…TB"’ÂÖ&v–åF÷ƒ"’“°¢6Æ–FW$f–VÆB‚Ò6Æ–FW"†f÷&ÒÂ-
+½]-"Â—FVÒç‚À¢ÂÖF‚æÖ‚ƒÂ6öæf–ræw&–D6öÇVÖç2Ò’ÂÂ"ırâ"“°¢6Æ–FW$f–VÆB’Ò6Æ–FW"†f÷&ÒÂ-
+-]]2"Â—FVÒç’À¢ÂÖF‚æÖ‚ƒÂ6öæf–ræw&–E&÷w2Ò’ÂÂ"ırâ"“°¢6Æ–FW$f–VÆBv–GF‚Ò6Æ–FW"†f÷&ÒÂ-
+İ"Â—FVÒçv–GF‚À¢ÂÖF‚æÖ‚ƒÂ6öæf–ræw&–D6öÇVÖç2’ÂÂ"ırâ"“°¢6Æ–FW$f–VÆB†V–v‡BÒ6Æ–FW"†f÷&ÒÂ-	-½í-"Â—FVÒæ†V–v‡BÀ¢ÂÖF‚æÖ‚ƒÂ6öæf–ræw&–E&÷w2’ÂÂ"ırâ"“° ¢7–ææW"Æ–væÖVçBÒ7–ææW"†æWr7G&–æuµ×²$ÄTeB"Â$4TåDU""Â%$”t…B'ÒÂ—FVÒæÆ–væÖVçB“°¢f÷&ÒæFEf–Wr†Æ&VÂ‚-	-½-İ-İR"’ÂÖ&v–åF÷ƒ’“°¢f÷&ÒæFEf–Wr†Æ–væÖVçB“°¢7v—F6‚—FVÔVæ&ÆVBÒ7v—F6…f–Wr‚-	ıí­}½--Âİ½]Í]İ""Â—FVÒæVæ&ÆVB“°¢7v—F6‚w&Ò7v—F6…f–Wr‚-	ı]]İí-ÂM½İİ½’-]­""Â—FVÒçw&FW‡B“°¢f÷&ÒæFEf–Wr†—FVÔVæ&ÆVBÂÖ&v–åF÷ƒ‚’“°¢f÷&ÒæFEf–Wr‡w&ÂÖ&v–åF÷ƒB’“°¢f÷&ÒæFEf–Wr‡FW‡B‚-
+2-Mm]-İ]"í--]İİí’ıíM½ím­‚â
+}Í]M]ÍÍ]İı]"Í]-â ¢²-M½ò-]­-‚Í-=M­ƒ²}Í]-]­-Í]İı]-ò-í½Í­â}M]Ââ"À¢"Â„dc“Tb’ÂÖ&v–åF÷ƒb’“° ¢f÷&ÒæFEf–Wr‡6V7F–öâ‚-
+=Íİ½’MíÂò-İ]İ’-í}İ¢"’ÂÖ&v–åF÷ƒb’“°¢7G&–ær6öææV7F÷$æÖRÒ—FVÒç6÷W&6T&–æF–ærÓÒçVÆÀ¢ò6öææV7F÷%G—Rä„ôÔUô54•5DåBææÖR‚¢¢—FVÒç6÷W&6T&–æF–æræ6öææV7F÷%G—RææÖR‚“°¢7–ææW"6öææV7F÷"Ò7–ææW"†æWr7G&–æuµ×²$„ôÔUô54•5DåB"Â$ÕEB"Â%5%UD…T""Â%„ôäR'ÒÀ¢6öææV7F÷$æÖR“°¢f÷&ÒæFEf–Wr†6öææV7F÷"“°¢VF—EFW‡B6öææV7F÷$–BÒf–VÆB†f÷&ÒÂ$”BıíM­½í}]İò"À¢—FVÒç6÷W&6T&–æF–ærÓÒçVÆÂò6÷W&6T&–æF–æräDTdTÅEô4ôääT5Dõ%ô”@¢¢—FVÒç6÷W&6T&–æF–æræ6öææV7F÷$–BÂfÇ6R“°¢VF—EFW‡B&W6÷W&6RÒf–VÆB†f÷&ÒÂ$VçF—G’òF÷–2ò6†&7FW&—7F–2"À¢—FVÒç6÷W&6T&–æF–ærÓÒçVÆÂò""¢—FVÒç6÷W&6T&–æF–ærç&W6÷W&6T–BÂfÇ6R“°¢VF—EFW‡BfÇVUF‚Òf–VÆB†f÷&ÒÂ-	ı=-Â¢}İ}]İâ"À¢—FVÒç6÷W&6T&–æF–ærÓÒçVÆÂò""¢—FVÒç6÷W&6T&–æF–ærçfÇVUF‚ÂfÇ6R“° ¢f÷&ÒæFEf–Wr‡6V7F–öâ‚-	Míıí½İ-]½Íİ½Rİ-í­‚İ½]Í]İ-"’ÂÖ&v–åF÷ƒb’“°¢ÖÅ7G&–ærÂö&¦V7Câf—7VÄ÷F–öç2ÒæWrÆ–æ¶VD†6„ÖÃâ‚“°¢FEf—7VÄVÆVÖVçD÷F–öç2†f÷&ÒÂ—FVÒÂf—7VÄ÷F–öç2“°¢VF—EFW‡B÷F–öç2Òf–VÆB†f÷&ÒÀ¢-
+]İİ½RıÍ]-²¥4ôâ-}=½Íİ½Rıí½ò-½RÍ]í"ıí-]"’"À¢—FVÒæ÷F–öç2çFõ7G&–ær‚’ÂfÇ6R“°¢÷F–öç2ç6WDÖ–äÆ–æW2ƒR“°¢÷F–öç2ç6WE6–ævÆTÆ–æR†fÇ6R“° ¢ÆW'DF–ÆörF–ÆörÒæWrÆW'DF–Æörä'V–ÆFW"‡F†—2¢ç6WEF—FÆR†—FVÒçG—RæÆ&VÂ¢ç6WEf–Wr‡67&öÆÂ¢ç6WE÷6—F—fT'WGFöâ‚-	ıÍ]İ-Â"ÂçVÆÂ¢ç6WDæVvF—fT'WGFöâ‚-	í-Í]İ"ÂçVÆÂ¢æ7&VFR‚“°¢F–Æörç6WDöå6†÷tÆ—7FVæW"†–væ÷&VBÓâF–ÆörævWD'WGFöâ„ÆW'DF–Æörä%UEDôåõõ4•D•dR¢ç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ°¢G'’°¢—FVÒçF—FÆRÒfÇVR‡F—FÆR“°¢—FVÒæWFöÖF–öä–BÒfÇVR†WFöÖF–öâ“°¢—FVÒçFVÆVÖWG'”ÖWG&–4–BÒfÇVR†ÖWG&–2“°¢—FVÒçFW‡Df÷&ÖBÒfÇVR†f÷&ÖB“°¢—FVÒçVæ—BÒfÇVR‡Væ—B“°¢—FVÒçFW‡D6öÆ÷"ÒfÇVR‡FW‡D6öÆ÷"“°¢—FVÒçVæ—D6öÆ÷"ÒfÇVR‡Væ—D6öÆ÷"“°¢—FVÒæ&6¶w&÷VæD6öÆ÷"Ò"3#°¢—FVÒæföçE6—¦U7ÒföçE6—¦Ræ–çEfÇVR‚“°¢—FVÒæföçEvV–v‡BÒföçEvV–v‡Bæ–çEfÇVR‚“°¢—FVÒç‚Ò‚æ–çEfÇVR‚“°¢—FVÒç’Ò’æ–çEfÇVR‚“°¢—FVÒçv–GF‚Òv–GF‚æ–çEfÇVR‚“°¢—FVÒæ†V–v‡BÒ†V–v‡Bæ–çEfÇVR‚“°¢—FVÒæÆ–væÖVçBÒ7G&–ærçfÇVTöb†Æ–væÖVçBævWE6VÆV7FVD—FVÒ‚’“°¢—FVÒæVæ&ÆVBÒ—FVÔVæ&ÆVBæ—46†V6¶VB‚“°¢—FVÒçw&FW‡BÒw&æ—46†V6¶VB‚“°¢7G&–ær&W6÷W&6T–BÒfÇVR‡&W6÷W&6R“°¢–b‡&W6÷W&6T–Bæ—4V×G’‚’’°¢—FVÒç6÷W&6T&–æF–ærÒçVÆÃ°¢ÒVÇ6R°¢—FVÒç6÷W&6T&–æF–ærÒæWr6÷W&6T&–æF–ær€¢6öææV7F÷%G—Ræg&öÔ§6öäæÖR€¢7G&–ærçfÇVTöb†6öææV7F÷"ævWE6VÆV7FVD—FVÒ‚’’À¢6öææV7F÷%G—Rä„ôÔUô54•5DåB’À¢fÇVR†6öææV7F÷$–B’Â&W6÷W&6T–BÂfÇVR‡fÇVUF‚’À¢6÷W&6T&–æF–ærå$U4TåDD”ôåôUDòÂ—FVÒçVæ—B“°¢Ğ¢¥4ôäö&¦V7B'6VD÷F–öç2ÒæWr¥4ôäö&¦V7B‡fÇVR†÷F–öç2’æ—4V×G’‚¢ò'·Ò"¢fÇVR†÷F–öç2’“°¢Ç•f—7VÄVÆVÖVçD÷F–öç2‡'6VD÷F–öç2Âf—7VÄ÷F–öç2“°¢—FVÒæ÷F–öç2Ò'6VD÷F–öç3°¢—FVÒææ÷&ÖÆ—¦R†6öæf–ræw&–D6öÇVÖç2Â6öæf–ræw&–E&÷w2“°¢6çf2çWFFT6öæf–r†6öæf–r“°¢WFFU6VÆV7F–öâ†—FVÒ“°¢W'6—7B†fÇ6R“°¢F–ÆöræF—6Ö—72‚“°¢Ò6F6‚„W†6WF–öâW'&÷"’°¢Fö7BæÖ¶UFW‡B‡F†—2Â-	ıí-]Í-RıÍ]-³¢"²W'&÷"ævWDÖW76vR‚’À¢Fö7BäÄTäuD…ôÄôär’ç6†÷r‚“°¢Ğ¢Ò’“°¢6†÷u6fTF–Æör†F–Æör“°¢Ğ ¢ò¢¢vVöÖWG'’&VÆöæw2FòF†R…TBVÆVÖVçC²&VæFW&–ær6WGF–æw2&VÆöærFòF†R…TBÖ&öf–ÆRâ¢ğ¢&—fFRfö–BVF—DÖ7W&f6R„æöäçVÆÂ‡VDVÆVÖVçD6öæf–r—FVÒ’°¢æf–vF–öä–çFVw&F–öä6öæf–ræf–vF–öâÒÆöDæf–vF–öä–çFVw&F–öä6öæf–r‚“°¢æf–vF–öä–çFVw&F–öä6öæf–räÖ&öf–ÆR&öf–ÆRÒæf–vF–öâæ‡VDÖ° ¢67&öÆÅf–Wr67&öÆÂÒæWr67&öÆÅf–Wr‡F†—2“°¢Æ–æV$Æ–÷WBf÷&ÒÒ6öÇVÖâ‚“°¢f÷&Òç6WEFF–ær†Gƒ‚’ÂGƒ‚’ÂGƒ‚’ÂGƒ#B’“°¢67&öÆÂæFEf–Wr†f÷&Ò“° ¢VF—EFW‡BF—FÆRÒf–VÆB†f÷&ÒÂ-	İ}-İR"Â—FVÒçF—FÆRÂfÇ6R“°¢f÷&ÒæFEf–Wr‡FW‡B‚-	ıí½ím]İR"]-­R…TBâ	­-2-­mRÍímİâı]]--Â‚-ıİ=-Â ¢²-ııÍâİı]MıíÍí-Râ"Â"Â„dc“Tb’ÂÖ&v–åF÷ƒ’“°¢6Æ–FW$f–VÆB‚Ò6Æ–FW"†f÷&ÒÂ-
+½]-"Â—FVÒç‚À¢ÂÖF‚æÖ‚ƒÂ6öæf–ræw&–D6öÇVÖç2Ò’ÂÂ"ırâ"“°¢6Æ–FW$f–VÆB’Ò6Æ–FW"†f÷&ÒÂ-
+-]]2"Â—FVÒç’À¢ÂÖF‚æÖ‚ƒÂ6öæf–ræw&–E&÷w2Ò’ÂÂ"ırâ"“°¢6Æ–FW$f–VÆBv–GF‚Ò6Æ–FW"†f÷&ÒÂ-
+İ"Â—FVÒçv–GF‚À¢ÂÖF‚æÖ‚ƒÂ6öæf–ræw&–D6öÇVÖç2’ÂÂ"ırâ"“°¢6Æ–FW$f–VÆB†V–v‡BÒ6Æ–FW"†f÷&ÒÂ-	-½í-"Â—FVÒæ†V–v‡BÀ¢ÂÖF‚æÖ‚ƒÂ6öæf–ræw&–E&÷w2’ÂÂ"ırâ"“°¢7v—F6‚VÆVÖVçDVæ&ÆVBÒ7v—F6…f–Wr‚-	ıí­}½--Âí½-Â­-²"Â—FVÒæVæ&ÆVB“°¢7v—F6‚&VæFW&W$Væ&ÆVBÒ7v—F6…f–Wr‚-
+]İM]-Âİ]}-Í=â­-2…TB"Â&öf–ÆRæVæ&ÆVB“°¢f÷&ÒæFEf–Wr†VÆVÖVçDVæ&ÆVBÂÖ&v–åF÷ƒ‚’“°¢f÷&ÒæFEf–Wr‡&VæFW&W$Væ&ÆVBÂÖ&v–åF÷ƒB’“°¢6Æ–FW$f–VÆB&F—W2Ò6Æ–FW"†f÷&ÒÂ-
+­==½]İR­-²"À¢—FVÒæ÷F–öç2æ÷D–çB‚&6÷&æW%&F—W5‚"Â’ÂÂƒÂÂ"‚"“°¢6Æ–FW$f–VÆB÷6—G’Ò6Æ–FW"†f÷&ÒÂ-	İ]ıí}}İí-Â­-²"À¢—FVÒæ÷F–öç2æ÷D–çB‚&÷6—G•W&6VçB"Â’Â#ÂÂÂ"R"“° ¢f÷&ÒæFEf–Wr‡6V7F–öâ‚-	­Í]…TB"’ÂÖ&v–åF÷ƒb’“°¢7–ææW"6ÖW&ÖöFRÒæf–vF–öä6ÖW&ÖöFU7–ææW"‡&öf–ÆRæ6ÖW&ÖöFR“°¢f÷&ÒæFEf–Wr†Æ&VÂ‚-	­¢­-½]M=]"}--íÍí½]Â"’ÂÖ&v–åF÷ƒ‚’“°¢f÷&ÒæFEf–Wr†6ÖW&ÖöFR“°¢6Æ–FW$f–VÆB¦ööÒÒ6Æ–FW"†f÷&ÒÀ¢-	ı½m]İS¢(	B-İM-İíRÂ²½mRÂ(‰"M½ÍR"À¢&öf–ÆRç¦ööÔFVÇFÂÓ‚Â‚Âã#RÂ""“°¢6Æ–FW$f–VÆBF–ÇBÒ6Æ–FW"†f÷&ÒÂ-	İ­½íÒ­-³¢+(	B-]]2Âc+(	Bı]ı]­--"À¢&öf–ÆRçF–ÇDFVw&VW2ÂÂƒÂÂ,+"“°¢6Æ–FW$f–VÆBfö7W5‚Ò6Æ–FW"†f÷&ÒÂ-	--íÍí½Âıâ=í}íİ-½‚"À¢&öf–ÆRæfö7W5…W&6VçBÂÂÂÂ"R"“°¢6Æ–FW$f–VÆBfö7W5’Ò6Æ–FW"†f÷&ÒÂ-	--íÍí½Âıâ-]-­½‚"À¢&öf–ÆRæfö7W5•W&6VçBÂÂÂÂ"R"“°¢6Æ–FW$f–VÆBÖ66ÆRÒ6Æ–FW"†f÷&ÒÂ-
+}Í]ıíMı]’‚í­]­-í"­-²"À¢&öf–ÆRæÖ66ÆUW&6VçBÂSÂ3ÂRÂ"R"“°¢6Æ–FW$f–VÆBÖ†–×VÔg2Ò6Æ–FW"†f÷&ÒÀ¢-	ı½-İí-Â­-²M½ò…TBí½}İâMí--í}İâ#’"À¢&öf–ÆRæÖ†–×VÔg2ÂRÂcÂÂ"­Mı"“° ¢f÷&ÒæFEf–Wr‡6V7F–öâ‚-
+í-"‚m-]"­-²…TB"’ÂÖ&v–åF÷ƒb’“°¢7v—F6‚WFöÖF–4F”æ–v‡BÒ7v—F6…f–Wr‚-	--íÍ-}]­’M]İÂòİí}Â"À¢&öf–ÆRæWFöÖF–4F”æ–v‡B“°¢7v—F6‚æ–v‡DÖöFRÒ7v—F6…f–Wr‚-	ıİ=M-]½Íİâİí}İí’]mÂ"Â&öf–ÆRææ–v‡DÖöFR“°¢7v—F6‚6†÷u&÷WFRÒ7v—F6…f–Wr‚-	Í=""Â&öf–ÆRç6†÷u&÷WFR“°¢7v—F6‚6†÷u&÷WFUG&ff–2Ò7v—F6…f–Wr€¢-	ıí­‚İ½İ‚Í=-"Â&öf–ÆRç6†÷u&÷WFUG&ff–2“°¢7v—F6‚6†÷uG&ff–2Ò7v—F6…f–Wr‚-	ıí­‚İí-½Íİ½RMíí=R"Â&öf–ÆRç6†÷uG&ff–2“°¢7v—F6‚6†÷tÆ&VÇ2Ò7v—F6…f–Wr‚-	ıíMı‚"Â&öf–ÆRç6†÷tÆ&VÇ2“°¢7v—F6‚6†÷uö—2Ò7v—F6…f–Wr‚-	ıí½]}İ½RÍ]-"Â&öf–ÆRç6†÷uö—2“°¢7v—F6‚6†÷t'V–ÆF–æw2Ò7v—F6…f–Wr‚-	}Mİò"Â&öf–ÆRç6†÷t'V–ÆF–æw2“°¢7v—F6‚6†÷u&·2Ò7v—F6…f–Wr‚-	ı­‚"Â&öf–ÆRç6†÷u&·2“°¢7v—F6‚6†÷uvFW"Ò7v—F6…f–Wr‚-	-íM"Â&öf–ÆRç6†÷uvFW"“°¢7v—F6‚6†÷tÖöFVÇ2Ò7v—F6…f–Wr‚#4BİÍíM]½‚"Â&öf–ÆRç6†÷tÖöFVÇ2“°¢7v—F6‚6†÷t7W'6÷"Ò7v—F6…f–Wr‚-	­=í--íÍí½ò"Â&öf–ÆRç6†÷t7W'6÷"“°¢7v—F6‚&öG4öæÇ’Ò7v—F6…f–Wr€¢-
+-í½Í­âMíí=‚(	Bıí}}İ½’MíÒ"Â&öf–ÆRç&öG4öæÇ’“°¢f÷"…7v—F6‚6öçG&öÂ¢æWr7v—F6…µ×¶WFöÖF–4F”æ–v‡BÂæ–v‡DÖöFRÂ6†÷u&÷WFRÀ¢6†÷u&÷WFUG&ff–2Â6†÷uG&ff–2Â6†÷tÆ&VÇ2Â6†÷uö—2Â6†÷t'V–ÆF–æw2À¢6†÷u&·2Â6†÷uvFW"À¢6†÷tÖöFVÇ2Â6†÷t7W'6÷"Â&öG4öæÇ—Ò’°¢f÷&ÒæFEf–Wr†6öçG&öÂÂÖ&v–åF÷ƒB’“°¢Ğ¢6Æ–FW$f–VÆB7W'6÷%66ÆRÒ6Æ–FW"†f÷&ÒÂ-
+}Í]­=í"À¢&öf–ÆRæ7W'6÷%66ÆUW&6VçBÂ#RÂ3ÂRÂ"R"“°¢6öÆ÷$f–VÆB7W'6÷$6öÆ÷"Ò6öÆ÷$f–VÆB†f÷&ÒÂ-
+m-]"--íÍí½ò"Â&öf–ÆRæ7W'6÷$6öÆ÷"“°¢6öÆ÷$f–VÆB7W'6÷$÷WFÆ–æRÒ6öÆ÷$f–VÆB†f÷&ÒÂ-	­íİ-=--íÍí½ò"À¢&öf–ÆRæ7W'6÷$÷WFÆ–æT6öÆ÷"“°¢6öÆ÷$f–VÆB&÷WFT6öÆ÷"Ò6öÆ÷$f–VÆB†f÷&ÒÂ-
+m-]"Í=-"Â&öf–ÆRç&÷WFT6öÆ÷"“°¢6öÆ÷$f–VÆB&÷WFT÷WFÆ–æRÒ6öÆ÷$f–VÆB†f÷&ÒÂ-	­íİ-=Í=-"À¢&öf–ÆRç&÷WFT÷WFÆ–æT6öÆ÷"“°¢6Æ–FW$f–VÆB&÷WFUv–GF‚Ò6Æ–FW"†f÷&ÒÂ-
+-í½İÍ=-"À¢&öf–ÆRç&÷WFUv–GF‚ÂÂCÂãRÂ"‚"“°¢6Æ–FW$f–VÆB&÷WFT÷WFÆ–æUv–GF‚Ò6Æ–FW"†f÷&ÒÂ-
+-í½İ­íİ-=Í=-"À¢&öf–ÆRç&÷WFT÷WFÆ–æUv–GF‚ÂÂ#ÂãRÂ"‚"“°¢f÷&ÒæFEf–Wr‡6V7F–öâ‚-
+m-]-}==m]İİí-‚Míí2"’ÂÖ&v–åF÷ƒb’“°¢6öÆ÷$f–VÆBG&ff–4g&VT6öÆ÷"Ò6öÆ÷$f–VÆB†f÷&ÒÂ-	Míí=-ííMİ"À¢&öf–ÆRçG&ff–4g&VT6öÆ÷"“°¢6öÆ÷$f–VÆBG&ff–4Æ–v‡D6öÆ÷"Ò6öÆ÷$f–VÆB†f÷&ÒÂ-	İ]í½ÍíR}-=Mİ]İR"À¢&öf–ÆRçG&ff–4Æ–v‡D6öÆ÷"“°¢6öÆ÷$f–VÆBG&ff–4†&D6öÆ÷"Ò6öÆ÷$f–VÆB†f÷&ÒÂ-	ı½í-İíRM-m]İR"À¢&öf–ÆRçG&ff–4†&D6öÆ÷"“°¢6öÆ÷$f–VÆBG&ff–5fW'”†&D6öÆ÷"Ò6öÆ÷$f–VÆB†f÷&ÒÂ-
+½Íİòıí­"À¢&öf–ÆRçG&ff–5fW'”†&D6öÆ÷"“°¢6öÆ÷$f–VÆBG&ff–4&Æö6¶VD6öÆ÷"Ò6öÆ÷$f–VÆB†f÷&ÒÂ-	Míí=ı]]­½-"À¢&öf–ÆRçG&ff–4&Æö6¶VD6öÆ÷"“°¢6öÆ÷$f–VÆBG&ff–5Væ¶æ÷vä6öÆ÷"Ò6öÆ÷$f–VÆB†f÷&ÒÂ-	İ]"Mİİ½R"À¢&öf–ÆRçG&ff–5Væ¶æ÷vä6öÆ÷"“°¢6Æ–FW$f–VÆBG&ff–4w&F–VçBÒ6Æ–FW"†f÷&ÒÂ-	M½İı]]]íMm-]-í"ıíí¢"À¢&öf–ÆRçG&ff–4w&F–VçDÆVæwF‚ÂÂÂÂ"R"“°¢f÷&ÒæFEf–Wr‡FW‡B‚-
+-]]İ}]­R¥4ôâİ-½‚­½-²rí½}İ½Rİ-í]¢â
+m-]-‚í-" ¢²-­-²Í]İıí-òİ½]Í]İ-Í‚-½Râ"Â"Â„dc“Tb’ÂÖ&v–åF÷ƒ"’“° ¢ÆW'DF–ÆörF–ÆörÒæWrÆW'DF–Æörä'V–ÆFW"‡F†—2¢ç6WEF—FÆR‚-	İ]}-Íò­-…TB"¢ç6WEf–Wr‡67&öÆÂ¢ç6WE÷6—F—fT'WGFöâ‚-	ıÍ]İ-Â"ÂçVÆÂ¢ç6WDæVvF—fT'WGFöâ‚-	í-Í]İ"ÂçVÆÂ¢æ7&VFR‚“°¢F–Æörç6WDöå6†÷tÆ—7FVæW"†–væ÷&VBÓâF–ÆörævWD'WGFöâ„ÆW'DF–Æörä%UEDôåõõ4•D•dR¢ç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ°¢G'’°¢—FVÒçF—FÆRÒfÇVR‡F—FÆR“°¢—FVÒç‚Ò‚æ–çEfÇVR‚“°¢—FVÒç’Ò’æ–çEfÇVR‚“°¢—FVÒçv–GF‚Òv–GF‚æ–çEfÇVR‚“°¢—FVÒæ†V–v‡BÒ†V–v‡Bæ–çEfÇVR‚“°¢—FVÒæVæ&ÆVBÒVÆVÖVçDVæ&ÆVBæ—46†V6¶VB‚“°¢—FVÒæ÷F–öç2çWB‚'&VæFW&W""Â‡VDVÆVÖVçD6öæf–räD•$T5EôÔõ$TäDU$U"“°¢—FVÒæ÷F–öç2çWB‚&6÷&æW%&F—W5‚"Â&F—W2æ–çEfÇVR‚’“°¢—FVÒæ÷F–öç2çWB‚&÷6—G•W&6VçB"Â÷6—G’æ–çEfÇVR‚’“°¢—FVÒæ÷F–öç2çWB‚'G&ç7&VçD&6¶w&÷VæB"Â&öG4öæÇ’æ—46†V6¶VB‚’“° ¢&öf–ÆRæVæ&ÆVBÒ&VæFW&W$Væ&ÆVBæ—46†V6¶VB‚“°¢&öf–ÆRæ6ÖW&ÖöFRÒæf–vF–öä6ÖW&ÖöFUfÇVR€¢6ÖW&ÖöFRævWE6VÆV7FVD—FVÕ÷6—F–öâ‚’“°¢&öf–ÆRç¦ööÔFVÇFÒ¦ööÒçfÇVR‚“°¢&öf–ÆRçF–ÇDFVw&VW2ÒF–ÇBæ–çEfÇVR‚“°¢&öf–ÆRæfö7W5…W&6VçBÒfö7W5‚æ–çEfÇVR‚“°¢&öf–ÆRæfö=xóNí¢G§²ÚîÆ­yİ]-ò}İí’Í­í’â ¢²$"İM½2ıÍ]İı]-ò‚ı‚-½­½í}]İİí’ıí½Í}í--]½Í­í’…TBİıİ]½‚â ¢²-	M½òİ½]Í]İ-í"V6'…öFVÖöâMíıí½İ-]½Íİâıí½Í}=]-òí-M]½Íİ½’ ¢²%7W&f6TfÆ–ævW"İ½í’}]]r½í­½Íİ½’D"õFVÆæWC²ı‚]=âİ]Mí-=ıİí-‚ ¢²-í--òí½}İ½’÷fW&Æ’â"À¢"Â„dd#„342“°¢7v—F6‚6æ÷rÒ7v—F6…f–Wr‚-
+İ]mİ½’]mÂ"Â6öæf–rç6æ÷tÖöFR“°¢7v—F6‚7–æ2Ò7v—F6…f–Wr‚-	íMÒm-]"M½ò-]Rİ½]Í]İ-í""Â6öæf–rç7–æ4VÆVÖVçD6öÆ÷'2“°¢7v—F6‚WF÷7F'BÒ7v—F6…f–Wr‚-	}ı=­-Â…TBıí½Rı]]}==}­‚"À¢&VfW&Væ6W2æ‡VEæVÄWF÷7F'BævWB‚’“°¢f÷&ÒæFEf–Wr‡6†÷tw&–BÂÖ&v–åF÷ƒ‚’“°¢f÷&ÒæFEf–Wr†g&VR“°¢f÷&ÒæFEf–Wr†Ö6µ7Fö6´‡VB“°¢f÷&ÒæFEf–Wr†Ö6´†–çB“°¢'WGFöâ7Fö6´‡VBÒ'WGFöâ‚-
+--İ½R]mÍ²‚}M]½²…TB"“°¢7Fö6´‡VBç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâVF—E7Fö6´‡VD6öçG&öÇ2‚’“°¢f÷&ÒæFEf–Wr‡7Fö6´‡VBÂÖ&v–åF÷ƒ’“°¢f÷&ÒæFEf–Wr‡6æ÷r“°¢f÷&ÒæFEf–Wr‡7–æ2“°¢f÷&ÒæFEf–Wr†WF÷7F'B“°¢'WGFöâ6†ö÷6TföçBÒ'WGFöâ‚-	-½-ÂM²M-"“°¢6†ö÷6TföçBç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ°¢–çFVçB–çFVçBÒæWr–çFVçB„–çFVçBä5D”ôåôõTåôDô5TÔTåB¢æFD6FVv÷'’„–çFVçBä4DTtõ%•ôõTä$ÄR¢ç6WEG—R‚"¢ò¢"“°¢7F'D7F—f—G”f÷%&W7VÇB†–çFVçBÂ”4µôdôåB“°¢Ò“°¢f÷&ÒæFEf–Wr†6†ö÷6TföçBÂÖ&v–åF÷ƒ’“°¢'WGFöâ&W6WBÒ'WGFöâ‚-
+í-Â…TB¢]íMİí’­½M­R"“°¢&W6WBç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ6öæf—&Õ&W6WB‚’“°¢f÷&ÒæFEf–Wr‡&W6WBÂÖ&v–åF÷ƒ"’“° ¢ÆW'DF–ÆörF–ÆörÒæWrÆW'DF–Æörä'V–ÆFW"‡F†—2¢ç6WEF—FÆR‚-	ıÍ]-²…TB"¢ç6WEf–Wr‡67&öÆÂ¢ç6WE÷6—F—fT'WGFöâ‚-	ıÍ]İ-Â"ÂçVÆÂ¢ç6WDæVvF—fT'WGFöâ‚-	í-Í]İ"ÂçVÆÂ¢æ7&VFR‚“°¢F–Æörç6WDöå6†÷tÆ—7FVæW"†–væ÷&VBÓâF–ÆörævWD'WGFöâ„ÆW'DF–Æörä%UEDôåõõ4•D•dR¢ç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ°¢6öæf–ræw&–D6öÇVÖç2Ò6öÇVÖç2æ–çEfÇVR‚“°¢6öæf–ræw&–E&÷w2Ò&÷w2æ–çEfÇVR‚“°¢6öæf–ræ&6¶w&÷VæDÖöFRÒ7G&–ærçfÇVTöb†&6¶w&÷VæBævWE6VÆV7FVD—FVÒ‚’“°¢6öæf–rævÆö&Ä'&–v‡FæW72Ò'&–v‡FæW72æ–çEfÇVR‚“°¢6öæf–rævÆö&ÅFW‡D6öÆ÷"ÒfÇVR†vÆö&Ä6öÆ÷"“°¢6öæf–rævÆö&ÅVæ—D6öÆ÷"ÒfÇVR†vÆö&ÅVæ—B“°¢6öæf–rævÆö&ÄföçEvV–v‡BÒföçEvV–v‡Bæ–çEfÇVR‚“°¢6öæf–ræ7W7FöÔföçEW&’ÒfÇVR†föçEW&’“°¢6öæf–rææf–vF–öäF—7Æ•F‡&W6†öÆDÖWFW'2ÒæeF‡&W6†öÆBæ–çEfÇVR‚“°¢6öæf–rææf–vF–öä†–FTFVÆ•6V6öæG2ÒædFVÆ’æ–çEfÇVR‚“°¢6öæf–rç6†÷tw&–BÒ6†÷tw&–Bæ—46†V6¶VB‚“°¢6öæf–ræg&VTÖ÷fVÖVçBÒg&VRæ—46†V6¶VB‚“°¢6öæf–ræÖ6µ7Fö6´‡VBÒÖ6µ7Fö6´‡VBæ—46†V6¶VB‚“°¢–b‚&VfW&Væ6W2æ‡VEæVÄVæ&ÆVBævWB‚’’°¢Ç•7Fö6´‡VE&VfW&Væ6R†6öæf–ræÖ6µ7Fö6´‡VB“°¢Ğ¢6öæf–rç6æ÷tÖöFRÒ6æ÷ræ—46†V6¶VB‚“°¢6öæf–rç7–æ4VÆVÖVçD6öÆ÷'2Ò7–æ2æ—46†V6¶VB‚“°¢&VfW&Væ6W2æ‡VEæVÄWF÷7F'Bç6WB†WF÷7F'Bæ—46†V6¶VB‚’“°¢6öæf–rææ÷&ÖÆ—¦R‚“°¢6çf2çWFFT6öæf–r†6öæf–r“°¢W'6—7B†fÇ6R“°¢F–ÆöræF—6Ö—72‚“°¢Ò’“°¢6†÷u6fTF–Æör†F–Æör“°¢Ğ ¢&—fFRfö–BVF—E7Fö6´‡VD6öçG&öÇ2‚’°¢67&öÆÅf–Wr67&öÆÂÒæWr67&öÆÅf–Wr‡F†—2“°¢Æ–æV$Æ–÷WBf÷&ÒÒ6öÇVÖâ‚“°¢f÷&Òç6WEFF–ær†Gƒ‚’ÂGƒ‚’ÂGƒ‚’ÂGƒ#"’“°¢67&öÆÂæFEf–Wr†f÷&Ò“° ¢f÷&ÒæFEf–Wr‡6V7F–öâ‚%&öf–ÆUG&ç6fW"+r4#33#s‚"’“°¢f÷&ÒæFEf–Wr‡FW‡B€¢-
+}]-½R--İ½R]mÍÂİM]İİ½R"T4%ƒ¢wV–FRÂG&—fRÂ""Â ¢²#26–×ÆRâ	­íÍİMÍ]İı]"-í½Í­â-½İİ½’]mÂ‚İRı]]M" ¢²-İ=½]-=â…TBİÍ­2â"À¢"Â„dd#„342’ÂÖ&v–åF÷ƒR’“°¢7G&–æuµÒÖöFT6†ö–6W2Ò°¢-	İRÍ]İı-Â"À¢#+rwV–FR"À¢#+rG&—fR"À¢#"+r""À¢#2+r6–×ÆR ¢Ó°¢7–ææW"ÖöFRÒ7–ææW"†ÖöFT6†ö–6W2Â-	İRÍ]İı-Â"“°¢–çB6fVDÖöFRÒ&VfW&Væ6W2æ‡VE7Fö6µ&öf–ÆTÖöFRævWB‚“°¢ÖöFRç6WE6VÆV7F–öâ‡6fVDÖöFRãÒbb6fVDÖöFRÃÒ2ò6fVDÖöFR²¢“°¢f÷&ÒæFEf–Wr†ÖöFRÂÖ&v–åF÷ƒr’“°¢7v—F6‚WFõ&WVBÒ7v—F6…f–Wr€¢-
+]}]-İ½’--íıí--í-½İİí=â]mÍ"À¢&VfW&Væ6W2æ‡VE7Fö6µ&öf–ÆTÖöFTWFõ&WVBævWB‚’“°¢f÷&ÒæFEf–Wr†WFõ&WVBÂÖ&v–åF÷ƒb’“°¢f÷&ÒæFEf–Wr‡FW‡B€¢-	--íıí--í-½-]"ıí½R}==}­‚ÂÍ]İ²ıíM½òÂı]]]íMí"…TBôD2 ¢²-‚ı]]]}]İò#­Âırâ	İR}RR}ı]’"Íİ=-2Â6—&7V—B'&V¶W"â ¢²-	ı]]M-ò-í½Í­â4#33#s‚â}İ}]İ]Â(
+c2â"À¢"Â„dddd43cb’ÂÖ&v–åF÷ƒB’“° ¢f÷&ÒæFEf–Wr‡6V7F–öâ‚-
+}M]½²--İí=â…TB"’ÂÖ&v–åF÷ƒB’“°¢f÷&ÒæFEf–Wr‡FW‡B€¢-	í-M]½Íİ½’--İ½’ı=-Â”6$gVæ7F–öâç6WDgVæ7F–öåfÇVRâ	İıí-­RÂ=MR ¢²-}M]²İ]Mí-=ı]ÒÂı½ím]İRıí­m]"M­-}]­’í-­rT4%‚â"À¢"Â„dd#„342’ÂÖ&v–åF÷ƒB’“°¢&ööÆVâ÷&–v–æÄG&—fRÒ&VfW&Væ6W2æ‡VE7Fö6´G&—fTVçf—&öæÖVçBævWB‚“°¢&ööÆVâ÷&–v–æÅ6fWG’Ò&VfW&Væ6W2æ‡VE7Fö6µ6fWG’ævWB‚“°¢&ööÆVâ÷&–v–æÄÖVF–Ò&VfW&Væ6W2æ‡VE7Fö6´ÖVF–ævWB‚“°¢&ööÆVâ÷&–v–æÄæf–vF–öâÒ&VfW&Væ6W2æ‡VE7Fö6´æf–vF–öâævWB‚“°¢&ööÆVâ÷&–v–æÅ†öæRÒ&VfW&Væ6W2æ‡VE7Fö6µ†öæRævWB‚“°¢7v—F6‚G&—fRÒ7v—F6…f–Wr‚$G&—fRVçf—&öæÖVçB+rÍİ­‚í­=m]İR"Â÷&–v–æÄG&—fR“°¢7v—F6‚6fWG’Ò7v—F6…f–Wr‚%6fWG’+r­íí-Â‚]}íıİí-Â"Â÷&–v–æÅ6fWG’“°¢7v—F6‚ÖVF–Ò7v—F6…f–Wr‚$ÖVF–+rÍ=}½­"Â÷&–v–æÄÖVF–“°¢7v—F6‚æf–vF–öâÒ7v—F6…f–Wr‚$æf–vF–öâ+rİ-=mò"Â÷&–v–æÄæf–vF–öâ“°¢7v—F6‚†öæRÒ7v—F6…f–Wr‚%†öæR+r-]½]MíÒ"Â÷&–v–æÅ†öæR“°¢f–æÂ&ööÆVåµÒf÷&6TÆÄ6FVv÷&–W2Ò¶fÇ6WÓ°¢f÷&ÒæFEf–Wr†G&—fRÂÖ&v–åF÷ƒR’“°¢f÷&ÒæFEf–Wr‡6fWG’“°¢f÷&ÒæFEf–Wr†ÖVF–“°¢f÷&ÒæFEf–Wr†æf–vF–öâ“°¢f÷&ÒæFEf–Wr‡†öæR“°¢'WGFöâ&W7F÷&RÒ'WGFöâ‚-	-­½í}-Â-Rıı-Â}M]½í""“°¢&W7F÷&Rç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ°¢f÷&6TÆÄ6FVv÷&–W5³ÒÒG'VS°¢G&—fRç6WD6†V6¶VB‡G'VR“°¢6fWG’ç6WD6†V6¶VB‡G'VR“°¢ÖVF–ç6WD6†V6¶VB‡G'VR“°¢æf–vF–öâç6WD6†V6¶VB‡G'VR“°¢†öæRç6WD6†V6¶VB‡G'VR“°¢Ò“°¢f÷&ÒæFEf–Wr‡&W7F÷&RÂÖ&v–åF÷ƒ‚’“° ¢ÆW'DF–ÆörF–ÆörÒæWrÆW'DF–Æörä'V–ÆFW"‡F†—2¢ç6WEF—FÆR‚-
+--İ½’…TBT4%‚"¢ç6WEf–Wr‡67&öÆÂ¢ç6WE÷6—F—fT'WGFöâ‚-	ıÍ]İ-Â"ÂçVÆÂ¢ç6WDæVvF—fT'WGFöâ‚-	í-Í]İ"ÂçVÆÂ¢æ7&VFR‚“°¢F–Æörç6WDöå6†÷tÆ—7FVæW"†–væ÷&VBÓâF–ÆörævWD'WGFöâ„ÆW'DF–Æörä%UEDôåõõ4•D•dR¢ç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâ°¢–çB6VÆV7FVDÖöFRÒÖöFRævWE6VÆV7FVD—FVÕ÷6—F–öâ‚’Ò°¢&ööÆVâ&WVBÒ6VÆV7FVDÖöFRãÒbbWFõ&WVBæ—46†V6¶VB‚“°¢&VfW&Væ6W2æ‡VE7Fö6µ&öf–ÆTÖöFRç6WB‡6VÆV7FVDÖöFR“°¢&VfW&Væ6W2æ‡VE7Fö6µ&öf–ÆTÖöFTWFõ&WVBç6WB‡&WVB“°¢6$–çFVw&F–öâ–çFVw&F–öâÒ6$–çFVw&F–öç2ævWB‡F†—2“°¢–b‡6VÆV7FVDÖöFRãÒ’°¢–çFVw&F–öâç6WE7Fö6´‡VE&öf–ÆTÖöFR‡6VÆV7FVDÖöFRÂ&WVBÀ¢‡7V66W72ÂÖW76vR’Óâ6†÷u7Fö6´‡VE&W7VÇB€¢-
+]mÂ"²6VÆV7FVDÖöFRÂ7V66W72ÂÖW76vR’“°¢ÒVÇ6R°¢–çFVw&F–öâç7F÷7Fö6´‡VE&öf–ÆTÖöFTWFõ&WVB€¢‡7V66W72ÂÖW76vR’Óâ°¢–b‚7V66W72’6†÷u7Fö6´‡VE&W7VÇB€¢-	--íıí--í"ÂfÇ6RÂÖW76vR“°¢Ò“°¢Ğ ¢Ç•7Fö6´‡VD6FVv÷'”–d6†ævVB†–çFVw&F–öâÀ¢6$–çFVw&F–öâå7Fö6´‡VDF—7Æ”6FVv÷'’äE$•dUôTåd•$ôäÔTåBÀ¢÷&–v–æÄG&—fRÂG&—fRæ—46†V6¶VB‚’Âf÷&6TÆÄ6FVv÷&–W5³ÒÀ¢&VfW&Væ6W2æ‡VE7Fö6´G&—fTVçf—&öæÖVçB“°¢Ç•7Fö6´‡VD6FVv÷'”–d6†ævVB†–çFVw&F–öâÀ¢6$–çFVw&F–öâå7Fö6´‡VDF—7Æ”6FVv÷'’å4dUE’À¢÷&–v–æÅ6fWG’Â6fWG’æ—46†V6¶VB‚’Âf÷&6TÆÄ6FVv÷&–W5³ÒÀ¢&VfW&Væ6W2æ‡VE7Fö6µ6fWG’“°¢Ç•7Fö6´‡VD6FVv÷'”–d6†ævVB†–çFVw&F–öâÀ¢6$–çFVw&F–öâå7Fö6´‡VDF—7Æ”6FVv÷'’äÔTD”À¢÷&–v–æÄÖVF–ÂÖVF–æ—46†V6¶VB‚’Âf÷&6TÆÄ6FVv÷&–W5³ÒÀ¢&VfW&Væ6W2æ‡VE7Fö6´ÖVF–“°¢Ç•7Fö6´‡VD6FVv÷'”–d6†ævVB†–çFVw&F–öâÀ¢6$–çFVw&F–öâå7Fö6´‡VDF—7Æ”6FVv÷'’ääd”tD”ôâÀ¢÷&–v–æÄæf–vF–öâÂæf–vF–öâæ—46†V6¶VB‚’Âf÷&6TÆÄ6FVv÷&–W5³ÒÀ¢&VfW&Væ6W2æ‡VE7Fö6´æf–vF–öâ“°¢Ç•7Fö6´‡VD6FVv÷'”–d6†ævVB†–çFVw&F–öâÀ¢6$–çFVw&F–öâå7Fö6´‡VDF—7Æ”6FVv÷'’å„ôäRÀ¢÷&–v–æÅ†öæRÂ†öæRæ—46†V6¶VB‚’Âf÷&6TÆÄ6FVv÷&–W5³ÒÀ¢&VfW&Væ6W2æ‡VE7Fö6µ†öæR“°¢F–ÆöræF—6Ö—72‚“°¢Ò’“°¢6†÷u6fTF–Æör†F–Æör“°¢Ğ ¢&—fFRfö–BÇ•7Fö6´‡VD6FVv÷'”–d6†ævVB€¢æöäçVÆÂ6$–çFVw&F–öâ–çFVw&F–öâÀ¢æöäçVÆÂ6$–çFVw&F–öâå7Fö6´‡VDF—7Æ”6FVv÷'’6FVv÷'’À¢&ööÆVâ÷&–v–æÂÂ&ööÆVâFW6—&VBÂ&ööÆVâf÷&6RÀ¢æöäçVÆÂ&VfW&Væ6W2ä&ööÂ&VfW&Væ6R’°¢&VfW&Væ6Rç6WB†FW6—&VB“°¢–b‚f÷&6Rbb÷&–v–æÂÓÒFW6—&VB’&WGW&ã°¢–çFVw&F–öâç6WE7Fö6´‡VDF—7Æ”6FVv÷'’†6FVv÷'’ÂFW6—&VBÂ‡7V66W72ÂÖW76vR’Óâ°¢–b‚7V66W72’6†÷u7Fö6´‡VE&W7VÇB†6FVv÷'’ææÖR‚’ÂfÇ6RÂÖW76vR“°¢Ò“°¢Ğ ¢&—fFRfö–B6†÷u7Fö6´‡VE&W7VÇB…7G&–ær÷W&F–öâÂ&ööÆVâ7V66W72À¢çVÆÆ&ÆR7G&–ærÖW76vR’°¢7G&–ærFWF–ÂÒÖW76vRÓÒçVÆÂÇÂÖW76vRçG&–Ò‚’æ—4V×G’‚¢ò‡7V66W72ò-­íÍİMıİı-"¢$T4%‚İRıíM--]M²­íÍİM2"¢¢ÖW76vRçG&–Ò‚“°¢Fö7BæÖ¶UFW‡B†vWDÆ–6F–öä6öçFW‡B‚’À¢÷W&F–öâ²#¢"²FWF–ÂÂ7V66W72òFö7BäÄTäuD…õ4„õ%B¢Fö7BäÄTäuD…ôÄôär¢ç6†÷r‚“°¢Ğ ¢&—fFRfö–BÇ•7Fö6´‡VE&VfW&Væ6R†&ööÆVâ†–FFVâ’°¢6$–çFVw&F–öç2ævWB‡F†—2’ç6WE7Fö6´‡VD6$†–FFVâ††–FFVâÂ‡7V66W72ÂÖW76vR’Óâ°¢–b‡7V66W72’&WGW&ã°¢7G&–ærFWF–ÂÒÖW76vRÓÒçVÆÂÇÂÖW76vRçG&–Ò‚’æ—4V×G’‚¢ò$T4%‚İRıíM--]M²}Í]İ]İR ¢¢ÖW76vRçG&–Ò‚“°¢Fö7BæÖ¶UFW‡B†vWDÆ–6F–öä6öçFW‡B‚’À¢-
+--İ½’…TB#¢"²FWF–ÂÂFö7BäÄTäuD…ôÄôär’ç6†÷r‚“°¢Ò“°¢Ğ ¢&—fFRfö–B6öæf—&Õ&W6WB‚’°¢æWrÆW'DF–Æörä'V–ÆFW"‡F†—2’ç6WEF—FÆR‚-
+í-Â…TCò"¢ç6WDÖW76vR‚-	=M="}Í]İ]İ²]-­‚-Rİ½]Í]İ-²…TBâ	í-½Íİ½Rıİ]½‚ ¢²-ı½ím]İòİR}Í]İı-òâ"¢ç6WE÷6—F—fT'WGFöâ‚-
+í-Â"Â†F–ÆörÂv†–6‚’Óâ°¢7G&–ærF—7Æ•Væ—VT–BÒ6öæf–ræF—7Æ•Væ—VT–C°¢–çBF—7Æ”–BÒ6öæf–ræF—7Æ”–C°¢7G&–ærF—7Æ”æÖRÒ6öæf–ræF—7Æ”æÖS°¢–çBF—7Æ•v–GF‚Ò6öæf–ræF—7Æ•v–GFƒ°¢–çBF—7Æ”†V–v‡BÒ6öæf–ræF—7Æ”†V–v‡C°¢6öæf–rÒ‡VEæVÄ6öæf–ræFVfVÇG2‚“°¢6öæf–ræF—7Æ•Væ—VT–BÒF—7Æ•Væ—VT–C°¢6öæf–ræF—7Æ”–BÒF—7Æ”–C°¢6öæf–ræF—7Æ”æÖRÒF—7Æ”æÖS°¢6öæf–ræF—7Æ•v–GF‚ÒF—7Æ•v–GFƒ°¢6öæf–ræF—7Æ”†V–v‡BÒF—7Æ”†V–v‡C°¢6çf2çWFFT6öæf–r†6öæf–r“°¢6çf2ç6VÆV7B†çVÆÂ“°¢W'6—7B†fÇ6R“°¢Ò’ç6WDæVvF—fT'WGFöâ‚-	í-Í]İ"ÂçVÆÂ’ç6†÷r‚“°¢Ğ ¢&—fFRfö–BGWÆ–6FU6VÆV7FVB‚’°¢‡VDVÆVÖVçD6öæf–r6÷W&6RÒ6çf2ç6VÆV7FVB‚“°¢–b‡6÷W&6RÓÒçVÆÂ’&WGW&ã°¢–b‡6÷W&6RçG—RÓÒ‡VDVÆVÖVçEG—RääeôÔ’°¢Fö7BæÖ¶UFW‡B‡F†—2Â-	M½òíMİí=â…TBMí-=ıİ-í½Í­âíMİ­-"À¢Fö7BäÄTäuD…õ4„õ%B’ç6†÷r‚“°¢&WGW&ã°¢Ğ¢G'’°¢‡VDVÆVÖVçD6öæf–r6÷’Ò‡VDVÆVÖVçD6öæf–ræg&öÔ§6öâ‡6÷W&6RçFô§6öâ‚’À¢6öæf–ræw&–D6öÇVÖç2Â6öæf–ræw&–E&÷w2“°¢–çB7Vff—‚Ò#°¢7G&–ær&6RÒ6÷W&6Ræ–C°¢v†–ÆR†6öçF–ç4–B†&6R²%ò"²7Vff—‚’’7Vff—‚²³°¢6÷’æ–BÒ&6R²%ò"²7Vff—ƒ°¢6÷’æWFöÖF–öä–BÒ6÷’æ–C°¢6÷’ç‚ÒÖF‚æÖ–â†6öæf–ræw&–D6öÇVÖç2Ò6÷’çv–GF‚Â6÷W&6Rç‚²“°¢6÷’ç’ÒÖF‚æÖ–â†6öæf–ræw&–E&÷w2Ò6÷’æ†V–v‡BÂ6÷W&6Rç’²“°¢6÷’ç¤–æFW‚ÒæW‡DÆ–W"‚“°¢6÷’ææ÷&ÖÆ—¦R†6öæf–ræw&–D6öÇVÖç2Â6öæf–ræw&–E&÷w2“°¢6öæf–ræVÆVÖVçG2æFB†6÷’“°¢6çf2çWFFT6öæf–r†6öæf–r“°¢6çf2ç6VÆV7B†6÷’æ–B“°¢W'6—7B†fÇ6R“°¢Ò6F6‚„¥4ôäW†6WF–öâ–×÷76–&ÆR’°¢F‡&÷ræWr–ÆÆVvÅ7FFTW†6WF–öâ†–×÷76–&ÆR“°¢Ğ¢Ğ ¢&—fFRfö–BFVÆWFU6VÆV7FVB‚’°¢‡VDVÆVÖVçD6öæf–r—FVÒÒ6çf2ç6VÆV7FVB‚“°¢–b†—FVÒÓÒçVÆÂ’&WGW&ã°¢æWrÆW'DF–Æörä'V–ÆFW"‡F†—2’ç6WEF—FÆR‚-
+=M½-Â*²"²—FVÒçF—FÆR²,+³ò"¢ç6WDÖW76vR‚-
+m]½Âm]İ]""²—FVÒæWFöÖF–öä–@¢²"í-İ]-ò"í]İİİ½Rm]İıRÂİâı]]-İ]"í-ím-Íòâ"¢ç6WE÷6—F—fT'WGFöâ‚-
+=M½-Â"Â†F–ÆörÂv†–6‚’Óâ°¢6öæf–ræVÆVÖVçG2ç&VÖ÷fR†—FVÒ“°¢6çf2ç6VÆV7B†çVÆÂ“°¢6çf2çWFFT6öæf–r†6öæf–r“°¢W'6—7B†fÇ6R“°¢Ò’ç6WDæVvF—fT'WGFöâ‚-	í-Í]İ"ÂçVÆÂ’ç6†÷r‚“°¢Ğ ¢&—fFRfö–B6†ævTÆ–W"†–çBFVÇF’°¢‡VDVÆVÖVçD6öæf–r—FVÒÒ6çf2ç6VÆV7FVB‚“°¢–b†—FVÒÓÒçVÆÂ’&WGW&ã°¢—FVÒç¤–æFW‚³ÒFVÇF°¢6çf2æ–çfÆ–FFR‚“°¢W'6—7B†fÇ6R“°¢Ğ ¢&—fFRfö–BW'6—7B†&ööÆVâFö7B’°¢–b‡7F÷&RÓÒçVÆÂÇÂ6öæf–rÓÒçVÆÂ’&WGW&ã°¢Ö–âç&VÖ÷fT6ÆÆ&6·2‡W'6—7DÆ—fR“°¢6öæf–rææ÷&ÖÆ—¦R‚“°¢7F÷&Rç6fR†6öæf–r“°¢–b‡'VçF–ÖRÒçVÆÂ’'VçF–ÖRçWFFT6öæf–r†6öæf–r“°¢–b†6çf2ÒçVÆÂ’6çf2çWFFT6öæf–r†6öæf–r“°¢‡VE&W6VçFF–öå6W'f–6Rææ÷F–g”6öæf–t6†ævVB‡F†—2“°¢–b‡Fö7B’Fö7BæÖ¶UFW‡B‡F†—2Â$…TBí]İÒ"ÂFö7BäÄTäuD…õ4„õ%B’ç6†÷r‚“°¢Ğ ¢&—fFRfö–BWFFU7FGW2‚’°¢–b‡7FGW2ÓÒçVÆÂ’&WGW&ã°¢7G&–ær6VÆV7FVDF—7Æ’Ò$F—7Æ’”B"²‡VEf–Ww÷'EöÆ–7’ådU$”d”TEôD•5Ä•ô”@¢²†6öæf–ræF—7Æ”æÖRæ—4V×G’‚’ò""¢"+r"²6öæf–ræF—7Æ”æÖR¢²†6öæf–ræF—7Æ•Væ—VT–Bæ—4V×G’‚’ò""¢"+r"²6öæf–ræF—7Æ•Væ—VT–B¢²†6öæf–ræF—7Æ•v–GF‚ÃÒÇÂ6öæf–ræF—7Æ”†V–v‡BÃÒò" ¢¢"+r"²6öæf–ræF—7Æ•v–GF‚²,9r"²6öæf–ræF—7Æ”†V–v‡B“°¢7FGW2ç6WEFW‡B‚‡&VfW&Væ6W2æ‡VEæVÄVæ&ÆVBævWB‚’ò-	-­½í}Ò"¢-	-½­½í}]Ò"¢²"+r"²6VÆV7FVDF—7Æ’²%Æâ ¢²‡VE&W6VçFF–öå6W'f–6Rç'VçF–ÖTFWF–Â‡F†—2’“°¢Ğ ¢&—fFRfö–BWFFU6VÆV7F–öâ„çVÆÆ&ÆR‡VDVÆVÖVçD6öæf–r—FVÒ’°¢–b‡6VÆV7F–öâÓÒçVÆÂ’&WGW&ã°¢6VÆV7F–öâç6WEFW‡B†—FVÒÓÒçVÆÂò-
+İ½]Í]İ"İR-½Ò ¢¢—FVÒçF—FÆR²"+r"²—FVÒçG—RæÆ&VÂ²"+r ¢²—FVÒç‚²#¢"²—FVÒç’²"+r"²—FVÒçv–GF‚²,9r"²—FVÒæ†V–v‡@¢²"+rm]İƒ¢"²—FVÒæWFöÖF–öä–B“°¢Ğ ¢&—fFR&ööÆVâ6öçF–ç4–B…7G&–ær–B’°¢f÷"„‡VDVÆVÖVçD6öæf–r—FVÒ¢6öæf–ræVÆVÖVçG2’–b†–BæWVÇ2†—FVÒæ–B’’&WGW&âG'VS°¢&WGW&âfÇ6S°¢Ğ ¢&—fFR–çBæW‡DÆ–W"‚’°¢–çBÖ†–×VÒÒ°¢f÷"„‡VDVÆVÖVçD6öæf–r—FVÒ¢6öæf–ræVÆVÖVçG2’Ö†–×VÒÒÖF‚æÖ‚†Ö†–×VÒÂ—FVÒç¤–æFW‚“°¢&WGW&âÖ†–×VÒ²°¢Ğ ¢&—fFR–çB&Wf–÷W4&6¶G&÷Æ–W"‚’°¢–çBÖ–æ–×VÒÒ°¢f÷"„‡VDVÆVÖVçD6öæf–r—FVÒ¢6öæf–ræVÆVÖVçG2’°¢–b†—FVÒçG—RÓÒ‡VDVÆVÖVçEG—Rä$4´E$õ’°¢Ö–æ–×VÒÒÖF‚æÖ–â†Ö–æ–×VÒÂ—FVÒç¤–æFW‚“°¢Ğ¢Ğ¢&WGW&âÖ–æ–×VÒÒ°¢Ğ ¢÷fW'&–FP¢&÷FV7FVBfö–Böä7F—f—G•&W7VÇB†–çB&WVW7D6öFRÂ–çB&W7VÇD6öFRÂçVÆÆ&ÆR–çFVçBFF’°¢7WW"æöä7F—f—G•&W7VÇB‡&WVW7D6öFRÂ&W7VÇD6öFRÂFF“°¢–b‡&WVW7D6öFRÒ”4µôdôåBÇÂ&W7VÇD6öFRÒ$U5TÅEôô²ÇÂFFÓÒçVÆÂ’&WGW&ã°¢W&’W&’ÒFFævWDFF‚“°¢–b‡W&’ÓÒçVÆÂ’&WGW&ã°¢G'’°¢vWD6öçFVçE&W6öÇfW"‚’çF¶UW'6—7F&ÆUW&•W&Ö—76–öâ‡W&’À¢FFævWDfÆw2‚’b„–çFVçBädÄuôu$åEõ$TEõU$•õU$Ô•54”ôà¢Â–çFVçBädÄuôu$åEõu$•DUõU$•õU$Ô•54”ôâ’“°¢Ò6F6‚…'VçF–ÖTW†6WF–öâ–væ÷&VB’·Ğ¢6öæf–ræ7W7FöÔföçEW&’ÒW&’çFõ7G&–ær‚“°¢W'6—7B†fÇ6R“°¢Fö7BæÖ¶UFW‡B‡F†—2Â-
+M"…TB-½Ò"ÂFö7BäÄTäuD…õ4„õ%B’ç6†÷r‚“°¢Ğ ¢&—fFRÆ–æV$Æ–÷WB6öÇVÖâ‚’°¢Æ–æV$Æ–÷WBÆ–÷WBÒæWrÆ–æV$Æ–÷WB‡F†—2“°¢Æ–÷WBç6WD÷&–VçFF–öâ„Æ–æV$Æ–÷WBådU%D”4Â“°¢&WGW&âÆ–÷WC°¢Ğ ¢&—fFRFW‡Ef–WrÆ&VÂ…7G&–ærfÇVR’²&WGW&âFW‡B‡fÇVRÂ"Â„dc“„D#2“²Ğ ¢&—fFRFW‡Ef–Wr6V7F–öâ…7G&–ærfÇVR’°¢FW‡Ef–Wrf–WrÒFW‡B‡fÇVRÂbÂ6öÆ÷"åt„•DR“°¢f–Wrç6WEG—Vf6R†æG&ö–Bæw&†–72åG—Vf6RäDTdTÅEô$ôÄB“°¢&WGW&âf–Ws°¢Ğ ¢&—fFRFW‡Ef–WrFW‡B…7G&–ærfÇVRÂ–çB7Â–çB6öÆ÷"’°¢FW‡Ef–Wrf–WrÒæWrFW‡Ef–Wr‡F†—2“°¢f–Wrç6WEFW‡B‡fÇVR“°¢f–Wrç6WEFW‡E6—¦R‡7“°¢f–Wrç6WEFW‡D6öÆ÷"†6öÆ÷"“°¢&WGW&âf–Ws°¢Ğ ¢&—fFR'WGFöâ'WGFöâ…7G&–ærfÇVR’°¢'WGFöâ'WGFöâÒæWr'WGFöâ‡F†—2“°¢'WGFöâç6WEFW‡B‡fÇVR“°¢'WGFöâç6WDÆÄ62†fÇ6R“°¢'WGFöâç6WDÖ–åv–GF‚ƒ“°¢&WGW&â'WGFöã°¢Ğ ¢&—fFR7v—F6‚7v—F6…f–Wr…7G&–ærÆ&VÂÂ&ööÆVâ6†V6¶VB’°¢7v—F6‚f–WrÒæWr7v—F6‚‡F†—2“°¢f–Wrç6WEFW‡B†Æ&VÂ“°¢f–Wrç6WEFW‡D6öÆ÷"„6öÆ÷"åt„•DR“°¢f–Wrç6WE6†÷uFW‡B‡G'VR“°¢f–Wrç6WEFW‡Döâ‚-	-­²"“°¢f–Wrç6WEFW‡Döfb‚-	-½­²"“°¢f–Wrç6WD6†V6¶VB†6†V6¶VB“°¢f–Wrç6WEFF–ær†Gƒb’ÂGƒR’ÂGƒb’ÂGƒR’“°¢&WGW&âf–Ws°¢Ğ ¢&—fFRVF—EFW‡Bf–VÆB„Æ–æV$Æ–÷WB&VçBÂ7G&–ærÆ&VÂÂ7G&–ærfÇVRÂ&ööÆVâçVÖ&W"’°¢&VçBæFEf–Wr†Æ&VÂ†Æ&VÂ’ÂÖ&v–åF÷ƒ‚’“°¢VF—EFW‡Bf–VÆBÒæWrVF—EFW‡B‡F†—2“°¢f–VÆBç6WEFW‡B‡fÇVR“°¢f–VÆBç6WEFW‡D6öÆ÷"„6öÆ÷"åt„•DR“°¢f–VÆBç6WD†–çEFW‡D6öÆ÷"ƒ„dcccsƒ“°¢f–VÆBç6WE6–ævÆTÆ–æR‡G'VR“°¢–b†çVÖ&W"’f–VÆBç6WD–çWEG—R„–çWEG—RåE•Uô4Ä55ôåTÔ$U ¢Â–çWEG—RåE•UôåTÔ$U%ôdÄuõ4”täTB“°¢&VçBæFEf–Wr†f–VÆBÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2€¢f–Wtw&÷WäÆ–÷WE&×2äÔD4…õ$TåBÂf–Wtw&÷WäÆ–÷WE&×2åu$ô4ôåDTåB’“°¢&WGW&âf–VÆC°¢Ğ ¢ò¢¢&÷VæFVB6öçG&öÂf÷"6öÖÖöâ…TBf—7VÂfÇVW3²æò¶W–&ö&B÷"ÖÆf÷&ÖVBçVÖ&W'2â¢ğ¢&—fFR6Æ–FW$f–VÆB6Æ–FW"„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ærF—FÆRÀ¢F÷V&ÆR–æ—F–ÂÂF÷V&ÆRÖ–æ–×VÒÂF÷V&ÆRÖ†–×VÒÀ¢F÷V&ÆR7FWÂæöäçVÆÂ7G&–ær7Vff—‚’°¢FW‡Ef–WrfÇVTÆ&VÂÒÆ&VÂ‚""“°¢&VçBæFEf–Wr‡fÇVTÆ&VÂÂÖ&v–åF÷ƒ‚’“°¢6VV´&"6öçG&öÂÒæWr6VV´&"‡F†—2“°¢–çB7FW2ÒÖF‚æÖ‚ƒÂ†–çB’ÖF‚ç&÷VæB‚†Ö†–×VÒÒÖ–æ–×VÒ’ò7FW’“°¢6öçG&öÂç6WDÖ‚‡7FW2“°¢–çB–æ—F–Å&öw&W72Ò†–çB’ÖF‚ç&÷VæB‚†–æ—F–ÂÒÖ–æ–×VÒ’ò7FW“°¢6öçG&öÂç6WE&öw&W72„ÖF‚æÖ‚ƒÂÖF‚æÖ–â‡7FW2Â–æ—F–Å&öw&W72’’“°¢6Æ–FW$f–VÆB&W7VÇBÒæWr6Æ–FW$f–VÆB€¢F—FÆRÂ7Vff—‚ÂÖ–æ–×VÒÂ7FWÂ6öçG&öÂÂfÇVTÆ&VÂ“°¢&W7VÇBçWFFTÆ&VÂ‚“°¢6öçG&öÂç6WDöå6VV´&$6†ævTÆ—7FVæW"†æWr6VV´&"äöå6VV´&$6†ævTÆ—7FVæW"‚’°¢÷fW'&–FRV&Æ–2fö–Böå&öw&W746†ævVB…6VV´&"6VV´&"Â–çB&öw&W72À¢&ööÆVâg&öÕW6W"’°¢&W7VÇBçWFFTÆ&VÂ‚“°¢Ğ ¢÷fW'&–FRV&Æ–2fö–Böå7F'EG&6¶–æuF÷V6‚…6VV´&"6VV´&"’·Ğ ¢÷fW'&–FRV&Æ–2fö–Böå7F÷G&6¶–æuF÷V6‚…6VV´&"6VV´&"’·Ğ¢Ò“°¢&VçBæFEf–Wr†6öçG&öÂÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2€¢f–Wtw&÷WäÆ–÷WE&×2äÔD4…õ$TåBÂf–Wtw&÷WäÆ–÷WE&×2åu$ô4ôåDTåB’“°¢&WGW&â&W7VÇC°¢Ğ ¢&—fFR7FF–2f–æÂ6Æ726Æ–FW$f–VÆB°¢æöäçVÆÂ&—fFRf–æÂ7G&–ærF—FÆS°¢æöäçVÆÂ&—fFRf–æÂ7G&–ær7Vff—ƒ°¢&—fFRf–æÂF÷V&ÆRÖ–æ–×VÓ°¢&—fFRf–æÂF÷V&ÆR7FW°¢æöäçVÆÂ&—fFRf–æÂ6VV´&"6öçG&öÃ°¢æöäçVÆÂ&—fFRf–æÂFW‡Ef–WrfÇVTÆ&VÃ° ¢6Æ–FW$f–VÆB„æöäçVÆÂ7G&–ærF—FÆRÂæöäçVÆÂ7G&–ær7Vff—‚À¢F÷V&ÆRÖ–æ–×VÒÂF÷V&ÆR7FWÂæöäçVÆÂ6VV´&"6öçG&öÂÀ¢æöäçVÆÂFW‡Ef–WrfÇVTÆ&VÂ’°¢F†—2çF—FÆRÒF—FÆS°¢F†—2ç7Vff—‚Ò7Vff—ƒ°¢F†—2æÖ–æ–×VÒÒÖ–æ–×VÓ°¢F†—2ç7FWÒ7FW°¢F†—2æ6öçG&öÂÒ6öçG&öÃ°¢F†—2çfÇVTÆ&VÂÒfÇVTÆ&VÃ°¢Ğ ¢F÷V&ÆRfÇVR‚’°¢&WGW&âÖ–æ–×VÒ²6öçG&öÂævWE&öw&W72‚’¢7FW°¢Ğ ¢–çB–çEfÇVR‚’°¢&WGW&â†–çB’ÖF‚ç&÷VæB‡fÇVR‚’“°¢Ğ ¢fö–BWFFTÆ&VÂ‚’°¢F÷V&ÆR7W'&VçBÒfÇVR‚“°¢7G&–ær&VæFW&VC°¢–b„ÖF‚æ'2†7W'&VçBÒÖF‚ç&–çB†7W'&VçB’’Âã’°¢&VæFW&VBÒ–çFVvW"çFõ7G&–ær‚†–çB’ÖF‚ç&–çB†7W'&VçB’“°¢ÒVÇ6R–b„ÖF‚æ'2†7W'&VçB¢"ÒÖF‚ç&–çB†7W'&VçB¢"’’Âã’°¢&VæFW&VBÒ7G&–æræf÷&ÖB„Æö6ÆRå$ôõBÂ"Rãb"Â7W'&VçB“°¢ÒVÇ6R°¢&VæFW&VBÒ7G&–æræf÷&ÖB„Æö6ÆRå$ôõBÂ"Rã&b"Â7W'&VçB“°¢Ğ¢fÇVTÆ&VÂç6WEFW‡B‡F—FÆR²#¢"²&VæFW&VB²7Vff—‚“°¢Ğ¢Ğ ¢&—fFR7–ææW"7–ææW"…7G&–æuµÒ6†ö–6W2Â7G&–ær6VÆV7FVB’°¢7–ææW"7–ææW"ÒæWr7–ææW"‡F†—2“°¢'&”FFW#Å7G&–æsâFFW"ÒæWr'&”FFW#Ãâ‡F†—2À¢æG&ö–Bå"æÆ–÷WBç6–×ÆU÷7–ææW%öG&÷F÷våö—FVÒÂ6†ö–6W2“°¢7–ææW"ç6WDFFW"†FFW"“°¢f÷"†–çB–æFW‚Ò²–æFW‚Â6†ö–6W2æÆVæwFƒ²–æFW‚²²’°¢–b†6†ö–6W5¶–æFW…ÒæWVÇ4–væ÷&T66R‡6VÆV7FVB’’°¢7–ææW"ç6WE6VÆV7F–öâ†–æFW‚“°¢'&V³°¢Ğ¢Ğ¢&WGW&â7–ææW#°¢Ğ ¢&—fFR7–ææW"æf–vF–öä6ÖW&ÖöFU7–ææW"„æöäçVÆÂ7G&–ærÖöFR’°¢7–ææW"&W7VÇBÒ7–ææW"†æWr7G&–æuµ×°¢-	ıâÍ=-2"Â-
+]-]-]=M-]]2"Â-	ıâİı-½]İâM-m]İò"À¢-
+-ííMİíRıí½ím]İR ¢ÒÂ""“°¢–çB6VÆV7FVC°¢7v—F6‚†ÖöFR’°¢66R$äõ%D…õU#¢6VÆV7FVBÒ²'&V³°¢66R$„TD”äuõU#¢6VÆV7FVBÒ#²'&V³°¢66R$e$TR#¢6VÆV7FVBÒ3²'&V³°¢66R$dôÄÄõuõ$õUDR# ¢FVfVÇC¢6VÆV7FVBÒ²'&V³°¢Ğ¢&W7VÇBç6WE6VÆV7F–öâ‡6VÆV7FVB“°¢&WGW&â&W7VÇC°¢Ğ ¢æöäçVÆÀ¢&—fFR7FF–27G&–æræf–vF–öä6ÖW&ÖöFUfÇVR†–çB÷6—F–öâ’°¢7v—F6‚‡÷6—F–öâ’°¢66R¢&WGW&â$äõ%D…õU#°¢66R#¢&WGW&â$„TD”äuõU#°¢66R3¢&WGW&â$e$TR#°¢66R ¢FVfVÇC¢&WGW&â$dôÄÄõuõ$õUDR#°¢Ğ¢Ğ ¢&—fFR7–ææW"v–æF÷t'WGFöå÷6—F–öå7–ææW"„æöäçVÆÂ7G&–ær÷6—F–öâ’°¢7–ææW"&W7VÇBÒ7–ææW"†æWr7G&–æuµ×°¢-
+-]]2½]-"Â-
+-]]2ı-"Â-
+İ}2½]-"Â-
+İ}2ı- ¢ÒÂ""“°¢–çB6VÆV7FVC°¢7v—F6‚‡÷6—F–öâ’°¢66R%Dõõ$”t…B#¢6VÆV7FVBÒ²'&V³°¢66R$$õEDôÕôÄTeB#¢6VÆV7FVBÒ#²'&V³°¢66R$$õEDôÕõ$”t…B#¢6VÆV7FVBÒ3²'&V³°¢66R%DõôÄTeB# ¢FVfVÇC¢6VÆV7FVBÒ²'&V³°¢Ğ¢&W7VÇBç6WE6VÆV7F–öâ‡6VÆV7FVB“°¢&WGW&â&W7VÇC°¢Ğ ¢æöäçVÆÀ¢&—fFR7FF–27G&–ærv–æF÷t'WGFöå÷6—F–öåfÇVR†–çB÷6—F–öâ’°¢7v—F6‚‡÷6—F–öâ’°¢66R¢&WGW&â%Dõõ$”t…B#°¢66R#¢&WGW&â$$õEDôÕôÄTeB#°¢66R3¢&WGW&â$$õEDôÕõ$”t…B#°¢66R ¢FVfVÇC¢&WGW&â%DõôÄTeB#°¢Ğ¢Ğ ¢&—fFR6öÆ÷$f–VÆB6öÆ÷$f–VÆB„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ærF—FÆRÀ¢æöäçVÆÂ7G&–ær–æ—F–Â’°¢6öÆ÷$f–VÆBf–VÆBÒæWr6öÆ÷$f–VÆB†–æ—F–Â“°¢ÖFW&–Ä'WGFöâ'WGFöâÒæWrÖFW&–Ä'WGFöâ‡F†—2“°¢'WGFöâç6WEFW‡B‡F—FÆR“°¢'WGFöâç6WDÆÄ62†fÇ6R“°¢f–VÆBæ'WGFöâÒ'WGFöã°¢ÆT6öÆ÷%–6¶W$F–ÆöræFV6÷&FT'WGFöâ†'WGFöâÂF—FÆRÂ–æ—F–Â“°¢'WGFöâç6WDöä6Æ–6´Æ—7FVæW"‡f–WrÓâÆT6öÆ÷%–6¶W$F–Æörç6†÷r€¢F†—2ÂF—FÆRÂf–VÆBçfÇVRÂÆT6öÆ÷%–6¶W$F–Æörä÷F–öç2ç7FæF&B‚’À¢æWrÆT6öÆ÷%–6¶W$F–ÆöräÆ—7FVæW"‚’°¢&—fFRfö–BÇ’„çVÆÆ&ÆR7G&–ær6VÆV7FVB’°¢–b‡6VÆV7FVBÓÒçVÆÂÇÂ6VÆV7FVBçG&–Ò‚’æ—4V×G’‚’’&WGW&ã°¢f–VÆBçfÇVRÒ6VÆV7FVC°¢ÆT6öÆ÷%–6¶W$F–ÆöræFV6÷&FT'WGFöâ†'WGFöâÂF—FÆRÂf–VÆBçfÇVR“°¢Ğ ¢÷fW'&–FRV&Æ–2fö–Böå&Wf–Wr„çVÆÆ&ÆR7G&–ær6VÆV7FVB’°¢Ç’‡6VÆV7FVB“°¢Ğ ¢÷fW'&–FRV&Æ–2fö–Böå6VÆV7FVB„çVÆÆ&ÆR7G&–ær6VÆV7FVB’°¢Ç’‡6VÆV7FVB“°¢Ğ¢Ò’“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2&×2ÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2€¢f–Wtw&÷WäÆ–÷WE&×2äÔD4…õ$TåBÂGƒSb’“°¢&×2çF÷Ö&v–âÒGƒb“°¢&VçBæFEf–Wr†'WGFöâÂ&×2“°¢&WGW&âf–VÆC°¢Ğ ¢&—fFR7FF–2f–æÂ6Æ726öÆ÷$f–VÆB°¢æöäçVÆÂ7G&–ærfÇVS°¢çVÆÆ&ÆRÖFW&–Ä'WGFöâ'WGFöã° ¢6öÆ÷$f–VÆB„æöäçVÆÂ7G&–ærfÇVR’°¢F†—2çfÇVRÒfÇVS°¢Ğ¢Ğ ¢&—fFRÆ–æV$Æ–÷WBäÆ–÷WE&×2f—†VB†–çBv–GF„G’°¢&WGW&âæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†G‡v–GF„G’Âf–Wtw&÷WäÆ–÷WE&×2åu$ô4ôåDTåB“°¢Ğ ¢&—fFRÆ–æV$Æ–÷WBäÆ–÷WE&×2Ö&v–åF÷†–çBG’°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2&×2ÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2€¢f–Wtw&÷WäÆ–÷WE&×2äÔD4…õ$TåBÂf–Wtw&÷WäÆ–÷WE&×2åu$ô4ôåDTåB“°¢&×2çF÷Ö&v–âÒG†G“°¢&WGW&â&×3°¢Ğ ¢&—fFR7FF–27G&–ærfÇVR„VF—EFW‡Bf–VÆB’°¢&WGW&âf–VÆBævWEFW‡B‚’ÓÒçVÆÂò""¢f–VÆBævWEFW‡B‚’çFõ7G&–ær‚’çG&–Ò‚“°¢Ğ ¢ò¢ ¢¢¶VW2WfW'’VF—F÷"F–Æör&VÆ÷rF†RÆ—fRG&—fW"÷7FGW2æVÂöâF†R“#ƒs#†VBVæ—Bà¢¢F†R6öçFVçB&VÖ–ç267&öÆÆ&ÆRÂ6òVæÆ&vVBôTÒföçB66Æ–ær6ææ÷BW6‚Ç’öfb×67&VVâà¢¢ğ¢&—fFRfö–B6†÷u6fTF–Æör„æöäçVÆÂÆW'DF–ÆörF–Æör’°¢F–Æörç6†÷r‚“°¢æG&ö–Bçf–Wråv–æF÷rv–æF÷rÒF–ÆörævWEv–æF÷r‚“°¢–b‡v–æF÷rÓÒçVÆÂ’&WGW&ã°¢æG&ö–BçWF–ÂäF—7Æ”ÖWG&–72ÖWG&–72ÒæWræG&ö–BçWF–ÂäF—7Æ”ÖWG&–72‚“°¢vWEv–æF÷tÖævW"‚’ævWDFVfVÇDF—7Æ’‚’ævWDÖWG&–72†ÖWG&–72“°¢v–FvWE6W'f–6R†÷7BÒv–FvWE6W'f–6RævWD–ç7Fæ6R‚“°¢–çB÷fW&Æ•F÷Ò†÷7BÓÒçVÆÂò¢†÷7BævWE7FGW4&$÷fW&Æ”†V–v‡B‚“°¢–çB&W6W'fVEF÷ÒÖF‚æÖ‚†Gƒs"’Â÷fW&Æ•F÷²Gƒ‚’“°¢–çBv–GF‚ÒÖF‚æÖ‚†GƒCƒ’ÂÖWG&–72çv–GF…—†VÇ2ÒGƒ3"’“°¢–çB†V–v‡BÒÖF‚æÖ‚†Gƒ3’ÂÖWG&–72æ†V–v‡E—†VÇ2Ò&W6W'fVEF÷ÒGƒ"’“°¢v–GF‚ÒÖF‚æÖ–â‡v–GF‚ÂÖWG&–72çv–GF…—†VÇ2“°¢†V–v‡BÒÖF‚æÖ–â††V–v‡BÂÖWG&–72æ†V–v‡E—†VÇ2“°¢v–æF÷rç6WDw&f—G’„w&f—G’ä$õEDôÒÂw&f—G’ä4TåDU%ô„õ$•¤ôåDÂ“°¢v–æF÷rç6WDÆ–÷WB‡v–GF‚Â†V–v‡B“°¢–çBG&—fW$–ç6WBÒG&—fW%æVÄ–ç6WB‚“°¢&ööÆVâG&—fW$öå&–v‡BÒ&VfW&Væ6W2æG&—fW%æVÅ6–FRævWB‚’ÓÒ°¢f–WrFV6÷"Òv–æF÷rævWDFV6÷%f–Wr‚“°¢FV6÷"ç6WEFF–ær†G&—fW$öå&–v‡Bò¢G&—fW$–ç6WBÂFV6÷"ævWEFF–æuF÷‚’À¢G&—fW$öå&–v‡BòG&—fW$–ç6WB¢ÂFV6÷"ævWEFF–æt&÷GFöÒ‚’“°¢Ğ ¢&—fFR–çBG&—fW%æVÄ–ç6WB‚’°¢–b‡&VfW&Væ6W2ÓÒçVÆÂÇÂ&VfW&Væ6W2æG&—fW%æVÄVæ&ÆVBævWB‚’’&WGW&â°¢&WGW&âÖF‚æÖ‚†Gƒ"’Â&VfW&Væ6W2æG&—fW%æVÅv–GF…‚ævWB‚’²Gƒ"’“°¢Ğ ¢&—fFR–çBG†–çBfÇVR’°¢&WGW&âÖF‚ç&÷VæB‡fÇVR¢vWE&W6÷W&6W2‚’ævWDF—7Æ”ÖWG&–72‚’æFVç6—G’“°¢Ğ§Ğ

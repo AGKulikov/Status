@@ -11,7 +11,8 @@ import java.util.List;
 final class RoutePolylineStyler {
     private RoutePolylineStyler() {}
 
-    static void apply(Object line, Object drivingRoute, NavigationMapProfile profile)
+    static void apply(Object line, Object drivingRoute, NavigationMapProfile profile,
+                      int firstSegmentIndex, int renderedSegmentCount)
             throws Exception {
         invoke(line, "setStrokeColor", new Class<?>[]{int.class},
                 Color.parseColor(profile.routeColor));
@@ -25,7 +26,12 @@ final class RoutePolylineStyler {
                 (float) profile.trafficGradientLength);
         invoke(line, "setZIndex", new Class<?>[]{float.class}, 100f);
         invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
-        if (profile.showTraffic) applyJamPalette(line, drivingRoute, profile);
+        if (profile.showRouteTraffic) {
+            applyJamPalette(line, drivingRoute, profile,
+                    firstSegmentIndex, renderedSegmentCount);
+        } else {
+            clearJamPalette(line, renderedSegmentCount);
+        }
     }
 
     static long jamFingerprint(Object drivingRoute) {
@@ -45,14 +51,15 @@ final class RoutePolylineStyler {
     }
 
     private static void applyJamPalette(Object line, Object drivingRoute,
-                                        NavigationMapProfile profile) throws Exception {
+                                        NavigationMapProfile profile, int firstSegmentIndex,
+                                        int renderedSegmentCount) throws Exception {
         List<?> jams = list(invoke(drivingRoute, "getJamSegments", new Class<?>[0]));
-        if (jams.isEmpty()) return;
-        Object geometry = invoke(drivingRoute, "getGeometry", new Class<?>[0]);
-        List<?> points = geometry == null ? new ArrayList<>()
-                : list(invoke(geometry, "getPoints", new Class<?>[0]));
-        int segmentCount = Math.max(0, points.size() - 1);
+        int segmentCount = Math.max(0, renderedSegmentCount);
         if (segmentCount == 0) return;
+        if (jams.isEmpty()) {
+            clearJamPalette(line, segmentCount);
+            return;
+        }
 
         for (int paletteIndex = 0; paletteIndex <= 6; paletteIndex++) {
             invoke(line, "setPaletteColor", new Class<?>[]{int.class, int.class},
@@ -60,13 +67,20 @@ final class RoutePolylineStyler {
         }
         ArrayList<Integer> colors = new ArrayList<>(segmentCount);
         for (int index = 0; index < segmentCount; index++) {
-            if (index >= jams.size()) {
+            int sourceIndex = firstSegmentIndex + index;
+            if (sourceIndex < 0 || sourceIndex >= jams.size()) {
                 colors.add(0);
                 continue;
             }
-            Object jamType = invoke(jams.get(index), "getJamType", new Class<?>[0]);
+            Object jamType = invoke(jams.get(sourceIndex), "getJamType", new Class<?>[0]);
             colors.add(paletteIndex(jamType == null ? "UNKNOWN" : jamType.toString()));
         }
+        invoke(line, "setStrokeColors", new Class<?>[]{List.class}, colors);
+    }
+
+    private static void clearJamPalette(Object line, int segmentCount) throws Exception {
+        ArrayList<Integer> colors = new ArrayList<>(Math.max(0, segmentCount));
+        for (int index = 0; index < segmentCount; index++) colors.add(0);
         invoke(line, "setStrokeColors", new Class<?>[]{List.class}, colors);
     }
 
@@ -90,7 +104,4 @@ final class RoutePolylineStyler {
         return value instanceof List<?> ? (List<?>) value : new ArrayList<>();
     }
 
-    private static double number(Object value) {
-        return value instanceof Number ? ((Number) value).doubleValue() : Double.NaN;
-    }
 }

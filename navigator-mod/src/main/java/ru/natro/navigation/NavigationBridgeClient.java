@@ -170,8 +170,10 @@ final class NavigationBridgeClient {
             @Override public void onNavigationState(String snapshotJson, String routeJson,
                                                      Object drivingRoute, long routeEpoch) {
                 mainMapController.updateRoute(routeEpoch, drivingRoute);
-                hudMapRenderer.updateNavigationState(snapshotJson);
                 hudMapRenderer.updateRoute(routeEpoch, drivingRoute);
+                // Install the current DrivingRoute wrapper before applying its snapshot so the
+                // HUD trims against the exact RoutePosition that produced this state.
+                hudMapRenderer.updateNavigationState(snapshotJson);
                 sendState(MSG_NAVIGATION_SNAPSHOT, KEY_SNAPSHOT_JSON, snapshotJson);
                 if (routeJson != null) {
                     sendState(MSG_ROUTE_GEOMETRY, KEY_ROUTE_GEOMETRY_JSON, routeJson);

@@ -35,6 +35,7 @@ final class NavigationMapProfile {
     boolean showWater = true;
     boolean showModels;
     boolean showRoute = true;
+    boolean showRouteTraffic = true;
     boolean showTraffic = true;
     boolean showCursor = true;
     boolean roadsOnly;
@@ -83,6 +84,10 @@ final class NavigationMapProfile {
             result.showModels = source.optBoolean("showModels", false);
             result.showRoute = source.optBoolean("showRoute", true);
             result.showTraffic = source.optBoolean("showTraffic", true);
+            // Old configurations had one switch for both layers. Preserve that behaviour until
+            // Natro sends the new independent route-traffic value.
+            result.showRouteTraffic = source.optBoolean(
+                    "showRouteTraffic", result.showTraffic);
             result.showCursor = source.optBoolean("showCursor", true);
             result.roadsOnly = source.optBoolean("roadsOnly", false);
             result.cameraMode = enumText(source.optString(

@@ -23,6 +23,8 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.routeColor = "#FFAABBCC";
         config.hudMap.trafficBlockedColor = "#FF550011";
         config.hudMap.trafficGradientLength = 24d;
+        config.hudMap.showTraffic = false;
+        config.hudMap.showRouteTraffic = true;
         config.hudMap.enabled = true;
         config.hudMap.roadsOnly = true;
         config.mainFloatingWindow.movementLocked = true;
@@ -42,6 +44,8 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FF334455", restored.mainMap.trafficHardColor);
         assertEquals("#FF550011", restored.hudMap.trafficBlockedColor);
         assertEquals(24d, restored.hudMap.trafficGradientLength, 0d);
+        assertFalse(restored.hudMap.showTraffic);
+        assertTrue(restored.hudMap.showRouteTraffic);
         assertTrue(restored.hudMap.enabled);
         assertTrue(restored.hudMap.roadsOnly);
         assertTrue(restored.mainFloatingWindow.movementLocked);
@@ -243,6 +247,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("lastAppliedCamera"));
         assertTrue(renderer.contains("else if (jamsChanged) restyleRoute()"));
         assertTrue(renderer.contains("Updates traffic colours in place"));
+        assertTrue(renderer.contains("positionOnRoute"));
+        assertTrue(renderer.contains("setGeometry"));
+        assertTrue(renderer.contains("isForwardProgress"));
+        assertTrue(renderer.contains("slice.firstSegmentIndex"));
+        assertTrue(routeStyler.contains("profile.showRouteTraffic"));
+        assertTrue(routeStyler.contains("firstSegmentIndex + index"));
+        assertTrue(mapProfile.contains("showRouteTraffic"));
         assertFalse(renderer.contains("drivingRoute != activeRoute"));
         assertFalse(routeStyler.contains("Double.doubleToLongBits"));
         assertTrue(renderer.contains("applyStyleSlot"));
