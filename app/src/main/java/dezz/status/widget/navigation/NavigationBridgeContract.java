@@ -18,6 +18,10 @@ public final class NavigationBridgeContract {
     public static final String NATRO_ENDPOINT_SERVICE_CLASS =
             "dezz.status.widget.navigation.NavigationHudEndpointService";
     public static final String NATRO_BIND_ACTION = "ru.natro.navigation.bridge.BIND_V2";
+    public static final String CONFIGURATION_PROVIDER_AUTHORITY =
+            "ru.natro.statuswidget.navigation.configuration";
+    public static final String CONFIGURATION_PROVIDER_METHOD =
+            "get_navigation_configuration_v2";
 
     /** Existing Natro shortcuts already send this vendor-compatible window contract. */
     public static final String LEGACY_FLOATING_ACTION =

@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -27,6 +28,10 @@ final class NavigationBridgeClient {
     private static final String NATRO_SERVICE =
             "dezz.status.widget.navigation.NavigationHudEndpointService";
     private static final String BIND_ACTION = "ru.natro.navigation.bridge.BIND_V2";
+    private static final Uri CONFIGURATION_PROVIDER_URI = Uri.parse(
+            "content://ru.natro.statuswidget.navigation.configuration");
+    private static final String CONFIGURATION_PROVIDER_METHOD =
+            "get_navigation_configuration_v2";
 
     private static final int MSG_HELLO = 1;
     private static final int MSG_CAPABILITIES = 2;
@@ -67,6 +72,7 @@ final class NavigationBridgeClient {
 
     private static final long MIN_RETRY_MS = 1_000L;
     private static final long MAX_RETRY_MS = 30_000L;
+    private static final int MAX_CONFIGURATION_CHARS = 384 * 1024;
     private static NavigationBridgeClient instance;
 
     private final Context context;
@@ -124,6 +130,22 @@ final class NavigationBridgeClient {
     /** Best-effort diagnostics from the host lifecycle hook; it must never throw into Navigator. */
     static synchronized void reportDiagnostic(String detail) {
         if (instance != null) instance.sendDiagnostic(detail);
+    }
+
+    /** Reads one current snapshot even when KX11 has not established the Messenger bridge yet. */
+    static String readHostedConfiguration(Context source) {
+        if (source == null) return null;
+        try {
+            Bundle result = source.getContentResolver().call(
+                    CONFIGURATION_PROVIDER_URI, CONFIGURATION_PROVIDER_METHOD, null, null);
+            if (result == null) return null;
+            String raw = result.getString(KEY_CONFIGURATION_JSON);
+            if (raw == null || raw.length() > MAX_CONFIGURATION_CHARS
+                    || raw.indexOf('\u0000') >= 0) return null;
+            return raw;
+        } catch (RuntimeException unavailable) {
+            return null;
+        }
     }
 
     private NavigationBridgeClient(Context context) {

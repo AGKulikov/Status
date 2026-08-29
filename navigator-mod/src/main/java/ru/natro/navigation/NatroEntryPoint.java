@@ -28,6 +28,7 @@ public final class NatroEntryPoint {
         if (activity == null || activity.isFinishing()) return;
         try {
             FloatingWindowController controller = controllerFor(activity);
+            applyHostedConfiguration(activity, controller);
             controller.install();
             controller.consumeIntent(activity.getIntent());
             NavigationBridgeClient.attachActivity(activity);
@@ -41,6 +42,7 @@ public final class NatroEntryPoint {
         try {
             activity.setIntent(intent);
             FloatingWindowController controller = controllerFor(activity);
+            applyHostedConfiguration(activity, controller);
             boolean requestedFloating = controller.requestsFloating(intent);
             if (requestedFloating != controller.isFloating()) {
                 controller.restartInMode(requestedFloating, intent);
@@ -133,6 +135,12 @@ public final class NatroEntryPoint {
         controller = new FloatingWindowController(activity);
         CONTROLLERS.put(activity, controller);
         return controller;
+    }
+
+    private static void applyHostedConfiguration(Activity activity,
+                                                 FloatingWindowController controller) {
+        String raw = NavigationBridgeClient.readHostedConfiguration(activity);
+        if (raw != null) controller.applyConfiguration(raw);
     }
 
     private static void reportFailure(String stage, Throwable failure) {

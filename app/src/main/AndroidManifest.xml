@@ -326,6 +326,16 @@
             android:exported="false"
             android:stopWithTask="false" />
 
+        <!-- Synchronous fallback used only by the same-certificate patched Navigator. The
+             provider verifies Binder.getCallingUid() before returning the current snapshot. -->
+        <provider
+            android:name=".navigation.NavigationConfigurationProvider"
+            android:authorities="ru.natro.statuswidget.navigation.configuration"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true"
+            android:grantUriPermissions="false" />
+
         <service
             android:name=".diagnostics.ActionRecorderOverlayService"
             android:enabled="true"

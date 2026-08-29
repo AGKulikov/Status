@@ -114,6 +114,8 @@ public final class NavigationHudV2ContractTest {
                 "navigation/NavigationHudEndpointService.java"));
         String relay = read(sourceRoot().resolve(
                 "navigation/NavigationConfigurationRelayService.java"));
+        String provider = read(sourceRoot().resolve(
+                "navigation/NavigationConfigurationProvider.java"));
         String verifier = read(sourceRoot().resolve(
                 "navigation/NavigationBridgeCallerVerifier.java"));
         String compactManifest = manifest.replaceAll("\\s+", "");
@@ -136,6 +138,12 @@ public final class NavigationHudV2ContractTest {
         assertFalse(compactManifest.contains("android:process=\":hud\""));
         assertTrue(relay.contains("getStringExtra(EXTRA_CONFIGURATION_JSON)"));
         assertTrue(relay.contains("acceptRelayedConfiguration(raw)"));
+        assertTrue(compactManifest.contains("android:name=\".navigation."
+                + "NavigationConfigurationProvider\"android:authorities=\""
+                + "ru.natro.statuswidget.navigation.configuration\""));
+        assertTrue(provider.contains("Binder.getCallingUid()"));
+        assertTrue(provider.contains("isTrustedNavigator("));
+        assertTrue(provider.contains("navigationIntegrationConfigJson.get()"));
     }
 
     @Test public void navigatorPatchHasButtonAndConsumesExistingNatroWindowContract()
@@ -185,6 +193,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("decor.setClipToOutline(true)"));
         assertTrue(controller.contains("roundedOutlineProvider"));
         assertTrue(controller.contains("NatroEntryPoint.usesMovableMap(activity)"));
+        assertTrue(client.contains("readHostedConfiguration(Context source)"));
+        assertTrue(client.contains("getContentResolver().call("));
+        assertTrue(entry.contains("applyHostedConfiguration(activity, controller)"));
         assertFalse(controller.contains("decor.setClipToOutline(profile.cornerRadiusDp > 0)"));
         assertFalse(controller.contains("View.SYSTEM_UI_FLAG_HIDE_NAVIGATION"));
         assertFalse(controller.contains("containsReadySurface"));
