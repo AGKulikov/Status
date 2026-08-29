@@ -14,6 +14,8 @@ OUTPUT_DIR="$4"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 EXPECTED_CERT_SHA256='6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
 EXPECTED_BASELINE_SHA256='663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f'
+EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.4.7}"
+EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021271}"
 KEYSTORE_FILE="${KEYSTORE_FILE:-}"
 KEY_ALIAS="${KEY_ALIAS:-status-widget-ha}"
 APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
@@ -71,8 +73,8 @@ VERSION_NAME=$(jq -er '.natro.versionName' "$MANIFEST")
 VERSION_CODE=$(jq -er '.natro.versionCode' "$MANIFEST")
 test "$(jq -er '.schema' "$MANIFEST")" = 'natro-navigation-hud-v2-candidate/v1'
 test "$(jq -er '.repository' "$MANIFEST")" = 'AGKulikov/Status'
-test "$VERSION_NAME" = '2.4.6'
-test "$VERSION_CODE" = '208021270'
+test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"
+test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"
 test "$(jq -er '.navigator.baselineSha256' "$MANIFEST")" = \
   "$EXPECTED_BASELINE_SHA256"
 test "$(jq -er '.toolchain.apktoolSha256' "$MANIFEST")" = \
@@ -166,6 +168,8 @@ grep -Fq \
   <<<"$BADGING"
 grep -Fxq "application-label:'Natro'" <<<"$BADGING"
 
+EXPECTED_NATRO_VERSION_NAME="$EXPECTED_NATRO_VERSION_NAME" \
+EXPECTED_NATRO_VERSION_CODE="$EXPECTED_NATRO_VERSION_CODE" \
 python3 "$SCRIPT_DIR/verify_kx11_navigation_pair.py" \
   --baseline "$BASELINE_APK" \
   --navigator "$NAVIGATOR_SIGNED" \

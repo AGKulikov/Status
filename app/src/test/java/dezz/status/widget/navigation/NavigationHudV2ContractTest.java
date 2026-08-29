@@ -254,6 +254,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("else if (jamsChanged) restyleRoute()"));
         assertTrue(renderer.contains("Updates traffic colours in place"));
         assertTrue(renderer.contains("positionOnRoute"));
+        assertTrue(renderer.contains("invoke(route, \"getPosition\""));
         assertTrue(renderer.contains("setGeometry"));
         assertTrue(renderer.contains("isForwardProgress"));
         assertTrue(renderer.contains("slice.firstSegmentIndex"));
@@ -292,6 +293,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("MapActivity.x()"));
         assertTrue(publisher.contains("getMapWindow"));
         assertTrue(publisher.contains("getGuidance"));
+        assertTrue(publisher.contains("getRouteStatus"));
+        assertTrue(publisher.contains("scheduleRouteReconcile"));
+        assertTrue(publisher.contains("main.post(routeReconcile)"));
+        assertTrue(publisher.contains("main.postDelayed(routeReconcileConfirmation"));
         assertTrue(publisher.contains("distanceToFinish"));
         assertTrue(publisher.contains("timeToFinish"));
         assertTrue(publisher.contains("getManoeuvres"));
@@ -361,6 +366,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(composite.contains("publishHudSurface"));
         assertTrue(composite.contains("mapTexture.setOpaque(!transparentMap)"));
         assertTrue(composite.contains("transparentBackground"));
+        assertTrue(composite.contains("width <= 1 || height <= 1"));
+        assertTrue(composite.contains("texture.setDefaultBufferSize(width, height)"));
+        assertTrue(composite.contains("addOnLayoutChangeListener"));
+        assertTrue(composite.contains("publishLaidOutSurface"));
         assertFalse(composite.contains("Bitmap"));
         assertFalse(composite.contains("ImageReader"));
         assertFalse(composite.contains("MediaProjection"));

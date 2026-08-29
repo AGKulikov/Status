@@ -117,6 +117,7 @@ import dezz.status.widget.launcher.information.InformationPanelView;
 import dezz.status.widget.launcher.navigation.NavigationPanelConfig;
 import dezz.status.widget.launcher.navigation.NavigationPanelConfigStore;
 import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.launcher.panels.PanelGridLayout;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
@@ -257,6 +258,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean carIntegrationLoadInFlight;
     private int carIntegrationLoadGeneration;
     private boolean homeRootInvocation;
+    private boolean initialRootNavigationChecked;
     private boolean pendingAutomaticNavigatorLaunch;
     private boolean ecarxPhoneWakeSentForStart;
     @Nullable private View navigationRouteContent;
@@ -414,6 +416,14 @@ public final class LauncherActivity extends AppCompatActivity {
     };
     private boolean launcherFirstDrawCompleted;
     private final Runnable panelInitializationStep = this::continuePanelInitialization;
+    private final Runnable automaticNavigatorLaunch = () -> {
+        if (!pendingAutomaticNavigatorLaunch || !activityStarted || !launcherBootstrapReady
+                || !launcherFirstDrawCompleted || isFinishing() || isDestroyed()) return;
+        pendingAutomaticNavigatorLaunch = false;
+        DiagnosticJournal.info("launcher-navigation",
+                "launching windowed Navigator over HOME");
+        launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false);
+    };
     private final Runnable deferredLauncherRuntimeStart = new Runnable() {
         @Override public void run() {
             if (!activityStarted || !launcherBootstrapReady
@@ -452,11 +462,7 @@ public final class LauncherActivity extends AppCompatActivity {
                     scheduleNavigationRefresh();
                     break;
                 case 5:
-                    if (pendingAutomaticNavigatorLaunch) {
-                        pendingAutomaticNavigatorLaunch = false;
-                        launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false);
-                        return;
-                    }
+                    scheduleAutomaticNavigatorLaunch();
                     break;
                 case 6:
                     // Geometry already admitted the first catalog scan. This is only a fallback
@@ -501,6 +507,7 @@ public final class LauncherActivity extends AppCompatActivity {
                     }
                     applyPendingLauncherBootstrapAfterFirstDraw();
                     startImmediateHomeRuntime();
+                    scheduleAutomaticNavigatorLaunch();
                     scheduleInitialLauncherBackdrops();
                 });
             }
@@ -582,8 +589,9 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void handleStagedOrHomeNavigation(@Nullable Intent intent) {
-        if (intent == null || !launcherBootstrapReady) return;
-        String staged = intent.getStringExtra(YandexWindowLauncher.EXTRA_STAGED_PRODUCT);
+        if (!launcherBootstrapReady) return;
+        String staged = intent == null ? null
+                : intent.getStringExtra(YandexWindowLauncher.EXTRA_STAGED_PRODUCT);
         if (staged != null && !staged.trim().isEmpty()) {
             intent.removeExtra(YandexWindowLauncher.EXTRA_STAGED_PRODUCT);
             boolean full = intent.getBooleanExtra(
@@ -598,11 +606,20 @@ public final class LauncherActivity extends AppCompatActivity {
             navigationUiHandler.post(() -> launchYandex(product, full));
             return;
         }
-        boolean homeIntent = Intent.ACTION_MAIN.equals(intent.getAction())
-                && intent.hasCategory(Intent.CATEGORY_HOME);
-        if (homeIntent && preferences.launcherHomeOpensWindowedNavigator.get()) {
+        boolean explicitHome = isHomeInvocation(intent);
+        boolean restoredHomeRoot = !initialRootNavigationChecked && isTaskRoot()
+                && !requestsAnyHomeEditor(intent);
+        if (explicitHome || restoredHomeRoot) {
+            initialRootNavigationChecked = true;
+            homeRootInvocation = true;
+        }
+        if ((explicitHome || restoredHomeRoot)
+                && preferences.launcherHomeOpensWindowedNavigator.get()) {
             pendingAutomaticNavigatorLaunch = true;
-            if (activityStarted) scheduleDeferredLauncherRuntimeStart();
+            DiagnosticJournal.info("launcher-navigation",
+                    "windowed Navigator requested by "
+                            + (explicitHome ? "explicit HOME" : "restored HOME root"));
+            scheduleAutomaticNavigatorLaunch();
         }
     }
 
@@ -622,6 +639,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (launcherFirstDrawCompleted) {
             navigationUiHandler.post(this::startImmediateHomeRuntime);
         }
+        scheduleAutomaticNavigatorLaunch();
         scheduleDeferredLauncherRuntimeStart();
         requestLauncherSafeAreaRefresh();
         scheduleRuntimeBindingProbe();
@@ -655,6 +673,7 @@ public final class LauncherActivity extends AppCompatActivity {
         initialBackdropLoadInFlight = false;
         navigationUiHandler.removeCallbacks(deferredLauncherRuntimeStart);
         navigationUiHandler.removeCallbacks(deferredLauncherRuntimeStep);
+        navigationUiHandler.removeCallbacks(automaticNavigatorLaunch);
         deferredLauncherRuntimeStarted = false;
         deferredLauncherRuntimeStage = 0;
         ecarxPhoneWakeSentForStart = false;
@@ -871,6 +890,14 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationUiHandler.removeCallbacks(deferredLauncherRuntimeStep);
         if (!launcherBootstrapReady || !activityStarted) return;
         navigationUiHandler.post(deferredLauncherRuntimeStart);
+    }
+
+    /** Opens Navigator after HOME has committed one frame, independent of optional panel startup. */
+    private void scheduleAutomaticNavigatorLaunch() {
+        navigationUiHandler.removeCallbacks(automaticNavigatorLaunch);
+        if (!pendingAutomaticNavigatorLaunch || !launcherBootstrapReady
+                || !launcherFirstDrawCompleted || !activityStarted) return;
+        navigationUiHandler.post(automaticNavigatorLaunch);
     }
 
     private void scheduleVisibleIntegrationHostHandoff() {

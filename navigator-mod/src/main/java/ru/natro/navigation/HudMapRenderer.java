@@ -440,15 +440,22 @@ final class HudMapRenderer {
         double segmentPosition = 0d;
         Object currentPoint = null;
         Object routePosition = invoke(route, "getRoutePosition", new Class<?>[0]);
-        if (routePosition != null) {
+        // DrivingRoute.getPosition() is MapKit's canonical reached polyline position. Asking the
+        // RoutePosition wrapper to project itself back to the same route can temporarily return
+        // null while guidance is rerouting, which reset the HUD slice to segment zero and left the
+        // already travelled route visible.
+        Object polylinePosition = invoke(route, "getPosition", new Class<?>[0]);
+        if (polylinePosition == null && routePosition != null) {
             String routeId = String.valueOf(invoke(route, "getRouteId", new Class<?>[0]));
-            Object polylinePosition = invoke(routePosition, "positionOnRoute",
+            polylinePosition = invoke(routePosition, "positionOnRoute",
                     new Class<?>[]{String.class}, routeId);
-            if (polylinePosition != null) {
-                segmentIndex = ((Number) invoke(polylinePosition, "getSegmentIndex",
-                        new Class<?>[0])).intValue();
-                segmentPosition = ((Number) invoke(polylinePosition, "getSegmentPosition",
-                        new Class<?>[0])).doubleValue();
+        }
+        if (polylinePosition != null) {
+            segmentIndex = ((Number) invoke(polylinePosition, "getSegmentIndex",
+                    new Class<?>[0])).intValue();
+            segmentPosition = ((Number) invoke(polylinePosition, "getSegmentPosition",
+                    new Class<?>[0])).doubleValue();
+            if (routePosition != null) {
                 currentPoint = invoke(routePosition, "getPoint", new Class<?>[0]);
             }
         }

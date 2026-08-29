@@ -67,6 +67,7 @@ final class NavigatorStatePublisher {
     private static final long CAMERA_INTERVAL_MS = 100L;
     private static final long MIN_RESOLVE_RETRY_MS = 250L;
     private static final long MAX_RESOLVE_RETRY_MS = 5_000L;
+    private static final long ROUTE_RECONCILE_CONFIRM_MS = 250L;
     private static final int MAX_POLYLINE_POINTS = 16_000;
     private static final int MAX_ENCODED_POLYLINE_CHARS = 190_000;
     private static final int MAX_TRAFFIC_RUNS = 2_048;
@@ -99,6 +100,7 @@ final class NavigatorStatePublisher {
     private long resolveRetryMs = MIN_RESOLVE_RETRY_MS;
     private String lastPrimaryMapFailure = "";
     private String lastGuidanceFailure = "";
+    private String lastRouteDiagnostic = "";
 
     NavigatorStatePublisher(Sink sink) {
         this.sink = sink;
@@ -234,7 +236,8 @@ final class NavigatorStatePublisher {
             boolean routeMayHaveChanged = "onCurrentRouteChanged".equals(methodName)
                     || "onRouteFinished".equals(methodName)
                     || "onRouteLost".equals(methodName);
-            publishState(routeMayHaveChanged, false);
+            if (routeMayHaveChanged) scheduleRouteReconcile(methodName);
+            else publishState(false, false);
         });
         invoke(nextGuidance, "addListener", new Class<?>[]{guidanceListenerClass},
                 guidanceListener);
@@ -291,7 +294,13 @@ final class NavigatorStatePublisher {
         }
         try {
             Object nextRoute = invoke(currentGuidance, "getCurrentRoute");
+            String routeStatus = readRouteStatus(currentGuidance);
+            // MapKit normally changes getCurrentRoute() to null when guidance stops. During the
+            // onRouteFinished callback the Java wrapper may still expose the old route for the
+            // remainder of that native callback, so the terminal status is authoritative too.
+            if ("ROUTE_FINISHED".equals(routeStatus)) nextRoute = null;
             boolean routeChanged = updateRoute(nextRoute, routeMayHaveChanged);
+            publishRouteDiagnostic(routeStatus);
             String snapshot = buildSnapshot(currentGuidance, activeRoute).toString();
             String route = routeChanged || forceRoute ? buildRoutePayload().toString() : null;
             sink.onNavigationState(snapshot, route, activeRoute, routeEpoch);
@@ -301,6 +310,34 @@ final class NavigatorStatePublisher {
             guidance = null;
             main.removeCallbacks(resolveRetry);
             main.postDelayed(resolveRetry, MIN_RESOLVE_RETRY_MS);
+        }
+    }
+
+    private void scheduleRouteReconcile(String eventName) {
+        sink.onDiagnostic("Guidance route lifecycle event=" + eventName
+                + "; deferring canonical route read");
+        main.removeCallbacks(routeReconcile);
+        main.removeCallbacks(routeReconcileConfirmation);
+        // GuidanceListener is invoked from inside MapKit's state transition. Reading the route in
+        // that same stack frame can return the route that has just been stopped. One main-loop turn
+        // observes the committed value; the bounded confirmation catches vendor-side deferral.
+        main.post(routeReconcile);
+        main.postDelayed(routeReconcileConfirmation, ROUTE_RECONCILE_CONFIRM_MS);
+    }
+
+    private void publishRouteDiagnostic(String routeStatus) {
+        String detail = "active=" + (activeRoute != null) + ", status=" + routeStatus
+                + ", epoch=" + routeEpoch;
+        if (detail.equals(lastRouteDiagnostic)) return;
+        lastRouteDiagnostic = detail;
+        sink.onDiagnostic("Guidance route state " + detail);
+    }
+
+    private static String readRouteStatus(Object currentGuidance) {
+        try {
+            return enumName(invoke(currentGuidance, "getRouteStatus"));
+        } catch (Throwable unavailable) {
+            return "UNKNOWN";
         }
     }
 
@@ -711,6 +748,8 @@ final class NavigatorStatePublisher {
     private void detachOnMain() {
         main.removeCallbacks(resolveRetry);
         main.removeCallbacks(dispatchCamera);
+        main.removeCallbacks(routeReconcile);
+        main.removeCallbacks(routeReconcileConfirmation);
         detachCameraListener();
         detachGuidanceListeners();
         activityReference = new WeakReference<>(null);
@@ -768,6 +807,10 @@ final class NavigatorStatePublisher {
     private final Runnable resolveRetry = this::resolveBindings;
 
     private final Runnable dispatchCamera = this::dispatchPendingCamera;
+
+    private final Runnable routeReconcile = () -> publishState(true, true);
+
+    private final Runnable routeReconcileConfirmation = () -> publishState(true, true);
 
     private void dispatchPendingCamera() {
         CameraState next = pendingCamera;
@@ -895,4 +938,3 @@ final class NavigatorStatePublisher {
         return result.length() > 240 ? result.substring(0, 240) : result;
     }
 }
-

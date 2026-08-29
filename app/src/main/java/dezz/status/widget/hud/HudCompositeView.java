@@ -32,6 +32,9 @@ final class HudCompositeView extends FrameLayout
     @NonNull private final TextureView mapTexture;
     @NonNull private final HudCanvasView canvas;
     @Nullable private Surface leasedSurface;
+    @Nullable private SurfaceTexture leasedTexture;
+    private int leasedWidth;
+    private int leasedHeight;
     @Nullable private HudElementConfig activeMap;
 
     HudCompositeView(@NonNull Context context,
@@ -51,6 +54,11 @@ final class HudCompositeView extends FrameLayout
         // produced by setBackgroundColor(). Its opaque producer surface is already black before
         // Navigator submits the first frame, so no View background is needed here.
         mapTexture.setSurfaceTextureListener(this);
+        mapTexture.addOnLayoutChangeListener((view, left, top, right, bottom,
+                oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (right - left <= 1 || bottom - top <= 1) return;
+            publishLaidOutSurface();
+        });
         addView(mapTexture, new LayoutParams(1, 1));
 
         canvas = new HudCanvasView(context, config, data, false, null, localHudViewport);
@@ -120,12 +128,17 @@ final class HudCompositeView extends FrameLayout
         mapTexture.setLayoutParams(params);
         if (sizeChanged) mapTexture.requestLayout();
         mapTexture.invalidateOutline();
+        // KX11 may keep the producer buffer at the constructor's temporary 1x1 size without
+        // issuing onSurfaceTextureSizeChanged(). Reconcile after this geometry traversal as well
+        // as from the layout listener above.
+        mapTexture.post(this::publishLaidOutSurface);
     }
 
     @Override
     public void onSurfaceTextureAvailable(@NonNull SurfaceTexture texture,
                                           int width, int height) {
         publishSurface(texture, width, height);
+        mapTexture.post(this::publishLaidOutSurface);
     }
 
     @Override
@@ -147,10 +160,19 @@ final class HudCompositeView extends FrameLayout
     }
 
     private void publishSurface(@NonNull SurfaceTexture texture, int width, int height) {
-        if (activeMap == null || width <= 0 || height <= 0) return;
+        // The TextureView is intentionally constructed at 1x1 until the HUD element geometry is
+        // known. Publishing that placeholder made Navigator attach a permanent 1x1 MapWindow on
+        // cold boot because this Android 9 compositor does not reliably send the resize callback.
+        if (activeMap == null || width <= 1 || height <= 1) return;
+        if (leasedSurface != null && leasedTexture == texture
+                && leasedWidth == width && leasedHeight == height) return;
         revokeSurface();
+        texture.setDefaultBufferSize(width, height);
         Surface surface = new Surface(texture);
         leasedSurface = surface;
+        leasedTexture = texture;
+        leasedWidth = width;
+        leasedHeight = height;
         int dpi = getResources().getDisplayMetrics().densityDpi;
         long generation = NavigationHudEndpointService.publishHudSurface(
                 surface, width, height, dpi);
@@ -160,9 +182,19 @@ final class HudCompositeView extends FrameLayout
                         + ", transparent=" + !mapTexture.isOpaque());
     }
 
+    private void publishLaidOutSurface() {
+        if (activeMap == null || !mapTexture.isAvailable()) return;
+        SurfaceTexture texture = mapTexture.getSurfaceTexture();
+        if (texture == null) return;
+        publishSurface(texture, mapTexture.getWidth(), mapTexture.getHeight());
+    }
+
     private void revokeSurface() {
         Surface current = leasedSurface;
         leasedSurface = null;
+        leasedTexture = null;
+        leasedWidth = 0;
+        leasedHeight = 0;
         if (current == null) return;
         NavigationHudEndpointService.revokeHudSurface(current);
         try {

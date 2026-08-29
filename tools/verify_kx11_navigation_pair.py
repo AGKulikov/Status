@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -15,8 +16,8 @@ import zipfile
 
 KX11_ANDROID_API = 28
 NATRO_PACKAGE = "ru.natro.statuswidget"
-NATRO_VERSION_NAME = "2.4.6"
-NATRO_VERSION_CODE = "208021270"
+NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.4.7")
+NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021271")
 NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi"
 NAVIGATOR_VERSION_CODE = "739564630"
 NAVIGATOR_BASELINE_SHA256 = (

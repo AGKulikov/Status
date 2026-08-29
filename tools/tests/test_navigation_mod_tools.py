@@ -194,8 +194,10 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn("test \"$VERSION_NAME\" = '2.4.6'", pair)
-        self.assertIn("test \"$VERSION_CODE\" = '208021270'", pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.4.7}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021271}"', pair)
+        self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
+        self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
     def test_kx11_pair_gate_freezes_device_identity_and_hud_plane(self):

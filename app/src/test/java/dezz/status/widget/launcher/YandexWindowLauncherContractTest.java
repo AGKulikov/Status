@@ -56,6 +56,10 @@ public final class YandexWindowLauncherContractTest {
         assertTrue(launcher.contains("handleStagedOrHomeNavigation("));
         assertTrue(launcher.contains("intent.hasCategory(Intent.CATEGORY_HOME)"));
         assertTrue(launcher.contains("launcherHomeOpensWindowedNavigator.get()"));
+        assertTrue(launcher.contains("restoredHomeRoot"));
+        assertTrue(launcher.contains("isTaskRoot()"));
+        assertTrue(launcher.contains("scheduleAutomaticNavigatorLaunch()"));
+        assertTrue(launcher.contains("independent of optional panel startup"));
         assertTrue(settings.contains("HOME → наш лаунчер → оконный Навигатор"));
         assertTrue(preferences.contains("launcherHomeOpensWindowedNavigator"));
     }
