@@ -85,6 +85,7 @@ final class FloatingWindowController {
     private Drawable transparentContentBackground;
     private Drawable transparentMapRootBackground;
     private Drawable transparentMapWithControlsBackground;
+    private String appliedConfigurationRaw;
     private boolean floating;
     private boolean floatingIdentityRejected;
     private boolean destroyed;
@@ -224,6 +225,13 @@ final class FloatingWindowController {
     }
 
     void applyConfiguration(String rawConfiguration) {
+        // The provider supplies the profile synchronously before the Activity enters floating
+        // mode, then the authenticated Binder session publishes the same snapshot again. ECARX
+        // Android 9 cannot safely accept repeated type-2038 setAttributes transactions for an
+        // already attached Activity window: the surface is removed a few seconds later without
+        // a Java exception. Treat an identical wire snapshot as an idempotent delivery.
+        if (rawConfiguration != null && rawConfiguration.equals(appliedConfigurationRaw)) return;
+        appliedConfigurationRaw = rawConfiguration;
         profile = FloatingWindowProfile.fromConfiguration(rawConfiguration);
         if (!profile.enabled && floating) restartInMode(false, null);
         else if (floating) applyFloatingAttributes(false);

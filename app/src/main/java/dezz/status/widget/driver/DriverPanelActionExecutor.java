@@ -222,7 +222,11 @@ final class DriverPanelActionExecutor {
     }
 
     private void launchYandex(YandexWindowLauncher.Product product, boolean full) {
-        if (!YandexWindowLauncher.launchOverLauncher(context, product, full)) {
+        // The driver panel already owns a stable overlay above HOME. Staging a windowed launch
+        // through LauncherActivity creates a second task transition on ECARX and can bring HOME
+        // back to the foreground while Navigator is converting MapActivity to type 2038.
+        // Launch the exact same Yandex surface atomically from the panel service instead.
+        if (!YandexWindowLauncher.launch(context, product, full)) {
             toast("Приложение Яндекса не найдено");
         }
     }

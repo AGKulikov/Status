@@ -204,6 +204,7 @@ public final class NavigationHudV2ContractTest {
         assertFalse(controller.contains("view instanceof SurfaceView"));
         assertFalse(controller.contains("prepareWindowBeforeContent"));
         assertTrue(controller.contains("floatingIdentityRejected"));
+        assertTrue(controller.contains("rawConfiguration.equals(appliedConfigurationRaw)"));
         assertTrue(windowProfile.contains("backgroundColor = \"#00000000\""));
         assertTrue(controller.contains("navi_service_open_voice_search"));
         assertTrue(controller.contains("guidance_open_voice_search"));
