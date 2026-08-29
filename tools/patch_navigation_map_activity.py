@@ -69,7 +69,11 @@ def patch(source: str) -> str:
         new_intent_super,
         new_intent_super
         + "\n    invoke-static {p0, p1}, " + ENTRY_POINT
-        + "->onNewIntent(Landroid/app/Activity;Landroid/content/Intent;)V\n",
+        + "->onNewIntent(Landroid/app/Activity;Landroid/content/Intent;)Z\n\n"
+        + "    move-result v0\n\n"
+        + "    if-eqz v0, :natro_continue_new_intent\n\n"
+        + "    return-void\n\n"
+        + "    :natro_continue_new_intent\n",
         "onNewIntent",
     )
 

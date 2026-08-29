@@ -37,8 +37,8 @@ public final class NatroEntryPoint {
         }
     }
 
-    public static void onNewIntent(Activity activity, Intent intent) {
-        if (activity == null || intent == null || activity.isFinishing()) return;
+    public static boolean onNewIntent(Activity activity, Intent intent) {
+        if (activity == null || intent == null || activity.isFinishing()) return false;
         try {
             activity.setIntent(intent);
             FloatingWindowController controller = controllerFor(activity);
@@ -46,11 +46,18 @@ public final class NatroEntryPoint {
             boolean requestedFloating = controller.requestsFloating(intent);
             if (requestedFloating != controller.isFloating()) {
                 controller.restartInMode(requestedFloating, intent);
+                // The replacement Activity retains the complete source Intent, including a route
+                // URI. The old Activity must not let Yandex process the same command afterwards.
+                return true;
             } else {
                 controller.consumeIntent(intent);
+                // Pure ddnavwin/fullscreen control commands belong only to this controller.
+                // Route deep links still continue through MapActivity's original onNewIntent.
+                return isPureWindowCommand(intent);
             }
         } catch (Throwable failure) {
             reportFailure("onNewIntent", failure);
+            return false;
         }
     }
 
@@ -141,6 +148,13 @@ public final class NatroEntryPoint {
                                                  FloatingWindowController controller) {
         String raw = NavigationBridgeClient.readHostedConfiguration(activity);
         if (raw != null) controller.applyConfiguration(raw);
+    }
+
+    private static boolean isPureWindowCommand(Intent intent) {
+        if (intent.getData() != null) return false;
+        return intent.hasExtra(EXTRA_WINDOWED)
+                || intent.hasExtra(EXTRA_FORCE_FULLSCREEN)
+                || ACTION_FLOATING.equals(intent.getAction());
     }
 
     private static void reportFailure(String stage, Throwable failure) {

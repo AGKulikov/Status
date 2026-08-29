@@ -196,6 +196,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(client.contains("readHostedConfiguration(Context source)"));
         assertTrue(client.contains("getContentResolver().call("));
         assertTrue(entry.contains("applyHostedConfiguration(activity, controller)"));
+        assertTrue(entry.contains("public static boolean onNewIntent"));
+        assertTrue(entry.contains("return isPureWindowCommand(intent)"));
         assertFalse(controller.contains("decor.setClipToOutline(profile.cornerRadiusDp > 0)"));
         assertFalse(controller.contains("View.SYSTEM_UI_FLAG_HIDE_NAVIGATION"));
         assertFalse(controller.contains("containsReadySurface"));

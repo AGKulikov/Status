@@ -104,7 +104,9 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertNotIn("onActivityPreCreate(Landroid/app/Activity;)V", result)
         self.assertIn("onActivityResumed(Landroid/app/Activity;)V", result)
         self.assertIn("onActivityDestroyed(Landroid/app/Activity;)V", result)
-        self.assertIn("onNewIntent(Landroid/app/Activity;Landroid/content/Intent;)V", result)
+        self.assertIn("onNewIntent(Landroid/app/Activity;Landroid/content/Intent;)Z", result)
+        self.assertIn("if-eqz v0, :natro_continue_new_intent", result)
+        self.assertIn(":natro_continue_new_intent", result)
         with self.assertRaisesRegex(ValueError, "already contains"):
             PATCHER.patch(result)
 
