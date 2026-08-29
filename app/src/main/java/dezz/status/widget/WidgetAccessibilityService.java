@@ -28,7 +28,6 @@ import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
@@ -514,43 +513,6 @@ public class WidgetAccessibilityService extends AccessibilityService {
         // No-op — we don't drive any feedback streams.
     }
 
-    @Override
-    protected boolean onKeyEvent(KeyEvent event) {
-        if (event == null) return false;
-        int displayId = keyDisplayId(event);
-        ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY, "KEY_EVENT",
-                ActionRecorder.object(
-                        "key_code", event.getKeyCode(),
-                        "scan_code", event.getScanCode(),
-                        "action", event.getAction() == KeyEvent.ACTION_DOWN ? "DOWN" : "UP",
-                        "repeat", event.getRepeatCount(),
-                        "long_press", event.isLongPress(),
-                        "device_id", event.getDeviceId(),
-                        "source", event.getSource(),
-                        "display_id", displayId,
-                        "down_time", event.getDownTime(),
-                        "event_time", event.getEventTime()));
-        DiagnosticJournal.debug("key",
-                "keyCode=" + event.getKeyCode() + " action=" + event.getAction()
-                        + " repeat=" + event.getRepeatCount() + " display=" + displayId);
-        // Observing must never consume a steering-wheel or hardware key.
-        return false;
-    }
-
-    /**
-     * ECARX exposes an InputEvent display id on some builds, but it is hidden from the public
-     * Android SDK used to compile the APK. Reflection keeps the extra diagnostic when available
-     * without making steering-key capture depend on that OEM extension.
-     */
-    private static int keyDisplayId(@NonNull KeyEvent event) {
-        try {
-            Object value = event.getClass().getMethod("getDisplayId").invoke(event);
-            return value instanceof Number ? ((Number) value).intValue() : -1;
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            return -1;
-        }
-    }
-
     /**
      * Refreshes {@link #foregroundByDisplay} from the live list of accessibility windows.
      * <p>
@@ -654,11 +616,8 @@ public class WidgetAccessibilityService extends AccessibilityService {
         if (info == null) return;
         int desired = BASE_ACCESSIBILITY_EVENTS
                 | (needed ? AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED : 0);
-        int desiredFlags = info.flags
-                | AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS;
-        if (info.eventTypes == desired && info.flags == desiredFlags) return;
+        if (info.eventTypes == desired) return;
         info.eventTypes = desired;
-        info.flags = desiredFlags;
         try {
             setServiceInfo(info);
         } catch (RuntimeException failure) {

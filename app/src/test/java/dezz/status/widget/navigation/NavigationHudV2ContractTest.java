@@ -27,6 +27,10 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.showRouteTraffic = true;
         config.hudMap.enabled = true;
         config.hudMap.roadsOnly = true;
+        config.hudMap.setRoadEventMode("SPEED_CONTROL",
+                NavigationIntegrationConfig.RoadEventMode.ALWAYS);
+        config.hudMap.setRoadEventMode("ACCIDENT",
+                NavigationIntegrationConfig.RoadEventMode.ROUTE_ONLY);
         config.mainFloatingWindow.movementLocked = true;
         config.mainFloatingWindow.cornerRadiusDp = 38;
         config.mainFloatingWindow.modeButtonVisible = true;
@@ -48,6 +52,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(restored.hudMap.showRouteTraffic);
         assertTrue(restored.hudMap.enabled);
         assertTrue(restored.hudMap.roadsOnly);
+        assertEquals(NavigationIntegrationConfig.RoadEventMode.ALWAYS,
+                restored.hudMap.roadEventMode("SPEED_CONTROL"));
+        assertEquals(NavigationIntegrationConfig.RoadEventMode.ROUTE_ONLY,
+                restored.hudMap.roadEventMode("ACCIDENT"));
         assertTrue(restored.mainFloatingWindow.movementLocked);
         assertEquals(38, restored.mainFloatingWindow.cornerRadiusDp);
         assertTrue(restored.mainFloatingWindow.modeButtonVisible);
@@ -248,6 +256,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("setTrafficStyle"));
         assertTrue(renderer.contains("\\\"scale\\\":0.45"));
         assertTrue(renderer.contains("createUserLocationLayer"));
+        assertTrue(renderer.contains("NavigationLayerFactory"));
+        assertTrue(renderer.contains("setUseLayerCamera"));
+        assertTrue(renderer.contains("setUseLayerRoutes"));
+        assertTrue(renderer.contains("setUseLayerCursor"));
+        assertTrue(renderer.contains("setRoadEventVisibleOnRoute"));
+        assertTrue(renderer.contains("setRoadEventVisible"));
+        assertTrue(renderer.contains("r74.c"));
+        assertTrue(renderer.contains("guidanceCamera == null"));
         assertTrue(renderer.contains("invoke(currentLocation, \"resetAnchor\""));
         assertFalse(renderer.contains("invoke(currentLocation, \"setAnchor\""));
         assertTrue(renderer.contains("com.yandex.mapkit.Animation$Type"));
@@ -277,6 +293,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("updateInitialCamera"));
         assertTrue(renderer.contains("updateNavigationState"));
         assertTrue(client.contains("hudMapRenderer.updateNavigationState(snapshotJson)"));
+        assertTrue(client.contains("hudMapRenderer.updateNavigationRuntime(navigation)"));
         assertFalse(client.contains("hudMapRenderer.updatePrimaryCamera"));
         assertTrue(renderer.contains("getGeometry"));
         assertTrue(renderer.contains("addPolyline"));
@@ -449,6 +466,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("navigation.mainMap"));
         assertTrue(settings.contains("navigation.mainFloatingWindow"));
         assertTrue(settings.contains("Только дороги — прозрачный фон"));
+        assertTrue(settings.contains("Дорожные события — выбрать типы и режимы"));
+        assertTrue(settings.contains("Только с маршрутом"));
+        assertTrue(settings.contains("Направление камер берётся из данных Яндекса"));
         assertTrue(settings.contains("profile.roadsOnly = roadsOnly.isChecked()"));
         assertTrue(settings.contains("Цвет рекомендуемой полосы"));
         assertTrue(settings.contains("Красный сигнал ARGB"));

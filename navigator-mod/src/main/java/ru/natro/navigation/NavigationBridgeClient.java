@@ -167,6 +167,10 @@ final class NavigationBridgeClient {
                 hudMapRenderer.updateInitialCamera(state);
             }
 
+            @Override public void onNavigationRuntime(Object navigation) {
+                hudMapRenderer.updateNavigationRuntime(navigation);
+            }
+
             @Override public void onNavigationState(String snapshotJson, String routeJson,
                                                      Object drivingRoute, long routeEpoch) {
                 mainMapController.updateRoute(routeEpoch, drivingRoute);

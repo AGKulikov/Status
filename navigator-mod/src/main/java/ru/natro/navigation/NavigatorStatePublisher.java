@@ -35,6 +35,9 @@ final class NavigatorStatePublisher {
 
         void onPrimaryCamera(CameraState state);
 
+        /** The exact automotive Navigation session used by Navigator 30.3.0. */
+        void onNavigationRuntime(Object navigation);
+
         void onNavigationState(String snapshotJson, String routeJson, Object drivingRoute,
                                long routeEpoch);
 
@@ -83,6 +86,7 @@ final class NavigatorStatePublisher {
     private long lastCameraDispatchElapsedMs;
 
     private Object naviKitGuidance;
+    private Object navigation;
     private Object guidance;
     private Object guidanceListener;
     private Object windshield;
@@ -166,26 +170,29 @@ final class NavigatorStatePublisher {
                 }
             }
         }
-        if (guidance == null || naviKitGuidance == null) {
+        if (guidance == null || naviKitGuidance == null || navigation == null) {
             try {
                 Object applicationComponent = invoke(activity.getApplication(), "c");
                 Object nextNaviKitGuidance = invoke(applicationComponent, "getGuidance");
-                Object navigation = invoke(nextNaviKitGuidance, "navigation");
-                Object nextGuidance = invoke(navigation, "getGuidance");
+                Object nextNavigation = invoke(nextNaviKitGuidance, "navigation");
+                Object nextGuidance = invoke(nextNavigation, "getGuidance");
                 Object valid = invoke(nextGuidance, "isValid");
                 if (valid instanceof Boolean && !((Boolean) valid)) {
                     throw new IllegalStateException("automotive Guidance is invalid");
                 }
                 naviKitGuidance = nextNaviKitGuidance;
+                navigation = nextNavigation;
                 guidance = nextGuidance;
                 try {
                     attachGuidanceListeners(nextGuidance);
                 } catch (Throwable listenerFailure) {
                     detachGuidanceListeners();
                     naviKitGuidance = null;
+                    navigation = null;
                     guidance = null;
                     throw listenerFailure;
                 }
+                sink.onNavigationRuntime(nextNavigation);
                 resolvedSomething = true;
                 Log.i(TAG, "Active NaviKit Guidance session resolved");
                 lastGuidanceFailure = "";
@@ -199,11 +206,12 @@ final class NavigatorStatePublisher {
                 }
             }
         }
-        if (guidance != null && naviKitGuidance != null
+        if (guidance != null && naviKitGuidance != null && navigation != null
                 && (resolvedSomething || primaryMap != null)) {
             publishState(true, true);
         }
-        if (primaryMap == null || guidance == null || naviKitGuidance == null) {
+        if (primaryMap == null || guidance == null || naviKitGuidance == null
+                || navigation == null) {
             main.removeCallbacks(resolveRetry);
             main.postDelayed(resolveRetry, resolveRetryMs);
             resolveRetryMs = Math.min(MAX_RESOLVE_RETRY_MS, resolveRetryMs * 2L);
@@ -317,6 +325,8 @@ final class NavigatorStatePublisher {
             Log.w(TAG, "Could not publish Navigator state", failure);
             detachGuidanceListeners();
             naviKitGuidance = null;
+            if (navigation != null) sink.onNavigationRuntime(null);
+            navigation = null;
             guidance = null;
             main.removeCallbacks(resolveRetry);
             main.postDelayed(resolveRetry, MIN_RESOLVE_RETRY_MS);
@@ -768,6 +778,8 @@ final class NavigatorStatePublisher {
         activityReference = new WeakReference<>(null);
         pendingCamera = null;
         naviKitGuidance = null;
+        if (navigation != null) sink.onNavigationRuntime(null);
+        navigation = null;
         guidance = null;
     }
 

@@ -65,13 +65,10 @@ public final class DiagnosticsContractTest {
         String config = resource("xml/widget_accessibility_service.xml");
         String application = source("StatusWidgetApplication.java");
 
-        assertTrue(accessibility.contains("protected boolean onKeyEvent(KeyEvent event)"));
-        assertTrue(accessibility.contains("SOURCE_STEERING_KEY"));
-        assertTrue(accessibility.contains("\"repeat\", event.getRepeatCount()"));
-        assertTrue(accessibility.contains("\"long_press\", event.isLongPress()"));
-        assertTrue(accessibility.contains("return false;"));
-        assertTrue(config.contains("flagRequestFilterKeyEvents"));
-        assertTrue(config.contains("android:canRequestFilterKeyEvents=\"true\""));
+        assertFalse(accessibility.contains("protected boolean onKeyEvent(KeyEvent event)"));
+        assertFalse(accessibility.contains("FLAG_REQUEST_FILTER_KEY_EVENTS"));
+        assertFalse(config.contains("flagRequestFilterKeyEvents"));
+        assertFalse(config.contains("android:canRequestFilterKeyEvents"));
         assertTrue(application.contains("registerActivityLifecycleCallbacks"));
         assertTrue(application.contains("\"intent_action\""));
         assertTrue(application.contains("\"data_scheme\""));

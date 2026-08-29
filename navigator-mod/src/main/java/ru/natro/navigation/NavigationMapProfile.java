@@ -6,6 +6,7 @@ import android.graphics.Color;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.LinkedHashMap;
 import java.util.Locale;
 
 /** Validated, target-specific map configuration received from Natro. */
@@ -24,6 +25,13 @@ final class NavigationMapProfile {
             + "\"ice_road\",\"path\",\"crosswalk\",\"underpass\",\"road_surface\","
             + "\"road_marking\"]},\"stylers\":{\"visibility\":\"off\"}},"
             + "{\"elements\":\"label\",\"stylers\":{\"visibility\":\"off\"}}]";
+    static final String[] ROAD_EVENT_TAGS = {
+            "ACCIDENT", "RECONSTRUCTION", "CHAT", "LOCAL_CHAT", "CLOSED", "DRAWBRIDGE",
+            "DANGER", "OTHER", "SPEED_CONTROL", "NO_STOPPING_CONTROL", "LANE_CONTROL",
+            "ROAD_MARKING_CONTROL", "MOBILE_CONTROL", "CROSS_ROAD_CONTROL",
+            "TRAFFIC_CONTROL", "CROSS_ROAD_DANGER", "OVERTAKING_DANGER",
+            "PEDESTRIAN_DANGER", "SCHOOL", "POLICE", "POLICE_PATROL", "FEEDBACK"
+    };
 
     boolean enabled;
     boolean automaticDayNight = true;
@@ -45,7 +53,7 @@ final class NavigationMapProfile {
     int focusXPercent = 50;
     int focusYPercent = 72;
     int mapScalePercent = 100;
-    int maximumFps = 20;
+    int maximumFps = 30;
     int cursorScalePercent = 100;
     String cursorColor = "#FFFFC400";
     String cursorOutlineColor = "#FF17191E";
@@ -62,6 +70,11 @@ final class NavigationMapProfile {
     double trafficGradientLength = 12d;
     String dayStyleJson = "";
     String nightStyleJson = "";
+    final LinkedHashMap<String, String> roadEventModes = new LinkedHashMap<>();
+
+    NavigationMapProfile() {
+        for (String tag : ROAD_EVENT_TAGS) roadEventModes.put(tag, defaultRoadEventMode(tag));
+    }
 
     static NavigationMapProfile fromConfiguration(String raw, String section) {
         NavigationMapProfile result = new NavigationMapProfile();
@@ -98,7 +111,7 @@ final class NavigationMapProfile {
             result.focusYPercent = clamp(source.optInt("focusYPercent", 72), 0, 100);
             result.mapScalePercent = clamp(
                     source.optInt("mapScalePercent", 100), 50, 300);
-            result.maximumFps = clamp(source.optInt("maximumFps", 20), 1, 60);
+            result.maximumFps = clamp(source.optInt("maximumFps", 30), 1, 60);
             result.cursorScalePercent = clamp(
                     source.optInt("cursorScalePercent", 100), 25, 300);
             result.cursorColor = color(source.optString(
@@ -135,8 +148,20 @@ final class NavigationMapProfile {
                     0d, 100d, 12d);
             result.dayStyleJson = bounded(source.optString("dayStyleJson", ""));
             result.nightStyleJson = bounded(source.optString("nightStyleJson", ""));
+            JSONObject events = source.optJSONObject("roadEvents");
+            if (events != null) {
+                for (String tag : ROAD_EVENT_TAGS) {
+                    result.roadEventModes.put(tag, eventMode(
+                            events.optString(tag, ""), defaultRoadEventMode(tag)));
+                }
+            }
         } catch (JSONException | RuntimeException ignored) {}
         return result;
+    }
+
+    String roadEventMode(String tag) {
+        String value = roadEventModes.get(tag);
+        return value == null ? "HIDDEN" : value;
     }
 
     String visibilityStyleJson() {
@@ -215,5 +240,21 @@ final class NavigationMapProfile {
         String value = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
         return "NORTH_UP".equals(value) || "HEADING_UP".equals(value)
                 || "FREE".equals(value) ? value : "FOLLOW_ROUTE";
+    }
+
+    private static String eventMode(String raw, String fallback) {
+        String value = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        return "HIDDEN".equals(value) || "ALWAYS".equals(value)
+                || "ROUTE_ONLY".equals(value) ? value : fallback;
+    }
+
+    private static String defaultRoadEventMode(String tag) {
+        if ("FEEDBACK".equals(tag)) return "HIDDEN";
+        if ("ACCIDENT".equals(tag) || "RECONSTRUCTION".equals(tag)
+                || "CHAT".equals(tag) || "LOCAL_CHAT".equals(tag)
+                || "CLOSED".equals(tag) || "DRAWBRIDGE".equals(tag)) {
+            return "ALWAYS";
+        }
+        return "ROUTE_ONLY";
     }
 }

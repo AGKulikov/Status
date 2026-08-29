@@ -494,7 +494,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField mapScale = slider(form, "Размер подписей и объектов карты",
                 profile.mapScalePercent, 50, 300, 5, " %");
         SliderField maximumFps = slider(form,
-                "Плавность карты (для HUD обычно достаточно 20)",
+                "Плавность нативной камеры (рекомендуется 30)",
                 profile.maximumFps, 5, 60, 1, " кадр/с");
 
         form.addView(section("Состав и цвет карты HUD"), marginTop(16));
@@ -520,6 +520,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 showModels, showCursor, roadsOnly}) {
             form.addView(control, marginTop(4));
         }
+        Button roadEvents = button("Дорожные события — выбрать типы и режимы");
+        roadEvents.setOnClickListener(view -> editHudRoadEvents(profile));
+        form.addView(roadEvents, marginTop(10));
+        form.addView(text("Для каждой отметки: скрыть, показывать всегда или только вдоль "
+                + "активного маршрута. Направление камер берётся из данных Яндекса.",
+                12, 0xFF95A0AF), marginTop(5));
         SliderField cursorScale = slider(form, "Размер курсора",
                 profile.cursorScalePercent, 25, 300, 5, " %");
         ColorField cursorColor = colorField(form, "Цвет автомобиля", profile.cursorColor);
@@ -623,6 +629,76 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     }
                 }));
         showSafeDialog(dialog);
+    }
+
+    private void editHudRoadEvents(
+            @NonNull NavigationIntegrationConfig.MapProfile profile) {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = column();
+        form.setPadding(dp(18), dp(8), dp(18), dp(24));
+        scroll.addView(form);
+        form.addView(text("Режим «Только с маршрутом» использует штатный слой ведения "
+                + "MapKit. Направление камеры отображается, когда оно есть в данных события.",
+                12, 0xFFB8C0CC));
+
+        final String[] modes = {"Не показывать", "Всегда", "Только с маршрутом"};
+        ArrayList<RoadEventModeControl> controls = new ArrayList<>();
+        String lastGroup = "";
+        for (NavigationIntegrationConfig.RoadEventSpec spec
+                : NavigationIntegrationConfig.HUD_ROAD_EVENTS) {
+            if (!spec.group.equals(lastGroup)) {
+                form.addView(section(spec.group), marginTop(lastGroup.isEmpty() ? 12 : 18));
+                lastGroup = spec.group;
+            }
+            form.addView(label(spec.title), marginTop(8));
+            Spinner mode = spinner(modes, "");
+            mode.setSelection(roadEventModePosition(profile.roadEventMode(spec.tag)));
+            form.addView(mode);
+            controls.add(new RoadEventModeControl(spec.tag, mode));
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Дорожные события HUD")
+                .setView(scroll)
+                .setPositiveButton("Применить", null)
+                .setNegativeButton("Отмена", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    for (RoadEventModeControl control : controls) {
+                        profile.setRoadEventMode(control.tag,
+                                roadEventModeValue(control.spinner.getSelectedItemPosition()));
+                    }
+                    dialog.dismiss();
+                }));
+        showSafeDialog(dialog);
+    }
+
+    private static int roadEventModePosition(
+            @NonNull NavigationIntegrationConfig.RoadEventMode mode) {
+        switch (mode) {
+            case ALWAYS: return 1;
+            case ROUTE_ONLY: return 2;
+            case HIDDEN:
+            default: return 0;
+        }
+    }
+
+    @NonNull
+    private static NavigationIntegrationConfig.RoadEventMode roadEventModeValue(int position) {
+        if (position == 1) return NavigationIntegrationConfig.RoadEventMode.ALWAYS;
+        if (position == 2) return NavigationIntegrationConfig.RoadEventMode.ROUTE_ONLY;
+        return NavigationIntegrationConfig.RoadEventMode.HIDDEN;
+    }
+
+    private static final class RoadEventModeControl {
+        @NonNull final String tag;
+        @NonNull final Spinner spinner;
+
+        RoadEventModeControl(@NonNull String tag, @NonNull Spinner spinner) {
+            this.tag = tag;
+            this.spinner = spinner;
+        }
     }
 
     /** Main-map and floating-window profile; HUD map stays independent in its own element dialog. */

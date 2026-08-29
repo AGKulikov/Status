@@ -6,7 +6,9 @@ import androidx.annotation.NonNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 
 /** Independent rendering profiles for Navigator's main surface and Natro's HUD surface. */
 public final class NavigationIntegrationConfig {
@@ -18,6 +20,90 @@ public final class NavigationIntegrationConfig {
     @NonNull public FloatingWindowProfile mainFloatingWindow = FloatingWindowProfile.defaults();
 
     public enum Target { MAIN, HUD }
+
+    /** Visibility of one Yandex road-event type on the independent HUD map. */
+    public enum RoadEventMode {
+        HIDDEN,
+        ALWAYS,
+        ROUTE_ONLY;
+
+        @NonNull
+        static RoadEventMode fromJson(String raw, @NonNull RoadEventMode fallback) {
+            String value = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+            for (RoadEventMode mode : values()) {
+                if (mode.name().equals(value)) return mode;
+            }
+            return fallback;
+        }
+    }
+
+    /** Stable MapKit EventTag name plus the Russian label shown in Natro settings. */
+    public static final class RoadEventSpec {
+        @NonNull public final String tag;
+        @NonNull public final String title;
+        @NonNull public final String group;
+        @NonNull public final RoadEventMode defaultMode;
+
+        private RoadEventSpec(@NonNull String tag, @NonNull String title,
+                              @NonNull String group,
+                              @NonNull RoadEventMode defaultMode) {
+            this.tag = tag;
+            this.title = title;
+            this.group = group;
+            this.defaultMode = defaultMode;
+        }
+    }
+
+    /** Every EventTag exported by the MapKit embedded in Navigator 30.3.0. */
+    public static final RoadEventSpec[] HUD_ROAD_EVENTS = new RoadEventSpec[]{
+            event("ACCIDENT", "ДТП", "Дорожные события", RoadEventMode.ALWAYS),
+            event("RECONSTRUCTION", "Дорожные работы", "Дорожные события",
+                    RoadEventMode.ALWAYS),
+            event("CHAT", "Разговорчики", "Дорожные события", RoadEventMode.ALWAYS),
+            event("LOCAL_CHAT", "Локальные разговорчики", "Дорожные события",
+                    RoadEventMode.ALWAYS),
+            event("CLOSED", "Перекрытие", "Дорожные события", RoadEventMode.ALWAYS),
+            event("DRAWBRIDGE", "Разведение мостов", "Дорожные события",
+                    RoadEventMode.ALWAYS),
+            event("DANGER", "Опасный участок", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("OTHER", "Прочее", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("SPEED_CONTROL", "Камера контроля скорости", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("NO_STOPPING_CONTROL", "Камера контроля остановки",
+                    "Камеры и предупреждения", RoadEventMode.ROUTE_ONLY),
+            event("LANE_CONTROL", "Камера контроля полосы", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("ROAD_MARKING_CONTROL", "Камера контроля разметки",
+                    "Камеры и предупреждения", RoadEventMode.ROUTE_ONLY),
+            event("MOBILE_CONTROL", "Мобильная засада", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("CROSS_ROAD_CONTROL", "Камера контроля перекрёстка",
+                    "Камеры и предупреждения", RoadEventMode.ROUTE_ONLY),
+            event("TRAFFIC_CONTROL", "Камера контроля светофора",
+                    "Камеры и предупреждения", RoadEventMode.ROUTE_ONLY),
+            event("CROSS_ROAD_DANGER", "Опасный перекрёсток", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("OVERTAKING_DANGER", "Опасный обгон", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("PEDESTRIAN_DANGER", "Опасный пешеходный переход",
+                    "Камеры и предупреждения", RoadEventMode.ROUTE_ONLY),
+            event("SCHOOL", "Школа", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("POLICE", "Полиция", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("POLICE_PATROL", "Патруль", "Камеры и предупреждения",
+                    RoadEventMode.ROUTE_ONLY),
+            event("FEEDBACK", "Отзывы о дорожном событии", "Служебные события",
+                    RoadEventMode.HIDDEN)
+    };
+
+    private static RoadEventSpec event(@NonNull String tag, @NonNull String title,
+                                       @NonNull String group,
+                                       @NonNull RoadEventMode defaultMode) {
+        return new RoadEventSpec(tag, title, group, defaultMode);
+    }
 
     @NonNull
     public JSONObject toJson() throws JSONException {
@@ -110,16 +196,20 @@ public final class NavigationIntegrationConfig {
         public int maximumFps;
         @NonNull public String dayStyleJson = "";
         @NonNull public String nightStyleJson = "";
+        /** EventTag -> HIDDEN / ALWAYS / ROUTE_ONLY, in stable UI order. */
+        @NonNull public final LinkedHashMap<String, RoadEventMode> roadEventModes =
+                new LinkedHashMap<>();
 
         private MapProfile(@NonNull Target target) {
             this.target = target;
+            resetRoadEventModes();
         }
 
         @NonNull
         public static MapProfile defaults(@NonNull Target target) {
             MapProfile result = new MapProfile(target);
             result.enabled = true;
-            result.maximumFps = target == Target.HUD ? 20 : 30;
+            result.maximumFps = 30;
             if (target == Target.HUD) {
                 result.showPois = false;
                 result.showBuildings = false;
@@ -169,7 +259,8 @@ public final class NavigationIntegrationConfig {
                     .put("trafficGradientLength", trafficGradientLength)
                     .put("maximumFps", maximumFps)
                     .put("dayStyleJson", dayStyleJson)
-                    .put("nightStyleJson", nightStyleJson);
+                    .put("nightStyleJson", nightStyleJson)
+                    .put("roadEvents", roadEventsJson());
         }
 
         @NonNull
@@ -227,6 +318,13 @@ public final class NavigationIntegrationConfig {
             result.maximumFps = source.optInt("maximumFps", result.maximumFps);
             result.dayStyleJson = source.optString("dayStyleJson", result.dayStyleJson);
             result.nightStyleJson = source.optString("nightStyleJson", result.nightStyleJson);
+            JSONObject events = source.optJSONObject("roadEvents");
+            if (events != null) {
+                for (RoadEventSpec spec : HUD_ROAD_EVENTS) {
+                    result.roadEventModes.put(spec.tag, RoadEventMode.fromJson(
+                            events.optString(spec.tag, ""), spec.defaultMode));
+                }
+            }
             result.normalize();
             return result;
         }
@@ -256,6 +354,48 @@ public final class NavigationIntegrationConfig {
             trafficUnknownColor = color(trafficUnknownColor, "#FF8A9099");
             dayStyleJson = bounded(dayStyleJson, MAX_STYLE_CHARS);
             nightStyleJson = bounded(nightStyleJson, MAX_STYLE_CHARS);
+            LinkedHashMap<String, RoadEventMode> normalized = new LinkedHashMap<>();
+            for (RoadEventSpec spec : HUD_ROAD_EVENTS) {
+                RoadEventMode value = roadEventModes.get(spec.tag);
+                normalized.put(spec.tag, value == null ? spec.defaultMode : value);
+            }
+            roadEventModes.clear();
+            roadEventModes.putAll(normalized);
+        }
+
+        @NonNull
+        public RoadEventMode roadEventMode(@NonNull String tag) {
+            RoadEventMode value = roadEventModes.get(tag);
+            if (value != null) return value;
+            for (RoadEventSpec spec : HUD_ROAD_EVENTS) {
+                if (spec.tag.equals(tag)) return spec.defaultMode;
+            }
+            return RoadEventMode.HIDDEN;
+        }
+
+        public void setRoadEventMode(@NonNull String tag, @NonNull RoadEventMode mode) {
+            for (RoadEventSpec spec : HUD_ROAD_EVENTS) {
+                if (spec.tag.equals(tag)) {
+                    roadEventModes.put(tag, mode);
+                    return;
+                }
+            }
+        }
+
+        private void resetRoadEventModes() {
+            roadEventModes.clear();
+            for (RoadEventSpec spec : HUD_ROAD_EVENTS) {
+                roadEventModes.put(spec.tag, spec.defaultMode);
+            }
+        }
+
+        @NonNull
+        private JSONObject roadEventsJson() throws JSONException {
+            JSONObject result = new JSONObject();
+            for (Map.Entry<String, RoadEventMode> entry : roadEventModes.entrySet()) {
+                result.put(entry.getKey(), entry.getValue().name());
+            }
+            return result;
         }
     }
 
