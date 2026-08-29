@@ -29,6 +29,10 @@ final class HudMapRenderer {
     /** High, stable slots avoid replacing styles that Navigator itself may install. */
     private static final int CUSTOM_STYLE_ID = 0x4E415452; // "NATR"
     private static final int VISIBILITY_STYLE_ID = CUSTOM_STYLE_ID + 1;
+    private static final int TRAFFIC_STYLE_ID = CUSTOM_STYLE_ID + 2;
+    /** Match the main map's road-width traffic instead of the custom thick route stroke. */
+    private static final String BACKGROUND_TRAFFIC_STYLE =
+            "[{\"types\":\"polyline\",\"stylers\":{\"scale\":0.45}}]";
     private final Context context;
     private final FailureReporter reporter;
     private final MapCursorStyler cursorStyler;
@@ -165,7 +169,7 @@ final class HudMapRenderer {
         activeRouteEpoch = routeEpoch;
         activeRoute = drivingRoute;
         activeJamFingerprint = jamFingerprint;
-        applyTrafficVisibility();
+        applyTrafficPresentation();
         if (changed) rebuildRoute();
         else if (jamsChanged) restyleRoute();
     }
@@ -180,14 +184,21 @@ final class HudMapRenderer {
         return profile.showTraffic || (routeOnlyMode && activeRoute == null);
     }
 
-    private void applyTrafficVisibility() {
+    private void applyTrafficPresentation() {
         Object currentTraffic = trafficLayer;
         if (currentTraffic == null) return;
         try {
+            boolean visible = shouldShowBackgroundTraffic();
+            Object styled = invoke(currentTraffic, "setTrafficStyle",
+                    new Class<?>[]{int.class, String.class}, TRAFFIC_STYLE_ID,
+                    visible ? BACKGROUND_TRAFFIC_STYLE : "");
+            if (styled instanceof Boolean && !((Boolean) styled)) {
+                Log.w(TAG, "HUD background traffic style was rejected by MapKit");
+            }
             invoke(currentTraffic, "setTrafficVisible", new Class<?>[]{boolean.class},
-                    shouldShowBackgroundTraffic());
+                    visible);
         } catch (Throwable failure) {
-            Log.w(TAG, "HUD background traffic visibility could not be updated", failure);
+            Log.w(TAG, "HUD background traffic presentation could not be updated", failure);
         }
     }
 
@@ -260,11 +271,7 @@ final class HudMapRenderer {
                     width * profile.focusXPercent / 100f,
                     height * profile.focusYPercent / 100f);
             invoke(currentWindow, "setFocusPoint", new Class<?>[]{pointClass}, focus);
-            Object currentTraffic = trafficLayer;
-            if (currentTraffic != null) {
-                invoke(currentTraffic, "setTrafficVisible",
-                        new Class<?>[]{boolean.class}, shouldShowBackgroundTraffic());
-            }
+            applyTrafficPresentation();
             Object currentLocation = userLocationLayer;
             if (currentLocation != null) {
                 try {

@@ -82,6 +82,7 @@ final class NavigatorStatePublisher {
     private CameraState pendingCamera;
     private long lastCameraDispatchElapsedMs;
 
+    private Object naviKitGuidance;
     private Object guidance;
     private Object guidanceListener;
     private Object windshield;
@@ -165,21 +166,23 @@ final class NavigatorStatePublisher {
                 }
             }
         }
-        if (guidance == null) {
+        if (guidance == null || naviKitGuidance == null) {
             try {
                 Object applicationComponent = invoke(activity.getApplication(), "c");
-                Object naviKitGuidance = invoke(applicationComponent, "getGuidance");
-                Object navigation = invoke(naviKitGuidance, "navigation");
+                Object nextNaviKitGuidance = invoke(applicationComponent, "getGuidance");
+                Object navigation = invoke(nextNaviKitGuidance, "navigation");
                 Object nextGuidance = invoke(navigation, "getGuidance");
                 Object valid = invoke(nextGuidance, "isValid");
                 if (valid instanceof Boolean && !((Boolean) valid)) {
                     throw new IllegalStateException("automotive Guidance is invalid");
                 }
+                naviKitGuidance = nextNaviKitGuidance;
                 guidance = nextGuidance;
                 try {
                     attachGuidanceListeners(nextGuidance);
                 } catch (Throwable listenerFailure) {
                     detachGuidanceListeners();
+                    naviKitGuidance = null;
                     guidance = null;
                     throw listenerFailure;
                 }
@@ -196,10 +199,11 @@ final class NavigatorStatePublisher {
                 }
             }
         }
-        if (guidance != null && (resolvedSomething || primaryMap != null)) {
+        if (guidance != null && naviKitGuidance != null
+                && (resolvedSomething || primaryMap != null)) {
             publishState(true, true);
         }
-        if (primaryMap == null || guidance == null) {
+        if (primaryMap == null || guidance == null || naviKitGuidance == null) {
             main.removeCallbacks(resolveRetry);
             main.postDelayed(resolveRetry, resolveRetryMs);
             resolveRetryMs = Math.min(MAX_RESOLVE_RETRY_MS, resolveRetryMs * 2L);
@@ -288,25 +292,31 @@ final class NavigatorStatePublisher {
 
     private void publishState(boolean routeMayHaveChanged, boolean forceRoute) {
         Object currentGuidance = guidance;
-        if (currentGuidance == null) {
+        Object currentNaviKitGuidance = naviKitGuidance;
+        if (currentGuidance == null || currentNaviKitGuidance == null) {
             resolveBindings();
             return;
         }
         try {
-            Object nextRoute = invoke(currentGuidance, "getCurrentRoute");
+            // Automotive Guidance.getCurrentRoute() is also populated by Navigator's automatic
+            // free-drive guidance. Only NaviKit Guidance.route() represents a route explicitly
+            // started by the user; freeDriveRoute() must remain ordinary background traffic.
+            Object engineRoute = invoke(currentGuidance, "getCurrentRoute");
+            Object freeDriveRoute = invoke(currentNaviKitGuidance, "freeDriveRoute");
+            Object nextRoute = invoke(currentNaviKitGuidance, "route");
             String routeStatus = readRouteStatus(currentGuidance);
-            // MapKit normally changes getCurrentRoute() to null when guidance stops. During the
-            // onRouteFinished callback the Java wrapper may still expose the old route for the
+            // During onRouteFinished the Java wrapper may still expose the old user route for the
             // remainder of that native callback, so the terminal status is authoritative too.
             if ("ROUTE_FINISHED".equals(routeStatus)) nextRoute = null;
             boolean routeChanged = updateRoute(nextRoute, routeMayHaveChanged);
-            publishRouteDiagnostic(routeStatus);
+            publishRouteDiagnostic(routeStatus, engineRoute, freeDriveRoute);
             String snapshot = buildSnapshot(currentGuidance, activeRoute).toString();
             String route = routeChanged || forceRoute ? buildRoutePayload().toString() : null;
             sink.onNavigationState(snapshot, route, activeRoute, routeEpoch);
         } catch (Throwable failure) {
             Log.w(TAG, "Could not publish Navigator state", failure);
             detachGuidanceListeners();
+            naviKitGuidance = null;
             guidance = null;
             main.removeCallbacks(resolveRetry);
             main.postDelayed(resolveRetry, MIN_RESOLVE_RETRY_MS);
@@ -325,9 +335,12 @@ final class NavigatorStatePublisher {
         main.postDelayed(routeReconcileConfirmation, ROUTE_RECONCILE_CONFIRM_MS);
     }
 
-    private void publishRouteDiagnostic(String routeStatus) {
-        String detail = "active=" + (activeRoute != null) + ", status=" + routeStatus
-                + ", epoch=" + routeEpoch;
+    private void publishRouteDiagnostic(String routeStatus, Object engineRoute,
+                                        Object freeDriveRoute) {
+        String detail = "userActive=" + (activeRoute != null)
+                + ", engineActive=" + (engineRoute != null)
+                + ", freeDriveActive=" + (freeDriveRoute != null)
+                + ", status=" + routeStatus + ", epoch=" + routeEpoch;
         if (detail.equals(lastRouteDiagnostic)) return;
         lastRouteDiagnostic = detail;
         sink.onDiagnostic("Guidance route state " + detail);
@@ -754,6 +767,7 @@ final class NavigatorStatePublisher {
         detachGuidanceListeners();
         activityReference = new WeakReference<>(null);
         pendingCamera = null;
+        naviKitGuidance = null;
         guidance = null;
     }
 

@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
+import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.launcher.MediaAutoResumeController;
 import dezz.status.widget.phone.PackageReplaceBleRecoveryGate;
 import dezz.status.widget.phone.PhoneConnectionJournal;
@@ -174,6 +175,7 @@ public class BootReceiver extends BroadcastReceiver {
             if (Intent.ACTION_BOOT_COMPLETED.equals(action)
                     || ACTION_QUICKBOOT_POWERON.equals(action)
                     || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+                restoreHudSurfaceImmediately(context, action);
                 WidgetServiceStarter.startVisibleSurfaceImmediatelyWithRetry(context);
             }
             if (ACTION_QUICKBOOT_POWERON.equals(action)) {
@@ -183,6 +185,21 @@ public class BootReceiver extends BroadcastReceiver {
                 }
             }
             StartupWorkCoordinator.scheduleForLifecycle(context, action);
+        }
+    }
+
+    /**
+     * The independent HUD map surface must not wait for the complete integration graph. Entering
+     * Settings used to call HudPresentationService.apply() first and accidentally became the event
+     * that made the map appear. Admit the saved autostart HUD at the lifecycle boundary instead;
+     * the later coordinator reconcile remains idempotent and owns QuickBoot surface replacement.
+     */
+    private static void restoreHudSurfaceImmediately(Context context, String action) {
+        try {
+            Log.i(TAG, "Reconciling autostart HUD at lifecycle boundary: " + action);
+            HudPresentationService.reconcileAutomaticLifecycle(context);
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not restore autostart HUD at lifecycle boundary", failure);
         }
     }
 

@@ -244,7 +244,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("createTrafficLayer"));
         assertTrue(renderer.contains("shouldShowBackgroundTraffic"));
         assertTrue(renderer.contains("routeOnlyMode && activeRoute == null"));
-        assertTrue(renderer.contains("applyTrafficVisibility()"));
+        assertTrue(renderer.contains("applyTrafficPresentation()"));
+        assertTrue(renderer.contains("setTrafficStyle"));
+        assertTrue(renderer.contains("\\\"scale\\\":0.45"));
         assertTrue(renderer.contains("createUserLocationLayer"));
         assertTrue(renderer.contains("invoke(currentLocation, \"resetAnchor\""));
         assertFalse(renderer.contains("invoke(currentLocation, \"setAnchor\""));
@@ -294,6 +296,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("getMapWindow"));
         assertTrue(publisher.contains("getGuidance"));
         assertTrue(publisher.contains("getRouteStatus"));
+        assertTrue(publisher.contains("invoke(currentNaviKitGuidance, \"route\")"));
+        assertTrue(publisher.contains("invoke(currentNaviKitGuidance, \"freeDriveRoute\")"));
+        assertTrue(publisher.contains("invoke(currentGuidance, \"getCurrentRoute\")"));
+        assertTrue(publisher.contains("userActive="));
         assertTrue(publisher.contains("scheduleRouteReconcile"));
         assertTrue(publisher.contains("main.post(routeReconcile)"));
         assertTrue(publisher.contains("main.postDelayed(routeReconcileConfirmation"));
@@ -313,6 +319,21 @@ public final class NavigationHudV2ContractTest {
         assertFalse(controller.contains("ImageReader"));
         assertFalse(controller.contains("MediaProjection"));
         assertFalse(controller.contains("Bitmap"));
+    }
+
+    @Test public void bootAdmitsAutostartHudBeforeTheIntegrationGraph() throws Exception {
+        String boot = read(projectRoot().resolve(
+                "app/src/main/java/dezz/status/widget/BootReceiver.java"));
+        String hudService = read(projectRoot().resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudPresentationService.java"));
+        int immediate = boot.indexOf("restoreHudSurfaceImmediately(context, action);");
+        int coordinated = boot.indexOf(
+                "StartupWorkCoordinator.scheduleForLifecycle(context, action);", immediate);
+        assertTrue(immediate >= 0);
+        assertTrue(coordinated > immediate);
+        assertTrue(boot.contains("HudPresentationService.reconcileAutomaticLifecycle(context)"));
+        assertTrue(hudService.contains("prefs.hudPanelEnabled.get()"));
+        assertTrue(hudService.contains("prefs.hudPanelAutostart.get()"));
     }
 
     @Test public void endpointRequestsFreshStateAfterAuthenticatedHello() throws Exception {
