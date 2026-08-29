@@ -165,8 +165,30 @@ final class HudMapRenderer {
         activeRouteEpoch = routeEpoch;
         activeRoute = drivingRoute;
         activeJamFingerprint = jamFingerprint;
+        applyTrafficVisibility();
         if (changed) rebuildRoute();
         else if (jamsChanged) restyleRoute();
+    }
+
+    /**
+     * In route-only mode the background layer is useful before guidance starts, then disappears
+     * as soon as an active route can carry its own congestion palette.
+     */
+    private boolean shouldShowBackgroundTraffic() {
+        boolean routeOnlyMode = profile.showRoute && profile.showRouteTraffic
+                && !profile.showTraffic;
+        return profile.showTraffic || (routeOnlyMode && activeRoute == null);
+    }
+
+    private void applyTrafficVisibility() {
+        Object currentTraffic = trafficLayer;
+        if (currentTraffic == null) return;
+        try {
+            invoke(currentTraffic, "setTrafficVisible", new Class<?>[]{boolean.class},
+                    shouldShowBackgroundTraffic());
+        } catch (Throwable failure) {
+            Log.w(TAG, "HUD background traffic visibility could not be updated", failure);
+        }
     }
 
     private void startRenderer() {
@@ -238,7 +260,7 @@ final class HudMapRenderer {
             Object currentTraffic = trafficLayer;
             if (currentTraffic != null) {
                 invoke(currentTraffic, "setTrafficVisible",
-                        new Class<?>[]{boolean.class}, profile.showTraffic);
+                        new Class<?>[]{boolean.class}, shouldShowBackgroundTraffic());
             }
             Object currentLocation = userLocationLayer;
             if (currentLocation != null) {

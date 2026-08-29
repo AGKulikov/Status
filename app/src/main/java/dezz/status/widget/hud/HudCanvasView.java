@@ -211,45 +211,10 @@ public final class HudCanvasView extends View {
     }
 
     private void drawPanelBackground(Canvas canvas, Geometry geometry) {
-        if (config.maskStockHud && config.hasStandaloneDrawableElement() && !editor) {
-            // Opaque pixels are required here: alpha or CLEAR would let the OEM HUD layer show
-            // through. The hard clip established by onDraw prevents this mask from touching the
-            // cluster and DIM regions that share displayId=2.
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.BLACK);
-            drawPanelColorWithMapCutout(canvas, geometry);
-            return;
-        }
-        if ("TRANSPARENT".equals(config.backgroundMode) && !editor) {
-            // Canvas.drawColor observes the hard clip established by onDraw.
-            canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-            return;
-        }
-        int color = "BLACK".equals(config.backgroundMode) ? Color.BLACK
-                : "DIM".equals(config.backgroundMode) ? 0xDD101218 : 0xFF090B10;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(color);
-        if (editor) canvas.drawRect(geometry.content, paint);
-        else drawPanelColorWithMapCutout(canvas, geometry);
-    }
-
-    /** Leaves the direct TextureView map visible below this Canvas and below system-mask PNGs. */
-    private void drawPanelColorWithMapCutout(Canvas canvas, Geometry geometry) {
-        HudElementConfig map = HudDirectMapGeometry.find(config);
-        if (map == null) {
-            canvas.drawRect(geometry.content, paint);
-            return;
-        }
-        RectF mapBounds = bounds(map, geometry);
-        float radius = Math.max(0f, Math.min(
-                map.options.optInt("cornerRadiusPx", 0),
-                Math.min(mapBounds.width(), mapBounds.height()) / 2f));
-        path.reset();
-        path.setFillType(Path.FillType.EVEN_ODD);
-        path.addRect(geometry.content, Path.Direction.CW);
-        path.addRoundRect(mapBounds, radius, radius, Path.Direction.CW);
-        canvas.drawPath(path, paint);
-        path.setFillType(Path.FillType.WINDING);
+        if (editor) return;
+        // The live Natro panel never owns a substrate. Only explicitly configured widgets and
+        // backdrops may contribute pixels; everything else must reveal the OEM HUD below it.
+        canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
     }
 
     private void drawElement(Canvas canvas, HudElementConfig item, RectF bounds, float scale,

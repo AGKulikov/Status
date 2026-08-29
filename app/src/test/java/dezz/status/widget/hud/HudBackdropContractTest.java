@@ -29,13 +29,16 @@ public final class HudBackdropContractTest {
         assertFalse(settings.contains("Цвет фона\", item.backgroundColor"));
     }
 
-    @Test public void stockHudArCanBeChangedWithoutPublishingCustomPanel()
+    @Test public void removedStockCarControlCannotBeRestoredByThePanel()
             throws Exception {
         String settings = read("dezz/status/widget/HudPanelSettingsActivity.java");
+        String service = read("dezz/status/widget/hud/HudPresentationService.java");
+        String integration = read("dezz/status/widget/car/CarIntegration.java");
 
-        assertTrue(settings.contains("if (!preferences.hudPanelEnabled.get())"));
-        assertTrue(settings.contains("applyStockHudPreference(config.maskStockHud)"));
-        assertTrue(settings.contains("setStockHudCarHidden(hidden"));
+        assertFalse(settings.contains("maskStockHud"));
+        assertFalse(settings.contains("Скрывать штатные машинку"));
+        assertFalse(service.contains("setStockHudCarHidden"));
+        assertFalse(integration.contains("setStockHudCarHidden"));
     }
 
     private static String read(String relative) throws Exception {

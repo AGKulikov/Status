@@ -68,7 +68,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import dezz.status.widget.BrickType;
 import dezz.status.widget.diagnostics.ActionRecorder;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
-import dezz.status.widget.hud.HudProfileWirePatcher;
 import dezz.status.widget.launcher.vehicle.VehicleDerivedMetrics;
 
 /**
@@ -145,17 +144,9 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final long CONTROL_COMMAND_TIMEOUT_MS = 5_000L;
     private static final int CONTROL_PULSE_ATTEMPTS = 2;
     private static final long CONTROL_PULSE_RETRY_MS = 200L;
-    /** Wait for ActiveProfile and ProfileCloudData after ignition without blocking control IO. */
-    private static final int HUD_AR_PROFILE_READY_ATTEMPTS = 12;
-    private static final long HUD_AR_PROFILE_READY_RETRY_MS = 500L;
-    /** Re-read the complete profile before every bounded retry; never replay a stale snapshot. */
-    private static final int HUD_AR_PROFILE_APPLY_ATTEMPTS = 3;
-    private static final long HUD_AR_PROFILE_READBACK_MS = 900L;
-    /**
-     * Limited generic-function fallback. These are gaps, producing writes at approximately
-     * 0, 0.75, 1.5 and 3 seconds; this is intentionally not a permanent command flood.
-     */
-    private static final long[] HUD_AR_FALLBACK_GAPS_MS = { 0L, 750L, 750L, 1_500L };
+    /** Wait for the ProfileTransfer manager after ignition without blocking control IO. */
+    private static final int HUD_MODE_READY_ATTEMPTS = 12;
+    private static final long HUD_MODE_READY_RETRY_MS = 500L;
     /** Internal route marker; this value is never sent to ECARX. */
     private static final int NO_ZONE = Integer.MAX_VALUE;
     /** ECARX's real default-zone value, used by Passenger before its global fallback. */
@@ -277,8 +268,6 @@ final class GeelyCarIntegration implements CarIntegration {
     private final Map<String, ControlCommandSubmission> latestControlCommandSubmissions =
             new HashMap<>();
     private long nextControlCommandGeneration;
-    /** Cancels delayed profile/fallback work when a newer HUD AR preference replaces it. */
-    private final AtomicLong hudArRequestGeneration = new AtomicLong();
     /** Cancels readiness retries when another OEM ProfileTransfer mode is selected. */
     private final AtomicLong hudModeRequestGeneration = new AtomicLong();
     private volatile boolean controlsShuttingDown;
@@ -311,7 +300,7 @@ final class GeelyCarIntegration implements CarIntegration {
     @Nullable
     private volatile ICarFunction carFunctions;
     private final EcarxSignalFallback signalFallback;
-    private final EcarxProfileCloudAccess profileCloudAccess;
+    private final EcarxHudModeAccess hudModeAccess;
     private final Object adasRecorderLock = new Object();
     private final Map<Integer, Integer> lastRecordedAdasSignals = new HashMap<>();
     private final Map<Integer, byte[]> lastRecordedAdasBinarySignals = new HashMap<>();
@@ -407,27 +396,6 @@ final class GeelyCarIntegration implements CarIntegration {
             this.registrationSource = registrationSource;
             this.sensorListener = sensorListener;
             this.cancelled = cancelled;
-        }
-    }
-
-    /** One bounded legacy-HUD request; all mutable fields are owned by controlWorker. */
-    private static final class HudArRequest {
-        final long generation;
-        final boolean hidden;
-        final int desiredValue;
-        final ControlCommandListener listener;
-        final AtomicBoolean finished = new AtomicBoolean();
-        int profileApplyAttempts;
-        boolean fallbackStarted;
-        boolean fallbackAccepted;
-
-        HudArRequest(long generation, boolean hidden,
-                     @NonNull ControlCommandListener listener) {
-            this.generation = generation;
-            this.hidden = hidden;
-            this.desiredValue = hidden ? ICarFunction.COMMON_VALUE_ON
-                    : ICarFunction.COMMON_VALUE_OFF;
-            this.listener = listener;
         }
     }
 
@@ -1107,7 +1075,7 @@ final class GeelyCarIntegration implements CarIntegration {
 
     GeelyCarIntegration(@NonNull Context appContext) {
         this.appContext = appContext;
-        profileCloudAccess = new EcarxProfileCloudAccess(appContext);
+        hudModeAccess = new EcarxHudModeAccess(appContext);
         signalFallback = new EcarxSignalFallback(appContext,
                 new EcarxSignalFallback.Listener() {
                     @Override public void onGear(int adaptGear, int actualGear,
@@ -3623,29 +3591,6 @@ final class GeelyCarIntegration implements CarIntegration {
         }
     }
 
-    /**
-     * Replays the removed stock Settings "AR mode" through the raw active profile first.
-     *
-     * <p>The public {@code IUserProfile} adapter rebuilds a 150-field vendor protobuf from only
-     * 85 exposed fields and can therefore clear hidden vehicle settings. Every write below reads
-     * the complete PA33873 wire message, changes only {@code vfhudbyte0} (field 111), and sends
-     * those exact bytes through CB33264. A generic {@link ICarFunction} write is repeated only a
-     * few times as an unconfirmed compatibility fallback.</p>
-     */
-    @Override
-    public void setStockHudCarHidden(boolean hidden,
-                                     @NonNull ControlCommandListener listener) {
-        if (controlsShuttingDown) {
-            postCommandResult(listener, false, "ECARX уже остановлен");
-            return;
-        }
-        HudArRequest request = new HudArRequest(
-                hudArRequestGeneration.incrementAndGet(), hidden, listener);
-        if (!executeControlTask(() -> attemptHudArProfile(request, 0))) {
-            completeHudArRequest(request, false, "ECARX уже остановлен");
-        }
-    }
-
     @Override
     public void setStockHudProfileMode(int mode, boolean autoRepeat,
                                        @NonNull ControlCommandListener listener) {
@@ -3683,7 +3628,7 @@ final class GeelyCarIntegration implements CarIntegration {
             postCommandResult(listener, false, "Режим HUD заменён более новым");
             return;
         }
-        EcarxProfileCloudAccess.HudModeResult result = profileCloudAccess.writeHudMode(mode);
+        EcarxHudModeAccess.HudModeResult result = hudModeAccess.writeHudMode(mode);
         if (result.accepted) {
             String repeat = autoRepeat
                     ? "; резервный автоповтор включён"
@@ -3691,7 +3636,7 @@ final class GeelyCarIntegration implements CarIntegration {
             postCommandResult(listener, true, result.detail + repeat);
             return;
         }
-        if (attempt + 1 < HUD_AR_PROFILE_READY_ATTEMPTS) {
+        if (attempt + 1 < HUD_MODE_READY_ATTEMPTS) {
             mainHandler.postDelayed(() -> {
                 if (controlsShuttingDown || generation != hudModeRequestGeneration.get()) {
                     postCommandResult(listener, false, "Режим HUD заменён более новым");
@@ -3699,7 +3644,7 @@ final class GeelyCarIntegration implements CarIntegration {
                         mode, autoRepeat, generation, attempt + 1, listener))) {
                     postCommandResult(listener, false, "ECARX уже остановлен");
                 }
-            }, HUD_AR_PROFILE_READY_RETRY_MS);
+            }, HUD_MODE_READY_RETRY_MS);
             return;
         }
         if (autoRepeat) {
@@ -3796,192 +3741,6 @@ final class GeelyCarIntegration implements CarIntegration {
                 return IHUD.SETTING_FUNC_HUD_DISPLAY_BTPHONE;
             default:
                 throw new IllegalArgumentException("Неизвестная категория HUD " + category);
-        }
-    }
-
-    private void attemptHudArProfile(@NonNull HudArRequest request, int readinessAttempt) {
-        if (!isCurrentHudArRequest(request)) {
-            completeHudArRequest(request, false, "Настройка HUD заменена более новой");
-            return;
-        }
-        try {
-            byte[] completeProfile = profileCloudAccess.readCompleteProfile();
-            if (completeProfile == null || completeProfile.length == 0) {
-                retryHudArProfileReadiness(request, readinessAttempt,
-                        "PA33873 ProfileCloudData ещё не загружен");
-                return;
-            }
-
-            byte[] patchedProfile;
-            try {
-                patchedProfile = HudProfileWirePatcher.patchHudAr(
-                        completeProfile, request.hidden);
-            } catch (IllegalArgumentException invalidSnapshot) {
-                retryHudArProfileReadiness(request, readinessAttempt,
-                        invalidSnapshot.getMessage());
-                return;
-            }
-            int previous = HudProfileWirePatcher.readHudAr(completeProfile);
-            if (previous == request.desiredValue) {
-                completeHudArRequest(request, true,
-                        "Штатный AR-профиль уже установлен: " + previous);
-                return;
-            }
-            if (!HudProfileWirePatcher.isExactPatch(
-                    completeProfile, patchedProfile, request.hidden)) {
-                startHudArFunctionFallback(request,
-                        "проверка точечного изменения ProfileCloudData не пройдена");
-                return;
-            }
-
-            request.profileApplyAttempts++;
-            boolean accepted = profileCloudAccess.writeCompleteProfile(patchedProfile);
-            if (!accepted) {
-                if (request.profileApplyAttempts < HUD_AR_PROFILE_APPLY_ATTEMPTS) {
-                    scheduleHudArTask(request,
-                            () -> attemptHudArProfile(request, 0),
-                            HUD_AR_PROFILE_READBACK_MS);
-                } else {
-                    startHudArFunctionFallback(request,
-                            "низкоуровневая запись полного профиля отклонена");
-                }
-                return;
-            }
-            scheduleHudArTask(request,
-                    () -> verifyHudArProfile(request),
-                    HUD_AR_PROFILE_READBACK_MS);
-        } catch (Throwable error) {
-            Log.w(TAG, "legacy HUD AR profile write failed", error);
-            if (request.profileApplyAttempts > 0) {
-                if (request.profileApplyAttempts < HUD_AR_PROFILE_APPLY_ATTEMPTS) {
-                    scheduleHudArTask(request,
-                            () -> attemptHudArProfile(request, 0),
-                            HUD_AR_PROFILE_READBACK_MS);
-                } else {
-                    startHudArFunctionFallback(request,
-                            "профильный API завершился ошибкой после записи");
-                }
-            } else if (readinessAttempt + 1 < HUD_AR_PROFILE_READY_ATTEMPTS) {
-                retryHudArProfileReadiness(request, readinessAttempt,
-                        error.getClass().getSimpleName());
-            } else {
-                startHudArFunctionFallback(request,
-                        "профильный API завершился ошибкой");
-            }
-        }
-    }
-
-    private void retryHudArProfileReadiness(@NonNull HudArRequest request,
-                                            int readinessAttempt,
-                                            @Nullable String detail) {
-        if (readinessAttempt + 1 >= HUD_AR_PROFILE_READY_ATTEMPTS) {
-            startHudArFunctionFallback(request, detail == null
-                    ? "ProfileCloudData не загрузился"
-                    : detail);
-            return;
-        }
-        scheduleHudArTask(request,
-                () -> attemptHudArProfile(request, readinessAttempt + 1),
-                HUD_AR_PROFILE_READY_RETRY_MS);
-    }
-
-    private void verifyHudArProfile(@NonNull HudArRequest request) {
-        if (!isCurrentHudArRequest(request)) {
-            completeHudArRequest(request, false, "Настройка HUD заменена более новой");
-            return;
-        }
-        try {
-            byte[] completeProfile = profileCloudAccess.readCompleteProfile();
-            if (completeProfile != null && completeProfile.length > 0) {
-                int confirmed = HudProfileWirePatcher.readHudAr(completeProfile);
-                if (confirmed == request.desiredValue) {
-                    completeHudArRequest(request, true,
-                            "Полный PA-профиль HUD AR подтверждён: " + confirmed);
-                    return;
-                }
-            }
-        } catch (Throwable error) {
-            Log.w(TAG, "legacy HUD AR profile read-back failed", error);
-        }
-
-        if (request.profileApplyAttempts < HUD_AR_PROFILE_APPLY_ATTEMPTS) {
-            // Re-read immediately before the retry so concurrent vehicle-setting changes survive.
-            attemptHudArProfile(request, 0);
-        } else {
-            startHudArFunctionFallback(request,
-                    "полный профиль принят, но AR не подтверждён");
-        }
-    }
-
-    private void startHudArFunctionFallback(@NonNull HudArRequest request,
-                                            @Nullable String profileFailure) {
-        if (!isCurrentHudArRequest(request)) {
-            completeHudArRequest(request, false, "Настройка HUD заменена более новой");
-            return;
-        }
-        if (request.fallbackStarted) return;
-        request.fallbackStarted = true;
-        Log.w(TAG, "Using bounded HUD AR function fallback: " + profileFailure);
-        attemptHudArFunctionFallback(request, 0);
-    }
-
-    private void attemptHudArFunctionFallback(@NonNull HudArRequest request, int attempt) {
-        if (!isCurrentHudArRequest(request)) {
-            completeHudArRequest(request, false, "Настройка HUD заменена более новой");
-            return;
-        }
-        ICarFunction source = ensureCarFunctions();
-        if (source != null) {
-            try {
-                request.fallbackAccepted |= source.setFunctionValue(
-                        IHUD.SETTING_FUNC_HUD_AR_ENGINE, request.desiredValue);
-                int confirmed = source.getFunctionValue(IHUD.SETTING_FUNC_HUD_AR_ENGINE);
-                if (confirmed == request.desiredValue) {
-                    completeHudArRequest(request, true,
-                            "Резервная команда HUD AR подтверждена: " + confirmed);
-                    return;
-                }
-            } catch (Throwable error) {
-                invalidateFunctionProxy(source);
-                Log.w(TAG, "bounded HUD AR function fallback failed", error);
-            }
-        }
-
-        int next = attempt + 1;
-        if (next < HUD_AR_FALLBACK_GAPS_MS.length) {
-            scheduleHudArTask(request,
-                    () -> attemptHudArFunctionFallback(request, next),
-                    HUD_AR_FALLBACK_GAPS_MS[next]);
-            return;
-        }
-        completeHudArRequest(request, false, request.fallbackAccepted
-                ? "Резервная команда HUD AR принята, но обратная связь недоступна"
-                : "Профиль и резервная команда HUD AR недоступны");
-    }
-
-    private void scheduleHudArTask(@NonNull HudArRequest request,
-                                   @NonNull Runnable workerTask, long delayMillis) {
-        mainHandler.postDelayed(() -> {
-            if (!isCurrentHudArRequest(request)) {
-                completeHudArRequest(request, false,
-                        "Настройка HUD заменена более новой");
-                return;
-            }
-            if (!executeControlTask(workerTask)) {
-                completeHudArRequest(request, false, "ECARX уже остановлен");
-            }
-        }, Math.max(0L, delayMillis));
-    }
-
-    private boolean isCurrentHudArRequest(@NonNull HudArRequest request) {
-        return !controlsShuttingDown && !request.finished.get()
-                && hudArRequestGeneration.get() == request.generation;
-    }
-
-    private void completeHudArRequest(@NonNull HudArRequest request, boolean success,
-                                      @Nullable String message) {
-        if (request.finished.compareAndSet(false, true)) {
-            postCommandResult(request.listener, success, message);
         }
     }
 
@@ -4635,7 +4394,6 @@ final class GeelyCarIntegration implements CarIntegration {
         adaptApiCapabilityProbeGeneration.incrementAndGet();
         adasRecorderDemand = false;
         controlsShuttingDown = true;
-        hudArRequestGeneration.incrementAndGet();
         hudModeRequestGeneration.incrementAndGet();
         synchronized (controlCommandSubmissionLock) {
             latestControlCommandSubmissions.clear();
@@ -4675,7 +4433,7 @@ final class GeelyCarIntegration implements CarIntegration {
             detachControlWatcher();
             cancelActiveControlCommandsOnWorker("ECARX остановлен");
         });
-        profileCloudAccess.close();
+        hudModeAccess.close();
         signalFallback.shutdown();
         telemetryWorker.shutdown();
         controlWorker.shutdown();
@@ -4688,4 +4446,3 @@ final class GeelyCarIntegration implements CarIntegration {
         externalOverlayActive = false;
     }
 }
-

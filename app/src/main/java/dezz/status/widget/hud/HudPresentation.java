@@ -4,6 +4,7 @@ package dezz.status.widget.hud;
 import android.app.Presentation;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.view.Display;
@@ -32,8 +33,10 @@ final class HudPresentation extends Presentation {
         super.onCreate(savedInstanceState);
         Window window = getWindow();
         if (window != null) {
+            window.setFormat(PixelFormat.TRANSLUCENT);
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             window.setDimAmount(0f);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                     | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
             View decor = window.getDecorView();
@@ -57,4 +60,3 @@ final class HudPresentation extends Presentation {
         if (content != null) content.invalidateHud();
     }
 }
-

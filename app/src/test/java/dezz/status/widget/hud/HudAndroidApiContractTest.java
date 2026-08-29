@@ -30,7 +30,7 @@ public final class HudAndroidApiContractTest {
         assertTrue(source.contains("if (cachedAppVersion != null) return cachedAppVersion"));
     }
 
-    @Test public void systemHudMaskLivesAboveEcarxDaemonAndHasSafeFallback()
+    @Test public void systemHudSurfaceLivesAboveEcarxDaemonAndHasSafeFallback()
             throws Exception {
         String bridge = read("HudSurfaceBridgeMain.java");
         String client = read("HudSystemSurfaceWindow.java");
@@ -59,9 +59,9 @@ public final class HudAndroidApiContractTest {
         assertTrue(service.contains("кадр принят SurfaceFlinger"));
         assertTrue(service.contains("systemSurfaceRetryAfter"));
         assertTrue(service.contains("scheduleSystemSurfaceRetry()"));
-        assertTrue(service.contains("setCustomFrameReady(true)"));
-        assertTrue(service.contains("setCustomFrameReady(false)"));
-        assertTrue(service.contains("HudStockMaskPolicy.shouldHideStockCar"));
+        assertFalse(service.contains("setCustomFrameReady"));
+        assertFalse(service.contains("HudStockMaskPolicy"));
+        assertFalse(service.contains("setStockHudCarHidden"));
         assertTrue(service.contains("SYSTEM_SURFACE_RETRY_MS = 15_000L"));
         assertTrue(service.contains("apply(app);"));
         assertFalse(service.contains("sendCommand(app, ACTION_DATA_CHANGED, null);"));
@@ -69,6 +69,19 @@ public final class HudAndroidApiContractTest {
         assertTrue(service.contains("DiagnosticJournal.error(\"hud-runtime\""));
         assertTrue(service.contains("HUD service создан в основном процессе Natro"));
         assertTrue(service.contains("elements=\" + config.elements.size()"));
+    }
+
+    @Test public void everyWindowLevelHudSubstrateIsTransparent() throws Exception {
+        String presentation = read("HudPresentation.java");
+        String overlay = read("HudOverlayWindow.java");
+        String composite = read("HudCompositeView.java");
+
+        assertTrue(presentation.contains("window.setFormat(PixelFormat.TRANSLUCENT)"));
+        assertTrue(presentation.contains("new ColorDrawable(Color.TRANSPARENT)"));
+        assertTrue(presentation.contains("window.clearFlags("));
+        assertTrue(overlay.contains("PixelFormat.TRANSLUCENT"));
+        assertTrue(overlay.contains("params.dimAmount = 0f"));
+        assertTrue(composite.contains("setBackgroundColor(Color.TRANSPARENT)"));
     }
 
     @Test public void textureViewNeverReceivesUnsupportedBackgroundDrawable()

@@ -43,15 +43,8 @@ public final class HudPanelConfig {
     public int gridRows = 18;
     public boolean showGrid = true;
     public boolean freeMovement;
+    /** Retained in exported schema for compatibility; the live panel is always transparent. */
     @NonNull public String backgroundMode = "TRANSPARENT";
-    /**
-     * Paints an opaque black mask inside the verified HUD viewport before drawing widgets.
-     *
-     * <p>Display 2 is a composite 1920x1080 surface shared by the cluster, DIM and HUD. The mask
-     * must therefore remain clipped to {@link HudViewportPolicy}; a full-display black surface
-     * would also blank the other OEM displays.</p>
-     */
-    public boolean maskStockHud = true;
     public boolean snowMode;
     public int globalBrightness = 100;
     @NonNull public String globalTextColor = "#FFFFFFFF";
@@ -125,7 +118,8 @@ public final class HudPanelConfig {
         displayHeight = clamp(displayHeight, 0, 16_384);
         displayUniqueId = bounded(displayUniqueId, 512);
         displayName = bounded(displayName, 256);
-        backgroundMode = normalizeBackground(backgroundMode);
+        // Imported BLACK/DIM layouts must not be able to restore an opaque HUD substrate.
+        backgroundMode = "TRANSPARENT";
         globalBrightness = clamp(globalBrightness, 0, 100);
         globalTextColor = color(globalTextColor, "#FFFFFFFF");
         globalUnitColor = color(globalUnitColor, "#CCFFFFFF");
@@ -224,7 +218,7 @@ public final class HudPanelConfig {
         out.put("gridColumns", gridColumns).put("gridRows", gridRows);
         out.put("showGrid", showGrid).put("freeMovement", freeMovement);
         out.put("backgroundMode", backgroundMode);
-        out.put("maskStockHud", maskStockHud).put("snowMode", snowMode);
+        out.put("snowMode", snowMode);
         out.put("globalBrightness", globalBrightness);
         out.put("globalTextColor", globalTextColor).put("globalUnitColor", globalUnitColor);
         out.put("syncElementColors", syncElementColors);
@@ -268,9 +262,6 @@ public final class HudPanelConfig {
             out.showGrid = source.optBoolean("showGrid", true);
             out.freeMovement = source.optBoolean("freeMovement", false);
             out.backgroundMode = source.optString("backgroundMode", "TRANSPARENT");
-            // Old layouts predate the OEM-HUD mask. Enable it during migration so the stock
-            // arrows and signs do not remain visible below the custom panel.
-            out.maskStockHud = source.optBoolean("maskStockHud", true);
             out.snowMode = source.optBoolean("snowMode", false);
             out.globalBrightness = source.optInt("globalBrightness", 100);
             out.globalTextColor = source.optString("globalTextColor", "#FFFFFFFF");
@@ -317,19 +308,6 @@ public final class HudPanelConfig {
     }
 
     @NonNull
-    private static String normalizeBackground(String raw) {
-        String value = bounded(raw, 32).toUpperCase(java.util.Locale.ROOT);
-        switch (value) {
-            case "BLACK":
-            case "DIM":
-            case "TRANSPARENT":
-                return value;
-            default:
-                return "TRANSPARENT";
-        }
-    }
-
-    @NonNull
     private static String color(String raw, String fallback) {
         String value = bounded(raw, 32);
         return value.isEmpty() ? fallback : value;
@@ -346,4 +324,3 @@ public final class HudPanelConfig {
         return Math.max(minimum, Math.min(maximum, value));
     }
 }
-

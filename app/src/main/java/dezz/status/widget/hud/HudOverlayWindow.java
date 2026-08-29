@@ -58,6 +58,8 @@ final class HudOverlayWindow {
         params.gravity = Gravity.TOP | Gravity.LEFT;
         params.x = HudViewportPolicy.SAFE_LEFT;
         params.y = HudViewportPolicy.SAFE_TOP;
+        params.dimAmount = 0f;
+        params.alpha = 1f;
         params.setTitle("Natro HUD overlay 728x190");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             params.layoutInDisplayCutoutMode =
@@ -93,4 +95,3 @@ final class HudOverlayWindow {
         }
     }
 }
-

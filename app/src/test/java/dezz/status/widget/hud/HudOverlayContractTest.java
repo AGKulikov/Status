@@ -5,6 +5,7 @@
 
 package dezz.status.widget.hud;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -15,7 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Guards the display-2 mask and overlay behavior verified from the ECARX device dump. */
+/** Guards the transparent display-2 overlay and its hardware safety boundary. */
 public final class HudOverlayContractTest {
     @Test
     public void hardwareViewportCannotCoverOtherCompositeDisplayRegions() throws IOException {
@@ -26,8 +27,9 @@ public final class HudOverlayContractTest {
         assertTrue(viewport.contains("SAFE_HEIGHT = 190"));
         assertTrue(canvas.contains("canvas.clipRect(geometry.safeClip)"));
         assertTrue(canvas.contains(
-                "config.maskStockHud && config.hasStandaloneDrawableElement() && !editor"));
-        assertTrue(canvas.contains("paint.setColor(Color.BLACK)"));
+                "canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)"));
+        assertFalse(canvas.contains("config.maskStockHud"));
+        assertFalse(canvas.contains("paint.setColor(Color.BLACK)"));
     }
 
     @Test
@@ -50,15 +52,15 @@ public final class HudOverlayContractTest {
     }
 
     @Test
-    public void oldLayoutsMigrateToAnEnabledStockHudMask() throws IOException {
+    public void oldLayoutsCannotRestoreAnOpaqueStockHudMask() throws IOException {
         String config = source("dezz/status/widget/hud/HudPanelConfig.java");
         assertTrue(config.contains("SCHEMA_VERSION = 6"));
         assertTrue(config.contains(
                 "public int displayId = HudViewportPolicy.VERIFIED_DISPLAY_ID"));
         assertTrue(config.contains(
                 "displayId = HudViewportPolicy.VERIFIED_DISPLAY_ID"));
-        assertTrue(config.contains("public boolean maskStockHud = true"));
-        assertTrue(config.contains("source.optBoolean(\"maskStockHud\", true)"));
+        assertTrue(config.contains("backgroundMode = \"TRANSPARENT\""));
+        assertFalse(config.contains("maskStockHud"));
     }
 
     private static String source(String relative) throws IOException {

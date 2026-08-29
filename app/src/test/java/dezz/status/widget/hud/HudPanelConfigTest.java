@@ -53,6 +53,20 @@ public final class HudPanelConfigTest {
         assertEquals(HudElementType.CLOCK, restored.elements.get(0).type);
     }
 
+    @Test public void opaqueLegacySubstrateAndStockMaskAreDiscarded() throws Exception {
+        HudPanelConfig restored = HudPanelConfig.fromJson("{"
+                + "\"schema\":6,"
+                + "\"backgroundMode\":\"BLACK\","
+                + "\"maskStockHud\":true,"
+                + "\"elements\":[]"
+                + "}");
+
+        assertEquals("TRANSPARENT", restored.backgroundMode);
+        String encoded = restored.toJson().toString();
+        assertTrue(encoded.contains("\"backgroundMode\":\"TRANSPARENT\""));
+        assertFalse(encoded.contains("maskStockHud"));
+    }
+
     @Test public void backdropRoundTripKeepsDecorationAndAlwaysDrawsBelowWidgets()
             throws Exception {
         HudPanelConfig value = HudPanelConfig.defaults();

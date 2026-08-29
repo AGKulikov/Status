@@ -142,11 +142,6 @@ final class GeelyPassengerControlIntegration implements CarIntegration {
         else delegate.executeControl(command, listener);
     }
 
-    @Override public void setStockHudCarHidden(boolean hidden,
-                                               @NonNull ControlCommandListener listener) {
-        delegate.setStockHudCarHidden(hidden, listener);
-    }
-
     @Override public void setStockHudProfileMode(int mode, boolean repeat,
                                                  @NonNull ControlCommandListener listener) {
         delegate.setStockHudProfileMode(mode, repeat, listener);

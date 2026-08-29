@@ -1296,10 +1296,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 + "Панель и каждый виджет жёстко обрезаются по этой области.",
                 13, 0xFFFFCC66);
         form.addView(hardwareBounds, marginTop(10));
-        Spinner background = spinner(new String[]{"TRANSPARENT", "BLACK", "DIM"},
-                config.backgroundMode);
-        form.addView(label("Фон"), marginTop(10));
-        form.addView(background);
+        form.addView(text("Фон панели всегда полностью прозрачный. Непрозрачными могут быть "
+                + "только явно добавленные подложки и сама карта.",
+                12, 0xFFB8C0CC), marginTop(10));
         SliderField brightness = slider(form, "Общая яркость",
                 config.globalBrightness, 0, 100, 1, " %");
         EditText globalColor = field(form, "Общий цвет текста", config.globalTextColor, false);
@@ -1314,25 +1313,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 config.navigationHideDelaySeconds, 0, 60, 1, " с");
         Switch showGrid = switchView("Показывать сетку в редакторе", config.showGrid);
         Switch free = switchView("Свободное перемещение между линиями", config.freeMovement);
-        Switch maskStockHud = switchView(
-                "Скрывать штатные машинку и скорость (AR + HUD-маска)",
-                config.maskStockHud);
-        TextView maskHint = text(
-                "Машинка и дорога отключаются старым штатным AR-флагом через полный активный "
-                        + "профиль автомобиля; цифровая скорость закрывается чёрной маской. "
-                        + "AR-флаг применяется и при выключенной пользовательской HUD-панели. "
-                        + "Для элементов ecarx_daemon дополнительно используется отдельный "
-                        + "SurfaceFlinger-слой через локальный ADB/Telnet; при его недоступности "
-                        + "остаётся обычный overlay.",
-                12, 0xFFB8C0CC);
         Switch snow = switchView("Снежный режим", config.snowMode);
         Switch sync = switchView("Один цвет для всех элементов", config.syncElementColors);
         Switch autostart = switchView("Запускать HUD после перезагрузки",
                 preferences.hudPanelAutostart.get());
         form.addView(showGrid, marginTop(8));
         form.addView(free);
-        form.addView(maskStockHud);
-        form.addView(maskHint);
         Button stockHud = button("Штатные режимы и разделы HUD");
         stockHud.setOnClickListener(view -> editStockHudControls());
         form.addView(stockHud, marginTop(10));
@@ -1361,7 +1347,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 .setOnClickListener(view -> {
                     config.gridColumns = columns.intValue();
                     config.gridRows = rows.intValue();
-                    config.backgroundMode = String.valueOf(background.getSelectedItem());
+                    config.backgroundMode = "TRANSPARENT";
                     config.globalBrightness = brightness.intValue();
                     config.globalTextColor = value(globalColor);
                     config.globalUnitColor = value(globalUnit);
@@ -1371,10 +1357,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     config.navigationHideDelaySeconds = navDelay.intValue();
                     config.showGrid = showGrid.isChecked();
                     config.freeMovement = free.isChecked();
-                    config.maskStockHud = maskStockHud.isChecked();
-                    if (!preferences.hudPanelEnabled.get()) {
-                        applyStockHudPreference(config.maskStockHud);
-                    }
                     config.snowMode = snow.isChecked();
                     config.syncElementColors = sync.isChecked();
                     preferences.hudPanelAutostart.set(autostart.isChecked());
@@ -1521,17 +1503,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Toast.makeText(getApplicationContext(),
                 operation + ": " + detail, success ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG)
                 .show();
-    }
-
-    private void applyStockHudPreference(boolean hidden) {
-        CarIntegrations.get(this).setStockHudCarHidden(hidden, (success, message) -> {
-            if (success) return;
-            String detail = message == null || message.trim().isEmpty()
-                    ? "ECARX не подтвердил изменение"
-                    : message.trim();
-            Toast.makeText(getApplicationContext(),
-                    "Штатный HUD AR: " + detail, Toast.LENGTH_LONG).show();
-        });
     }
 
     private void confirmReset() {

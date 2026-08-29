@@ -239,6 +239,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("addSurface"));
         assertTrue(renderer.contains("removeSurface"));
         assertTrue(renderer.contains("createTrafficLayer"));
+        assertTrue(renderer.contains("shouldShowBackgroundTraffic"));
+        assertTrue(renderer.contains("routeOnlyMode && activeRoute == null"));
+        assertTrue(renderer.contains("applyTrafficVisibility()"));
         assertTrue(renderer.contains("createUserLocationLayer"));
         assertTrue(renderer.contains("invoke(currentLocation, \"resetAnchor\""));
         assertFalse(renderer.contains("invoke(currentLocation, \"setAnchor\""));

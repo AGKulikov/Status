@@ -2,6 +2,7 @@
 package dezz.status.widget.hud;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
@@ -39,6 +40,7 @@ final class HudCompositeView extends FrameLayout
         super(context);
         this.config = config;
         this.localHudViewport = localHudViewport;
+        setBackgroundColor(Color.TRANSPARENT);
         setClipChildren(true);
         setClipToPadding(true);
 
