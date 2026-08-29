@@ -30,6 +30,7 @@ import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.hud.HudPresentationService;
+import dezz.status.widget.instrument.InstrumentDisplayLauncher;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /**
@@ -97,6 +98,12 @@ public final class AppRuntimeBootstrap {
             } catch (RuntimeException error) {
                 Log.w(TAG, "Could not reconcile HUD display service", error);
             }
+        }
+
+        try {
+            InstrumentDisplayLauncher.reconcileAutomatic(appContext);
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not reconcile instrument-panel activity", error);
         }
 
         if (preferences.climatePanelEnabled.get()

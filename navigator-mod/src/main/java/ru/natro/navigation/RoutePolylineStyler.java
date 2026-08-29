@@ -11,8 +11,9 @@ import java.util.List;
 final class RoutePolylineStyler {
     private RoutePolylineStyler() {}
 
-    static void apply(Object line, Object drivingRoute, NavigationMapProfile profile,
-                      int firstSegmentIndex, int renderedSegmentCount)
+    static void apply(Object line, JamStyle jamStyle, NavigationMapProfile profile,
+                      int firstSegmentIndex, int renderedSegmentCount,
+                      ArrayList<Integer> colorScratch)
             throws Exception {
         invoke(line, "setStrokeColor", new Class<?>[]{int.class},
                 Color.parseColor(profile.routeColor));
@@ -27,61 +28,81 @@ final class RoutePolylineStyler {
         invoke(line, "setZIndex", new Class<?>[]{float.class}, 100f);
         invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
         if (profile.showRouteTraffic) {
-            applyJamPalette(line, drivingRoute, profile,
-                    firstSegmentIndex, renderedSegmentCount);
+            for (int paletteIndex = 0; paletteIndex <= 6; paletteIndex++) {
+                invoke(line, "setPaletteColor", new Class<?>[]{int.class, int.class},
+                        paletteIndex, profile.trafficColor(paletteIndex));
+            }
+        }
+        applyProgressColors(line, jamStyle, profile, firstSegmentIndex,
+                renderedSegmentCount, colorScratch);
+    }
+
+    /** Route movement keeps all static line styling and changes only per-segment colours. */
+    static void applyProgressColors(Object line, JamStyle jamStyle,
+                                    NavigationMapProfile profile, int firstSegmentIndex,
+                                    int renderedSegmentCount,
+                                    ArrayList<Integer> colorScratch) throws Exception {
+        if (profile.showRouteTraffic) {
+            applyJamPalette(line, jamStyle, firstSegmentIndex,
+                    renderedSegmentCount, colorScratch);
         } else {
-            clearJamPalette(line, renderedSegmentCount);
+            clearJamPalette(line, renderedSegmentCount, colorScratch);
         }
     }
 
     static long jamFingerprint(Object drivingRoute) {
-        if (drivingRoute == null) return 0L;
+        return readJamStyle(drivingRoute).fingerprint;
+    }
+
+    /** One reflected jam scan shared by every independent MapWindow. */
+    static JamStyle readJamStyle(Object drivingRoute) {
+        if (drivingRoute == null) return JamStyle.EMPTY;
         try {
             List<?> segments = list(invoke(drivingRoute, "getJamSegments", new Class<?>[0]));
             long result = 0xcbf29ce484222325L;
-            for (Object segment : segments) {
+            int[] palette = new int[segments.size()];
+            for (int index = 0; index < segments.size(); index++) {
+                Object segment = segments.get(index);
                 Object type = invoke(segment, "getJamType", new Class<?>[0]);
-                result ^= type == null ? 0L : type.toString().hashCode();
+                String name = type == null ? "UNKNOWN" : type.toString();
+                result ^= name.hashCode();
                 result *= 0x100000001b3L;
+                palette[index] = paletteIndex(name);
             }
-            return result ^ segments.size();
+            return new JamStyle(result ^ segments.size(), palette);
         } catch (Throwable ignored) {
-            return 0L;
+            return JamStyle.EMPTY;
         }
     }
 
-    private static void applyJamPalette(Object line, Object drivingRoute,
-                                        NavigationMapProfile profile, int firstSegmentIndex,
-                                        int renderedSegmentCount) throws Exception {
-        List<?> jams = list(invoke(drivingRoute, "getJamSegments", new Class<?>[0]));
+    private static void applyJamPalette(Object line, JamStyle jamStyle,
+                                        int firstSegmentIndex,
+                                        int renderedSegmentCount,
+                                        ArrayList<Integer> colorScratch) throws Exception {
         int segmentCount = Math.max(0, renderedSegmentCount);
         if (segmentCount == 0) return;
-        if (jams.isEmpty()) {
-            clearJamPalette(line, segmentCount);
+        int[] palette = jamStyle == null ? JamStyle.EMPTY.palette : jamStyle.palette;
+        if (palette.length == 0) {
+            clearJamPalette(line, segmentCount, colorScratch);
             return;
         }
 
-        for (int paletteIndex = 0; paletteIndex <= 6; paletteIndex++) {
-            invoke(line, "setPaletteColor", new Class<?>[]{int.class, int.class},
-                    paletteIndex, profile.trafficColor(paletteIndex));
-        }
-        ArrayList<Integer> colors = new ArrayList<>(segmentCount);
+        colorScratch.clear();
+        colorScratch.ensureCapacity(segmentCount);
         for (int index = 0; index < segmentCount; index++) {
             int sourceIndex = firstSegmentIndex + index;
-            if (sourceIndex < 0 || sourceIndex >= jams.size()) {
-                colors.add(0);
-                continue;
-            }
-            Object jamType = invoke(jams.get(sourceIndex), "getJamType", new Class<?>[0]);
-            colors.add(paletteIndex(jamType == null ? "UNKNOWN" : jamType.toString()));
+            colorScratch.add(sourceIndex < 0 || sourceIndex >= palette.length
+                    ? 0 : palette[sourceIndex]);
         }
-        invoke(line, "setStrokeColors", new Class<?>[]{List.class}, colors);
+        invoke(line, "setStrokeColors", new Class<?>[]{List.class}, colorScratch);
     }
 
-    private static void clearJamPalette(Object line, int segmentCount) throws Exception {
-        ArrayList<Integer> colors = new ArrayList<>(Math.max(0, segmentCount));
-        for (int index = 0; index < segmentCount; index++) colors.add(0);
-        invoke(line, "setStrokeColors", new Class<?>[]{List.class}, colors);
+    private static void clearJamPalette(Object line, int segmentCount,
+                                        ArrayList<Integer> colorScratch) throws Exception {
+        colorScratch.clear();
+        colorScratch.ensureCapacity(Math.max(0, segmentCount));
+        for (int index = 0; index < segmentCount; index++) colorScratch.add(0);
+        invoke(line, "setStrokeColors", new Class<?>[]{List.class}, colorScratch);
     }
 
     static int paletteIndex(String jamType) {
@@ -93,10 +114,20 @@ final class RoutePolylineStyler {
         return 6;
     }
 
+    static final class JamStyle {
+        static final JamStyle EMPTY = new JamStyle(0L, new int[0]);
+        final long fingerprint;
+        final int[] palette;
+
+        JamStyle(long fingerprint, int[] palette) {
+            this.fingerprint = fingerprint;
+            this.palette = palette == null ? new int[0] : palette;
+        }
+    }
+
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,
                                  Object... arguments) throws Exception {
-        Method method = target.getClass().getMethod(name, parameterTypes);
-        method.setAccessible(true);
+        Method method = ReflectMethods.publicMethod(target.getClass(), name, parameterTypes);
         return method.invoke(target, arguments);
     }
 

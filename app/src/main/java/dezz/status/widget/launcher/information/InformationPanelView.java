@@ -79,7 +79,8 @@ public final class InformationPanelView extends FrameLayout {
         void onContentChanged(boolean hasConfiguredItems);
     }
 
-    private static final long TICK_MS = 1_000L;
+    /** Slow system fallbacks only; vehicle and connector values arrive through listeners. */
+    private static final long TICK_MS = 5_000L;
     private static final long SERVICE_RETRY_MS = 500L;
     private static final long DEFAULT_CAR_STALE_MS = 15_000L;
 
@@ -92,17 +93,24 @@ public final class InformationPanelView extends FrameLayout {
             new LinkedHashMap<>();
     private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
     private final Map<String, ItemViews> itemViews = new LinkedHashMap<>();
+    private final DecimalFormat[] numberFormats = new DecimalFormat[5];
+    @Nullable private Locale numberFormatLocale;
     private boolean editorPreviewMode;
     /** Driver-rail controls are specified in physical KX11 pixels, not density-independent dp. */
     private boolean physicalPixelMetrics;
     private InformationPanelConfig config;
     @Nullable private Integer fixedCellBackgroundColor;
     private boolean started;
+    private boolean valueRefreshPosted;
     private int catalogGeneration;
     private int connectorGeneration;
     @Nullable private WidgetService subscribedService;
     @Nullable private ConnectorValueSubscriptionHub.Subscriber connectorListener;
     @Nullable private ContentListener contentListener;
+    private final Runnable valueRefresh = () -> {
+        valueRefreshPosted = false;
+        if (started) updateValues();
+    };
 
     private final CarIntegration.TelemetryListener vehicleListener = value -> {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -166,6 +174,8 @@ public final class InformationPanelView extends FrameLayout {
         started = false;
         catalogGeneration++;
         handler.removeCallbacks(tick);
+        removeCallbacks(valueRefresh);
+        valueRefreshPosted = false;
         if (carIntegration != null) carIntegration.unsubscribeTelemetry(vehicleListener);
         disconnectConnectorService();
         vehicleValues.clear();
@@ -291,7 +301,7 @@ public final class InformationPanelView extends FrameLayout {
     private void acceptVehicleValue(@NonNull CarIntegration.TelemetryValue value) {
         if (!started) return;
         vehicleValues.put(value.id, value);
-        updateValues();
+        requestValueRefresh();
     }
 
     private void reconcileConnectorService() {
@@ -339,7 +349,14 @@ public final class InformationPanelView extends FrameLayout {
         if (!started || generation != connectorGeneration
                 || subscribedService != capturedService) return;
         for (ConnectorValue value : changed) connectorValues.put(connectorKey(value), value);
-        updateValues();
+        requestValueRefresh();
+    }
+
+    /** One layout pass per display frame even if speed, RPM and connectors arrive together. */
+    private void requestValueRefresh() {
+        if (!started || valueRefreshPosted) return;
+        valueRefreshPosted = true;
+        postOnAnimation(valueRefresh);
     }
 
     private void rebuild() {
@@ -479,21 +496,33 @@ public final class InformationPanelView extends FrameLayout {
             Value value = resolve(item);
             StatusBrickSnapshot status = statusSnapshot(item);
             applyIcon(item, views, value, status);
-            views.tile.setVisibility(editorPreviewMode || InformationValuePolicy.isVisible(
-                    item.visibility, value.known, value.active) ? View.VISIBLE : View.INVISIBLE);
-            views.label.setText(item.displayLabel());
-            views.value.setText(value.known ? value.display : "—");
-            views.value.setAlpha(value.known ? 1f : .48f);
+            int visibility = editorPreviewMode || InformationValuePolicy.isVisible(
+                    item.visibility, value.known, value.active) ? View.VISIBLE : View.INVISIBLE;
+            if (views.tile.getVisibility() != visibility) views.tile.setVisibility(visibility);
+            String label = item.displayLabel();
+            if (!TextUtils.equals(views.label.getText(), label)) views.label.setText(label);
+            String display = value.known ? value.display : "—";
+            if (!TextUtils.equals(views.value.getText(), display)) views.value.setText(display);
+            float valueAlpha = value.known ? 1f : .48f;
+            if (views.value.getAlpha() != valueAlpha) views.value.setAlpha(valueAlpha);
             float configuredAlpha = item.iconAlpha / 255f;
-            views.icon.setAlpha(configuredAlpha
-                    * (value.known ? (value.active ? 1f : .58f) : .28f));
-            views.background.setColor(fixedCellBackgroundColor == null
+            float iconAlpha = configuredAlpha
+                    * (value.known ? (value.active ? 1f : .58f) : .28f);
+            if (views.icon.getAlpha() != iconAlpha) views.icon.setAlpha(iconAlpha);
+            int backgroundColor = fixedCellBackgroundColor == null
                     ? (value.known && value.active
                     ? Color.argb(82, 84, 168, 255)
                     : Color.argb(58, 255, 255, 255))
-                    : fixedCellBackgroundColor);
-            views.tile.setContentDescription(item.displayLabel() + ": "
-                    + (value.known ? value.display : "нет актуальных данных"));
+                    : fixedCellBackgroundColor;
+            if (views.backgroundColor != backgroundColor) {
+                views.backgroundColor = backgroundColor;
+                views.background.setColor(backgroundColor);
+            }
+            String description = label + ": "
+                    + (value.known ? value.display : "нет актуальных данных");
+            if (!TextUtils.equals(views.tile.getContentDescription(), description)) {
+                views.tile.setContentDescription(description);
+            }
         }
     }
 
@@ -508,8 +537,7 @@ public final class InformationPanelView extends FrameLayout {
                 views.resolvedIconKey = statusKey;
             }
             views.icon.setImageLevel(status.iconLevel);
-            ImageViewCompat.setImageTintList(views.icon, status.iconTint == 0 ? null
-                    : ColorStateList.valueOf(status.iconTint));
+            applyImageTint(views, status.iconTint);
             views.icon.setBatteryPercent(status.batteryPercent,
                     status.iconTint == 0 ? Color.WHITE : status.iconTint);
             views.icon.setBatteryCharging(status.batteryCharging);
@@ -517,15 +545,18 @@ public final class InformationPanelView extends FrameLayout {
             views.icon.setOutlineWidth(status.outlineWidth);
             views.icon.setBadgeText(status.badgeText,
                     status.badgeBackground, status.badgeForeground);
-            views.icon.setBadgeDrawable(status.badgeDrawableResource == 0 ? null
-                    : ContextCompat.getDrawable(getContext(),
-                    status.badgeDrawableResource));
+            if (views.badgeDrawableResource != status.badgeDrawableResource) {
+                views.badgeDrawableResource = status.badgeDrawableResource;
+                views.icon.setBadgeDrawable(status.badgeDrawableResource == 0 ? null
+                        : ContextCompat.getDrawable(getContext(),
+                        status.badgeDrawableResource));
+            }
             return;
         }
         // Switching away from the exact status-bar style must also remove its semantic tint.
         // ImageViewCompat keeps that ColorStateList on the view and would otherwise recolour the
         // regular preset selected by the driver.
-        ImageViewCompat.setImageTintList(views.icon, null);
+        applyImageTint(views, 0);
         views.icon.setBatteryPercent(null, Color.WHITE);
         views.icon.setBatteryCharging(false);
         String iconKey = resolvedIconKey(item);
@@ -539,7 +570,10 @@ public final class InformationPanelView extends FrameLayout {
         views.icon.setOutlineWidth(item.iconOutlineAlpha == 0
                 ? 0 : item.iconOutlineWidth);
         views.icon.setBadgeText(null, 0, 0);
-        views.icon.setBadgeDrawable(null);
+        if (views.badgeDrawableResource != 0) {
+            views.badgeDrawableResource = 0;
+            views.icon.setBadgeDrawable(null);
+        }
     }
 
     @NonNull
@@ -576,6 +610,13 @@ public final class InformationPanelView extends FrameLayout {
             default:
                 return fallback;
         }
+    }
+
+    private static void applyImageTint(@NonNull ItemViews views, int color) {
+        if (views.imageTintColor == color) return;
+        views.imageTintColor = color;
+        ImageViewCompat.setImageTintList(views.icon,
+                color == 0 ? null : ColorStateList.valueOf(color));
     }
 
     @NonNull
@@ -770,15 +811,25 @@ public final class InformationPanelView extends FrameLayout {
     }
 
     @NonNull
-    private static String formatNumber(double value, int decimals, @NonNull String unit) {
+    private String formatNumber(double value, int decimals, @NonNull String unit) {
         if (!Double.isFinite(value)) return "—";
-        StringBuilder pattern = new StringBuilder("0");
-        if (decimals > 0) {
-            pattern.append('.');
-            for (int index = 0; index < decimals; index++) pattern.append('0');
+        int boundedDecimals = Math.max(0, Math.min(numberFormats.length - 1, decimals));
+        Locale locale = Locale.getDefault();
+        if (!locale.equals(numberFormatLocale)) {
+            numberFormatLocale = locale;
+            java.util.Arrays.fill(numberFormats, null);
         }
-        DecimalFormat format = new DecimalFormat(pattern.toString(),
-                DecimalFormatSymbols.getInstance(Locale.getDefault()));
+        DecimalFormat format = numberFormats[boundedDecimals];
+        if (format == null) {
+            StringBuilder pattern = new StringBuilder("0");
+            if (boundedDecimals > 0) {
+                pattern.append('.');
+                for (int index = 0; index < boundedDecimals; index++) pattern.append('0');
+            }
+            format = new DecimalFormat(pattern.toString(),
+                    DecimalFormatSymbols.getInstance(locale));
+            numberFormats[boundedDecimals] = format;
+        }
         String number = format.format(value);
         return unit.isEmpty() ? number : number + " " + unit;
     }
@@ -890,6 +941,9 @@ public final class InformationPanelView extends FrameLayout {
         final TextView value;
         final GradientDrawable background;
         @NonNull String resolvedIconKey;
+        int backgroundColor = Integer.MIN_VALUE;
+        int badgeDrawableResource = Integer.MIN_VALUE;
+        int imageTintColor = Integer.MIN_VALUE;
 
         ItemViews(View tile, OutlineImageView icon, TextView label, TextView value,
                   GradientDrawable background, @NonNull String resolvedIconKey) {

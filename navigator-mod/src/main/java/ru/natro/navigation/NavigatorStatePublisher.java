@@ -39,7 +39,9 @@ final class NavigatorStatePublisher {
         void onNavigationRuntime(Object navigation);
 
         void onNavigationState(String snapshotJson, String routeJson, Object drivingRoute,
-                               long routeEpoch);
+                               long routeEpoch, long jamFingerprint,
+                               RoutePolylineStyler.JamStyle jamStyle,
+                               NavigationFrame navigationFrame);
 
         void onDiagnostic(String detail);
     }
@@ -66,8 +68,49 @@ final class NavigatorStatePublisher {
         }
     }
 
+    /**
+     * Primitive camera/progress sample consumed by both independent MapWindows. It bypasses JSON
+     * completely and is deliberately cheaper than the text-rich HUD snapshot.
+     */
+    static final class NavigationFrame {
+        final double latitude;
+        final double longitude;
+        final double bearingDegrees;
+        final double speedKmh;
+        final boolean routeActive;
+        final boolean routeProgressValid;
+        final int routeSegmentIndex;
+        final double routeSegmentPosition;
+        final Object currentRoutePoint;
+
+        NavigationFrame(double latitude, double longitude, double bearingDegrees,
+                        double speedKmh, boolean routeActive,
+                        boolean routeProgressValid, int routeSegmentIndex,
+                        double routeSegmentPosition, Object currentRoutePoint) {
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.bearingDegrees = finite(bearingDegrees) ? bearingDegrees : 0d;
+            this.speedKmh = finite(speedKmh) ? Math.max(0d, speedKmh) : 0d;
+            this.routeActive = routeActive;
+            this.routeProgressValid = routeProgressValid;
+            this.routeSegmentIndex = Math.max(0, routeSegmentIndex);
+            this.routeSegmentPosition = Math.max(0d, Math.min(1d, routeSegmentPosition));
+            this.currentRoutePoint = currentRoutePoint;
+        }
+
+        boolean isValid() {
+            return finite(latitude) && finite(longitude)
+                    && latitude >= -90d && latitude <= 90d
+                    && longitude >= -180d && longitude <= 180d;
+        }
+    }
+
     private static final String TAG = "NatroNavigationState";
     private static final long CAMERA_INTERVAL_MS = 100L;
+    /** Data extraction cadence only; native GuidanceCamera rendering remains at its own FPS. */
+    private static final long STATE_INTERVAL_MS = 33L;
+    /** Text, lanes and traffic lights are human-facing and do not need the map's 30 Hz cadence. */
+    private static final long SNAPSHOT_INTERVAL_MS = 100L;
     private static final long MIN_RESOLVE_RETRY_MS = 250L;
     private static final long MAX_RESOLVE_RETRY_MS = 5_000L;
     private static final long ROUTE_RECONCILE_CONFIRM_MS = 250L;
@@ -94,9 +137,19 @@ final class NavigatorStatePublisher {
 
     private long sequence;
     private long routeEpoch;
+    private long activeJamFingerprint;
+    private RoutePolylineStyler.JamStyle activeJamStyle =
+            RoutePolylineStyler.JamStyle.EMPTY;
+    private long lastStateDispatchElapsedMs;
+    private long lastSnapshotDispatchElapsedMs;
+    private boolean statePublishScheduled;
+    private boolean pendingForceRoute;
     private String activeRouteKey;
+    private String activeRouteId = "";
     private Object activeRoute;
     private String encodedRoute = "";
+    private long cachedDestinationEpoch = Long.MIN_VALUE;
+    private String cachedDestination = "";
     // MapKit may report metadata weight for only the remaining route after position updates.
     // Freeze the first positive distance per route epoch so HUD trip progress has a stable base.
     private int activeRouteTotalDistanceMeters = -1;
@@ -122,11 +175,11 @@ final class NavigatorStatePublisher {
     }
 
     void requestSnapshot() {
-        runOnMain(() -> publishState(false, false));
+        runOnMain(() -> publishState(false, false, true));
     }
 
     void requestRoute() {
-        runOnMain(() -> publishState(true, true));
+        runOnMain(() -> publishState(true, true, true));
     }
 
     private void attachOnMain(Activity activity) {
@@ -208,7 +261,7 @@ final class NavigatorStatePublisher {
         }
         if (guidance != null && naviKitGuidance != null && navigation != null
                 && (resolvedSomething || primaryMap != null)) {
-            publishState(true, true);
+            publishState(true, true, true);
         }
         if (primaryMap == null || guidance == null || naviKitGuidance == null
                 || navigation == null) {
@@ -249,7 +302,7 @@ final class NavigatorStatePublisher {
                     || "onRouteFinished".equals(methodName)
                     || "onRouteLost".equals(methodName);
             if (routeMayHaveChanged) scheduleRouteReconcile(methodName);
-            else publishState(false, false);
+            else scheduleStatePublish(false);
         });
         invoke(nextGuidance, "addListener", new Class<?>[]{guidanceListenerClass},
                 guidanceListener);
@@ -258,7 +311,7 @@ final class NavigatorStatePublisher {
         Class<?> windshieldListenerClass = Class.forName(
                 "com.yandex.mapkit.navigation.automotive.WindshieldListener");
         windshieldListener = listenerProxy(windshieldListenerClass,
-                methodName -> publishState(false, false));
+                methodName -> scheduleStatePublish(false));
         invoke(windshield, "addListener", new Class<?>[]{windshieldListenerClass},
                 windshieldListener);
     }
@@ -298,7 +351,8 @@ final class NavigatorStatePublisher {
         }
     }
 
-    private void publishState(boolean routeMayHaveChanged, boolean forceRoute) {
+    private void publishState(boolean routeMayHaveChanged, boolean forceRoute,
+                              boolean forceSnapshot) {
         Object currentGuidance = guidance;
         Object currentNaviKitGuidance = naviKitGuidance;
         if (currentGuidance == null || currentNaviKitGuidance == null) {
@@ -309,18 +363,32 @@ final class NavigatorStatePublisher {
             // Automotive Guidance.getCurrentRoute() is also populated by Navigator's automatic
             // free-drive guidance. Only NaviKit Guidance.route() represents a route explicitly
             // started by the user; freeDriveRoute() must remain ordinary background traffic.
-            Object engineRoute = invoke(currentGuidance, "getCurrentRoute");
-            Object freeDriveRoute = invoke(currentNaviKitGuidance, "freeDriveRoute");
             Object nextRoute = invoke(currentNaviKitGuidance, "route");
             String routeStatus = readRouteStatus(currentGuidance);
             // During onRouteFinished the Java wrapper may still expose the old user route for the
             // remainder of that native callback, so the terminal status is authoritative too.
             if ("ROUTE_FINISHED".equals(routeStatus)) nextRoute = null;
             boolean routeChanged = updateRoute(nextRoute, routeMayHaveChanged);
-            publishRouteDiagnostic(routeStatus, engineRoute, freeDriveRoute);
-            String snapshot = buildSnapshot(currentGuidance, activeRoute).toString();
+            if (routeChanged || forceRoute) {
+                activeJamStyle = RoutePolylineStyler.readJamStyle(activeRoute);
+                activeJamFingerprint = activeJamStyle.fingerprint;
+            }
+            SnapshotInputs inputs = readSnapshotInputs(currentGuidance, activeRoute);
+            long elapsedNow = SystemClock.elapsedRealtime();
+            boolean snapshotDue = forceSnapshot || routeChanged || forceRoute
+                    || elapsedNow - lastSnapshotDispatchElapsedMs >= SNAPSHOT_INTERVAL_MS;
+            if (snapshotDue) {
+                Object engineRoute = invoke(currentGuidance, "getCurrentRoute");
+                Object freeDriveRoute = invoke(currentNaviKitGuidance, "freeDriveRoute");
+                publishRouteDiagnostic(routeStatus, engineRoute, freeDriveRoute);
+            }
+            String snapshot = snapshotDue
+                    ? buildSnapshot(currentGuidance, activeRoute, inputs).toString() : null;
+            if (snapshotDue) lastSnapshotDispatchElapsedMs = elapsedNow;
             String route = routeChanged || forceRoute ? buildRoutePayload().toString() : null;
-            sink.onNavigationState(snapshot, route, activeRoute, routeEpoch);
+            sink.onNavigationState(snapshot, route, activeRoute, routeEpoch,
+                    activeJamFingerprint, activeJamStyle, inputs.frame);
+            lastStateDispatchElapsedMs = elapsedNow;
         } catch (Throwable failure) {
             Log.w(TAG, "Could not publish Navigator state", failure);
             detachGuidanceListeners();
@@ -345,6 +413,20 @@ final class NavigatorStatePublisher {
         main.postDelayed(routeReconcileConfirmation, ROUTE_RECONCILE_CONFIRM_MS);
     }
 
+    /**
+     * Guidance and Windshield often emit several callbacks for one native position update.
+     * Collapse that burst into one extraction pass and retain an upgraded traffic refresh flag.
+     */
+    private void scheduleStatePublish(boolean forceRoute) {
+        pendingForceRoute |= forceRoute;
+        if (statePublishScheduled) return;
+        statePublishScheduled = true;
+        long elapsed = SystemClock.elapsedRealtime() - lastStateDispatchElapsedMs;
+        long delay = Math.max(0L, STATE_INTERVAL_MS - elapsed);
+        if (delay == 0L) main.post(dispatchState);
+        else main.postDelayed(dispatchState, delay);
+    }
+
     private void publishRouteDiagnostic(String routeStatus, Object engineRoute,
                                         Object freeDriveRoute) {
         String detail = "userActive=" + (activeRoute != null)
@@ -365,35 +447,57 @@ final class NavigatorStatePublisher {
     }
 
     private boolean updateRoute(Object nextRoute, boolean routeMayHaveChanged) throws Exception {
-        if (conditionsRoute != nextRoute) attachRouteConditions(nextRoute);
         if (activeRouteKey != null && nextRoute == activeRoute && !routeMayHaveChanged) {
             if (activeRouteTotalDistanceMeters <= 0 && nextRoute != null) {
                 activeRouteTotalDistanceMeters = readRouteTotalDistance(nextRoute);
             }
             return false;
         }
-        String nextEncoded = nextRoute == null ? "" : encodeRoute(nextRoute);
         String routeId = nextRoute == null ? "" : text(invoke(nextRoute, "getRouteId"));
+        if (!routeMayHaveChanged && nextRoute != null && !routeId.isEmpty()
+                && routeId.equals(activeRouteId)) {
+            // MapKit frequently returns a fresh Java DrivingRoute wrapper for the same native
+            // route. Do not encode and hash its complete polyline on every Guidance pulse.
+            activeRoute = nextRoute;
+            if (activeRouteTotalDistanceMeters <= 0) {
+                activeRouteTotalDistanceMeters = readRouteTotalDistance(nextRoute);
+            }
+            return false;
+        }
+        String nextEncoded = nextRoute == null ? "" : encodeRoute(nextRoute);
         String nextKey = nextRoute == null ? ""
                 : routeId + ':' + nextEncoded.length() + ':' + nextEncoded.hashCode();
         boolean initial = activeRouteKey == null;
         boolean changed = !initial && !activeRouteKey.equals(nextKey);
+        if ((initial || changed || routeMayHaveChanged) && conditionsRoute != nextRoute) {
+            // Only a confirmed route lifecycle transition may replace the conditions listener.
+            // Fresh wrappers of the same native route are common on every Guidance pulse.
+            attachRouteConditions(nextRoute);
+        }
         if (initial && nextRoute != null) routeEpoch = 1L;
         else if (changed) routeEpoch++;
         activeRoute = nextRoute;
+        activeRouteId = routeId;
         activeRouteKey = nextKey;
         encodedRoute = nextEncoded;
+        if (initial || changed) {
+            cachedDestinationEpoch = Long.MIN_VALUE;
+            cachedDestination = "";
+        }
         if (initial || changed || activeRouteTotalDistanceMeters <= 0) {
             activeRouteTotalDistanceMeters = readRouteTotalDistance(nextRoute);
         }
         return initial || changed;
     }
 
-    private JSONObject buildSnapshot(Object currentGuidance, Object route) throws Exception {
-        long now = System.currentTimeMillis();
+    /**
+     * Reads location and route progress once for both independent maps. The previous renderer
+     * path repeated getRoutePosition/getPosition reflection separately for HUD and cluster.
+     */
+    private SnapshotInputs readSnapshotInputs(Object currentGuidance, Object route)
+            throws Exception {
         Object location = invoke(currentGuidance, "getLocation");
         Object routePosition = route == null ? null : invoke(route, "getRoutePosition");
-
         double latitude = Double.NaN;
         double longitude = Double.NaN;
         double bearing = Double.NaN;
@@ -411,6 +515,42 @@ final class NavigatorStatePublisher {
         if (!finite(bearing) && routePosition != null) {
             bearing = number(invoke(routePosition, "heading"), Double.NaN);
         }
+
+        RouteProgressSample progress = readRouteProgress(route, routePosition);
+        NavigationFrame frame = new NavigationFrame(
+                latitude, longitude, bearing, speedKmh, route != null,
+                progress.valid, progress.segmentIndex, progress.segmentPosition,
+                progress.currentPoint);
+        return new SnapshotInputs(frame, routePosition);
+    }
+
+    private static RouteProgressSample readRouteProgress(Object route, Object routePosition) {
+        if (route == null) return RouteProgressSample.INVALID;
+        try {
+            Object polylinePosition = invoke(route, "getPosition");
+            if (polylinePosition == null && routePosition != null) {
+                String routeId = String.valueOf(invoke(route, "getRouteId"));
+                polylinePosition = invoke(routePosition, "positionOnRoute",
+                        new Class<?>[]{String.class}, routeId);
+            }
+            if (polylinePosition == null) return RouteProgressSample.INVALID;
+            int segmentIndex = ((Number) invoke(
+                    polylinePosition, "getSegmentIndex")).intValue();
+            double segmentPosition = ((Number) invoke(
+                    polylinePosition, "getSegmentPosition")).doubleValue();
+            Object currentPoint = routePosition == null
+                    ? null : invoke(routePosition, "getPoint");
+            return new RouteProgressSample(true, segmentIndex, segmentPosition, currentPoint);
+        } catch (Throwable unavailable) {
+            return RouteProgressSample.INVALID;
+        }
+    }
+
+    private JSONObject buildSnapshot(Object currentGuidance, Object route,
+                                     SnapshotInputs inputs) throws Exception {
+        long now = System.currentTimeMillis();
+        Object routePosition = inputs.routePosition;
+        NavigationFrame frame = inputs.frame;
 
         int remainingDistance = routePosition == null ? -1 : nonNegativeInt(
                 number(invoke(routePosition, "distanceToFinish"), -1d));
@@ -437,7 +577,7 @@ final class NavigatorStatePublisher {
                 .put("maneuverTitle", manoeuvre.title)
                 .put("maneuverSubtext", manoeuvre.subtext)
                 .put("street", text(invoke(currentGuidance, "getRoadName")))
-                .put("destination", readDestination(route))
+                .put("destination", destinationForRoute(route))
                 .put("maneuverDistanceMeters", manoeuvre.distanceMeters)
                 .put("routeTotalDistanceMeters", routeTotalDistance)
                 .put("remainingDistanceMeters", remainingDistance)
@@ -447,11 +587,22 @@ final class NavigatorStatePublisher {
                 .put("laneDistanceMeters", lanes.distanceMeters)
                 .put("lanesJson", lanes.values.toString())
                 .put("trafficLightsJson", trafficLights);
-        if (finite(latitude)) result.put("latitude", latitude);
-        if (finite(longitude)) result.put("longitude", longitude);
-        if (finite(bearing)) result.put("bearingDegrees", normalizeBearing(bearing));
-        if (finite(speedKmh)) result.put("speedKmh", Math.min(400d, speedKmh));
+        if (finite(frame.latitude)) result.put("latitude", frame.latitude);
+        if (finite(frame.longitude)) result.put("longitude", frame.longitude);
+        if (finite(frame.bearingDegrees)) {
+            result.put("bearingDegrees", normalizeBearing(frame.bearingDegrees));
+        }
+        if (finite(frame.speedKmh)) {
+            result.put("speedKmh", Math.min(400d, frame.speedKmh));
+        }
         return result;
+    }
+
+    private String destinationForRoute(Object route) {
+        if (cachedDestinationEpoch == routeEpoch) return cachedDestination;
+        cachedDestination = readDestination(route);
+        cachedDestinationEpoch = routeEpoch;
+        return cachedDestination;
     }
 
     private Manoeuvre readManoeuvre(Object routePosition) throws Exception {
@@ -700,7 +851,7 @@ final class NavigatorStatePublisher {
                     }
                     if ("onConditionsUpdated".equals(method.getName())
                             || "onConditionsOutdated".equals(method.getName())) {
-                        runOnMain(() -> publishState(false, true));
+                        runOnMain(() -> scheduleStatePublish(true));
                     }
                     return null;
                 });
@@ -773,6 +924,9 @@ final class NavigatorStatePublisher {
         main.removeCallbacks(dispatchCamera);
         main.removeCallbacks(routeReconcile);
         main.removeCallbacks(routeReconcileConfirmation);
+        main.removeCallbacks(dispatchState);
+        statePublishScheduled = false;
+        pendingForceRoute = false;
         detachCameraListener();
         detachGuidanceListeners();
         activityReference = new WeakReference<>(null);
@@ -834,9 +988,16 @@ final class NavigatorStatePublisher {
 
     private final Runnable dispatchCamera = this::dispatchPendingCamera;
 
-    private final Runnable routeReconcile = () -> publishState(true, true);
+    private final Runnable routeReconcile = () -> publishState(true, true, true);
 
-    private final Runnable routeReconcileConfirmation = () -> publishState(true, true);
+    private final Runnable routeReconcileConfirmation = () -> publishState(true, true, true);
+
+    private final Runnable dispatchState = () -> {
+        statePublishScheduled = false;
+        boolean forceRoute = pendingForceRoute;
+        pendingForceRoute = false;
+        publishState(false, forceRoute, forceRoute);
+    };
 
     private void dispatchPendingCamera() {
         CameraState next = pendingCamera;
@@ -848,6 +1009,33 @@ final class NavigatorStatePublisher {
 
     private interface Event {
         void onEvent(String methodName);
+    }
+
+    private static final class SnapshotInputs {
+        final NavigationFrame frame;
+        final Object routePosition;
+
+        SnapshotInputs(NavigationFrame frame, Object routePosition) {
+            this.frame = frame;
+            this.routePosition = routePosition;
+        }
+    }
+
+    private static final class RouteProgressSample {
+        static final RouteProgressSample INVALID = new RouteProgressSample(
+                false, 0, 0d, null);
+        final boolean valid;
+        final int segmentIndex;
+        final double segmentPosition;
+        final Object currentPoint;
+
+        RouteProgressSample(boolean valid, int segmentIndex,
+                            double segmentPosition, Object currentPoint) {
+            this.valid = valid;
+            this.segmentIndex = Math.max(0, segmentIndex);
+            this.segmentPosition = Math.max(0d, Math.min(1d, segmentPosition));
+            this.currentPoint = currentPoint;
+        }
     }
 
     private static final class TrafficSample {
@@ -920,8 +1108,7 @@ final class NavigatorStatePublisher {
         if (target == null) {
             throw new IllegalStateException("Cannot call " + name + " on null target");
         }
-        Method method = target.getClass().getMethod(name, parameterTypes);
-        method.setAccessible(true);
+        Method method = ReflectMethods.publicMethod(target.getClass(), name, parameterTypes);
         return method.invoke(target, arguments);
     }
 

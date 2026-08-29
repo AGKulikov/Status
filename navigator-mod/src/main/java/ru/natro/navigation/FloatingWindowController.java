@@ -38,6 +38,9 @@ final class FloatingWindowController {
     private static final int MODE_FULLSCREEN = 0;
     private static final int MODE_FLOATING = 1;
     private static final int MODE_TOGGLE = 2;
+    private static final long MODE_BUTTON_SEARCH_MS = 500L;
+    private static final long MODE_BUTTON_STABLE_MS = 5_000L;
+    private static final long FLOATING_CONTRACT_CHECK_MS = 1_000L;
     // Exact 29.4.2 KX11 window lane: 0x20 | 0x200 | 0x40000.
     private static final int FLOATING_FLAGS =
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
@@ -336,7 +339,13 @@ final class FloatingWindowController {
         @Override public void run() {
             if (floating) enforceFloatingWindowContract();
             attachModeButtonToNavigator();
-            if (!destroyed) mainHandler.postDelayed(this, 1000L);
+            if (destroyed) return;
+            boolean stableFullscreenHost = !floating && modeButton != null
+                    && modeButtonHost != null && modeButton.getParent() == modeButtonHost
+                    && modeButtonHost.isAttachedToWindow();
+            long delay = floating ? FLOATING_CONTRACT_CHECK_MS
+                    : stableFullscreenHost ? MODE_BUTTON_STABLE_MS : MODE_BUTTON_SEARCH_MS;
+            mainHandler.postDelayed(this, delay);
         }
     };
 

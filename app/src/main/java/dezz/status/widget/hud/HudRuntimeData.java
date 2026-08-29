@@ -62,12 +62,15 @@ public final class HudRuntimeData {
     @NonNull private final Handler main = new Handler(Looper.getMainLooper());
     @Nullable private ExecutorService navigationWorker;
     @NonNull private final AtomicBoolean navigationReadQueued = new AtomicBoolean();
+    @NonNull private final AtomicBoolean directNavigationWakePosted = new AtomicBoolean();
     @NonNull private final LauncherMediaController mediaController;
     @NonNull private final CarIntegration carIntegration;
     @NonNull private AutomationStateStore retainedAutomation;
     @NonNull private final Map<String, AutomationState> retainedAutomationCache = new HashMap<>();
     @NonNull private final Map<String, CarIntegration.TelemetryValue> telemetry = new HashMap<>();
     @NonNull private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
+    /** Reused on the main thread; creating DecimalFormat for every speed redraw is expensive. */
+    @NonNull private final DecimalFormat compactNumberFormat = new DecimalFormat("0.##");
     @NonNull private HudPanelConfig config;
     @Nullable private HudNavigationState navigation;
     @Nullable private LauncherMediaController.Snapshot media;
@@ -96,8 +99,14 @@ public final class HudRuntimeData {
             }
         }
     };
-    private final NavigationBridgeStateStore.Listener directNavigationListener =
-            () -> runOnMain(this::refreshNavigation);
+    private final Runnable directNavigationWake = () -> {
+        directNavigationWakePosted.set(false);
+        if (started) refreshNavigation();
+    };
+    private final NavigationBridgeStateStore.Listener directNavigationListener = () -> {
+        if (!directNavigationWakePosted.compareAndSet(false, true)) return;
+        if (!main.post(directNavigationWake)) directNavigationWakePosted.set(false);
+    };
     /** Main-process editor only: retry promptly until its already-started WidgetService appears. */
     private final Runnable hostProbe = new Runnable() {
         @Override public void run() {
@@ -164,6 +173,8 @@ public final class HudRuntimeData {
         started = false;
         main.removeCallbacks(hostProbe);
         main.removeCallbacks(clockTick);
+        main.removeCallbacks(directNavigationWake);
+        directNavigationWakePosted.set(false);
         mediaController.stop();
         NavigationBridgeStateStore.removeListener(directNavigationListener);
         carIntegration.unsubscribeTelemetry(telemetryListener);
@@ -443,17 +454,17 @@ public final class HudRuntimeData {
             text = Integer.toString(value);
         }
         if (item.options.optBoolean("letterOnly", false)) {
-            return text.replaceAll("[0-9]", "");
+            return withoutDigits(text);
         }
         if (item.options.optBoolean("numberOnly", false)) {
-            String number = text.replaceAll("\\D", "");
+            String number = digitsOnly(text);
             return number.isEmpty() ? text : number;
         }
         return text;
     }
 
     @NonNull
-    private static String applyFormat(String format, @Nullable Object raw, String unit) {
+    private String applyFormat(String format, @Nullable Object raw, String unit) {
         if (raw == null) return "—";
         String value;
         if (raw instanceof Number) {
@@ -462,10 +473,10 @@ public final class HudRuntimeData {
                 if (format != null && format.contains("%") && !"%s".equals(format)) {
                     value = String.format(Locale.getDefault(), format, number);
                 } else {
-                    value = new DecimalFormat("0.##").format(number);
+                    value = compactNumberFormat.format(number);
                 }
             } catch (RuntimeException ignored) {
-                value = new DecimalFormat("0.##").format(number);
+                value = compactNumberFormat.format(number);
             }
         } else {
             value = String.valueOf(raw);
@@ -475,6 +486,43 @@ public final class HudRuntimeData {
             }
         }
         return unit == null || unit.trim().isEmpty() ? value : value + " " + unit.trim();
+    }
+
+    @NonNull
+    private static String withoutDigits(@NonNull String value) {
+        int firstDigit = -1;
+        for (int index = 0; index < value.length(); index++) {
+            if (Character.isDigit(value.charAt(index))) {
+                firstDigit = index;
+                break;
+            }
+        }
+        if (firstDigit < 0) return value;
+        StringBuilder result = new StringBuilder(value.length());
+        result.append(value, 0, firstDigit);
+        for (int index = firstDigit + 1; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (!Character.isDigit(character)) result.append(character);
+        }
+        return result.toString();
+    }
+
+    @NonNull
+    private static String digitsOnly(@NonNull String value) {
+        boolean allDigits = !value.isEmpty();
+        for (int index = 0; index < value.length(); index++) {
+            if (!Character.isDigit(value.charAt(index))) {
+                allDigits = false;
+                break;
+            }
+        }
+        if (allDigits) return value;
+        StringBuilder result = new StringBuilder(value.length());
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (Character.isDigit(character)) result.append(character);
+        }
+        return result.toString();
     }
 
     @NonNull
@@ -565,7 +613,7 @@ public final class HudRuntimeData {
         NavigationSnapshotV2 direct = NavigationBridgeStateStore.snapshot();
         if (direct != null) {
             NavigationRouteGeometryV2 route = NavigationBridgeStateStore.routeGeometry();
-            navigation = HudNavigationState.fromBridge(direct, route);
+            navigation = HudNavigationState.fromBridge(direct, route, navigation);
             notifyChanged();
             return;
         }
@@ -587,7 +635,7 @@ public final class HudRuntimeData {
                     NavigationSnapshotV2 latest = NavigationBridgeStateStore.snapshot();
                     if (latest != null) {
                         navigation = HudNavigationState.fromBridge(latest,
-                                NavigationBridgeStateStore.routeGeometry());
+                                NavigationBridgeStateStore.routeGeometry(), navigation);
                     } else {
                         navigation = result == null ? null : HudNavigationState.fromLegacy(result);
                     }

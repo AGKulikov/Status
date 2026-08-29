@@ -152,6 +152,11 @@ public final class SettingsDestinationCatalog {
                 "hud", "dezz.status.widget.HudPanelSettingsActivity",
                 "hud", "проекция", "внешний дисплей", "стрелки", "светофоры",
                 "полосы", "телеметрия", "умный дом", "сценарии", "сетка"));
+        values.add(activity("panel_instrument_cluster", Group.PANELS, "Панель приборов",
+                "Живой редактор 1920×720, аналоговые и цифровые приборы и независимая карта",
+                "vehicle", "dezz.status.widget.InstrumentPanelSettingsActivity",
+                "приборка", "панель приборов", "спидометр", "тахометр", "одометр",
+                "аналоговый", "цифровой", "карта", "display 2", "dim", "1920 720"));
         values.add(activity("navigator_window", Group.PANELS,
                 "Оконный режим Навигатора",
                 "Размер, положение, скругление, прозрачный фон и фиксация окна",

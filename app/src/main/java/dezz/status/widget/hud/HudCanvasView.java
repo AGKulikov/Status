@@ -16,6 +16,7 @@ import android.os.SystemClock;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
+import android.util.SparseArray;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -26,8 +27,10 @@ import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.launcher.HorizontalGroupLayout;
@@ -47,8 +50,15 @@ public final class HudCanvasView extends View {
     private static final float HANDLE_SIZE = 34f;
     @NonNull private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     @NonNull private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    @NonNull private final Paint.FontMetrics textFontMetrics = new Paint.FontMetrics();
     @NonNull private final Path path = new Path();
     @NonNull private HudPanelConfig config;
+    @NonNull private List<HudElementConfig> drawingOrder;
+    @Nullable private HudElementConfig directMap;
+    @Nullable private Geometry cachedGeometry;
+    /** Live geometry changes only on config/size updates, never on telemetry frames. */
+    @NonNull private final Map<HudElementConfig, RectF> cachedElementBounds =
+            new IdentityHashMap<>();
     @NonNull private final HudRuntimeData data;
     private final boolean editor;
     /** True when WindowManager already cropped this View to the physical 728x190 HUD plane. */
@@ -69,6 +79,12 @@ public final class HudCanvasView extends View {
     private boolean movedSinceDown;
     @Nullable private String loadedFontUri;
     @Nullable private Typeface loadedFont;
+    @NonNull private final SparseArray<Typeface> typefaceCache = new SparseArray<>(9);
+    private boolean animationWakePosted;
+    @NonNull private final Runnable animationWake = () -> {
+        animationWakePosted = false;
+        if (isAttachedToWindow()) invalidate();
+    };
 
     public HudCanvasView(@NonNull Context context, @NonNull HudPanelConfig config,
                          @NonNull HudRuntimeData data, boolean editor,
@@ -82,6 +98,8 @@ public final class HudCanvasView extends View {
                   boolean localHudViewport) {
         super(context);
         this.config = config;
+        drawingOrder = config.drawingOrder();
+        directMap = HudDirectMapGeometry.find(config);
         this.data = data;
         this.editor = editor;
         this.localHudViewport = localHudViewport;
@@ -95,8 +113,23 @@ public final class HudCanvasView extends View {
 
     public void updateConfig(@NonNull HudPanelConfig next) {
         config = next;
+        drawingOrder = next.drawingOrder();
+        directMap = HudDirectMapGeometry.find(next);
+        cachedGeometry = null;
+        cachedElementBounds.clear();
         if (selectedId != null && find(selectedId) == null) selectedId = null;
         invalidate();
+    }
+
+    @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight);
+        cachedGeometry = null;
+        cachedElementBounds.clear();
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        cancelAnimationWake();
+        super.onDetachedFromWindow();
     }
 
     public void select(@Nullable String id) {
@@ -121,10 +154,13 @@ public final class HudCanvasView extends View {
         drawPanelBackground(canvas, geometry);
         if (config.snowMode) drawSnow(canvas, geometry);
 
-        int layer = canvas.saveLayerAlpha(geometry.safeClip,
-                Math.round(255f * config.globalBrightness / 100f));
+        int brightnessAlpha = Math.round(255f * config.globalBrightness / 100f);
+        // The default 100% brightness needs no offscreen composition buffer. Avoiding this layer
+        // removes one full HUD-plane GPU blend from every telemetry refresh.
+        int layer = brightnessAlpha < 255
+                ? canvas.saveLayerAlpha(geometry.safeClip, brightnessAlpha) : -1;
         boolean animated = false;
-        for (HudElementConfig item : config.drawingOrder()) {
+        for (HudElementConfig item : drawingOrder) {
             if (!shouldDraw(item)) continue;
             RectF bounds = bounds(item, geometry);
             drawElement(canvas, item, bounds, geometry.scale, geometry);
@@ -136,14 +172,26 @@ public final class HudCanvasView extends View {
                 animated = true;
             }
         }
-        canvas.restoreToCount(layer);
+        if (layer >= 0) canvas.restoreToCount(layer);
         if (editor && config.showGrid) drawGrid(canvas, geometry);
         if (editor && selectedId != null) {
             HudElementConfig selected = find(selectedId);
             if (selected != null) drawSelection(canvas, bounds(selected, geometry));
         }
         canvas.restoreToCount(safety);
-        if (animated || config.snowMode) postInvalidateDelayed(250L);
+        if (animated || config.snowMode) scheduleAnimationWake();
+        else cancelAnimationWake();
+    }
+
+    private void scheduleAnimationWake() {
+        if (animationWakePosted) return;
+        animationWakePosted = postDelayed(animationWake, 250L);
+    }
+
+    private void cancelAnimationWake() {
+        if (!animationWakePosted) return;
+        removeCallbacks(animationWake);
+        animationWakePosted = false;
     }
 
     private boolean shouldDraw(HudElementConfig item) {
@@ -290,7 +338,7 @@ public final class HudCanvasView extends View {
                               Geometry geometry) {
         int clipped = canvas.save();
         if (!editor) {
-            HudElementConfig map = HudDirectMapGeometry.find(config);
+            HudElementConfig map = directMap;
             if (map != null) {
                 RectF mapBounds = bounds(map, geometry);
                 float mapRadius = Math.max(0f, Math.min(
@@ -471,7 +519,8 @@ public final class HudCanvasView extends View {
         float top = bounds.top + stroke;
         float dx = bounds.width() * .27f;
         canvas.drawLine(cx, bounds.bottom - stroke, cx, joint, paint);
-        for (int direction : new int[]{-1, 1}) {
+        for (int branch = 0; branch < 2; branch++) {
+            int direction = branch == 0 ? -1 : 1;
             int branchColor = direction == selectedDirection ? color : withAlpha(color, 75);
             paint.setColor(branchColor);
             path.reset();
@@ -716,7 +765,7 @@ public final class HudCanvasView extends View {
 
     private void drawSpeedLimit(Canvas canvas, HudElementConfig item, RectF bounds,
                                 int color, float scale) {
-        String speed = data.textFor(item).replaceAll("[^0-9]", "");
+        String speed = digitsOnly(data.textFor(item));
         boolean white = item.options.optBoolean("whiteSign", true);
         double current = data.numericValue(item);
         double limit;
@@ -1035,9 +1084,35 @@ public final class HudCanvasView extends View {
         textPaint.setColor(color);
         textPaint.setTextSize(size);
         textPaint.setTypeface(typeface(weight));
-        textPaint.setTextAlign(Paint.Align.LEFT);
         int width = Math.max(1, Math.round(bounds.width()));
         String text = value == null ? "" : value;
+        if (!wrap && text.indexOf('\n') < 0) {
+            CharSequence displayed = text;
+            if (textPaint.measureText(text) > width) {
+                displayed = android.text.TextUtils.ellipsize(text, textPaint, width,
+                        android.text.TextUtils.TruncateAt.END);
+            }
+            float x;
+            if (alignment == Layout.Alignment.ALIGN_NORMAL) {
+                textPaint.setTextAlign(Paint.Align.LEFT);
+                x = bounds.left;
+            } else if (alignment == Layout.Alignment.ALIGN_OPPOSITE) {
+                textPaint.setTextAlign(Paint.Align.RIGHT);
+                x = bounds.right;
+            } else {
+                textPaint.setTextAlign(Paint.Align.CENTER);
+                x = bounds.centerX();
+            }
+            textPaint.getFontMetrics(textFontMetrics);
+            float baseline = bounds.centerY()
+                    - (textFontMetrics.ascent + textFontMetrics.descent) * .5f;
+            int save = canvas.save();
+            canvas.clipRect(bounds);
+            canvas.drawText(displayed, 0, displayed.length(), x, baseline, textPaint);
+            canvas.restoreToCount(save);
+            return;
+        }
+        textPaint.setTextAlign(Paint.Align.LEFT);
         StaticLayout layout = new StaticLayout(text, textPaint, width, alignment,
                 1f, 0f, false);
         if (!wrap && layout.getLineCount() > 1) {
@@ -1238,6 +1313,17 @@ public final class HudCanvasView extends View {
     }
 
     private RectF bounds(HudElementConfig item, Geometry geometry) {
+        if (!editor) {
+            RectF cached = cachedElementBounds.get(item);
+            if (cached != null) return cached;
+            RectF resolved = resolveBounds(item, geometry);
+            cachedElementBounds.put(item, resolved);
+            return resolved;
+        }
+        return resolveBounds(item, geometry);
+    }
+
+    private RectF resolveBounds(HudElementConfig item, Geometry geometry) {
         if (item.type != HudElementType.HORIZONTAL_GROUP
                 && item.type != HudElementType.BACKDROP) {
             RectF grouped = groupedBounds(item, geometry);
@@ -1315,6 +1401,8 @@ public final class HudCanvasView extends View {
     }
 
     private Geometry geometry() {
+        Geometry cached = cachedGeometry;
+        if (cached != null) return cached;
         float width = Math.max(1f, getWidth());
         float height = Math.max(1f, getHeight());
         if (editor) {
@@ -1325,9 +1413,10 @@ public final class HudCanvasView extends View {
             RectF content = new RectF(left, top,
                     left + HudViewportPolicy.SAFE_WIDTH * scale,
                     top + HudViewportPolicy.SAFE_HEIGHT * scale);
-            return new Geometry(scale, content, new RectF(content),
+            cachedGeometry = new Geometry(scale, content, new RectF(content),
                     content.width() / config.gridColumns,
                     content.height() / config.gridRows);
+            return cachedGeometry;
         }
 
         if (localHudViewport) {
@@ -1339,9 +1428,10 @@ public final class HudCanvasView extends View {
             RectF safeClip = new RectF(0f, 0f,
                     Math.min(width, HudViewportPolicy.SAFE_WIDTH),
                     Math.min(height, HudViewportPolicy.SAFE_HEIGHT));
-            return new Geometry(1f, content, safeClip,
+            cachedGeometry = new Geometry(1f, content, safeClip,
                     HudViewportPolicy.SAFE_WIDTH / (float) config.gridColumns,
                     HudViewportPolicy.SAFE_HEIGHT / (float) config.gridRows);
+            return cachedGeometry;
         }
 
         // Presentation fallback coordinates are physical pixels, exactly as in mHUD 6.1. Never
@@ -1351,31 +1441,40 @@ public final class HudCanvasView extends View {
         HudViewportPolicy.Bounds clipped = HudViewportPolicy.clipToSurface(
                 Math.round(width), Math.round(height));
         RectF safeClip = new RectF(clipped.left, clipped.top, clipped.right, clipped.bottom);
-        return new Geometry(1f, content, safeClip,
+        cachedGeometry = new Geometry(1f, content, safeClip,
                 HudViewportPolicy.SAFE_WIDTH / (float) config.gridColumns,
                 HudViewportPolicy.SAFE_HEIGHT / (float) config.gridRows);
+        return cachedGeometry;
     }
 
     @NonNull
     private Typeface typeface(int itemWeight) {
         int weight = clamp(itemWeight > 0 ? itemWeight : config.globalFontWeight, 100, 900);
         String uri = config.customFontUri;
-        if (!uri.isEmpty() && !uri.equals(loadedFontUri)) {
+        String previousUri = loadedFontUri == null ? "" : loadedFontUri;
+        if (!uri.equals(previousUri)) {
             loadedFontUri = uri;
             loadedFont = null;
-            try (ParcelFileDescriptor descriptor = getContext().getContentResolver()
-                    .openFileDescriptor(Uri.parse(uri), "r")) {
-                if (descriptor != null) {
-                    loadedFont = new Typeface.Builder(descriptor.getFileDescriptor())
-                            .setWeight(weight).build();
+            typefaceCache.clear();
+            if (!uri.isEmpty()) {
+                try (ParcelFileDescriptor descriptor = getContext().getContentResolver()
+                        .openFileDescriptor(Uri.parse(uri), "r")) {
+                    if (descriptor != null) {
+                        loadedFont = new Typeface.Builder(descriptor.getFileDescriptor()).build();
+                    }
+                } catch (Exception ignored) {
+                    loadedFont = null;
                 }
-            } catch (Exception ignored) {
-                loadedFont = null;
             }
         }
+        Typeface cached = typefaceCache.get(weight);
+        if (cached != null) return cached;
         Typeface base = loadedFont == null ? Typeface.DEFAULT : loadedFont;
-        try { return Typeface.create(base, weight, false); }
-        catch (RuntimeException ignored) { return Typeface.DEFAULT_BOLD; }
+        Typeface resolved;
+        try { resolved = Typeface.create(base, weight, false); }
+        catch (RuntimeException ignored) { resolved = Typeface.DEFAULT_BOLD; }
+        typefaceCache.put(weight, resolved);
+        return resolved;
     }
 
     private void drawArrowHead(Canvas canvas, float x, float y, boolean right,
@@ -1435,9 +1534,30 @@ public final class HudCanvasView extends View {
 
     private static double parseNumber(@Nullable String raw) {
         if (raw == null) return Double.NaN;
-        String normalized = raw.replace(',', '.').replaceAll("[^0-9.\\-]", "");
-        try { return Double.parseDouble(normalized); }
-        catch (NumberFormatException ignored) { return Double.NaN; }
+        boolean negative = false;
+        boolean digits = false;
+        boolean decimal = false;
+        double value = 0d;
+        double place = .1d;
+        for (int index = 0; index < raw.length(); index++) {
+            char character = raw.charAt(index);
+            if (character == '-' && !digits && !decimal) {
+                negative = true;
+            } else if ((character == '.' || character == ',') && !decimal) {
+                decimal = true;
+            } else if (character >= '0' && character <= '9') {
+                digits = true;
+                int digit = character - '0';
+                if (decimal) {
+                    value += digit * place;
+                    place *= .1d;
+                } else {
+                    value = value * 10d + digit;
+                }
+            }
+        }
+        if (!digits) return Double.NaN;
+        return negative ? -value : value;
     }
 
     private static RectF inset(RectF source, float amount) {
@@ -1496,6 +1616,25 @@ public final class HudCanvasView extends View {
     private static int withAlpha(int color, int alpha) {
         return Color.argb(clamp(alpha, 0, 255), Color.red(color),
                 Color.green(color), Color.blue(color));
+    }
+
+    @NonNull
+    private static String digitsOnly(@NonNull String value) {
+        boolean allDigits = !value.isEmpty();
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character < '0' || character > '9') {
+                allDigits = false;
+                break;
+            }
+        }
+        if (allDigits) return value;
+        StringBuilder result = new StringBuilder(value.length());
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character >= '0' && character <= '9') result.append(character);
+        }
+        return result.toString();
     }
 
     private static int clamp(int value, int minimum, int maximum) {

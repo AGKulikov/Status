@@ -16,13 +16,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Prevents the one-second vehicle tick from regressing to full navigation bitmap/JSON reads. */
+/** Keeps the vehicle panel event-driven and its scalar navigation read bounded. */
 public final class VehicleNavigationReadPathTest {
     @Test
     public void vehiclePanelUsesScalarNavigationStatus() throws IOException {
         String source = source("dezz/status/widget/launcher/vehicle/VehicleInfoPanelView.java");
         assertTrue(source.contains("NavigationDataRepository.readRouteStatus(getContext())"));
         assertFalse(source.contains("NavigationDataRepository.read(getContext())"));
+        assertTrue(source.contains("postOnAnimation(valueRefresh)"));
+        assertTrue(source.contains("pendingMetricRefresh"));
+        assertTrue(source.contains("ROUTE_STATUS_CACHE_MS"));
+        assertTrue(source.contains("scheduleStateRefresh()"));
+        assertFalse(source.contains("postDelayed(this, STALE_TICK_MS)"));
     }
 
     @Test

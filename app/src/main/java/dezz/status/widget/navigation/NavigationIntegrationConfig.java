@@ -10,16 +10,17 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
-/** Independent rendering profiles for Navigator's main surface and Natro's HUD surface. */
+/** Independent rendering profiles for Navigator's main, HUD and instrument-cluster surfaces. */
 public final class NavigationIntegrationConfig {
     public static final int SCHEMA_VERSION = 1;
     public static final int MAX_JSON_CHARS = 384 * 1024;
 
     @NonNull public MapProfile mainMap = MapProfile.defaults(Target.MAIN);
     @NonNull public MapProfile hudMap = MapProfile.defaults(Target.HUD);
+    @NonNull public MapProfile clusterMap = MapProfile.defaults(Target.CLUSTER);
     @NonNull public FloatingWindowProfile mainFloatingWindow = FloatingWindowProfile.defaults();
 
-    public enum Target { MAIN, HUD }
+    public enum Target { MAIN, HUD, CLUSTER }
 
     /** Visibility of one Yandex road-event type on the independent HUD map. */
     public enum RoadEventMode {
@@ -112,6 +113,7 @@ public final class NavigationIntegrationConfig {
                 .put("schema", SCHEMA_VERSION)
                 .put("mainMap", mainMap.toJson())
                 .put("hudMap", hudMap.toJson())
+                .put("clusterMap", clusterMap.toJson())
                 .put("mainFloatingWindow", mainFloatingWindow.toJson());
     }
 
@@ -130,6 +132,8 @@ public final class NavigationIntegrationConfig {
             NavigationIntegrationConfig result = new NavigationIntegrationConfig();
             result.mainMap = MapProfile.fromJson(Target.MAIN, source.optJSONObject("mainMap"));
             result.hudMap = MapProfile.fromJson(Target.HUD, source.optJSONObject("hudMap"));
+            result.clusterMap = MapProfile.fromJson(
+                    Target.CLUSTER, source.optJSONObject("clusterMap"));
             result.mainFloatingWindow = FloatingWindowProfile.fromJson(
                     source.optJSONObject("mainFloatingWindow"));
             result.normalize();
@@ -146,9 +150,13 @@ public final class NavigationIntegrationConfig {
         if (hudMap == null || hudMap.target != Target.HUD) {
             hudMap = MapProfile.defaults(Target.HUD);
         }
+        if (clusterMap == null || clusterMap.target != Target.CLUSTER) {
+            clusterMap = MapProfile.defaults(Target.CLUSTER);
+        }
         if (mainFloatingWindow == null) mainFloatingWindow = FloatingWindowProfile.defaults();
         mainMap.normalize();
         hudMap.normalize();
+        clusterMap.normalize();
         mainFloatingWindow.normalize();
     }
 
@@ -209,10 +217,15 @@ public final class NavigationIntegrationConfig {
         public static MapProfile defaults(@NonNull Target target) {
             MapProfile result = new MapProfile(target);
             result.enabled = true;
-            result.maximumFps = 30;
+            result.maximumFps = target == Target.CLUSTER ? 60 : 30;
             if (target == Target.HUD) {
                 result.showPois = false;
                 result.showBuildings = false;
+                result.showModels = false;
+            } else if (target == Target.CLUSTER) {
+                // The instrument display keeps the useful road context but avoids expensive 3D
+                // models by default. Its native-size surface is adaptively throttled by Navigator
+                // while the car is stationary.
                 result.showModels = false;
             }
             return result;
@@ -281,7 +294,7 @@ public final class NavigationIntegrationConfig {
             result.showRoute = source.optBoolean("showRoute", result.showRoute);
             result.showTraffic = source.optBoolean("showTraffic", result.showTraffic);
             result.showRouteTraffic = source.optBoolean(
-                    "showRouteTraffic", result.showTraffic);
+                    "showRouteTraffic", result.showRouteTraffic);
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
             result.showPois = source.optBoolean("showPois", result.showPois);
             result.showBuildings = source.optBoolean("showBuildings", result.showBuildings);

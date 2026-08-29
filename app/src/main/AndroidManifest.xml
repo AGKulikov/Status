@@ -179,6 +179,22 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".InstrumentPanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".instrument.InstrumentPanelActivity"
+            android:configChanges="density|orientation|screenSize|smallestScreenSize|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:hardwareAccelerated="true"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.StatusWidget.Launcher" />
+
+        <activity
             android:name=".NavigatorWindowSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />

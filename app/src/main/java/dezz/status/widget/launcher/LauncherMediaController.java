@@ -31,9 +31,13 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import java.util.ArrayList;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import dezz.status.widget.MediaNotificationListener;
 import dezz.status.widget.Permissions;
@@ -67,6 +71,11 @@ public final class LauncherMediaController {
     private static final long DIFFERENT_SOURCE_RECENCY_SLOP_MS = 10_000L;
     private static final long SEEK_COMMAND_INTERVAL_MS = 90L;
     private static final String TAG = "LauncherMedia";
+    /**
+     * MediaSessionManager is an OEM Binder service and may block while the head unit is under
+     * GPU pressure. One shared worker keeps that call off every HOME/HUD main Looper.
+     */
+    private static final ThreadPoolExecutor SESSION_QUERY_LANE = createSessionQueryLane();
 
     public interface Listener { void onMediaChanged(@NonNull Snapshot state); }
 
@@ -217,6 +226,9 @@ public final class LauncherMediaController {
     private boolean seekDispatchScheduled;
     private boolean seekFailureToastShown;
     private boolean sessionAccessGrantAttempted;
+    private boolean sessionQueryInFlight;
+    private boolean sessionQueryPending;
+    private int sessionQueryGeneration;
     @NonNull private List<MediaController> seekGestureControllers = Collections.emptyList();
     @NonNull private String seekGesturePackage = "";
     @NonNull private String visiblePackage = "";
@@ -362,6 +374,9 @@ public final class LauncherMediaController {
         mainHandler.removeCallbacks(pendingSeekDispatch);
         pendingSeekPositionMs = -1L;
         seekDispatchScheduled = false;
+        sessionQueryPending = false;
+        sessionQueryInFlight = false;
+        sessionQueryGeneration++;
         clearSeekGesture();
         lastSessionRefreshElapsedMs = 0L;
         boolean removeSessionsListener = sessionsListenerRegistered;
@@ -383,38 +398,132 @@ public final class LauncherMediaController {
     }
 
     public void refresh() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::refresh);
+            return;
+        }
         if (manager == null) {
             publish();
             return;
         }
+        if (sessionQueryInFlight) {
+            sessionQueryPending = true;
+            return;
+        }
+        sessionQueryInFlight = true;
+        final int generation = ++sessionQueryGeneration;
         try {
-            select(manager.getActiveSessions(listenerComponent()));
-        } catch (RuntimeException ignored) {
+            SESSION_QUERY_LANE.execute(() -> {
+                List<MediaController> controllers = null;
+                RuntimeException failure = null;
+                try {
+                    controllers = manager.getActiveSessions(listenerComponent());
+                } catch (RuntimeException error) {
+                    failure = error;
+                }
+                List<MediaController> result = controllers;
+                RuntimeException queryFailure = failure;
+                mainHandler.post(() -> completeSessionQuery(
+                        generation, result, queryFailure));
+            });
+        } catch (RejectedExecutionException saturated) {
+            sessionQueryInFlight = false;
+            sessionQueryPending = false;
+            // Keep the callback-tracked controller that is already driving the visible media
+            // card. Queue pressure is temporary; dropping this known-good session would force
+            // the next steering command through the expensive global fallback precisely while
+            // the system is busy.
+            publish();
+        }
+    }
+
+    private void completeSessionQuery(int generation,
+                                      @Nullable List<MediaController> controllers,
+                                      @Nullable RuntimeException failure) {
+        if (generation != sessionQueryGeneration) return;
+        sessionQueryInFlight = false;
+        if (!started) return;
+        if (failure == null) {
+            try {
+                select(controllers == null ? Collections.emptyList() : controllers);
+            } catch (RuntimeException staleSession) {
+                replace(null);
+                sessionState = null;
+                publish();
+            }
+        } else {
             replace(null);
             sessionState = null;
             publish();
+        }
+        if (sessionQueryPending) {
+            sessionQueryPending = false;
+            refresh();
         }
     }
 
     public void playPause() {
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
-        MediaResumeCommand.playPause(context, target);
+        if (!dispatchCurrentPlayPause(target)) {
+            MediaResumeCommand.playPause(context, target);
+        }
         scheduleCommandReconcile();
     }
 
     public void previous() {
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
-        MediaResumeCommand.previous(context, target);
+        if (!dispatchCurrentSkip(target, false)) {
+            MediaResumeCommand.previous(context, target);
+        }
         scheduleCommandReconcile();
     }
 
     public void next() {
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
-        MediaResumeCommand.next(context, target);
+        if (!dispatchCurrentSkip(target, true)) {
+            MediaResumeCommand.next(context, target);
+        }
         scheduleCommandReconcile();
+    }
+
+    /**
+     * The visible session is already selected and callback-tracked. Use it before the diagnostic
+     * fallback scans every process and MediaSession; this keeps steering/HOME commands responsive
+     * when the renderer is busy and also removes avoidable Binder traffic from the common path.
+     */
+    private boolean dispatchCurrentPlayPause(@NonNull String targetPackage) {
+        MediaController controller = current;
+        if (controller == null || !samePackage(targetPackage, controllerPackage(controller))) {
+            return false;
+        }
+        try {
+            PlaybackState state = controller.getPlaybackState();
+            if (state != null && state.getState() == PlaybackState.STATE_PLAYING) {
+                controller.getTransportControls().pause();
+            } else {
+                controller.getTransportControls().play();
+            }
+            return true;
+        } catch (RuntimeException staleSession) {
+            return false;
+        }
+    }
+
+    private boolean dispatchCurrentSkip(@NonNull String targetPackage, boolean nextTrack) {
+        MediaController controller = current;
+        if (controller == null || !samePackage(targetPackage, controllerPackage(controller))) {
+            return false;
+        }
+        try {
+            if (nextTrack) controller.getTransportControls().skipToNext();
+            else controller.getTransportControls().skipToPrevious();
+            return true;
+        } catch (RuntimeException staleSession) {
+            return false;
+        }
     }
 
     /**
@@ -1384,6 +1493,18 @@ public final class LauncherMediaController {
         } catch (RuntimeException ignored) {
             return 0;
         }
+    }
+
+    @NonNull
+    private static ThreadPoolExecutor createSessionQueryLane() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                0, 1, 10L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(8), task -> {
+            Thread worker = new Thread(task, "media-session-query");
+            worker.setDaemon(true);
+            return worker;
+        }, new ThreadPoolExecutor.AbortPolicy());
+        executor.allowCoreThreadTimeOut(true);
+        return executor;
     }
 
     @NonNull

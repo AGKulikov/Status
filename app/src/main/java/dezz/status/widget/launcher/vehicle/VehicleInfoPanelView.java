@@ -14,6 +14,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
@@ -27,6 +28,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -56,7 +59,10 @@ public final class VehicleInfoPanelView extends FrameLayout {
         void onContentVisibilityChanged(boolean visible);
     }
 
-    private static final long STALE_TICK_MS = 1_000L;
+    private static final long BLINK_INTERVAL_MS = 1_000L;
+    private static final long ROUTE_STATUS_CACHE_MS = 1_000L;
+    private static final long ROUTE_STATUS_IDLE_REFRESH_MS = 5_000L;
+    private static final long STATE_TICK_SLOP_MS = 25L;
     private static final long UNKNOWN_STREAM_STALE_MS = 15_000L;
     private static final String FUEL_ID = "ISensor.fuel_level";
     private static final String FUEL_CAPACITY_ID = "ICarInfo.fuel_capacity";
@@ -71,12 +77,20 @@ public final class VehicleInfoPanelView extends FrameLayout {
     private final Map<String, CarTelemetryDescriptor> catalog = new LinkedHashMap<>();
     private final Map<String, CarIntegration.TelemetryValue> latest = new LinkedHashMap<>();
     private final Map<String, MetricViews> metricViews = new LinkedHashMap<>();
+    private final Set<String> pendingMetricRefresh = new LinkedHashSet<>();
+    private final DecimalFormat[] numberFormats = new DecimalFormat[5];
+    @NonNull private Set<String> currentSubscriptionIds = Collections.emptySet();
+    @Nullable private Locale numberFormatLocale;
+    @Nullable private NavigationDataRepository.RouteStatus cachedRouteStatus;
     private VehicleInfoPanelConfig config;
     private boolean started;
     private boolean catalogReady;
     private boolean previewMode;
     private boolean firstSessionSample;
     private boolean navigationReceiverRegistered;
+    private boolean valueRefreshPosted;
+    private boolean speedLimitBlinking;
+    private long routeStatusReadElapsed;
     private int catalogGeneration;
     @Nullable private ContentVisibilityListener contentVisibilityListener;
     @Nullable private Boolean lastReportedContentVisibility;
@@ -84,8 +98,11 @@ public final class VehicleInfoPanelView extends FrameLayout {
     private final BroadcastReceiver navigationReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             if (NavigationDataRepository.ACTION_UPDATED.equals(intent.getAction())) {
+                routeStatus(true);
+                speedLimitBlinking = false;
                 updateMetric(VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID);
                 updatePanelVisibility();
+                scheduleStateRefresh();
             }
         }
     };
@@ -98,12 +115,28 @@ public final class VehicleInfoPanelView extends FrameLayout {
         }
     };
 
-    private final Runnable staleTick = new Runnable() {
-        @Override public void run() {
-            if (!started) return;
-            updateAllValues();
-            postDelayed(this, STALE_TICK_MS);
+    /** Coalesces a burst of independent vendor metrics into one HOME traversal. */
+    private final Runnable valueRefresh = () -> {
+        valueRefreshPosted = false;
+        if (!started) {
+            pendingMetricRefresh.clear();
+            return;
         }
+        boolean refreshesSpeedWarning = pendingMetricRefresh.contains(
+                VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID);
+        if (refreshesSpeedWarning) speedLimitBlinking = false;
+        for (String id : pendingMetricRefresh) updateMetric(id);
+        pendingMetricRefresh.clear();
+        updatePanelVisibility();
+        scheduleStateRefresh();
+    };
+
+    /** Wakes only at the next stale/blink boundary; there is no permanent one-second loop. */
+    private final Runnable stateRefresh = () -> {
+        if (!started) return;
+        if (valueRefreshPosted) return; // That frame will also schedule the next exact deadline.
+        updateAllValues();
+        scheduleStateRefresh();
     };
 
     public VehicleInfoPanelView(@NonNull Context context, @NonNull CarIntegration integration,
@@ -135,6 +168,9 @@ public final class VehicleInfoPanelView extends FrameLayout {
         // or temperature merely because another sensor happened to reconnect first.
         latest.clear();
         firstSessionSample = false;
+        cachedRouteStatus = null;
+        routeStatusReadElapsed = 0L;
+        speedLimitBlinking = false;
         // The listener may have been attached before LauncherActivity added its outer frame.
         // Re-emit now that start() guarantees the frame is present.
         lastReportedContentVisibility = null;
@@ -142,8 +178,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
         registerNavigationReceiver();
         subscribeEnabledMetrics();
         requestCatalog();
-        removeCallbacks(staleTick);
-        postDelayed(staleTick, STALE_TICK_MS);
+        scheduleStateRefresh();
     }
 
     /** Releases only this panel's listener; other bricks and exporters remain subscribed. */
@@ -153,7 +188,12 @@ public final class VehicleInfoPanelView extends FrameLayout {
         catalogGeneration++;
         if (integration != null) integration.unsubscribeTelemetry(telemetryListener);
         unregisterNavigationReceiver();
-        removeCallbacks(staleTick);
+        removeCallbacks(valueRefresh);
+        removeCallbacks(stateRefresh);
+        valueRefreshPosted = false;
+        pendingMetricRefresh.clear();
+        currentSubscriptionIds = Collections.emptySet();
+        cachedRouteStatus = null;
     }
 
     public void reloadConfig() {
@@ -233,7 +273,9 @@ public final class VehicleInfoPanelView extends FrameLayout {
         CarIntegration current = requireIntegration();
         current.unsubscribeTelemetry(telemetryListener);
         Set<String> ids = subscriptionMetricIds();
+        currentSubscriptionIds = Collections.unmodifiableSet(new LinkedHashSet<>(ids));
         if (started && !ids.isEmpty()) current.subscribeTelemetry(ids, telemetryListener);
+        scheduleStateRefresh();
     }
 
     @NonNull
@@ -290,9 +332,25 @@ public final class VehicleInfoPanelView extends FrameLayout {
             configStore.save(config);
             rebuild();
         } else {
-            updateAllValues();
-            updatePanelVisibility();
+            requestMetricRefresh(sample.id);
         }
+    }
+
+    private void requestMetricRefresh(@NonNull String sampleId) {
+        pendingMetricRefresh.add(sampleId);
+        if (FUEL_ID.equals(sampleId) || FUEL_CAPACITY_ID.equals(sampleId)
+                || GEAR_ID.equals(sampleId)) {
+            pendingMetricRefresh.add(VehicleDerivedMetrics.REFILL_FUEL_ID);
+        }
+        if (TURN_LEFT_ID.equals(sampleId) || TURN_RIGHT_ID.equals(sampleId)) {
+            pendingMetricRefresh.add(VehicleDerivedMetrics.TURN_SIGNALS_ID);
+        }
+        if (SPEED_ID.equals(sampleId)) {
+            pendingMetricRefresh.add(VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID);
+        }
+        if (valueRefreshPosted) return;
+        valueRefreshPosted = true;
+        postOnAnimation(valueRefresh);
     }
 
     @NonNull
@@ -339,6 +397,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
             addView(empty, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             updatePanelVisibility();
+            scheduleStateRefresh();
             return;
         }
 
@@ -371,6 +430,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         updateAllValues();
         updatePanelVisibility();
+        scheduleStateRefresh();
     }
 
     @NonNull
@@ -420,7 +480,8 @@ public final class VehicleInfoPanelView extends FrameLayout {
     }
 
     private void updateAllValues() {
-        for (String id : new ArrayList<>(metricViews.keySet())) updateMetric(id);
+        speedLimitBlinking = false;
+        for (String id : metricViews.keySet()) updateMetric(id);
         updatePanelVisibility();
     }
 
@@ -428,7 +489,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
         MetricViews views = metricViews.get(id);
         VehicleInfoPanelConfig.Metric metric = config.metric(id);
         if (views == null || metric == null) return;
-        views.label.setText(resolveLabel(metric));
+        setTextIfChanged(views.label, resolveLabel(metric));
         resetMetricAppearance(views, metric);
 
         if (previewMode) {
@@ -472,8 +533,8 @@ public final class VehicleInfoPanelView extends FrameLayout {
         if (metric.refillOnlyInPark) {
             CarIntegration.TelemetryValue gear = latest.get(GEAR_ID);
             if (gear == null || !VehicleDerivedMetrics.isPark(gear.value)) {
-                views.tile.setVisibility(View.GONE);
-                views.value.setContentDescription(resolveLabel(metric)
+                setVisibilityIfChanged(views.tile, View.GONE);
+                setDescriptionIfChanged(views.value, resolveLabel(metric)
                         + ": доступно только на передаче P");
                 return;
             }
@@ -517,17 +578,17 @@ public final class VehicleInfoPanelView extends FrameLayout {
             renderMissing(views, metric);
             return;
         }
-        NavigationDataRepository.RouteStatus navigation =
-                NavigationDataRepository.readRouteStatus(getContext());
+        NavigationDataRepository.RouteStatus navigation = routeStatus(false);
         renderSpeedLimitWarning(views, metric, speed.value, navigation.speedLimit,
                 navigation.routeActive);
-        if (isStale(SPEED_ID, speed)) views.value.setAlpha(.48f);
+        if (isStale(SPEED_ID, speed)) setAlphaIfChanged(views.value, .48f);
     }
 
     private void renderSpeedLimitWarning(@NonNull MetricViews views,
                                          @NonNull VehicleInfoPanelConfig.Metric metric,
                                          double rawSpeed, @NonNull String limitText,
                                          boolean activeRoute) {
+        speedLimitBlinking = false;
         if (metric.speedLimitOnlyActiveRoute && !activeRoute) {
             renderValue(views, metric, "Нет маршрута", false);
             return;
@@ -541,43 +602,45 @@ public final class VehicleInfoPanelView extends FrameLayout {
         double excess = VehicleDerivedMetrics.speedExcess(rawSpeed, limit,
                 metric.speedLimitThresholdKmh);
         boolean exceeded = Double.isFinite(excess) && excess > 0d;
-        String value = String.format(Locale.getDefault(), "%.0f / %.0f км/ч", current, limit);
+        String value = formatNumber(current, 0) + " / " + formatNumber(limit, 0) + " км/ч";
         renderValue(views, metric, value, false);
         if (!exceeded) return;
-        views.value.setTextColor(color(metric.warningColor, Color.RED));
+        setTextColorIfChanged(views.value, color(metric.warningColor, Color.RED));
         if (metric.speedLimitWhiteBackground) {
-            views.background.setColor(Color.argb(238, 255, 255, 255));
-            views.label.setTextColor(Color.rgb(35, 35, 35));
+            setBackgroundColorIfChanged(views, Color.argb(238, 255, 255, 255));
+            setTextColorIfChanged(views.label, Color.rgb(35, 35, 35));
         }
-        if (metric.speedLimitBlink
-                && ((System.currentTimeMillis() / STALE_TICK_MS) & 1L) != 0L) {
-            views.value.setAlpha(.22f);
+        speedLimitBlinking = metric.speedLimitBlink;
+        if (speedLimitBlinking
+                && ((System.currentTimeMillis() / BLINK_INTERVAL_MS) & 1L) != 0L) {
+            setAlphaIfChanged(views.value, .22f);
         }
-        views.value.setContentDescription(resolveLabel(metric) + ": превышение, " + value);
+        setDescriptionIfChanged(views.value,
+                resolveLabel(metric) + ": превышение, " + value);
     }
 
     private void resetMetricAppearance(@NonNull MetricViews views,
                                        @NonNull VehicleInfoPanelConfig.Metric metric) {
-        views.tile.setVisibility(View.VISIBLE);
-        views.value.setTextColor(color(metric.valueColor, Color.WHITE));
-        views.label.setTextColor(color(metric.labelColor, Color.LTGRAY));
-        views.value.setAlpha(1f);
-        views.background.setColor(Color.argb(66, 255, 255, 255));
+        setVisibilityIfChanged(views.tile, View.VISIBLE);
+        setTextColorIfChanged(views.value, color(metric.valueColor, Color.WHITE));
+        setTextColorIfChanged(views.label, color(metric.labelColor, Color.LTGRAY));
+        setAlphaIfChanged(views.value, 1f);
+        setBackgroundColorIfChanged(views, Color.argb(66, 255, 255, 255));
     }
 
     private void renderMissing(@NonNull MetricViews views,
                                @NonNull VehicleInfoPanelConfig.Metric metric) {
-        views.value.setText("…");
-        views.value.setAlpha(.55f);
-        views.value.setContentDescription(resolveLabel(metric) + ": нет данных");
+        setTextIfChanged(views.value, "…");
+        setAlphaIfChanged(views.value, .55f);
+        setDescriptionIfChanged(views.value, resolveLabel(metric) + ": нет данных");
     }
 
     private void renderValue(@NonNull MetricViews views,
                              @NonNull VehicleInfoPanelConfig.Metric metric,
                              @NonNull String formatted, boolean stale) {
-        views.value.setText(stale ? formatted + "  · устарело" : formatted);
-        views.value.setAlpha(stale ? .48f : 1f);
-        views.value.setContentDescription(resolveLabel(metric) + ": " + formatted
+        setTextIfChanged(views.value, stale ? formatted + "  · устарело" : formatted);
+        setAlphaIfChanged(views.value, stale ? .48f : 1f);
+        setDescriptionIfChanged(views.value, resolveLabel(metric) + ": " + formatted
                 + (stale ? ", данные устарели" : ""));
     }
 
@@ -589,6 +652,46 @@ public final class VehicleInfoPanelView extends FrameLayout {
         if (staleAfter <= 0L) return false;
         long age = System.currentTimeMillis() - sample.observedAtMillis;
         return age > staleAfter;
+    }
+
+    @NonNull
+    private NavigationDataRepository.RouteStatus routeStatus(boolean force) {
+        long now = SystemClock.elapsedRealtime();
+        NavigationDataRepository.RouteStatus current = cachedRouteStatus;
+        if (force || current == null
+                || now - routeStatusReadElapsed >= ROUTE_STATUS_CACHE_MS) {
+            current = NavigationDataRepository.readRouteStatus(getContext());
+            cachedRouteStatus = current;
+            routeStatusReadElapsed = now;
+        }
+        return current;
+    }
+
+    private void scheduleStateRefresh() {
+        removeCallbacks(stateRefresh);
+        if (!started) return;
+        long wallNow = System.currentTimeMillis();
+        long delay = Long.MAX_VALUE;
+        for (String id : currentSubscriptionIds) {
+            CarIntegration.TelemetryValue sample = latest.get(id);
+            if (sample == null) continue;
+            CarTelemetryDescriptor descriptor = catalog.get(id);
+            long staleAfter = descriptor == null
+                    ? UNKNOWN_STREAM_STALE_MS : descriptor.staleAfterMillis;
+            if (staleAfter <= 0L) continue;
+            long remaining = sample.observedAtMillis + staleAfter - wallNow;
+            if (remaining > 0L) delay = Math.min(delay, remaining + STATE_TICK_SLOP_MS);
+        }
+        if (metricViews.containsKey(VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID)
+                && latest.containsKey(SPEED_ID)) {
+            delay = Math.min(delay, ROUTE_STATUS_IDLE_REFRESH_MS);
+        }
+        if (speedLimitBlinking) {
+            long nextBlink = BLINK_INTERVAL_MS
+                    - Math.floorMod(wallNow, BLINK_INTERVAL_MS) + STATE_TICK_SLOP_MS;
+            delay = Math.min(delay, nextBlink);
+        }
+        if (delay != Long.MAX_VALUE) postDelayed(stateRefresh, Math.max(1L, delay));
     }
 
     @NonNull
@@ -628,8 +731,32 @@ public final class VehicleInfoPanelView extends FrameLayout {
         double normalized = normalizeRaw(metric.id, raw);
         double value = normalized * metric.multiplier + metric.offset;
         if (!Double.isFinite(value)) return "—";
-        String number = String.format(Locale.getDefault(), "%." + metric.decimals + "f", value);
+        String number = formatNumber(value, metric.decimals);
         return unit.isEmpty() ? number : number + " " + unit;
+    }
+
+    @NonNull
+    private String formatNumber(double value, int decimals) {
+        if (!Double.isFinite(value)) return "—";
+        int bounded = Math.max(0, Math.min(numberFormats.length - 1, decimals));
+        Locale locale = Locale.getDefault();
+        if (!locale.equals(numberFormatLocale)) {
+            numberFormatLocale = locale;
+            java.util.Arrays.fill(numberFormats, null);
+        }
+        DecimalFormat format = numberFormats[bounded];
+        if (format == null) {
+            StringBuilder pattern = new StringBuilder("0");
+            if (bounded > 0) {
+                pattern.append('.');
+                for (int index = 0; index < bounded; index++) pattern.append('0');
+            }
+            format = new DecimalFormat(pattern.toString(),
+                    DecimalFormatSymbols.getInstance(locale));
+            format.setGroupingUsed(false);
+            numberFormats[bounded] = format;
+        }
+        return format.format(value);
     }
 
     private static double normalizeRaw(@NonNull String id, double value) {
@@ -692,7 +819,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
         }
         boolean hide = (config.hideUntilFirstSample && !previewMode && !firstSessionSample)
                 || allTilesHidden;
-        setVisibility(hide ? View.GONE : View.VISIBLE);
+        setVisibilityIfChanged(this, hide ? View.GONE : View.VISIBLE);
         boolean visible = !hide;
         if (contentVisibilityListener != null
                 && (lastReportedContentVisibility == null
@@ -736,11 +863,41 @@ public final class VehicleInfoPanelView extends FrameLayout {
         catch (IllegalArgumentException ignored) { return fallback; }
     }
 
+    private static void setTextIfChanged(@NonNull TextView view, @NonNull String value) {
+        if (!TextUtils.equals(view.getText(), value)) view.setText(value);
+    }
+
+    private static void setTextColorIfChanged(@NonNull TextView view, int color) {
+        if (view.getCurrentTextColor() != color) view.setTextColor(color);
+    }
+
+    private static void setAlphaIfChanged(@NonNull View view, float alpha) {
+        if (view.getAlpha() != alpha) view.setAlpha(alpha);
+    }
+
+    private static void setVisibilityIfChanged(@NonNull View view, int visibility) {
+        if (view.getVisibility() != visibility) view.setVisibility(visibility);
+    }
+
+    private static void setDescriptionIfChanged(@NonNull View view,
+                                                @NonNull String description) {
+        if (!TextUtils.equals(view.getContentDescription(), description)) {
+            view.setContentDescription(description);
+        }
+    }
+
+    private static void setBackgroundColorIfChanged(@NonNull MetricViews views, int color) {
+        if (views.backgroundColor == color) return;
+        views.backgroundColor = color;
+        views.background.setColor(color);
+    }
+
     private static final class MetricViews {
         final View tile;
         final TextView label;
         final TextView value;
         final GradientDrawable background;
+        int backgroundColor = Integer.MIN_VALUE;
 
         MetricViews(View tile, TextView label, TextView value, GradientDrawable background) {
             this.tile = tile;

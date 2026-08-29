@@ -15,7 +15,6 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
-import android.os.SystemClock;
 import android.view.Surface;
 
 import java.util.UUID;
@@ -46,6 +45,9 @@ final class NavigationBridgeClient {
     private static final int MSG_HUD_SURFACE_LOST = 12;
     private static final int MSG_HEARTBEAT = 13;
     private static final int MSG_DIAGNOSTIC = 14;
+    private static final int MSG_ATTACH_CLUSTER_SURFACE = 15;
+    private static final int MSG_DETACH_CLUSTER_SURFACE = 16;
+    private static final int MSG_CLUSTER_SURFACE_LOST = 17;
 
     private static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     private static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -55,6 +57,8 @@ final class NavigationBridgeClient {
     private static final long CAP_HUD_DIRECT_SURFACE = 1L << 7;
     private static final long CAP_NAVIGATOR_WINDOW_BUTTON = 1L << 8;
     private static final long CAP_LEGACY_WINDOW_INTENTS = 1L << 9;
+    private static final long CAP_CLUSTER_INDEPENDENT_MAP_WINDOW = 1L << 10;
+    private static final long CAP_CLUSTER_DIRECT_SURFACE = 1L << 11;
 
     private static final String KEY_PROTOCOL_VERSION = "protocol_version";
     private static final String KEY_SESSION_ID = "session_id";
@@ -80,13 +84,13 @@ final class NavigationBridgeClient {
     private final Messenger callbacks;
     private final MainMapController mainMapController;
     private final HudMapRenderer hudMapRenderer;
+    private final HudMapRenderer clusterMapRenderer;
     private final NavigatorStatePublisher statePublisher;
     private final String sessionId = UUID.randomUUID().toString();
     private Messenger remote;
     private boolean binding;
     private boolean bound;
     private long retryMs = MIN_RETRY_MS;
-    private long lastConnectedElapsedMs;
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder service) {
@@ -94,7 +98,6 @@ final class NavigationBridgeClient {
             bound = true;
             remote = new Messenger(service);
             retryMs = MIN_RETRY_MS;
-            lastConnectedElapsedMs = SystemClock.elapsedRealtime();
             sendHello();
             sendDiagnostic("Navigator hook connected to Natro endpoint");
         }
@@ -154,6 +157,8 @@ final class NavigationBridgeClient {
         callbacks = new Messenger(new Handler(Looper.getMainLooper(), this::onMessage));
         mainMapController = new MainMapController(this.context);
         hudMapRenderer = new HudMapRenderer(this.context, this::sendSurfaceLost);
+        clusterMapRenderer = new HudMapRenderer(this.context, this::sendClusterSurfaceLost,
+                "clusterMap", "instrument cluster", true);
         statePublisher = new NavigatorStatePublisher(new NavigatorStatePublisher.Sink() {
             @Override public void onPrimaryMap(Object mapWindow, Object map) {
                 mainMapController.attach(mapWindow, map);
@@ -165,20 +170,34 @@ final class NavigationBridgeClient {
                 // consume only its first camera as a cold-start fallback; live following comes
                 // from canonical Guidance location snapshots below.
                 hudMapRenderer.updateInitialCamera(state);
+                clusterMapRenderer.updateInitialCamera(state);
             }
 
             @Override public void onNavigationRuntime(Object navigation) {
                 hudMapRenderer.updateNavigationRuntime(navigation);
+                clusterMapRenderer.updateNavigationRuntime(navigation);
             }
 
             @Override public void onNavigationState(String snapshotJson, String routeJson,
-                                                     Object drivingRoute, long routeEpoch) {
+                                                     Object drivingRoute, long routeEpoch,
+                                                     long jamFingerprint,
+                                                     RoutePolylineStyler.JamStyle jamStyle,
+                                                     NavigatorStatePublisher.NavigationFrame
+                                                             navigationFrame) {
                 mainMapController.updateRoute(routeEpoch, drivingRoute);
-                hudMapRenderer.updateRoute(routeEpoch, drivingRoute);
-                // Install the current DrivingRoute wrapper before applying its snapshot so the
-                // HUD trims against the exact RoutePosition that produced this state.
-                hudMapRenderer.updateNavigationState(snapshotJson);
-                sendState(MSG_NAVIGATION_SNAPSHOT, KEY_SNAPSHOT_JSON, snapshotJson);
+                hudMapRenderer.updateRoute(
+                        routeEpoch, drivingRoute, jamFingerprint, jamStyle);
+                clusterMapRenderer.updateRoute(
+                        routeEpoch, drivingRoute, jamFingerprint, jamStyle);
+                // Install the current DrivingRoute wrapper before applying the primitive frame so
+                // both maps trim against the exact RoutePosition read once by the publisher.
+                hudMapRenderer.updateNavigationState(navigationFrame);
+                clusterMapRenderer.updateNavigationState(navigationFrame);
+                // The publisher builds text-rich state at 10 Hz while this primitive map path
+                // remains at 30 Hz. A null snapshot therefore means there is no Binder work.
+                if (snapshotJson != null) {
+                    sendState(MSG_NAVIGATION_SNAPSHOT, KEY_SNAPSHOT_JSON, snapshotJson);
+                }
                 if (routeJson != null) {
                     sendState(MSG_ROUTE_GEOMETRY, KEY_ROUTE_GEOMETRY_JSON, routeJson);
                 }
@@ -219,6 +238,7 @@ final class NavigationBridgeClient {
                     NatroEntryPoint.applyConfiguration(raw);
                     mainMapController.applyConfiguration(raw);
                     hudMapRenderer.applyConfiguration(raw);
+                    clusterMapRenderer.applyConfiguration(raw);
                 }
                 break;
             case MSG_ATTACH_HUD_SURFACE:
@@ -227,6 +247,17 @@ final class NavigationBridgeClient {
             case MSG_DETACH_HUD_SURFACE:
                 if (sessionMatches(message.getData())) {
                     hudMapRenderer.detach(message.getData().getLong(
+                            KEY_SURFACE_GENERATION, -1L));
+                }
+                break;
+            case MSG_ATTACH_CLUSTER_SURFACE:
+                if (sessionMatches(message.getData())) {
+                    attachSurface(message.getData(), clusterMapRenderer);
+                }
+                break;
+            case MSG_DETACH_CLUSTER_SURFACE:
+                if (sessionMatches(message.getData())) {
+                    clusterMapRenderer.detach(message.getData().getLong(
                             KEY_SURFACE_GENERATION, -1L));
                 }
                 break;
@@ -265,7 +296,9 @@ final class NavigationBridgeClient {
                         | CAP_HUD_INDEPENDENT_MAP_WINDOW
                         | CAP_HUD_DIRECT_SURFACE
                         | CAP_NAVIGATOR_WINDOW_BUTTON
-                        | CAP_LEGACY_WINDOW_INTENTS);
+                        | CAP_LEGACY_WINDOW_INTENTS
+                        | CAP_CLUSTER_INDEPENDENT_MAP_WINDOW
+                        | CAP_CLUSTER_DIRECT_SURFACE);
         Message hello = Message.obtain(null, MSG_HELLO);
         hello.replyTo = callbacks;
         hello.setData(data);
@@ -281,6 +314,10 @@ final class NavigationBridgeClient {
     }
 
     private void attachHudSurface(Bundle data) {
+        attachSurface(data, hudMapRenderer);
+    }
+
+    private void attachSurface(Bundle data, HudMapRenderer renderer) {
         data.setClassLoader(Surface.class.getClassLoader());
         Surface surface;
         try {
@@ -288,20 +325,28 @@ final class NavigationBridgeClient {
         } catch (RuntimeException invalidParcel) {
             surface = null;
         }
-        hudMapRenderer.attach(surface,
+        renderer.attach(surface,
                 data.getInt(KEY_SURFACE_WIDTH, 0),
                 data.getInt(KEY_SURFACE_HEIGHT, 0),
                 data.getLong(KEY_SURFACE_GENERATION, -1L));
     }
 
     private void sendSurfaceLost(long generation, String detail) {
+        sendSurfaceLost(MSG_HUD_SURFACE_LOST, generation, detail);
+    }
+
+    private void sendClusterSurfaceLost(long generation, String detail) {
+        sendSurfaceLost(MSG_CLUSTER_SURFACE_LOST, generation, detail);
+    }
+
+    private void sendSurfaceLost(int what, long generation, String detail) {
         Messenger current = remote;
         if (current == null) return;
         Bundle data = new Bundle();
         data.putString(KEY_SESSION_ID, sessionId);
         data.putLong(KEY_SURFACE_GENERATION, generation);
         data.putString(KEY_ERROR_DETAIL, detail == null ? "" : detail);
-        Message lost = Message.obtain(null, MSG_HUD_SURFACE_LOST);
+        Message lost = Message.obtain(null, what);
         lost.replyTo = callbacks;
         lost.setData(data);
         try {
@@ -369,6 +414,7 @@ final class NavigationBridgeClient {
 
     private void disconnectAndRetry() {
         hudMapRenderer.disconnect();
+        clusterMapRenderer.disconnect();
         remote = null;
         binding = false;
         if (bound) {

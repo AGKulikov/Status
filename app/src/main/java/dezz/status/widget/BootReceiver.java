@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.hud.HudPresentationService;
+import dezz.status.widget.instrument.InstrumentDisplayLauncher;
 import dezz.status.widget.launcher.MediaAutoResumeController;
 import dezz.status.widget.phone.PackageReplaceBleRecoveryGate;
 import dezz.status.widget.phone.PhoneConnectionJournal;
@@ -200,6 +201,11 @@ public class BootReceiver extends BroadcastReceiver {
             HudPresentationService.reconcileAutomaticLifecycle(context);
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not restore autostart HUD at lifecycle boundary", failure);
+        }
+        try {
+            InstrumentDisplayLauncher.reconcileAutomatic(context);
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not restore instrument panel at lifecycle boundary", failure);
         }
     }
 

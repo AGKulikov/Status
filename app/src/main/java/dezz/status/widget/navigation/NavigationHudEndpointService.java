@@ -5,10 +5,12 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.Process;
 import android.os.RemoteException;
 import android.util.Log;
 import android.view.Surface;
@@ -24,9 +26,9 @@ import dezz.status.widget.diagnostics.DiagnosticJournal;
 /**
  * Explicit-only Natro endpoint to which the patched Navigator process connects.
  *
- * <p>The endpoint accepts versioned snapshots/route geometry, sends the two-map configuration and
- * leases Natro's real HUD Surface to Navigator. The Surface is producer-owned: no screenshot,
- * ImageReader or per-frame bitmap crosses this bridge.</p>
+ * <p>The endpoint accepts versioned snapshots/route geometry, sends the independent map profiles
+ * and leases Natro's real HUD and instrument-cluster Surfaces to Navigator. Each Surface is
+ * producer-owned: no screenshot, ImageReader or per-frame bitmap crosses this bridge.</p>
  */
 public final class NavigationHudEndpointService extends Service {
     private static final String TAG = "NavigationHudEndpoint";
@@ -34,16 +36,27 @@ public final class NavigationHudEndpointService extends Service {
     @NonNull private static final Object SURFACE_LOCK = new Object();
     @Nullable private static volatile NavigationHudEndpointService instance;
     @Nullable private static SurfaceLease publishedSurface;
+    @Nullable private static SurfaceLease publishedClusterSurface;
     @Nullable private static volatile String publishedConfigurationJson;
     private static long nextSurfaceGeneration;
     private static final long HOST_CAPABILITIES =
             NavigationBridgeContract.CAP_NATRO_CONFIGURATION_HOST
                     | NavigationBridgeContract.CAP_NATRO_NAVIGATION_STATE_SINK
-                    | NavigationBridgeContract.CAP_NATRO_HUD_SURFACE_PROVIDER;
+                    | NavigationBridgeContract.CAP_NATRO_HUD_SURFACE_PROVIDER
+                    | NavigationBridgeContract.CAP_NATRO_CLUSTER_SURFACE_PROVIDER;
 
     @NonNull private final Handler handler = new Handler(Looper.getMainLooper(), this::onMessage);
     @NonNull private final Messenger endpoint = new Messenger(handler);
+    @NonNull private final Object parserQueueLock = new Object();
+    @Nullable private HandlerThread parserThread;
+    @Nullable private Handler parser;
     @Nullable private Client client;
+    @Nullable private PendingPayload pendingSnapshot;
+    @Nullable private PendingPayload pendingRouteGeometry;
+    private boolean snapshotDrainPosted;
+    private boolean routeGeometryDrainPosted;
+    @NonNull private final Runnable snapshotDrain = this::drainLatestSnapshot;
+    @NonNull private final Runnable routeGeometryDrain = this::drainLatestRouteGeometry;
 
     /** Called by the HUD TextureView in this same Natro process. Ownership stays with it. */
     public static long publishHudSurface(@NonNull Surface surface,
@@ -70,6 +83,36 @@ public final class NavigationHudEndpointService extends Service {
         }
         NavigationHudEndpointService current = instance;
         if (current != null) current.handler.post(() -> current.sendSurfaceDetach(generation));
+    }
+
+    /** Called by the instrument-panel TextureView; this lease is independent from the HUD. */
+    public static long publishClusterSurface(@NonNull Surface surface,
+                                             int width, int height, int dpi) {
+        if (!surface.isValid() || width <= 0 || height <= 0) return -1L;
+        final SurfaceLease next;
+        synchronized (SURFACE_LOCK) {
+            next = new SurfaceLease(surface, width, height, Math.max(1, dpi),
+                    ++nextSurfaceGeneration);
+            publishedClusterSurface = next;
+        }
+        NavigationHudEndpointService current = instance;
+        if (current != null) current.handler.post(() -> current.sendClusterSurface(next));
+        return next.generation;
+    }
+
+    /** Revokes exactly the instrument-panel lease before its TextureView releases the Surface. */
+    public static void revokeClusterSurface(@NonNull Surface surface) {
+        final long generation;
+        synchronized (SURFACE_LOCK) {
+            if (publishedClusterSurface == null
+                    || publishedClusterSurface.surface != surface) return;
+            generation = publishedClusterSurface.generation;
+            publishedClusterSurface = null;
+        }
+        NavigationHudEndpointService current = instance;
+        if (current != null) {
+            current.handler.post(() -> current.sendClusterSurfaceDetach(generation));
+        }
     }
 
     /** Re-sends independently edited map profiles to the authenticated Navigator client. */
@@ -125,6 +168,11 @@ public final class NavigationHudEndpointService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        HandlerThread thread = new HandlerThread(
+                "navigation-bridge-parser", Process.THREAD_PRIORITY_BACKGROUND);
+        thread.start();
+        parserThread = thread;
+        parser = new Handler(thread.getLooper());
         instance = this;
         DiagnosticJournal.info("navigation-bridge", "HUD endpoint service created in main Natro process");
     }
@@ -152,6 +200,16 @@ public final class NavigationHudEndpointService extends Service {
     public void onDestroy() {
         if (instance == this) instance = null;
         disconnectCurrentClient();
+        HandlerThread thread = parserThread;
+        synchronized (parserQueueLock) {
+            pendingSnapshot = null;
+            pendingRouteGeometry = null;
+            snapshotDrainPosted = false;
+            routeGeometryDrainPosted = false;
+        }
+        parser = null;
+        parserThread = null;
+        if (thread != null) thread.quitSafely();
         super.onDestroy();
     }
 
@@ -178,10 +236,12 @@ public final class NavigationHudEndpointService extends Service {
         try {
             switch (message.what) {
                 case NavigationBridgeContract.MSG_NAVIGATION_SNAPSHOT:
-                    acceptSnapshot(current, message);
+                    enqueueSnapshot(current, message.getData().getString(
+                            NavigationBridgeContract.KEY_SNAPSHOT_JSON, ""));
                     break;
                 case NavigationBridgeContract.MSG_ROUTE_GEOMETRY:
-                    acceptRouteGeometry(current, message);
+                    enqueueRouteGeometry(current, message.getData().getString(
+                            NavigationBridgeContract.KEY_ROUTE_GEOMETRY_JSON, ""));
                     break;
                 case NavigationBridgeContract.MSG_HUD_SURFACE_LOST:
                     String surfaceLoss = "Navigator reported HUD surface loss, generation="
@@ -191,6 +251,16 @@ public final class NavigationHudEndpointService extends Service {
                             NavigationBridgeContract.KEY_ERROR_DETAIL, "");
                     Log.i(TAG, surfaceLoss);
                     DiagnosticJournal.warn("hud-map", surfaceLoss);
+                    break;
+                case NavigationBridgeContract.MSG_CLUSTER_SURFACE_LOST:
+                    String clusterSurfaceLoss =
+                            "Navigator reported instrument-cluster surface loss, generation="
+                                    + message.getData().getLong(
+                                    NavigationBridgeContract.KEY_SURFACE_GENERATION, -1L)
+                                    + ", detail=" + message.getData().getString(
+                                    NavigationBridgeContract.KEY_ERROR_DETAIL, "");
+                    Log.i(TAG, clusterSurfaceLoss);
+                    DiagnosticJournal.warn("cluster-map", clusterSurfaceLoss);
                     break;
                 case NavigationBridgeContract.MSG_HEARTBEAT:
                     replyCapabilities(current.messenger);
@@ -245,16 +315,61 @@ public final class NavigationHudEndpointService extends Service {
         sendConfiguration(reply, session);
         requestNavigationState(client);
         sendPublishedSurface();
+        sendPublishedClusterSurface();
         Log.i(TAG, "Authenticated Navigator bridge session started");
         DiagnosticJournal.info("navigation-bridge",
                 "authenticated Navigator session started; capabilities="
                         + Long.toHexString(client.capabilities));
     }
 
-    private void acceptSnapshot(@NonNull Client current, @NonNull Message message) {
-        String raw = message.getData().getString(
-                NavigationBridgeContract.KEY_SNAPSHOT_JSON, "");
-        NavigationSnapshotV2 next = NavigationSnapshotV2.fromJson(raw);
+    private void enqueueSnapshot(@NonNull Client current, @NonNull String raw) {
+        Handler worker = parser;
+        if (worker == null) return;
+        synchronized (parserQueueLock) {
+            pendingSnapshot = new PendingPayload(current, raw);
+            if (snapshotDrainPosted) return;
+            snapshotDrainPosted = true;
+        }
+        if (!worker.post(snapshotDrain)) {
+            synchronized (parserQueueLock) {
+                snapshotDrainPosted = false;
+                pendingSnapshot = null;
+            }
+        }
+    }
+
+    /** Parse at most the newest waiting snapshot, then yield so route work cannot starve. */
+    private void drainLatestSnapshot() {
+        PendingPayload payload;
+        synchronized (parserQueueLock) {
+            payload = pendingSnapshot;
+            pendingSnapshot = null;
+        }
+        if (payload != null) acceptSnapshot(payload.client, payload.raw);
+        repostSnapshotDrainIfNeeded();
+    }
+
+    private void repostSnapshotDrainIfNeeded() {
+        Handler worker = parser;
+        synchronized (parserQueueLock) {
+            if (pendingSnapshot == null || worker == null) {
+                snapshotDrainPosted = false;
+                return;
+            }
+            if (worker.post(snapshotDrain)) return;
+            snapshotDrainPosted = false;
+            pendingSnapshot = null;
+        }
+    }
+
+    private void acceptSnapshot(@NonNull Client current, @NonNull String raw) {
+        final NavigationSnapshotV2 next;
+        try {
+            next = NavigationSnapshotV2.fromJson(raw);
+        } catch (IllegalArgumentException invalid) {
+            replyError(current.messenger, "INVALID_PAYLOAD", invalid.getMessage());
+            return;
+        }
         if (!NavigationBridgeStateStore.publishSnapshot(current.sessionId, next)) {
             replyError(current.messenger, "STALE_SNAPSHOT", "Sequence did not advance");
         } else if (next.sequence == 1L) {
@@ -263,10 +378,54 @@ public final class NavigationHudEndpointService extends Service {
         }
     }
 
-    private void acceptRouteGeometry(@NonNull Client current, @NonNull Message message) {
-        String raw = message.getData().getString(
-                NavigationBridgeContract.KEY_ROUTE_GEOMETRY_JSON, "");
-        NavigationRouteGeometryV2 next = NavigationRouteGeometryV2.fromJson(raw);
+    private void enqueueRouteGeometry(@NonNull Client current, @NonNull String raw) {
+        Handler worker = parser;
+        if (worker == null) return;
+        synchronized (parserQueueLock) {
+            pendingRouteGeometry = new PendingPayload(current, raw);
+            if (routeGeometryDrainPosted) return;
+            routeGeometryDrainPosted = true;
+        }
+        if (!worker.post(routeGeometryDrain)) {
+            synchronized (parserQueueLock) {
+                routeGeometryDrainPosted = false;
+                pendingRouteGeometry = null;
+            }
+        }
+    }
+
+    /** Route replacement and congestion refresh are state, not an event log: keep only latest. */
+    private void drainLatestRouteGeometry() {
+        PendingPayload payload;
+        synchronized (parserQueueLock) {
+            payload = pendingRouteGeometry;
+            pendingRouteGeometry = null;
+        }
+        if (payload != null) acceptRouteGeometry(payload.client, payload.raw);
+        repostRouteGeometryDrainIfNeeded();
+    }
+
+    private void repostRouteGeometryDrainIfNeeded() {
+        Handler worker = parser;
+        synchronized (parserQueueLock) {
+            if (pendingRouteGeometry == null || worker == null) {
+                routeGeometryDrainPosted = false;
+                return;
+            }
+            if (worker.post(routeGeometryDrain)) return;
+            routeGeometryDrainPosted = false;
+            pendingRouteGeometry = null;
+        }
+    }
+
+    private void acceptRouteGeometry(@NonNull Client current, @NonNull String raw) {
+        final NavigationRouteGeometryV2 next;
+        try {
+            next = NavigationRouteGeometryV2.fromJson(raw);
+        } catch (IllegalArgumentException invalid) {
+            replyError(current.messenger, "INVALID_PAYLOAD", invalid.getMessage());
+            return;
+        }
         if (!NavigationBridgeStateStore.publishRouteGeometry(current.sessionId, next)) {
             replyError(current.messenger, "STALE_ROUTE", "Session or route epoch mismatch");
         }
@@ -312,6 +471,14 @@ public final class NavigationHudEndpointService extends Service {
         if (lease != null) sendSurface(lease);
     }
 
+    private void sendPublishedClusterSurface() {
+        SurfaceLease lease;
+        synchronized (SURFACE_LOCK) {
+            lease = publishedClusterSurface;
+        }
+        if (lease != null) sendClusterSurface(lease);
+    }
+
     private void requestNavigationState(@NonNull Client current) {
         Bundle data = new Bundle();
         data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
@@ -353,9 +520,44 @@ public final class NavigationHudEndpointService extends Service {
         send(current.messenger, NavigationBridgeContract.MSG_DETACH_HUD_SURFACE, data);
     }
 
+    private void sendClusterSurface(@NonNull SurfaceLease lease) {
+        Client current = client;
+        if (current == null || !supportsDirectClusterMap(current)
+                || !lease.surface.isValid()) return;
+        synchronized (SURFACE_LOCK) {
+            if (publishedClusterSurface != lease) return;
+        }
+        Bundle data = new Bundle();
+        data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
+        data.putParcelable(NavigationBridgeContract.KEY_SURFACE, lease.surface);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_WIDTH, lease.width);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_HEIGHT, lease.height);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_DPI, lease.dpi);
+        data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, lease.generation);
+        send(current.messenger, NavigationBridgeContract.MSG_ATTACH_CLUSTER_SURFACE, data);
+        DiagnosticJournal.info("cluster-map",
+                "instrument-cluster surface lease sent to Navigator; generation="
+                        + lease.generation + ", size=" + lease.width + "x" + lease.height);
+    }
+
+    private void sendClusterSurfaceDetach(long generation) {
+        Client current = client;
+        if (current == null || !supportsDirectClusterMap(current)) return;
+        Bundle data = new Bundle();
+        data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
+        data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, generation);
+        send(current.messenger, NavigationBridgeContract.MSG_DETACH_CLUSTER_SURFACE, data);
+    }
+
     private static boolean supportsDirectHudMap(@NonNull Client value) {
         long required = NavigationBridgeContract.CAP_HUD_INDEPENDENT_MAP_WINDOW
                 | NavigationBridgeContract.CAP_HUD_DIRECT_SURFACE;
+        return (value.capabilities & required) == required;
+    }
+
+    private static boolean supportsDirectClusterMap(@NonNull Client value) {
+        long required = NavigationBridgeContract.CAP_CLUSTER_INDEPENDENT_MAP_WINDOW
+                | NavigationBridgeContract.CAP_CLUSTER_DIRECT_SURFACE;
         return (value.capabilities & required) == required;
     }
 
@@ -398,6 +600,17 @@ public final class NavigationHudEndpointService extends Service {
         try {
             target.send(response);
         } catch (RemoteException ignored) {}
+    }
+
+    /** Immutable hand-off from the Messenger main Looper to the bounded parser queue. */
+    private static final class PendingPayload {
+        @NonNull final Client client;
+        @NonNull final String raw;
+
+        PendingPayload(@NonNull Client client, @NonNull String raw) {
+            this.client = client;
+            this.raw = raw;
+        }
     }
 
     private static final class Client {

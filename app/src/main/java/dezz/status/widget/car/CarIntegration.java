@@ -87,6 +87,19 @@ public interface CarIntegration {
         void onTelemetry(@NonNull TelemetryValue value);
     }
 
+    /**
+     * Allocation-free high-rate telemetry intended for instrument animation.
+     *
+     * <p>Unlike {@link TelemetryListener}, this callback may run on a vendor Binder/SDK thread.
+     * Implementations must return immediately; a listener may only copy primitives into
+     * thread-safe fields. It must never touch a View, perform I/O or block the callback. The
+     * instrument renderer snapshots those fields once per display VSync.</p>
+     */
+    interface RealtimeTelemetryListener {
+        void onRealtimeTelemetry(@NonNull String metricId, float value,
+                                 long observedAtElapsedNanos);
+    }
+
     /** Receives all telemetry metrics exposed by this vehicle connector on the main thread. */
     interface TelemetryCatalogListener {
         void onCatalog(@NonNull List<CarTelemetryDescriptor> values);
@@ -150,6 +163,19 @@ public interface CarIntegration {
 
     /** Stop a telemetry subscription without disturbing the widget's brick subscriptions. */
     void unsubscribeTelemetry(@NonNull TelemetryListener listener);
+
+    /**
+     * Subscribe to high-rate primitive samples without routing every sample through the main
+     * Looper. This optional channel is deliberately separate from the general telemetry API so
+     * existing HUD, automation and connector consumers retain their main-thread contract.
+     */
+    default void subscribeRealtimeTelemetry(@NonNull Set<String> metricIds,
+                                             @NonNull RealtimeTelemetryListener listener) {
+    }
+
+    /** Stop only this listener's high-rate primitive subscription. */
+    default void unsubscribeRealtimeTelemetry(@NonNull RealtimeTelemetryListener listener) {
+    }
 
     /**
      * Return the stable, connector-neutral metric catalog. Implementations do not need a live

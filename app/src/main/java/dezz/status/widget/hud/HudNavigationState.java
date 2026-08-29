@@ -22,6 +22,12 @@ import dezz.status.widget.navigation.NavigationSnapshotV2;
 
 /** One renderer-facing model, preferring the direct 30.3.0 stream over notification fallback. */
 public final class HudNavigationState {
+    private static final ThreadLocal<SimpleDateFormat> ARRIVAL_FORMAT =
+            new ThreadLocal<SimpleDateFormat>() {
+                @Override protected SimpleDateFormat initialValue() {
+                    return new SimpleDateFormat("HH:mm", Locale.getDefault());
+                }
+            };
     public static final class Lane {
         @NonNull public final String kind;
         @NonNull public final String highlightedDirection;
@@ -88,6 +94,9 @@ public final class HudNavigationState {
     @Nullable public final Bitmap lanesImage;
     @Nullable public final Bitmap jamImage;
     @Nullable public final Bitmap rainbowImage;
+    @NonNull private final String bridgeLanesJson;
+    @NonNull private final String bridgeLightsJson;
+    @Nullable private final NavigationRouteGeometryV2 bridgeGeometry;
 
     private HudNavigationState(boolean direct, boolean routeActive, String maneuverType,
             String maneuverTitle, String maneuverText, String maneuverSubtext, String street,
@@ -97,7 +106,9 @@ public final class HudNavigationState {
             List<Lane> laneItems, String trafficColor, String trafficCountdown,
             String trafficArrow, boolean trafficAvailable, List<TrafficLight> trafficLights,
             List<TrafficRun> trafficRuns, double tripProgress, Bitmap maneuverImage,
-            Bitmap lanesImage, Bitmap jamImage, Bitmap rainbowImage) {
+            Bitmap lanesImage, Bitmap jamImage, Bitmap rainbowImage,
+            String bridgeLanesJson, String bridgeLightsJson,
+            NavigationRouteGeometryV2 bridgeGeometry) {
         this.direct = direct;
         this.routeActive = routeActive;
         this.maneuverType = maneuverType;
@@ -128,14 +139,32 @@ public final class HudNavigationState {
         this.lanesImage = lanesImage;
         this.jamImage = jamImage;
         this.rainbowImage = rainbowImage;
+        this.bridgeLanesJson = bridgeLanesJson;
+        this.bridgeLightsJson = bridgeLightsJson;
+        this.bridgeGeometry = bridgeGeometry;
     }
 
     @NonNull
     public static HudNavigationState fromBridge(@NonNull NavigationSnapshotV2 source,
             @Nullable NavigationRouteGeometryV2 geometry) {
-        List<Lane> lanes = parseLanes(source.lanesJson);
-        List<TrafficLight> lights = parseLights(source.trafficLightsJson);
-        List<TrafficRun> runs = parseRuns(geometry == null ? "" : geometry.trafficSegmentsJson);
+        return fromBridge(source, geometry, null);
+    }
+
+    /** Reuses immutable parsed collections while only distance/speed/countdown text changes. */
+    @NonNull
+    public static HudNavigationState fromBridge(@NonNull NavigationSnapshotV2 source,
+            @Nullable NavigationRouteGeometryV2 geometry,
+            @Nullable HudNavigationState previous) {
+        boolean previousDirect = previous != null && previous.direct;
+        List<Lane> lanes = previousDirect
+                && source.lanesJson.equals(previous.bridgeLanesJson)
+                ? previous.laneItems : parseLanes(source.lanesJson);
+        List<TrafficLight> lights = previousDirect
+                && source.trafficLightsJson.equals(previous.bridgeLightsJson)
+                ? previous.trafficLights : parseLights(source.trafficLightsJson);
+        List<TrafficRun> runs = previousDirect && geometry == previous.bridgeGeometry
+                ? previous.trafficRuns
+                : parseRuns(geometry == null ? "" : geometry.trafficSegmentsJson);
         double progress = Double.NaN;
         if (source.routeTotalDistanceMeters > 0 && source.remainingDistanceMeters >= 0) {
             progress = 1d - source.remainingDistanceMeters
@@ -153,7 +182,7 @@ public final class HudNavigationState {
                 source.laneDistanceMeters, !lanes.isEmpty(), lanes,
                 first == null ? "" : first.color, first == null ? "" : first.countdown,
                 first == null ? "" : first.arrow, !lights.isEmpty(), lights, runs, progress,
-                null, null, null, null);
+                null, null, null, null, source.lanesJson, source.trafficLightsJson, geometry);
     }
 
     @NonNull
@@ -169,7 +198,8 @@ public final class HudNavigationState {
                 source.laneDistanceMeters, source.laneAvailable, new ArrayList<>(),
                 source.trafficColor, source.trafficCountdown, source.trafficArrow,
                 source.trafficAvailable, lights, new ArrayList<>(), Double.NaN,
-                source.maneuverImage, source.lanesImage, source.jamImage, source.rainbowImage);
+                source.maneuverImage, source.lanesImage, source.jamImage, source.rainbowImage,
+                "", "", null);
     }
 
     @NonNull private static List<Lane> parseLanes(String raw) {
@@ -242,6 +272,6 @@ public final class HudNavigationState {
 
     @NonNull private static String formatArrival(long epochMs) {
         if (epochMs <= 0L) return "";
-        return new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date(epochMs));
+        return ARRIVAL_FORMAT.get().format(new Date(epochMs));
     }
 }

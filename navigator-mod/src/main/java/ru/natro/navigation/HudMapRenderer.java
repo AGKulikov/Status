@@ -3,10 +3,9 @@ package ru.natro.navigation;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.Surface;
-
-import org.json.JSONObject;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -33,9 +32,14 @@ final class HudMapRenderer {
     /** Match the main map's road-width traffic instead of the custom thick route stroke. */
     private static final String BACKGROUND_TRAFFIC_STYLE =
             "[{\"types\":\"polyline\",\"stylers\":{\"scale\":0.45}}]";
+    /** Geometry slicing is expensive; native camera motion remains independent and full-rate. */
+    private static final long ROUTE_GEOMETRY_INTERVAL_MS = 100L;
     private final Context context;
     private final FailureReporter reporter;
     private final MapCursorStyler cursorStyler;
+    private final String profileSection;
+    private final String displayName;
+    private final boolean adaptiveFrameRate;
 
     private Surface surface;
     private int width;
@@ -60,23 +64,37 @@ final class HudMapRenderer {
     private Object activeRoute;
     private long activeRouteEpoch = -1L;
     private long activeJamFingerprint;
+    private RoutePolylineStyler.JamStyle activeJamStyle =
+            RoutePolylineStyler.JamStyle.EMPTY;
+    private final ArrayList<Integer> routeColorScratch = new ArrayList<>();
     private int renderedRouteSegmentIndex;
     private double renderedRouteSegmentPosition = Double.NaN;
     private int renderedRouteSegmentCount;
+    private long lastRouteGeometryElapsedMs;
     private NavigatorStatePublisher.CameraState initialCamera;
     private NavigatorStatePublisher.CameraState navigationCamera;
     private AppliedCamera lastAppliedCamera;
     private boolean freeCameraInitialized;
+    private double latestSpeedKmh = Double.NaN;
+    private int appliedMaximumFps = -1;
     private NavigationMapProfile profile = new NavigationMapProfile();
 
     HudMapRenderer(Context context, FailureReporter reporter) {
+        this(context, reporter, "hudMap", "HUD", false);
+    }
+
+    HudMapRenderer(Context context, FailureReporter reporter, String profileSection,
+                   String displayName, boolean adaptiveFrameRate) {
         this.context = context.getApplicationContext();
         this.reporter = reporter;
+        this.profileSection = profileSection;
+        this.displayName = displayName;
+        this.adaptiveFrameRate = adaptiveFrameRate;
         cursorStyler = new MapCursorStyler(this.context);
     }
 
     void applyConfiguration(String raw) {
-        NavigationMapProfile next = NavigationMapProfile.fromConfiguration(raw, "hudMap");
+        NavigationMapProfile next = NavigationMapProfile.fromConfiguration(raw, profileSection);
         boolean enabledChanged = profile.enabled != next.enabled;
         boolean cameraModeChanged = !profile.cameraMode.equals(next.cameraMode);
         profile = next;
@@ -140,30 +158,23 @@ final class HudMapRenderer {
     }
 
     /** Canonical navigation location, independent from every visual operation on the main map. */
-    void updateNavigationState(String snapshotJson) {
-        if (snapshotJson == null || snapshotJson.length() > 256 * 1024) return;
+    void updateNavigationState(NavigatorStatePublisher.NavigationFrame frame) {
+        if (frame == null || !frame.isValid()) return;
         try {
-            JSONObject snapshot = new JSONObject(snapshotJson);
-            if (!snapshot.has("latitude") || !snapshot.has("longitude")) return;
-            double latitude = snapshot.optDouble("latitude", Double.NaN);
-            double longitude = snapshot.optDouble("longitude", Double.NaN);
-            double bearing = snapshot.optDouble("bearingDegrees", 0d);
-            double speed = snapshot.optDouble("speedKmh", 0d);
-            boolean routeActive = snapshot.optBoolean("routeActive", false);
-            float baseZoom = routeActive
-                    ? speed >= 90d ? 14.5f : speed >= 50d ? 15.2f : 16f
+            latestSpeedKmh = Math.max(0d, frame.speedKmh);
+            applyMaximumFps();
+            float baseZoom = frame.routeActive
+                    ? frame.speedKmh >= 90d ? 14.5f : frame.speedKmh >= 50d ? 15.2f : 16f
                     : 15.5f;
-            NavigatorStatePublisher.CameraState next =
-                    new NavigatorStatePublisher.CameraState(latitude, longitude, baseZoom,
-                            finite(bearing) ? (float) bearing : 0f, profile.tiltDegrees);
-            if (!next.isValid()) return;
-            navigationCamera = next;
+            navigationCamera = new NavigatorStatePublisher.CameraState(
+                    frame.latitude, frame.longitude, baseZoom, (float) frame.bearingDegrees,
+                    profile.tiltDegrees);
             // Once GuidanceCamera owns this MapWindow, snapshots only advance the custom route.
             // Competing Map.move animations were the source of the one-second HUD jumps.
             if (guidanceCamera == null) applyCamera(false);
-            updateRouteProgress();
+            updateRouteProgress(frame);
         } catch (Exception invalid) {
-            Log.w(TAG, "Rejected invalid Guidance camera snapshot", invalid);
+            Log.w(TAG, "Guidance frame could not be applied to " + displayName, invalid);
         }
     }
 
@@ -172,21 +183,43 @@ final class HudMapRenderer {
     }
 
     void updateRoute(long routeEpoch, Object drivingRoute) {
+        RoutePolylineStyler.JamStyle jamStyle =
+                RoutePolylineStyler.readJamStyle(drivingRoute);
+        updateRoute(routeEpoch, drivingRoute, jamStyle.fingerprint, jamStyle);
+    }
+
+    /** Reuses the same congestion scan for the HUD and instrument-cluster map. */
+    void updateRoute(long routeEpoch, Object drivingRoute, long jamFingerprint) {
+        RoutePolylineStyler.JamStyle jamStyle =
+                RoutePolylineStyler.readJamStyle(drivingRoute);
+        updateRoute(routeEpoch, drivingRoute, jamFingerprint, jamStyle);
+    }
+
+    /** Receives the publisher-owned jam palette so two maps never scan it separately. */
+    void updateRoute(long routeEpoch, Object drivingRoute, long jamFingerprint,
+                     RoutePolylineStyler.JamStyle jamStyle) {
         if (routeEpoch < activeRouteEpoch) return;
-        long jamFingerprint = RoutePolylineStyler.jamFingerprint(drivingRoute);
         // MapKit may hand out a new Java wrapper for the same DrivingRoute on every Guidance
         // callback. Object identity is therefore not a route identity; routeEpoch is.
         boolean changed = routeEpoch != activeRouteEpoch
                 || (drivingRoute == null) != (activeRoute == null);
         boolean jamsChanged = jamFingerprint != activeJamFingerprint;
+        if (!changed && !jamsChanged) {
+            // Keep the newest Java wrapper for RoutePosition without repeating reflected layer
+            // calls for every Guidance/Windshield callback.
+            activeRoute = drivingRoute;
+            return;
+        }
         if (changed) {
             renderedRouteSegmentIndex = 0;
             renderedRouteSegmentPosition = Double.NaN;
             renderedRouteSegmentCount = 0;
+            lastRouteGeometryElapsedMs = 0L;
         }
         activeRouteEpoch = routeEpoch;
         activeRoute = drivingRoute;
         activeJamFingerprint = jamFingerprint;
+        activeJamStyle = jamStyle == null ? RoutePolylineStyler.JamStyle.EMPTY : jamStyle;
         applyTrafficPresentation();
         if (changed) rebuildRoute();
         else if (jamsChanged) restyleRoute();
@@ -264,15 +297,16 @@ final class HudMapRenderer {
             createRoadEventsLayer(mapKit, mapKitClass, mapWindowClass, nextMapWindow);
             applyProfile();
             createNativeNavigationLayer();
-            Log.i(TAG, "Independent HUD OffscreenMapWindow attached, generation=" + generation
+            Log.i(TAG, "Independent " + displayName
+                    + " OffscreenMapWindow attached, generation=" + generation
                     + ", size=" + width + "x" + height);
             NavigationBridgeClient.reportDiagnostic(
-                    "independent HUD map attached; generation=" + generation
+                    "independent " + displayName + " map attached; generation=" + generation
                             + ", size=" + width + "x" + height);
         } catch (Throwable failure) {
             long failedGeneration = generation;
             String detail = shortMessage(failure);
-            Log.e(TAG, "Could not attach independent HUD MapWindow", failure);
+            Log.e(TAG, "Could not attach independent " + displayName + " MapWindow", failure);
             stopRenderer(false);
             reporter.onSurfaceLost(failedGeneration, detail);
         }
@@ -283,7 +317,7 @@ final class HudMapRenderer {
         Object currentMap = map;
         if (currentWindow == null || currentMap == null) return;
         try {
-            invoke(currentWindow, "setMaxFps", new Class<?>[]{int.class}, profile.maximumFps);
+            applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
                     profile.mapScalePercent / 100f);
             Class<?> pointClass = Class.forName("com.yandex.mapkit.ScreenPoint");
@@ -340,6 +374,24 @@ final class HudMapRenderer {
         } catch (Throwable failure) {
             Log.w(TAG, "Some HUD MapProfile fields could not be applied", failure);
         }
+    }
+
+    /**
+     * Preserve native resolution and spend frame budget only when it is visible: the cluster map
+     * uses its configured ceiling while the car moves and idles at 15 FPS while stationary.
+     * MapKit still receives every route/location update; only identical visual frames are skipped.
+     */
+    private void applyMaximumFps() throws Exception {
+        Object currentWindow = mapWindow;
+        if (currentWindow == null) return;
+        int target = profile.maximumFps;
+        if (adaptiveFrameRate && Double.isFinite(latestSpeedKmh) && latestSpeedKmh < 1d) {
+            target = Math.min(target, 15);
+        }
+        target = Math.max(1, target);
+        if (target == appliedMaximumFps) return;
+        invoke(currentWindow, "setMaxFps", new Class<?>[]{int.class}, target);
+        appliedMaximumFps = target;
     }
 
     /** Follows Guidance location only; all HUD camera parameters remain independently editable. */
@@ -591,8 +643,9 @@ final class HudMapRenderer {
             renderedRouteSegmentIndex = slice.firstSegmentIndex;
             renderedRouteSegmentPosition = slice.segmentPosition;
             renderedRouteSegmentCount = slice.segmentCount;
-            RoutePolylineStyler.apply(line, route, profile, slice.firstSegmentIndex,
-                    slice.segmentCount);
+            RoutePolylineStyler.apply(line, activeJamStyle, profile,
+                    slice.firstSegmentIndex, slice.segmentCount, routeColorScratch);
+            lastRouteGeometryElapsedMs = SystemClock.elapsedRealtime();
         } catch (Throwable failure) {
             Log.w(TAG, "Active route could not be rendered in the HUD MapWindow", failure);
         }
@@ -608,46 +661,82 @@ final class HudMapRenderer {
             return;
         }
         try {
-            RoutePolylineStyler.apply(line, route, profile, renderedRouteSegmentIndex,
-                    renderedRouteSegmentCount);
+            RoutePolylineStyler.apply(line, activeJamStyle, profile,
+                    renderedRouteSegmentIndex, renderedRouteSegmentCount,
+                    routeColorScratch);
         } catch (Throwable failure) {
             Log.w(TAG, "HUD route traffic palette could not be updated", failure);
         }
     }
 
     /** Advances the visible route in place; it never re-adds the polyline or moves backwards. */
-    private void updateRouteProgress() {
+    private void updateRouteProgress(NavigatorStatePublisher.NavigationFrame frame) {
         Object line = routePolyline;
         Object route = activeRoute;
-        if (line == null || route == null || !profile.showRoute) return;
+        if (line == null || route == null || !profile.showRoute
+                || !frame.routeProgressValid) return;
         try {
-            RouteSlice slice = remainingRoute(route);
-            if (slice == null || !isForwardProgress(slice)) return;
+            RouteProgress progress = new RouteProgress(
+                    frame.routeSegmentIndex, frame.routeSegmentPosition,
+                    frame.currentRoutePoint);
+            if (!isForwardProgress(progress)) return;
+            long now = SystemClock.elapsedRealtime();
+            if (progress.segmentIndex == renderedRouteSegmentIndex
+                    && now - lastRouteGeometryElapsedMs < ROUTE_GEOMETRY_INTERVAL_MS) return;
+            // Publisher already read RoutePosition once for both maps. Copy the remaining
+            // polyline only after progress crossed the visual/time threshold.
+            RouteSlice slice = remainingRoute(route, progress);
+            if (slice == null) return;
             Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
             invoke(line, "setGeometry", new Class<?>[]{polylineClass}, slice.geometry);
             renderedRouteSegmentIndex = slice.firstSegmentIndex;
             renderedRouteSegmentPosition = slice.segmentPosition;
             renderedRouteSegmentCount = slice.segmentCount;
-            RoutePolylineStyler.apply(line, route, profile, slice.firstSegmentIndex,
-                    slice.segmentCount);
+            lastRouteGeometryElapsedMs = now;
+            RoutePolylineStyler.applyProgressColors(line, activeJamStyle, profile,
+                    slice.firstSegmentIndex, slice.segmentCount, routeColorScratch);
         } catch (Throwable failure) {
             Log.w(TAG, "HUD route progress could not be advanced", failure);
         }
     }
 
-    private boolean isForwardProgress(RouteSlice slice) {
-        if (slice.firstSegmentIndex > renderedRouteSegmentIndex) return true;
-        if (slice.firstSegmentIndex < renderedRouteSegmentIndex) return false;
+    private boolean isForwardProgress(RouteProgress progress) {
+        if (progress.segmentIndex > renderedRouteSegmentIndex) return true;
+        if (progress.segmentIndex < renderedRouteSegmentIndex) return false;
         return Double.isNaN(renderedRouteSegmentPosition)
-                || slice.segmentPosition > renderedRouteSegmentPosition + 0.002d;
+                || progress.segmentPosition > renderedRouteSegmentPosition + 0.05d;
     }
 
     private static RouteSlice remainingRoute(Object route) throws Exception {
+        return remainingRoute(route, currentRouteProgress(route));
+    }
+
+    private static RouteSlice remainingRoute(Object route, RouteProgress progress)
+            throws Exception {
+        if (progress == null) return null;
         Object fullGeometry = invoke(route, "getGeometry", new Class<?>[0]);
         if (fullGeometry == null) return null;
         List<?> points = list(invoke(fullGeometry, "getPoints", new Class<?>[0]));
         if (points.size() < 2) return null;
 
+        int segmentIndex = Math.max(0, Math.min(points.size() - 2, progress.segmentIndex));
+        double segmentPosition = progress.segmentPosition;
+        Object currentPoint = progress.currentPoint;
+        if (currentPoint == null) currentPoint = points.get(segmentIndex);
+
+        ArrayList<Object> remaining = new ArrayList<>(points.size() - segmentIndex);
+        remaining.add(currentPoint);
+        for (int index = segmentIndex + 1; index < points.size(); index++) {
+            remaining.add(points.get(index));
+        }
+        Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
+        Object geometry = polylineClass.getConstructor(List.class).newInstance(remaining);
+        return new RouteSlice(geometry, segmentIndex, segmentPosition,
+                Math.max(0, remaining.size() - 1));
+    }
+
+    /** RoutePosition-only read; deliberately does not touch or copy the full route geometry. */
+    private static RouteProgress currentRouteProgress(Object route) throws Exception {
         int segmentIndex = 0;
         double segmentPosition = 0d;
         Object currentPoint = null;
@@ -671,19 +760,9 @@ final class HudMapRenderer {
                 currentPoint = invoke(routePosition, "getPoint", new Class<?>[0]);
             }
         }
-        segmentIndex = Math.max(0, Math.min(points.size() - 2, segmentIndex));
+        segmentIndex = Math.max(0, segmentIndex);
         segmentPosition = Math.max(0d, Math.min(1d, segmentPosition));
-        if (currentPoint == null) currentPoint = points.get(segmentIndex);
-
-        ArrayList<Object> remaining = new ArrayList<>(points.size() - segmentIndex);
-        remaining.add(currentPoint);
-        for (int index = segmentIndex + 1; index < points.size(); index++) {
-            remaining.add(points.get(index));
-        }
-        Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
-        Object geometry = polylineClass.getConstructor(List.class).newInstance(remaining);
-        return new RouteSlice(geometry, segmentIndex, segmentPosition,
-                Math.max(0, remaining.size() - 1));
+        return new RouteProgress(segmentIndex, segmentPosition, currentPoint);
     }
 
     private static List<?> list(Object value) {
@@ -702,6 +781,18 @@ final class HudMapRenderer {
             this.firstSegmentIndex = firstSegmentIndex;
             this.segmentPosition = segmentPosition;
             this.segmentCount = segmentCount;
+        }
+    }
+
+    private static final class RouteProgress {
+        final int segmentIndex;
+        final double segmentPosition;
+        final Object currentPoint;
+
+        RouteProgress(int segmentIndex, double segmentPosition, Object currentPoint) {
+            this.segmentIndex = segmentIndex;
+            this.segmentPosition = segmentPosition;
+            this.currentPoint = currentPoint;
         }
     }
 
@@ -745,6 +836,7 @@ final class HudMapRenderer {
         runtimeSurface = null;
         offscreenMapWindow = null;
         mapWindow = null;
+        appliedMaximumFps = -1;
         map = null;
         trafficLayer = null;
         roadEventsLayer = null;
@@ -754,9 +846,11 @@ final class HudMapRenderer {
         userLocationLayer = null;
         routeCollection = null;
         routePolyline = null;
+        routeColorScratch.clear();
         renderedRouteSegmentIndex = 0;
         renderedRouteSegmentPosition = Double.NaN;
         renderedRouteSegmentCount = 0;
+        lastRouteGeometryElapsedMs = 0L;
         freeCameraInitialized = false;
         lastAppliedCamera = null;
         if (releaseSurface && currentSurface != null) {
@@ -770,8 +864,7 @@ final class HudMapRenderer {
 
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,
                                  Object... arguments) throws Exception {
-        Method method = target.getClass().getMethod(name, parameterTypes);
-        method.setAccessible(true);
+        Method method = ReflectMethods.publicMethod(target.getClass(), name, parameterTypes);
         return method.invoke(target, arguments);
     }
 

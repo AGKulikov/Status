@@ -235,6 +235,12 @@ final class GeelyCarIntegration implements CarIntegration {
     private final Object telemetryLock = new Object();
     private final Map<TelemetryListener, TelemetrySubscription> telemetrySubscriptions =
             new IdentityHashMap<>();
+    /** High-rate instrument subscriptions never enter the main-Looper telemetry queue. */
+    private final Map<RealtimeTelemetryListener, RealtimeTelemetrySubscription>
+            realtimeTelemetrySubscriptions = new IdentityHashMap<>();
+    /** Lock-free snapshot for the low-level gear Binder callback; rebuilt only on subscribe. */
+    private volatile RealtimeTelemetrySubscription[] realtimeTelemetrySnapshot =
+            new RealtimeTelemetrySubscription[0];
     /** Worker-thread-only debounce state shared by all subscribers of the same physical lamp. */
     private final Map<String, Long> bcmLastOnMillis = new HashMap<>();
     private final Object controlsLock = new Object();
@@ -592,10 +598,33 @@ final class GeelyCarIntegration implements CarIntegration {
         final List<VendorRegistration> vendorListeners = new ArrayList<>();
         /** Worker-thread-only per-listener dedupe; new listeners still receive an initial state. */
         final Map<String, Integer> lastBcmValues = new HashMap<>();
+        /** Guarded by this subscription; only the latest fast samples may wait for main Looper. */
+        @Nullable TelemetryValue pendingSpeed;
+        @Nullable TelemetryValue pendingRpm;
+        boolean fastDeliveryScheduled;
         @Nullable TPMS tpmsSource;
         @Nullable TPMS.ITireStateMonitor tireStateMonitor;
 
         TelemetrySubscription(TelemetryListener listener, Set<String> metricIds) {
+            this.listener = listener;
+            this.metricIds = metricIds;
+        }
+    }
+
+    /**
+     * Minimal subscription used by the instrument cluster. Vendor callbacks only copy one
+     * primitive sample to the listener; no Handler post, TelemetryValue or collection update is
+     * allowed on this path.
+     */
+    private static final class RealtimeTelemetrySubscription {
+        final RealtimeTelemetryListener listener;
+        final Set<String> metricIds;
+        final AtomicBoolean cancelled = new AtomicBoolean(false);
+        /** Accessed only by telemetryWorker except for vendor callback iteration. */
+        final List<VendorRegistration> vendorListeners = new ArrayList<>();
+
+        RealtimeTelemetrySubscription(RealtimeTelemetryListener listener,
+                                      Set<String> metricIds) {
             this.listener = listener;
             this.metricIds = metricIds;
         }
@@ -1923,11 +1952,15 @@ final class GeelyCarIntegration implements CarIntegration {
             availabilityPollAttempts++;
         }
         boolean recovered = false;
+        boolean recoveredRealtimePath = false;
         for (Integer sensorType : new ArrayList<>(recoverySensorTypes)) {
             FunctionStatus status = sensorSupportStatus(sensorType);
             if (isDefinitive(status)) {
                 recoverySensorTypes.remove(sensorType);
                 recovered = true;
+                if (isSupported(status) && isRealtimeSensorRecoveryDemanded(sensorType)) {
+                    recoveredRealtimePath = true;
+                }
             }
         }
         if (recoveryFuelCapacity && isDefinitive(fuelCapacitySupportStatus())) {
@@ -1937,6 +1970,7 @@ final class GeelyCarIntegration implements CarIntegration {
         if (recovered && availabilityChangedListener != null) {
             availabilityChangedListener.run();
         }
+        if (recoveredRealtimePath) reconcileRealtimeTelemetryAfterRecovery();
         if (!recoverySensorTypes.isEmpty() || recoveryFuelCapacity) {
             scheduleAvailabilityPoll();
         } else {
@@ -1976,8 +2010,40 @@ final class GeelyCarIntegration implements CarIntegration {
                     return true;
                 }
             }
+            for (RealtimeTelemetrySubscription subscription
+                    : realtimeTelemetrySubscriptions.values()) {
+                if (!subscription.cancelled.get() && subscription.metricIds.contains(metricId)) {
+                    return true;
+                }
+            }
         }
         return false;
+    }
+
+    private boolean isRealtimeSensorRecoveryDemanded(int sensorType) {
+        synchronized (telemetryLock) {
+            for (RealtimeTelemetrySubscription subscription
+                    : realtimeTelemetrySubscriptions.values()) {
+                if (subscription.cancelled.get()) continue;
+                for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
+                    if (signal.sensorType == sensorType
+                            && subscription.metricIds.contains(signal.id)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Recovery is rare; rebuilding the one small fast subscription avoids duplicate listeners. */
+    private void reconcileRealtimeTelemetryAfterRecovery() {
+        RealtimeTelemetrySubscription[] subscriptions = realtimeTelemetrySnapshot;
+        executeTelemetryTask(() -> {
+            for (RealtimeTelemetrySubscription subscription : subscriptions) {
+                if (subscription.cancelled.get()) continue;
+                unregisterRealtimeTelemetryVendorListeners(subscription);
+                activateRealtimeTelemetrySubscription(subscription);
+            }
+        });
     }
 
     /** Package-visible so the long-term recovery policy is covered without Android/Binder mocks. */
@@ -2350,6 +2416,177 @@ final class GeelyCarIntegration implements CarIntegration {
         mainHandler.post(this::reconcileAutoHoldReceiver);
     }
 
+    @Override
+    public void subscribeRealtimeTelemetry(@NonNull Set<String> metricIds,
+                                           @NonNull RealtimeTelemetryListener listener) {
+        Set<String> selected = selectRealtimeTelemetryMetricIds(metricIds);
+        RealtimeTelemetrySubscription next = new RealtimeTelemetrySubscription(
+                listener, selected);
+        RealtimeTelemetrySubscription previous;
+        synchronized (telemetryLock) {
+            previous = realtimeTelemetrySubscriptions.put(listener, next);
+            rebuildRealtimeTelemetrySnapshotLocked();
+        }
+        if (previous != null) previous.cancelled.set(true);
+        executeTelemetryTask(() -> {
+            if (previous != null) unregisterRealtimeTelemetryVendorListeners(previous);
+            activateRealtimeTelemetrySubscription(next);
+        });
+        mainHandler.post(this::reconcileSignalFallback);
+    }
+
+    @Override
+    public void unsubscribeRealtimeTelemetry(@NonNull RealtimeTelemetryListener listener) {
+        RealtimeTelemetrySubscription removed;
+        synchronized (telemetryLock) {
+            removed = realtimeTelemetrySubscriptions.remove(listener);
+            rebuildRealtimeTelemetrySnapshotLocked();
+        }
+        if (removed == null) return;
+        removed.cancelled.set(true);
+        executeTelemetryTask(() -> unregisterRealtimeTelemetryVendorListeners(removed));
+        mainHandler.post(this::pruneRecoveryRequests);
+        mainHandler.post(this::reconcileSignalFallback);
+    }
+
+    @NonNull
+    private static Set<String> selectRealtimeTelemetryMetricIds(
+            @NonNull Set<String> requested) {
+        Set<String> selected = new LinkedHashSet<>();
+        for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
+            if (requested.contains(signal.id)) selected.add(signal.id);
+        }
+        return Collections.unmodifiableSet(selected);
+    }
+
+    /** Must be called while holding telemetryLock. */
+    private void rebuildRealtimeTelemetrySnapshotLocked() {
+        realtimeTelemetrySnapshot = realtimeTelemetrySubscriptions.values().toArray(
+                new RealtimeTelemetrySubscription[0]);
+    }
+
+    private void activateRealtimeTelemetrySubscription(
+            @NonNull RealtimeTelemetrySubscription subscription) {
+        if (subscription.cancelled.get() || subscription.metricIds.isEmpty()) return;
+        ISensor source = ensureSensors();
+        if (source == null) {
+            for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
+                if (subscription.metricIds.contains(signal.id)) {
+                    requestSensorRecovery(signal.sensorType);
+                }
+            }
+            return;
+        }
+        for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
+            if (subscription.cancelled.get()) break;
+            if (subscription.metricIds.contains(signal.id)) {
+                registerRealtimeTelemetrySignal(source, signal, subscription);
+            }
+        }
+    }
+
+    private void registerRealtimeTelemetrySignal(
+            @NonNull ISensor source, @NonNull TelemetrySignal signal,
+            @NonNull RealtimeTelemetrySubscription subscription) {
+        ISensor.ISensorListener vendorListener = new ISensor.ISensorListener() {
+            @Override public void onSensorEventChanged(int changedType, int value) {
+                if (subscription.cancelled.get() || changedType != signal.sensorType
+                        || !signal.eventOnly
+                        || !isValidTelemetryEventValue(value, signal.boundedTemperature)
+                        || isLowLevelGearPreferred(signal)) return;
+                int delivered = normalizedEventValue(signal, value);
+                if (delivered != Integer.MIN_VALUE) {
+                    deliverRealtimeTelemetry(subscription, signal.id, delivered);
+                }
+            }
+
+            @Override public void onSensorSupportChanged(int changedType, FunctionStatus status) {
+                if (changedType != signal.sensorType || subscription.cancelled.get()
+                        || !isSupported(status)) return;
+                executeTelemetryTask(() -> emitInitialRealtimeSensorValue(
+                        source, signal, subscription));
+            }
+
+            @Override public void onSensorValueChanged(int changedType, float value) {
+                if (subscription.cancelled.get() || changedType != signal.sensorType
+                        || signal.eventOnly
+                        || !isValidTelemetryValue(value, signal.boundedTemperature)
+                        || isLowLevelGearPreferred(signal)) return;
+                deliverRealtimeTelemetry(subscription, signal.id, value);
+            }
+        };
+        try {
+            if (!source.registerListener(vendorListener, signal.sensorType)) {
+                Log.w(TAG, "realtime telemetry register rejected for " + signal.id);
+                requestSensorRecovery(signal.sensorType);
+                return;
+            }
+            subscription.vendorListeners.add(new VendorRegistration(source, vendorListener));
+            // A successful physical registration proves this failed path is healthy. Clear its
+            // low-rate recovery probe once, without posting from every subsequent fast sample.
+            mainHandler.post(() -> markSensorRecovered(signal.sensorType));
+            if (!subscription.cancelled.get()) {
+                emitInitialRealtimeSensorValue(source, signal, subscription);
+            }
+        } catch (Throwable error) {
+            invalidateSensorProxy(source);
+            Log.w(TAG, "realtime telemetry subscription failed for " + signal.id, error);
+            requestSensorRecovery(signal.sensorType);
+        }
+    }
+
+    private void emitInitialRealtimeSensorValue(
+            @NonNull ISensor source, @NonNull TelemetrySignal signal,
+            @NonNull RealtimeTelemetrySubscription subscription) {
+        if (subscription.cancelled.get()) return;
+        try {
+            FunctionStatus status = sensorSupportStatus(source, signal.sensorType);
+            if (!isSupported(status) && !signal.probeWithoutSupport) return;
+            if (signal.eventOnly) {
+                int latest = source.getSensorEvent(signal.sensorType);
+                if (isValidTelemetryEventValue(latest, signal.boundedTemperature)) {
+                    int delivered = normalizedEventValue(signal, latest);
+                    if (delivered != Integer.MIN_VALUE) {
+                        deliverRealtimeTelemetry(subscription, signal.id, delivered);
+                    }
+                }
+            } else {
+                float latest = source.getSensorLatestValue(signal.sensorType);
+                if (isValidTelemetryValue(latest, signal.boundedTemperature)) {
+                    deliverRealtimeTelemetry(subscription, signal.id, latest);
+                }
+            }
+        } catch (Throwable error) {
+            invalidateSensorProxy(source);
+            Log.w(TAG, "realtime telemetry initial read failed for " + signal.id, error);
+        }
+    }
+
+    private void deliverRealtimeTelemetry(
+            @NonNull RealtimeTelemetrySubscription subscription,
+            @NonNull String metricId, float value) {
+        if (subscription.cancelled.get()) return;
+        try {
+            subscription.listener.onRealtimeTelemetry(
+                    metricId, value, SystemClock.elapsedRealtimeNanos());
+        } catch (RuntimeException error) {
+            // A client bug must never escape into the ECARX Binder callback.
+            Log.w(TAG, "realtime telemetry listener failed", error);
+        }
+    }
+
+    private void unregisterRealtimeTelemetryVendorListeners(
+            @NonNull RealtimeTelemetrySubscription subscription) {
+        for (VendorRegistration registration : subscription.vendorListeners) {
+            try {
+                registration.source.unregisterListener(registration.listener);
+            } catch (Throwable error) {
+                Log.w(TAG, "realtime telemetry unregister failed", error);
+            }
+        }
+        subscription.vendorListeners.clear();
+    }
+
     private void activateTelemetrySubscription(TelemetrySubscription subscription) {
         if (subscription.cancelled.get()) return;
         boolean needsSensors = false;
@@ -2426,6 +2663,11 @@ final class GeelyCarIntegration implements CarIntegration {
                 }
                 if (subscription.metricIds.contains(HIGH_BEAM_ID)) needsHighBeam = true;
             }
+            for (RealtimeTelemetrySubscription subscription
+                    : realtimeTelemetrySubscriptions.values()) {
+                if (subscription.cancelled.get()) continue;
+                if (subscription.metricIds.contains(GEAR_ID)) needsGear = true;
+            }
         }
         if (!needsGear) {
             lowLevelGearKnown = false;
@@ -2453,6 +2695,11 @@ final class GeelyCarIntegration implements CarIntegration {
             if (subscription.metricIds.contains(LOW_LEVEL_GEAR_MANUAL_ID)) {
                 deliverTelemetry(subscription, LOW_LEVEL_GEAR_MANUAL_ID,
                         "Ручной режим коробки", "", manualMode ? 1 : 0);
+            }
+        }
+        for (RealtimeTelemetrySubscription subscription : realtimeTelemetrySnapshot) {
+            if (subscription.metricIds.contains(GEAR_ID)) {
+                deliverRealtimeTelemetry(subscription, GEAR_ID, adaptGear);
             }
         }
     }
@@ -2865,12 +3112,49 @@ final class GeelyCarIntegration implements CarIntegration {
     }
 
     private void deliverTelemetry(TelemetrySubscription subscription, TelemetryValue sample) {
+        if (isFastContinuousTelemetry(sample.id)) {
+            synchronized (subscription) {
+                if ("ISensor.speed".equals(sample.id)) subscription.pendingSpeed = sample;
+                else subscription.pendingRpm = sample;
+                if (subscription.fastDeliveryScheduled) return;
+                subscription.fastDeliveryScheduled = true;
+            }
+            // At most one pending Runnable per listener. If MapKit or the OEM UI briefly blocks
+            // main, stale speed/RPM samples are replaced instead of building a minute-long queue.
+            mainHandler.post(() -> drainFastTelemetry(subscription));
+            return;
+        }
         mainHandler.post(() -> {
             if (!subscription.cancelled.get()) {
                 markTelemetryRecovered(sample.id);
                 subscription.listener.onTelemetry(sample);
             }
         });
+    }
+
+    private static boolean isFastContinuousTelemetry(@NonNull String metricId) {
+        return "ISensor.speed".equals(metricId) || "ISensor.rpm".equals(metricId);
+    }
+
+    private void drainFastTelemetry(@NonNull TelemetrySubscription subscription) {
+        TelemetryValue speed;
+        TelemetryValue rpm;
+        synchronized (subscription) {
+            speed = subscription.pendingSpeed;
+            rpm = subscription.pendingRpm;
+            subscription.pendingSpeed = null;
+            subscription.pendingRpm = null;
+            subscription.fastDeliveryScheduled = false;
+        }
+        if (subscription.cancelled.get()) return;
+        if (speed != null) {
+            markTelemetryRecovered(speed.id);
+            subscription.listener.onTelemetry(speed);
+        }
+        if (rpm != null && !subscription.cancelled.get()) {
+            markTelemetryRecovered(rpm.id);
+            subscription.listener.onTelemetry(rpm);
+        }
     }
 
     private void unregisterTelemetryVendorListeners(TelemetrySubscription subscription) {
@@ -4402,11 +4686,18 @@ final class GeelyCarIntegration implements CarIntegration {
             unsubscribe(type);
         }
         List<TelemetrySubscription> telemetry;
+        List<RealtimeTelemetrySubscription> realtimeTelemetry;
         synchronized (telemetryLock) {
             telemetry = new ArrayList<>(telemetrySubscriptions.values());
             telemetrySubscriptions.clear();
+            realtimeTelemetry = new ArrayList<>(realtimeTelemetrySubscriptions.values());
+            realtimeTelemetrySubscriptions.clear();
+            rebuildRealtimeTelemetrySnapshotLocked();
         }
         for (TelemetrySubscription subscription : telemetry) subscription.cancelled.set(true);
+        for (RealtimeTelemetrySubscription subscription : realtimeTelemetry) {
+            subscription.cancelled.set(true);
+        }
         List<ControlSubscription> controls;
         synchronized (controlsLock) {
             controls = new ArrayList<>(controlSubscriptions.values());
@@ -4426,6 +4717,9 @@ final class GeelyCarIntegration implements CarIntegration {
         executeTelemetryTask(() -> {
             for (TelemetrySubscription subscription : telemetry) {
                 unregisterTelemetryVendorListeners(subscription);
+            }
+            for (RealtimeTelemetrySubscription subscription : realtimeTelemetry) {
+                unregisterRealtimeTelemetryVendorListeners(subscription);
             }
             bcmLastOnMillis.clear();
         });

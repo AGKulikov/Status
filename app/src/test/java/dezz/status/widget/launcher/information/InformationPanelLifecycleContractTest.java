@@ -45,6 +45,9 @@ public final class InformationPanelLifecycleContractTest {
         String source = source("dezz/status/widget/launcher/information/InformationPanelView.java");
         assertTrue(source.contains("This runnable is the sole owner of scheduling"));
         assertTrue(source.contains("subscribedService == null ? SERVICE_RETRY_MS : TICK_MS"));
+        assertTrue(source.contains("private static final long TICK_MS = 5_000L"));
+        assertTrue(source.contains("postOnAnimation(valueRefresh)"));
+        assertTrue(source.contains("if (!TextUtils.equals(views.value.getText(), display))"));
         assertFalse(source.contains("setOnClickListener"));
         assertFalse(source.contains("ActionBinding"));
         assertFalse(source.contains("execute"));

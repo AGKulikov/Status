@@ -31,6 +31,11 @@ public final class NavigationHudV2ContractTest {
                 NavigationIntegrationConfig.RoadEventMode.ALWAYS);
         config.hudMap.setRoadEventMode("ACCIDENT",
                 NavigationIntegrationConfig.RoadEventMode.ROUTE_ONLY);
+        config.clusterMap.zoomDelta = .75d;
+        config.clusterMap.maximumFps = 60;
+        config.clusterMap.showModels = false;
+        config.clusterMap.setRoadEventMode("RECONSTRUCTION",
+                NavigationIntegrationConfig.RoadEventMode.ALWAYS);
         config.mainFloatingWindow.movementLocked = true;
         config.mainFloatingWindow.cornerRadiusDp = 38;
         config.mainFloatingWindow.modeButtonVisible = true;
@@ -41,6 +46,7 @@ public final class NavigationHudV2ContractTest {
                 config.toJson().toString());
 
         assertNotSame(restored.mainMap, restored.hudMap);
+        assertNotSame(restored.hudMap, restored.clusterMap);
         assertEquals(2.5d, restored.mainMap.zoomDelta, 0d);
         assertEquals(-1.25d, restored.hudMap.zoomDelta, 0d);
         assertEquals("#FF112233", restored.mainMap.routeColor);
@@ -56,6 +62,11 @@ public final class NavigationHudV2ContractTest {
                 restored.hudMap.roadEventMode("SPEED_CONTROL"));
         assertEquals(NavigationIntegrationConfig.RoadEventMode.ROUTE_ONLY,
                 restored.hudMap.roadEventMode("ACCIDENT"));
+        assertEquals(.75d, restored.clusterMap.zoomDelta, 0d);
+        assertEquals(60, restored.clusterMap.maximumFps);
+        assertFalse(restored.clusterMap.showModels);
+        assertEquals(NavigationIntegrationConfig.RoadEventMode.ALWAYS,
+                restored.clusterMap.roadEventMode("RECONSTRUCTION"));
         assertTrue(restored.mainFloatingWindow.movementLocked);
         assertEquals(38, restored.mainFloatingWindow.cornerRadiusDp);
         assertTrue(restored.mainFloatingWindow.modeButtonVisible);
@@ -86,6 +97,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue((required & NavigationBridgeContract.CAP_NAVIGATION_SNAPSHOT) != 0L);
         assertTrue((required & NavigationBridgeContract.CAP_HUD_INDEPENDENT_MAP_WINDOW) != 0L);
         assertTrue((required & NavigationBridgeContract.CAP_HUD_DIRECT_SURFACE) != 0L);
+        assertTrue(NavigationBridgeContract.MSG_ATTACH_CLUSTER_SURFACE
+                > NavigationBridgeContract.MSG_DIAGNOSTIC);
+        assertTrue((NavigationBridgeContract.CAP_CLUSTER_INDEPENDENT_MAP_WINDOW
+                & NavigationBridgeContract.CAP_CLUSTER_DIRECT_SURFACE) == 0L);
+        assertTrue(NavigationBridgeContract.CAP_NATRO_CLUSTER_SURFACE_PROVIDER != 0L);
     }
 
     @Test public void navigatorBindsToNatroAndPreservesExistingWindowCommands() {
@@ -143,6 +159,12 @@ public final class NavigationHudV2ContractTest {
                 "| NavigationBridgeContract.CAP_NATRO_HUD_SURFACE_PROVIDER"));
         assertTrue(service.contains("data.putParcelable("));
         assertTrue(service.contains("supportsDirectHudMap(current)"));
+        assertTrue(service.contains("navigation-bridge-parser"));
+        assertTrue(service.contains("pendingSnapshot = new PendingPayload"));
+        assertTrue(service.contains("pendingRouteGeometry = new PendingPayload"));
+        assertTrue(service.contains("worker.post(snapshotDrain)"));
+        assertTrue(service.contains("worker.post(routeGeometryDrain)"));
+        assertTrue(service.contains("Parse at most the newest waiting snapshot"));
         assertFalse(service.contains("getStringExtra("));
         assertTrue(compactManifest.contains("android:name=\".navigation."
                 + "NavigationConfigurationRelayService\"android:directBootAware=\"true\""
@@ -225,6 +247,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("guidance_open_voice_search"));
         assertTrue(controller.contains("host.addView(modeButton, 0"));
         assertTrue(controller.contains("controlLayer.addView(floatingModeButton)"));
+        assertTrue(controller.contains("MODE_BUTTON_STABLE_MS = 5_000L"));
+        assertTrue(controller.contains("stableFullscreenHost"));
         assertTrue(controller.contains("restartInMode("));
         assertTrue(controller.contains("activity.finish()"));
         assertTrue(controller.contains("activity.startActivity(restart)"));
@@ -292,14 +316,24 @@ public final class NavigationHudV2ContractTest {
         assertTrue(mapProfile.contains("if (roadsOnly) return ROADS_ONLY_STYLE"));
         assertTrue(renderer.contains("updateInitialCamera"));
         assertTrue(renderer.contains("updateNavigationState"));
-        assertTrue(client.contains("hudMapRenderer.updateNavigationState(snapshotJson)"));
+        assertFalse(client.contains("parseNavigationState(snapshotJson)"));
+        assertTrue(publisher.contains("readSnapshotInputs(currentGuidance, activeRoute)"));
+        assertTrue(client.contains("hudMapRenderer.updateNavigationState(navigationFrame)"));
+        assertTrue(client.contains("clusterMapRenderer.updateNavigationState(navigationFrame)"));
+        assertTrue(client.contains("jamFingerprint, jamStyle"));
+        assertTrue(client.contains("if (snapshotJson != null)"));
+        assertTrue(publisher.contains("SNAPSHOT_INTERVAL_MS = 100L"));
+        assertTrue(publisher.contains("elapsedNow - lastSnapshotDispatchElapsedMs"));
         assertTrue(client.contains("hudMapRenderer.updateNavigationRuntime(navigation)"));
+        assertTrue(client.contains("clusterMapRenderer.updateNavigationRuntime(navigation)"));
         assertFalse(client.contains("hudMapRenderer.updatePrimaryCamera"));
         assertTrue(renderer.contains("getGeometry"));
         assertTrue(renderer.contains("addPolyline"));
         assertTrue(routeStyler.contains("getJamSegments"));
         assertTrue(routeStyler.contains("setStrokeColors"));
         assertTrue(routeStyler.contains("setPaletteColor"));
+        assertTrue(routeStyler.contains("readJamStyle"));
+        assertTrue(renderer.contains("applyProgressColors"));
         assertTrue(cursor.contains("UserLocationObjectListener"));
         assertTrue(cursor.contains("ViewProvider"));
         assertTrue(cursor.contains("setView"));
@@ -327,6 +361,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("getTrafficLightsWithSignal"));
         assertTrue(publisher.contains("ConditionsListener"));
         assertTrue(publisher.contains("trafficSegmentsJson"));
+        assertTrue(publisher.contains("STATE_INTERVAL_MS = 33L"));
+        assertTrue(publisher.contains("scheduleStatePublish(false)"));
+        assertTrue(publisher.contains("activeJamFingerprint"));
+        assertTrue(publisher.contains("routeId.equals(activeRouteId)"));
+        assertTrue(publisher.contains("destinationForRoute(route)"));
+        assertTrue(renderer.contains("currentRouteProgress(route)"));
+        assertTrue(renderer.contains("progress.segmentPosition"));
+        assertTrue(renderer.contains("0.05d"));
         assertTrue(publisher.contains("addCameraListener"));
         assertTrue(publisher.contains("getValue\"), 0d) * 3.6d"));
         assertFalse(publisher.contains("getDeclaredField"));

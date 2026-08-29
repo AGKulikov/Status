@@ -162,8 +162,7 @@ final class MapCursorStyler {
 
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,
                                  Object... arguments) throws Exception {
-        Method method = target.getClass().getMethod(name, parameterTypes);
-        method.setAccessible(true);
+        Method method = ReflectMethods.publicMethod(target.getClass(), name, parameterTypes);
         return method.invoke(target, arguments);
     }
 

@@ -4,7 +4,6 @@ package dezz.status.widget.navigation;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -16,6 +15,7 @@ public final class NavigationBridgeStateStore {
     @Nullable private static NavigationSnapshotV2 snapshot;
     @Nullable private static NavigationRouteGeometryV2 routeGeometry;
     @NonNull private static final Set<Listener> listeners = new HashSet<>();
+    @NonNull private static volatile Listener[] listenerSnapshot = new Listener[0];
 
     private NavigationBridgeStateStore() {}
 
@@ -69,11 +69,11 @@ public final class NavigationBridgeStateStore {
     }
 
     public static synchronized void addListener(@NonNull Listener listener) {
-        listeners.add(listener);
+        if (listeners.add(listener)) rebuildListenerSnapshotLocked();
     }
 
     public static synchronized void removeListener(@NonNull Listener listener) {
-        listeners.remove(listener);
+        if (listeners.remove(listener)) rebuildListenerSnapshotLocked();
     }
 
     @NonNull public static synchronized String sessionId() { return sessionId; }
@@ -83,14 +83,15 @@ public final class NavigationBridgeStateStore {
     }
 
     private static void notifyListeners() {
-        final ArrayList<Listener> copy;
-        synchronized (NavigationBridgeStateStore.class) {
-            copy = new ArrayList<>(listeners);
-        }
-        for (Listener listener : copy) {
+        for (Listener listener : listenerSnapshot) {
             try { listener.onNavigationBridgeStateChanged(); }
             catch (RuntimeException ignored) {}
         }
+    }
+
+    /** Listener lifecycle is rare; state publication is hot and remains allocation-free. */
+    private static void rebuildListenerSnapshotLocked() {
+        listenerSnapshot = listeners.toArray(new Listener[0]);
     }
 
     @NonNull

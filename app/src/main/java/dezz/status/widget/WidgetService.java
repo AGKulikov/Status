@@ -857,6 +857,7 @@ public class WidgetService extends Service {
     @Nullable private OverlayStateListener overlayStateListener;
 
     private MediaSessionManager mediaSessionManager;
+    private int mediaBindingGeneration;
     private final List<MediaController> activeMediaControllers = new ArrayList<>();
     private final MediaController.Callback mediaControllerCallback = new MediaController.Callback() {
         @Override
@@ -870,7 +871,10 @@ public class WidgetService extends Service {
         }
     };
     private final MediaSessionManager.OnActiveSessionsChangedListener activeSessionsChangedListener =
-            this::rebindMediaControllers;
+            controllers -> {
+                mediaBindingGeneration++;
+                rebindMediaControllers(controllers);
+            };
 
     private int satellitesCount = -1;
     private int gnssModeFlags = 0;
@@ -5925,9 +5929,10 @@ public class WidgetService extends Service {
         mediaSessionManager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
         if (mediaSessionManager == null) return;
         ComponentName component = new ComponentName(this, MediaNotificationListener.class);
+        int generation = ++mediaBindingGeneration;
         try {
             mediaSessionManager.addOnActiveSessionsChangedListener(activeSessionsChangedListener, component, mainHandler);
-            rebindMediaControllers(mediaSessionManager.getActiveSessions(component));
+            requestInitialMediaControllers(mediaSessionManager, component, generation);
         } catch (SecurityException e) {
             Log.w(TAG, "Notification access not granted; media tracking disabled", e);
             mediaSessionManager = null;
@@ -5936,6 +5941,7 @@ public class WidgetService extends Service {
 
     private void disableMediaTracking() {
         if (mediaSessionManager == null) return;
+        mediaBindingGeneration++;
         try {
             mediaSessionManager.removeOnActiveSessionsChangedListener(activeSessionsChangedListener);
         } catch (Exception ignored) {
@@ -5945,6 +5951,32 @@ public class WidgetService extends Service {
         }
         activeMediaControllers.clear();
         mediaSessionManager = null;
+    }
+
+    private void requestInitialMediaControllers(@NonNull MediaSessionManager source,
+                                                @NonNull ComponentName component,
+                                                int generation) {
+        try {
+            startupStateWorker.execute(() -> {
+                List<MediaController> controllers = null;
+                RuntimeException failure = null;
+                try {
+                    controllers = source.getActiveSessions(component);
+                } catch (RuntimeException error) {
+                    failure = error;
+                }
+                List<MediaController> result = controllers;
+                RuntimeException queryFailure = failure;
+                mainHandler.post(() -> {
+                    if (destroyed || mediaSessionManager != source
+                            || generation != mediaBindingGeneration) return;
+                    if (queryFailure == null) rebindMediaControllers(result);
+                    else updateMediaInfo();
+                });
+            });
+        } catch (RuntimeException stopped) {
+            updateMediaInfo();
+        }
     }
 
     private void rebindMediaControllers(@Nullable List<MediaController> controllers) {
