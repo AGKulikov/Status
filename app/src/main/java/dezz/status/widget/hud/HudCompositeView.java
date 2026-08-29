@@ -111,7 +111,13 @@ final class HudCompositeView extends FrameLayout
 
     private void applyMapGeometry() {
         HudElementConfig item = activeMap;
-        if (item == null || getWidth() <= 0 || getHeight() <= 0) return;
+        if (item == null) return;
+        // The HUD map geometry is derived from the fixed, verified 728x190 physical plane rather
+        // than this View's measured size. Apply it while the overlay tree is still being built so
+        // TextureView creates its first producer buffer at the real map size on cold boot. Waiting
+        // for this root's onSizeChanged() is unreliable on the KX11 secondary-display overlay: the
+        // root can arrive already measured, leaving TextureView at the constructor's 1x1 sentinel
+        // until an unrelated Settings update calls updateConfig().
         RectF source = HudDirectMapGeometry.bounds(config, item, localHudViewport);
         int left = Math.round(source.left);
         int top = Math.round(source.top);

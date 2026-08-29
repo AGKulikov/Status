@@ -391,6 +391,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(composite.contains("texture.setDefaultBufferSize(width, height)"));
         assertTrue(composite.contains("addOnLayoutChangeListener"));
         assertTrue(composite.contains("publishLaidOutSurface"));
+        assertFalse(composite.contains(
+                "item == null || getWidth() <= 0 || getHeight() <= 0"));
+        assertTrue(composite.contains(
+                "Apply it while the overlay tree is still being built"));
         assertFalse(composite.contains("Bitmap"));
         assertFalse(composite.contains("ImageReader"));
         assertFalse(composite.contains("MediaProjection"));
