@@ -46,9 +46,9 @@ public final class NavigationHudEndpointService extends Service {
     @Nullable private Client client;
 
     /** Called by the HUD TextureView in this same Natro process. Ownership stays with it. */
-    public static void publishHudSurface(@NonNull Surface surface,
+    public static long publishHudSurface(@NonNull Surface surface,
                                          int width, int height, int dpi) {
-        if (!surface.isValid() || width <= 0 || height <= 0) return;
+        if (!surface.isValid() || width <= 0 || height <= 0) return -1L;
         final SurfaceLease next;
         synchronized (SURFACE_LOCK) {
             next = new SurfaceLease(surface, width, height, Math.max(1, dpi),
@@ -57,6 +57,7 @@ public final class NavigationHudEndpointService extends Service {
         }
         NavigationHudEndpointService current = instance;
         if (current != null) current.handler.post(() -> current.sendSurface(next));
+        return next.generation;
     }
 
     /** Revokes exactly the lease backed by this TextureView Surface before its owner releases it. */
@@ -183,11 +184,13 @@ public final class NavigationHudEndpointService extends Service {
                     acceptRouteGeometry(current, message);
                     break;
                 case NavigationBridgeContract.MSG_HUD_SURFACE_LOST:
-                    Log.i(TAG, "Navigator reported HUD surface loss, generation="
+                    String surfaceLoss = "Navigator reported HUD surface loss, generation="
                             + message.getData().getLong(
                                     NavigationBridgeContract.KEY_SURFACE_GENERATION, -1L)
                             + ", detail=" + message.getData().getString(
-                            NavigationBridgeContract.KEY_ERROR_DETAIL, ""));
+                            NavigationBridgeContract.KEY_ERROR_DETAIL, "");
+                    Log.i(TAG, surfaceLoss);
+                    DiagnosticJournal.warn("hud-map", surfaceLoss);
                     break;
                 case NavigationBridgeContract.MSG_HEARTBEAT:
                     replyCapabilities(current.messenger);
@@ -336,6 +339,9 @@ public final class NavigationHudEndpointService extends Service {
         data.putInt(NavigationBridgeContract.KEY_SURFACE_DPI, lease.dpi);
         data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, lease.generation);
         send(current.messenger, NavigationBridgeContract.MSG_ATTACH_HUD_SURFACE, data);
+        DiagnosticJournal.info("hud-map",
+                "HUD surface lease sent to Navigator; generation=" + lease.generation
+                        + ", size=" + lease.width + "x" + lease.height);
     }
 
     private void sendSurfaceDetach(long generation) {
@@ -432,4 +438,3 @@ public final class NavigationHudEndpointService extends Service {
         }
     }
 }
-

@@ -209,6 +209,9 @@ public final class NavigationHudV2ContractTest {
         assertFalse(controller.contains("prepareWindowBeforeContent"));
         assertTrue(controller.contains("floatingIdentityRejected"));
         assertTrue(controller.contains("rawConfiguration.equals(appliedConfigurationRaw)"));
+        assertTrue(controller.contains("profile.sameWindowContract(next)"));
+        assertTrue(controller.contains("if (!windowContractChanged)"));
+        assertTrue(windowProfile.contains("sameWindowContract(FloatingWindowProfile other)"));
         assertTrue(windowProfile.contains("backgroundColor = \"#00000000\""));
         assertTrue(controller.contains("navi_service_open_voice_search"));
         assertTrue(controller.contains("guidance_open_voice_search"));

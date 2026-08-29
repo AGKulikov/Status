@@ -235,6 +235,9 @@ final class HudMapRenderer {
             applyProfile();
             Log.i(TAG, "Independent HUD OffscreenMapWindow attached, generation=" + generation
                     + ", size=" + width + "x" + height);
+            NavigationBridgeClient.reportDiagnostic(
+                    "independent HUD map attached; generation=" + generation
+                            + ", size=" + width + "x" + height);
         } catch (Throwable failure) {
             long failedGeneration = generation;
             String detail = shortMessage(failure);

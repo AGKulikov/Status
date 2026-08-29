@@ -232,7 +232,17 @@ final class FloatingWindowController {
         // a Java exception. Treat an identical wire snapshot as an idempotent delivery.
         if (rawConfiguration != null && rawConfiguration.equals(appliedConfigurationRaw)) return;
         appliedConfigurationRaw = rawConfiguration;
-        profile = FloatingWindowProfile.fromConfiguration(rawConfiguration);
+        FloatingWindowProfile next = FloatingWindowProfile.fromConfiguration(rawConfiguration);
+        boolean windowContractChanged = !profile.sameWindowContract(next);
+        profile = next;
+        // HUD-map, route and traffic settings share this wire document. They must not cause a
+        // second type-2038 setAttributes transaction when the floating-window block itself did
+        // not change; the 2.4.5 road log shows that transaction immediately before Navigator's
+        // Binder session disappeared. Controls may still be refreshed without touching WindowManager.
+        if (!windowContractChanged) {
+            updateControls();
+            return;
+        }
         if (!profile.enabled && floating) restartInMode(false, null);
         else if (floating) applyFloatingAttributes(false);
         else updateControls();

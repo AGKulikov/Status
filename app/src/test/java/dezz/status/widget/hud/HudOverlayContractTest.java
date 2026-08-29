@@ -26,8 +26,8 @@ public final class HudOverlayContractTest {
         assertTrue(viewport.contains("SAFE_WIDTH = 728"));
         assertTrue(viewport.contains("SAFE_HEIGHT = 190"));
         assertTrue(canvas.contains("canvas.clipRect(geometry.safeClip)"));
-        assertTrue(canvas.contains(
-                "canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)"));
+        assertTrue(canvas.contains("do not issue CLEAR here"));
+        assertFalse(canvas.contains("PorterDuff.Mode.CLEAR"));
         assertFalse(canvas.contains("config.maskStockHud"));
         assertFalse(canvas.contains("paint.setColor(Color.BLACK)"));
     }

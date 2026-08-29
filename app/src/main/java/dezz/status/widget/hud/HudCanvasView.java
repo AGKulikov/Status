@@ -7,7 +7,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
@@ -211,10 +210,11 @@ public final class HudCanvasView extends View {
     }
 
     private void drawPanelBackground(Canvas canvas, Geometry geometry) {
-        if (editor) return;
-        // The live Natro panel never owns a substrate. Only explicitly configured widgets and
-        // backdrops may contribute pixels; everything else must reveal the OEM HUD below it.
-        canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+        // The live Natro panel never owns a substrate. In particular, do not issue CLEAR here:
+        // HudCanvasView is the top child of the same translucent window as the TextureView map,
+        // and KX11 applies that blend operation to the complete window buffer. It therefore
+        // erased the already rendered map below this Canvas in 2.4.5. An empty display list is
+        // transparent by construction; only explicit widgets/backdrops contribute pixels.
     }
 
     private void drawElement(Canvas canvas, HudElementConfig item, RectF bounds, float scale,

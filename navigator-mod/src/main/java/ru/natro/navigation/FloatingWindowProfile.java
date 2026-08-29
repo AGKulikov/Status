@@ -30,6 +30,34 @@ final class FloatingWindowProfile {
     int modeButtonOpacityPercent = 85;
     boolean closeButtonVisible = true;
 
+    /** True when applying the next full Natro document cannot change the floating window. */
+    boolean sameWindowContract(FloatingWindowProfile other) {
+        return other != null
+                && enabled == other.enabled
+                && leftPercent == other.leftPercent
+                && topPercent == other.topPercent
+                && widthPercent == other.widthPercent
+                && heightPercent == other.heightPercent
+                && movementLocked == other.movementLocked
+                && resizeLocked == other.resizeLocked
+                && cornerRadiusDp == other.cornerRadiusDp
+                && opacityPercent == other.opacityPercent
+                && borderWidthDp == other.borderWidthDp
+                && borderColor.equals(other.borderColor)
+                && shadowRadiusDp == other.shadowRadiusDp
+                && shadowColor.equals(other.shadowColor)
+                && backgroundColor.equals(other.backgroundColor)
+                && aspectRatioLocked == other.aspectRatioLocked
+                && rememberGeometry == other.rememberGeometry
+                && dragHandleVisible == other.dragHandleVisible
+                && resizeHandleVisible == other.resizeHandleVisible
+                && modeButtonVisible == other.modeButtonVisible
+                && modeButtonPosition.equals(other.modeButtonPosition)
+                && modeButtonSizeDp == other.modeButtonSizeDp
+                && modeButtonOpacityPercent == other.modeButtonOpacityPercent
+                && closeButtonVisible == other.closeButtonVisible;
+    }
+
     static FloatingWindowProfile fromConfiguration(String raw) {
         FloatingWindowProfile result = new FloatingWindowProfile();
         if (raw == null || raw.length() > 384 * 1024 || raw.indexOf('\u0000') >= 0) {
@@ -111,4 +139,3 @@ final class FloatingWindowProfile {
         return value.matches("#[0-9A-F]{8}") ? value : fallback;
     }
 }
-

@@ -15,6 +15,7 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 
 /**
@@ -151,7 +152,12 @@ final class HudCompositeView extends FrameLayout
         Surface surface = new Surface(texture);
         leasedSurface = surface;
         int dpi = getResources().getDisplayMetrics().densityDpi;
-        NavigationHudEndpointService.publishHudSurface(surface, width, height, dpi);
+        long generation = NavigationHudEndpointService.publishHudSurface(
+                surface, width, height, dpi);
+        DiagnosticJournal.info("hud-map",
+                "HUD TextureView surface published; generation=" + generation
+                        + ", size=" + width + "x" + height
+                        + ", transparent=" + !mapTexture.isOpaque());
     }
 
     private void revokeSurface() {
