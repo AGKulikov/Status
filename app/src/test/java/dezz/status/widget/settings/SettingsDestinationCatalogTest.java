@@ -31,6 +31,7 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.HomeAssistantSettingsActivity",
             "dezz.status.widget.HudPanelSettingsActivity",
             "dezz.status.widget.IntentScenarioSettingsActivity",
+            "dezz.status.widget.InstrumentPanelSettingsActivity",
             "dezz.status.widget.LauncherSettingsActivity",
             "dezz.status.widget.MainActivity",
             "dezz.status.widget.MqttSettingsActivity",
@@ -107,6 +108,7 @@ public final class SettingsDestinationCatalogTest {
         assertSearchContains("столбцы", "home_behavior");
         assertSearchContains("скругление", "navigator_window");
         assertSearchContains("зафиксировать", "navigator_window");
+        assertSearchContains("приборка", "panel_instrument_cluster");
         assertEquals(SettingsDestinationCatalog.all().size(),
                 SettingsDestinationCatalog.search("  ").size());
         assertTrue(SettingsDestinationCatalog.search("несуществующий-запрос").isEmpty());
