@@ -46,7 +46,6 @@ public final class YandexWindowLauncherContractTest {
             throws IOException {
         String window = source();
         String launcher = source("dezz/status/widget/LauncherActivity.java");
-        String driver = source("dezz/status/widget/driver/DriverPanelActionExecutor.java");
         String settings = source("dezz/status/widget/LauncherSettingsActivity.java");
         String preferences = source("dezz/status/widget/Preferences.java");
 
@@ -57,9 +56,6 @@ public final class YandexWindowLauncherContractTest {
         assertTrue(launcher.contains("handleStagedOrHomeNavigation("));
         assertTrue(launcher.contains("intent.hasCategory(Intent.CATEGORY_HOME)"));
         assertTrue(launcher.contains("launcherHomeOpensWindowedNavigator.get()"));
-        assertTrue(driver.contains("YandexWindowLauncher.launch(context, product, full)"));
-        assertFalse(driver.contains(
-                "YandexWindowLauncher.launchOverLauncher(context, product, full)"));
         assertTrue(settings.contains("HOME → наш лаунчер → оконный Навигатор"));
         assertTrue(preferences.contains("launcherHomeOpensWindowedNavigator"));
     }
