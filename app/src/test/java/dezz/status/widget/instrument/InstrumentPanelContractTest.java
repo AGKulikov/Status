@@ -59,6 +59,8 @@ public final class InstrumentPanelContractTest {
                 + "InstrumentTelemetryRepository.java"));
         String integration = read(root.resolve("app/src/geely/java/dezz/status/widget/car/"
                 + "GeelyCarIntegration.java"));
+        String passengerDecorator = read(root.resolve("app/src/geely/java/dezz/status/widget/car/"
+                + "GeelyPassengerControlIntegration.java"));
         String panel = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
                 + "InstrumentPanelView.java"));
         String renderer = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
@@ -75,6 +77,10 @@ public final class InstrumentPanelContractTest {
         assertTrue(integration.contains("realtimeTelemetrySnapshot"));
         assertTrue(integration.contains("isRealtimeSensorRecoveryDemanded"));
         assertTrue(integration.contains("reconcileRealtimeTelemetryAfterRecovery"));
+        assertTrue(passengerDecorator.contains(
+                "delegate.subscribeRealtimeTelemetry(ids, listener)"));
+        assertTrue(passengerDecorator.contains(
+                "delegate.unsubscribeRealtimeTelemetry(listener)"));
         assertTrue(panel.contains("publishClusterSurface("));
         assertTrue(panel.contains("revokeClusterSurface("));
         assertFalse(panel.contains("Bitmap.createBitmap"));
@@ -96,6 +102,12 @@ public final class InstrumentPanelContractTest {
         String manifest = read(root.resolve("app/src/main/AndroidManifest.xml"));
         String store = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
                 + "InstrumentPanelStore.java"));
+        String activity = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentPanelActivity.java"));
+        String endpoint = read(root.resolve("app/src/main/java/dezz/status/widget/navigation/"
+                + "NavigationHudEndpointService.java"));
+        String client = read(root.resolve("navigator-mod/src/main/java/ru/natro/navigation/"
+                + "NavigationBridgeClient.java"));
 
         assertTrue(launcher.contains("DIM_NAVIGATION_MODE = 3"));
         assertTrue(launcher.contains("switchNaviMode"));
@@ -106,6 +118,14 @@ public final class InstrumentPanelContractTest {
         assertTrue(launcher.contains("android.activity.SplitScreenShownPosition"));
         assertTrue(launcher.contains("DIM_WAKE_TO_TASK_RESET_MS = 200L"));
         assertTrue(launcher.contains("finishStalePanelTask"));
+        assertTrue(launcher.contains("prepareInstrumentPanelLaunch"));
+        assertTrue(launcher.contains("FORCE_STOP_COMMAND"));
+        assertTrue(launcher.contains("PrivilegedShell.get(app)"));
+        assertTrue(endpoint.contains("CAP_EXTERNAL_INSTRUMENT_LAUNCHER"));
+        assertTrue(endpoint.contains("MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH"));
+        assertTrue(client.contains("CAP_EXTERNAL_INSTRUMENT_LAUNCHER"));
+        assertTrue(client.contains("ActivityOptions.makeBasic()"));
+        assertTrue(client.contains("setComponent(new ComponentName(NATRO_PACKAGE"));
         assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_CLEAR_TOP"));
         assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_SINGLE_TOP"));
         assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_NO_ANIMATION"));
@@ -113,9 +133,15 @@ public final class InstrumentPanelContractTest {
         assertTrue(bootstrap.contains("InstrumentDisplayLauncher.reconcileAutomatic"));
         assertTrue(boot.contains("InstrumentDisplayLauncher.reconcileAutomatic"));
         assertTrue(manifest.contains(".instrument.InstrumentPanelActivity"));
+        assertTrue(manifest.contains("android:exported=\"true\""));
         assertTrue(manifest.contains("android:taskAffinity=\"ru.natro.statuswidget.instrument\""));
         assertTrue(manifest.contains("eos_supports_multipages"));
         assertTrue(store.contains("createDeviceProtectedStorageContext"));
+        assertTrue(store.contains("issueLaunchToken"));
+        assertTrue(store.contains("consumeLaunchToken"));
+        assertTrue(store.contains(".commit()"));
+        assertTrue(activity.contains("store.consumeLaunchToken("));
+        assertTrue(activity.contains("StatusWidgetApplication.notifyFirstUsefulSurface"));
     }
 
     private static Path projectRoot() {

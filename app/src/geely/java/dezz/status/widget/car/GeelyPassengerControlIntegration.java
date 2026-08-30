@@ -106,6 +106,18 @@ final class GeelyPassengerControlIntegration implements CarIntegration {
         delegate.unsubscribeTelemetry(listener);
     }
 
+    /** Keep the instrument cluster's allocation-free channel intact through this decorator. */
+    @Override public void subscribeRealtimeTelemetry(
+            @NonNull Set<String> ids,
+            @NonNull RealtimeTelemetryListener listener) {
+        delegate.subscribeRealtimeTelemetry(ids, listener);
+    }
+
+    @Override public void unsubscribeRealtimeTelemetry(
+            @NonNull RealtimeTelemetryListener listener) {
+        delegate.unsubscribeRealtimeTelemetry(listener);
+    }
+
     @Override public void requestTelemetryCatalog(@NonNull TelemetryCatalogListener listener) {
         delegate.requestTelemetryCatalog(listener);
     }

@@ -525,36 +525,46 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             form.addView(control, marginTop(4));
         }
         Button roadEvents = button("Дорожные события — выбрать типы и режимы");
-        roadEvents.setOnClickListener(view -> editHudRoadEvents(profile));
+        roadEvents.setOnClickListener(view -> editHudRoadEvents(navigation, profile));
         form.addView(roadEvents, marginTop(10));
         form.addView(text("Для каждой отметки: скрыть, показывать всегда или только вдоль "
                 + "активного маршрута. Направление камер берётся из данных Яндекса.",
                 12, 0xFF95A0AF), marginTop(5));
         SliderField cursorScale = slider(form, "Размер курсора",
                 profile.cursorScalePercent, 25, 300, 5, " %");
-        ColorField cursorColor = colorField(form, "Цвет автомобиля", profile.cursorColor);
-        ColorField cursorOutline = colorField(form, "Контур автомобиля",
-                profile.cursorOutlineColor);
-        ColorField routeColor = colorField(form, "Цвет маршрута", profile.routeColor);
-        ColorField routeOutline = colorField(form, "Контур маршрута",
-                profile.routeOutlineColor);
+        ColorField cursorColor = navigationColorField(form, "Цвет автомобиля",
+                profile.cursorColor, navigation, value -> profile.cursorColor = value);
+        ColorField cursorOutline = navigationColorField(form, "Контур автомобиля",
+                profile.cursorOutlineColor, navigation,
+                value -> profile.cursorOutlineColor = value);
+        ColorField routeColor = navigationColorField(form, "Цвет маршрута",
+                profile.routeColor, navigation, value -> profile.routeColor = value);
+        ColorField routeOutline = navigationColorField(form, "Контур маршрута",
+                profile.routeOutlineColor, navigation,
+                value -> profile.routeOutlineColor = value);
         SliderField routeWidth = slider(form, "Толщина маршрута",
                 profile.routeWidth, 1, 40, 0.5, " px");
         SliderField routeOutlineWidth = slider(form, "Толщина контура маршрута",
                 profile.routeOutlineWidth, 0, 20, 0.5, " px");
         form.addView(section("Цвета загруженности дорог"), marginTop(16));
-        ColorField trafficFreeColor = colorField(form, "Дорога свободна",
-                profile.trafficFreeColor);
-        ColorField trafficLightColor = colorField(form, "Небольшое затруднение",
-                profile.trafficLightColor);
-        ColorField trafficHardColor = colorField(form, "Плотное движение",
-                profile.trafficHardColor);
-        ColorField trafficVeryHardColor = colorField(form, "Сильная пробка",
-                profile.trafficVeryHardColor);
-        ColorField trafficBlockedColor = colorField(form, "Дорога перекрыта",
-                profile.trafficBlockedColor);
-        ColorField trafficUnknownColor = colorField(form, "Нет данных",
-                profile.trafficUnknownColor);
+        ColorField trafficFreeColor = navigationColorField(form, "Дорога свободна",
+                profile.trafficFreeColor, navigation,
+                value -> profile.trafficFreeColor = value);
+        ColorField trafficLightColor = navigationColorField(form, "Небольшое затруднение",
+                profile.trafficLightColor, navigation,
+                value -> profile.trafficLightColor = value);
+        ColorField trafficHardColor = navigationColorField(form, "Плотное движение",
+                profile.trafficHardColor, navigation,
+                value -> profile.trafficHardColor = value);
+        ColorField trafficVeryHardColor = navigationColorField(form, "Сильная пробка",
+                profile.trafficVeryHardColor, navigation,
+                value -> profile.trafficVeryHardColor = value);
+        ColorField trafficBlockedColor = navigationColorField(form, "Дорога перекрыта",
+                profile.trafficBlockedColor, navigation,
+                value -> profile.trafficBlockedColor = value);
+        ColorField trafficUnknownColor = navigationColorField(form, "Нет данных",
+                profile.trafficUnknownColor, navigation,
+                value -> profile.trafficUnknownColor = value);
         SliderField trafficGradient = slider(form, "Длина перехода цветов пробок",
                 profile.trafficGradientLength, 0, 100, 1, " %");
         form.addView(text("Технические JSON-стили скрыты из обычных настроек. Цвета и состав "
@@ -619,8 +629,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
 
                         item.normalize(config.gridColumns, config.gridRows);
                         navigation.normalize();
-                        preferences.navigationIntegrationConfigJson.set(
-                                navigation.toJson().toString());
+                        if (!preferences.navigationIntegrationConfigJson.commit(
+                                navigation.toJson().toString())) {
+                            throw new IllegalStateException("не удалось записать настройки карты");
+                        }
                         NavigationHudEndpointService.requestConfigurationRefresh(this);
                         config.normalize();
                         canvas.updateConfig(config);
@@ -636,6 +648,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
     }
 
     private void editHudRoadEvents(
+            @NonNull NavigationIntegrationConfig navigation,
             @NonNull NavigationIntegrationConfig.MapProfile profile) {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
@@ -674,7 +687,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.setRoadEventMode(control.tag,
                                 roadEventModeValue(control.spinner.getSelectedItemPosition()));
                     }
-                    dialog.dismiss();
+                    if (persistNavigationConfiguration(navigation)) dialog.dismiss();
                 }));
         showSafeDialog(dialog);
     }
@@ -1982,8 +1995,42 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         }
     }
 
+    private ColorField navigationColorField(
+            @NonNull LinearLayout parent,
+            @NonNull String title,
+            @NonNull String initial,
+            @NonNull NavigationIntegrationConfig navigation,
+            @NonNull ColorSelectionListener setter) {
+        return colorField(parent, title, initial, selected -> {
+            setter.onSelected(selected);
+            persistNavigationConfiguration(navigation);
+        });
+    }
+
+    private boolean persistNavigationConfiguration(
+            @NonNull NavigationIntegrationConfig navigation) {
+        try {
+            navigation.normalize();
+            boolean stored = preferences.navigationIntegrationConfigJson.commit(
+                    navigation.toJson().toString());
+            if (!stored) throw new IllegalStateException("не удалось записать настройки карты");
+            NavigationHudEndpointService.requestConfigurationRefresh(this);
+            return true;
+        } catch (Exception failure) {
+            Toast.makeText(this, "Не удалось сохранить настройки карты: "
+                    + failure.getMessage(), Toast.LENGTH_LONG).show();
+            return false;
+        }
+    }
+
     private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
                                   @NonNull String initial) {
+        return colorField(parent, title, initial, null);
+    }
+
+    private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
+                                  @NonNull String initial,
+                                  @Nullable ColorSelectionListener selectionListener) {
         ColorField field = new ColorField(initial);
         MaterialButton button = new MaterialButton(this);
         button.setText(title);
@@ -1993,10 +2040,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         button.setOnClickListener(view -> AppleColorPickerDialog.show(
                 this, title, field.value, AppleColorPickerDialog.Options.standard(),
                 new AppleColorPickerDialog.Listener() {
-                    private void apply(@Nullable String selected) {
-                        if (selected == null || selected.trim().isEmpty()) return;
+                    private boolean apply(@Nullable String selected) {
+                        if (selected == null || selected.trim().isEmpty()) return false;
                         field.value = selected;
                         AppleColorPickerDialog.decorateButton(button, title, field.value);
+                        return true;
                     }
 
                     @Override public void onPreview(@Nullable String selected) {
@@ -2004,7 +2052,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     }
 
                     @Override public void onSelected(@Nullable String selected) {
-                        apply(selected);
+                        if (apply(selected) && selectionListener != null) {
+                            selectionListener.onSelected(field.value);
+                        }
                     }
                 }));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -2021,6 +2071,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         ColorField(@NonNull String value) {
             this.value = value;
         }
+    }
+
+    private interface ColorSelectionListener {
+        void onSelected(@NonNull String selected);
     }
 
     private LinearLayout.LayoutParams fixed(int widthDp) {

@@ -9,6 +9,8 @@ import androidx.annotation.NonNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.UUID;
+
 /** Durable store for the instrument panel; one atomic JSON write drives live projection. */
 public final class InstrumentPanelStore {
     public static final String PREFS = "instrument_panel";
@@ -19,6 +21,10 @@ public final class InstrumentPanelStore {
             "ru.natro.statuswidget.internal.INSTRUMENT_CONFIG_CHANGED";
     public static final String ACTION_CLOSE =
             "ru.natro.statuswidget.internal.INSTRUMENT_CLOSE";
+    public static final String EXTRA_LAUNCH_TOKEN = "instrument_launch_token";
+    private static final String KEY_LAUNCH_TOKEN = "launch_token";
+    private static final String KEY_LAUNCH_TOKEN_EXPIRES_AT = "launch_token_expires_at";
+    private static final long LAUNCH_TOKEN_LIFETIME_MS = 15_000L;
 
     @NonNull private final SharedPreferences preferences;
 
@@ -66,5 +72,33 @@ public final class InstrumentPanelStore {
         } catch (JSONException impossible) {
             throw new IllegalStateException(impossible);
         }
+    }
+
+    /** One durable capability authorizes exactly one fresh exported DIM Activity start. */
+    @NonNull
+    public String issueLaunchToken() {
+        String token = UUID.randomUUID().toString();
+        boolean stored = preferences.edit()
+                .putString(KEY_LAUNCH_TOKEN, token)
+                .putLong(KEY_LAUNCH_TOKEN_EXPIRES_AT,
+                        System.currentTimeMillis() + LAUNCH_TOKEN_LIFETIME_MS)
+                .commit();
+        if (!stored) throw new IllegalStateException("Could not persist instrument launch token");
+        return token;
+    }
+
+    /** Validates and consumes the capability before any driver-display content is created. */
+    public synchronized boolean consumeLaunchToken(String candidate) {
+        if (candidate == null || candidate.length() < 16 || candidate.length() > 128) return false;
+        String expected = preferences.getString(KEY_LAUNCH_TOKEN, "");
+        long expiresAt = preferences.getLong(KEY_LAUNCH_TOKEN_EXPIRES_AT, 0L);
+        boolean valid = candidate.equals(expected) && System.currentTimeMillis() <= expiresAt;
+        if (valid || (expiresAt > 0L && System.currentTimeMillis() > expiresAt)) {
+            if (!preferences.edit()
+                    .remove(KEY_LAUNCH_TOKEN)
+                    .remove(KEY_LAUNCH_TOKEN_EXPIRES_AT)
+                    .commit()) return false;
+        }
+        return valid;
     }
 }

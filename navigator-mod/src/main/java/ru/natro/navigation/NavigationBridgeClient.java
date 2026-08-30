@@ -2,6 +2,7 @@
 package ru.natro.navigation;
 
 import android.app.Activity;
+import android.app.ActivityOptions;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -48,6 +49,7 @@ final class NavigationBridgeClient {
     private static final int MSG_ATTACH_CLUSTER_SURFACE = 15;
     private static final int MSG_DETACH_CLUSTER_SURFACE = 16;
     private static final int MSG_CLUSTER_SURFACE_LOST = 17;
+    private static final int MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH = 18;
 
     private static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     private static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -59,6 +61,7 @@ final class NavigationBridgeClient {
     private static final long CAP_LEGACY_WINDOW_INTENTS = 1L << 9;
     private static final long CAP_CLUSTER_INDEPENDENT_MAP_WINDOW = 1L << 10;
     private static final long CAP_CLUSTER_DIRECT_SURFACE = 1L << 11;
+    private static final long CAP_EXTERNAL_INSTRUMENT_LAUNCHER = 1L << 12;
 
     private static final String KEY_PROTOCOL_VERSION = "protocol_version";
     private static final String KEY_SESSION_ID = "session_id";
@@ -73,6 +76,12 @@ final class NavigationBridgeClient {
     private static final String KEY_SURFACE_GENERATION = "surface_generation";
     private static final String KEY_ERROR_DETAIL = "error_detail";
     private static final String KEY_WINDOW_MODE = "window_mode";
+    private static final String KEY_INSTRUMENT_DISPLAY_ID = "instrument_display_id";
+    private static final String KEY_INSTRUMENT_LAUNCH_DELAY_MS =
+            "instrument_launch_delay_ms";
+    private static final String KEY_INSTRUMENT_LAUNCH_TOKEN = "instrument_launch_token";
+    private static final String INSTRUMENT_ACTIVITY =
+            "dezz.status.widget.instrument.InstrumentPanelActivity";
 
     private static final long MIN_RETRY_MS = 1_000L;
     private static final long MAX_RETRY_MS = 30_000L;
@@ -92,6 +101,7 @@ final class NavigationBridgeClient {
     private boolean binding;
     private boolean bound;
     private long retryMs = MIN_RETRY_MS;
+    private Runnable pendingInstrumentLaunch;
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder service) {
@@ -285,6 +295,11 @@ final class NavigationBridgeClient {
                     NatroEntryPoint.setWindowMode(message.getData().getInt(KEY_WINDOW_MODE, 2));
                 }
                 break;
+            case MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH:
+                if (sessionMatches(message.getData())) {
+                    prepareInstrumentPanelLaunch(message.getData());
+                }
+                break;
             case MSG_HEARTBEAT:
                 sendHello();
                 break;
@@ -311,7 +326,8 @@ final class NavigationBridgeClient {
                         | CAP_NAVIGATOR_WINDOW_BUTTON
                         | CAP_LEGACY_WINDOW_INTENTS
                         | CAP_CLUSTER_INDEPENDENT_MAP_WINDOW
-                        | CAP_CLUSTER_DIRECT_SURFACE);
+                        | CAP_CLUSTER_DIRECT_SURFACE
+                        | CAP_EXTERNAL_INSTRUMENT_LAUNCHER);
         Message hello = Message.obtain(null, MSG_HELLO);
         hello.replyTo = callbacks;
         hello.setData(data);
@@ -324,6 +340,40 @@ final class NavigationBridgeClient {
 
     private boolean sessionMatches(Bundle data) {
         return sessionId.equals(data.getString(KEY_SESSION_ID, ""));
+    }
+
+    /** Executes from Navigator's process after Natro has reset its own task/package state. */
+    private void prepareInstrumentPanelLaunch(Bundle data) {
+        String token = data.getString(KEY_INSTRUMENT_LAUNCH_TOKEN, "");
+        if (token.length() < 16 || token.length() > 128) return;
+        int displayId = Math.max(0, Math.min(15,
+                data.getInt(KEY_INSTRUMENT_DISPLAY_ID, 2)));
+        long delayMillis = Math.max(250L, Math.min(3_000L,
+                data.getLong(KEY_INSTRUMENT_LAUNCH_DELAY_MS, 700L)));
+        Runnable previous = pendingInstrumentLaunch;
+        if (previous != null) main.removeCallbacks(previous);
+        Runnable launch = () -> {
+            pendingInstrumentLaunch = null;
+            Intent intent = new Intent(Intent.ACTION_MAIN)
+                    .setComponent(new ComponentName(NATRO_PACKAGE, INSTRUMENT_ACTIVITY))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .putExtra(KEY_INSTRUMENT_LAUNCH_TOKEN, token);
+            ActivityOptions options = ActivityOptions.makeBasic();
+            options.setLaunchDisplayId(displayId);
+            Bundle launchOptions = options.toBundle();
+            launchOptions.putInt("android.activity.windowingMode", 5);
+            launchOptions.putInt("android.activity.SplitScreenShownPosition", 0);
+            try {
+                context.startActivity(intent, launchOptions);
+                sendDiagnostic("Navigator externally launched Natro instrument panel on display "
+                        + displayId);
+            } catch (RuntimeException failure) {
+                sendDiagnostic("Navigator instrument launch failed: "
+                        + failure.getClass().getSimpleName());
+            }
+        };
+        pendingInstrumentLaunch = launch;
+        main.postDelayed(launch, delayMillis);
     }
 
     private void attachHudSurface(Bundle data) {

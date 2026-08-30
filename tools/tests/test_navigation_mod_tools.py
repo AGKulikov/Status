@@ -213,29 +213,32 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.5.4}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021287}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.5.5}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021288}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
-    def test_hud_renderer_avoids_camera_less_automotive_navigation_layer(self):
+    def test_hud_renderer_uses_route_bound_layer_with_parked_camera(self):
         renderer = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                     / "ru" / "natro" / "navigation" / "HudMapRenderer.java").read_text()
         publisher = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                      / "ru" / "natro" / "navigation"
                      / "NavigatorStatePublisher.java").read_text()
 
-        self.assertNotIn("NavigationLayerFactory", renderer)
-        self.assertNotIn("setUseLayerCamera", renderer)
-        self.assertNotIn("setRoadEventVisibleOnRoute", renderer)
-        self.assertIn("safe standalone road-events layer attached", renderer)
+        self.assertIn("NavigationLayerFactory", renderer)
         self.assertIn(
-            'routeGuidanceActive && "ROUTE_ONLY".equals(mode)', renderer
+            '"setUseLayerCamera", new Class<?>[]{boolean.class}, true', renderer
         )
-        self.assertIn("routeAwareRoadEventStyleProvider", renderer)
-        self.assertIn('properties, "isOnRoute"', renderer)
-        self.assertIn("method.invoke(delegate, arguments)", renderer)
+        self.assertIn("setRoadEventVisibleOnRoute", renderer)
+        self.assertIn("createNativeNavigationLayer", renderer)
+        self.assertIn("parkNativeGuidanceCamera", renderer)
+        self.assertIn('Enum.valueOf((Class) cameraModeClass, "FREE")', renderer)
+        self.assertIn("setSwitchModesAutomatically", renderer)
+        self.assertIn("safe standalone road-events layer attached", renderer)
+        self.assertIn("nearby fallback active", renderer)
+        self.assertNotIn("routeAwareRoadEventStyleProvider", renderer)
+        self.assertNotIn('properties, "isOnRoute"', renderer)
         self.assertIn("setMaxNumberOfUpcomingTrafficLights", publisher)
         self.assertIn("MAX_UPCOMING_TRAFFIC_LIGHTS = 8", publisher)
         self.assertIn("setRoadEventVisible", renderer)

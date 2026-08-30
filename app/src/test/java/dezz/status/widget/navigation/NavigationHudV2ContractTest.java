@@ -21,7 +21,12 @@ public final class NavigationHudV2ContractTest {
         config.mainMap.trafficHardColor = "#FF334455";
         config.hudMap.zoomDelta = -1.25d;
         config.hudMap.routeColor = "#FFAABBCC";
-        config.hudMap.trafficBlockedColor = "#FF550011";
+        config.hudMap.trafficFreeColor = "#FF010203";
+        config.hudMap.trafficLightColor = "#FF111213";
+        config.hudMap.trafficHardColor = "#FF212223";
+        config.hudMap.trafficVeryHardColor = "#FF313233";
+        config.hudMap.trafficBlockedColor = "#FF414243";
+        config.hudMap.trafficUnknownColor = "#FF515253";
         config.hudMap.trafficGradientLength = 24d;
         config.hudMap.showTraffic = false;
         config.hudMap.showRouteTraffic = true;
@@ -41,6 +46,12 @@ public final class NavigationHudV2ContractTest {
         config.clusterMap.maximumFps = 60;
         config.clusterMap.showModels = false;
         config.clusterMap.showTrafficLights = true;
+        config.clusterMap.trafficFreeColor = "#FF616263";
+        config.clusterMap.trafficLightColor = "#FF717273";
+        config.clusterMap.trafficHardColor = "#FF818283";
+        config.clusterMap.trafficVeryHardColor = "#FF919293";
+        config.clusterMap.trafficBlockedColor = "#FFA1A2A3";
+        config.clusterMap.trafficUnknownColor = "#FFB1B2B3";
         config.clusterMap.setRoadEventMode("RECONSTRUCTION",
                 NavigationIntegrationConfig.RoadEventMode.ALWAYS);
         config.mainFloatingWindow.movementLocked = true;
@@ -59,7 +70,12 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FF112233", restored.mainMap.routeColor);
         assertEquals("#FFAABBCC", restored.hudMap.routeColor);
         assertEquals("#FF334455", restored.mainMap.trafficHardColor);
-        assertEquals("#FF550011", restored.hudMap.trafficBlockedColor);
+        assertEquals("#FF010203", restored.hudMap.trafficFreeColor);
+        assertEquals("#FF111213", restored.hudMap.trafficLightColor);
+        assertEquals("#FF212223", restored.hudMap.trafficHardColor);
+        assertEquals("#FF313233", restored.hudMap.trafficVeryHardColor);
+        assertEquals("#FF414243", restored.hudMap.trafficBlockedColor);
+        assertEquals("#FF515253", restored.hudMap.trafficUnknownColor);
         assertEquals(24d, restored.hudMap.trafficGradientLength, 0d);
         assertFalse(restored.hudMap.showTraffic);
         assertTrue(restored.hudMap.showRouteTraffic);
@@ -79,6 +95,12 @@ public final class NavigationHudV2ContractTest {
         assertEquals(60, restored.clusterMap.maximumFps);
         assertFalse(restored.clusterMap.showModels);
         assertTrue(restored.clusterMap.showTrafficLights);
+        assertEquals("#FF616263", restored.clusterMap.trafficFreeColor);
+        assertEquals("#FF717273", restored.clusterMap.trafficLightColor);
+        assertEquals("#FF818283", restored.clusterMap.trafficHardColor);
+        assertEquals("#FF919293", restored.clusterMap.trafficVeryHardColor);
+        assertEquals("#FFA1A2A3", restored.clusterMap.trafficBlockedColor);
+        assertEquals("#FFB1B2B3", restored.clusterMap.trafficUnknownColor);
         assertEquals(NavigationIntegrationConfig.RoadEventMode.ALWAYS,
                 restored.clusterMap.roadEventMode("RECONSTRUCTION"));
         assertTrue(restored.mainFloatingWindow.movementLocked);
@@ -108,6 +130,9 @@ public final class NavigationHudV2ContractTest {
             assertTrue(source.contains("dayNightSpinner("));
             assertTrue(source.contains("map.automaticDayNight = selection == 0"));
             assertTrue(source.contains("map.nightMode = selection == 2"));
+            assertTrue(source.contains("navigationColorField("));
+            assertTrue(source.contains("navigationIntegrationConfigJson.commit("));
+            assertTrue(source.contains("persistNavigationConfiguration("));
         }
         assertFalse(cluster.contains("android.widget.EditText"));
         assertTrue(cluster.contains("map.cameraMode = navigationCameraModeValue("));
@@ -180,6 +205,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue((NavigationBridgeContract.CAP_CLUSTER_INDEPENDENT_MAP_WINDOW
                 & NavigationBridgeContract.CAP_CLUSTER_DIRECT_SURFACE) == 0L);
         assertTrue(NavigationBridgeContract.CAP_NATRO_CLUSTER_SURFACE_PROVIDER != 0L);
+        assertTrue(NavigationBridgeContract.CAP_EXTERNAL_INSTRUMENT_LAUNCHER != 0L);
+        assertTrue(NavigationBridgeContract.MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH
+                > NavigationBridgeContract.MSG_CLUSTER_SURFACE_LOST);
     }
 
     @Test public void navigatorBindsToNatroAndPreservesExistingWindowCommands() {
@@ -367,19 +395,25 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("setTrafficStyle"));
         assertTrue(renderer.contains("\\\"scale\\\":0.45"));
         assertTrue(renderer.contains("createUserLocationLayer"));
-        assertFalse(renderer.contains("NavigationLayerFactory"));
-        assertFalse(renderer.contains("setUseLayerCamera"));
-        assertFalse(renderer.contains("setRoadEventVisibleOnRoute"));
+        assertTrue(renderer.contains("NavigationLayerFactory"));
         assertTrue(renderer.contains(
-                "routeGuidanceActive && \"ROUTE_ONLY\".equals(mode)"));
-        assertTrue(renderer.contains("routeAwareRoadEventStyleProvider"));
-        assertTrue(renderer.contains("shouldStyleRoadEvent"));
-        assertTrue(renderer.contains("properties, \"isOnRoute\""));
-        assertTrue(renderer.contains("method.invoke(delegate, arguments)"));
+                "\"setUseLayerCamera\", new Class<?>[]{boolean.class}, true"));
+        assertTrue(renderer.contains("setRoadEventVisibleOnRoute"));
+        assertTrue(renderer.contains("createNativeNavigationLayer"));
+        assertTrue(renderer.contains("parkNativeGuidanceCamera"));
+        assertTrue(renderer.contains("if (!routeGuidanceActive || currentWindow == null"));
+        assertTrue(renderer.contains("if (routeGuidanceActive) createNativeNavigationLayer()"));
+        assertTrue(renderer.contains("else removeNativeNavigationLayer()"));
+        assertTrue(renderer.contains("Enum.valueOf((Class) cameraModeClass, \"FREE\")"));
+        assertTrue(renderer.contains("setSwitchModesAutomatically"));
+        assertFalse(renderer.contains("routeAwareRoadEventStyleProvider"));
+        assertFalse(renderer.contains("shouldStyleRoadEvent"));
+        assertFalse(renderer.contains("properties, \"isOnRoute\""));
         assertTrue(renderer.contains("safe standalone road-events layer attached"));
+        assertTrue(renderer.contains("nearby fallback active"));
         assertTrue(renderer.contains("setRoadEventVisible"));
         assertTrue(renderer.contains("r74.c"));
-        assertFalse(renderer.contains("guidanceCamera"));
+        assertTrue(renderer.contains("guidanceCamera"));
         assertFalse(renderer.contains("applyNativeCameraProfile"));
         assertTrue(renderer.contains("float tilt = profile.tiltDegrees"));
         assertTrue(renderer.contains("applyCamera(false)"));

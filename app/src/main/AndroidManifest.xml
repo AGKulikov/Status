@@ -197,7 +197,7 @@
             android:name=".instrument.InstrumentPanelActivity"
             android:configChanges="density|orientation|screenSize|smallestScreenSize|uiMode"
             android:excludeFromRecents="true"
-            android:exported="false"
+            android:exported="true"
             android:hardwareAccelerated="true"
             android:launchMode="singleTask"
             android:resizeableActivity="true"

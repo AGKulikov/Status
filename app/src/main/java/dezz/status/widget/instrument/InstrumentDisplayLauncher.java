@@ -23,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dezz.status.widget.diagnostics.DiagnosticJournal;
+import dezz.status.widget.navigation.NavigationHudEndpointService;
+import dezz.status.widget.shell.PrivilegedShell;
 
 /** Mirrors the verified ECARX DIM launch sequence without keeping a permanent worker thread. */
 public final class InstrumentDisplayLauncher {
@@ -34,6 +36,9 @@ public final class InstrumentDisplayLauncher {
     private static final long DIM_MODE_TO_WAKE_MS = 100L;
     private static final long DIM_WAKE_TO_TASK_RESET_MS = 200L;
     private static final long TASK_RESET_TO_LAUNCH_MS = 50L;
+    private static final long EXTERNAL_LAUNCH_DELAY_MS = 850L;
+    private static final String FORCE_STOP_COMMAND =
+            "am force-stop --user 0 ru.natro.statuswidget";
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final AtomicBoolean LAUNCH_PENDING = new AtomicBoolean();
     private static final ThreadPoolExecutor DIM_LANE = createDimLane();
@@ -69,7 +74,7 @@ public final class InstrumentDisplayLauncher {
                     switchDimMode(app, DIM_NAVIGATION_MODE);
                     SystemClock.sleep(DIM_MODE_TO_WAKE_MS);
                     sendDimWake(app);
-                    postTaskReset(app, DIM_WAKE_TO_TASK_RESET_MS);
+                    postExternalLaunch(app, 0, DIM_WAKE_TO_TASK_RESET_MS);
                 } catch (RuntimeException failure) {
                     LAUNCH_PENDING.set(false);
                     Log.w(TAG, "DIM launch sequence failed", failure);
@@ -109,7 +114,9 @@ public final class InstrumentDisplayLauncher {
         }
         Intent intent = new Intent(app, InstrumentPanelActivity.class)
                 .setAction(Intent.ACTION_MAIN)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(InstrumentPanelStore.EXTRA_LAUNCH_TOKEN,
+                        store.issueLaunchToken());
         ActivityOptions options = ActivityOptions.makeBasic();
         options.setLaunchDisplayId(config.displayId);
         Bundle launchOptions = options.toBundle();
@@ -138,6 +145,72 @@ public final class InstrumentDisplayLauncher {
             finishStalePanelTask(app);
             postStart(app, 0, TASK_RESET_TO_LAUNCH_MS);
         }, app, SystemClock.uptimeMillis() + Math.max(0L, delayMillis));
+    }
+
+    private static void postExternalLaunch(@NonNull Context app, int attempt,
+                                           long delayMillis) {
+        MAIN.postAtTime(() -> prepareExternalLaunch(app, attempt), app,
+                SystemClock.uptimeMillis() + Math.max(0L, delayMillis));
+    }
+
+    /**
+     * MConfig launches the target from its own process after force-stopping the target package.
+     * Natro cannot survive its own force-stop, so the authenticated Navigator bridge keeps the
+     * delayed Activity start. The preliminary shell probe prevents arming that launch when the
+     * package reset cannot be issued.
+     */
+    private static void prepareExternalLaunch(@NonNull Context app, int attempt) {
+        InstrumentPanelStore store = new InstrumentPanelStore(app);
+        if (!store.isEnabled()) {
+            LAUNCH_PENDING.set(false);
+            return;
+        }
+        InstrumentPanelConfig config = store.load();
+        DisplayManager displays = app.getSystemService(DisplayManager.class);
+        if ((displays == null || displays.getDisplay(config.displayId) == null)
+                && attempt < MAX_DISPLAY_RETRIES) {
+            postExternalLaunch(app, attempt + 1, DISPLAY_RETRY_MS);
+            return;
+        }
+        PrivilegedShell shell = PrivilegedShell.get(app);
+        shell.runCommand("true", (probeOutput, probeError) -> {
+            if (probeError != null) {
+                DiagnosticJournal.warn("instrument-panel",
+                        "external launch unavailable; using direct fallback: " + probeError);
+                postTaskReset(app, 0L);
+                return;
+            }
+            final String launchToken;
+            try {
+                launchToken = store.issueLaunchToken();
+            } catch (RuntimeException failure) {
+                LAUNCH_PENDING.set(false);
+                DiagnosticJournal.error("instrument-panel",
+                        "could not persist external launch token", failure);
+                return;
+            }
+            NavigationHudEndpointService.prepareInstrumentPanelLaunch(
+                    config.displayId, launchToken, EXTERNAL_LAUNCH_DELAY_MS, prepared -> {
+                        if (!prepared) {
+                            DiagnosticJournal.warn("instrument-panel",
+                                    "Navigator external launcher unavailable; using direct fallback");
+                            postTaskReset(app, 0L);
+                            return;
+                        }
+                        DiagnosticJournal.info("instrument-panel",
+                                "resetting Natro package after Navigator accepted DIM launch");
+                        shell.runCommand(FORCE_STOP_COMMAND, (output, error) -> {
+                            // On success Android terminates this process before the callback. If a
+                            // firmware keeps it alive, Navigator still owns the already-armed start.
+                            if (error != null) {
+                                Log.w(TAG, "Natro package reset failed after external handoff: "
+                                        + error);
+                                DiagnosticJournal.warn("instrument-panel",
+                                        "package reset failed after external handoff: " + error);
+                            }
+                        });
+                    });
+        });
     }
 
     /**

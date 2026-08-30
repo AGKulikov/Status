@@ -199,6 +199,14 @@ public class Preferences {
         public void set(String value) {
             preferences.prefs.edit().putString(key, value).apply();
         }
+
+        /**
+         * Persist state that must survive an immediate process/package restart before returning.
+         * Ordinary high-frequency preferences should keep using {@link #set(String)}.
+         */
+        public boolean commit(String value) {
+            return preferences.prefs.edit().putString(key, value).commit();
+        }
     }
 
     /** A string encrypted with an app-private Android Keystore key. */

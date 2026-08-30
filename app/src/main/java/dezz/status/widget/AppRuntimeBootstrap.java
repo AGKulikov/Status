@@ -62,8 +62,8 @@ public final class AppRuntimeBootstrap {
      * action deliberately asks its live service to retry overlay/reservation setup. This matters
      * when overlay or location access was granted without recreating the settings Activity.</p>
      */
-    static void reconcileServices(@NonNull Context context,
-                                  @NonNull Preferences preferences) {
+    public static void reconcileServices(@NonNull Context context,
+                                         @NonNull Preferences preferences) {
         Context appContext = context.getApplicationContext();
         boolean integrationHostRequired =
                 WidgetServiceStarter.requiresIntegrationHost(preferences);

@@ -59,6 +59,52 @@ public final class NavigationHudEndpointService extends Service {
     @NonNull private final Runnable snapshotDrain = this::drainLatestSnapshot;
     @NonNull private final Runnable routeGeometryDrain = this::drainLatestRouteGeometry;
 
+    public interface InstrumentLaunchCallback {
+        /** Delivered on Natro's main thread after the request entered Navigator's Binder queue. */
+        void onPrepared(boolean prepared);
+    }
+
+    /**
+     * Arms the already-authenticated Navigator process as the external DIM launcher. This mirrors
+     * MConfig's important process boundary: Navigator keeps the delayed launch after Natro resets
+     * its own package task, so ECARX does not ask to move the current Natro task to the DIM.
+     */
+    public static void prepareInstrumentPanelLaunch(
+            int displayId,
+            @NonNull String launchToken,
+            long delayMillis,
+            @NonNull InstrumentLaunchCallback callback) {
+        NavigationHudEndpointService current = instance;
+        if (current == null) {
+            new Handler(Looper.getMainLooper()).post(() -> callback.onPrepared(false));
+            return;
+        }
+        current.handler.post(() -> {
+            Client connected = current.client;
+            boolean supported = connected != null
+                    && (connected.capabilities
+                    & NavigationBridgeContract.CAP_EXTERNAL_INSTRUMENT_LAUNCHER) != 0L;
+            if (!supported || launchToken.length() < 16 || launchToken.length() > 128) {
+                callback.onPrepared(false);
+                return;
+            }
+            Bundle data = new Bundle();
+            data.putString(NavigationBridgeContract.KEY_SESSION_ID, connected.sessionId);
+            data.putInt(NavigationBridgeContract.KEY_INSTRUMENT_DISPLAY_ID,
+                    Math.max(0, Math.min(15, displayId)));
+            data.putLong(NavigationBridgeContract.KEY_INSTRUMENT_LAUNCH_DELAY_MS,
+                    Math.max(250L, Math.min(3_000L, delayMillis)));
+            data.putString(NavigationBridgeContract.KEY_INSTRUMENT_LAUNCH_TOKEN, launchToken);
+            boolean sent = send(connected.messenger,
+                    NavigationBridgeContract.MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH, data);
+            if (sent) {
+                DiagnosticJournal.info("instrument-panel",
+                        "external Navigator launch armed for display " + displayId);
+            }
+            callback.onPrepared(sent);
+        });
+    }
+
     /** Called by the HUD TextureView in this same Natro process. Ownership stays with it. */
     public static long publishHudSurface(@NonNull Surface surface,
                                          int width, int height, int dpi) {
@@ -616,12 +662,15 @@ public final class NavigationHudEndpointService extends Service {
         send(target, NavigationBridgeContract.MSG_ERROR, data);
     }
 
-    private static void send(@NonNull Messenger target, int what, @NonNull Bundle data) {
+    private static boolean send(@NonNull Messenger target, int what, @NonNull Bundle data) {
         Message response = Message.obtain(null, what);
         response.setData(data);
         try {
             target.send(response);
-        } catch (RemoteException ignored) {}
+            return true;
+        } catch (RemoteException ignored) {
+            return false;
+        }
     }
 
     /** Immutable hand-off from the Messenger main Looper to the bounded parser queue. */

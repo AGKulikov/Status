@@ -7,9 +7,7 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.view.Surface;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,6 +56,10 @@ final class HudMapRenderer {
     private Object roadEventStyleProvider;
     private Object roadEventsManager;
     private Object roadEventsLayer;
+    private Object navigationRuntime;
+    private Object navigationStyleProvider;
+    private Object navigationLayer;
+    private Object guidanceCamera;
     private Object routeCollection;
     private Object routePolyline;
     private Object activeRoute;
@@ -154,8 +156,12 @@ final class HudMapRenderer {
         applyCamera(false);
     }
 
-    /** Clears route-scoped presentation when Navigator no longer has a Navigation session. */
+    /** Keeps route-only events bound to Navigator's real automotive Navigation session. */
     void updateNavigationRuntime(Object nextNavigation) {
+        if (navigationRuntime == nextNavigation) return;
+        removeNativeNavigationLayer();
+        navigationRuntime = nextNavigation;
+        if (mapWindow != null && nextNavigation != null) createNativeNavigationLayer();
         if (nextNavigation == null) {
             routeGuidanceActive = false;
             trafficLightMapLayer.clearData();
@@ -169,7 +175,15 @@ final class HudMapRenderer {
         if (frame == null) return;
         boolean routeVisibilityChanged = routeGuidanceActive != frame.routeActive;
         routeGuidanceActive = frame.routeActive;
-        if (routeVisibilityChanged) applyRoadEventVisibility();
+        if (routeVisibilityChanged) {
+            // A camera-backed NavigationLayer is useful only while a user route exists. The
+            // previous always-attached experiment left MapKit's native layer alive in free drive
+            // and was followed by the Navigator process dying a few seconds later. Binding it to
+            // the real route lifecycle also removes all route-event work when guidance is idle.
+            if (routeGuidanceActive) createNativeNavigationLayer();
+            else removeNativeNavigationLayer();
+            applyRoadEventVisibility();
+        }
         trafficLightMapLayer.update(frame.routeActive,
                 frame.trafficLightsSampleElapsedMs, frame.trafficLights);
         if (!frame.isValid()) return;
@@ -310,6 +324,7 @@ final class HudMapRenderer {
 
             createRoadEventsLayer(mapKit, mapKitClass, mapWindowClass, nextMapWindow);
             applyProfile();
+            createNativeNavigationLayer();
             Log.i(TAG, "Independent " + displayName
                     + " OffscreenMapWindow attached, generation=" + generation
                     + ", size=" + width + "x" + height);
@@ -462,15 +477,13 @@ final class HudMapRenderer {
                     .newInstance(context);
             Class<?> styleProviderClass = Class.forName(
                     "com.yandex.mapkit.road_events_layer.StyleProvider");
-            Object provider = routeAwareRoadEventStyleProvider(
-                    styleProviderClass, stockProvider);
             Class<?> managerClass = Class.forName(
                     "com.yandex.mapkit.road_events.RoadEventsManager");
             Object manager = mapKitClass.getMethod("createRoadEventsManager").invoke(mapKit);
             Object layer = mapKitClass.getMethod("createRoadEventsLayer", mapWindowClass,
                             styleProviderClass, managerClass)
-                    .invoke(mapKit, currentMapWindow, provider, manager);
-            roadEventStyleProvider = provider;
+                    .invoke(mapKit, currentMapWindow, stockProvider, manager);
+            roadEventStyleProvider = stockProvider;
             roadEventsManager = manager;
             roadEventsLayer = layer;
             applyRoadEventVisibility();
@@ -489,77 +502,138 @@ final class HudMapRenderer {
     }
 
     /**
-     * Keeps Navigator's own icon provider, including its camera artwork and directional metadata,
-     * but applies ROUTE_ONLY to each event rather than to the complete nearby-events layer.
-     * RoadEventStylingProperties.isOnRoute() is the public MapKit 30.3.0 route-match result; using
-     * it avoids both missing route events and markers leaking in from a parallel street.
+     * Route matching belongs to NavigationLayer, not to a standalone nearby-events layer. The
+     * latter reports {@code isOnRoute=false} because it has no automotive Navigation attached,
+     * which made every ROUTE_ONLY marker disappear in 2.5.4. Keep MapKit's camera subsystem
+     * enabled (the camera-less 30.3.0 path crashes natively), park it in FREE mode, and leave all
+     * actual camera movement to the exact Natro profile below.
      */
-    private Object routeAwareRoadEventStyleProvider(Class<?> providerClass, Object delegate) {
-        return Proxy.newProxyInstance(providerClass.getClassLoader(),
-                new Class<?>[]{providerClass}, (proxy, method, arguments) -> {
-                    if (method.getDeclaringClass() == Object.class) {
-                        String name = method.getName();
-                        if ("toString".equals(name)) return "NatroRouteAwareRoadEventStyleProvider";
-                        if ("hashCode".equals(name)) return System.identityHashCode(proxy);
-                        if ("equals".equals(name)) {
-                            return arguments != null && arguments.length == 1
-                                    && proxy == arguments[0];
-                        }
-                    }
-                    if ("provideStyle".equals(method.getName())
-                            && arguments != null && arguments.length >= 1
-                            && !shouldStyleRoadEvent(arguments[0])) {
-                        return Boolean.FALSE;
-                    }
-                    try {
-                        return method.invoke(delegate, arguments);
-                    } catch (InvocationTargetException failure) {
-                        throw failure.getCause();
-                    }
-                });
+    private void createNativeNavigationLayer() {
+        Object currentWindow = mapWindow;
+        Object currentNavigation = navigationRuntime;
+        Object eventProvider = roadEventStyleProvider;
+        if (!routeGuidanceActive || currentWindow == null || currentNavigation == null
+                || eventProvider == null || navigationLayer != null) return;
+        try {
+            Class<?> mapWindowClass = Class.forName("com.yandex.mapkit.map.MapWindow");
+            Class<?> eventProviderClass = Class.forName(
+                    "com.yandex.mapkit.road_events_layer.StyleProvider");
+            Class<?> navigationProviderClass = Class.forName(
+                    "com.yandex.mapkit.navigation.automotive.layer.styling."
+                            + "NavigationStyleProvider");
+            Class<?> navigationClass = Class.forName(
+                    "com.yandex.mapkit.navigation.automotive.Navigation");
+            Class<?> settingsClass = Class.forName(
+                    "com.yandex.mapkit.navigation.automotive.layer.NavigationLayerSettings");
+            Object settings = settingsClass.getConstructor().newInstance();
+            invoke(settings, "setUseDefaultSublayersSetup",
+                    new Class<?>[]{boolean.class}, false);
+            invoke(settings, "setUseLayerCamera", new Class<?>[]{boolean.class}, true);
+            invoke(settings, "setUseLayerRoadEvents", new Class<?>[]{boolean.class}, true);
+            invoke(settings, "setUseLayerRoutes", new Class<?>[]{boolean.class}, false);
+            invoke(settings, "setUseLayerCursor", new Class<?>[]{boolean.class}, false);
+            invoke(settings, "setUseLayerRequestPoints", new Class<?>[]{boolean.class}, false);
+            invoke(settings, "setUseLayerBalloonsInGuidance",
+                    new Class<?>[]{boolean.class}, false);
+            invoke(settings, "setUseLayerBalloonsInNavigation",
+                    new Class<?>[]{boolean.class}, false);
+
+            Object style = Class.forName(
+                            "com.yandex.mapkit.styling.automotivenavigation."
+                                    + "AutomotiveNavigationStyleProvider")
+                    .getConstructor(Context.class).newInstance(context);
+            Class<?> factoryClass = Class.forName(
+                    "com.yandex.mapkit.navigation.automotive.layer.NavigationLayerFactory");
+            Object layer = factoryClass.getMethod("createNavigationLayer", mapWindowClass,
+                            eventProviderClass, navigationProviderClass, navigationClass,
+                            settingsClass)
+                    .invoke(null, currentWindow, eventProvider, style, currentNavigation,
+                            settings);
+            navigationStyleProvider = style;
+            navigationLayer = layer;
+            guidanceCamera = invoke(layer, "getCamera", new Class<?>[0]);
+            parkNativeGuidanceCamera();
+            applyRoadEventVisibility();
+            Log.i(TAG, "Route-matched road-events layer attached to " + displayName);
+            NavigationBridgeClient.reportDiagnostic(
+                    "route-matched road-events layer attached to independent "
+                            + displayName + " MapWindow");
+        } catch (Throwable failure) {
+            removeNativeNavigationLayer();
+            applyRoadEventVisibility();
+            Log.w(TAG, "Route-matched road-events layer unavailable: "
+                    + shortMessage(failure));
+            NavigationBridgeClient.reportDiagnostic(
+                    "route-matched road-events layer unavailable; nearby fallback active: "
+                            + shortMessage(failure));
+        }
     }
 
-    private boolean shouldStyleRoadEvent(Object properties) {
+    private void parkNativeGuidanceCamera() {
+        Object camera = guidanceCamera;
+        if (camera == null) return;
         try {
-            @SuppressWarnings("unchecked")
-            List<Object> tags = (List<Object>) invoke(
-                    properties, "getTags", new Class<?>[0]);
-            boolean routeOnly = false;
-            for (Object tag : tags) {
-                String mode = profile.roadEventMode(String.valueOf(tag));
-                if ("ALWAYS".equals(mode)) return true;
-                if ("ROUTE_ONLY".equals(mode)) routeOnly = true;
-            }
-            if (!routeOnly || !routeGuidanceActive) return false;
-            return Boolean.TRUE.equals(invoke(
-                    properties, "isOnRoute", new Class<?>[0]));
-        } catch (Throwable unavailable) {
-            // Failing closed is important here: an unknown object must not leak from a nearby
-            // street into the route-only HUD layer.
-            return false;
+            Class<?> animationTypeClass = Class.forName("com.yandex.mapkit.Animation$Type");
+            Object smooth = animationTypeClass.getField("SMOOTH").get(null);
+            Class<?> animationClass = Class.forName("com.yandex.mapkit.Animation");
+            Object immediate = animationClass.getConstructor(animationTypeClass, float.class)
+                    .newInstance(smooth, 0f);
+            Class<?> cameraModeClass = Class.forName(
+                    "com.yandex.mapkit.navigation.guidance_camera.CameraMode");
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            Object free = Enum.valueOf((Class) cameraModeClass, "FREE");
+            invoke(camera, "setSwitchModesAutomatically",
+                    new Class<?>[]{boolean.class}, false);
+            invoke(camera, "setAutoRotation",
+                    new Class<?>[]{boolean.class, animationClass}, false, immediate);
+            invoke(camera, "setAutoZoom",
+                    new Class<?>[]{boolean.class, animationClass}, false, immediate);
+            invoke(camera, "setCameraMode",
+                    new Class<?>[]{cameraModeClass, animationClass}, free, immediate);
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Could not park GuidanceCamera", failure);
         }
     }
 
     private void applyRoadEventVisibility() {
         Object everywhere = roadEventsLayer;
-        if (everywhere == null) return;
+        Object onRoute = navigationLayer;
+        if (everywhere == null && onRoute == null) return;
         try {
             Class<?> eventTagClass = Class.forName("com.yandex.mapkit.road_events.EventTag");
             for (String tagName : NavigationMapProfile.ROAD_EVENT_TAGS) {
                 @SuppressWarnings({"rawtypes", "unchecked"})
                 Object tag = Enum.valueOf((Class) eventTagClass, tagName);
                 String mode = profile.roadEventMode(tagName);
-                // MapKit 30.3.0 crashes asynchronously when an automotive NavigationLayer is
-                // created for road events with its camera disabled. Keep the stable standalone
-                // RoadEventsLayer and let its route-aware StyleProvider filter each object.
-                boolean visible = "ALWAYS".equals(mode)
-                        || (routeGuidanceActive && "ROUTE_ONLY".equals(mode));
-                invoke(everywhere, "setRoadEventVisible",
-                        new Class<?>[]{eventTagClass, boolean.class}, tag, visible);
+                if (everywhere != null) {
+                    // Never leave the user with an empty map if the automotive layer is absent:
+                    // the fallback can include a nearby marker, but it preserves all selected data.
+                    boolean fallbackRoute = onRoute == null && routeGuidanceActive
+                            && "ROUTE_ONLY".equals(mode);
+                    invoke(everywhere, "setRoadEventVisible",
+                            new Class<?>[]{eventTagClass, boolean.class}, tag,
+                            "ALWAYS".equals(mode) || fallbackRoute);
+                }
+                if (onRoute != null) {
+                    invoke(onRoute, "setRoadEventVisibleOnRoute",
+                            new Class<?>[]{eventTagClass, boolean.class}, tag,
+                            "ROUTE_ONLY".equals(mode));
+                }
             }
         } catch (Throwable failure) {
             Log.w(TAG, "HUD road-event visibility could not be applied", failure);
         }
+    }
+
+    private void removeNativeNavigationLayer() {
+        Object layer = navigationLayer;
+        if (layer != null) {
+            try { invoke(layer, "removeFromMap", new Class<?>[0]); }
+            catch (Throwable ignored) {}
+        }
+        guidanceCamera = null;
+        navigationLayer = null;
+        navigationStyleProvider = null;
     }
 
     /** Renders the exact active DrivingRoute geometry into this independent MapWindow. */
@@ -762,6 +836,7 @@ final class HudMapRenderer {
     }
 
     private void stopRenderer(boolean releaseSurface) {
+        removeNativeNavigationLayer();
         Object currentMapWindow = mapWindow;
         Object currentRuntimeSurface = runtimeSurface;
         Surface currentSurface = surface;

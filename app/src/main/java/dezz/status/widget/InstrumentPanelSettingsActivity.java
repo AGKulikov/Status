@@ -393,30 +393,42 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(section("Маршрут и курсор"), marginTop(14));
         SliderField cursorScale = slider(content, "Размер курсора",
                 map.cursorScalePercent, 25, 300, 5, " %");
-        ColorField cursorColor = colorField(content, "Цвет автомобиля", map.cursorColor);
-        ColorField cursorOutline = colorField(content, "Контур автомобиля",
-                map.cursorOutlineColor);
-        ColorField routeColor = colorField(content, "Цвет маршрута", map.routeColor);
-        ColorField routeOutline = colorField(content, "Контур маршрута",
-                map.routeOutlineColor);
+        ColorField cursorColor = navigationColorField(content, "Цвет автомобиля",
+                map.cursorColor, finalNavigation, preferences,
+                value -> map.cursorColor = value);
+        ColorField cursorOutline = navigationColorField(content, "Контур автомобиля",
+                map.cursorOutlineColor, finalNavigation, preferences,
+                value -> map.cursorOutlineColor = value);
+        ColorField routeColor = navigationColorField(content, "Цвет маршрута",
+                map.routeColor, finalNavigation, preferences,
+                value -> map.routeColor = value);
+        ColorField routeOutline = navigationColorField(content, "Контур маршрута",
+                map.routeOutlineColor, finalNavigation, preferences,
+                value -> map.routeOutlineColor = value);
         SliderField routeWidth = slider(content, "Толщина маршрута",
                 map.routeWidth, 1, 40, 0.5, " px");
         SliderField routeOutlineWidth = slider(content, "Толщина контура маршрута",
                 map.routeOutlineWidth, 0, 20, 0.5, " px");
 
         content.addView(section("Цвета загруженности дорог"), marginTop(14));
-        ColorField trafficFreeColor = colorField(content, "Дорога свободна",
-                map.trafficFreeColor);
-        ColorField trafficLightColor = colorField(content, "Небольшое затруднение",
-                map.trafficLightColor);
-        ColorField trafficHardColor = colorField(content, "Плотное движение",
-                map.trafficHardColor);
-        ColorField trafficVeryHardColor = colorField(content, "Сильная пробка",
-                map.trafficVeryHardColor);
-        ColorField trafficBlockedColor = colorField(content, "Дорога перекрыта",
-                map.trafficBlockedColor);
-        ColorField trafficUnknownColor = colorField(content, "Нет данных",
-                map.trafficUnknownColor);
+        ColorField trafficFreeColor = navigationColorField(content, "Дорога свободна",
+                map.trafficFreeColor, finalNavigation, preferences,
+                value -> map.trafficFreeColor = value);
+        ColorField trafficLightColor = navigationColorField(content,
+                "Небольшое затруднение", map.trafficLightColor,
+                finalNavigation, preferences, value -> map.trafficLightColor = value);
+        ColorField trafficHardColor = navigationColorField(content, "Плотное движение",
+                map.trafficHardColor, finalNavigation, preferences,
+                value -> map.trafficHardColor = value);
+        ColorField trafficVeryHardColor = navigationColorField(content, "Сильная пробка",
+                map.trafficVeryHardColor, finalNavigation, preferences,
+                value -> map.trafficVeryHardColor = value);
+        ColorField trafficBlockedColor = navigationColorField(content, "Дорога перекрыта",
+                map.trafficBlockedColor, finalNavigation, preferences,
+                value -> map.trafficBlockedColor = value);
+        ColorField trafficUnknownColor = navigationColorField(content, "Нет данных",
+                map.trafficUnknownColor, finalNavigation, preferences,
+                value -> map.trafficUnknownColor = value);
         SliderField trafficGradient = slider(content, "Длина перехода цветов пробок",
                 map.trafficGradientLength, 0, 100, 1, " %");
 
@@ -460,19 +472,13 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.trafficBlockedColor = trafficBlockedColor.value;
                     map.trafficUnknownColor = trafficUnknownColor.value;
                     map.trafficGradientLength = trafficGradient.value();
-                    try {
-                        finalNavigation.normalize();
-                        preferences.navigationIntegrationConfigJson.set(
-                                finalNavigation.toJson().toString());
-                        NavigationHudEndpointService.requestConfigurationRefresh(this);
+                    if (persistNavigationConfiguration(finalNavigation, preferences)) {
                         // Make the projected panel re-read map enable/opacity immediately. When
                         // disabled this revokes its Surface instead of retaining an idle lease.
                         sendBroadcast(new android.content.Intent(
                                 InstrumentPanelStore.ACTION_CONFIG_CHANGED)
                                 .setPackage(getPackageName()));
                         preview.updateConfig(config);
-                    } catch (JSONException impossible) {
-                        throw new IllegalStateException(impossible);
                     }
                 })
                 .setNegativeButton("Отмена", null)
@@ -517,13 +523,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                         profile.setRoadEventMode(control.tag, roadEventModeValue(
                                 control.mode.getSelectedItemPosition()));
                     }
-                    try {
-                        preferences.navigationIntegrationConfigJson.set(
-                                navigation.toJson().toString());
-                        NavigationHudEndpointService.requestConfigurationRefresh(this);
-                    } catch (JSONException impossible) {
-                        throw new IllegalStateException(impossible);
-                    }
+                    persistNavigationConfiguration(navigation, preferences);
                 })
                 .setNegativeButton("Отмена", null)
                 .show();
@@ -739,8 +739,44 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         return result;
     }
 
+    @NonNull private ColorField navigationColorField(
+            @NonNull LinearLayout parent,
+            @NonNull String title,
+            @NonNull String initial,
+            @NonNull NavigationIntegrationConfig navigation,
+            @NonNull Preferences preferences,
+            @NonNull ColorSelectionListener setter) {
+        return colorField(parent, title, initial, selected -> {
+            setter.onSelected(selected);
+            persistNavigationConfiguration(navigation, preferences);
+        });
+    }
+
+    private boolean persistNavigationConfiguration(
+            @NonNull NavigationIntegrationConfig navigation,
+            @NonNull Preferences preferences) {
+        try {
+            navigation.normalize();
+            boolean stored = preferences.navigationIntegrationConfigJson.commit(
+                    navigation.toJson().toString());
+            if (!stored) throw new IllegalStateException("Не удалось записать настройки карты");
+            NavigationHudEndpointService.requestConfigurationRefresh(this);
+            return true;
+        } catch (Exception failure) {
+            Toast.makeText(this, "Не удалось сохранить настройки карты: "
+                    + failure.getMessage(), Toast.LENGTH_LONG).show();
+            return false;
+        }
+    }
+
     @NonNull private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
                                            @NonNull String initial) {
+        return colorField(parent, title, initial, null);
+    }
+
+    @NonNull private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
+                                           @NonNull String initial,
+                                           @Nullable ColorSelectionListener selectionListener) {
         ColorField field = new ColorField(initial);
         MaterialButton button = new MaterialButton(this);
         button.setText(title);
@@ -749,15 +785,20 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         button.setOnClickListener(view -> AppleColorPickerDialog.show(
                 this, title, field.value, AppleColorPickerDialog.Options.standard(),
                 new AppleColorPickerDialog.Listener() {
-                    private void apply(@Nullable String selected) {
-                        if (selected == null || selected.trim().isEmpty()) return;
+                    private boolean apply(@Nullable String selected) {
+                        if (selected == null || selected.trim().isEmpty()) return false;
                         field.value = selected;
                         AppleColorPickerDialog.decorateButton(button, title, field.value);
+                        return true;
                     }
 
                     @Override public void onPreview(@Nullable String selected) { apply(selected); }
 
-                    @Override public void onSelected(@Nullable String selected) { apply(selected); }
+                    @Override public void onSelected(@Nullable String selected) {
+                        if (apply(selected) && selectionListener != null) {
+                            selectionListener.onSelected(field.value);
+                        }
+                    }
                 }));
         LinearLayout.LayoutParams params = marginTop(5);
         params.height = dp(52);
@@ -769,6 +810,10 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         @NonNull String value;
 
         ColorField(@NonNull String value) { this.value = value; }
+    }
+
+    private interface ColorSelectionListener {
+        void onSelected(@NonNull String selected);
     }
 
     @NonNull private Button button(@NonNull String title) {

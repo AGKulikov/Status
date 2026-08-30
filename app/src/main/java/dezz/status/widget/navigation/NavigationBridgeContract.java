@@ -47,6 +47,8 @@ public final class NavigationBridgeContract {
     public static final int MSG_ATTACH_CLUSTER_SURFACE = 15;
     public static final int MSG_DETACH_CLUSTER_SURFACE = 16;
     public static final int MSG_CLUSTER_SURFACE_LOST = 17;
+    /** Natro asks its authenticated Navigator peer to perform the external DIM task launch. */
+    public static final int MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH = 18;
 
     public static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     public static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -62,6 +64,7 @@ public final class NavigationBridgeContract {
     /** Navigator owns a third, native-size MapWindow for Natro's instrument panel. */
     public static final long CAP_CLUSTER_INDEPENDENT_MAP_WINDOW = 1L << 10;
     public static final long CAP_CLUSTER_DIRECT_SURFACE = 1L << 11;
+    public static final long CAP_EXTERNAL_INSTRUMENT_LAUNCHER = 1L << 12;
     public static final long CAP_NATRO_CONFIGURATION_HOST = 1L << 32;
     public static final long CAP_NATRO_NAVIGATION_STATE_SINK = 1L << 33;
     /** Advertise only after Natro can lease a real Surface rather than a bitmap bridge. */
@@ -91,6 +94,9 @@ public final class NavigationBridgeContract {
     public static final String KEY_WINDOW_COMMAND_SOURCE = "window_command_source";
     public static final String KEY_ERROR_CODE = "error_code";
     public static final String KEY_ERROR_DETAIL = "error_detail";
+    public static final String KEY_INSTRUMENT_DISPLAY_ID = "instrument_display_id";
+    public static final String KEY_INSTRUMENT_LAUNCH_DELAY_MS = "instrument_launch_delay_ms";
+    public static final String KEY_INSTRUMENT_LAUNCH_TOKEN = "instrument_launch_token";
 
     private NavigationBridgeContract() {}
 }

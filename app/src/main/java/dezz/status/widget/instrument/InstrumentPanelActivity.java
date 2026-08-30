@@ -17,6 +17,10 @@ import androidx.core.content.ContextCompat;
 
 import java.lang.ref.WeakReference;
 
+import dezz.status.widget.AppRuntimeBootstrap;
+import dezz.status.widget.Preferences;
+import dezz.status.widget.StatusWidgetApplication;
+
 /** Touch-free 1920x720 activity projected to the driver's instrument display. */
 public final class InstrumentPanelActivity extends Activity {
     private static volatile WeakReference<InstrumentPanelActivity> active =
@@ -48,15 +52,23 @@ public final class InstrumentPanelActivity extends Activity {
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        active = new WeakReference<>(this);
-        configureWindow();
         store = new InstrumentPanelStore(this);
+        if (savedInstanceState == null && !store.consumeLaunchToken(
+                getIntent() == null ? null
+                        : getIntent().getStringExtra(InstrumentPanelStore.EXTRA_LAUNCH_TOKEN))) {
+            finishAndRemoveTask();
+            return;
+        }
         if (!store.isEnabled()) {
             finishAndRemoveTask();
             return;
         }
+        active = new WeakReference<>(this);
+        configureWindow();
         panel = new InstrumentPanelView(this, store.load(), false, null);
         setContentView(panel);
+        StatusWidgetApplication.notifyFirstUsefulSurface(this);
+        AppRuntimeBootstrap.reconcileServices(this, new Preferences(this));
         IntentFilter filter = new IntentFilter();
         filter.addAction(InstrumentPanelStore.ACTION_CONFIG_CHANGED);
         filter.addAction(InstrumentPanelStore.ACTION_CLOSE);
@@ -67,6 +79,10 @@ public final class InstrumentPanelActivity extends Activity {
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        if (intent == null || store == null || !store.consumeLaunchToken(
+                intent.getStringExtra(InstrumentPanelStore.EXTRA_LAUNCH_TOKEN))) {
+            return;
+        }
         setIntent(intent);
         reload();
     }
