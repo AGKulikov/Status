@@ -56,9 +56,6 @@ final class HudMapRenderer {
     private Object roadEventStyleProvider;
     private Object roadEventsManager;
     private Object roadEventsLayer;
-    private Object navigationRuntime;
-    private Object navigationStyleProvider;
-    private Object navigationLayer;
     private Object routeCollection;
     private Object routePolyline;
     private Object activeRoute;
@@ -75,6 +72,7 @@ final class HudMapRenderer {
     private NavigatorStatePublisher.CameraState navigationCamera;
     private AppliedCamera lastAppliedCamera;
     private boolean freeCameraInitialized;
+    private boolean routeGuidanceActive;
     private double latestSpeedKmh = Double.NaN;
     private int appliedMaximumFps = -1;
     private NavigationMapProfile profile = new NavigationMapProfile();
@@ -154,14 +152,12 @@ final class HudMapRenderer {
         applyCamera(false);
     }
 
-    /** Attaches the second MapWindow to Navigator's existing automotive Navigation session. */
+    /** Clears route-scoped presentation when Navigator no longer has a Navigation session. */
     void updateNavigationRuntime(Object nextNavigation) {
-        if (navigationRuntime == nextNavigation) return;
-        removeNativeNavigationLayer();
-        navigationRuntime = nextNavigation;
-        if (mapWindow != null && nextNavigation != null) createNativeNavigationLayer();
         if (nextNavigation == null) {
+            routeGuidanceActive = false;
             trafficLightMapLayer.clearData();
+            applyRoadEventVisibility();
             applyCamera(false);
         }
     }
@@ -169,6 +165,9 @@ final class HudMapRenderer {
     /** Canonical navigation location, independent from every visual operation on the main map. */
     void updateNavigationState(NavigatorStatePublisher.NavigationFrame frame) {
         if (frame == null) return;
+        boolean routeVisibilityChanged = routeGuidanceActive != frame.routeActive;
+        routeGuidanceActive = frame.routeActive;
+        if (routeVisibilityChanged) applyRoadEventVisibility();
         trafficLightMapLayer.update(frame.routeActive,
                 frame.trafficLightsSampleElapsedMs, frame.trafficLights);
         if (!frame.isValid()) return;
@@ -309,7 +308,6 @@ final class HudMapRenderer {
 
             createRoadEventsLayer(mapKit, mapKitClass, mapWindowClass, nextMapWindow);
             applyProfile();
-            createNativeNavigationLayer();
             Log.i(TAG, "Independent " + displayName
                     + " OffscreenMapWindow attached, generation=" + generation
                     + ", size=" + width + "x" + height);
@@ -472,7 +470,10 @@ final class HudMapRenderer {
             roadEventsManager = manager;
             roadEventsLayer = layer;
             applyRoadEventVisibility();
-            Log.i(TAG, "Native Yandex road-events layer attached to HUD map");
+            Log.i(TAG, "Standalone Yandex road-events layer attached to " + displayName);
+            NavigationBridgeClient.reportDiagnostic(
+                    "safe standalone road-events layer attached to independent "
+                            + displayName + " MapWindow");
         } catch (Throwable failure) {
             roadEventStyleProvider = null;
             roadEventsManager = null;
@@ -483,98 +484,27 @@ final class HudMapRenderer {
         }
     }
 
-    /** Creates a route-events-only NavigationLayer; route, cursor and camera stay custom. */
-    private void createNativeNavigationLayer() {
-        Object currentWindow = mapWindow;
-        Object currentNavigation = navigationRuntime;
-        Object eventProvider = roadEventStyleProvider;
-        if (currentWindow == null || currentNavigation == null || eventProvider == null
-                || navigationLayer != null) return;
-        try {
-            Class<?> mapWindowClass = Class.forName("com.yandex.mapkit.map.MapWindow");
-            Class<?> eventProviderClass = Class.forName(
-                    "com.yandex.mapkit.road_events_layer.StyleProvider");
-            Class<?> navigationProviderClass = Class.forName(
-                    "com.yandex.mapkit.navigation.automotive.layer.styling."
-                            + "NavigationStyleProvider");
-            Class<?> navigationClass = Class.forName(
-                    "com.yandex.mapkit.navigation.automotive.Navigation");
-            Class<?> settingsClass = Class.forName(
-                    "com.yandex.mapkit.navigation.automotive.layer.NavigationLayerSettings");
-            Object settings = settingsClass.getConstructor().newInstance();
-            invoke(settings, "setUseDefaultSublayersSetup",
-                    new Class<?>[]{boolean.class}, false);
-            // GuidanceCamera exposes only a 2D/3D threshold in MapKit 30.3.0. Keeping it disabled
-            // makes tiltDegrees, zoomDelta and cameraMode exact and gives the MapWindow one owner.
-            invoke(settings, "setUseLayerCamera", new Class<?>[]{boolean.class}, false);
-            invoke(settings, "setUseLayerRoadEvents", new Class<?>[]{boolean.class}, true);
-            invoke(settings, "setUseLayerRoutes", new Class<?>[]{boolean.class}, false);
-            invoke(settings, "setUseLayerCursor", new Class<?>[]{boolean.class}, false);
-            invoke(settings, "setUseLayerRequestPoints", new Class<?>[]{boolean.class}, false);
-            invoke(settings, "setUseLayerBalloonsInGuidance",
-                    new Class<?>[]{boolean.class}, false);
-            invoke(settings, "setUseLayerBalloonsInNavigation",
-                    new Class<?>[]{boolean.class}, false);
-
-            Object style = Class.forName(
-                            "com.yandex.mapkit.styling.automotivenavigation."
-                                    + "AutomotiveNavigationStyleProvider")
-                    .getConstructor(Context.class).newInstance(context);
-            Class<?> factoryClass = Class.forName(
-                    "com.yandex.mapkit.navigation.automotive.layer.NavigationLayerFactory");
-            Object layer = factoryClass.getMethod("createNavigationLayer", mapWindowClass,
-                            eventProviderClass, navigationProviderClass, navigationClass,
-                            settingsClass)
-                    .invoke(null, currentWindow, eventProvider, style, currentNavigation,
-                            settings);
-            navigationStyleProvider = style;
-            navigationLayer = layer;
-            applyRoadEventVisibility();
-            Log.i(TAG, "Native route-events layer attached to independent HUD MapWindow");
-            NavigationBridgeClient.reportDiagnostic(
-                    "native route-events layer attached to independent HUD MapWindow");
-        } catch (Throwable failure) {
-            removeNativeNavigationLayer();
-            Log.w(TAG, "Native HUD NavigationLayer unavailable: " + shortMessage(failure));
-            NavigationBridgeClient.reportDiagnostic(
-                    "native HUD NavigationLayer unavailable: " + shortMessage(failure));
-        }
-    }
-
     private void applyRoadEventVisibility() {
         Object everywhere = roadEventsLayer;
-        Object onRoute = navigationLayer;
-        if (everywhere == null && onRoute == null) return;
+        if (everywhere == null) return;
         try {
             Class<?> eventTagClass = Class.forName("com.yandex.mapkit.road_events.EventTag");
             for (String tagName : NavigationMapProfile.ROAD_EVENT_TAGS) {
                 @SuppressWarnings({"rawtypes", "unchecked"})
                 Object tag = Enum.valueOf((Class) eventTagClass, tagName);
                 String mode = profile.roadEventMode(tagName);
-                if (everywhere != null) {
-                    invoke(everywhere, "setRoadEventVisible",
-                            new Class<?>[]{eventTagClass, boolean.class}, tag,
-                            "ALWAYS".equals(mode));
-                }
-                if (onRoute != null) {
-                    invoke(onRoute, "setRoadEventVisibleOnRoute",
-                            new Class<?>[]{eventTagClass, boolean.class}, tag,
-                            "ROUTE_ONLY".equals(mode));
-                }
+                // MapKit 30.3.0 crashes asynchronously when an automotive NavigationLayer is
+                // created for road events with its camera disabled. Keep the stable standalone
+                // RoadEventsLayer instead. ROUTE_ONLY remains route-gated, although MapKit may
+                // show nearby events as well as events located directly on the route.
+                boolean visible = "ALWAYS".equals(mode)
+                        || (routeGuidanceActive && "ROUTE_ONLY".equals(mode));
+                invoke(everywhere, "setRoadEventVisible",
+                        new Class<?>[]{eventTagClass, boolean.class}, tag, visible);
             }
         } catch (Throwable failure) {
             Log.w(TAG, "HUD road-event visibility could not be applied", failure);
         }
-    }
-
-    private void removeNativeNavigationLayer() {
-        Object layer = navigationLayer;
-        if (layer != null) {
-            try { invoke(layer, "removeFromMap", new Class<?>[0]); }
-            catch (Throwable ignored) {}
-        }
-        navigationLayer = null;
-        navigationStyleProvider = null;
     }
 
     /** Renders the exact active DrivingRoute geometry into this independent MapWindow. */
@@ -777,7 +707,6 @@ final class HudMapRenderer {
     }
 
     private void stopRenderer(boolean releaseSurface) {
-        removeNativeNavigationLayer();
         Object currentMapWindow = mapWindow;
         Object currentRuntimeSurface = runtimeSurface;
         Surface currentSurface = surface;

@@ -367,12 +367,12 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("setTrafficStyle"));
         assertTrue(renderer.contains("\\\"scale\\\":0.45"));
         assertTrue(renderer.contains("createUserLocationLayer"));
-        assertTrue(renderer.contains("NavigationLayerFactory"));
+        assertFalse(renderer.contains("NavigationLayerFactory"));
+        assertFalse(renderer.contains("setUseLayerCamera"));
+        assertFalse(renderer.contains("setRoadEventVisibleOnRoute"));
         assertTrue(renderer.contains(
-                "setUseLayerCamera\", new Class<?>[]{boolean.class}, false"));
-        assertTrue(renderer.contains("setUseLayerRoutes"));
-        assertTrue(renderer.contains("setUseLayerCursor"));
-        assertTrue(renderer.contains("setRoadEventVisibleOnRoute"));
+                "routeGuidanceActive && \"ROUTE_ONLY\".equals(mode)"));
+        assertTrue(renderer.contains("safe standalone road-events layer attached"));
         assertTrue(renderer.contains("setRoadEventVisible"));
         assertTrue(renderer.contains("r74.c"));
         assertFalse(renderer.contains("guidanceCamera"));
