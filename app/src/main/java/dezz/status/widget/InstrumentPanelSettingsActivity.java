@@ -487,7 +487,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         LinearLayout content = dialogColumn();
         scroll.addView(content);
         content.addView(text("Для каждого события: не показывать, показывать всегда или только "
-                + "при активном маршруте. Направление камер берётся из штатных данных Яндекса.",
+                + "когда MapKit пометил его как находящееся на активном маршруте. Направление "
+                + "камер берётся из штатных данных Яндекса.",
                 12, 0xFFB8C0CC));
         String[] modes = {"Не показывать", "Всегда", "Только с маршрутом"};
         List<RoadEventControl> controls = new ArrayList<>();

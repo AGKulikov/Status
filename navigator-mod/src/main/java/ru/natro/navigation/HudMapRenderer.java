@@ -7,7 +7,9 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.view.Surface;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -456,10 +458,12 @@ final class HudMapRenderer {
                                        Class<?> mapWindowClass, Object currentMapWindow) {
         if (roadEventsLayer != null) return;
         try {
-            Object provider = Class.forName("r74.c").getConstructor(Context.class)
+            Object stockProvider = Class.forName("r74.c").getConstructor(Context.class)
                     .newInstance(context);
             Class<?> styleProviderClass = Class.forName(
                     "com.yandex.mapkit.road_events_layer.StyleProvider");
+            Object provider = routeAwareRoadEventStyleProvider(
+                    styleProviderClass, stockProvider);
             Class<?> managerClass = Class.forName(
                     "com.yandex.mapkit.road_events.RoadEventsManager");
             Object manager = mapKitClass.getMethod("createRoadEventsManager").invoke(mapKit);
@@ -484,6 +488,58 @@ final class HudMapRenderer {
         }
     }
 
+    /**
+     * Keeps Navigator's own icon provider, including its camera artwork and directional metadata,
+     * but applies ROUTE_ONLY to each event rather than to the complete nearby-events layer.
+     * RoadEventStylingProperties.isOnRoute() is the public MapKit 30.3.0 route-match result; using
+     * it avoids both missing route events and markers leaking in from a parallel street.
+     */
+    private Object routeAwareRoadEventStyleProvider(Class<?> providerClass, Object delegate) {
+        return Proxy.newProxyInstance(providerClass.getClassLoader(),
+                new Class<?>[]{providerClass}, (proxy, method, arguments) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        String name = method.getName();
+                        if ("toString".equals(name)) return "NatroRouteAwareRoadEventStyleProvider";
+                        if ("hashCode".equals(name)) return System.identityHashCode(proxy);
+                        if ("equals".equals(name)) {
+                            return arguments != null && arguments.length == 1
+                                    && proxy == arguments[0];
+                        }
+                    }
+                    if ("provideStyle".equals(method.getName())
+                            && arguments != null && arguments.length >= 1
+                            && !shouldStyleRoadEvent(arguments[0])) {
+                        return Boolean.FALSE;
+                    }
+                    try {
+                        return method.invoke(delegate, arguments);
+                    } catch (InvocationTargetException failure) {
+                        throw failure.getCause();
+                    }
+                });
+    }
+
+    private boolean shouldStyleRoadEvent(Object properties) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Object> tags = (List<Object>) invoke(
+                    properties, "getTags", new Class<?>[0]);
+            boolean routeOnly = false;
+            for (Object tag : tags) {
+                String mode = profile.roadEventMode(String.valueOf(tag));
+                if ("ALWAYS".equals(mode)) return true;
+                if ("ROUTE_ONLY".equals(mode)) routeOnly = true;
+            }
+            if (!routeOnly || !routeGuidanceActive) return false;
+            return Boolean.TRUE.equals(invoke(
+                    properties, "isOnRoute", new Class<?>[0]));
+        } catch (Throwable unavailable) {
+            // Failing closed is important here: an unknown object must not leak from a nearby
+            // street into the route-only HUD layer.
+            return false;
+        }
+    }
+
     private void applyRoadEventVisibility() {
         Object everywhere = roadEventsLayer;
         if (everywhere == null) return;
@@ -495,8 +551,7 @@ final class HudMapRenderer {
                 String mode = profile.roadEventMode(tagName);
                 // MapKit 30.3.0 crashes asynchronously when an automotive NavigationLayer is
                 // created for road events with its camera disabled. Keep the stable standalone
-                // RoadEventsLayer instead. ROUTE_ONLY remains route-gated, although MapKit may
-                // show nearby events as well as events located directly on the route.
+                // RoadEventsLayer and let its route-aware StyleProvider filter each object.
                 boolean visible = "ALWAYS".equals(mode)
                         || (routeGuidanceActive && "ROUTE_ONLY".equals(mode));
                 invoke(everywhere, "setRoadEventVisible",

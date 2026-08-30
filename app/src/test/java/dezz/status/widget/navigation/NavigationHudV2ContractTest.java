@@ -372,6 +372,10 @@ public final class NavigationHudV2ContractTest {
         assertFalse(renderer.contains("setRoadEventVisibleOnRoute"));
         assertTrue(renderer.contains(
                 "routeGuidanceActive && \"ROUTE_ONLY\".equals(mode)"));
+        assertTrue(renderer.contains("routeAwareRoadEventStyleProvider"));
+        assertTrue(renderer.contains("shouldStyleRoadEvent"));
+        assertTrue(renderer.contains("properties, \"isOnRoute\""));
+        assertTrue(renderer.contains("method.invoke(delegate, arguments)"));
         assertTrue(renderer.contains("safe standalone road-events layer attached"));
         assertTrue(renderer.contains("setRoadEventVisible"));
         assertTrue(renderer.contains("r74.c"));
@@ -469,6 +473,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("getManoeuvres"));
         assertTrue(publisher.contains("getLaneSigns"));
         assertTrue(publisher.contains("getTrafficLightsWithSignal"));
+        assertTrue(publisher.contains("setMaxNumberOfUpcomingTrafficLights"));
+        assertTrue(publisher.contains("MAX_UPCOMING_TRAFFIC_LIGHTS = 8"));
         assertTrue(publisher.contains("activeRoute == null"));
         assertTrue(publisher.contains("Collections.unmodifiableList("));
         assertTrue(publisher.contains("readTrafficLights(inputs.routePosition)"));

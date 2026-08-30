@@ -2,6 +2,8 @@
 package dezz.status.widget.instrument;
 
 import android.app.ActivityOptions;
+import android.app.ActivityManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.display.DisplayManager;
@@ -29,6 +31,9 @@ public final class InstrumentDisplayLauncher {
     private static final int DIM_STOCK_MODE = 1;
     private static final int MAX_DISPLAY_RETRIES = 10;
     private static final long DISPLAY_RETRY_MS = 1_500L;
+    private static final long DIM_MODE_TO_WAKE_MS = 100L;
+    private static final long DIM_WAKE_TO_TASK_RESET_MS = 200L;
+    private static final long TASK_RESET_TO_LAUNCH_MS = 50L;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final AtomicBoolean LAUNCH_PENDING = new AtomicBoolean();
     private static final ThreadPoolExecutor DIM_LANE = createDimLane();
@@ -62,10 +67,9 @@ public final class InstrumentDisplayLauncher {
             DIM_LANE.execute(() -> {
                 try {
                     switchDimMode(app, DIM_NAVIGATION_MODE);
-                    // This is the exact KX11 DIM protocol wake used by MConfig after mode 3.
-                    SystemClock.sleep(100L);
+                    SystemClock.sleep(DIM_MODE_TO_WAKE_MS);
                     sendDimWake(app);
-                    postStart(app, 0, 100L);
+                    postTaskReset(app, DIM_WAKE_TO_TASK_RESET_MS);
                 } catch (RuntimeException failure) {
                     LAUNCH_PENDING.set(false);
                     Log.w(TAG, "DIM launch sequence failed", failure);
@@ -104,15 +108,14 @@ public final class InstrumentDisplayLauncher {
             return;
         }
         Intent intent = new Intent(app, InstrumentPanelActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                .setAction(Intent.ACTION_MAIN)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         ActivityOptions options = ActivityOptions.makeBasic();
         options.setLaunchDisplayId(config.displayId);
         Bundle launchOptions = options.toBundle();
         // ECARX uses windowing mode 5 for an application-owned DIM page.
         launchOptions.putInt("android.activity.windowingMode", 5);
+        launchOptions.putInt("android.activity.SplitScreenShownPosition", 0);
         try {
             app.startActivity(intent, launchOptions);
             LAUNCH_PENDING.set(false);
@@ -127,6 +130,39 @@ public final class InstrumentDisplayLauncher {
                 DiagnosticJournal.error("instrument-panel",
                         "instrument display launch failed", failure);
             }
+        }
+    }
+
+    private static void postTaskReset(@NonNull Context app, long delayMillis) {
+        MAIN.postAtTime(() -> {
+            finishStalePanelTask(app);
+            postStart(app, 0, TASK_RESET_TO_LAUNCH_MS);
+        }, app, SystemClock.uptimeMillis() + Math.max(0L, delayMillis));
+    }
+
+    /**
+     * MConfig resets the target package before projecting it. Natro must keep ANCS, navigation
+     * and its background services alive, so the equivalent safe reset removes only the dedicated
+     * instrument task. The task has its own affinity and can never pull the settings task from the
+     * centre display, which was the cause of ECARX's "open on this screen" confirmation.
+     */
+    private static void finishStalePanelTask(@NonNull Context app) {
+        if (InstrumentPanelActivity.isActive()) return;
+        ActivityManager manager = app.getSystemService(ActivityManager.class);
+        if (manager == null) return;
+        String panelClass = InstrumentPanelActivity.class.getName();
+        try {
+            for (ActivityManager.AppTask task : manager.getAppTasks()) {
+                ActivityManager.RecentTaskInfo info = task.getTaskInfo();
+                Intent baseIntent = info == null ? null : info.baseIntent;
+                ComponentName component = baseIntent == null ? null : baseIntent.getComponent();
+                if (component != null && panelClass.equals(component.getClassName())) {
+                    task.finishAndRemoveTask();
+                }
+            }
+        } catch (RuntimeException failure) {
+            Log.i(TAG, "Could not reset stale instrument task: "
+                    + failure.getClass().getSimpleName());
         }
     }
 

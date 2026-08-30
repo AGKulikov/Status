@@ -16,8 +16,8 @@ import zipfile
 
 KX11_ANDROID_API = 28
 NATRO_PACKAGE = "ru.natro.statuswidget"
-NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.3")
-NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021286")
+NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.4")
+NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021287")
 NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi"
 NAVIGATOR_VERSION_CODE = "739564630"
 NAVIGATOR_BASELINE_SHA256 = (
@@ -296,6 +296,8 @@ def verify_navigator(
         b"Lru/natro/navigation/TrafficLightMapLayer;",
         b"Lru/natro/navigation/BackgroundMapLease;",
         b"getTrafficLightsWithSignal",
+        b"setMaxNumberOfUpcomingTrafficLights",
+        b"isOnRoute",
         b"showTrafficLights",
         b"background MapKit lease active",
     ):

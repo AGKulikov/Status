@@ -213,8 +213,8 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.5.3}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021286}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.5.4}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021287}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
@@ -222,6 +222,9 @@ class NavigationModToolsTest(unittest.TestCase):
     def test_hud_renderer_avoids_camera_less_automotive_navigation_layer(self):
         renderer = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                     / "ru" / "natro" / "navigation" / "HudMapRenderer.java").read_text()
+        publisher = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                     / "ru" / "natro" / "navigation"
+                     / "NavigatorStatePublisher.java").read_text()
 
         self.assertNotIn("NavigationLayerFactory", renderer)
         self.assertNotIn("setUseLayerCamera", renderer)
@@ -230,6 +233,11 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn(
             'routeGuidanceActive && "ROUTE_ONLY".equals(mode)', renderer
         )
+        self.assertIn("routeAwareRoadEventStyleProvider", renderer)
+        self.assertIn('properties, "isOnRoute"', renderer)
+        self.assertIn("method.invoke(delegate, arguments)", renderer)
+        self.assertIn("setMaxNumberOfUpcomingTrafficLights", publisher)
+        self.assertIn("MAX_UPCOMING_TRAFFIC_LIGHTS = 8", publisher)
         self.assertIn("setRoadEventVisible", renderer)
 
     def test_kx11_pair_gate_freezes_device_identity_and_hud_plane(self):

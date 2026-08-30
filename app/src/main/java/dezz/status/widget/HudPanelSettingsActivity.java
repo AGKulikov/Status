@@ -641,8 +641,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         LinearLayout form = column();
         form.setPadding(dp(18), dp(8), dp(18), dp(24));
         scroll.addView(form);
-        form.addView(text("Режим «Только с маршрутом» использует штатный слой ведения "
-                + "MapKit. Направление камеры отображается, когда оно есть в данных события.",
+        form.addView(text("Режим «Только с маршрутом» проверяет штатный признак MapKit "
+                + "«на маршруте» для каждого события. Направление камеры отображается, "
+                + "когда оно есть в данных события.",
                 12, 0xFFB8C0CC));
 
         final String[] modes = {"Не показывать", "Всегда", "Только с маршрутом"};

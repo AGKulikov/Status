@@ -179,6 +179,8 @@ final class NavigatorStatePublisher {
     private static final long SNAPSHOT_INTERVAL_MS = 100L;
     /** Signal phases change at one-second resolution; 2 Hz is ample and halves reflection work. */
     private static final long TRAFFIC_LIGHT_INTERVAL_MS = 500L;
+    /** MapKit defaults vary by host; request enough upcoming lights for both independent maps. */
+    private static final int MAX_UPCOMING_TRAFFIC_LIGHTS = 8;
     private static final long MIN_RESOLVE_RETRY_MS = 250L;
     private static final long MAX_RESOLVE_RETRY_MS = 5_000L;
     private static final long ROUTE_RECONCILE_CONFIRM_MS = 250L;
@@ -308,6 +310,8 @@ final class NavigatorStatePublisher {
                 navigation = nextNavigation;
                 guidance = nextGuidance;
                 try {
+                    invoke(nextGuidance, "setMaxNumberOfUpcomingTrafficLights",
+                            new Class<?>[]{int.class}, MAX_UPCOMING_TRAFFIC_LIGHTS);
                     attachGuidanceListeners(nextGuidance);
                 } catch (Throwable listenerFailure) {
                     detachGuidanceListeners();
@@ -788,7 +792,7 @@ final class NavigatorStatePublisher {
         ArrayList<TrafficLightFrame> result = new ArrayList<>();
         if (routePosition == null) return result;
         for (Object light : invokeList(windshield, "getTrafficLightsWithSignal")) {
-            if (result.size() >= 8) break;
+            if (result.size() >= MAX_UPCOMING_TRAFFIC_LIGHTS) break;
             Object position = invoke(light, "getPosition");
             double rawDistance = distance(routePosition, position);
             if (!finite(rawDistance) || rawDistance < -5d) continue;

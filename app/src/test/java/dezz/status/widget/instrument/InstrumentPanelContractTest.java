@@ -101,11 +101,20 @@ public final class InstrumentPanelContractTest {
         assertTrue(launcher.contains("switchNaviMode"));
         assertTrue(launcher.contains("(byte) 2, (byte) 8, (byte) 8"));
         assertTrue(launcher.contains("setLaunchDisplayId(config.displayId)"));
+        assertTrue(launcher.contains("setAction(Intent.ACTION_MAIN)"));
         assertTrue(launcher.contains("android.activity.windowingMode"));
+        assertTrue(launcher.contains("android.activity.SplitScreenShownPosition"));
+        assertTrue(launcher.contains("DIM_WAKE_TO_TASK_RESET_MS = 200L"));
+        assertTrue(launcher.contains("finishStalePanelTask"));
+        assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_CLEAR_TOP"));
+        assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_SINGLE_TOP"));
+        assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_NO_ANIMATION"));
         assertTrue(launcher.contains("MAX_DISPLAY_RETRIES"));
         assertTrue(bootstrap.contains("InstrumentDisplayLauncher.reconcileAutomatic"));
         assertTrue(boot.contains("InstrumentDisplayLauncher.reconcileAutomatic"));
         assertTrue(manifest.contains(".instrument.InstrumentPanelActivity"));
+        assertTrue(manifest.contains("android:taskAffinity=\"ru.natro.statuswidget.instrument\""));
+        assertTrue(manifest.contains("eos_supports_multipages"));
         assertTrue(store.contains("createDeviceProtectedStorageContext"));
     }
 
