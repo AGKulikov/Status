@@ -803,14 +803,17 @@ public final class NavigationHudV2ContractTest {
         assertFalse(labels.contains("Bitmap.createBitmap"));
     }
 
-    @Test public void confirmedBackwardProgressRestoresRouteAfterGpsJump() throws Exception {
+    @Test public void backwardProgressImmediatelyRestoresRouteFromCursor() throws Exception {
         String renderer = read(navigatorModRoot().resolve("HudMapRenderer.java"));
-        assertTrue(renderer.contains("BACKWARD_PROGRESS_CONFIRMATIONS = 2"));
-        assertTrue(renderer.contains("shouldApplyRouteProgress(progress)"));
-        assertTrue(renderer.contains("meaningfulBackward"));
-        assertTrue(renderer.contains("pendingBackwardConfirmations"));
+        assertTrue(renderer.contains("routeProgressChanged(progress)"));
+        assertTrue(renderer.contains("isBehindRenderedProgress(progress)"));
+        assertTrue(renderer.contains("if (!movingBackward"));
+        assertTrue(renderer.contains("route geometry is not historical progress"));
+        assertTrue(renderer.contains("Object cursorPoint = frame.currentRoutePoint"));
+        assertTrue(renderer.contains("newInstance(frame.latitude, frame.longitude)"));
         assertTrue(renderer.contains("remainingRoute(route, progress)"));
-        assertFalse(renderer.contains("it never re-adds the polyline or moves backwards"));
+        assertFalse(renderer.contains("BACKWARD_PROGRESS_CONFIRMATIONS"));
+        assertFalse(renderer.contains("pendingBackwardConfirmations"));
     }
 
     private static Path sourceRoot() {

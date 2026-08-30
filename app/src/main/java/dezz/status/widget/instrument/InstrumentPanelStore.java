@@ -15,6 +15,9 @@ import java.util.UUID;
 public final class InstrumentPanelStore {
     public static final String PREFS = "instrument_panel";
     public static final String KEY_CONFIG = "config_json";
+    /** Active profile plus one complete document per approved variant. */
+    public static final String KEY_ACTIVE_PRESET = "active_preset_id";
+    private static final String KEY_PRESET_PREFIX = "preset_config_json_";
     public static final String KEY_ENABLED = "enabled";
     public static final String KEY_AUTOSTART = "autostart";
     public static final String ACTION_CONFIG_CHANGED =
@@ -56,21 +59,62 @@ public final class InstrumentPanelStore {
 
     @NonNull
     public InstrumentPanelConfig load() {
-        String raw = preferences.getString(KEY_CONFIG, "");
-        if (raw == null || raw.trim().isEmpty()) return InstrumentPanelConfig.defaults();
-        try {
-            return InstrumentPanelConfig.fromJson(new JSONObject(raw));
-        } catch (JSONException | RuntimeException ignored) {
-            return InstrumentPanelConfig.defaults();
+        String activeId = preferences.getString(KEY_ACTIVE_PRESET, "");
+        if (activeId != null && !activeId.trim().isEmpty()) {
+            InstrumentPanelPreset active = InstrumentPanelPreset.fromId(activeId);
+            InstrumentPanelConfig profile = readConfig(profileKey(active));
+            if (profile != null && active.id.equals(profile.presetId)) return profile;
         }
+        // KEY_CONFIG is the old single-document location. Reading it here gives existing users a
+        // lossless first migration; the next save assigns that document to its own variant.
+        InstrumentPanelConfig legacy = readConfig(KEY_CONFIG);
+        return legacy == null ? InstrumentPanelConfig.defaults() : legacy;
     }
 
     public void save(@NonNull InstrumentPanelConfig config) {
         config.normalize();
         try {
-            preferences.edit().putString(KEY_CONFIG, config.toJson().toString()).apply();
+            String raw = config.toJson().toString();
+            InstrumentPanelPreset preset = InstrumentPanelPreset.fromId(config.presetId);
+            preferences.edit()
+                    .putString(KEY_CONFIG, raw)
+                    .putString(KEY_ACTIVE_PRESET, preset.id)
+                    .putString(profileKey(preset), raw)
+                    .apply();
         } catch (JSONException impossible) {
             throw new IllegalStateException(impossible);
+        }
+    }
+
+    /**
+     * Saves the current variant and restores the target variant's independent module document.
+     * Only the physical ECARX display remains global; layout, visibility, sizes and background
+     * belong to each of the five variants and survive arbitrary switching between them.
+     */
+    @NonNull
+    public InstrumentPanelConfig switchPreset(@NonNull InstrumentPanelPreset target,
+                                              @NonNull InstrumentPanelConfig current) {
+        save(current);
+        InstrumentPanelConfig next = readConfig(profileKey(target));
+        if (next == null || !target.id.equals(next.presetId)) next = target.create();
+        next.displayId = current.displayId;
+        next.normalize();
+        save(next);
+        return next;
+    }
+
+    @NonNull
+    private static String profileKey(@NonNull InstrumentPanelPreset preset) {
+        return KEY_PRESET_PREFIX + preset.id;
+    }
+
+    private InstrumentPanelConfig readConfig(@NonNull String key) {
+        String raw = preferences.getString(key, "");
+        if (raw == null || raw.trim().isEmpty()) return null;
+        try {
+            return InstrumentPanelConfig.fromJson(new JSONObject(raw));
+        } catch (JSONException | RuntimeException ignored) {
+            return null;
         }
     }
 

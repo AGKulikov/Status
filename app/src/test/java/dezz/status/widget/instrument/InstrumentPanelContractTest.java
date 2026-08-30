@@ -137,6 +137,13 @@ public final class InstrumentPanelContractTest {
         assertTrue(settings.contains("Цифровое значение внутри"));
         assertTrue(settings.contains("Нижний цвет градиента"));
         assertTrue(settings.contains("Чисто чёрная зона"));
+        assertTrue(settings.contains("store.switchPreset(presets[which], config)"));
+        String store = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentPanelStore.java"));
+        assertTrue(store.contains("KEY_ACTIVE_PRESET"));
+        assertTrue(store.contains("KEY_PRESET_PREFIX + preset.id"));
+        assertTrue(store.contains("save(current)"));
+        assertTrue(store.contains("readConfig(profileKey(target))"));
         assertTrue(renderer.contains("new LinearGradient("));
         assertTrue(renderer.contains("config.backgroundBottomColor"));
         assertTrue(renderer.contains("config.blackZonePercent"));

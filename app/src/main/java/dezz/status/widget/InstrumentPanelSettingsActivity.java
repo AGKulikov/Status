@@ -230,12 +230,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle("Базовая компоновка")
                 .setSingleChoiceItems(labels, selected, (dialog, which) -> {
-                    InstrumentPanelConfig replacement = presets[which].create();
-                    replacement.displayId = config.displayId;
-                    replacement.transparentBackground = config.transparentBackground;
-                    replacement.backgroundBottomColor = config.backgroundBottomColor;
-                    replacement.blackZonePercent = config.blackZonePercent;
-                    config = replacement;
+                    config = store.switchPreset(presets[which], config);
                     dialog.dismiss();
                     refresh(null, true);
                 })

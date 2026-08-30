@@ -39,8 +39,6 @@ final class HudMapRenderer {
             "[{\"types\":\"polyline\",\"stylers\":{\"scale\":0.45}}]";
     /** Geometry slicing is expensive; camera motion remains independent and full-rate. */
     private static final long ROUTE_GEOMETRY_INTERVAL_MS = 100L;
-    /** Two matching reverse samples restore route geometry after a GPS jump without following jitter. */
-    private static final int BACKWARD_PROGRESS_CONFIRMATIONS = 2;
     private final Context context;
     private final FailureReporter reporter;
     private final MapCursorStyler cursorStyler;
@@ -85,9 +83,6 @@ final class HudMapRenderer {
     private double renderedRouteSegmentPosition = Double.NaN;
     private int renderedRouteSegmentCount;
     private long lastRouteGeometryElapsedMs;
-    private int pendingBackwardSegmentIndex = -1;
-    private double pendingBackwardSegmentPosition = Double.NaN;
-    private int pendingBackwardConfirmations;
     private NavigatorStatePublisher.CameraState initialCamera;
     private NavigatorStatePublisher.CameraState navigationCamera;
     private AppliedCamera lastAppliedCamera;
@@ -271,7 +266,6 @@ final class HudMapRenderer {
             renderedRouteSegmentPosition = Double.NaN;
             renderedRouteSegmentCount = 0;
             lastRouteGeometryElapsedMs = 0L;
-            clearPendingBackwardProgress();
         }
         activeRouteEpoch = routeEpoch;
         activeRoute = drivingRoute;
@@ -787,22 +781,36 @@ final class HudMapRenderer {
         }
     }
 
-    /** Re-slices the visible route in place, including a confirmed backward GPS correction. */
+    /**
+     * Re-slices the visible route from the same map-matched point as the cursor. A backward GPS
+     * correction is applied immediately: route geometry is not historical progress and therefore
+     * must restore the previously hidden section whenever RoutePosition moves back.
+     */
     private void updateRouteProgress(NavigatorStatePublisher.NavigationFrame frame) {
         Object line = routePolyline;
         Object route = activeRoute;
         if (line == null || route == null || !profile.showRoute
                 || !frame.routeProgressValid) return;
         try {
+            Object cursorPoint = frame.currentRoutePoint;
+            if (cursorPoint == null && finite(frame.latitude) && finite(frame.longitude)) {
+                Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
+                cursorPoint = pointClass.getConstructor(double.class, double.class)
+                        .newInstance(frame.latitude, frame.longitude);
+            }
             RouteProgress progress = new RouteProgress(
                     frame.routeSegmentIndex, frame.routeSegmentPosition,
-                    frame.currentRoutePoint);
-            if (!shouldApplyRouteProgress(progress)) return;
+                    cursorPoint);
+            if (!routeProgressChanged(progress)) return;
+            boolean movingBackward = isBehindRenderedProgress(progress);
             long now = SystemClock.elapsedRealtime();
-            if (progress.segmentIndex == renderedRouteSegmentIndex
+            // Forward/current movement is capped at 10 geometry updates per second on the KX11.
+            // A reverse correction bypasses that performance throttle so the line immediately
+            // returns to the cursor instead of remaining irreversibly clipped ahead of it.
+            if (!movingBackward && progress.segmentIndex == renderedRouteSegmentIndex
                     && now - lastRouteGeometryElapsedMs < ROUTE_GEOMETRY_INTERVAL_MS) return;
-            // Publisher already read RoutePosition once for both maps. Copy the remaining
-            // polyline only after progress crossed the visual/time threshold.
+            // Publisher already read RoutePosition once for both maps. The first geometry point
+            // is that exact map-matched cursor point; the rest comes from the active route.
             RouteSlice slice = remainingRoute(route, progress);
             if (slice == null) return;
             Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
@@ -818,47 +826,17 @@ final class HudMapRenderer {
         }
     }
 
-    private boolean shouldApplyRouteProgress(RouteProgress progress) {
-        boolean forward = progress.segmentIndex > renderedRouteSegmentIndex
-                || (progress.segmentIndex == renderedRouteSegmentIndex
-                && (Double.isNaN(renderedRouteSegmentPosition)
-                || progress.segmentPosition > renderedRouteSegmentPosition + 0.05d));
-        if (forward) {
-            clearPendingBackwardProgress();
-            return true;
-        }
-        boolean meaningfulBackward = progress.segmentIndex < renderedRouteSegmentIndex
-                || (progress.segmentIndex == renderedRouteSegmentIndex
-                && !Double.isNaN(renderedRouteSegmentPosition)
-                // Forward geometry is applied at +0.05. A smaller reverse threshold plus two
-                // confirmations guarantees every already-applied jump can be restored while
-                // rejecting one-sample GNSS jitter.
-                && progress.segmentPosition < renderedRouteSegmentPosition - 0.02d);
-        if (!meaningfulBackward) return false;
-
-        boolean matchesPending = pendingBackwardSegmentIndex >= 0
-                && Math.abs(progress.segmentIndex - pendingBackwardSegmentIndex) <= 1
-                && (Double.isNaN(pendingBackwardSegmentPosition)
-                || Math.abs(progress.segmentPosition - pendingBackwardSegmentPosition) <= 0.25d);
-        if (matchesPending) {
-            pendingBackwardConfirmations++;
-        } else {
-            pendingBackwardSegmentIndex = progress.segmentIndex;
-            pendingBackwardSegmentPosition = progress.segmentPosition;
-            pendingBackwardConfirmations = 1;
-        }
-        if (pendingBackwardConfirmations < BACKWARD_PROGRESS_CONFIRMATIONS) return false;
-        // A confirmed correction must not be swallowed by the normal forward-geometry throttle;
-        // otherwise a same-segment jump could leave the beginning clipped for extra samples.
-        lastRouteGeometryElapsedMs = 0L;
-        clearPendingBackwardProgress();
-        return true;
+    private boolean routeProgressChanged(RouteProgress progress) {
+        return progress.segmentIndex != renderedRouteSegmentIndex
+                || Double.isNaN(renderedRouteSegmentPosition)
+                || Math.abs(progress.segmentPosition - renderedRouteSegmentPosition) > 0.000001d;
     }
 
-    private void clearPendingBackwardProgress() {
-        pendingBackwardSegmentIndex = -1;
-        pendingBackwardSegmentPosition = Double.NaN;
-        pendingBackwardConfirmations = 0;
+    private boolean isBehindRenderedProgress(RouteProgress progress) {
+        return progress.segmentIndex < renderedRouteSegmentIndex
+                || (progress.segmentIndex == renderedRouteSegmentIndex
+                && !Double.isNaN(renderedRouteSegmentPosition)
+                && progress.segmentPosition < renderedRouteSegmentPosition);
     }
 
     private static RouteSlice remainingRoute(Object route) throws Exception {
@@ -1011,7 +989,6 @@ final class HudMapRenderer {
         renderedRouteSegmentPosition = Double.NaN;
         renderedRouteSegmentCount = 0;
         lastRouteGeometryElapsedMs = 0L;
-        clearPendingBackwardProgress();
         freeCameraInitialized = false;
         lastAppliedCamera = null;
         if (releaseSurface && currentSurface != null) {
