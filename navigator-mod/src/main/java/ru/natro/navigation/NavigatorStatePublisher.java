@@ -385,6 +385,8 @@ final class NavigatorStatePublisher {
     private double lastRouteMatchedLongitude = Double.NaN;
     private double lastRouteMatchedBearing = Double.NaN;
     private long lastRouteMatchedElapsedMs;
+    private Object activeRoutePolylineIndex;
+    private long activeRoutePolylineIndexEpoch = Long.MIN_VALUE;
     private Object conditionsRoute;
     private Object conditionsListener;
     private long resolveRetryMs = MIN_RESOLVE_RETRY_MS;
@@ -775,6 +777,8 @@ final class NavigatorStatePublisher {
             cachedDestinationEpoch = Long.MIN_VALUE;
             cachedDestination = "";
             clearRouteMatchedPosition();
+            activeRoutePolylineIndex = null;
+            activeRoutePolylineIndexEpoch = Long.MIN_VALUE;
         }
         if (initial || changed || activeRouteTotalDistanceMeters <= 0) {
             activeRouteTotalDistanceMeters = readRouteTotalDistance(nextRoute);
@@ -863,26 +867,71 @@ final class NavigatorStatePublisher {
         lastRouteMatchedElapsedMs = 0L;
     }
 
-    private static RouteProgressSample readRouteProgress(Object route, Object routePosition) {
+    private RouteProgressSample readRouteProgress(Object route, Object routePosition) {
         if (route == null) return RouteProgressSample.INVALID;
         try {
-            Object polylinePosition = invoke(route, "getPosition");
-            if (polylinePosition == null && routePosition != null) {
-                String routeId = String.valueOf(invoke(route, "getRouteId"));
-                polylinePosition = invoke(routePosition, "positionOnRoute",
-                        new Class<?>[]{String.class}, routeId);
+            Object currentPoint = null;
+            if (routePosition != null) {
+                try {
+                    currentPoint = invoke(routePosition, "getPoint");
+                } catch (Throwable unavailable) {
+                    // Progress can still fall back to DrivingRoute while the point is unavailable.
+                }
             }
+
+            // DrivingRoute.getPosition() describes completed guidance progress and can remain
+            // ahead after a GNSS jump. Project the current RoutePosition first so trimming follows
+            // the same reversible, map-matched point as the cursor.
+            Object polylinePosition = null;
+            if (routePosition != null) {
+                try {
+                    String routeId = String.valueOf(invoke(route, "getRouteId"));
+                    polylinePosition = invoke(routePosition, "positionOnRoute",
+                            new Class<?>[]{String.class}, routeId);
+                } catch (Throwable unavailable) {
+                    // The route can be between native wrappers for one guidance callback.
+                }
+            }
+            if (polylinePosition == null && currentPoint != null) {
+                try {
+                    polylinePosition = closestPositionOnRoute(route, currentPoint);
+                } catch (Throwable unavailable) {
+                    // Keep the completed-progress value as the last-resort continuity fallback.
+                }
+            }
+            if (polylinePosition == null) polylinePosition = invoke(route, "getPosition");
             if (polylinePosition == null) return RouteProgressSample.INVALID;
             int segmentIndex = ((Number) invoke(
                     polylinePosition, "getSegmentIndex")).intValue();
             double segmentPosition = ((Number) invoke(
                     polylinePosition, "getSegmentPosition")).doubleValue();
-            Object currentPoint = routePosition == null
-                    ? null : invoke(routePosition, "getPoint");
             return new RouteProgressSample(true, segmentIndex, segmentPosition, currentPoint);
         } catch (Throwable unavailable) {
             return RouteProgressSample.INVALID;
         }
+    }
+
+    /** Cached native PolylineIndex fallback for the rare positionOnRoute transition gap. */
+    private Object closestPositionOnRoute(Object route, Object currentPoint) throws Exception {
+        Object index = activeRoutePolylineIndex;
+        if (index == null || activeRoutePolylineIndexEpoch != routeEpoch) {
+            Object geometry = invoke(route, "getGeometry");
+            Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
+            Class<?> utilsClass = Class.forName(
+                    "com.yandex.mapkit.geometry.geo.PolylineUtils");
+            Method create = ReflectMethods.publicMethod(utilsClass, "createPolylineIndex",
+                    new Class<?>[]{polylineClass});
+            index = create.invoke(null, geometry);
+            activeRoutePolylineIndex = index;
+            activeRoutePolylineIndexEpoch = routeEpoch;
+        }
+        Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
+        Class<?> priorityClass = Class.forName(
+                "com.yandex.mapkit.geometry.geo.PolylineIndex$Priority");
+        Object priority = priorityClass.getField("CLOSEST_TO_RAW_POINT").get(null);
+        return invoke(index, "closestPolylinePosition",
+                new Class<?>[]{pointClass, priorityClass, double.class},
+                currentPoint, priority, 1.0d);
     }
 
     private JSONObject buildSnapshot(Object currentGuidance, Object route,
@@ -1529,6 +1578,8 @@ final class NavigatorStatePublisher {
         lastRouteStreetLabelsReadElapsedMs = 0L;
         lastTrafficLightsReadElapsedMs = 0L;
         clearRouteMatchedPosition();
+        activeRoutePolylineIndex = null;
+        activeRoutePolylineIndexEpoch = Long.MIN_VALUE;
         activityReference = new WeakReference<>(null);
         pendingCamera = null;
         naviKitGuidance = null;

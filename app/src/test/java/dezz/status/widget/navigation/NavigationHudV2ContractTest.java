@@ -795,6 +795,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("lastRouteMatchedLatitude"));
         assertTrue(publisher.contains("latitude = routeLatitude"));
         assertTrue(publisher.contains("longitude = routeLongitude"));
+        assertTrue(publisher.contains("polylinePosition = invoke(routePosition, \"positionOnRoute\""));
+        assertTrue(publisher.contains("closestPositionOnRoute(route, currentPoint)"));
+        assertTrue(publisher.contains("CLOSEST_TO_RAW_POINT"));
+        assertTrue(publisher.indexOf("positionOnRoute")
+                < publisher.indexOf("polylinePosition = invoke(route, \"getPosition\")"));
         assertTrue(renderer.contains("routeStreetLabelMapLayer.update("));
         assertTrue(labels.contains("FRESH_MS = 2_500L"));
         assertTrue(labels.contains("Screen-facing street names sourced exclusively"));
@@ -812,6 +817,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("Object cursorPoint = frame.currentRoutePoint"));
         assertTrue(renderer.contains("newInstance(frame.latitude, frame.longitude)"));
         assertTrue(renderer.contains("remainingRoute(route, progress)"));
+        assertTrue(renderer.contains("The cursor-owned RoutePosition is reversible"));
         assertFalse(renderer.contains("BACKWARD_PROGRESS_CONFIRMATIONS"));
         assertFalse(renderer.contains("pendingBackwardConfirmations"));
     }

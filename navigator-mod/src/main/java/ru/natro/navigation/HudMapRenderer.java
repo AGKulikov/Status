@@ -873,24 +873,25 @@ final class HudMapRenderer {
         double segmentPosition = 0d;
         Object currentPoint = null;
         Object routePosition = invoke(route, "getRoutePosition", new Class<?>[0]);
-        // DrivingRoute.getPosition() is MapKit's canonical reached polyline position. Asking the
-        // RoutePosition wrapper to project itself back to the same route can temporarily return
-        // null while guidance is rerouting, which reset the HUD slice to segment zero and left the
-        // already travelled route visible.
-        Object polylinePosition = invoke(route, "getPosition", new Class<?>[0]);
-        if (polylinePosition == null && routePosition != null) {
+        if (routePosition != null) {
+            currentPoint = invoke(routePosition, "getPoint", new Class<?>[0]);
+        }
+        // The cursor-owned RoutePosition is reversible. DrivingRoute.getPosition() represents
+        // completed guidance progress and is only a continuity fallback during native rerouting.
+        Object polylinePosition = null;
+        if (routePosition != null) {
             String routeId = String.valueOf(invoke(route, "getRouteId", new Class<?>[0]));
             polylinePosition = invoke(routePosition, "positionOnRoute",
                     new Class<?>[]{String.class}, routeId);
+        }
+        if (polylinePosition == null) {
+            polylinePosition = invoke(route, "getPosition", new Class<?>[0]);
         }
         if (polylinePosition != null) {
             segmentIndex = ((Number) invoke(polylinePosition, "getSegmentIndex",
                     new Class<?>[0])).intValue();
             segmentPosition = ((Number) invoke(polylinePosition, "getSegmentPosition",
                     new Class<?>[0])).doubleValue();
-            if (routePosition != null) {
-                currentPoint = invoke(routePosition, "getPoint", new Class<?>[0]);
-            }
         }
         segmentIndex = Math.max(0, segmentIndex);
         segmentPosition = Math.max(0d, Math.min(1d, segmentPosition));
