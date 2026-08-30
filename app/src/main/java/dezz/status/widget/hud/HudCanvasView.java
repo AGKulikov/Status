@@ -629,30 +629,141 @@ public final class HudCanvasView extends View {
 
     private void drawCombinedNavigation(Canvas canvas, HudElementConfig item, RectF bounds,
                                         int color, int unitColor, float scale) {
+        if (item.options.optBoolean("showCardBackground", true)) {
+            int card = optionColor(item, "cardColor", 0xFF0758E8);
+            int opacity = clamp(item.options.optInt("cardOpacityPercent", 94), 0, 100);
+            int alpha = Math.round(Color.alpha(card) * opacity / 100f
+                    * item.brightness / 100f);
+            float radius = Math.max(0f, Math.min(
+                    item.options.optInt("cardCornerRadiusPx", 18) * scale,
+                    Math.min(bounds.width(), bounds.height()) / 2f));
+            paint.clearShadowLayer();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(card, alpha));
+            canvas.drawRoundRect(bounds, radius, radius, paint);
+        }
+
+        float padding = Math.max(3f, 5f * scale);
+        RectF content = inset(bounds, padding);
         String layout = item.options.optString("arrowLayout", "LEFT");
-        RectF arrow = new RectF(bounds);
-        RectF text = new RectF(bounds);
+        RectF arrow = new RectF(content);
+        RectF text = new RectF(content);
         if ("TOP".equals(layout) || "BOTTOM".equals(layout)) {
-            float split = bounds.height() * .58f;
+            float split = content.height() * .56f;
             if ("TOP".equals(layout)) {
                 arrow.bottom = arrow.top + split;
                 text.top = arrow.bottom;
             } else {
-                text.bottom = text.top + bounds.height() - split;
+                text.bottom = text.top + content.height() - split;
                 arrow.top = text.bottom;
             }
         } else {
-            float split = bounds.width() * .43f;
+            float split = content.width() * .38f;
             if ("RIGHT".equals(layout)) {
-                text.right = text.left + bounds.width() - split;
+                text.right = text.left + content.width() - split;
                 arrow.left = text.right;
             } else {
                 arrow.right = arrow.left + split;
                 text.left = arrow.right;
             }
         }
-        drawManeuver(canvas, item, inset(arrow, scale * 4f), color);
-        drawText(canvas, item, data.textFor(item), text, unitColor, scale);
+        drawManeuver(canvas, item, inset(arrow, Math.max(1f, scale * 3f)), color);
+        drawManeuverCardText(canvas, item, text, color, unitColor, scale);
+    }
+
+    /** Draws Navigator's information card without coupling it to the native map Surface. */
+    private void drawManeuverCardText(Canvas canvas, HudElementConfig item, RectF bounds,
+                                      int color, int unitColor, float scale) {
+        HudNavigationState nav = data.navigation();
+        String distance = nav == null ? (editor ? "350 м" : "") : nav.turnDistance;
+        String roadCandidate = nav == null ? (editor ? "М2" : "")
+                : firstCardText(nav.maneuverSubtext, nav.street);
+        boolean showRoadBadge = item.options.optBoolean("showRoadBadge", true);
+        String roadBadge = showRoadBadge && looksLikeRoadReference(roadCandidate)
+                ? roadCandidate : "";
+        String direction = nav == null ? (editor ? "Тула" : "")
+                : firstCardText(nav.maneuverTitle, nav.maneuverText,
+                        roadCandidate, nav.destination);
+        boolean showDirection = item.options.optBoolean("showDirection", true);
+        if (!showDirection) direction = "";
+        if (sameCardText(direction, roadBadge)) direction = "";
+
+        float distanceHeight = bounds.height() * .56f;
+        RectF distanceBounds = new RectF(bounds.left, bounds.top,
+                bounds.right, bounds.top + distanceHeight);
+        RectF detailBounds = new RectF(bounds.left, distanceBounds.bottom,
+                bounds.right, bounds.bottom);
+        float distanceSize = Math.max(10f, Math.min(item.fontSizeSp * scale,
+                distanceBounds.height() * .72f));
+        float detailSize = Math.max(8f, Math.min(item.fontSizeSp * scale * .52f,
+                detailBounds.height() * .62f));
+        drawStyledText(canvas, distance, distanceBounds, color, distanceSize,
+                Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
+
+        float detailLeft = detailBounds.left;
+        if (!roadBadge.isEmpty()) {
+            textPaint.setTextSize(detailSize);
+            textPaint.setTypeface(typeface(Math.max(600, item.fontWeight)));
+            float horizontalPadding = Math.max(3f, 5f * scale);
+            float badgeWidth = Math.min(detailBounds.width() * .42f,
+                    textPaint.measureText(roadBadge) + horizontalPadding * 2f);
+            RectF badge = new RectF(detailBounds.left,
+                    detailBounds.centerY() - detailSize * .72f,
+                    detailBounds.left + badgeWidth,
+                    detailBounds.centerY() + detailSize * .72f);
+            int badgeColor = optionColor(item, "roadBadgeColor", 0xFF16A34A);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(badgeColor, Math.round(
+                    Color.alpha(badgeColor) * Color.alpha(color) / 255f)));
+            canvas.drawRoundRect(badge, Math.max(2f, 3f * scale),
+                    Math.max(2f, 3f * scale), paint);
+            drawStyledText(canvas, roadBadge, inset(badge, Math.max(1f, 2f * scale)),
+                    color, detailSize, Layout.Alignment.ALIGN_CENTER, false,
+                    Math.max(600, item.fontWeight));
+            detailLeft = badge.right + Math.max(3f, 5f * scale);
+        } else if (showDirection && !roadCandidate.isEmpty()
+                && !sameCardText(roadCandidate, direction)) {
+            direction = direction.isEmpty() ? roadCandidate : roadCandidate + " · " + direction;
+        }
+        if (!direction.isEmpty() && detailLeft < detailBounds.right) {
+            drawStyledText(canvas, direction,
+                    new RectF(detailLeft, detailBounds.top, detailBounds.right,
+                            detailBounds.bottom), unitColor, detailSize,
+                    Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
+        }
+    }
+
+    @NonNull
+    private static String firstCardText(@Nullable String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty() && !"—".equals(value.trim())) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private static boolean sameCardText(@Nullable String left, @Nullable String right) {
+        return left != null && right != null && !left.trim().isEmpty()
+                && left.trim().equalsIgnoreCase(right.trim());
+    }
+
+    /** Route shields are intentionally conservative: arbitrary destination text stays plain. */
+    private static boolean looksLikeRoadReference(@Nullable String raw) {
+        if (raw == null) return false;
+        String value = raw.trim();
+        if (value.isEmpty() || value.length() > 10 || value.indexOf(' ') >= 0) return false;
+        boolean digit = false;
+        boolean letter = false;
+        boolean lowercase = false;
+        for (int index = 0; index < value.length(); index++) {
+            char current = value.charAt(index);
+            digit |= Character.isDigit(current);
+            letter |= Character.isLetter(current);
+            lowercase |= Character.isLowerCase(current);
+        }
+        return digit || (letter && !lowercase);
     }
 
     private void drawLanes(Canvas canvas, HudElementConfig item, RectF bounds, int color) {

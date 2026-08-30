@@ -365,6 +365,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch traffic = switchView("Пробки на остальных дорогах", map.showTraffic);
         Switch trafficLights = switchView(
                 "Светофоры с отсчётом — отдельный слой", map.showTrafficLights);
+        Switch laneGuidance = switchView(
+                "Подсказки по полосам — слой на маршруте", map.showLaneGuidance);
         Switch labels = switchView("Подписи дорог", map.showLabels);
         Switch pois = switchView("Полезные места", map.showPois);
         Switch buildings = switchView("Здания", map.showBuildings);
@@ -377,6 +379,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(traffic);
         content.addView(routeTraffic);
         content.addView(trafficLights);
+        content.addView(laneGuidance);
         content.addView(labels);
         content.addView(pois);
         content.addView(buildings);
@@ -450,6 +453,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showTraffic = traffic.isChecked();
                     map.showRouteTraffic = routeTraffic.isChecked();
                     map.showTrafficLights = trafficLights.isChecked();
+                    map.showLaneGuidance = laneGuidance.isChecked();
                     map.showPois = pois.isChecked();
                     map.showBuildings = buildings.isChecked();
                     map.showLabels = labels.isChecked();
@@ -757,9 +761,13 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             @NonNull Preferences preferences) {
         try {
             navigation.normalize();
-            boolean stored = preferences.navigationIntegrationConfigJson.commit(
-                    navigation.toJson().toString());
-            if (!stored) throw new IllegalStateException("Не удалось записать настройки карты");
+            String encoded = navigation.toJson().toString();
+            boolean stored = preferences.navigationIntegrationConfigJson.commit(encoded);
+            String verified = preferences.navigationIntegrationConfigJson.get();
+            if (!stored || !encoded.equals(verified)) {
+                throw new IllegalStateException(
+                        "Записанное значение не прошло контрольное чтение");
+            }
             NavigationHudEndpointService.requestConfigurationRefresh(this);
             return true;
         } catch (Exception failure) {

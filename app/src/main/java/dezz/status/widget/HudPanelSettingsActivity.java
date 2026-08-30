@@ -508,6 +508,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showTraffic = switchView("Пробки на остальных дорогах", profile.showTraffic);
         Switch showTrafficLights = switchView(
                 "Светофоры с отсчётом — отдельный слой", profile.showTrafficLights);
+        Switch showLaneGuidance = switchView(
+                "Подсказки по полосам — слой на маршруте", profile.showLaneGuidance);
         Switch showLabels = switchView("Подписи", profile.showLabels);
         Switch showPois = switchView("Полезные места", profile.showPois);
         Switch showBuildings = switchView("Здания", profile.showBuildings);
@@ -519,6 +521,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Только дороги — прозрачный фон", profile.roadsOnly);
         for (Switch control : new Switch[]{showRoute,
                 showRouteTraffic, showTraffic, showTrafficLights,
+                showLaneGuidance,
                 showLabels, showPois, showBuildings,
                 showParks, showWater,
                 showModels, showCursor, roadsOnly}) {
@@ -604,6 +607,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showRouteTraffic = showRouteTraffic.isChecked();
                         profile.showTraffic = showTraffic.isChecked();
                         profile.showTrafficLights = showTrafficLights.isChecked();
+                        profile.showLaneGuidance = showLaneGuidance.isChecked();
                         profile.showLabels = showLabels.isChecked();
                         profile.showPois = showPois.isChecked();
                         profile.showBuildings = showBuildings.isChecked();
@@ -629,8 +633,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
 
                         item.normalize(config.gridColumns, config.gridRows);
                         navigation.normalize();
+                        String encodedNavigation = navigation.toJson().toString();
                         if (!preferences.navigationIntegrationConfigJson.commit(
-                                navigation.toJson().toString())) {
+                                encodedNavigation)
+                                || !encodedNavigation.equals(
+                                preferences.navigationIntegrationConfigJson.get())) {
                             throw new IllegalStateException("не удалось записать настройки карты");
                         }
                         NavigationHudEndpointService.requestConfigurationRefresh(this);
@@ -866,8 +873,14 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         window.modeButtonOpacityPercent = buttonOpacity.intValue();
 
                         navigation.normalize();
-                        preferences.navigationIntegrationConfigJson.set(
-                                navigation.toJson().toString());
+                        String encodedNavigation = navigation.toJson().toString();
+                        if (!preferences.navigationIntegrationConfigJson.commit(
+                                encodedNavigation)
+                                || !encodedNavigation.equals(
+                                preferences.navigationIntegrationConfigJson.get())) {
+                            throw new IllegalStateException(
+                                    "не удалось проверить сохранённые настройки Навигатора");
+                        }
                         NavigationHudEndpointService.requestConfigurationRefresh(this);
                         dialog.dismiss();
                         Toast.makeText(this, "Настройки Навигатора сохранены",
@@ -921,6 +934,16 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.options.optString("clockMode", "SYSTEM"));
                 break;
             case NAV_MANEUVER_ARROW:
+                visualSwitch(form, controls, "bool:arrowAnimation",
+                        "Анимация стрелки",
+                        item.options.optBoolean("arrowAnimation", true));
+                visualSwitch(form, controls, "bool:preferSourceImage",
+                        "Использовать штатную графику манёвра",
+                        item.options.optBoolean("preferSourceImage", true));
+                visualSpinner(form, controls, "string:arrowLayout",
+                        "Положение стрелки", new String[]{"LEFT", "RIGHT", "TOP", "BOTTOM"},
+                        item.options.optString("arrowLayout", "LEFT"));
+                break;
             case NAV_COMBINED:
                 visualSwitch(form, controls, "bool:arrowAnimation",
                         "Анимация стрелки",
@@ -931,6 +954,27 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 visualSpinner(form, controls, "string:arrowLayout",
                         "Положение стрелки", new String[]{"LEFT", "RIGHT", "TOP", "BOTTOM"},
                         item.options.optString("arrowLayout", "LEFT"));
+                visualSwitch(form, controls, "bool:showCardBackground",
+                        "Синяя карточка",
+                        item.options.optBoolean("showCardBackground", true));
+                visualSwitch(form, controls, "bool:showRoadBadge",
+                        "Номер дороги отдельной плашкой",
+                        item.options.optBoolean("showRoadBadge", true));
+                visualSwitch(form, controls, "bool:showDirection",
+                        "Название дороги / направление",
+                        item.options.optBoolean("showDirection", true));
+                visualColor(form, controls, item, "cardColor",
+                        "Цвет карточки ARGB", "#FF0758E8");
+                visualColor(form, controls, item, "roadBadgeColor",
+                        "Цвет номера дороги ARGB", "#FF16A34A");
+                controls.put("int:cardOpacityPercent", slider(form,
+                        "Непрозрачность карточки",
+                        item.options.optInt("cardOpacityPercent", 94),
+                        0, 100, 1, " %"));
+                controls.put("int:cardCornerRadiusPx", slider(form,
+                        "Скругление карточки",
+                        item.options.optInt("cardCornerRadiusPx", 18),
+                        0, 80, 1, " px"));
                 break;
             case NAV_LANES:
                 visualSwitch(form, controls, "bool:preferSourceImage",
@@ -2011,9 +2055,13 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             @NonNull NavigationIntegrationConfig navigation) {
         try {
             navigation.normalize();
-            boolean stored = preferences.navigationIntegrationConfigJson.commit(
-                    navigation.toJson().toString());
-            if (!stored) throw new IllegalStateException("не удалось записать настройки карты");
+            String encoded = navigation.toJson().toString();
+            boolean stored = preferences.navigationIntegrationConfigJson.commit(encoded);
+            String verified = preferences.navigationIntegrationConfigJson.get();
+            if (!stored || !encoded.equals(verified)) {
+                throw new IllegalStateException(
+                        "записанное значение не прошло контрольное чтение");
+            }
             NavigationHudEndpointService.requestConfigurationRefresh(this);
             return true;
         } catch (Exception failure) {

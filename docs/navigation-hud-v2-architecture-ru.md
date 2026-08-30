@@ -79,10 +79,17 @@ level/zipalign допустима, а изменение любого защищ
   standalone-свойство `isOnRoute` всегда было ложным, и одновременно не возвращает аварийную
   конфигурацию «слой без камеры». Если automotive API недоступен, fallback сохраняет выбранные
   события при активном маршруте, но явно диагностирует менее точную nearby-фильтрацию. Штатный
-  style provider сохраняет родные значки, масштаб и направление камер.
+  style provider сохраняет родные значки и масштаб. Направление активных камер берётся отдельно
+  из `Windshield.getActiveSpeedCameras()` и `ActiveSpeedCamera.getActiveDirections()`; указатель
+  поворачивается по направлению соответствующего сегмента активного маршрута.
 - Светофоры Windshield с валидным сигналом и координатой помещаются в собственную
   `MapObjectCollection`. HUD и приборная карта имеют независимый `showTrafficLights`; основной
   `MapWindow` этот слой не получает. Маркер содержит три сигнала, стрелку и цифровой отсчёт.
+  Образец без `secondsLeft` остаётся доступен отдельному HUD-модулю, но не создаёт статичный знак
+  на карте.
+- Подсказки по полосам имеют отдельный `showLaneGuidance`. Один screen-facing billboard
+  привязывается к географической точке ближайшего `UpcomingLaneSign`; он не является HUD-виджетом
+  и удаляется через 1,5 секунды без свежего маршрутного образца.
 - Опциональный `roadsOnly` скрывает все substrate-объекты, у которых нет официального дорожного
   тега MapKit, и включает `setTransparentBackgroundEnabled(true)`. Natro одновременно переводит
   HUD `TextureView` в non-opaque composition, поэтому между дорогами остаётся настоящий alpha,
@@ -91,6 +98,9 @@ level/zipalign допустима, а изменение любого защищ
   MediaProjection и покадровая передача RGBA не используются.
 - Natro размещает карту как один из элементов HUD, а манёвр, дистанцию, полосы, скорость,
   светофоры, ETA и любые будущие элементы — независимо, любого размера и в любом месте HUD.
+  `NAV_COMBINED` — отдельная карточка ближайшего манёвра поверх прозрачной HUD-плоскости, а не
+  объект `MapWindow`: она объединяет стрелку, расстояние до поворота, номер дороги и направление
+  и целиком скрывается без свежего активного маршрута.
 
 ### Проверенные точки данных 30.3.0
 
@@ -127,15 +137,21 @@ Natro. Внутри процесса Навигатора второй MapWindow
 `DrivingRoute.getJamSegments()` относится к отрезку между точками N и N+1 геометрии. Один
 `PolylineMapObject` получает индексы палитры через `setStrokeColors`, а `ConditionsListener`
 обновляет HUD, основную карту и компактный RLE-поток `trafficSegmentsJson` без смены
-`routeEpoch`. Курсор обеих карт создаётся как программный `View`, передаётся штатному
-`ViewProvider` и настраивается через `UserLocationObjectListener`; drawable/resources для курсора
-не добавляются.
+`routeEpoch`. Курсор каждой внешней карты — один стабильный `PlacemarkMapObject` с программно
+нарисованным bitmap через `ImageProvider`. Его координата и bearing берутся из того же
+`NavigationFrame`; отдельного location provider, GPS polling и зависимости от внутреннего
+arrow/pin-состояния `UserLocationLayer` нет.
 
 Светофоры также не читаются отдельно для каждой карты. `getTrafficLightsWithSignal()` вызывается
 один раз на 2 Гц, координата берётся из `position.getPoint()`, а неизменяемый список одновременно
 используют JSON bridge, HUD-карта и карта приборной панели. Рендерер пропускает повторный
-30-Hz `NavigationFrame` по identity образца и заменяет `ViewProvider` только при смене сигнала,
-секунды или состава маркеров. Через 3 секунды без нового образца коллекция очищается.
+30-Hz `NavigationFrame` по identity образца и заменяет `ImageProvider` только при смене сигнала,
+секунды или состава маркеров. Иконка рисуется напрямую в `Canvas` без создания/measure/layout
+Android `View`. Через 3 секунды без нового образца коллекция очищается.
+
+Активные камеры читаются вместе со светофорами не чаще 2 раз/с; геометрия маршрута извлекается
+один раз на весь образец камер. Полосы переиспользуют уже существовавшее чтение быстрого snapshot.
+Ни один новый слой не создаёт дополнительный таймер GPS или отдельный запрос местоположения.
 
 Для основной карты контроллер принципиально не создаёт вторую линию маршрута, второй курсор и не
 вызывает `Map.move`. Это сохраняет штатное ведение Навигатора. Camera callbacks основной карты
@@ -167,7 +183,7 @@ HUD/cluster `OffscreenMapWindow` подключён к Surface. После от�
 [Map/CameraListener](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/Map.html),
 [route jam segments](https://yandex.com/maps-api/docs/mapkit/android/generated/tutorials/map_routes.html),
 [PolylineMapObject](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/PolylineMapObject.html),
-[UserLocationObjectListener](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/user_location/UserLocationObjectListener.html)
+[ImageProvider](https://yandex.com/maps-api/docs/mapkit/com/yandex/runtime/image/ImageProvider.html)
 и [LayerIds](https://yandex.com/maps-api/docs/mapkit/com/yandex/mapkit/map/LayerIds.html).
 
 ## IPC и граница доверия

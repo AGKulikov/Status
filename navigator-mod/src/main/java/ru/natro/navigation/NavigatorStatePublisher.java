@@ -84,6 +84,10 @@ final class NavigatorStatePublisher {
         final Object currentRoutePoint;
         final List<TrafficLightFrame> trafficLights;
         final long trafficLightsSampleElapsedMs;
+        final List<CameraDirectionFrame> cameraDirections;
+        final long cameraDirectionsSampleElapsedMs;
+        final LaneGuidanceFrame laneGuidance;
+        final long laneGuidanceSampleElapsedMs;
 
         NavigationFrame(double latitude, double longitude, double bearingDegrees,
                         double speedKmh, boolean routeActive,
@@ -91,7 +95,8 @@ final class NavigatorStatePublisher {
                         double routeSegmentPosition, Object currentRoutePoint) {
             this(latitude, longitude, bearingDegrees, speedKmh, routeActive,
                     routeProgressValid, routeSegmentIndex, routeSegmentPosition,
-                    currentRoutePoint, Collections.emptyList(), 0L);
+                    currentRoutePoint, Collections.emptyList(), 0L,
+                    Collections.emptyList(), 0L, null, 0L);
         }
 
         NavigationFrame(double latitude, double longitude, double bearingDegrees,
@@ -99,7 +104,11 @@ final class NavigatorStatePublisher {
                         boolean routeProgressValid, int routeSegmentIndex,
                         double routeSegmentPosition, Object currentRoutePoint,
                         List<TrafficLightFrame> trafficLights,
-                        long trafficLightsSampleElapsedMs) {
+                        long trafficLightsSampleElapsedMs,
+                        List<CameraDirectionFrame> cameraDirections,
+                        long cameraDirectionsSampleElapsedMs,
+                        LaneGuidanceFrame laneGuidance,
+                        long laneGuidanceSampleElapsedMs) {
             this.latitude = latitude;
             this.longitude = longitude;
             this.bearingDegrees = finite(bearingDegrees) ? bearingDegrees : 0d;
@@ -112,12 +121,26 @@ final class NavigatorStatePublisher {
             this.trafficLights = trafficLights == null
                     ? Collections.emptyList() : trafficLights;
             this.trafficLightsSampleElapsedMs = Math.max(0L, trafficLightsSampleElapsedMs);
+            this.cameraDirections = cameraDirections == null
+                    ? Collections.emptyList() : cameraDirections;
+            this.cameraDirectionsSampleElapsedMs =
+                    Math.max(0L, cameraDirectionsSampleElapsedMs);
+            this.laneGuidance = laneGuidance;
+            this.laneGuidanceSampleElapsedMs = Math.max(0L, laneGuidanceSampleElapsedMs);
         }
 
-        NavigationFrame withTrafficLights(List<TrafficLightFrame> values, long sampledAt) {
+        NavigationFrame withMapOverlays(List<TrafficLightFrame> trafficLightValues,
+                                        long trafficLightsSampledAt,
+                                        List<CameraDirectionFrame> cameraDirectionValues,
+                                        long cameraDirectionsSampledAt,
+                                        LaneGuidanceFrame laneGuidanceValue,
+                                        long laneGuidanceSampledAt) {
             return new NavigationFrame(latitude, longitude, bearingDegrees, speedKmh,
                     routeActive, routeProgressValid, routeSegmentIndex,
-                    routeSegmentPosition, currentRoutePoint, values, sampledAt);
+                    routeSegmentPosition, currentRoutePoint,
+                    trafficLightValues, trafficLightsSampledAt,
+                    cameraDirectionValues, cameraDirectionsSampledAt,
+                    laneGuidanceValue, laneGuidanceSampledAt);
         }
 
         boolean isValid() {
@@ -171,6 +194,81 @@ final class NavigatorStatePublisher {
         }
     }
 
+    /** One active route camera plus the actual control direction supplied by Windshield. */
+    static final class CameraDirectionFrame {
+        final String id;
+        final double latitude;
+        final double longitude;
+        final int distanceMeters;
+        final float bearingDegrees;
+        final boolean inFace;
+        final boolean inBack;
+
+        CameraDirectionFrame(String id, double latitude, double longitude,
+                             int distanceMeters, float bearingDegrees,
+                             boolean inFace, boolean inBack) {
+            this.id = id == null ? "" : id;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.distanceMeters = Math.max(-1, distanceMeters);
+            this.bearingDegrees = normalizeBearing(bearingDegrees);
+            this.inFace = inFace;
+            this.inBack = inBack;
+        }
+
+        boolean hasMapPosition() {
+            return finite(latitude) && latitude >= -90d && latitude <= 90d
+                    && finite(longitude) && longitude >= -180d && longitude <= 180d;
+        }
+    }
+
+    /** A route-positioned lane sign rendered by both independent map layers. */
+    static final class LaneGuidanceFrame {
+        final String id;
+        final double latitude;
+        final double longitude;
+        final int distanceMeters;
+        final float bearingDegrees;
+        final List<LaneFrame> lanes;
+
+        LaneGuidanceFrame(String id, double latitude, double longitude,
+                          int distanceMeters, float bearingDegrees,
+                          List<LaneFrame> lanes) {
+            this.id = id == null ? "" : id;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.distanceMeters = Math.max(-1, distanceMeters);
+            this.bearingDegrees = normalizeBearing(bearingDegrees);
+            this.lanes = lanes == null ? Collections.emptyList() : lanes;
+        }
+
+        boolean hasMapPosition() {
+            return finite(latitude) && latitude >= -90d && latitude <= 90d
+                    && finite(longitude) && longitude >= -180d && longitude <= 180d;
+        }
+
+        boolean hasContent() {
+            if (!hasMapPosition() || lanes.isEmpty()) return false;
+            for (LaneFrame lane : lanes) {
+                if (lane != null && !lane.directions.isEmpty()) return true;
+            }
+            return false;
+        }
+    }
+
+    static final class LaneFrame {
+        final String kind;
+        final String highlightedDirection;
+        final List<String> directions;
+
+        LaneFrame(String kind, String highlightedDirection, List<String> directions) {
+            this.kind = kind == null ? "" : kind;
+            this.highlightedDirection = highlightedDirection == null
+                    ? "" : highlightedDirection;
+            this.directions = directions == null ? Collections.emptyList() : directions;
+        }
+    }
+
     private static final String TAG = "NatroNavigationState";
     private static final long CAMERA_INTERVAL_MS = 100L;
     /** Primitive camera extraction cadence; duplicate output frames are filtered by each map. */
@@ -181,6 +279,9 @@ final class NavigatorStatePublisher {
     private static final long TRAFFIC_LIGHT_INTERVAL_MS = 500L;
     /** MapKit defaults vary by host; request enough upcoming lights for both independent maps. */
     private static final int MAX_UPCOMING_TRAFFIC_LIGHTS = 8;
+    /** Windshield returns only cameras which are active for the current route direction. */
+    private static final int MAX_ACTIVE_SPEED_CAMERAS = 8;
+    private static final int MAX_MAP_LANES = 8;
     private static final long MIN_RESOLVE_RETRY_MS = 250L;
     private static final long MAX_RESOLVE_RETRY_MS = 5_000L;
     private static final long ROUTE_RECONCILE_CONFIRM_MS = 250L;
@@ -225,6 +326,10 @@ final class NavigatorStatePublisher {
     private int activeRouteTotalDistanceMeters = -1;
     private List<TrafficLightFrame> activeTrafficLights = Collections.emptyList();
     private long activeTrafficLightsSampleElapsedMs;
+    private List<CameraDirectionFrame> activeCameraDirections = Collections.emptyList();
+    private long activeCameraDirectionsSampleElapsedMs;
+    private LaneState activeLaneState = LaneState.EMPTY;
+    private long activeLaneSampleElapsedMs;
     private long lastTrafficLightsReadElapsedMs;
     private Object conditionsRoute;
     private Object conditionsListener;
@@ -456,25 +561,41 @@ final class NavigatorStatePublisher {
                 Object engineRoute = invoke(currentGuidance, "getCurrentRoute");
                 Object freeDriveRoute = invoke(currentNaviKitGuidance, "freeDriveRoute");
                 publishRouteDiagnostic(routeStatus, engineRoute, freeDriveRoute);
+                if (activeRoute == null) {
+                    activeLaneState = LaneState.EMPTY;
+                    activeLaneSampleElapsedMs = 0L;
+                } else {
+                    activeLaneState = readLanes(inputs.routePosition,
+                            inputs.frame.bearingDegrees);
+                    activeLaneSampleElapsedMs = elapsedNow;
+                }
                 boolean trafficSampleDue = routeChanged || forceRoute
                         || elapsedNow - lastTrafficLightsReadElapsedMs
                         >= TRAFFIC_LIGHT_INTERVAL_MS;
                 if (activeRoute == null) {
                     activeTrafficLights = Collections.emptyList();
                     activeTrafficLightsSampleElapsedMs = 0L;
+                    activeCameraDirections = Collections.emptyList();
+                    activeCameraDirectionsSampleElapsedMs = 0L;
                     lastTrafficLightsReadElapsedMs = elapsedNow;
                 } else if (trafficSampleDue) {
                     activeTrafficLights = Collections.unmodifiableList(
                             readTrafficLights(inputs.routePosition));
                     activeTrafficLightsSampleElapsedMs = elapsedNow;
+                    activeCameraDirections = Collections.unmodifiableList(
+                            readActiveSpeedCameras(activeRoute,
+                                    inputs.frame.bearingDegrees));
+                    activeCameraDirectionsSampleElapsedMs = elapsedNow;
                     lastTrafficLightsReadElapsedMs = elapsedNow;
                 }
             }
-            NavigationFrame navigationFrame = inputs.frame.withTrafficLights(
-                    activeTrafficLights, activeTrafficLightsSampleElapsedMs);
+            NavigationFrame navigationFrame = inputs.frame.withMapOverlays(
+                    activeTrafficLights, activeTrafficLightsSampleElapsedMs,
+                    activeCameraDirections, activeCameraDirectionsSampleElapsedMs,
+                    activeLaneState.mapFrame, activeLaneSampleElapsedMs);
             String snapshot = snapshotDue
                     ? buildSnapshot(currentGuidance, activeRoute, inputs,
-                            activeTrafficLights).toString() : null;
+                            activeTrafficLights, activeLaneState).toString() : null;
             if (snapshotDue) lastSnapshotDispatchElapsedMs = elapsedNow;
             String route = routeChanged || forceRoute ? buildRoutePayload().toString() : null;
             sink.onNavigationState(snapshot, route, activeRoute, routeEpoch,
@@ -485,6 +606,10 @@ final class NavigatorStatePublisher {
             detachGuidanceListeners();
             activeTrafficLights = Collections.emptyList();
             activeTrafficLightsSampleElapsedMs = 0L;
+            activeCameraDirections = Collections.emptyList();
+            activeCameraDirectionsSampleElapsedMs = 0L;
+            activeLaneState = LaneState.EMPTY;
+            activeLaneSampleElapsedMs = 0L;
             lastTrafficLightsReadElapsedMs = 0L;
             naviKitGuidance = null;
             if (navigation != null) sink.onNavigationRuntime(null);
@@ -642,7 +767,8 @@ final class NavigatorStatePublisher {
 
     private JSONObject buildSnapshot(Object currentGuidance, Object route,
                                      SnapshotInputs inputs,
-                                     List<TrafficLightFrame> trafficLights)
+                                     List<TrafficLightFrame> trafficLights,
+                                     LaneState lanes)
             throws Exception {
         long now = System.currentTimeMillis();
         Object routePosition = inputs.routePosition;
@@ -659,8 +785,6 @@ final class NavigatorStatePublisher {
 
         Manoeuvre manoeuvre = routeActive && routePosition != null
                 ? readManoeuvre(routePosition) : Manoeuvre.EMPTY;
-        LaneState lanes = routeActive && routePosition != null
-                ? readLanes(routePosition) : new LaneState(new JSONArray(), -1);
         JSONArray trafficLightJson = new JSONArray();
         if (routeActive) {
             for (TrafficLightFrame light : trafficLights) trafficLightJson.put(light.toJson());
@@ -754,26 +878,59 @@ final class NavigatorStatePublisher {
         return fallback;
     }
 
-    private LaneState readLanes(Object routePosition) throws Exception {
+    private LaneState readLanes(Object routePosition, double fallbackBearingDegrees)
+            throws Exception {
         JSONArray result = new JSONArray();
+        if (routePosition == null) return new LaneState(result, -1, null);
         Object upcoming = nearest(invokeList(windshield, "getLaneSigns"),
                 routePosition, "getPosition");
-        if (upcoming == null) return new LaneState(result, -1);
-        int distanceMeters = nonNegativeInt(distance(routePosition,
-                invoke(upcoming, "getPosition")));
+        if (upcoming == null) return new LaneState(result, -1, null);
+        Object position = invoke(upcoming, "getPosition");
+        int distanceMeters = nonNegativeInt(distance(routePosition, position));
         Object sign = invoke(upcoming, "getLaneSign");
+        ArrayList<LaneFrame> mapLanes = new ArrayList<>();
         for (Object lane : invokeList(sign, "getLanes")) {
             JSONArray directions = new JSONArray();
+            ArrayList<String> directionNames = new ArrayList<>();
             for (Object direction : invokeList(lane, "getDirections")) {
-                directions.put(enumName(direction));
+                String name = enumName(direction);
+                directions.put(name);
+                if (!name.isEmpty() && !"UNKNOWN_DIRECTION".equals(name)) {
+                    directionNames.add(name);
+                }
             }
+            String kind = enumName(invoke(lane, "getLaneKind"));
+            String highlighted = enumName(invoke(lane, "getHighlightedDirection"));
             result.put(new JSONObject()
-                    .put("kind", enumName(invoke(lane, "getLaneKind")))
-                    .put("highlightedDirection",
-                            enumName(invoke(lane, "getHighlightedDirection")))
+                    .put("kind", kind)
+                    .put("highlightedDirection", highlighted)
                     .put("directions", directions));
+            if (mapLanes.size() < MAX_MAP_LANES && !directionNames.isEmpty()) {
+                mapLanes.add(new LaneFrame(kind, highlighted,
+                        Collections.unmodifiableList(directionNames)));
+            }
         }
-        return new LaneState(result, distanceMeters);
+        if (mapLanes.isEmpty()) return new LaneState(result, distanceMeters, null);
+        double latitude = Double.NaN;
+        double longitude = Double.NaN;
+        try {
+            Object point = position == null ? null : invoke(position, "getPoint");
+            if (point != null) {
+                latitude = number(invoke(point, "getLatitude"), Double.NaN);
+                longitude = number(invoke(point, "getLongitude"), Double.NaN);
+            }
+        } catch (Throwable ignored) {}
+        float bearing = normalizeBearing((float) fallbackBearingDegrees);
+        try {
+            bearing = normalizeBearing((float) number(invoke(position, "heading"), bearing));
+        } catch (Throwable ignored) {}
+        String id = finite(latitude) && finite(longitude)
+                ? "lane-sign:" + Math.round(latitude * 100_000d)
+                        + ':' + Math.round(longitude * 100_000d)
+                : "";
+        LaneGuidanceFrame frame = new LaneGuidanceFrame(id, latitude, longitude,
+                distanceMeters, bearing, Collections.unmodifiableList(mapLanes));
+        return new LaneState(result, distanceMeters, frame.hasContent() ? frame : null);
     }
 
     private static int readRouteTotalDistance(Object route) {
@@ -831,6 +988,114 @@ final class NavigatorStatePublisher {
     private static boolean validTrafficSignal(String signal) {
         return "RED".equals(signal) || "YELLOW".equals(signal)
                 || "RED_AND_YELLOW".equals(signal) || "GREEN".equals(signal);
+    }
+
+    /**
+     * Reads the direction-aware camera stream. RoadEventsLayer's StyleProvider never receives
+     * CameraData in MapKit 30.3.0, so styling the ordinary SPEED_CONTROL pin cannot expose this
+     * information. Windshield is the authoritative route-aware source used by Navigator itself.
+     */
+    private List<CameraDirectionFrame> readActiveSpeedCameras(
+            Object route, double fallbackBearingDegrees) throws Exception {
+        ArrayList<CameraDirectionFrame> result = new ArrayList<>();
+        if (route == null || windshield == null) return result;
+        List<?> routePoints = Collections.emptyList();
+        try {
+            Object geometry = invoke(route, "getGeometry");
+            if (geometry != null) routePoints = invokeList(geometry, "getPoints");
+        } catch (Throwable ignored) {
+            // Guidance bearing below remains valid while route geometry is being refreshed.
+        }
+        List<?> cameras;
+        try {
+            cameras = invokeList(windshield, "getActiveSpeedCameras");
+        } catch (Throwable unavailable) {
+            // Direction arrows are optional map decoration. A transient Windshield update must
+            // not detach the otherwise healthy Guidance session or interrupt route publishing.
+            return result;
+        }
+        for (Object camera : cameras) {
+            if (result.size() >= MAX_ACTIVE_SPEED_CAMERAS) break;
+            try {
+                Object directions = invoke(camera, "getActiveDirections");
+                if (directions == null) continue;
+                boolean inFace = Boolean.TRUE.equals(invoke(directions, "getInFace"));
+                boolean inBack = Boolean.TRUE.equals(invoke(directions, "getInBack"));
+                if (!inFace && !inBack) continue;
+
+                Object event = invoke(camera, "getEvent");
+                Object point = event == null ? null : invoke(event, "getLocation");
+                if (point == null) continue;
+                double latitude = number(invoke(point, "getLatitude"), Double.NaN);
+                double longitude = number(invoke(point, "getLongitude"), Double.NaN);
+                if (!finite(latitude) || latitude < -90d || latitude > 90d
+                        || !finite(longitude) || longitude < -180d
+                        || longitude > 180d) {
+                    continue;
+                }
+                String id = text(invoke(event, "getEventId"));
+                if (id.isEmpty()) {
+                    id = "speed-camera:" + Math.round(latitude * 100_000d)
+                            + ':' + Math.round(longitude * 100_000d);
+                }
+                int distanceMeters = nonNegativeInt(
+                        number(invoke(camera, "getDistanceToCamera"), -1d));
+                float bearing = routeBearingAtEvent(
+                        routePoints, event, fallbackBearingDegrees);
+                result.add(new CameraDirectionFrame(id, latitude, longitude,
+                        distanceMeters, bearing, inFace, inBack));
+            } catch (Throwable malformedCamera) {
+                // One vendor object can be invalid during route replacement. Keep every other
+                // valid camera and, most importantly, keep the navigation stream alive.
+            }
+        }
+        return result;
+    }
+
+    private static float routeBearingAtEvent(List<?> routePoints, Object event,
+                                             double fallbackBearingDegrees) {
+        try {
+            Object position = invoke(event, "getPolylinePosition");
+            int segmentIndex = position == null ? -1
+                    : ((Number) invoke(position, "getSegmentIndex")).intValue();
+            if (segmentIndex >= 0 && routePoints.size() >= 2) {
+                int index = Math.max(0, Math.min(routePoints.size() - 2, segmentIndex));
+                Object from = routePoints.get(index);
+                Object to = routePoints.get(index + 1);
+                double fromLatitude = number(invoke(from, "getLatitude"), Double.NaN);
+                double fromLongitude = number(invoke(from, "getLongitude"), Double.NaN);
+                double toLatitude = number(invoke(to, "getLatitude"), Double.NaN);
+                double toLongitude = number(invoke(to, "getLongitude"), Double.NaN);
+                float calculated = initialBearing(fromLatitude, fromLongitude,
+                        toLatitude, toLongitude);
+                if (!Float.isNaN(calculated)) return calculated;
+            }
+        } catch (Throwable ignored) {
+            // The current Guidance bearing is a safe fallback during a route geometry refresh.
+        }
+        return normalizeBearing((float) fallbackBearingDegrees);
+    }
+
+    private static float initialBearing(double fromLatitude, double fromLongitude,
+                                        double toLatitude, double toLongitude) {
+        if (!finite(fromLatitude) || !finite(fromLongitude)
+                || !finite(toLatitude) || !finite(toLongitude)) return Float.NaN;
+        double firstLatitude = Math.toRadians(fromLatitude);
+        double secondLatitude = Math.toRadians(toLatitude);
+        double longitudeDelta = Math.toRadians(toLongitude - fromLongitude);
+        double y = Math.sin(longitudeDelta) * Math.cos(secondLatitude);
+        double x = Math.cos(firstLatitude) * Math.sin(secondLatitude)
+                - Math.sin(firstLatitude) * Math.cos(secondLatitude)
+                * Math.cos(longitudeDelta);
+        if (Math.abs(x) < 1e-12d && Math.abs(y) < 1e-12d) return Float.NaN;
+        return normalizeBearing((float) Math.toDegrees(Math.atan2(y, x)));
+    }
+
+    private static float normalizeBearing(float value) {
+        if (Float.isNaN(value) || Float.isInfinite(value)) return 0f;
+        float result = value % 360f;
+        if (result < 0f) result += 360f;
+        return result;
     }
 
     private Object nearest(List<?> values, Object routePosition, String positionMethod)
@@ -1061,6 +1326,10 @@ final class NavigatorStatePublisher {
         detachGuidanceListeners();
         activeTrafficLights = Collections.emptyList();
         activeTrafficLightsSampleElapsedMs = 0L;
+        activeCameraDirections = Collections.emptyList();
+        activeCameraDirectionsSampleElapsedMs = 0L;
+        activeLaneState = LaneState.EMPTY;
+        activeLaneSampleElapsedMs = 0L;
         lastTrafficLightsReadElapsedMs = 0L;
         activityReference = new WeakReference<>(null);
         pendingCamera = null;
@@ -1197,12 +1466,15 @@ final class NavigatorStatePublisher {
     }
 
     private static final class LaneState {
+        static final LaneState EMPTY = new LaneState(new JSONArray(), -1, null);
         final JSONArray values;
         final int distanceMeters;
+        final LaneGuidanceFrame mapFrame;
 
-        LaneState(JSONArray values, int distanceMeters) {
+        LaneState(JSONArray values, int distanceMeters, LaneGuidanceFrame mapFrame) {
             this.values = values;
             this.distanceMeters = distanceMeters;
+            this.mapFrame = mapFrame;
         }
     }
 

@@ -225,6 +225,8 @@ def verify_natro(aapt: Path, apksigner: Path, zipalign: Path, apk: Path) -> str:
         b"transparentBackground",
         b"roadsOnly",
         b"showTrafficLights",
+        b"showLaneGuidance",
+        "Карточка ближайшего манёвра".encode("utf-8"),
     ))
     verify_zipalign(zipalign, apk)
     verify_signer(apksigner, apk, ("v2", "v3"))
@@ -294,13 +296,18 @@ def verify_navigator(
         raise VerificationError("Navigator classes4.dex has no Natro lifecycle hook")
     for marker in (
         b"Lru/natro/navigation/TrafficLightMapLayer;",
+        b"Lru/natro/navigation/CameraDirectionMapLayer;",
+        b"Lru/natro/navigation/LaneGuidanceMapLayer;",
         b"Lru/natro/navigation/BackgroundMapLease;",
         b"getTrafficLightsWithSignal",
+        b"getActiveSpeedCameras",
+        b"getActiveDirections",
         b"setMaxNumberOfUpcomingTrafficLights",
         b"NavigationLayerFactory",
         b"setRoadEventVisibleOnRoute",
         b"route-matched road-events layer attached",
         b"showTrafficLights",
+        b"showLaneGuidance",
         b"background MapKit lease active",
     ):
         if marker not in classes19:

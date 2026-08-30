@@ -180,6 +180,8 @@ public final class NavigationIntegrationConfig {
         public boolean showTraffic = true;
         /** Fresh Windshield traffic lights, rendered in their own map-object collection. */
         public boolean showTrafficLights = true;
+        /** Upcoming lane sign anchored to its RoutePosition on the map. */
+        public boolean showLaneGuidance = true;
         public boolean showLabels = true;
         public boolean showPois = true;
         public boolean showBuildings = true;
@@ -251,6 +253,7 @@ public final class NavigationIntegrationConfig {
                     .put("showRouteTraffic", showRouteTraffic)
                     .put("showTraffic", showTraffic)
                     .put("showTrafficLights", showTrafficLights)
+                    .put("showLaneGuidance", showLaneGuidance)
                     .put("showLabels", showLabels)
                     .put("showPois", showPois)
                     .put("showBuildings", showBuildings)
@@ -300,6 +303,8 @@ public final class NavigationIntegrationConfig {
                     "showRouteTraffic", result.showRouteTraffic);
             result.showTrafficLights = source.optBoolean(
                     "showTrafficLights", result.showTrafficLights);
+            result.showLaneGuidance = source.optBoolean(
+                    "showLaneGuidance", result.showLaneGuidance);
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
             result.showPois = source.optBoolean("showPois", result.showPois);
             result.showBuildings = source.optBoolean("showBuildings", result.showBuildings);

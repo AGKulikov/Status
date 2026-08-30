@@ -38,7 +38,7 @@ public final class HudNavigationVisibilityContractTest {
         assertTrue(state.contains("normalizedTrafficSignal"));
     }
 
-    @Test public void mapLightLayerHasIndependentHudAndClusterSwitches() throws Exception {
+    @Test public void mapOverlayLayersHaveIndependentHudAndClusterSwitches() throws Exception {
         Path root = projectRoot();
         String hudSettings = read(root.resolve(
                 "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
@@ -52,10 +52,43 @@ public final class HudNavigationVisibilityContractTest {
 
         assertTrue(hudSettings.contains("profile.showTrafficLights"));
         assertTrue(clusterSettings.contains("map.showTrafficLights"));
+        assertTrue(hudSettings.contains("profile.showLaneGuidance"));
+        assertTrue(clusterSettings.contains("map.showLaneGuidance"));
         assertTrue(hudSettings.contains("Светофоры с отсчётом — отдельный слой"));
         assertTrue(clusterSettings.contains("Светофоры с отсчётом — отдельный слой"));
+        assertTrue(hudSettings.contains("Подсказки по полосам — слой на маршруте"));
+        assertTrue(clusterSettings.contains("Подсказки по полосам — слой на маршруте"));
         assertTrue(config.contains(".put(\"showTrafficLights\", showTrafficLights)"));
+        assertTrue(config.contains(".put(\"showLaneGuidance\", showLaneGuidance)"));
         assertFalse(mainMap.contains("showTrafficLights"));
+        assertFalse(mainMap.contains("showLaneGuidance"));
+    }
+
+    @Test public void maneuverCardIsAStandaloneHudWidgetNotAMapLayer() throws Exception {
+        Path root = projectRoot();
+        String types = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudElementType.java"));
+        String element = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudElementConfig.java"));
+        String canvas = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudCanvasView.java"));
+        String runtime = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudRuntimeData.java"));
+        String state = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudNavigationState.java"));
+
+        assertTrue(types.contains("NAV_COMBINED(\"Карточка ближайшего манёвра\""));
+        assertTrue(element.contains("showCardBackground"));
+        assertTrue(element.contains("showRoadBadge"));
+        assertTrue(element.contains("cardOpacityPercent"));
+        assertTrue(canvas.contains("drawManeuverCardText"));
+        assertTrue(canvas.contains("nav.turnDistance"));
+        assertTrue(canvas.contains("nav.maneuverSubtext"));
+        assertTrue(canvas.contains("nav.street"));
+        assertFalse(canvas.contains("NAV_COMBINED MapObject"));
+        assertTrue(runtime.contains("navigation.turnDistance"));
+        assertTrue(state.contains("case NAV_COMBINED:"));
+        assertTrue(state.contains("return routeActive && (maneuverImage != null"));
     }
 
     private static Path projectRoot() {

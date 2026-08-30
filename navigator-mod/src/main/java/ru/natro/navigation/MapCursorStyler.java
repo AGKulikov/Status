@@ -2,200 +2,221 @@
 package ru.natro.navigation;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
 import android.util.Log;
-import android.view.View;
 
-import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 
-/** Owns a strong UserLocationObjectListener and a resource-free configurable car cursor. */
+/** Owns one stable, vector-rendered vehicle placemark for an independent MapWindow. */
 final class MapCursorStyler {
     private static final String TAG = "NatroMapCursor";
+
     private final Context context;
-    private Object layer;
-    private Object listener;
-    private WeakReference<Object> listenerReference;
-    private Object locationView;
-    private Object viewProvider;
+    private Object map;
+    private Object collection;
+    private Object placemark;
+    private Object iconStyle;
+    private Object imageProvider;
+    private Bitmap iconBitmap;
     private boolean visible;
     private int scalePercent = 100;
     private int fillColor = Color.parseColor("#FFFFC400");
     private int outlineColor = Color.parseColor("#FF17191E");
+    private double latitude = Double.NaN;
+    private double longitude = Double.NaN;
+    private float bearingDegrees;
 
     MapCursorStyler(Context context) {
-        this.context = context.getApplicationContext();
+        Context app = context.getApplicationContext();
+        this.context = app == null ? context : app;
     }
 
-    void attach(Object nextLayer) throws Exception {
-        if (layer == nextLayer) return;
+    /**
+     * Binds directly to MapObjects instead of UserLocationLayer.
+     *
+     * <p>MapKit 30.3.0 can replace its internal arrow/pin icon while keeping the same
+     * UserLocationView instance. The old listener therefore lost the custom arrow after a GPS or
+     * route-state transition. A single publisher-fed placemark has no such state switch and also
+     * avoids a second location source in each offscreen MapWindow.</p>
+     */
+    void attach(Object nextMap) throws Exception {
+        if (map == nextMap) return;
         detach();
-        if (nextLayer == null) return;
-        layer = nextLayer;
-        Class<?> listenerClass = Class.forName(
-                "com.yandex.mapkit.user_location.UserLocationObjectListener");
-        listener = Proxy.newProxyInstance(listenerClass.getClassLoader(),
-                new Class<?>[]{listenerClass}, (proxy, method, arguments) -> {
-                    if (method.getDeclaringClass() == Object.class) {
-                        return objectMethodResult(proxy, method, arguments);
-                    }
-                    String name = method.getName();
-                    if (("onObjectAdded".equals(name) || "onObjectUpdated".equals(name))
-                            && arguments != null && arguments.length > 0) {
-                        if (locationView != arguments[0]) {
-                            locationView = arguments[0];
-                            try {
-                                applyToCurrentView();
-                            } catch (Throwable failure) {
-                                Log.w(TAG, "Could not style user location view", failure);
-                            }
-                        }
-                    } else if ("onObjectRemoved".equals(name)) {
-                        locationView = null;
-                    }
-                    return null;
-                });
-        listenerReference = new WeakReference<>(listener);
-        invoke(nextLayer, "setObjectListener", new Class<?>[]{WeakReference.class},
-                listenerReference);
+        map = nextMap;
+        if (visible && hasPosition()) ensurePlacemark();
     }
 
     void apply(boolean nextVisible, int nextScalePercent, String nextFill,
                String nextOutline) throws Exception {
+        int normalizedScale = Math.max(25, Math.min(300, nextScalePercent));
+        int normalizedFill = Color.parseColor(nextFill);
+        int normalizedOutline = Color.parseColor(nextOutline);
+        boolean styleChanged = scalePercent != normalizedScale
+                || fillColor != normalizedFill || outlineColor != normalizedOutline;
         visible = nextVisible;
-        scalePercent = Math.max(25, Math.min(300, nextScalePercent));
-        fillColor = Color.parseColor(nextFill);
-        outlineColor = Color.parseColor(nextOutline);
-        Object currentLayer = layer;
-        if (currentLayer != null) {
-            invoke(currentLayer, "setVisible", new Class<?>[]{boolean.class}, visible);
+        scalePercent = normalizedScale;
+        fillColor = normalizedFill;
+        outlineColor = normalizedOutline;
+        if (styleChanged) {
+            imageProvider = null;
+            iconBitmap = null;
+            iconStyle = null;
         }
-        viewProvider = null;
-        applyToCurrentView();
+        if (visible && hasPosition()) ensurePlacemark();
+        Object currentPlacemark = placemark;
+        if (currentPlacemark != null) {
+            if (styleChanged) applyIcon(currentPlacemark);
+            invoke(currentPlacemark, "setVisible", new Class<?>[]{boolean.class}, visible);
+        }
+    }
+
+    /** Uses the already sampled Guidance frame; no independent GPS or polling is started. */
+    void update(double nextLatitude, double nextLongitude, double nextBearingDegrees) {
+        if (!finite(nextLatitude) || nextLatitude < -90d || nextLatitude > 90d
+                || !finite(nextLongitude) || nextLongitude < -180d || nextLongitude > 180d) {
+            return;
+        }
+        latitude = nextLatitude;
+        longitude = nextLongitude;
+        bearingDegrees = normalizeBearing(nextBearingDegrees);
+        if (!visible || map == null) return;
+        try {
+            Object currentPlacemark = ensurePlacemark();
+            Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
+            Object point = pointClass.getConstructor(double.class, double.class)
+                    .newInstance(latitude, longitude);
+            invoke(currentPlacemark, "setGeometry", new Class<?>[]{pointClass}, point);
+            invoke(currentPlacemark, "setDirection", new Class<?>[]{float.class},
+                    bearingDegrees);
+            invoke(currentPlacemark, "setVisible", new Class<?>[]{boolean.class}, true);
+        } catch (Throwable failure) {
+            Log.w(TAG, "Could not update independent-map cursor", failure);
+        }
     }
 
     void detach() {
-        Object currentLayer = layer;
-        if (currentLayer != null) {
-            try {
-                invoke(currentLayer, "setObjectListener",
-                        new Class<?>[]{WeakReference.class}, (Object) null);
-            } catch (Throwable ignored) {}
-            try {
-                invoke(currentLayer, "setVisible", new Class<?>[]{boolean.class}, false);
-            } catch (Throwable ignored) {}
+        Object currentCollection = collection;
+        if (currentCollection != null) {
+            try { invoke(currentCollection, "clear", new Class<?>[0]); }
+            catch (Throwable ignored) {}
         }
-        layer = null;
-        listener = null;
-        listenerReference = null;
-        locationView = null;
-        viewProvider = null;
+        map = null;
+        collection = null;
+        placemark = null;
+        iconStyle = null;
+        imageProvider = null;
+        iconBitmap = null;
     }
 
-    private void applyToCurrentView() throws Exception {
-        Object currentView = locationView;
-        if (currentView == null) return;
-        Object provider = viewProvider;
-        if (provider == null) {
-            provider = createViewProvider();
-            viewProvider = provider;
+    private Object ensurePlacemark() throws Exception {
+        Object currentPlacemark = placemark;
+        if (currentPlacemark != null) return currentPlacemark;
+        Object currentMap = map;
+        if (currentMap == null || !hasPosition()) return null;
+        Object currentCollection = collection;
+        if (currentCollection == null) {
+            Object root = invoke(currentMap, "getMapObjects", new Class<?>[0]);
+            currentCollection = invoke(root, "addCollection", new Class<?>[0]);
+            collection = currentCollection;
         }
-        Object arrow = invoke(currentView, "getArrow", new Class<?>[0]);
-        Object pin = invoke(currentView, "getPin", new Class<?>[0]);
-        applyPlacemark(arrow, provider, true);
-        applyPlacemark(pin, provider, false);
-
-        Object accuracy = invoke(currentView, "getAccuracyCircle", new Class<?>[0]);
-        int accuracyFill = (fillColor & 0x00ffffff) | 0x22000000;
-        int accuracyStroke = (outlineColor & 0x00ffffff) | 0x66000000;
-        invoke(accuracy, "setFillColor", new Class<?>[]{int.class}, accuracyFill);
-        invoke(accuracy, "setStrokeColor", new Class<?>[]{int.class}, accuracyStroke);
-        invoke(accuracy, "setStrokeWidth", new Class<?>[]{float.class}, 1.5f);
-        invoke(accuracy, "setVisible", new Class<?>[]{boolean.class}, visible);
+        Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
+        Object point = pointClass.getConstructor(double.class, double.class)
+                .newInstance(latitude, longitude);
+        currentPlacemark = invoke(currentCollection, "addPlacemark",
+                new Class<?>[]{pointClass}, point);
+        placemark = currentPlacemark;
+        applyIcon(currentPlacemark);
+        invoke(currentPlacemark, "setDirection", new Class<?>[]{float.class},
+                bearingDegrees);
+        invoke(currentPlacemark, "setVisible", new Class<?>[]{boolean.class}, visible);
+        return currentPlacemark;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void applyPlacemark(Object placemark, Object provider, boolean rotating)
-            throws Exception {
+    private void applyIcon(Object currentPlacemark) throws Exception {
+        if (currentPlacemark == null) return;
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
         Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
-        Class<?> providerClass = Class.forName("com.yandex.runtime.ui_view.ViewProvider");
-        Object style = styleClass.getConstructor().newInstance();
-        Object rotation = Enum.valueOf((Class<? extends Enum>) rotationClass,
-                rotating ? "ROTATE" : "NO_ROTATION");
-        invoke(style, "setAnchor", new Class<?>[]{PointF.class}, new PointF(0.5f, 0.5f));
-        invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
-        invoke(style, "setScale", new Class<?>[]{Float.class},
-                Float.valueOf(scalePercent / 100f));
-        invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
-        invoke(style, "setVisible", new Class<?>[]{Boolean.class},
-                Boolean.valueOf(visible));
-        invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(20f));
-        invoke(placemark, "setView", new Class<?>[]{providerClass, styleClass}, provider, style);
-        invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, visible);
-    }
-
-    private Object createViewProvider() throws Exception {
-        int size = Math.max(32, Math.round(48f
-                * context.getResources().getDisplayMetrics().density));
-        CursorView view = new CursorView(context, fillColor, outlineColor);
-        int specification = View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY);
-        view.measure(specification, specification);
-        view.layout(0, 0, size, size);
-        Class<?> providerClass = Class.forName("com.yandex.runtime.ui_view.ViewProvider");
-        return providerClass.getConstructor(View.class, boolean.class)
-                .newInstance(view, false);
-    }
-
-    private static Object objectMethodResult(Object proxy, Method method, Object[] arguments) {
-        if ("hashCode".equals(method.getName())) return System.identityHashCode(proxy);
-        if ("equals".equals(method.getName())) {
-            return arguments != null && arguments.length == 1 && proxy == arguments[0];
+        Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
+        Object style = iconStyle;
+        if (style == null) {
+            style = styleClass.getConstructor().newInstance();
+            Object rotation = Enum.valueOf((Class<? extends Enum>) rotationClass, "ROTATE");
+            invoke(style, "setAnchor", new Class<?>[]{PointF.class},
+                    new PointF(0.5f, 0.5f));
+            invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
+            invoke(style, "setScale", new Class<?>[]{Float.class},
+                    Float.valueOf(scalePercent / 100f));
+            invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
+            invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
+            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(50f));
+            iconStyle = style;
         }
-        return "NatroUserLocationListener";
+        Object provider = imageProvider;
+        if (provider == null) {
+            Bitmap bitmap = createCursorBitmap();
+            provider = providerClass.getMethod("fromBitmap", Bitmap.class)
+                    .invoke(null, bitmap);
+            iconBitmap = bitmap;
+            imageProvider = provider;
+        }
+        invoke(currentPlacemark, "setIcon",
+                new Class<?>[]{providerClass, styleClass}, provider, style);
+    }
+
+    private Bitmap createCursorBitmap() {
+        float density = context.getResources().getDisplayMetrics().density;
+        int size = Math.max(32, Math.round(48f * density));
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        float width = bitmap.getWidth();
+        float height = bitmap.getHeight();
+        Path path = new Path();
+        path.moveTo(width * 0.50f, height * 0.06f);
+        path.lineTo(width * 0.88f, height * 0.88f);
+        path.lineTo(width * 0.50f, height * 0.70f);
+        path.lineTo(width * 0.12f, height * 0.88f);
+        path.close();
+
+        Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
+        outline.setColor(outlineColor);
+        outline.setStyle(Paint.Style.STROKE);
+        outline.setStrokeJoin(Paint.Join.ROUND);
+        outline.setStrokeCap(Paint.Cap.ROUND);
+        outline.setStrokeWidth(Math.max(2f, 2.5f * density));
+        canvas.drawPath(path, outline);
+
+        Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        fill.setColor(fillColor);
+        fill.setStyle(Paint.Style.FILL);
+        canvas.drawPath(path, fill);
+        return bitmap;
+    }
+
+    private boolean hasPosition() {
+        return finite(latitude) && latitude >= -90d && latitude <= 90d
+                && finite(longitude) && longitude >= -180d && longitude <= 180d;
+    }
+
+    private static boolean finite(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
+    }
+
+    private static float normalizeBearing(double value) {
+        if (!finite(value)) return 0f;
+        double result = value % 360d;
+        if (result < 0d) result += 360d;
+        return (float) result;
     }
 
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,
                                  Object... arguments) throws Exception {
         Method method = ReflectMethods.publicMethod(target.getClass(), name, parameterTypes);
         return method.invoke(target, arguments);
-    }
-
-    /** A compact north-facing vehicle chevron; ViewProvider snapshots it only on style changes. */
-    private static final class CursorView extends View {
-        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Path path = new Path();
-
-        CursorView(Context context, int fillColor, int outlineColor) {
-            super(context);
-            fill.setColor(fillColor);
-            fill.setStyle(Paint.Style.FILL);
-            outline.setColor(outlineColor);
-            outline.setStyle(Paint.Style.STROKE);
-            outline.setStrokeJoin(Paint.Join.ROUND);
-            outline.setStrokeCap(Paint.Cap.ROUND);
-            outline.setStrokeWidth(Math.max(2f,
-                    2.5f * context.getResources().getDisplayMetrics().density));
-        }
-
-        @Override protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            float width = getWidth();
-            float height = getHeight();
-            path.reset();
-            path.moveTo(width * 0.50f, height * 0.06f);
-            path.lineTo(width * 0.88f, height * 0.88f);
-            path.lineTo(width * 0.50f, height * 0.70f);
-            path.lineTo(width * 0.12f, height * 0.88f);
-            path.close();
-            canvas.drawPath(path, outline);
-            canvas.drawPath(path, fill);
-        }
     }
 }

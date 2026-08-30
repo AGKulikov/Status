@@ -38,6 +38,8 @@ final class HudMapRenderer {
     private final FailureReporter reporter;
     private final MapCursorStyler cursorStyler;
     private final TrafficLightMapLayer trafficLightMapLayer;
+    private final CameraDirectionMapLayer cameraDirectionMapLayer;
+    private final LaneGuidanceMapLayer laneGuidanceMapLayer;
     private final String profileSection;
     private final String displayName;
     private final boolean adaptiveFrameRate;
@@ -52,7 +54,6 @@ final class HudMapRenderer {
     private Object mapWindow;
     private Object map;
     private Object trafficLayer;
-    private Object userLocationLayer;
     private Object roadEventStyleProvider;
     private Object roadEventsManager;
     private Object roadEventsLayer;
@@ -94,6 +95,8 @@ final class HudMapRenderer {
         this.adaptiveFrameRate = adaptiveFrameRate;
         cursorStyler = new MapCursorStyler(this.context);
         trafficLightMapLayer = new TrafficLightMapLayer(this.context);
+        cameraDirectionMapLayer = new CameraDirectionMapLayer(this.context);
+        laneGuidanceMapLayer = new LaneGuidanceMapLayer(this.context);
     }
 
     void applyConfiguration(String raw) {
@@ -165,6 +168,8 @@ final class HudMapRenderer {
         if (nextNavigation == null) {
             routeGuidanceActive = false;
             trafficLightMapLayer.clearData();
+            cameraDirectionMapLayer.clearData();
+            laneGuidanceMapLayer.clearData();
             applyRoadEventVisibility();
             applyCamera(false);
         }
@@ -186,9 +191,14 @@ final class HudMapRenderer {
         }
         trafficLightMapLayer.update(frame.routeActive,
                 frame.trafficLightsSampleElapsedMs, frame.trafficLights);
+        cameraDirectionMapLayer.update(frame.routeActive,
+                frame.cameraDirectionsSampleElapsedMs, frame.cameraDirections);
+        laneGuidanceMapLayer.update(frame.routeActive,
+                frame.laneGuidanceSampleElapsedMs, frame.laneGuidance);
         if (!frame.isValid()) return;
         try {
             latestSpeedKmh = Math.max(0d, frame.speedKmh);
+            cursorStyler.update(frame.latitude, frame.longitude, frame.bearingDegrees);
             applyMaximumFps();
             float baseZoom = frame.routeActive
                     ? frame.speedKmh >= 90d ? 14.5f : frame.speedKmh >= 50d ? 15.2f : 16f
@@ -294,6 +304,9 @@ final class HudMapRenderer {
             mapWindow = nextMapWindow;
             map = invoke(nextMapWindow, "getMap", new Class<?>[0]);
             trafficLightMapLayer.attach(map);
+            cameraDirectionMapLayer.attach(map);
+            laneGuidanceMapLayer.attach(map);
+            cursorStyler.attach(map);
 
             Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
             Class<?> surfaceFactoryClass = Class.forName(
@@ -305,22 +318,11 @@ final class HudMapRenderer {
                     new Class<?>[]{runtimeSurfaceClass}, nextRuntimeSurface);
             runtimeSurfaceAttached = true;
 
-            // These enrich the map, but neither is allowed to take down the core renderer.
+            // Optional traffic enriches the map but is not allowed to take down the renderer.
             Class<?> mapWindowClass = Class.forName("com.yandex.mapkit.map.MapWindow");
             trafficLayer = createOptionalLayer(
                     mapKit, mapKitClass, mapWindowClass, nextMapWindow,
                     "createTrafficLayer");
-            userLocationLayer = createOptionalLayer(
-                    mapKit, mapKitClass, mapWindowClass, nextMapWindow,
-                    "createUserLocationLayer");
-            if (userLocationLayer != null) {
-                try {
-                    cursorStyler.attach(userLocationLayer);
-                } catch (Throwable cursorFailure) {
-                    Log.w(TAG, "Custom HUD cursor listener unavailable: "
-                            + shortMessage(cursorFailure));
-                }
-            }
 
             createRoadEventsLayer(mapKit, mapKitClass, mapWindowClass, nextMapWindow);
             applyProfile();
@@ -345,6 +347,9 @@ final class HudMapRenderer {
         Object currentMap = map;
         if (currentWindow == null || currentMap == null) return;
         trafficLightMapLayer.apply(profile.showTrafficLights);
+        cameraDirectionMapLayer.apply(
+                !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL")));
+        laneGuidanceMapLayer.apply(profile.showLaneGuidance);
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -355,27 +360,8 @@ final class HudMapRenderer {
                     height * profile.focusYPercent / 100f);
             invoke(currentWindow, "setFocusPoint", new Class<?>[]{pointClass}, focus);
             applyTrafficPresentation();
-            Object currentLocation = userLocationLayer;
-            if (currentLocation != null) {
-                try {
-                    invoke(currentLocation, "setDefaultSource", new Class<?>[0]);
-                    invoke(currentLocation, "setVisible", new Class<?>[]{boolean.class},
-                            profile.showCursor);
-                    invoke(currentLocation, "setAutoZoomEnabled",
-                            new Class<?>[]{boolean.class}, false);
-                    invoke(currentLocation, "setHeadingModeActive",
-                            new Class<?>[]{boolean.class}, false);
-                    // The HUD camera has exactly one owner: Guidance snapshots below. setAnchor
-                    // turns UserLocationLayer into a second camera controller, which made MapKit
-                    // alternate between its GPS camera and our route-matched camera every second.
-                    // The MapWindow focus point already positions the visible cursor correctly.
-                    invoke(currentLocation, "resetAnchor", new Class<?>[0]);
-                    cursorStyler.apply(profile.showCursor, profile.cursorScalePercent,
-                            profile.cursorColor, profile.cursorOutlineColor);
-                } catch (Throwable cursorFailure) {
-                    Log.w(TAG, "HUD cursor profile could not be applied", cursorFailure);
-                }
-            }
+            cursorStyler.apply(profile.showCursor, profile.cursorScalePercent,
+                    profile.cursorColor, profile.cursorOutlineColor);
             boolean systemNight = (context.getResources().getConfiguration().uiMode
                     & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
             boolean night = profile.automaticDayNight ? systemNight : profile.nightMode;
@@ -466,8 +452,9 @@ final class HudMapRenderer {
 
     /**
      * Creates the stock Yandex event layer for ALWAYS events. The target 30.3.0 provider is
-     * intentionally resolved by its verified runtime name so its icons, camera directions and
-     * significance scaling are identical to the main Navigator map.
+     * intentionally resolved by its verified runtime name so its icons and significance scaling
+     * are identical to the main Navigator map. Camera direction is not part of StyleProvider in
+     * 30.3.0; CameraDirectionMapLayer receives it separately from Windshield.
      */
     private void createRoadEventsLayer(Object mapKit, Class<?> mapKitClass,
                                        Class<?> mapWindowClass, Object currentMapWindow) {
@@ -861,7 +848,8 @@ final class HudMapRenderer {
         roadEventStyleProvider = null;
         cursorStyler.detach();
         trafficLightMapLayer.detachMap();
-        userLocationLayer = null;
+        cameraDirectionMapLayer.detachMap();
+        laneGuidanceMapLayer.detachMap();
         routeCollection = null;
         routePolyline = null;
         routeColorScratch.clear();

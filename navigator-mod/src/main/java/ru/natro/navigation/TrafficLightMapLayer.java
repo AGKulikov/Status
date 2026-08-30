@@ -2,6 +2,7 @@
 package ru.natro.navigation;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -11,7 +12,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
-import android.view.View;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -22,7 +22,7 @@ import java.util.List;
  * A map-object collection dedicated only to fresh route traffic lights.
  *
  * <p>The publisher samples Windshield once for both independent maps. This layer performs no
- * Guidance reflection, does not touch Navigator's primary map and replaces a ViewProvider only
+ * Guidance reflection, does not touch Navigator's primary map and replaces its bitmap icon only
  * when a signal/countdown actually changes.</p>
  */
 final class TrafficLightMapLayer {
@@ -159,7 +159,11 @@ final class TrafficLightMapLayer {
         ArrayList<NavigatorStatePublisher.TrafficLightFrame> visible = new ArrayList<>();
         for (NavigatorStatePublisher.TrafficLightFrame light : latest) {
             if (visible.size() >= MAX_LIGHTS) break;
-            if (light != null && light.hasMapPosition()) visible.add(light);
+            // This is specifically the countdown layer. A signal without a timer remains useful
+            // to the standalone HUD module, but must not become another static map POI.
+            if (light != null && light.hasMapPosition() && light.secondsLeft >= 0) {
+                visible.add(light);
+            }
         }
         if (visible.isEmpty()) {
             clearVisual();
@@ -211,7 +215,7 @@ final class TrafficLightMapLayer {
                               NavigatorStatePublisher.TrafficLightFrame light)
             throws Exception {
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
-        Class<?> providerClass = Class.forName("com.yandex.runtime.ui_view.ViewProvider");
+        Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
         Object style = marker.iconStyle;
         if (style == null) {
             Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
@@ -226,27 +230,27 @@ final class TrafficLightMapLayer {
             marker.iconStyle = style;
         }
 
-        Object provider = createViewProvider(light);
-        invoke(marker.placemark, "setView", new Class<?>[]{providerClass, styleClass},
-                provider, style);
-        marker.viewProvider = provider;
+        RenderedIcon rendered = createImageProvider(light, providerClass);
+        invoke(marker.placemark, "setIcon", new Class<?>[]{providerClass, styleClass},
+                rendered.provider, style);
+        marker.imageProvider = rendered.provider;
+        marker.iconBitmap = rendered.bitmap;
         marker.signal = light.signal;
         marker.secondsLeft = light.secondsLeft;
         marker.arrow = light.arrow;
     }
 
-    private Object createViewProvider(NavigatorStatePublisher.TrafficLightFrame light)
+    private RenderedIcon createImageProvider(
+            NavigatorStatePublisher.TrafficLightFrame light, Class<?> providerClass)
             throws Exception {
         float density = context.getResources().getDisplayMetrics().density;
         int width = Math.max(56, Math.round(70f * density));
         int height = Math.max(52, Math.round(64f * density));
-        TrafficLightView view = new TrafficLightView(context, light);
-        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
-        view.layout(0, 0, width, height);
-        Class<?> providerClass = Class.forName("com.yandex.runtime.ui_view.ViewProvider");
-        return providerClass.getConstructor(View.class, boolean.class)
-                .newInstance(view, false);
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        drawTrafficLightIcon(new Canvas(bitmap), light, density, width, height);
+        Object provider = providerClass.getMethod("fromBitmap", Bitmap.class)
+                .invoke(null, bitmap);
+        return new RenderedIcon(provider, bitmap);
     }
 
     private void clearVisual() {
@@ -274,7 +278,7 @@ final class TrafficLightMapLayer {
         long result = 0x517cc1b727220a95L;
         int count = 0;
         for (NavigatorStatePublisher.TrafficLightFrame value : values) {
-            if (value == null || !value.hasMapPosition()) continue;
+            if (value == null || !value.hasMapPosition() || value.secondsLeft < 0) continue;
             if (count >= MAX_LIGHTS) break;
             count++;
             result = mix(result, value.id.hashCode());
@@ -303,7 +307,8 @@ final class TrafficLightMapLayer {
         int secondsLeft = Integer.MIN_VALUE;
         String arrow = "";
         Object iconStyle;
-        Object viewProvider;
+        Object imageProvider;
+        Bitmap iconBitmap;
 
         Marker(Object placemark, NavigatorStatePublisher.TrafficLightFrame ignored) {
             this.placemark = placemark;
@@ -315,93 +320,92 @@ final class TrafficLightMapLayer {
         }
     }
 
-    /** Resource-free vector marker: one signal housing plus a digital countdown badge. */
-    private static final class TrafficLightView extends View {
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF box = new RectF();
-        private final String signal;
-        private final int seconds;
-        private final String arrow;
+    private static final class RenderedIcon {
+        final Object provider;
+        final Bitmap bitmap;
 
-        TrafficLightView(Context context, NavigatorStatePublisher.TrafficLightFrame light) {
-            super(context);
-            signal = light.signal;
-            seconds = light.secondsLeft;
-            arrow = arrowGlyph(light.arrow);
+        RenderedIcon(Object provider, Bitmap bitmap) {
+            this.provider = provider;
+            this.bitmap = bitmap;
         }
+    }
 
-        @Override protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            float density = getResources().getDisplayMetrics().density;
-            float left = 2f * density;
-            float top = 2f * density;
-            float housingWidth = 25f * density;
-            float housingHeight = 56f * density;
-            float radius = 7f * density;
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(0xED17191E);
-            box.set(left, top, left + housingWidth, top + housingHeight);
-            canvas.drawRoundRect(box, radius, radius, paint);
+    /** One direct Canvas pass avoids allocating and laying out an Android View per countdown. */
+    private static void drawTrafficLightIcon(
+            Canvas canvas, NavigatorStatePublisher.TrafficLightFrame light,
+            float density, int width, int height) {
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        RectF box = new RectF();
+        String signal = light.signal;
+        int seconds = light.secondsLeft;
+        String arrow = arrowGlyph(light.arrow);
+        float left = 2f * density;
+        float top = 2f * density;
+        float housingWidth = 25f * density;
+        float housingHeight = 56f * density;
+        float radius = 7f * density;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xED17191E);
+        box.set(left, top, left + housingWidth, top + housingHeight);
+        canvas.drawRoundRect(box, radius, radius, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, density));
+        paint.setColor(0xCCFFFFFF);
+        canvas.drawRoundRect(box, radius, radius, paint);
+
+        float centerX = left + housingWidth / 2f;
+        float lightRadius = 6.2f * density;
+        drawLamp(canvas, paint, signal, density, centerX,
+                top + 10.5f * density, lightRadius, "RED", 0xFFFF3B30);
+        drawLamp(canvas, paint, signal, density, centerX,
+                top + 27.5f * density, lightRadius, "YELLOW", 0xFFFFCC00);
+        drawLamp(canvas, paint, signal, density, centerX,
+                top + 44.5f * density, lightRadius, "GREEN", 0xFF34C759);
+
+        if (seconds < 0 && arrow.isEmpty()) return;
+        float badgeLeft = left + housingWidth - 1f * density;
+        float badgeTop = top + 13f * density;
+        box.set(badgeLeft, badgeTop, width - 2f * density,
+                Math.min(height - 2f * density, top + 45f * density));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xF2262930);
+        canvas.drawRoundRect(box, 9f * density, 9f * density, paint);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        paint.setColor(Color.WHITE);
+        paint.setTextSize((seconds >= 10 ? 15f : 17f) * density);
+        String value = seconds < 0 ? arrow : Integer.toString(seconds);
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        float baseline = box.centerY() - (metrics.ascent + metrics.descent) / 2f;
+        canvas.drawText(value, box.centerX(), baseline, paint);
+        if (seconds >= 0 && !arrow.isEmpty()) {
+            paint.setTextSize(8f * density);
+            canvas.drawText(arrow, box.right - 6f * density,
+                    box.bottom - 3f * density, paint);
+        }
+    }
+
+    private static void drawLamp(Canvas canvas, Paint paint, String signal, float density,
+                                 float x, float y, float radius,
+                                 String lamp, int activeColor) {
+        boolean active = lamp.equals(signal) || "RED_AND_YELLOW".equals(signal)
+                && ("RED".equals(lamp) || "YELLOW".equals(lamp));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(active ? activeColor : 0xFF3B3E44);
+        canvas.drawCircle(x, y, radius, paint);
+        if (active) {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(Math.max(1f, density));
-            paint.setColor(0xCCFFFFFF);
-            canvas.drawRoundRect(box, radius, radius, paint);
-
-            float centerX = left + housingWidth / 2f;
-            float lightRadius = 6.2f * density;
-            drawLamp(canvas, centerX, top + 10.5f * density, lightRadius,
-                    "RED", 0xFFFF3B30);
-            drawLamp(canvas, centerX, top + 27.5f * density, lightRadius,
-                    "YELLOW", 0xFFFFCC00);
-            drawLamp(canvas, centerX, top + 44.5f * density, lightRadius,
-                    "GREEN", 0xFF34C759);
-
-            if (seconds >= 0 || !arrow.isEmpty()) {
-                float badgeLeft = left + housingWidth - 1f * density;
-                float badgeTop = top + 13f * density;
-                box.set(badgeLeft, badgeTop, getWidth() - 2f * density,
-                        top + 45f * density);
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(0xF2262930);
-                canvas.drawRoundRect(box, 9f * density, 9f * density, paint);
-                paint.setTextAlign(Paint.Align.CENTER);
-                paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-                paint.setColor(Color.WHITE);
-                paint.setTextSize((seconds >= 10 ? 15f : 17f) * density);
-                String value = seconds < 0 ? arrow : Integer.toString(seconds);
-                Paint.FontMetrics metrics = paint.getFontMetrics();
-                float baseline = box.centerY() - (metrics.ascent + metrics.descent) / 2f;
-                canvas.drawText(value, box.centerX(), baseline, paint);
-                if (seconds >= 0 && !arrow.isEmpty()) {
-                    paint.setTextSize(8f * density);
-                    canvas.drawText(arrow, box.right - 6f * density,
-                            box.bottom - 3f * density, paint);
-                }
-            }
-        }
-
-        private void drawLamp(Canvas canvas, float x, float y, float radius,
-                              String lamp, int activeColor) {
-            boolean active = lamp.equals(signal) || "RED_AND_YELLOW".equals(signal)
-                    && ("RED".equals(lamp) || "YELLOW".equals(lamp));
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(active ? activeColor : 0xFF3B3E44);
+            paint.setColor(0xE6FFFFFF);
             canvas.drawCircle(x, y, radius, paint);
-            if (active) {
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(Math.max(1f,
-                        getResources().getDisplayMetrics().density));
-                paint.setColor(0xE6FFFFFF);
-                canvas.drawCircle(x, y, radius, paint);
-            }
         }
+    }
 
-        private static String arrowGlyph(String raw) {
-            if (raw == null) return "";
-            if (raw.contains("LEFT")) return "←";
-            if (raw.contains("RIGHT")) return "→";
-            if (raw.contains("STRAIGHT") || raw.contains("FORWARD")) return "↑";
-            return "";
-        }
+    private static String arrowGlyph(String raw) {
+        if (raw == null) return "";
+        if (raw.contains("LEFT")) return "←";
+        if (raw.contains("RIGHT")) return "→";
+        if (raw.contains("STRAIGHT") || raw.contains("FORWARD")) return "↑";
+        return "";
     }
 }

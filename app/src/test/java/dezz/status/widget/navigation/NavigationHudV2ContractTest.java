@@ -31,6 +31,7 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.showTraffic = false;
         config.hudMap.showRouteTraffic = true;
         config.hudMap.showTrafficLights = false;
+        config.hudMap.showLaneGuidance = false;
         config.hudMap.enabled = true;
         config.hudMap.roadsOnly = true;
         config.hudMap.setRoadEventMode("SPEED_CONTROL",
@@ -46,6 +47,7 @@ public final class NavigationHudV2ContractTest {
         config.clusterMap.maximumFps = 60;
         config.clusterMap.showModels = false;
         config.clusterMap.showTrafficLights = true;
+        config.clusterMap.showLaneGuidance = true;
         config.clusterMap.trafficFreeColor = "#FF616263";
         config.clusterMap.trafficLightColor = "#FF717273";
         config.clusterMap.trafficHardColor = "#FF818283";
@@ -80,6 +82,7 @@ public final class NavigationHudV2ContractTest {
         assertFalse(restored.hudMap.showTraffic);
         assertTrue(restored.hudMap.showRouteTraffic);
         assertFalse(restored.hudMap.showTrafficLights);
+        assertFalse(restored.hudMap.showLaneGuidance);
         assertTrue(restored.hudMap.enabled);
         assertTrue(restored.hudMap.roadsOnly);
         assertEquals(NavigationIntegrationConfig.RoadEventMode.ALWAYS,
@@ -95,6 +98,7 @@ public final class NavigationHudV2ContractTest {
         assertEquals(60, restored.clusterMap.maximumFps);
         assertFalse(restored.clusterMap.showModels);
         assertTrue(restored.clusterMap.showTrafficLights);
+        assertTrue(restored.clusterMap.showLaneGuidance);
         assertEquals("#FF616263", restored.clusterMap.trafficFreeColor);
         assertEquals("#FF717273", restored.clusterMap.trafficLightColor);
         assertEquals("#FF818283", restored.clusterMap.trafficHardColor);
@@ -132,6 +136,9 @@ public final class NavigationHudV2ContractTest {
             assertTrue(source.contains("map.nightMode = selection == 2"));
             assertTrue(source.contains("navigationColorField("));
             assertTrue(source.contains("navigationIntegrationConfigJson.commit("));
+            assertTrue(source.contains("navigationIntegrationConfigJson.get()"));
+            assertTrue(source.contains("encoded.equals(verified)")
+                    || source.contains("encodedNavigation.equals("));
             assertTrue(source.contains("persistNavigationConfiguration("));
         }
         assertFalse(cluster.contains("android.widget.EditText"));
@@ -144,12 +151,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cluster.contains("map.cursorScalePercent = cursorScale.intValue()"));
         assertTrue(cluster.contains("map.trafficGradientLength = trafficGradient.value()"));
         assertTrue(cluster.contains("AppleColorPickerDialog.show("));
+        String normalizedHud = hud.replace("profile.", "map.");
         for (String assignment : new String[]{
                 "map.enabled = mapEnabled.isChecked()",
                 "map.showRoute = route.isChecked()",
                 "map.showRouteTraffic = routeTraffic.isChecked()",
                 "map.showTraffic = traffic.isChecked()",
                 "map.showTrafficLights = trafficLights.isChecked()",
+                "map.showLaneGuidance = laneGuidance.isChecked()",
                 "map.showLabels = labels.isChecked()",
                 "map.showPois = pois.isChecked()",
                 "map.showBuildings = buildings.isChecked()",
@@ -174,6 +183,8 @@ public final class NavigationHudV2ContractTest {
         }) {
             assertTrue("Missing cluster visual setting assignment: " + assignment,
                     cluster.contains(assignment));
+            assertTrue("Missing HUD visual setting assignment: " + assignment,
+                    normalizedHud.contains(assignment));
         }
     }
 
@@ -306,6 +317,8 @@ public final class NavigationHudV2ContractTest {
         String routeStyler = read(patchRoot.resolve("RoutePolylineStyler.java"));
         String mapProfile = read(patchRoot.resolve("NavigationMapProfile.java"));
         String trafficLights = read(patchRoot.resolve("TrafficLightMapLayer.java"));
+        String cameraDirections = read(patchRoot.resolve("CameraDirectionMapLayer.java"));
+        String laneGuidance = read(patchRoot.resolve("LaneGuidanceMapLayer.java"));
         String backgroundLease = read(patchRoot.resolve("BackgroundMapLease.java"));
         String mapViewPatch = read(projectRoot().resolve(
                 "tools/patch_navigation_map_view.py"));
@@ -394,7 +407,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("applyTrafficPresentation()"));
         assertTrue(renderer.contains("setTrafficStyle"));
         assertTrue(renderer.contains("\\\"scale\\\":0.45"));
-        assertTrue(renderer.contains("createUserLocationLayer"));
+        assertFalse(renderer.contains("createUserLocationLayer"));
         assertTrue(renderer.contains("NavigationLayerFactory"));
         assertTrue(renderer.contains(
                 "\"setUseLayerCamera\", new Class<?>[]{boolean.class}, true"));
@@ -417,8 +430,7 @@ public final class NavigationHudV2ContractTest {
         assertFalse(renderer.contains("applyNativeCameraProfile"));
         assertTrue(renderer.contains("float tilt = profile.tiltDegrees"));
         assertTrue(renderer.contains("applyCamera(false)"));
-        assertTrue(renderer.contains("invoke(currentLocation, \"resetAnchor\""));
-        assertFalse(renderer.contains("invoke(currentLocation, \"setAnchor\""));
+        assertTrue(renderer.contains("cursorStyler.update(frame.latitude"));
         assertTrue(renderer.contains("com.yandex.mapkit.Animation$Type"));
         assertTrue(renderer.contains("\"SMOOTH\""));
         assertTrue(renderer.contains("lastAppliedCamera"));
@@ -433,15 +445,31 @@ public final class NavigationHudV2ContractTest {
         assertTrue(routeStyler.contains("firstSegmentIndex + index"));
         assertTrue(mapProfile.contains("showRouteTraffic"));
         assertTrue(mapProfile.contains("showTrafficLights"));
+        assertTrue(mapProfile.contains("showLaneGuidance"));
         assertTrue(renderer.contains("trafficLightMapLayer.update(frame.routeActive"));
         assertTrue(renderer.contains("trafficLightMapLayer.apply(profile.showTrafficLights)"));
+        assertTrue(renderer.contains("cameraDirectionMapLayer.update(frame.routeActive"));
+        assertTrue(renderer.contains("laneGuidanceMapLayer.update(frame.routeActive"));
+        assertTrue(renderer.contains("laneGuidanceMapLayer.apply(profile.showLaneGuidance)"));
         assertTrue(trafficLights.contains("addCollection"));
         assertTrue(trafficLights.contains("addPlacemark"));
         assertTrue(trafficLights.contains("FRESH_MS = 3_000L"));
         assertTrue(trafficLights.contains("if (fingerprint == latestVisualFingerprint) return"));
-        assertTrue(trafficLights.contains("ViewProvider"));
+        assertTrue(trafficLights.contains("ImageProvider"));
+        assertTrue(trafficLights.contains("setIcon"));
+        assertFalse(trafficLights.contains("ViewProvider"));
+        assertTrue(trafficLights.contains("light.secondsLeft >= 0"));
         assertTrue(trafficLights.contains("secondsLeft"));
         assertFalse(mainMap.contains("TrafficLightMapLayer"));
+        assertFalse(mainMap.contains("CameraDirectionMapLayer"));
+        assertFalse(mainMap.contains("LaneGuidanceMapLayer"));
+        assertTrue(cameraDirections.contains("FRESH_MS = 3_000L"));
+        assertTrue(cameraDirections.contains("setDirection"));
+        assertTrue(cameraDirections.contains("camera.inFace || camera.inBack"));
+        assertTrue(laneGuidance.contains("FRESH_MS = 1_500L"));
+        assertTrue(laneGuidance.contains("RotationType"));
+        assertTrue(laneGuidance.contains("NO_ROTATION"));
+        assertTrue(laneGuidance.contains("setGeometry"));
         assertFalse(renderer.contains("drivingRoute != activeRoute"));
         assertFalse(routeStyler.contains("Double.doubleToLongBits"));
         assertTrue(renderer.contains("applyStyleSlot"));
@@ -482,9 +510,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(routeStyler.contains("setPaletteColor"));
         assertTrue(routeStyler.contains("readJamStyle"));
         assertTrue(renderer.contains("applyProgressColors"));
-        assertTrue(cursor.contains("UserLocationObjectListener"));
-        assertTrue(cursor.contains("ViewProvider"));
-        assertTrue(cursor.contains("setView"));
+        assertFalse(cursor.contains("UserLocationObjectListener"));
+        assertFalse(cursor.contains("ViewProvider"));
+        assertFalse(cursor.contains("setView"));
+        assertTrue(cursor.contains("addPlacemark"));
+        assertTrue(cursor.contains("setGeometry"));
+        assertTrue(cursor.contains("setDirection"));
+        assertTrue(cursor.contains("ImageProvider"));
         assertTrue(mainMap.contains("Stable main MapProfile applied"));
         assertFalse(mainMap.contains("rebuildRoute"));
         assertFalse(mainMap.contains("addCollection"));
@@ -506,6 +538,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("timeToFinish"));
         assertTrue(publisher.contains("getManoeuvres"));
         assertTrue(publisher.contains("getLaneSigns"));
+        assertTrue(publisher.contains("getActiveSpeedCameras"));
+        assertTrue(publisher.contains("getActiveDirections"));
+        assertTrue(publisher.contains("getInFace"));
+        assertTrue(publisher.contains("getInBack"));
+        assertTrue(publisher.contains("LaneGuidanceFrame"));
+        assertTrue(publisher.contains("invoke(position, \"getPoint\")"));
+        assertTrue(publisher.contains("invoke(position, \"heading\")"));
         assertTrue(publisher.contains("getTrafficLightsWithSignal"));
         assertTrue(publisher.contains("setMaxNumberOfUpcomingTrafficLights"));
         assertTrue(publisher.contains("MAX_UPCOMING_TRAFFIC_LIGHTS = 8"));
@@ -531,7 +570,7 @@ public final class NavigationHudV2ContractTest {
         assertFalse(publisher.contains("getDeclaredField"));
         assertFalse(renderer.contains("captureScreenshot("));
         assertFalse(renderer.contains("PlatformGLSurface"));
-        assertFalse(cursor.contains("Bitmap"));
+        assertTrue(cursor.contains("Bitmap"));
         assertFalse(controller.contains("ImageReader"));
         assertFalse(controller.contains("MediaProjection"));
         assertFalse(controller.contains("Bitmap"));
@@ -625,6 +664,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(elementTypes.contains("NAV_LANES"));
         assertTrue(elementTypes.contains("NAV_SPEED_LIMIT"));
         assertTrue(elementTypes.contains("NAV_TRAFFIC_LIGHTS"));
+        assertTrue(elementTypes.contains("NAV_COMBINED(\"Карточка ближайшего манёвра\""));
     }
 
     @Test public void independentHudElementsConsumeDirectBridgeState() throws Exception {
@@ -648,6 +688,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("readDestination(route)"));
         assertTrue(publisher.contains("getRequestPoints"));
         assertTrue(canvas.contains("HudNavigationVisuals.maneuver"));
+        assertTrue(canvas.contains("drawManeuverCardText"));
+        assertTrue(canvas.contains("nav.turnDistance"));
+        assertTrue(canvas.contains("showRoadBadge"));
         assertTrue(canvas.contains("HudNavigationVisuals.lane"));
         assertTrue(canvas.contains("drawTrafficArrow"));
         assertTrue(canvas.contains("isTrafficArrow"));

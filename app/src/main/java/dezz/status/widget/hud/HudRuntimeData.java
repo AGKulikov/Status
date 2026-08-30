@@ -404,8 +404,13 @@ public final class HudRuntimeData {
                 return navigation == null ? "—" : emptyDash(navigation.laneDistance);
             case NAV_COMBINED:
                 if (navigation == null) return "Маршрут не активен";
-                return join(firstNonEmpty(navigation.maneuverTitle, navigation.maneuverText, ""),
-                        navigation.distance, "\n");
+                String direction = firstNonEmpty(navigation.maneuverTitle,
+                        navigation.maneuverText,
+                        firstNonEmpty(navigation.maneuverSubtext, navigation.street, ""));
+                String road = firstNonEmpty(navigation.maneuverSubtext,
+                        navigation.street, "");
+                if (road.equals(direction)) road = "";
+                return join(navigation.turnDistance, join(road, direction, " · "), "\n");
             case NAV_TRIP_PROGRESS:
                 if (navigation == null) return "—";
                 String mode = item.options.optString("progressMode", "COMBINED");

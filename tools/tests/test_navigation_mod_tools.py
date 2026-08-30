@@ -225,6 +225,14 @@ class NavigationModToolsTest(unittest.TestCase):
         publisher = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                      / "ru" / "natro" / "navigation"
                      / "NavigatorStatePublisher.java").read_text()
+        cursor = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                  / "ru" / "natro" / "navigation" / "MapCursorStyler.java").read_text()
+        camera = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                  / "ru" / "natro" / "navigation"
+                  / "CameraDirectionMapLayer.java").read_text()
+        lanes = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                 / "ru" / "natro" / "navigation"
+                 / "LaneGuidanceMapLayer.java").read_text()
 
         self.assertIn("NavigationLayerFactory", renderer)
         self.assertIn(
@@ -242,6 +250,17 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("setMaxNumberOfUpcomingTrafficLights", publisher)
         self.assertIn("MAX_UPCOMING_TRAFFIC_LIGHTS = 8", publisher)
         self.assertIn("setRoadEventVisible", renderer)
+        self.assertIn("getActiveSpeedCameras", publisher)
+        self.assertIn("getActiveDirections", publisher)
+        self.assertIn("cameraDirectionMapLayer.update", renderer)
+        self.assertIn("laneGuidanceMapLayer.update", renderer)
+        self.assertIn("setDirection", camera)
+        self.assertIn("NO_ROTATION", lanes)
+        self.assertIn("setGeometry", lanes)
+        self.assertIn("ImageProvider", cursor)
+        self.assertIn("setGeometry", cursor)
+        self.assertIn("setDirection", cursor)
+        self.assertNotIn("UserLocationObjectListener", cursor)
 
     def test_kx11_pair_gate_freezes_device_identity_and_hud_plane(self):
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()

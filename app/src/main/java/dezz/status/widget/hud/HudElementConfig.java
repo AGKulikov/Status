@@ -111,11 +111,26 @@ public final class HudElementConfig {
                     options.put("transparentBackground", false);
                     break;
                 case NAV_MANEUVER_ARROW:
-                case NAV_COMBINED:
                     options.put("arrowAnimation", true);
                     options.put("arrowLayout", "LEFT");
                     options.put("preferSourceImage", true);
                     options.put("hideWhenInactive", true);
+                    break;
+                case NAV_COMBINED:
+                    // A self-contained HUD widget. It is deliberately not part of NAV_MAP and
+                    // therefore keeps its own geometry, visibility and presentation settings.
+                    options.put("arrowAnimation", true);
+                    options.put("arrowLayout", "LEFT");
+                    options.put("preferSourceImage", true);
+                    options.put("hideWhenInactive", true);
+                    options.put("hideWhenEmpty", true);
+                    options.put("showCardBackground", true);
+                    options.put("showRoadBadge", true);
+                    options.put("showDirection", true);
+                    options.put("cardColor", "#FF0758E8");
+                    options.put("roadBadgeColor", "#FF16A34A");
+                    options.put("cardOpacityPercent", 94);
+                    options.put("cardCornerRadiusPx", 18);
                     break;
                 case NAV_LANES:
                     options.put("laneDistancePosition", "BOTTOM");

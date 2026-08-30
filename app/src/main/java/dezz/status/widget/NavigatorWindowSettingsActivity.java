@@ -192,7 +192,11 @@ public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
         window.modeButtonOpacityPercent = buttonOpacity.value();
         navigation.normalize();
         try {
-            preferences.navigationIntegrationConfigJson.set(navigation.toJson().toString());
+            String encoded = navigation.toJson().toString();
+            if (!preferences.navigationIntegrationConfigJson.commit(encoded)
+                    || !encoded.equals(preferences.navigationIntegrationConfigJson.get())) {
+                throw new JSONException("контрольное чтение настроек не совпало");
+            }
         } catch (JSONException error) {
             Toast.makeText(this, "Не удалось сохранить настройки окна",
                     Toast.LENGTH_LONG).show();
