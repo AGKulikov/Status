@@ -247,6 +247,11 @@ class NavigationModToolsTest(unittest.TestCase):
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
         pair = (TOOLS / "sign_navigation_hud_v2_pair.sh").read_text()
 
+        self.assertIn("NavigationLayerFactory", verifier)
+        self.assertIn("setRoadEventVisibleOnRoute", verifier)
+        self.assertIn("route-matched road-events layer attached", verifier)
+        self.assertNotIn('b"isOnRoute"', verifier)
+
         self.assertIn('KX11_ANDROID_API = 28', verifier)
         self.assertIn('KX11_NAVIGATOR_ABIS = {"arm64-v8a"}', verifier)
         self.assertIn('"name": NATRO_PACKAGE', verifier)

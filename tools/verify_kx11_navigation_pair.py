@@ -297,13 +297,15 @@ def verify_navigator(
         b"Lru/natro/navigation/BackgroundMapLease;",
         b"getTrafficLightsWithSignal",
         b"setMaxNumberOfUpcomingTrafficLights",
-        b"isOnRoute",
+        b"NavigationLayerFactory",
+        b"setRoadEventVisibleOnRoute",
+        b"route-matched road-events layer attached",
         b"showTrafficLights",
         b"background MapKit lease active",
     ):
         if marker not in classes19:
             raise VerificationError(
-                f"Navigator classes19.dex has no traffic-light layer marker {marker!r}"
+                f"Navigator classes19.dex has no required HUD/navigation marker {marker!r}"
             )
     if (b"Lru/natro/navigation/NatroEntryPoint;" not in classes12
             or b"shouldUseMovableMap" not in classes12):
