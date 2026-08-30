@@ -59,6 +59,10 @@ public final class InstrumentPanelContractTest {
         assertTrue(InstrumentElementType.DIGITAL_SPEEDOMETER.isDigitalGauge());
         assertTrue(InstrumentElementType.AVERAGE_CONSUMPTION.isDigitalGauge());
         assertFalse(InstrumentElementType.GEAR.isDigitalGauge());
+
+        config.backgroundBottomColor = "not-a-color";
+        config.normalize();
+        assertEquals("#FF16283D", config.backgroundBottomColor);
     }
 
     @Test public void fiveApprovedPresetsAreModularAndOldSchemaMigrates() throws Exception {

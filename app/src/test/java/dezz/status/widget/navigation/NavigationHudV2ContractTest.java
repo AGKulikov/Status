@@ -473,7 +473,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("positionOnRoute"));
         assertTrue(renderer.contains("invoke(route, \"getPosition\""));
         assertTrue(renderer.contains("setGeometry"));
-        assertTrue(renderer.contains("isForwardProgress"));
+        assertTrue("Missing reversible route progress in " + patchRoot.toAbsolutePath(),
+                renderer.contains("routeProgressChanged"));
         assertTrue(renderer.contains("slice.firstSegmentIndex"));
         assertTrue(routeStyler.contains("profile.showRouteTraffic"));
         assertTrue(routeStyler.contains("firstSegmentIndex + index"));
@@ -517,9 +518,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("setTransparentBackgroundEnabled"));
         assertTrue(renderer.contains("profile.showModels && !profile.roadsOnly"));
         assertTrue(renderer.contains("profile.roadsOnly || !profile.showPois"));
-        assertTrue(mapProfile.contains("ROADS_ONLY_STYLE"));
+        assertTrue(mapProfile.contains("ROAD_TAGS_JSON"));
         assertTrue(mapProfile.contains("road_surface"));
-        assertTrue(mapProfile.contains("if (roadsOnly) return ROADS_ONLY_STYLE"));
+        assertTrue(mapProfile.contains("if (roadsOnly)"));
+        assertTrue(mapProfile.contains("\\\"tags\\\":{\\\"none\\\":"));
         assertTrue(renderer.contains("updateInitialCamera"));
         assertTrue(renderer.contains("updateNavigationState"));
         assertTrue(client.contains("refreshBackgroundMapLease()"));
@@ -603,7 +605,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("destinationForRoute(route)"));
         assertTrue(renderer.contains("currentRouteProgress(route)"));
         assertTrue(renderer.contains("progress.segmentPosition"));
-        assertTrue(renderer.contains("0.05d"));
+        assertTrue(renderer.contains("0.000001d"));
+        assertFalse(renderer.contains("> renderedRouteSegmentPosition + 0.05d"));
         assertTrue(publisher.contains("addCameraListener"));
         assertTrue(publisher.contains("getValue\"), 0d) * 3.6d"));
         assertFalse(publisher.contains("getDeclaredField"));

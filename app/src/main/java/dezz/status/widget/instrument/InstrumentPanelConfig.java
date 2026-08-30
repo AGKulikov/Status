@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.instrument;
 
-import android.graphics.Color;
-
 import androidx.annotation.NonNull;
 
 import org.json.JSONArray;
@@ -173,11 +171,16 @@ public final class InstrumentPanelConfig {
     @NonNull
     private static String color(@NonNull String raw, @NonNull String fallback) {
         String value = raw.trim();
-        try {
-            Color.parseColor(value);
-            return value;
-        } catch (IllegalArgumentException invalid) {
-            return fallback;
+        if (value.isEmpty() || value.charAt(0) != '#') return fallback;
+        int digits = value.length() - 1;
+        if (digits != 3 && digits != 4 && digits != 6 && digits != 8) return fallback;
+        for (int index = 1; index < value.length(); index++) {
+            char digit = value.charAt(index);
+            boolean hexadecimal = digit >= '0' && digit <= '9'
+                    || digit >= 'a' && digit <= 'f'
+                    || digit >= 'A' && digit <= 'F';
+            if (!hexadecimal) return fallback;
         }
+        return value;
     }
 }
