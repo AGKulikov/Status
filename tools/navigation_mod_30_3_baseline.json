@@ -27,7 +27,7 @@
   ],
   "release_entry_sha256": {
     "AndroidManifest.xml": "1e8d52eadd9f9561bc76cbeb6f22017d537af8b5eff8803e759be0694f8172e3",
-    "classes4.dex": "e17f9c22da97f6f2b0dd3837e9f6fe4b7d67ac576b186a780e2914042b4eab2a",
+    "classes4.dex": "3d4aa692bee65179a30cd9a7c8e0a1bd7fdd075578ca89e4b117d20de300cfd1",
     "classes12.dex": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23"
   },
   "critical_entries": [
