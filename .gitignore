@@ -4,6 +4,7 @@ build
 local.properties
 *.jks
 deliverables/
+/library-inputs/
 .DS_Store
 **/.DS_Store
 **/__pycache__/

@@ -16,8 +16,8 @@ import zipfile
 
 KX11_ANDROID_API = 28
 NATRO_PACKAGE = "ru.natro.statuswidget"
-NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.0")
-NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021283")
+NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.1")
+NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021284")
 NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi"
 NAVIGATOR_VERSION_CODE = "739564630"
 NAVIGATOR_BASELINE_SHA256 = (
@@ -203,6 +203,7 @@ def verify_natro(aapt: Path, apksigner: Path, zipalign: Path, apk: Path) -> str:
         b"ru.yandex.yandexmaps.app.MapActivity",
         b"transparentBackground",
         b"roadsOnly",
+        b"showTrafficLights",
     ))
     verify_zipalign(zipalign, apk)
     verify_signer(apksigner, apk, ("v2", "v3"))
@@ -258,6 +259,15 @@ def verify_navigator(
     classes19 = zip_entry(apk, "classes19.dex")
     if b"Lru/natro/navigation/NatroEntryPoint;" not in classes4:
         raise VerificationError("Navigator classes4.dex has no Natro lifecycle hook")
+    for marker in (
+        b"Lru/natro/navigation/TrafficLightMapLayer;",
+        b"getTrafficLightsWithSignal",
+        b"showTrafficLights",
+    ):
+        if marker not in classes19:
+            raise VerificationError(
+                f"Navigator classes19.dex has no traffic-light layer marker {marker!r}"
+            )
     if (b"Lru/natro/navigation/NatroEntryPoint;" not in classes12
             or b"shouldUseMovableMap" not in classes12):
         raise VerificationError(

@@ -62,6 +62,11 @@ public class NavigationSignalPolicyTest {
                 "RED", "15", 11_000L));
         assertFalse(NavigationSignalPolicy.acceptsTransition("YELLOW", "2", "GREEN", old,
                 "GREEN", "15", 11_000L));
+        assertTrue(NavigationSignalPolicy.acceptsTransition("RED", "3", "", old,
+                "RED_AND_YELLOW", "2", 11_000L));
+        assertTrue(NavigationSignalPolicy.acceptsTransition(
+                "RED_AND_YELLOW", "2", "RED", old, "GREEN", "15", 11_000L));
+        assertTrue(NavigationSignalPolicy.validTrafficColor("RED_AND_YELLOW"));
     }
 
     @Test
@@ -77,5 +82,14 @@ public class NavigationSignalPolicyTest {
         assertTrue(NavigationSignalPolicy.sameSlot("", 2, "", 2));
         assertFalse(NavigationSignalPolicy.sameSlot("first", 2, "second", 2));
         assertTrue(NavigationSignalPolicy.sameSlot("same", 1, "same", 5));
+    }
+
+    @Test
+    public void trafficSignalExpiresPromptlyWithOrWithoutCountdown() {
+        long updated = 100_000L;
+        assertTrue(NavigationSignalPolicy.fresh(updated, "8", 104_000L));
+        assertFalse(NavigationSignalPolicy.fresh(updated, "8", 104_001L));
+        assertTrue(NavigationSignalPolicy.fresh(updated, "", 110_000L));
+        assertFalse(NavigationSignalPolicy.fresh(updated, "", 110_001L));
     }
 }

@@ -325,6 +325,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch mapEnabled = switchView("Показывать карту", map.enabled);
         Switch traffic = switchView("Все пробки", map.showTraffic);
         Switch routeTraffic = switchView("Пробки на маршруте", map.showRouteTraffic);
+        Switch trafficLights = switchView(
+                "Светофоры с отсчётом — отдельный слой", map.showTrafficLights);
         Switch pois = switchView("Объекты на карте", map.showPois);
         Switch buildings = switchView("Здания", map.showBuildings);
         Switch labels = switchView("Подписи дорог", map.showLabels);
@@ -333,6 +335,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(mapEnabled);
         content.addView(traffic);
         content.addView(routeTraffic);
+        content.addView(trafficLights);
         content.addView(pois);
         content.addView(buildings);
         content.addView(labels);
@@ -359,6 +362,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.enabled = mapEnabled.isChecked();
                     map.showTraffic = traffic.isChecked();
                     map.showRouteTraffic = routeTraffic.isChecked();
+                    map.showTrafficLights = trafficLights.isChecked();
                     map.showPois = pois.isChecked();
                     map.showBuildings = buildings.isChecked();
                     map.showLabels = labels.isChecked();

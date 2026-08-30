@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -56,6 +57,8 @@ public final class HudRuntimeData {
     private static final long HOST_ATTACH_RETRY_MS = 1_000L;
     private static final long HOST_LIVENESS_CHECK_MS = 30_000L;
     private static final long CLOCK_TICK_SLOP_MS = 25L;
+    /** Direct snapshots arrive at 10 Hz; three seconds tolerates stalls but rejects dead routes. */
+    private static final long DIRECT_NAVIGATION_FRESH_MS = 3_000L;
 
     @NonNull private final Context context;
     @NonNull private final Listener listener;
@@ -82,6 +85,9 @@ public final class HudRuntimeData {
     private volatile boolean navigationDataNeeded;
     private boolean started;
     private boolean navigationReceiverRegistered;
+    private long navigationFreshUntilElapsedMs;
+    private long navigationScheduledExpiryElapsedMs;
+    private boolean navigationExpiryPosted;
     private final CarIntegration.TelemetryListener telemetryListener = value -> runOnMain(() -> {
         if (!started) return;
         telemetry.put(value.id, value);
@@ -110,6 +116,25 @@ public final class HudRuntimeData {
         if (!navigationDataNeeded) return;
         if (!directNavigationWakePosted.compareAndSet(false, true)) return;
         if (!main.post(directNavigationWake)) directNavigationWakePosted.set(false);
+    };
+    private final Runnable navigationExpiry = new Runnable() {
+        @Override public void run() {
+            navigationExpiryPosted = false;
+            navigationScheduledExpiryElapsedMs = 0L;
+            if (!started || navigationFreshUntilElapsedMs <= 0L) return;
+            long remaining = navigationFreshUntilElapsedMs - SystemClock.elapsedRealtime();
+            if (remaining > 0L) {
+                navigationExpiryPosted = main.postDelayed(this, remaining);
+                navigationScheduledExpiryElapsedMs = navigationFreshUntilElapsedMs;
+                return;
+            }
+            navigationFreshUntilElapsedMs = 0L;
+            if (navigation != null && navigation.direct) {
+                navigation = null;
+                notifyChanged();
+                refreshNavigation();
+            }
+        }
     };
     /** Main-process editor only: retry promptly until its already-started WidgetService appears. */
     private final Runnable hostProbe = new Runnable() {
@@ -176,6 +201,10 @@ public final class HudRuntimeData {
         navigationDataNeeded = false;
         main.removeCallbacks(hostProbe);
         main.removeCallbacks(clockTick);
+        main.removeCallbacks(navigationExpiry);
+        navigationExpiryPosted = false;
+        navigationFreshUntilElapsedMs = 0L;
+        navigationScheduledExpiryElapsedMs = 0L;
         main.removeCallbacks(directNavigationWake);
         directNavigationWakePosted.set(false);
         mediaController.stop();
@@ -202,6 +231,10 @@ public final class HudRuntimeData {
         navigationDataNeeded = hasEnabledNavigationData();
         if (!navigationDataNeeded) {
             navigation = null;
+            navigationFreshUntilElapsedMs = 0L;
+            main.removeCallbacks(navigationExpiry);
+            navigationExpiryPosted = false;
+            navigationScheduledExpiryElapsedMs = 0L;
             navigationReadPending = false;
             main.removeCallbacks(directNavigationWake);
             directNavigationWakePosted.set(false);
@@ -441,6 +474,18 @@ public final class HudRuntimeData {
             default:
                 return true;
         }
+    }
+
+    /** Live surfaces never draw a navigation shell when its own semantic payload is absent. */
+    public boolean navigationElementAvailable(@NonNull HudElementConfig item) {
+        if (item.type == HudElementType.NAV_MAP) return true;
+        if (item.type == HudElementType.NAV_SPEED) {
+            HudNavigationState state = navigation;
+            return (state != null && state.hasDataFor(item.type))
+                    || Double.isFinite(numericValue(item));
+        }
+        HudNavigationState state = navigation;
+        return state != null && state.hasDataFor(item.type);
     }
 
     @NonNull
@@ -704,22 +749,31 @@ public final class HudRuntimeData {
             return;
         }
         NavigationSnapshotV2 direct = NavigationBridgeStateStore.snapshot();
+        boolean directSource = direct != null
+                || !NavigationBridgeStateStore.sessionId().isEmpty();
         NavigationRouteGeometryV2 directRoute = direct == null
                 ? null : NavigationBridgeStateStore.routeGeometry();
         HudNavigationState previous = navigation;
         try {
             worker.execute(() -> {
                 HudNavigationState resolved = null;
-                if (direct != null) {
+                boolean directFresh = direct != null && direct.isFreshAt(
+                        System.currentTimeMillis(), DIRECT_NAVIGATION_FRESH_MS);
+                if (directFresh) {
                     resolved = HudNavigationState.fromBridge(
                             direct, directRoute, previous);
-                } else {
+                } else if (!directSource) {
                     NavigationDataRepository.Snapshot legacy = null;
                     try { legacy = NavigationDataRepository.read(context); }
                     catch (RuntimeException ignored) {}
                     if (legacy != null) resolved = HudNavigationState.fromLegacy(legacy);
                 }
                 HudNavigationState result = resolved;
+                long now = System.currentTimeMillis();
+                long remaining = directFresh ? Math.min(DIRECT_NAVIGATION_FRESH_MS,
+                        direct.sourceTimestampMs + DIRECT_NAVIGATION_FRESH_MS + 1L - now) : 0L;
+                long freshUntil = directFresh ? SystemClock.elapsedRealtime()
+                        + Math.max(1L, remaining) : 0L;
                 main.post(() -> {
                     navigationReadQueued.set(false);
                     if (!started || !navigationDataNeeded) {
@@ -727,6 +781,7 @@ public final class HudRuntimeData {
                         return;
                     }
                     navigation = result;
+                    scheduleNavigationExpiry(freshUntil);
                     notifyChanged();
                     if (navigationReadPending) refreshNavigation();
                 });
@@ -735,6 +790,23 @@ public final class HudRuntimeData {
             navigationReadQueued.set(false);
             navigationReadPending = false;
         }
+    }
+
+    private void scheduleNavigationExpiry(long freshUntilElapsedMs) {
+        navigationFreshUntilElapsedMs = Math.max(0L, freshUntilElapsedMs);
+        if (navigationFreshUntilElapsedMs <= 0L) {
+            main.removeCallbacks(navigationExpiry);
+            navigationExpiryPosted = false;
+            navigationScheduledExpiryElapsedMs = 0L;
+            return;
+        }
+        if (navigationExpiryPosted
+                && navigationScheduledExpiryElapsedMs <= navigationFreshUntilElapsedMs) return;
+        main.removeCallbacks(navigationExpiry);
+        long delay = Math.max(1L,
+                navigationFreshUntilElapsedMs - SystemClock.elapsedRealtime());
+        navigationExpiryPosted = main.postDelayed(navigationExpiry, delay);
+        navigationScheduledExpiryElapsedMs = navigationFreshUntilElapsedMs;
     }
 
     private void notifyChanged() {

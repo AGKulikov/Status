@@ -22,6 +22,7 @@ import org.json.JSONException;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
+import dezz.status.widget.launcher.NavigationDataRepository;
 
 /**
  * Explicit-only Natro endpoint to which the patched Navigator process connects.
@@ -377,11 +378,19 @@ public final class NavigationHudEndpointService extends Service {
             replyError(current.messenger, "INVALID_PAYLOAD", invalid.getMessage());
             return;
         }
+        NavigationSnapshotV2 previous = NavigationBridgeStateStore.snapshot();
         if (!NavigationBridgeStateStore.publishSnapshot(current.sessionId, next)) {
             replyError(current.messenger, "STALE_SNAPSHOT", "Sequence did not advance");
-        } else if (next.sequence == 1L) {
-            DiagnosticJournal.info("navigation-bridge",
-                    "first navigation snapshot received; routeEpoch=" + next.routeEpoch);
+        } else {
+            if (!next.routeActive && (previous == null || previous.routeActive)) {
+                // One transition write prevents notification-era turns, lanes and lights from
+                // resurfacing if this authoritative direct session later disappears.
+                NavigationDataRepository.clear(this);
+            }
+            if (next.sequence == 1L) {
+                DiagnosticJournal.info("navigation-bridge",
+                        "first navigation snapshot received; routeEpoch=" + next.routeEpoch);
+            }
         }
     }
 
@@ -577,10 +586,16 @@ public final class NavigationHudEndpointService extends Service {
         Client current = client;
         client = null;
         if (current == null) return;
+        NavigationSnapshotV2 direct = NavigationBridgeStateStore.snapshot();
         try {
             current.remote.unlinkToDeath(current.deathRecipient, 0);
         } catch (RuntimeException ignored) {}
         NavigationBridgeStateStore.endSession(current.sessionId);
+        if (direct != null) {
+            // Disconnect is also an explicit end-of-authority event. Clear once here so legacy
+            // caches cannot revive the last direct route while Navigator is no longer connected.
+            NavigationDataRepository.clear(this);
+        }
         Log.i(TAG, "Navigator bridge session ended");
         DiagnosticJournal.warn("navigation-bridge", "Navigator bridge session ended");
     }

@@ -45,6 +45,8 @@ final class NavigationMapProfile {
     boolean showRoute = true;
     boolean showRouteTraffic = true;
     boolean showTraffic = true;
+    /** Independent custom collection; unrelated to background traffic and route jams. */
+    boolean showTrafficLights = true;
     boolean showCursor = true;
     boolean roadsOnly;
     String cameraMode = "FOLLOW_ROUTE";
@@ -101,6 +103,7 @@ final class NavigationMapProfile {
             // Natro sends the new independent route-traffic value.
             result.showRouteTraffic = source.optBoolean(
                     "showRouteTraffic", result.showTraffic);
+            result.showTrafficLights = source.optBoolean("showTrafficLights", true);
             result.showCursor = source.optBoolean("showCursor", true);
             result.roadsOnly = source.optBoolean("roadsOnly", false);
             result.cameraMode = enumText(source.optString(

@@ -25,6 +25,7 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.trafficGradientLength = 24d;
         config.hudMap.showTraffic = false;
         config.hudMap.showRouteTraffic = true;
+        config.hudMap.showTrafficLights = false;
         config.hudMap.enabled = true;
         config.hudMap.roadsOnly = true;
         config.hudMap.setRoadEventMode("SPEED_CONTROL",
@@ -34,6 +35,7 @@ public final class NavigationHudV2ContractTest {
         config.clusterMap.zoomDelta = .75d;
         config.clusterMap.maximumFps = 60;
         config.clusterMap.showModels = false;
+        config.clusterMap.showTrafficLights = true;
         config.clusterMap.setRoadEventMode("RECONSTRUCTION",
                 NavigationIntegrationConfig.RoadEventMode.ALWAYS);
         config.mainFloatingWindow.movementLocked = true;
@@ -56,6 +58,7 @@ public final class NavigationHudV2ContractTest {
         assertEquals(24d, restored.hudMap.trafficGradientLength, 0d);
         assertFalse(restored.hudMap.showTraffic);
         assertTrue(restored.hudMap.showRouteTraffic);
+        assertFalse(restored.hudMap.showTrafficLights);
         assertTrue(restored.hudMap.enabled);
         assertTrue(restored.hudMap.roadsOnly);
         assertEquals(NavigationIntegrationConfig.RoadEventMode.ALWAYS,
@@ -65,6 +68,7 @@ public final class NavigationHudV2ContractTest {
         assertEquals(.75d, restored.clusterMap.zoomDelta, 0d);
         assertEquals(60, restored.clusterMap.maximumFps);
         assertFalse(restored.clusterMap.showModels);
+        assertTrue(restored.clusterMap.showTrafficLights);
         assertEquals(NavigationIntegrationConfig.RoadEventMode.ALWAYS,
                 restored.clusterMap.roadEventMode("RECONSTRUCTION"));
         assertTrue(restored.mainFloatingWindow.movementLocked);
@@ -199,6 +203,7 @@ public final class NavigationHudV2ContractTest {
         String cursor = read(patchRoot.resolve("MapCursorStyler.java"));
         String routeStyler = read(patchRoot.resolve("RoutePolylineStyler.java"));
         String mapProfile = read(patchRoot.resolve("NavigationMapProfile.java"));
+        String trafficLights = read(patchRoot.resolve("TrafficLightMapLayer.java"));
         String mapViewPatch = read(projectRoot().resolve(
                 "tools/patch_navigation_map_view.py"));
 
@@ -308,6 +313,16 @@ public final class NavigationHudV2ContractTest {
         assertTrue(routeStyler.contains("profile.showRouteTraffic"));
         assertTrue(routeStyler.contains("firstSegmentIndex + index"));
         assertTrue(mapProfile.contains("showRouteTraffic"));
+        assertTrue(mapProfile.contains("showTrafficLights"));
+        assertTrue(renderer.contains("trafficLightMapLayer.update(frame.routeActive"));
+        assertTrue(renderer.contains("trafficLightMapLayer.apply(profile.showTrafficLights)"));
+        assertTrue(trafficLights.contains("addCollection"));
+        assertTrue(trafficLights.contains("addPlacemark"));
+        assertTrue(trafficLights.contains("FRESH_MS = 3_000L"));
+        assertTrue(trafficLights.contains("if (fingerprint == latestVisualFingerprint) return"));
+        assertTrue(trafficLights.contains("ViewProvider"));
+        assertTrue(trafficLights.contains("secondsLeft"));
+        assertFalse(mainMap.contains("TrafficLightMapLayer"));
         assertFalse(renderer.contains("drivingRoute != activeRoute"));
         assertFalse(routeStyler.contains("Double.doubleToLongBits"));
         assertTrue(renderer.contains("applyStyleSlot"));
@@ -364,6 +379,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("getManoeuvres"));
         assertTrue(publisher.contains("getLaneSigns"));
         assertTrue(publisher.contains("getTrafficLightsWithSignal"));
+        assertTrue(publisher.contains("activeRoute == null"));
+        assertTrue(publisher.contains("Collections.unmodifiableList("));
+        assertTrue(publisher.contains("readTrafficLights(inputs.routePosition)"));
+        assertTrue(publisher.contains("TRAFFIC_LIGHT_INTERVAL_MS = 500L"));
+        assertTrue(publisher.contains("validTrafficSignal"));
+        assertTrue(publisher.contains("\"latitude\""));
+        assertTrue(publisher.contains("\"longitude\""));
         assertTrue(publisher.contains("ConditionsListener"));
         assertTrue(publisher.contains("trafficSegmentsJson"));
         assertTrue(publisher.contains("STATE_INTERVAL_MS = 33L"));

@@ -178,6 +178,8 @@ public final class NavigationIntegrationConfig {
         /** Colour the active route by congestion independently from the background traffic layer. */
         public boolean showRouteTraffic = true;
         public boolean showTraffic = true;
+        /** Fresh Windshield traffic lights, rendered in their own map-object collection. */
+        public boolean showTrafficLights = true;
         public boolean showLabels = true;
         public boolean showPois = true;
         public boolean showBuildings = true;
@@ -248,6 +250,7 @@ public final class NavigationIntegrationConfig {
                     .put("showRoute", showRoute)
                     .put("showRouteTraffic", showRouteTraffic)
                     .put("showTraffic", showTraffic)
+                    .put("showTrafficLights", showTrafficLights)
                     .put("showLabels", showLabels)
                     .put("showPois", showPois)
                     .put("showBuildings", showBuildings)
@@ -295,6 +298,8 @@ public final class NavigationIntegrationConfig {
             result.showTraffic = source.optBoolean("showTraffic", result.showTraffic);
             result.showRouteTraffic = source.optBoolean(
                     "showRouteTraffic", result.showRouteTraffic);
+            result.showTrafficLights = source.optBoolean(
+                    "showTrafficLights", result.showTrafficLights);
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
             result.showPois = source.optBoolean("showPois", result.showPois);
             result.showBuildings = source.optBoolean("showBuildings", result.showBuildings);

@@ -198,6 +198,11 @@ public final class HudCanvasView extends View {
         if (!item.enabled) return false;
         AutomationState state = data.automation(item);
         if (state.present && !state.visible) return false;
+        if (!editor && isNavigation(item.type)
+                && item.type != HudElementType.NAV_MAP
+                && !data.navigationElementAvailable(item)) {
+            return false;
+        }
         if (item.options.optBoolean("hideWhenInactive", false)) {
             if (isNavigation(item.type)) {
                 HudNavigationState nav = data.navigation();
@@ -838,7 +843,10 @@ public final class HudCanvasView extends View {
         }
         int active = optionColor(item, "unknownColor", 0xFF6B7280);
         String lower = state == null ? "" : state.toLowerCase(Locale.ROOT);
-        if (lower.contains("red") || lower.contains("крас")) {
+        boolean redAndYellow = lower.contains("red_and_yellow");
+        if (redAndYellow) {
+            active = optionColor(item, "yellowColor", 0xFFFFCC00);
+        } else if (lower.contains("red") || lower.contains("крас")) {
             active = optionColor(item, "redColor", 0xFFFF3B30);
         } else if (lower.contains("yellow") || lower.contains("жел")) {
             active = optionColor(item, "yellowColor", 0xFFFFCC00);
@@ -865,10 +873,19 @@ public final class HudCanvasView extends View {
         float cx = signalBounds.centerX();
         float cy = signalBounds.centerY();
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(active);
-        canvas.drawCircle(cx, cy, diameter * .45f, paint);
+        if (redAndYellow) {
+            RectF dualSignal = new RectF(cx - diameter * .45f, cy - diameter * .45f,
+                    cx + diameter * .45f, cy + diameter * .45f);
+            paint.setColor(optionColor(item, "redColor", 0xFFFF3B30));
+            canvas.drawArc(dualSignal, 90f, 180f, true, paint);
+            paint.setColor(active);
+            canvas.drawArc(dualSignal, -90f, 180f, true, paint);
+        } else {
+            paint.setColor(active);
+            canvas.drawCircle(cx, cy, diameter * .45f, paint);
+        }
         drawTrafficArrow(canvas, cx, cy, diameter * .48f, arrow,
-                lower.contains("red") ? Color.WHITE : Color.BLACK,
+                lower.contains("red") && !redAndYellow ? Color.WHITE : Color.BLACK,
                 Math.max(2f, 2.2f * scale));
         String line = countdown == null || countdown.trim().isEmpty() ? "—" : countdown.trim();
         drawSimpleText(canvas, line, text, fallbackColor,

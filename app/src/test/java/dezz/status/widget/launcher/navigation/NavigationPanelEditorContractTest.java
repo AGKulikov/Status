@@ -39,6 +39,31 @@ public final class NavigationPanelEditorContractTest {
         assertTrue(launcher.contains("clearNavigationRouteViews()"));
     }
 
+    @Test public void liveModulesRequireTheirOwnCurrentPayload() throws IOException {
+        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        assertTrue(launcher.contains("hasVisibleNavigationData(state)"));
+        assertTrue(launcher.contains("hasTrafficLightData(state)"));
+        assertTrue(launcher.contains("validTrafficSignal"));
+        assertTrue(launcher.contains("state.available && !state.arrival.isEmpty()"));
+        assertTrue(launcher.contains("&& !state.turnDistance.isEmpty()"));
+        assertTrue(launcher.contains("navigationManeuverDistance.setText(state.turnDistance)"));
+        assertTrue(launcher.contains("joinNavigationText(state.distance, state.duration)"));
+        assertTrue(launcher.contains("default: return;"));
+    }
+
+    @Test public void directBridgeOutranksLegacyAndExpiresWithoutPolling() throws IOException {
+        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String endpoint = source("dezz/status/widget/navigation/"
+                + "NavigationHudEndpointService.java");
+        assertTrue(launcher.contains("NavigationBridgeStateStore.snapshot()"));
+        assertTrue(launcher.contains("NavigationBridgeStateStore.sessionId()"));
+        assertTrue(launcher.contains("NavigationDataRepository.emptyDirectSnapshot()"));
+        assertTrue(launcher.contains("DIRECT_NAVIGATION_FRESH_MS = 3_000L"));
+        assertTrue(launcher.contains("scheduleDirectNavigationExpiry"));
+        assertTrue(launcher.contains("!directNavigationSourceActive && state.routeActive"));
+        assertTrue(endpoint.contains("NavigationDataRepository.clear(this)"));
+    }
+
     @Test public void bothHomeEditorsShareAllLiveSafeEdges() throws IOException {
         String launcher = source("dezz/status/widget/LauncherActivity.java");
         assertTrue(launcher.contains("LauncherSafeAreaResolver.resolveInsets"));

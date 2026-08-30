@@ -37,6 +37,7 @@ final class HudMapRenderer {
     private final Context context;
     private final FailureReporter reporter;
     private final MapCursorStyler cursorStyler;
+    private final TrafficLightMapLayer trafficLightMapLayer;
     private final String profileSection;
     private final String displayName;
     private final boolean adaptiveFrameRate;
@@ -91,6 +92,7 @@ final class HudMapRenderer {
         this.displayName = displayName;
         this.adaptiveFrameRate = adaptiveFrameRate;
         cursorStyler = new MapCursorStyler(this.context);
+        trafficLightMapLayer = new TrafficLightMapLayer(this.context);
     }
 
     void applyConfiguration(String raw) {
@@ -154,12 +156,18 @@ final class HudMapRenderer {
         removeNativeNavigationLayer();
         navigationRuntime = nextNavigation;
         if (mapWindow != null && nextNavigation != null) createNativeNavigationLayer();
-        if (nextNavigation == null) applyCamera(false);
+        if (nextNavigation == null) {
+            trafficLightMapLayer.clearData();
+            applyCamera(false);
+        }
     }
 
     /** Canonical navigation location, independent from every visual operation on the main map. */
     void updateNavigationState(NavigatorStatePublisher.NavigationFrame frame) {
-        if (frame == null || !frame.isValid()) return;
+        if (frame == null) return;
+        trafficLightMapLayer.update(frame.routeActive,
+                frame.trafficLightsSampleElapsedMs, frame.trafficLights);
+        if (!frame.isValid()) return;
         try {
             latestSpeedKmh = Math.max(0d, frame.speedKmh);
             applyMaximumFps();
@@ -266,6 +274,7 @@ final class HudMapRenderer {
             Object nextMapWindow = invoke(nextOffscreen, "getMapWindow", new Class<?>[0]);
             mapWindow = nextMapWindow;
             map = invoke(nextMapWindow, "getMap", new Class<?>[0]);
+            trafficLightMapLayer.attach(map);
 
             Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
             Class<?> surfaceFactoryClass = Class.forName(
@@ -316,6 +325,7 @@ final class HudMapRenderer {
         Object currentWindow = mapWindow;
         Object currentMap = map;
         if (currentWindow == null || currentMap == null) return;
+        trafficLightMapLayer.apply(profile.showTrafficLights);
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -843,6 +853,7 @@ final class HudMapRenderer {
         roadEventsManager = null;
         roadEventStyleProvider = null;
         cursorStyler.detach();
+        trafficLightMapLayer.detachMap();
         userLocationLayer = null;
         routeCollection = null;
         routePolyline = null;

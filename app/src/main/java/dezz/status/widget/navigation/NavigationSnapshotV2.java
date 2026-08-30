@@ -34,6 +34,15 @@ public final class NavigationSnapshotV2 {
     @NonNull public final String lanesJson;
     @NonNull public final String trafficLightsJson;
 
+    /** Wall-clock liveness check for the same-device Navigator bridge. */
+    public boolean isFreshAt(long nowEpochMs, long maximumAgeMs) {
+        if (sourceTimestampMs <= 0L || maximumAgeMs <= 0L) return false;
+        long age = nowEpochMs - sourceTimestampMs;
+        // A small forward skew is tolerated across the two application processes. Larger clock
+        // changes fail closed so an old route can never remain on HUD indefinitely.
+        return age >= -5_000L && age <= maximumAgeMs;
+    }
+
     public NavigationSnapshotV2(long sequence, long routeEpoch, long sourceTimestampMs,
             boolean routeActive, double latitude, double longitude, double bearingDegrees,
             double speedKmh, @NonNull String maneuverType, @NonNull String maneuverTitle,

@@ -65,6 +65,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -98,6 +99,8 @@ import dezz.status.widget.launcher.LauncherSafeAreaPolicy;
 import dezz.status.widget.launcher.LauncherSafeAreaResolver;
 import dezz.status.widget.launcher.LauncherWorkspaceView;
 import dezz.status.widget.launcher.NavigationDataRepository;
+import dezz.status.widget.navigation.NavigationBridgeStateStore;
+import dezz.status.widget.navigation.NavigationSnapshotV2;
 import dezz.status.widget.launcher.SingleFlightRefresh;
 import dezz.status.widget.launcher.SmartHomeShortcutStateBindingPolicy;
 import dezz.status.widget.launcher.SmartHomeShortcutStatePolicy;
@@ -158,6 +161,8 @@ public final class LauncherActivity extends AppCompatActivity {
     public static final String EXTRA_EDIT_ACTIONS_CONTENT =
             "dezz.status.widget.extra.EDIT_ACTIONS_CONTENT";
     private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 5_000L;
+    private static final long DIRECT_NAVIGATION_REFRESH_MS = 250L;
+    private static final long DIRECT_NAVIGATION_FRESH_MS = 3_000L;
     private static final long APP_CATALOG_REFRESH_MS = 10L * 60L * 1_000L;
     private final Map<String, LauncherElementFrame> panels = new LinkedHashMap<>();
     private final Map<String, LauncherElementFrame> globalElementFrames =
@@ -189,6 +194,12 @@ public final class LauncherActivity extends AppCompatActivity {
     @Nullable private Runnable launcherIconAdapterRefreshTask;
     @Nullable private BaseAdapter launcherIconAdapterRefreshTarget;
     private final SingleFlightRefresh navigationRefresh = new SingleFlightRefresh();
+    private final AtomicBoolean directNavigationWakePosted = new AtomicBoolean();
+    private long directNavigationExpiryElapsedMs;
+    private long directNavigationScheduledExpiryElapsedMs;
+    private boolean directNavigationExpiryPosted;
+    private boolean directNavigationSourceActive;
+    private boolean panelsInitialized;
     private final Runnable navigationUiRefresh = new Runnable() {
         @Override public void run() {
             updateNavigation();
@@ -208,6 +219,35 @@ public final class LauncherActivity extends AppCompatActivity {
         @Override public void onReceive(Context context, Intent intent) {
             updateNavigation();
             scheduleNavigationRefresh();
+        }
+    };
+    private final Runnable directNavigationWake = () -> {
+        directNavigationWakePosted.set(false);
+        if (!activityStarted || !panelsInitialized) return;
+        updateNavigation();
+        scheduleNavigationRefresh();
+    };
+    private final Runnable directNavigationExpiry = new Runnable() {
+        @Override public void run() {
+            directNavigationExpiryPosted = false;
+            directNavigationScheduledExpiryElapsedMs = 0L;
+            if (!activityStarted || !panelsInitialized) return;
+            long delay = directNavigationExpiryElapsedMs - SystemClock.elapsedRealtime();
+            if (delay > 0L) {
+                directNavigationExpiryPosted = true;
+                directNavigationScheduledExpiryElapsedMs = directNavigationExpiryElapsedMs;
+                navigationUiHandler.postDelayed(this, delay);
+                return;
+            }
+            directNavigationExpiryElapsedMs = 0L;
+            updateNavigation();
+        }
+    };
+    private final NavigationBridgeStateStore.Listener directNavigationListener = () -> {
+        if (!activityStarted || !directNavigationWakePosted.compareAndSet(false, true)) return;
+        if (!navigationUiHandler.postDelayed(
+                directNavigationWake, DIRECT_NAVIGATION_REFRESH_MS)) {
+            directNavigationWakePosted.set(false);
         }
     };
 
@@ -237,7 +277,6 @@ public final class LauncherActivity extends AppCompatActivity {
     private int systemRightInset;
     private int systemBottomInset;
     @Nullable private LauncherSafeAreaPolicy.Insets appliedSafeInsets;
-    private boolean panelsInitialized;
     private boolean launcherBootstrapStarted;
     private boolean launcherBootstrapReady;
     private int launcherBootstrapGeneration;
@@ -251,8 +290,8 @@ public final class LauncherActivity extends AppCompatActivity {
     private int panelInitializationGeneration;
     private int panelInitializationStage;
     private boolean navigationReceiverRegistered;
+    private boolean directNavigationListenerRegistered;
     private boolean navigationDynamicRefresh;
-    private boolean navigationLiveContentAvailable;
     private boolean deferredLauncherRuntimeStarted;
     private int deferredLauncherRuntimeStage;
     private boolean carIntegrationLoadInFlight;
@@ -1019,6 +1058,10 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void registerNavigationReceiver() {
+        if (!directNavigationListenerRegistered) {
+            NavigationBridgeStateStore.addListener(directNavigationListener);
+            directNavigationListenerRegistered = true;
+        }
         if (navigationReceiverRegistered) return;
         try {
             ContextCompat.registerReceiver(this, navigationReceiver,
@@ -1034,11 +1077,23 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void unregisterNavigationReceiver() {
-        if (!navigationReceiverRegistered) return;
-        navigationReceiverRegistered = false;
-        try { unregisterReceiver(navigationReceiver); }
-        catch (RuntimeException failure) {
-            Log.w(TAG, "Navigation receiver was already removed", failure);
+        navigationUiHandler.removeCallbacks(directNavigationWake);
+        navigationUiHandler.removeCallbacks(directNavigationExpiry);
+        directNavigationWakePosted.set(false);
+        directNavigationExpiryPosted = false;
+        directNavigationExpiryElapsedMs = 0L;
+        directNavigationScheduledExpiryElapsedMs = 0L;
+        directNavigationSourceActive = false;
+        if (directNavigationListenerRegistered) {
+            directNavigationListenerRegistered = false;
+            NavigationBridgeStateStore.removeListener(directNavigationListener);
+        }
+        if (navigationReceiverRegistered) {
+            navigationReceiverRegistered = false;
+            try { unregisterReceiver(navigationReceiver); }
+            catch (RuntimeException failure) {
+                Log.w(TAG, "Navigation receiver was already removed", failure);
+            }
         }
     }
 
@@ -3448,7 +3503,6 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationJamImage = null;
         navigationRainbowImage = null;
         navigationInactive = null;
-        navigationLiveContentAvailable = false;
         for (NavigationPanelConfig.Element element : config.enabledElements()) {
             TextView value = null;
             View content;
@@ -3513,9 +3567,6 @@ public final class LauncherActivity extends AppCompatActivity {
                 continue;
             }
             if (value != null) value.setGravity(Gravity.CENTER);
-            if (!NavigationPanelConfig.INACTIVE.equals(element.id)) {
-                navigationLiveContentAvailable = true;
-            }
             addNavigationGridElement(element, content);
         }
         navigationContentEditOverlay = new PanelContentEditOverlay(this);
@@ -4634,15 +4685,45 @@ public final class LauncherActivity extends AppCompatActivity {
             launcherWorker.execute(() -> {
                 NavigationDataRepository.Snapshot state = null;
                 RuntimeException error = null;
-                try { state = NavigationDataRepository.read(getApplicationContext()); }
+                boolean directSource = false;
+                long directExpiryElapsedMs = 0L;
+                try {
+                    NavigationSnapshotV2 direct = NavigationBridgeStateStore.snapshot();
+                    directSource = direct != null
+                            || !NavigationBridgeStateStore.sessionId().isEmpty();
+                    if (direct != null) {
+                        long now = System.currentTimeMillis();
+                        boolean fresh = direct.isFreshAt(now, DIRECT_NAVIGATION_FRESH_MS);
+                        state = NavigationDataRepository.fromDirectSnapshot(direct, fresh);
+                        if (fresh) {
+                            // Never extend a future-skewed producer timestamp beyond one local
+                            // freshness window. The single delayed wake below replaces polling.
+                            long remaining = Math.min(DIRECT_NAVIGATION_FRESH_MS,
+                                    direct.sourceTimestampMs
+                                            + DIRECT_NAVIGATION_FRESH_MS + 1L - now);
+                            directExpiryElapsedMs = SystemClock.elapsedRealtime()
+                                    + Math.max(1L, remaining);
+                        }
+                    } else if (directSource) {
+                        // An authenticated bridge awaiting its first frame is authoritative.
+                        // Do not flash an old notification route in this short interval.
+                        state = NavigationDataRepository.emptyDirectSnapshot();
+                    } else {
+                        state = NavigationDataRepository.read(getApplicationContext());
+                    }
+                }
                 catch (RuntimeException failure) { error = failure; }
                 NavigationDataRepository.Snapshot completedState = state;
                 RuntimeException completedError = error;
+                boolean completedDirectSource = directSource;
+                long completedDirectExpiryElapsedMs = directExpiryElapsedMs;
                 navigationUiHandler.post(() -> {
                     boolean runAgain = navigationRefresh.complete();
                     if (activityStarted && !isDestroyed() && !isFinishing()
                             && panelsInitialized) {
                         if (completedError == null && completedState != null) {
+                            directNavigationSourceActive = completedDirectSource;
+                            scheduleDirectNavigationExpiry(completedDirectExpiryElapsedMs);
                             renderNavigation(completedState);
                         } else if (completedError != null) {
                             Log.e(TAG, "Navigation snapshot could not be read", completedError);
@@ -4663,6 +4744,28 @@ public final class LauncherActivity extends AppCompatActivity {
         }
     }
 
+    /** Arms only the nearest direct-state deadline; newer frames merely move its target. */
+    private void scheduleDirectNavigationExpiry(long expiryElapsedMs) {
+        directNavigationExpiryElapsedMs = Math.max(0L, expiryElapsedMs);
+        if (directNavigationExpiryElapsedMs == 0L) {
+            navigationUiHandler.removeCallbacks(directNavigationExpiry);
+            directNavigationExpiryPosted = false;
+            directNavigationScheduledExpiryElapsedMs = 0L;
+            return;
+        }
+        if (directNavigationExpiryPosted
+                && directNavigationScheduledExpiryElapsedMs
+                <= directNavigationExpiryElapsedMs) {
+            return;
+        }
+        navigationUiHandler.removeCallbacks(directNavigationExpiry);
+        long delay = Math.max(1L,
+                directNavigationExpiryElapsedMs - SystemClock.elapsedRealtime());
+        directNavigationExpiryPosted = true;
+        directNavigationScheduledExpiryElapsedMs = directNavigationExpiryElapsedMs;
+        navigationUiHandler.postDelayed(directNavigationExpiry, delay);
+    }
+
     private void renderNavigation(@NonNull NavigationDataRepository.Snapshot state) {
         lastNavigationSnapshot = state;
         // Coalesced after this stack returns, so every field changed below is projected together.
@@ -4681,7 +4784,7 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         boolean phaseHasContent = CombinedNavigationPanelPolicy.hasVisibleContent(
                 state.routeActive, favoriteRoutesAvailable,
-                navigationLiveContentAvailable, navigationInactive != null);
+                hasVisibleNavigationData(state), navigationInactive != null);
         setPanelVisibility(LauncherLayoutStore.NAVIGATION,
                 (navigationContentEditMode || isCombinedNavigationEnabled())
                         && (editMode || navigationContentEditMode || phaseHasContent));
@@ -4696,7 +4799,8 @@ public final class LauncherActivity extends AppCompatActivity {
                 && navigationInactive == null) return;
         boolean laneTextAvailable = state.laneAvailable && (!state.lanes.isEmpty()
                 || !state.laneDistance.isEmpty() || Double.isFinite(state.laneDistanceMeters));
-        navigationDynamicRefresh = state.routeActive && (state.trafficAvailable
+        navigationDynamicRefresh = !directNavigationSourceActive && state.routeActive
+                && (hasTrafficLightData(state)
                 || state.jamImage != null
                 || state.lanesImage != null || state.rainbowImage != null || laneTextAvailable);
         if (!state.routeActive) {
@@ -4719,10 +4823,10 @@ public final class LauncherActivity extends AppCompatActivity {
             navigationInactive.setVisibility(View.GONE);
         }
         if (navigationArrival != null) {
-            navigationArrival.setVisibility(state.available ? View.VISIBLE : View.GONE);
-            navigationArrival.setText(!state.available ? ""
-                    : state.arrival.isEmpty() ? "Маршрут активен"
-                    : "Время прибытия: " + state.arrival);
+            navigationArrival.setVisibility(state.available && !state.arrival.isEmpty()
+                    ? View.VISIBLE : View.GONE);
+            navigationArrival.setText(state.arrival.isEmpty()
+                    ? "" : "Время прибытия: " + state.arrival);
         }
         if (navigationDuration != null) {
             navigationDuration.setVisibility(state.available && !state.duration.isEmpty()
@@ -4738,8 +4842,8 @@ public final class LauncherActivity extends AppCompatActivity {
                 state.available ? state.maneuverImage : null);
         if (navigationManeuverDistance != null) {
             navigationManeuverDistance.setVisibility(state.available
-                    && !state.maneuverTitle.isEmpty() ? View.VISIBLE : View.GONE);
-            navigationManeuverDistance.setText(state.maneuverTitle);
+                    && !state.turnDistance.isEmpty() ? View.VISIBLE : View.GONE);
+            navigationManeuverDistance.setText(state.turnDistance);
         }
         if (navigationManeuver != null) {
             String maneuver = state.maneuverText.isEmpty()
@@ -4749,15 +4853,16 @@ public final class LauncherActivity extends AppCompatActivity {
             navigationManeuver.setText(maneuver);
         }
         if (navigationTripInfo != null) {
-            navigationTripInfo.setVisibility(state.available && !state.maneuverSubtext.isEmpty()
+            String tripInfo = joinNavigationText(state.distance, state.duration);
+            navigationTripInfo.setVisibility(state.available && !tripInfo.isEmpty()
                     ? View.VISIBLE : View.GONE);
-            navigationTripInfo.setText(state.maneuverSubtext);
+            navigationTripInfo.setText(tripInfo);
         }
         if (navigationCombined != null) {
-            String combinedTitle = state.available ? state.maneuverTitle : "";
+            String combinedTitle = state.available ? state.turnDistance : "";
             String combinedManeuver = state.available
                     ? (state.maneuverText.isEmpty()
-                    ? state.maneuverSubtext : state.maneuverText) : "";
+                    ? state.maneuverTitle : state.maneuverText) : "";
             Bitmap combinedBitmap = state.available ? state.maneuverImage : null;
             boolean combinedVisible = combinedBitmap != null
                     || (state.available && (!combinedTitle.isEmpty()
@@ -4787,7 +4892,7 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         if (navigationTrafficLights != null) {
             navigationTrafficLights.removeAllViews();
-            if (state.trafficAvailable) {
+            if (hasTrafficLightData(state)) {
                 if (state.trafficLights.isEmpty()) {
                     addTrafficLightRow(state.trafficColor, state.trafficCountdown,
                             state.trafficArrow, -1);
@@ -4798,7 +4903,7 @@ public final class LauncherActivity extends AppCompatActivity {
                     }
                 }
             }
-            navigationTrafficLights.setVisibility(state.trafficAvailable
+            navigationTrafficLights.setVisibility(hasTrafficLightData(state)
                     && navigationTrafficLights.getChildCount() > 0 ? View.VISIBLE : View.GONE);
         }
         showNavigationImage(navigationLanesImage,
@@ -4821,6 +4926,59 @@ public final class LauncherActivity extends AppCompatActivity {
         showNavigationImage(navigationRainbowImage,
                 state.available ? state.rainbowImage : null);
         if (editMode) showNavigationEditorSamples();
+    }
+
+    /** The route panel itself follows the same per-module rule as HUD: payload, not a shell. */
+    private boolean hasVisibleNavigationData(@NonNull NavigationDataRepository.Snapshot state) {
+        if (!state.routeActive) return false;
+        if (navigationArrival != null && !state.arrival.isEmpty()) return true;
+        if (navigationDuration != null && !state.duration.isEmpty()) return true;
+        if (navigationDistance != null && !state.distance.isEmpty()) return true;
+        if (navigationManeuverImage != null && state.maneuverImage != null) return true;
+        if (navigationManeuverDistance != null && !state.turnDistance.isEmpty()) return true;
+        String maneuver = state.maneuverText.isEmpty()
+                ? state.maneuverTitle : state.maneuverText;
+        if (navigationManeuver != null && !maneuver.isEmpty()) return true;
+        if (navigationTripInfo != null
+                && !joinNavigationText(state.distance, state.duration).isEmpty()) return true;
+        if (navigationCombined != null && (state.maneuverImage != null
+                || !state.turnDistance.isEmpty() || !maneuver.isEmpty())) return true;
+        if (navigationSpeedLimit != null && !state.speedLimit.isEmpty()) return true;
+        if (navigationTrafficLights != null && hasTrafficLightData(state)) return true;
+        if (navigationLanesImage != null
+                && state.laneAvailable && state.lanesImage != null) return true;
+        if (navigationLaneInfo != null && state.laneAvailable
+                && (!state.lanes.isEmpty() || !state.laneDistance.isEmpty()
+                || Double.isFinite(state.laneDistanceMeters))) return true;
+        return (navigationJamImage != null && state.jamImage != null)
+                || (navigationRainbowImage != null && state.rainbowImage != null);
+    }
+
+    private static boolean hasTrafficLightData(
+            @NonNull NavigationDataRepository.Snapshot state) {
+        if (!state.routeActive || !state.trafficAvailable) return false;
+        if (validTrafficSignal(state.trafficColor)) return true;
+        for (NavigationDataRepository.TrafficLight light : state.trafficLights) {
+            if (validTrafficSignal(light.color)) return true;
+        }
+        return false;
+    }
+
+    private static boolean validTrafficSignal(@Nullable String color) {
+        if (color == null) return false;
+        String normalized = color.trim().toUpperCase(Locale.ROOT);
+        return "RED".equals(normalized) || "YELLOW".equals(normalized)
+                || "RED_AND_YELLOW".equals(normalized) || "GREEN".equals(normalized);
+    }
+
+    @NonNull
+    private static String joinNavigationText(@Nullable String first,
+                                             @Nullable String second) {
+        String left = first == null ? "" : first.trim();
+        String right = second == null ? "" : second.trim();
+        if (left.isEmpty()) return right;
+        if (right.isEmpty()) return left;
+        return left + " · " + right;
     }
 
     /** Clears every live field before idle/stale rendering so no old route can flash back. */
@@ -4921,14 +5079,18 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void addTrafficLightRow(String color, String countdown, String arrow, int position) {
-        if (navigationTrafficLights == null || color == null || color.isEmpty()) return;
+        if (navigationTrafficLights == null || !validTrafficSignal(color)) return;
         int tint;
         String label;
         switch (color.toUpperCase(Locale.ROOT)) {
             case "GREEN": label = "Зелёный"; tint = Color.rgb(80, 220, 120); break;
             case "YELLOW": label = "Жёлтый"; tint = Color.rgb(255, 210, 60); break;
+            case "RED_AND_YELLOW":
+                label = "Красный + жёлтый";
+                tint = Color.rgb(255, 165, 55);
+                break;
             case "RED": label = "Красный"; tint = Color.rgb(255, 90, 90); break;
-            default: label = color; tint = Color.WHITE; break;
+            default: return;
         }
         TextView row = text(18f * navigationTrafficScalePercent / 100f, tint, true);
         String prefix = position >= 0 ? "Светофор " + (position + 1) + ": " : "Светофор: ";

@@ -13,7 +13,8 @@ import java.util.Locale;
 /** Pure parsing/arbitration rules shared by the mHUD-compatible navigation transports. */
 final class NavigationSignalPolicy {
     static final long DYNAMIC_TRAFFIC_STALE_MS = 4_000L;
-    static final long STATIC_TRAFFIC_STALE_MS = 120_000L;
+    /** A color without countdown is still dynamic road state, never a two-minute cache entry. */
+    static final long STATIC_TRAFFIC_STALE_MS = 10_000L;
     private static final double JUNCTION_HANDOFF_METERS = 350.0d;
     private static final int MAX_LANE_RECORDS = 64;
 
@@ -137,7 +138,8 @@ final class NavigationSignalPolicy {
     }
 
     static boolean validTrafficColor(String color) {
-        return "RED".equals(color) || "YELLOW".equals(color) || "GREEN".equals(color);
+        return "RED".equals(color) || "YELLOW".equals(color)
+                || "RED_AND_YELLOW".equals(color) || "GREEN".equals(color);
     }
 
     static int sourceRank(String source) {
@@ -201,6 +203,13 @@ final class NavigationSignalPolicy {
             return newSeconds < 0 || expected <= 1 || Math.abs(newSeconds - expected) <= 1;
         }
 
+        if ("RED_AND_YELLOW".equals(newColor)) {
+            return "RED".equals(oldColor) && expected <= 4
+                    && age < DYNAMIC_TRAFFIC_STALE_MS;
+        }
+        if ("RED_AND_YELLOW".equals(oldColor)) {
+            return "GREEN".equals(newColor) && age < DYNAMIC_TRAFFIC_STALE_MS;
+        }
         if ("YELLOW".equals(newColor)) {
             return expected <= 4 && age < DYNAMIC_TRAFFIC_STALE_MS;
         }
@@ -213,6 +222,8 @@ final class NavigationSignalPolicy {
     }
 
     static String phaseOriginAfter(String oldColor, String oldPhaseOrigin, String newColor) {
+        if ("RED_AND_YELLOW".equals(newColor)) return "RED";
+        if ("RED_AND_YELLOW".equals(oldColor)) return "";
         if ("YELLOW".equals(newColor) && !"YELLOW".equals(oldColor)
                 && validTrafficColor(oldColor)) return oldColor;
         if ("YELLOW".equals(oldColor) && !"YELLOW".equals(newColor)) return "";

@@ -82,11 +82,24 @@ final class NavigatorStatePublisher {
         final int routeSegmentIndex;
         final double routeSegmentPosition;
         final Object currentRoutePoint;
+        final List<TrafficLightFrame> trafficLights;
+        final long trafficLightsSampleElapsedMs;
 
         NavigationFrame(double latitude, double longitude, double bearingDegrees,
                         double speedKmh, boolean routeActive,
                         boolean routeProgressValid, int routeSegmentIndex,
                         double routeSegmentPosition, Object currentRoutePoint) {
+            this(latitude, longitude, bearingDegrees, speedKmh, routeActive,
+                    routeProgressValid, routeSegmentIndex, routeSegmentPosition,
+                    currentRoutePoint, Collections.emptyList(), 0L);
+        }
+
+        NavigationFrame(double latitude, double longitude, double bearingDegrees,
+                        double speedKmh, boolean routeActive,
+                        boolean routeProgressValid, int routeSegmentIndex,
+                        double routeSegmentPosition, Object currentRoutePoint,
+                        List<TrafficLightFrame> trafficLights,
+                        long trafficLightsSampleElapsedMs) {
             this.latitude = latitude;
             this.longitude = longitude;
             this.bearingDegrees = finite(bearingDegrees) ? bearingDegrees : 0d;
@@ -96,6 +109,15 @@ final class NavigatorStatePublisher {
             this.routeSegmentIndex = Math.max(0, routeSegmentIndex);
             this.routeSegmentPosition = Math.max(0d, Math.min(1d, routeSegmentPosition));
             this.currentRoutePoint = currentRoutePoint;
+            this.trafficLights = trafficLights == null
+                    ? Collections.emptyList() : trafficLights;
+            this.trafficLightsSampleElapsedMs = Math.max(0L, trafficLightsSampleElapsedMs);
+        }
+
+        NavigationFrame withTrafficLights(List<TrafficLightFrame> values, long sampledAt) {
+            return new NavigationFrame(latitude, longitude, bearingDegrees, speedKmh,
+                    routeActive, routeProgressValid, routeSegmentIndex,
+                    routeSegmentPosition, currentRoutePoint, values, sampledAt);
         }
 
         boolean isValid() {
@@ -105,12 +127,58 @@ final class NavigatorStatePublisher {
         }
     }
 
+    /** One validated Windshield signal shared by JSON/HUD and both map renderers. */
+    static final class TrafficLightFrame {
+        final String id;
+        final double latitude;
+        final double longitude;
+        final int distanceMeters;
+        final int secondsLeft;
+        final String signal;
+        final String sectionType;
+        final String arrow;
+
+        TrafficLightFrame(String id, double latitude, double longitude,
+                          int distanceMeters, int secondsLeft, String signal,
+                          String sectionType, String arrow) {
+            this.id = id == null ? "" : id;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.distanceMeters = Math.max(-1, distanceMeters);
+            this.secondsLeft = Math.max(-1, secondsLeft);
+            this.signal = signal == null ? "" : signal;
+            this.sectionType = sectionType == null ? "" : sectionType;
+            this.arrow = arrow == null ? "" : arrow;
+        }
+
+        boolean hasMapPosition() {
+            return finite(latitude) && latitude >= -90d && latitude <= 90d
+                    && finite(longitude) && longitude >= -180d && longitude <= 180d;
+        }
+
+        JSONObject toJson() throws JSONException {
+            JSONObject result = new JSONObject()
+                    .put("id", id)
+                    .put("distanceMeters", distanceMeters)
+                    .put("secondsLeft", secondsLeft)
+                    .put("signal", signal)
+                    .put("sectionType", sectionType)
+                    .put("arrow", arrow);
+            if (hasMapPosition()) {
+                result.put("latitude", latitude).put("longitude", longitude);
+            }
+            return result;
+        }
+    }
+
     private static final String TAG = "NatroNavigationState";
     private static final long CAMERA_INTERVAL_MS = 100L;
     /** Data extraction cadence only; native GuidanceCamera rendering remains at its own FPS. */
     private static final long STATE_INTERVAL_MS = 33L;
     /** Text, lanes and traffic lights are human-facing and do not need the map's 30 Hz cadence. */
     private static final long SNAPSHOT_INTERVAL_MS = 100L;
+    /** Signal phases change at one-second resolution; 2 Hz is ample and halves reflection work. */
+    private static final long TRAFFIC_LIGHT_INTERVAL_MS = 500L;
     private static final long MIN_RESOLVE_RETRY_MS = 250L;
     private static final long MAX_RESOLVE_RETRY_MS = 5_000L;
     private static final long ROUTE_RECONCILE_CONFIRM_MS = 250L;
@@ -153,6 +221,9 @@ final class NavigatorStatePublisher {
     // MapKit may report metadata weight for only the remaining route after position updates.
     // Freeze the first positive distance per route epoch so HUD trip progress has a stable base.
     private int activeRouteTotalDistanceMeters = -1;
+    private List<TrafficLightFrame> activeTrafficLights = Collections.emptyList();
+    private long activeTrafficLightsSampleElapsedMs;
+    private long lastTrafficLightsReadElapsedMs;
     private Object conditionsRoute;
     private Object conditionsListener;
     private long resolveRetryMs = MIN_RESOLVE_RETRY_MS;
@@ -381,17 +452,36 @@ final class NavigatorStatePublisher {
                 Object engineRoute = invoke(currentGuidance, "getCurrentRoute");
                 Object freeDriveRoute = invoke(currentNaviKitGuidance, "freeDriveRoute");
                 publishRouteDiagnostic(routeStatus, engineRoute, freeDriveRoute);
+                boolean trafficSampleDue = routeChanged || forceRoute
+                        || elapsedNow - lastTrafficLightsReadElapsedMs
+                        >= TRAFFIC_LIGHT_INTERVAL_MS;
+                if (activeRoute == null) {
+                    activeTrafficLights = Collections.emptyList();
+                    activeTrafficLightsSampleElapsedMs = 0L;
+                    lastTrafficLightsReadElapsedMs = elapsedNow;
+                } else if (trafficSampleDue) {
+                    activeTrafficLights = Collections.unmodifiableList(
+                            readTrafficLights(inputs.routePosition));
+                    activeTrafficLightsSampleElapsedMs = elapsedNow;
+                    lastTrafficLightsReadElapsedMs = elapsedNow;
+                }
             }
+            NavigationFrame navigationFrame = inputs.frame.withTrafficLights(
+                    activeTrafficLights, activeTrafficLightsSampleElapsedMs);
             String snapshot = snapshotDue
-                    ? buildSnapshot(currentGuidance, activeRoute, inputs).toString() : null;
+                    ? buildSnapshot(currentGuidance, activeRoute, inputs,
+                            activeTrafficLights).toString() : null;
             if (snapshotDue) lastSnapshotDispatchElapsedMs = elapsedNow;
             String route = routeChanged || forceRoute ? buildRoutePayload().toString() : null;
             sink.onNavigationState(snapshot, route, activeRoute, routeEpoch,
-                    activeJamFingerprint, activeJamStyle, inputs.frame);
+                    activeJamFingerprint, activeJamStyle, navigationFrame);
             lastStateDispatchElapsedMs = elapsedNow;
         } catch (Throwable failure) {
             Log.w(TAG, "Could not publish Navigator state", failure);
             detachGuidanceListeners();
+            activeTrafficLights = Collections.emptyList();
+            activeTrafficLightsSampleElapsedMs = 0L;
+            lastTrafficLightsReadElapsedMs = 0L;
             naviKitGuidance = null;
             if (navigation != null) sink.onNavigationRuntime(null);
             navigation = null;
@@ -547,22 +637,30 @@ final class NavigatorStatePublisher {
     }
 
     private JSONObject buildSnapshot(Object currentGuidance, Object route,
-                                     SnapshotInputs inputs) throws Exception {
+                                     SnapshotInputs inputs,
+                                     List<TrafficLightFrame> trafficLights)
+            throws Exception {
         long now = System.currentTimeMillis();
         Object routePosition = inputs.routePosition;
         NavigationFrame frame = inputs.frame;
+        boolean routeActive = route != null;
 
-        int remainingDistance = routePosition == null ? -1 : nonNegativeInt(
+        int remainingDistance = !routeActive || routePosition == null ? -1 : nonNegativeInt(
                 number(invoke(routePosition, "distanceToFinish"), -1d));
-        int remainingDuration = routePosition == null ? -1 : nonNegativeInt(
+        int remainingDuration = !routeActive || routePosition == null ? -1 : nonNegativeInt(
                 number(invoke(routePosition, "timeToFinish"), -1d));
-        int routeTotalDistance = activeRouteTotalDistanceMeters;
+        int routeTotalDistance = routeActive ? activeRouteTotalDistanceMeters : -1;
         long arrival = remainingDuration < 0 ? 0L
                 : now + Math.min(31_536_000, remainingDuration) * 1_000L;
 
-        Manoeuvre manoeuvre = readManoeuvre(routePosition);
-        LaneState lanes = readLanes(routePosition);
-        String trafficLights = readTrafficLights(routePosition).toString();
+        Manoeuvre manoeuvre = routeActive && routePosition != null
+                ? readManoeuvre(routePosition) : Manoeuvre.EMPTY;
+        LaneState lanes = routeActive && routePosition != null
+                ? readLanes(routePosition) : new LaneState(new JSONArray(), -1);
+        JSONArray trafficLightJson = new JSONArray();
+        if (routeActive) {
+            for (TrafficLightFrame light : trafficLights) trafficLightJson.put(light.toJson());
+        }
         Object speedLimitValue = invoke(currentGuidance, "getSpeedLimit");
         int speedLimit = speedLimitValue == null ? 0 : nonNegativeInt(
                 number(invoke(speedLimitValue, "getValue"), 0d) * 3.6d);
@@ -572,12 +670,12 @@ final class NavigatorStatePublisher {
                 .put("sequence", ++sequence)
                 .put("routeEpoch", routeEpoch)
                 .put("sourceTimestampMs", now)
-                .put("routeActive", route != null)
+                .put("routeActive", routeActive)
                 .put("maneuverType", manoeuvre.type)
                 .put("maneuverTitle", manoeuvre.title)
                 .put("maneuverSubtext", manoeuvre.subtext)
                 .put("street", text(invoke(currentGuidance, "getRoadName")))
-                .put("destination", destinationForRoute(route))
+                .put("destination", routeActive ? destinationForRoute(route) : "")
                 .put("maneuverDistanceMeters", manoeuvre.distanceMeters)
                 .put("routeTotalDistanceMeters", routeTotalDistance)
                 .put("remainingDistanceMeters", remainingDistance)
@@ -586,7 +684,7 @@ final class NavigatorStatePublisher {
                 .put("speedLimitKmh", Math.min(300, speedLimit))
                 .put("laneDistanceMeters", lanes.distanceMeters)
                 .put("lanesJson", lanes.values.toString())
-                .put("trafficLightsJson", trafficLights);
+                .put("trafficLightsJson", trafficLightJson.toString());
         if (finite(frame.latitude)) result.put("latitude", frame.latitude);
         if (finite(frame.longitude)) result.put("longitude", frame.longitude);
         if (finite(frame.bearingDegrees)) {
@@ -686,21 +784,49 @@ final class NavigatorStatePublisher {
         }
     }
 
-    private JSONArray readTrafficLights(Object routePosition) throws Exception {
-        JSONArray result = new JSONArray();
-        int count = 0;
+    private List<TrafficLightFrame> readTrafficLights(Object routePosition) throws Exception {
+        ArrayList<TrafficLightFrame> result = new ArrayList<>();
+        if (routePosition == null) return result;
         for (Object light : invokeList(windshield, "getTrafficLightsWithSignal")) {
-            if (count++ >= 8) break;
+            if (result.size() >= 8) break;
             Object position = invoke(light, "getPosition");
-            result.put(new JSONObject()
-                    .put("id", text(invoke(light, "getId")))
-                    .put("distanceMeters", nonNegativeInt(distance(routePosition, position)))
-                    .put("secondsLeft", nullableInt(invoke(light, "getSecondsLeft")))
-                    .put("signal", enumName(invoke(light, "getSignal")))
-                    .put("sectionType", enumName(invoke(light, "getSectionType")))
-                    .put("arrow", enumName(invoke(light, "getArrow"))));
+            double rawDistance = distance(routePosition, position);
+            if (!finite(rawDistance) || rawDistance < -5d) continue;
+            int distanceMeters = nonNegativeInt(rawDistance);
+            int secondsLeft = nullableInt(invoke(light, "getSecondsLeft"));
+            String signal = enumName(invoke(light, "getSignal"));
+            // UNKNOWN/empty Windshield shells are not navigation data. Keeping them was the
+            // source of the grey traffic-light placeholder with blank values after a route.
+            if (!validTrafficSignal(signal)) continue;
+            double latitude = Double.NaN;
+            double longitude = Double.NaN;
+            try {
+                Object point = position == null ? null : invoke(position, "getPoint");
+                if (point != null) {
+                    latitude = number(invoke(point, "getLatitude"), Double.NaN);
+                    longitude = number(invoke(point, "getLongitude"), Double.NaN);
+                }
+            } catch (Throwable unavailable) {
+                // The standalone widget can still use a valid signal/countdown. The map layer
+                // independently filters entries which have no geographic point.
+            }
+            String id = text(invoke(light, "getId"));
+            if (id.isEmpty() && finite(latitude) && finite(longitude)) {
+                id = "point:" + Math.round(latitude * 100_000d)
+                        + ':' + Math.round(longitude * 100_000d);
+            }
+            if (id.isEmpty()) id = "route-light-" + result.size();
+            result.add(new TrafficLightFrame(id, latitude, longitude,
+                    distanceMeters, secondsLeft, signal,
+                    enumName(invoke(light, "getSectionType")),
+                    enumName(invoke(light, "getArrow"))));
         }
         return result;
+    }
+
+    private static boolean validTrafficSignal(String signal) {
+        return "RED".equals(signal) || "YELLOW".equals(signal)
+                || "RED_AND_YELLOW".equals(signal) || "GREEN".equals(signal);
     }
 
     private Object nearest(List<?> values, Object routePosition, String positionMethod)
@@ -929,6 +1055,9 @@ final class NavigatorStatePublisher {
         pendingForceRoute = false;
         detachCameraListener();
         detachGuidanceListeners();
+        activeTrafficLights = Collections.emptyList();
+        activeTrafficLightsSampleElapsedMs = 0L;
+        lastTrafficLightsReadElapsedMs = 0L;
         activityReference = new WeakReference<>(null);
         pendingCamera = null;
         naviKitGuidance = null;

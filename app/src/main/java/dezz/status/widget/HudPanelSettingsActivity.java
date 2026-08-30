@@ -505,6 +505,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showRouteTraffic = switchView(
                 "Пробки на линии маршрута", profile.showRouteTraffic);
         Switch showTraffic = switchView("Пробки на остальных дорогах", profile.showTraffic);
+        Switch showTrafficLights = switchView(
+                "Светофоры с отсчётом — отдельный слой", profile.showTrafficLights);
         Switch showLabels = switchView("Подписи", profile.showLabels);
         Switch showPois = switchView("Полезные места", profile.showPois);
         Switch showBuildings = switchView("Здания", profile.showBuildings);
@@ -515,7 +517,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch roadsOnly = switchView(
                 "Только дороги — прозрачный фон", profile.roadsOnly);
         for (Switch control : new Switch[]{automaticDayNight, nightMode, showRoute,
-                showRouteTraffic, showTraffic, showLabels, showPois, showBuildings,
+                showRouteTraffic, showTraffic, showTrafficLights,
+                showLabels, showPois, showBuildings,
                 showParks, showWater,
                 showModels, showCursor, roadsOnly}) {
             form.addView(control, marginTop(4));
@@ -590,6 +593,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showRoute = showRoute.isChecked();
                         profile.showRouteTraffic = showRouteTraffic.isChecked();
                         profile.showTraffic = showTraffic.isChecked();
+                        profile.showTrafficLights = showTrafficLights.isChecked();
                         profile.showLabels = showLabels.isChecked();
                         profile.showPois = showPois.isChecked();
                         profile.showBuildings = showBuildings.isChecked();

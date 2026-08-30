@@ -28,15 +28,19 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.reflect.Array;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+
+import dezz.status.widget.navigation.NavigationSnapshotV2;
 
 /** Extracts and persists navigation summary data published by Maps/Navigator applications. */
 public final class NavigationDataRepository {
@@ -155,10 +159,10 @@ public final class NavigationDataRepository {
     private static final String PREF_BOOT_COUNT = "bootCount";
     private static final String PREF_BOOT_EPOCH = "bootEpoch";
     private static final long STALE_MS = NavigationRouteStatePolicy.ROUTE_STALE_MS;
-    private static final long TRAFFIC_STALE_MS = 120_000L;
-    private static final long LANE_STALE_MS = 120_000L;
+    private static final long TRAFFIC_STALE_MS = 10_000L;
+    private static final long LANE_STALE_MS = 15_000L;
     private static final long MANEUVER_IMAGE_STALE_MS = STALE_MS;
-    private static final long LANES_IMAGE_STALE_MS = 120_000L;
+    private static final long LANES_IMAGE_STALE_MS = 15_000L;
     private static final long JAM_IMAGE_STALE_MS = 5_000L;
     private static final long RAINBOW_IMAGE_STALE_MS = 120_000L;
     private static final long TIMESTAMP_WRITE_INTERVAL_MS = 60_000L;
@@ -167,6 +171,12 @@ public final class NavigationDataRepository {
     private static final int MAX_ROUTE_PAYLOAD_CHARS = 196_608;
     private static final int UNKNOWN_BOOT_COUNT = -1;
     private static final long BOOT_EPOCH_TOLERANCE_MS = 5L * 60L * 1000L;
+    private static final ThreadLocal<SimpleDateFormat> DIRECT_ARRIVAL_FORMAT =
+            new ThreadLocal<SimpleDateFormat>() {
+                @Override protected SimpleDateFormat initialValue() {
+                    return new SimpleDateFormat("HH:mm", Locale.getDefault());
+                }
+            };
 
     /** One independently addressed traffic light supplied by the mHUD-compatible contract. */
     public static final class TrafficLight {
@@ -746,6 +756,141 @@ public final class NavigationDataRepository {
                 prefs.getString(PREF_LANE_RAW_DISTANCES, ""),
                 prefs.getString(PREF_LANE_RAW_ALONG_ROUTE, ""), laneAvailable, routeActive,
                 maneuverImage, lanesImage, jamImage, rainbowImage);
+    }
+
+    /**
+     * Adapts the authenticated direct bridge for HOME without touching persisted notification
+     * caches. Route-only fields are blank when guidance is inactive and no legacy bitmap can leak
+     * from an older maneuver into this exact snapshot.
+     */
+    @NonNull
+    public static Snapshot fromDirectSnapshot(@NonNull NavigationSnapshotV2 source) {
+        return fromDirectSnapshot(source, true);
+    }
+
+    /** Empty authoritative state used between bridge authentication and its first frame. */
+    @NonNull
+    public static Snapshot emptyDirectSnapshot() {
+        return new Snapshot("", "", "", PACKAGE_YANDEX_NAVIGATOR,
+                "", "", "", "", "", "", false,
+                "", "", "", "", "", "", Collections.emptyList(),
+                "", "", Double.NaN, Double.NaN, Double.NaN, false,
+                Collections.emptyList(), "", "", "", "", "", false, false,
+                null, null, null, null);
+    }
+
+    /** A retained but expired bridge snapshot becomes an explicit empty state, not fallback. */
+    @NonNull
+    public static Snapshot fromDirectSnapshot(@NonNull NavigationSnapshotV2 source,
+                                              boolean sourceFresh) {
+        boolean routeActive = sourceFresh && source.routeActive;
+        List<TrafficLight> lights = routeActive
+                ? directTrafficLights(source) : Collections.emptyList();
+        TrafficLight first = lights.isEmpty() ? null : lights.get(0);
+        String lanes = routeActive ? directLanes(source.lanesJson) : "";
+        String laneDistance = routeActive ? directDistance(source.laneDistanceMeters) : "";
+        boolean laneAvailable = routeActive && !lanes.isEmpty();
+        return new Snapshot(
+                routeActive ? directArrival(source.arrivalEpochMs) : "",
+                routeActive ? directDuration(source.remainingDurationSeconds) : "",
+                routeActive ? directDistance(source.remainingDistanceMeters) : "",
+                PACKAGE_YANDEX_NAVIGATOR,
+                routeActive ? source.maneuverTitle : "",
+                routeActive ? source.maneuverTitle : "",
+                sourceFresh && source.speedLimitKmh > 0
+                        ? Integer.toString(source.speedLimitKmh) : "",
+                first == null ? "" : first.color,
+                first == null ? "" : first.countdown,
+                first == null ? "" : first.arrow,
+                routeActive && !lights.isEmpty(),
+                routeActive ? source.maneuverSubtext : "",
+                sourceFresh ? source.street : "",
+                routeActive ? source.destination : "",
+                routeActive ? directDistance(source.maneuverDistanceMeters) : "",
+                "", "", lights, lanes, laneDistance,
+                routeActive ? source.laneDistanceMeters : Double.NaN,
+                Double.NaN, Double.NaN, routeActive,
+                Collections.emptyList(), lanes, "", "", laneDistance,
+                routeActive ? "true" : "", laneAvailable, routeActive,
+                null, null, null, null);
+    }
+
+    @NonNull
+    private static List<TrafficLight> directTrafficLights(NavigationSnapshotV2 source) {
+        ArrayList<TrafficLight> result = new ArrayList<>();
+        try {
+            JSONArray values = new JSONArray(source.trafficLightsJson);
+            for (int index = 0; index < Math.min(MAX_TRAFFIC_LIGHTS, values.length()); index++) {
+                JSONObject value = values.optJSONObject(index);
+                if (value == null) continue;
+                String signal = value.optString("signal", "").trim().toUpperCase(Locale.ROOT);
+                if (!NavigationSignalPolicy.validTrafficColor(signal)) continue;
+                int seconds = value.optInt("secondsLeft", -1);
+                result.add(new TrafficLight(value.optString("id", "direct-" + index),
+                        "yandex_windshield", signal,
+                        seconds < 0 ? "" : Integer.toString(seconds),
+                        value.optString("arrow", ""), index,
+                        source.sourceTimestampMs, ""));
+            }
+        } catch (JSONException ignored) {}
+        return result;
+    }
+
+    @NonNull
+    private static String directLanes(String raw) {
+        StringBuilder result = new StringBuilder();
+        try {
+            JSONArray lanes = new JSONArray(raw);
+            for (int index = 0; index < Math.min(8, lanes.length()); index++) {
+                JSONObject lane = lanes.optJSONObject(index);
+                if (lane == null) continue;
+                String direction = lane.optString("highlightedDirection", "");
+                if (direction.isEmpty()) {
+                    JSONArray directions = lane.optJSONArray("directions");
+                    direction = directions == null ? "" : directions.optString(0, "");
+                }
+                String arrow = directLaneArrow(direction);
+                if (arrow.isEmpty()) continue;
+                if (result.length() > 0) result.append(';');
+                result.append(arrow);
+            }
+        } catch (JSONException ignored) {}
+        return result.toString();
+    }
+
+    @NonNull
+    private static String directLaneArrow(String raw) {
+        String value = raw == null ? "" : raw.toUpperCase(Locale.ROOT);
+        if (value.contains("UTURN") || value.contains("U_TURN")) return "↶";
+        if (value.contains("LEFT")) return "←";
+        if (value.contains("RIGHT")) return "→";
+        if (value.contains("STRAIGHT") || value.contains("FORWARD")) return "↑";
+        return "";
+    }
+
+    @NonNull
+    private static String directDistance(int meters) {
+        if (meters < 0) return "";
+        if (meters < 1_000) return meters + " м";
+        double kilometres = meters / 1_000d;
+        return (kilometres < 10d
+                ? String.format(Locale.getDefault(), "%.1f", kilometres)
+                : Long.toString(Math.round(kilometres))) + " км";
+    }
+
+    @NonNull
+    private static String directDuration(int seconds) {
+        if (seconds < 0) return "";
+        int minutes = Math.max(0, (seconds + 30) / 60);
+        if (minutes < 60) return minutes + " мин";
+        int hours = minutes / 60;
+        int rest = minutes % 60;
+        return rest == 0 ? hours + " ч" : hours + " ч " + rest + " мин";
+    }
+
+    @NonNull
+    private static String directArrival(long epochMs) {
+        return epochMs <= 0L ? "" : DIRECT_ARRIVAL_FORMAT.get().format(new Date(epochMs));
     }
 
     /** Reads only scalar route state; never parses lane/traffic JSON or loads route bitmaps. */
