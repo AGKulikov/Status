@@ -55,7 +55,7 @@ class NavigationModToolsTest(unittest.TestCase):
                 MANIFEST_PATCHER.MAP_ACTIVITY_THEME_OFFSET,
             ) = original
 
-    def test_map_activity_patch_has_only_three_reviewed_hooks(self):
+    def test_map_activity_patch_has_five_reviewed_hooks(self):
         source = """.class public final Lru/yandex/yandexmaps/app/MapActivity;
 .super Landroidx/appcompat/app/s;
 
@@ -68,6 +68,23 @@ class NavigationModToolsTest(unittest.TestCase):
 
 .method public final onDestroy()V
     .locals 3
+    return-void
+.end method
+
+.method public final onStart()V
+    .locals 3
+    return-void
+.end method
+
+.method public final onStop()V
+    .locals 3
+    invoke-static {}, Lz74/f;->c()V
+
+    return-void
+.end method
+
+.method public final onTrimMemory(I)V
+    .locals 1
     return-void
 .end method
 
@@ -98,12 +115,14 @@ class NavigationModToolsTest(unittest.TestCase):
         finally:
             PATCHER.EXPECTED_SMALI_SHA256 = original_digest
 
-        self.assertEqual(3, result.count(PATCHER.ENTRY_POINT))
+        self.assertEqual(5, result.count(PATCHER.ENTRY_POINT))
         self.assertIn("const v0, 0x7f1605a2", result)
         self.assertIn("Landroid/app/Activity;->setTheme(I)V", result)
         self.assertNotIn("onActivityPreCreate(Landroid/app/Activity;)V", result)
         self.assertIn("onActivityResumed(Landroid/app/Activity;)V", result)
         self.assertIn("onActivityDestroyed(Landroid/app/Activity;)V", result)
+        self.assertIn("onActivityStarting(Landroid/app/Activity;)V", result)
+        self.assertIn("onActivityStopped(Landroid/app/Activity;)V", result)
         self.assertIn("onNewIntent(Landroid/app/Activity;Landroid/content/Intent;)Z", result)
         self.assertIn("if-eqz v0, :natro_continue_new_intent", result)
         self.assertIn(":natro_continue_new_intent", result)
@@ -194,8 +213,8 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.5.1}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021284}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.5.2}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021285}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
@@ -214,6 +233,8 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn('probe_api = 24 if scheme == "v2"', verifier)
         self.assertIn('b"navi_win/"', verifier)
         self.assertIn('b"Lru/natro/navigation/NatroEntryPoint;"', verifier)
+        self.assertIn('b"Lru/natro/navigation/BackgroundMapLease;"', verifier)
+        self.assertIn('GuidanceService must retain its location foreground-service type', verifier)
         self.assertIn('b"ddnavforcewinfull"', verifier)
         self.assertIn('verify_kx11_navigation_pair.py', pair)
         self.assertIn('KX11-COMPATIBILITY.txt', pair)

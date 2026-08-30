@@ -24,6 +24,16 @@ public final class NatroEntryPoint {
 
     private NatroEntryPoint() {}
 
+    /** Called at the beginning of MapActivity.onStart, before Navigator resumes its UI. */
+    public static void onActivityStarting(Activity activity) {
+        if (activity == null || activity.isFinishing()) return;
+        try {
+            NavigationBridgeClient.onActivityStarting();
+        } catch (Throwable failure) {
+            reportFailure("onActivityStarting", failure);
+        }
+    }
+
     public static void onActivityResumed(Activity activity) {
         if (activity == null || activity.isFinishing()) return;
         try {
@@ -34,6 +44,16 @@ public final class NatroEntryPoint {
             NavigationBridgeClient.attachActivity(activity);
         } catch (Throwable failure) {
             reportFailure("onActivityResumed", failure);
+        }
+    }
+
+    /** Called at the end of MapActivity.onStop after every host controller has settled. */
+    public static void onActivityStopped(Activity activity) {
+        if (activity == null) return;
+        try {
+            NavigationBridgeClient.onActivityStopped();
+        } catch (Throwable failure) {
+            reportFailure("onActivityStopped", failure);
         }
     }
 

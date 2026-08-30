@@ -16,8 +16,8 @@ import zipfile
 
 KX11_ANDROID_API = 28
 NATRO_PACKAGE = "ru.natro.statuswidget"
-NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.1")
-NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021284")
+NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.2")
+NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021285")
 NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi"
 NAVIGATOR_VERSION_CODE = "739564630"
 NAVIGATOR_BASELINE_SHA256 = (
@@ -89,6 +89,27 @@ def activity_block(tree: str, class_name: str) -> str:
     while end < len(lines) and not (
         lines[end].startswith("      E: ")
         and not lines[end].startswith("        ")
+    ):
+        end += 1
+    return "\n".join(lines[start:end])
+
+
+def service_block(tree: str, class_name: str) -> str:
+    lines = tree.splitlines()
+    name_marker = f'android:name(0x01010003)="{class_name}"'
+    matches = [index for index, line in enumerate(lines) if name_marker in line]
+    if len(matches) != 1:
+        raise VerificationError(
+            f"expected exactly one manifest service {class_name}, found {len(matches)}"
+        )
+    start = matches[0]
+    while start >= 0 and not lines[start].startswith("      E: service "):
+        start -= 1
+    if start < 0:
+        raise VerificationError(f"cannot locate manifest service block for {class_name}")
+    end = start + 1
+    while end < len(lines) and not (
+        lines[end].startswith("      E: ") and not lines[end].startswith("        ")
     ):
         end += 1
     return "\n".join(lines[start:end])
@@ -254,6 +275,18 @@ def verify_navigator(
         raise VerificationError(
             "Navigator MapActivity does not use the reviewed translucent bootstrap theme"
         )
+    guidance_service = service_block(
+        candidate_tree,
+        "com.yandex.navikit_platform.guidance.service.GuidanceService",
+    )
+    if "android:foregroundServiceType(0x01010599)=(type 0x11)0x8" not in guidance_service:
+        raise VerificationError(
+            "Navigator GuidanceService must retain its location foreground-service type"
+        )
+    if "android:process" in guidance_service:
+        raise VerificationError(
+            "Navigator GuidanceService unexpectedly moved out of the main navigation process"
+        )
     classes4 = zip_entry(apk, "classes4.dex")
     classes12 = zip_entry(apk, "classes12.dex")
     classes19 = zip_entry(apk, "classes19.dex")
@@ -261,8 +294,10 @@ def verify_navigator(
         raise VerificationError("Navigator classes4.dex has no Natro lifecycle hook")
     for marker in (
         b"Lru/natro/navigation/TrafficLightMapLayer;",
+        b"Lru/natro/navigation/BackgroundMapLease;",
         b"getTrafficLightsWithSignal",
         b"showTrafficLights",
+        b"background MapKit lease active",
     ):
         if marker not in classes19:
             raise VerificationError(
@@ -347,6 +382,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "Navigator aapt badging: logically identical to baseline\n"
             "Navigator MapActivity: reviewed existing translucent bootstrap theme; "
             "original SplashAppTheme restored before onCreate\n"
+            "Navigator background route: location GuidanceService retained in the main process; "
+            "MapKit lease is active only for attached HUD/cluster surfaces\n"
             "Navigator resources.arsc and res/: byte-for-byte identical to baseline\n"
             "Navigator sharedUserId: absent (original Yandex Music is not signature-coupled)\n"
             "Window launch contract: Natro and Navigator contain navi_win/ddnavwin/MapActivity; "

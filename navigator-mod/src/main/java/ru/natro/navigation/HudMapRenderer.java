@@ -32,7 +32,7 @@ final class HudMapRenderer {
     /** Match the main map's road-width traffic instead of the custom thick route stroke. */
     private static final String BACKGROUND_TRAFFIC_STYLE =
             "[{\"types\":\"polyline\",\"stylers\":{\"scale\":0.45}}]";
-    /** Geometry slicing is expensive; native camera motion remains independent and full-rate. */
+    /** Geometry slicing is expensive; camera motion remains independent and full-rate. */
     private static final long ROUTE_GEOMETRY_INTERVAL_MS = 100L;
     private final Context context;
     private final FailureReporter reporter;
@@ -59,7 +59,6 @@ final class HudMapRenderer {
     private Object navigationRuntime;
     private Object navigationStyleProvider;
     private Object navigationLayer;
-    private Object guidanceCamera;
     private Object routeCollection;
     private Object routePolyline;
     private Object activeRoute;
@@ -139,6 +138,11 @@ final class HudMapRenderer {
         stopRenderer(true);
     }
 
+    /** Background MapKit work is retained only for a live, enabled external MapWindow. */
+    boolean hasActiveMapWindow() {
+        return profile.enabled && mapWindow != null && surface != null && surface.isValid();
+    }
+
     /**
      * Uses one primary-camera sample only to avoid a blank cold-start map before Guidance emits
      * its first location. Subsequent pan/zoom/rotation gestures on the main map are ignored.
@@ -177,9 +181,9 @@ final class HudMapRenderer {
             navigationCamera = new NavigatorStatePublisher.CameraState(
                     frame.latitude, frame.longitude, baseZoom, (float) frame.bearingDegrees,
                     profile.tiltDegrees);
-            // Once GuidanceCamera owns this MapWindow, snapshots only advance the custom route.
-            // Competing Map.move animations were the source of the one-second HUD jumps.
-            if (guidanceCamera == null) applyCamera(false);
+            // This MapWindow has one camera owner. Exact tilt/zoom/focus settings therefore work
+            // independently without alternating against GuidanceCamera every second.
+            applyCamera(false);
             updateRouteProgress(frame);
         } catch (Exception invalid) {
             Log.w(TAG, "Guidance frame could not be applied to " + displayName, invalid);
@@ -377,8 +381,7 @@ final class HudMapRenderer {
             applyStyleSlot(currentMap, CUSTOM_STYLE_ID, style);
             applyStyleSlot(currentMap, VISIBILITY_STYLE_ID,
                     profile.visibilityStyleJson());
-            if (guidanceCamera != null) applyNativeCameraProfile();
-            else applyCamera(false);
+            applyCamera(false);
             applyRoadEventVisibility();
             rebuildRoute();
         } catch (Throwable failure) {
@@ -480,7 +483,7 @@ final class HudMapRenderer {
         }
     }
 
-    /** Creates a camera-and-route-events-only NavigationLayer; route and cursor stay custom. */
+    /** Creates a route-events-only NavigationLayer; route, cursor and camera stay custom. */
     private void createNativeNavigationLayer() {
         Object currentWindow = mapWindow;
         Object currentNavigation = navigationRuntime;
@@ -501,7 +504,9 @@ final class HudMapRenderer {
             Object settings = settingsClass.getConstructor().newInstance();
             invoke(settings, "setUseDefaultSublayersSetup",
                     new Class<?>[]{boolean.class}, false);
-            invoke(settings, "setUseLayerCamera", new Class<?>[]{boolean.class}, true);
+            // GuidanceCamera exposes only a 2D/3D threshold in MapKit 30.3.0. Keeping it disabled
+            // makes tiltDegrees, zoomDelta and cameraMode exact and gives the MapWindow one owner.
+            invoke(settings, "setUseLayerCamera", new Class<?>[]{boolean.class}, false);
             invoke(settings, "setUseLayerRoadEvents", new Class<?>[]{boolean.class}, true);
             invoke(settings, "setUseLayerRoutes", new Class<?>[]{boolean.class}, false);
             invoke(settings, "setUseLayerCursor", new Class<?>[]{boolean.class}, false);
@@ -524,72 +529,16 @@ final class HudMapRenderer {
                             settings);
             navigationStyleProvider = style;
             navigationLayer = layer;
-            guidanceCamera = invoke(layer, "getCamera", new Class<?>[0]);
-            applyNativeCameraProfile();
             applyRoadEventVisibility();
-            Log.i(TAG, "Native GuidanceCamera attached to independent HUD MapWindow");
+            Log.i(TAG, "Native route-events layer attached to independent HUD MapWindow");
             NavigationBridgeClient.reportDiagnostic(
-                    "native GuidanceCamera attached to independent HUD MapWindow");
+                    "native route-events layer attached to independent HUD MapWindow");
         } catch (Throwable failure) {
             removeNativeNavigationLayer();
             Log.w(TAG, "Native HUD NavigationLayer unavailable: " + shortMessage(failure));
             NavigationBridgeClient.reportDiagnostic(
                     "native HUD NavigationLayer unavailable: " + shortMessage(failure));
         }
-    }
-
-    private void applyNativeCameraProfile() {
-        Object camera = guidanceCamera;
-        Object layer = navigationLayer;
-        if (camera == null || layer == null) return;
-        try {
-            Class<?> animationTypeClass = Class.forName("com.yandex.mapkit.Animation$Type");
-            Object smooth = animationTypeClass.getField("SMOOTH").get(null);
-            Class<?> animationClass = Class.forName("com.yandex.mapkit.Animation");
-            Object animation = animationClass.getConstructor(animationTypeClass, float.class)
-                    .newInstance(smooth, 0.25f);
-            Class<?> cameraModeClass = Class.forName(
-                    "com.yandex.mapkit.navigation.guidance_camera.CameraMode");
-            boolean free = "FREE".equals(profile.cameraMode);
-            boolean northUp = "NORTH_UP".equals(profile.cameraMode);
-            boolean routeFollowing = "FOLLOW_ROUTE".equals(profile.cameraMode);
-            @SuppressWarnings({"rawtypes", "unchecked"})
-            Object mode = Enum.valueOf((Class) cameraModeClass,
-                    free ? "FREE" : "FOLLOWING");
-            invoke(camera, "setSwitchModesAutomatically", new Class<?>[]{boolean.class},
-                    routeFollowing);
-            invoke(camera, "setAutoRotation",
-                    new Class<?>[]{boolean.class, animationClass}, !northUp && !free, animation);
-            invoke(camera, "setAutoZoom",
-                    new Class<?>[]{boolean.class, animationClass}, !free, animation);
-            invoke(camera, "setFollowingModeZoomOffset",
-                    new Class<?>[]{float.class, animationClass}, (float) profile.zoomDelta,
-                    animation);
-            invoke(camera, "setCameraMode",
-                    new Class<?>[]{cameraModeClass, animationClass}, mode, animation);
-            invoke(layer, "set2DMode", new Class<?>[]{boolean.class},
-                    profile.tiltDegrees < 30);
-            if (northUp) resetNativeCameraAzimuth(animationClass, animation);
-        } catch (Throwable failure) {
-            Log.w(TAG, "Native HUD camera profile could not be applied", failure);
-        }
-    }
-
-    private void resetNativeCameraAzimuth(Class<?> animationClass, Object animation)
-            throws Exception {
-        Object currentMap = map;
-        if (currentMap == null) return;
-        Object position = invoke(currentMap, "getCameraPosition", new Class<?>[0]);
-        Object target = invoke(position, "getTarget", new Class<?>[0]);
-        float zoom = ((Number) invoke(position, "getZoom", new Class<?>[0])).floatValue();
-        float tilt = ((Number) invoke(position, "getTilt", new Class<?>[0])).floatValue();
-        Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
-        Class<?> positionClass = Class.forName("com.yandex.mapkit.map.CameraPosition");
-        Object north = positionClass.getConstructor(
-                        pointClass, float.class, float.class, float.class)
-                .newInstance(target, zoom, 0f, tilt);
-        invoke(currentMap, "move", new Class<?>[]{positionClass, animationClass},
-                north, animation);
     }
 
     private void applyRoadEventVisibility() {
@@ -624,7 +573,6 @@ final class HudMapRenderer {
             try { invoke(layer, "removeFromMap", new Class<?>[0]); }
             catch (Throwable ignored) {}
         }
-        guidanceCamera = null;
         navigationLayer = null;
         navigationStyleProvider = null;
     }

@@ -24,6 +24,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.material.button.MaterialButton;
+
 import org.json.JSONException;
 
 import java.util.ArrayList;
@@ -40,6 +42,7 @@ import dezz.status.widget.instrument.InstrumentPanelView;
 import dezz.status.widget.instrument.InstrumentStyleFamily;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
+import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Live editor for the native 1920x720 driver instrument panel. */
@@ -321,55 +324,144 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         }
         NavigationIntegrationConfig finalNavigation = navigation;
         NavigationIntegrationConfig.MapProfile map = navigation.clusterMap;
+        ScrollView scroll = new ScrollView(this);
         LinearLayout content = dialogColumn();
+        scroll.addView(content);
+
+        content.addView(text("Карта приборной панели полностью независима от основного экрана "
+                + "Навигатора. Все значения ниже применяются только к этой карте.",
+                12, 0xFFB8C0CC));
         Switch mapEnabled = switchView("Показывать карту", map.enabled);
-        Switch traffic = switchView("Все пробки", map.showTraffic);
-        Switch routeTraffic = switchView("Пробки на маршруте", map.showRouteTraffic);
+        content.addView(mapEnabled);
+
+        content.addView(section("Камера"), marginTop(14));
+        Spinner cameraMode = navigationCameraModeSpinner(map.cameraMode);
+        content.addView(label("Как карта следует за автомобилем"), marginTop(6));
+        content.addView(cameraMode);
+        SliderField zoom = slider(content,
+                "Приближение: 0 — стандартное, + ближе, − дальше",
+                map.zoomDelta, -8, 8, 0.25, "");
+        SliderField tilt = slider(content,
+                "Наклон: 0° — сверху, 60° — перспектива",
+                map.tiltDegrees, 0, 80, 1, "°");
+        SliderField focusX = slider(content, "Автомобиль по горизонтали",
+                map.focusXPercent, 0, 100, 1, " %");
+        SliderField focusY = slider(content, "Автомобиль по вертикали",
+                map.focusYPercent, 0, 100, 1, " %");
+        SliderField mapScale = slider(content, "Размер подписей и объектов",
+                map.mapScalePercent, 50, 300, 5, " %");
+        addCameraPresets(content, cameraMode, zoom, tilt, focusX, focusY);
+
+        SliderField maximumFps = slider(content,
+                "Плавность (на стоянке автоматически не выше 15)",
+                map.maximumFps, 5, 60, 1, " кадр/с");
+
+        content.addView(section("Состав карты"), marginTop(14));
+        Spinner dayNight = dayNightSpinner(map.automaticDayNight, map.nightMode);
+        content.addView(label("Оформление день / ночь"), marginTop(6));
+        content.addView(dayNight);
+        Switch route = switchView("Маршрут", map.showRoute);
+        Switch routeTraffic = switchView("Пробки на линии маршрута", map.showRouteTraffic);
+        Switch traffic = switchView("Пробки на остальных дорогах", map.showTraffic);
         Switch trafficLights = switchView(
                 "Светофоры с отсчётом — отдельный слой", map.showTrafficLights);
-        Switch pois = switchView("Объекты на карте", map.showPois);
-        Switch buildings = switchView("Здания", map.showBuildings);
         Switch labels = switchView("Подписи дорог", map.showLabels);
+        Switch pois = switchView("Полезные места", map.showPois);
+        Switch buildings = switchView("Здания", map.showBuildings);
+        Switch parks = switchView("Парки", map.showParks);
+        Switch water = switchView("Вода", map.showWater);
         Switch models = switchView("3D-модели (повышенная нагрузка)", map.showModels);
+        Switch cursor = switchView("Курсор автомобиля", map.showCursor);
         Switch roadsOnly = switchView("Только дороги — прозрачный фон", map.roadsOnly);
-        content.addView(mapEnabled);
+        content.addView(route);
         content.addView(traffic);
         content.addView(routeTraffic);
         content.addView(trafficLights);
+        content.addView(labels);
         content.addView(pois);
         content.addView(buildings);
-        content.addView(labels);
+        content.addView(parks);
+        content.addView(water);
         content.addView(models);
+        content.addView(cursor);
         content.addView(roadsOnly);
         Button roadEvents = button("Дорожные события — типы и режимы");
         roadEvents.setOnClickListener(view -> editClusterRoadEvents(
                 finalNavigation, map, preferences));
         content.addView(roadEvents);
-        TextView fpsValue = label("Максимум: " + map.maximumFps
-                + " FPS · на стоянке автоматически 15 FPS");
-        SeekBar fps = new SeekBar(this);
-        fps.setMax(45);
-        fps.setProgress(Math.max(15, map.maximumFps) - 15);
-        fps.setOnSeekBarChangeListener(seekListener(value -> fpsValue.setText(
-                "Максимум: " + (value + 15) + " FPS · на стоянке автоматически 15 FPS")));
-        content.addView(fpsValue);
-        content.addView(fps);
+
+        content.addView(section("Маршрут и курсор"), marginTop(14));
+        SliderField cursorScale = slider(content, "Размер курсора",
+                map.cursorScalePercent, 25, 300, 5, " %");
+        ColorField cursorColor = colorField(content, "Цвет автомобиля", map.cursorColor);
+        ColorField cursorOutline = colorField(content, "Контур автомобиля",
+                map.cursorOutlineColor);
+        ColorField routeColor = colorField(content, "Цвет маршрута", map.routeColor);
+        ColorField routeOutline = colorField(content, "Контур маршрута",
+                map.routeOutlineColor);
+        SliderField routeWidth = slider(content, "Толщина маршрута",
+                map.routeWidth, 1, 40, 0.5, " px");
+        SliderField routeOutlineWidth = slider(content, "Толщина контура маршрута",
+                map.routeOutlineWidth, 0, 20, 0.5, " px");
+
+        content.addView(section("Цвета загруженности дорог"), marginTop(14));
+        ColorField trafficFreeColor = colorField(content, "Дорога свободна",
+                map.trafficFreeColor);
+        ColorField trafficLightColor = colorField(content, "Небольшое затруднение",
+                map.trafficLightColor);
+        ColorField trafficHardColor = colorField(content, "Плотное движение",
+                map.trafficHardColor);
+        ColorField trafficVeryHardColor = colorField(content, "Сильная пробка",
+                map.trafficVeryHardColor);
+        ColorField trafficBlockedColor = colorField(content, "Дорога перекрыта",
+                map.trafficBlockedColor);
+        ColorField trafficUnknownColor = colorField(content, "Нет данных",
+                map.trafficUnknownColor);
+        SliderField trafficGradient = slider(content, "Длина перехода цветов пробок",
+                map.trafficGradientLength, 0, 100, 1, " %");
 
         new AlertDialog.Builder(this)
                 .setTitle("Независимая карта приборной панели")
-                .setView(content)
+                .setView(scroll)
                 .setPositiveButton("Применить", (dialog, which) -> {
                     map.enabled = mapEnabled.isChecked();
+                    map.cameraMode = navigationCameraModeValue(
+                            cameraMode.getSelectedItemPosition());
+                    map.zoomDelta = zoom.value();
+                    map.tiltDegrees = tilt.intValue();
+                    map.focusXPercent = focusX.intValue();
+                    map.focusYPercent = focusY.intValue();
+                    map.mapScalePercent = mapScale.intValue();
+                    map.maximumFps = maximumFps.intValue();
+                    applyDayNight(dayNight, map);
+                    map.showRoute = route.isChecked();
                     map.showTraffic = traffic.isChecked();
                     map.showRouteTraffic = routeTraffic.isChecked();
                     map.showTrafficLights = trafficLights.isChecked();
                     map.showPois = pois.isChecked();
                     map.showBuildings = buildings.isChecked();
                     map.showLabels = labels.isChecked();
+                    map.showParks = parks.isChecked();
+                    map.showWater = water.isChecked();
                     map.showModels = models.isChecked();
+                    map.showCursor = cursor.isChecked();
                     map.roadsOnly = roadsOnly.isChecked();
-                    map.maximumFps = fps.getProgress() + 15;
+                    map.cursorScalePercent = cursorScale.intValue();
+                    map.cursorColor = cursorColor.value;
+                    map.cursorOutlineColor = cursorOutline.value;
+                    map.routeColor = routeColor.value;
+                    map.routeOutlineColor = routeOutline.value;
+                    map.routeWidth = routeWidth.value();
+                    map.routeOutlineWidth = routeOutlineWidth.value();
+                    map.trafficFreeColor = trafficFreeColor.value;
+                    map.trafficLightColor = trafficLightColor.value;
+                    map.trafficHardColor = trafficHardColor.value;
+                    map.trafficVeryHardColor = trafficVeryHardColor.value;
+                    map.trafficBlockedColor = trafficBlockedColor.value;
+                    map.trafficUnknownColor = trafficUnknownColor.value;
+                    map.trafficGradientLength = trafficGradient.value();
                     try {
+                        finalNavigation.normalize();
                         preferences.navigationIntegrationConfigJson.set(
                                 finalNavigation.toJson().toString());
                         NavigationHudEndpointService.requestConfigurationRefresh(this);
@@ -515,6 +607,169 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
 
     private interface IntConsumer { void accept(int value); }
 
+    /** Bounded visual map value; no keyboard and no malformed numeric input. */
+    @NonNull private SliderField slider(@NonNull LinearLayout parent, @NonNull String title,
+                                        double initial, double minimum, double maximum,
+                                        double step, @NonNull String suffix) {
+        TextView valueLabel = label("");
+        parent.addView(valueLabel, marginTop(7));
+        SeekBar control = new SeekBar(this);
+        int steps = Math.max(1, (int) Math.round((maximum - minimum) / step));
+        control.setMax(steps);
+        SliderField result = new SliderField(
+                title, suffix, minimum, step, control, valueLabel);
+        result.setValue(initial);
+        control.setOnSeekBarChangeListener(seekListener(ignored -> result.updateLabel()));
+        parent.addView(control);
+        return result;
+    }
+
+    private static final class SliderField {
+        @NonNull final String title;
+        @NonNull final String suffix;
+        final double minimum;
+        final double step;
+        @NonNull final SeekBar control;
+        @NonNull final TextView valueLabel;
+
+        SliderField(@NonNull String title, @NonNull String suffix, double minimum,
+                    double step, @NonNull SeekBar control, @NonNull TextView valueLabel) {
+            this.title = title;
+            this.suffix = suffix;
+            this.minimum = minimum;
+            this.step = step;
+            this.control = control;
+            this.valueLabel = valueLabel;
+        }
+
+        double value() { return minimum + control.getProgress() * step; }
+
+        int intValue() { return (int) Math.round(value()); }
+
+        void setValue(double value) {
+            int progress = (int) Math.round((value - minimum) / step);
+            control.setProgress(Math.max(0, Math.min(control.getMax(), progress)));
+            updateLabel();
+        }
+
+        void updateLabel() {
+            double current = value();
+            String rendered = Math.abs(current - Math.rint(current)) < 0.0001
+                    ? Integer.toString((int) Math.rint(current))
+                    : String.format(Locale.ROOT, "%.2f", current)
+                            .replaceAll("0+$", "").replaceAll("\\.$", "");
+            valueLabel.setText(title + ": " + rendered + suffix);
+        }
+    }
+
+    private void addCameraPresets(@NonNull LinearLayout parent, @NonNull Spinner cameraMode,
+                                  @NonNull SliderField zoom, @NonNull SliderField tilt,
+                                  @NonNull SliderField focusX, @NonNull SliderField focusY) {
+        parent.addView(label("Быстрые варианты камеры"), marginTop(7));
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        Button top = button("2D сверху");
+        top.setOnClickListener(view -> {
+            cameraMode.setSelection(1);
+            zoom.setValue(0);
+            tilt.setValue(0);
+            focusX.setValue(50);
+            focusY.setValue(55);
+        });
+        Button city = button("3D город");
+        city.setOnClickListener(view -> {
+            cameraMode.setSelection(0);
+            zoom.setValue(0);
+            tilt.setValue(55);
+            focusX.setValue(50);
+            focusY.setValue(70);
+        });
+        Button highway = button("3D трасса");
+        highway.setOnClickListener(view -> {
+            cameraMode.setSelection(0);
+            zoom.setValue(-1);
+            tilt.setValue(68);
+            focusX.setValue(50);
+            focusY.setValue(76);
+        });
+        for (Button control : new Button[]{top, city, highway}) {
+            row.addView(control, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        parent.addView(row);
+    }
+
+    @NonNull private Spinner navigationCameraModeSpinner(@NonNull String mode) {
+        Spinner result = spinner(new String[]{
+                "По маршруту", "Север всегда сверху", "По направлению движения",
+                "Свободное положение"
+        });
+        if ("NORTH_UP".equals(mode)) result.setSelection(1);
+        else if ("HEADING_UP".equals(mode)) result.setSelection(2);
+        else if ("FREE".equals(mode)) result.setSelection(3);
+        else result.setSelection(0);
+        return result;
+    }
+
+    @NonNull private static String navigationCameraModeValue(int position) {
+        if (position == 1) return "NORTH_UP";
+        if (position == 2) return "HEADING_UP";
+        if (position == 3) return "FREE";
+        return "FOLLOW_ROUTE";
+    }
+
+    @NonNull private Spinner dayNightSpinner(boolean automatic, boolean night) {
+        Spinner result = spinner(new String[]{"Автоматически", "Всегда день", "Всегда ночь"});
+        result.setSelection(automatic ? 0 : night ? 2 : 1);
+        return result;
+    }
+
+    private static void applyDayNight(@NonNull Spinner control,
+                                      @NonNull NavigationIntegrationConfig.MapProfile map) {
+        int selection = control.getSelectedItemPosition();
+        map.automaticDayNight = selection == 0;
+        map.nightMode = selection == 2;
+    }
+
+    @NonNull private Spinner spinner(@NonNull String[] values) {
+        Spinner result = new Spinner(this);
+        result.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, values));
+        return result;
+    }
+
+    @NonNull private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
+                                           @NonNull String initial) {
+        ColorField field = new ColorField(initial);
+        MaterialButton button = new MaterialButton(this);
+        button.setText(title);
+        button.setAllCaps(false);
+        AppleColorPickerDialog.decorateButton(button, title, initial);
+        button.setOnClickListener(view -> AppleColorPickerDialog.show(
+                this, title, field.value, AppleColorPickerDialog.Options.standard(),
+                new AppleColorPickerDialog.Listener() {
+                    private void apply(@Nullable String selected) {
+                        if (selected == null || selected.trim().isEmpty()) return;
+                        field.value = selected;
+                        AppleColorPickerDialog.decorateButton(button, title, field.value);
+                    }
+
+                    @Override public void onPreview(@Nullable String selected) { apply(selected); }
+
+                    @Override public void onSelected(@Nullable String selected) { apply(selected); }
+                }));
+        LinearLayout.LayoutParams params = marginTop(5);
+        params.height = dp(52);
+        parent.addView(button, params);
+        return field;
+    }
+
+    private static final class ColorField {
+        @NonNull String value;
+
+        ColorField(@NonNull String value) { this.value = value; }
+    }
+
     @NonNull private Button button(@NonNull String title) {
         Button view = new Button(this);
         view.setText(title);
@@ -534,6 +789,12 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
 
     @NonNull private TextView label(@NonNull String value) {
         return text(value, 13, 0xFFD5DCE6);
+    }
+
+    @NonNull private TextView section(@NonNull String value) {
+        TextView view = text(value, 16, Color.WHITE);
+        view.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        return view;
     }
 
     @NonNull private TextView text(@NonNull String value, int size, int color) {

@@ -33,6 +33,11 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.setRoadEventMode("ACCIDENT",
                 NavigationIntegrationConfig.RoadEventMode.ROUTE_ONLY);
         config.clusterMap.zoomDelta = .75d;
+        config.clusterMap.tiltDegrees = 37;
+        config.clusterMap.focusXPercent = 42;
+        config.clusterMap.focusYPercent = 79;
+        config.clusterMap.mapScalePercent = 135;
+        config.clusterMap.cameraMode = "NORTH_UP";
         config.clusterMap.maximumFps = 60;
         config.clusterMap.showModels = false;
         config.clusterMap.showTrafficLights = true;
@@ -66,6 +71,11 @@ public final class NavigationHudV2ContractTest {
         assertEquals(NavigationIntegrationConfig.RoadEventMode.ROUTE_ONLY,
                 restored.hudMap.roadEventMode("ACCIDENT"));
         assertEquals(.75d, restored.clusterMap.zoomDelta, 0d);
+        assertEquals(37, restored.clusterMap.tiltDegrees);
+        assertEquals(42, restored.clusterMap.focusXPercent);
+        assertEquals(79, restored.clusterMap.focusYPercent);
+        assertEquals(135, restored.clusterMap.mapScalePercent);
+        assertEquals("NORTH_UP", restored.clusterMap.cameraMode);
         assertEquals(60, restored.clusterMap.maximumFps);
         assertFalse(restored.clusterMap.showModels);
         assertTrue(restored.clusterMap.showTrafficLights);
@@ -76,6 +86,70 @@ public final class NavigationHudV2ContractTest {
         assertTrue(restored.mainFloatingWindow.modeButtonVisible);
         assertEquals("BOTTOM_LEFT", restored.mainFloatingWindow.modeButtonPosition);
         assertEquals(52, restored.mainFloatingWindow.modeButtonSizeDp);
+    }
+
+    @Test public void hudAndClusterMapEditorsUseVisualControlsForEveryCameraValue()
+            throws Exception {
+        String hud = read(projectRoot().resolve(
+                "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
+        String cluster = read(projectRoot().resolve(
+                "app/src/main/java/dezz/status/widget/InstrumentPanelSettingsActivity.java"));
+
+        for (String source : new String[]{hud, cluster}) {
+            assertTrue(source.contains("SliderField zoom = slider("));
+            assertTrue(source.contains("SliderField tilt = slider("));
+            assertTrue(source.contains("SliderField focusX = slider("));
+            assertTrue(source.contains("SliderField focusY = slider("));
+            assertTrue(source.contains("SliderField mapScale = slider("));
+            assertTrue(source.contains("Быстрые варианты камеры"));
+            assertTrue(source.contains("2D сверху"));
+            assertTrue(source.contains("3D город"));
+            assertTrue(source.contains("3D трасса"));
+            assertTrue(source.contains("dayNightSpinner("));
+            assertTrue(source.contains("map.automaticDayNight = selection == 0"));
+            assertTrue(source.contains("map.nightMode = selection == 2"));
+        }
+        assertFalse(cluster.contains("android.widget.EditText"));
+        assertTrue(cluster.contains("map.cameraMode = navigationCameraModeValue("));
+        assertTrue(cluster.contains("map.zoomDelta = zoom.value()"));
+        assertTrue(cluster.contains("map.tiltDegrees = tilt.intValue()"));
+        assertTrue(cluster.contains("map.focusXPercent = focusX.intValue()"));
+        assertTrue(cluster.contains("map.focusYPercent = focusY.intValue()"));
+        assertTrue(cluster.contains("map.mapScalePercent = mapScale.intValue()"));
+        assertTrue(cluster.contains("map.cursorScalePercent = cursorScale.intValue()"));
+        assertTrue(cluster.contains("map.trafficGradientLength = trafficGradient.value()"));
+        assertTrue(cluster.contains("AppleColorPickerDialog.show("));
+        for (String assignment : new String[]{
+                "map.enabled = mapEnabled.isChecked()",
+                "map.showRoute = route.isChecked()",
+                "map.showRouteTraffic = routeTraffic.isChecked()",
+                "map.showTraffic = traffic.isChecked()",
+                "map.showTrafficLights = trafficLights.isChecked()",
+                "map.showLabels = labels.isChecked()",
+                "map.showPois = pois.isChecked()",
+                "map.showBuildings = buildings.isChecked()",
+                "map.showParks = parks.isChecked()",
+                "map.showWater = water.isChecked()",
+                "map.showModels = models.isChecked()",
+                "map.showCursor = cursor.isChecked()",
+                "map.roadsOnly = roadsOnly.isChecked()",
+                "map.cursorColor = cursorColor.value",
+                "map.cursorOutlineColor = cursorOutline.value",
+                "map.routeColor = routeColor.value",
+                "map.routeOutlineColor = routeOutline.value",
+                "map.routeWidth = routeWidth.value()",
+                "map.routeOutlineWidth = routeOutlineWidth.value()",
+                "map.trafficFreeColor = trafficFreeColor.value",
+                "map.trafficLightColor = trafficLightColor.value",
+                "map.trafficHardColor = trafficHardColor.value",
+                "map.trafficVeryHardColor = trafficVeryHardColor.value",
+                "map.trafficBlockedColor = trafficBlockedColor.value",
+                "map.trafficUnknownColor = trafficUnknownColor.value",
+                "map.maximumFps = maximumFps.intValue()"
+        }) {
+            assertTrue("Missing cluster visual setting assignment: " + assignment,
+                    cluster.contains(assignment));
+        }
     }
 
     @Test public void nonFiniteMapValuesRestoreFieldDefaults() {
@@ -204,6 +278,7 @@ public final class NavigationHudV2ContractTest {
         String routeStyler = read(patchRoot.resolve("RoutePolylineStyler.java"));
         String mapProfile = read(patchRoot.resolve("NavigationMapProfile.java"));
         String trafficLights = read(patchRoot.resolve("TrafficLightMapLayer.java"));
+        String backgroundLease = read(patchRoot.resolve("BackgroundMapLease.java"));
         String mapViewPatch = read(projectRoot().resolve(
                 "tools/patch_navigation_map_view.py"));
 
@@ -266,6 +341,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("end of onResumeFragments"));
         assertTrue(entry.contains("NavigationBridgeClient.attachActivity"));
         assertTrue(entry.contains("NavigationBridgeClient.detachActivity"));
+        assertTrue(entry.contains("NavigationBridgeClient.onActivityStarting"));
+        assertTrue(entry.contains("NavigationBridgeClient.onActivityStopped"));
         assertFalse(entry.contains("activity.finish()"));
         assertFalse(entry.contains("activity.startActivity(restart)"));
         assertTrue(entry.contains("controller.consumeIntent(intent)"));
@@ -291,13 +368,17 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("\\\"scale\\\":0.45"));
         assertTrue(renderer.contains("createUserLocationLayer"));
         assertTrue(renderer.contains("NavigationLayerFactory"));
-        assertTrue(renderer.contains("setUseLayerCamera"));
+        assertTrue(renderer.contains(
+                "setUseLayerCamera\", new Class<?>[]{boolean.class}, false"));
         assertTrue(renderer.contains("setUseLayerRoutes"));
         assertTrue(renderer.contains("setUseLayerCursor"));
         assertTrue(renderer.contains("setRoadEventVisibleOnRoute"));
         assertTrue(renderer.contains("setRoadEventVisible"));
         assertTrue(renderer.contains("r74.c"));
-        assertTrue(renderer.contains("guidanceCamera == null"));
+        assertFalse(renderer.contains("guidanceCamera"));
+        assertFalse(renderer.contains("applyNativeCameraProfile"));
+        assertTrue(renderer.contains("float tilt = profile.tiltDegrees"));
+        assertTrue(renderer.contains("applyCamera(false)"));
         assertTrue(renderer.contains("invoke(currentLocation, \"resetAnchor\""));
         assertFalse(renderer.contains("invoke(currentLocation, \"setAnchor\""));
         assertTrue(renderer.contains("com.yandex.mapkit.Animation$Type"));
@@ -336,6 +417,15 @@ public final class NavigationHudV2ContractTest {
         assertTrue(mapProfile.contains("if (roadsOnly) return ROADS_ONLY_STYLE"));
         assertTrue(renderer.contains("updateInitialCamera"));
         assertTrue(renderer.contains("updateNavigationState"));
+        assertTrue(client.contains("refreshBackgroundMapLease()"));
+        assertTrue(client.contains("hudMapRenderer.hasActiveMapWindow()"));
+        assertTrue(client.contains("clusterMapRenderer.hasActiveMapWindow()"));
+        assertTrue(backgroundLease.contains("HOST_STOP_SETTLE_MS = 1_000L"));
+        assertTrue(backgroundLease.contains("main.postDelayed(reassertAfterHostStop"));
+        assertTrue(backgroundLease.contains("!activityForeground && externalMapActive"));
+        assertTrue(backgroundLease.contains("invoke(mapKit, \"onStart\")"));
+        assertTrue(backgroundLease.contains("invoke(mapKit(), \"onStop\")"));
+        assertFalse(backgroundLease.contains("postDelayed(this"));
         assertFalse(client.contains("parseNavigationState(snapshotJson)"));
         assertTrue(publisher.contains("readSnapshotInputs(currentGuidance, activeRoute)"));
         assertTrue(client.contains("hudMapRenderer.updateNavigationState(navigationFrame)"));

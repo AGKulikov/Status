@@ -86,6 +86,7 @@ final class NavigationBridgeClient {
     private final HudMapRenderer hudMapRenderer;
     private final HudMapRenderer clusterMapRenderer;
     private final NavigatorStatePublisher statePublisher;
+    private final BackgroundMapLease backgroundMapLease;
     private final String sessionId = UUID.randomUUID().toString();
     private Messenger remote;
     private boolean binding;
@@ -130,6 +131,14 @@ final class NavigationBridgeClient {
         if (instance != null) instance.statePublisher.detach(activity);
     }
 
+    static synchronized void onActivityStarting() {
+        if (instance != null) instance.backgroundMapLease.onActivityStarting();
+    }
+
+    static synchronized void onActivityStopped() {
+        if (instance != null) instance.backgroundMapLease.onActivityStopped();
+    }
+
     /** Best-effort diagnostics from the host lifecycle hook; it must never throw into Navigator. */
     static synchronized void reportDiagnostic(String detail) {
         if (instance != null) instance.sendDiagnostic(detail);
@@ -159,6 +168,7 @@ final class NavigationBridgeClient {
         hudMapRenderer = new HudMapRenderer(this.context, this::sendSurfaceLost);
         clusterMapRenderer = new HudMapRenderer(this.context, this::sendClusterSurfaceLost,
                 "clusterMap", "instrument cluster", true);
+        backgroundMapLease = new BackgroundMapLease(main, this::sendDiagnostic);
         statePublisher = new NavigatorStatePublisher(new NavigatorStatePublisher.Sink() {
             @Override public void onPrimaryMap(Object mapWindow, Object map) {
                 mainMapController.attach(mapWindow, map);
@@ -239,6 +249,7 @@ final class NavigationBridgeClient {
                     mainMapController.applyConfiguration(raw);
                     hudMapRenderer.applyConfiguration(raw);
                     clusterMapRenderer.applyConfiguration(raw);
+                    refreshBackgroundMapLease();
                 }
                 break;
             case MSG_ATTACH_HUD_SURFACE:
@@ -248,6 +259,7 @@ final class NavigationBridgeClient {
                 if (sessionMatches(message.getData())) {
                     hudMapRenderer.detach(message.getData().getLong(
                             KEY_SURFACE_GENERATION, -1L));
+                    refreshBackgroundMapLease();
                 }
                 break;
             case MSG_ATTACH_CLUSTER_SURFACE:
@@ -259,6 +271,7 @@ final class NavigationBridgeClient {
                 if (sessionMatches(message.getData())) {
                     clusterMapRenderer.detach(message.getData().getLong(
                             KEY_SURFACE_GENERATION, -1L));
+                    refreshBackgroundMapLease();
                 }
                 break;
             case MSG_REQUEST_SNAPSHOT:
@@ -329,14 +342,23 @@ final class NavigationBridgeClient {
                 data.getInt(KEY_SURFACE_WIDTH, 0),
                 data.getInt(KEY_SURFACE_HEIGHT, 0),
                 data.getLong(KEY_SURFACE_GENERATION, -1L));
+        refreshBackgroundMapLease();
     }
 
     private void sendSurfaceLost(long generation, String detail) {
+        refreshBackgroundMapLease();
         sendSurfaceLost(MSG_HUD_SURFACE_LOST, generation, detail);
     }
 
     private void sendClusterSurfaceLost(long generation, String detail) {
+        refreshBackgroundMapLease();
         sendSurfaceLost(MSG_CLUSTER_SURFACE_LOST, generation, detail);
+    }
+
+    private void refreshBackgroundMapLease() {
+        backgroundMapLease.setExternalMapActive(
+                hudMapRenderer.hasActiveMapWindow()
+                        || clusterMapRenderer.hasActiveMapWindow());
     }
 
     private void sendSurfaceLost(int what, long generation, String detail) {
@@ -415,6 +437,7 @@ final class NavigationBridgeClient {
     private void disconnectAndRetry() {
         hudMapRenderer.disconnect();
         clusterMapRenderer.disconnect();
+        refreshBackgroundMapLease();
         remote = null;
         binding = false;
         if (bound) {

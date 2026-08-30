@@ -173,7 +173,7 @@ final class NavigatorStatePublisher {
 
     private static final String TAG = "NatroNavigationState";
     private static final long CAMERA_INTERVAL_MS = 100L;
-    /** Data extraction cadence only; native GuidanceCamera rendering remains at its own FPS. */
+    /** Primitive camera extraction cadence; duplicate output frames are filtered by each map. */
     private static final long STATE_INTERVAL_MS = 33L;
     /** Text, lanes and traffic lights are human-facing and do not need the map's 30 Hz cadence. */
     private static final long SNAPSHOT_INTERVAL_MS = 100L;

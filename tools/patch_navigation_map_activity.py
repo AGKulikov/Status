@@ -50,6 +50,16 @@ def patch(source: str) -> str:
         "onCreate original theme restore",
     )
 
+    start = ".method public final onStart()V\n    .locals 3\n"
+    source = replace_once(
+        source,
+        start,
+        start
+        + "\n    invoke-static {p0}, " + ENTRY_POINT
+        + "->onActivityStarting(Landroid/app/Activity;)V\n",
+        "onStart",
+    )
+
     destroy = ".method public final onDestroy()V\n    .locals 3\n"
     source = replace_once(
         source,
@@ -95,6 +105,24 @@ def patch(source: str) -> str:
         ".end method\n\n"
         ".method public final onSaveInstanceState(Landroid/os/Bundle;)V\n",
         "onResumeFragments insertion",
+    )
+
+    stop_tail = (
+        "    invoke-static {}, Lz74/f;->c()V\n\n"
+        "    return-void\n"
+        ".end method\n\n"
+        ".method public final onTrimMemory(I)V\n"
+    )
+    source = replace_once(
+        source,
+        stop_tail,
+        "    invoke-static {}, Lz74/f;->c()V\n\n"
+        "    invoke-static {p0}, " + ENTRY_POINT
+        + "->onActivityStopped(Landroid/app/Activity;)V\n\n"
+        "    return-void\n"
+        ".end method\n\n"
+        ".method public final onTrimMemory(I)V\n",
+        "onStop",
     )
     return source
 

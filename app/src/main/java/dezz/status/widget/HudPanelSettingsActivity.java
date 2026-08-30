@@ -493,14 +493,15 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 profile.focusYPercent, 0, 100, 1, " %");
         SliderField mapScale = slider(form, "Размер подписей и объектов карты",
                 profile.mapScalePercent, 50, 300, 5, " %");
+        addNavigationCameraPresets(form, cameraMode, zoom, tilt, focusX, focusY);
         SliderField maximumFps = slider(form,
-                "Плавность нативной камеры (рекомендуется 30)",
+                "Плавность камеры (рекомендуется 30)",
                 profile.maximumFps, 5, 60, 1, " кадр/с");
 
         form.addView(section("Состав и цвет карты HUD"), marginTop(16));
-        Switch automaticDayNight = switchView("Автоматический день / ночь",
-                profile.automaticDayNight);
-        Switch nightMode = switchView("Принудительно ночной режим", profile.nightMode);
+        Spinner dayNight = dayNightSpinner(profile.automaticDayNight, profile.nightMode);
+        form.addView(label("Оформление день / ночь"), marginTop(8));
+        form.addView(dayNight);
         Switch showRoute = switchView("Маршрут", profile.showRoute);
         Switch showRouteTraffic = switchView(
                 "Пробки на линии маршрута", profile.showRouteTraffic);
@@ -516,7 +517,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showCursor = switchView("Курсор автомобиля", profile.showCursor);
         Switch roadsOnly = switchView(
                 "Только дороги — прозрачный фон", profile.roadsOnly);
-        for (Switch control : new Switch[]{automaticDayNight, nightMode, showRoute,
+        for (Switch control : new Switch[]{showRoute,
                 showRouteTraffic, showTraffic, showTrafficLights,
                 showLabels, showPois, showBuildings,
                 showParks, showWater,
@@ -588,8 +589,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.focusYPercent = focusY.intValue();
                         profile.mapScalePercent = mapScale.intValue();
                         profile.maximumFps = maximumFps.intValue();
-                        profile.automaticDayNight = automaticDayNight.isChecked();
-                        profile.nightMode = nightMode.isChecked();
+                        applyDayNight(dayNight, profile);
                         profile.showRoute = showRoute.isChecked();
                         profile.showRouteTraffic = showRouteTraffic.isChecked();
                         profile.showTraffic = showTraffic.isChecked();
@@ -731,16 +731,16 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 map.mapScalePercent, 50, 300, 5, " %");
         SliderField maximumFps = slider(form, "Плавность основной карты",
                 map.maximumFps, 5, 60, 1, " кадр/с");
-        Switch automaticDayNight = switchView("Автоматический день / ночь",
-                map.automaticDayNight);
-        Switch nightMode = switchView("Принудительно ночной режим", map.nightMode);
+        Spinner dayNight = dayNightSpinner(map.automaticDayNight, map.nightMode);
+        form.addView(label("Оформление день / ночь"), marginTop(8));
+        form.addView(dayNight);
         Switch showLabels = switchView("Подписи", map.showLabels);
         Switch showPois = switchView("Полезные места", map.showPois);
         Switch showBuildings = switchView("Здания", map.showBuildings);
         Switch showParks = switchView("Парки", map.showParks);
         Switch showWater = switchView("Вода", map.showWater);
         Switch showModels = switchView("3D-модели", map.showModels);
-        for (Switch control : new Switch[]{automaticDayNight, nightMode, showLabels,
+        for (Switch control : new Switch[]{showLabels,
                 showPois, showBuildings, showParks, showWater, showModels}) {
             form.addView(control, marginTop(4));
         }
@@ -820,8 +820,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         map.focusYPercent = focusY.intValue();
                         map.mapScalePercent = mapScale.intValue();
                         map.maximumFps = maximumFps.intValue();
-                        map.automaticDayNight = automaticDayNight.isChecked();
-                        map.nightMode = nightMode.isChecked();
+                        applyDayNight(dayNight, map);
                         map.showLabels = showLabels.isChecked();
                         map.showPois = showPois.isChecked();
                         map.showBuildings = showBuildings.isChecked();
@@ -1838,6 +1837,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             return (int) Math.round(value());
         }
 
+        void setValue(double value) {
+            int progress = (int) Math.round((value - minimum) / step);
+            control.setProgress(Math.max(0, Math.min(control.getMax(), progress)));
+            updateLabel();
+        }
+
         void updateLabel() {
             double current = value();
             String rendered;
@@ -1881,6 +1886,61 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         }
         result.setSelection(selected);
         return result;
+    }
+
+    /** Three visual starting points; every value remains independently adjustable afterwards. */
+    private void addNavigationCameraPresets(@NonNull LinearLayout parent,
+                                            @NonNull Spinner cameraMode,
+                                            @NonNull SliderField zoom,
+                                            @NonNull SliderField tilt,
+                                            @NonNull SliderField focusX,
+                                            @NonNull SliderField focusY) {
+        parent.addView(label("Быстрые варианты камеры"), marginTop(8));
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        Button top = button("2D сверху");
+        top.setOnClickListener(view -> {
+            cameraMode.setSelection(1);
+            zoom.setValue(0);
+            tilt.setValue(0);
+            focusX.setValue(50);
+            focusY.setValue(55);
+        });
+        Button city = button("3D город");
+        city.setOnClickListener(view -> {
+            cameraMode.setSelection(0);
+            zoom.setValue(0);
+            tilt.setValue(55);
+            focusX.setValue(50);
+            focusY.setValue(70);
+        });
+        Button highway = button("3D трасса");
+        highway.setOnClickListener(view -> {
+            cameraMode.setSelection(0);
+            zoom.setValue(-1);
+            tilt.setValue(68);
+            focusX.setValue(50);
+            focusY.setValue(76);
+        });
+        for (Button control : new Button[]{top, city, highway}) {
+            row.addView(control, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        parent.addView(row);
+    }
+
+    private Spinner dayNightSpinner(boolean automatic, boolean night) {
+        Spinner result = spinner(new String[]{"Автоматически", "Всегда день", "Всегда ночь"},
+                "");
+        result.setSelection(automatic ? 0 : night ? 2 : 1);
+        return result;
+    }
+
+    private static void applyDayNight(@NonNull Spinner control,
+                                      @NonNull NavigationIntegrationConfig.MapProfile map) {
+        int selection = control.getSelectedItemPosition();
+        map.automaticDayNight = selection == 0;
+        map.nightMode = selection == 2;
     }
 
     @NonNull
