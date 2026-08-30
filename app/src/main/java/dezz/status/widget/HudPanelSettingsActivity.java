@@ -503,6 +503,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         form.addView(label("Оформление день / ночь"), marginTop(8));
         form.addView(dayNight);
         Switch showRoute = switchView("Маршрут", profile.showRoute);
+        Switch destination = switchView(
+                "Конечная точка маршрута", profile.showDestination);
         Switch showRouteTraffic = switchView(
                 "Пробки на линии маршрута", profile.showRouteTraffic);
         Switch showTraffic = switchView("Пробки на остальных дорогах", profile.showTraffic);
@@ -519,7 +521,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showCursor = switchView("Курсор автомобиля", profile.showCursor);
         Switch roadsOnly = switchView(
                 "Только дороги — прозрачный фон", profile.roadsOnly);
-        for (Switch control : new Switch[]{showRoute,
+        for (Switch control : new Switch[]{showRoute, destination,
                 showRouteTraffic, showTraffic, showTrafficLights,
                 showLaneGuidance,
                 showLabels, showPois, showBuildings,
@@ -604,6 +606,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.maximumFps = maximumFps.intValue();
                         applyDayNight(dayNight, profile);
                         profile.showRoute = showRoute.isChecked();
+                        profile.showDestination = destination.isChecked();
                         profile.showRouteTraffic = showRouteTraffic.isChecked();
                         profile.showTraffic = showTraffic.isChecked();
                         profile.showTrafficLights = showTrafficLights.isChecked();
@@ -816,12 +819,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 resizeHandleVisible, closeButtonVisible}) {
             form.addView(control, marginTop(4));
         }
-        form.addView(text("Кнопка находится в штатной левой колонке Навигатора, как в "
-                + "референсе 29.4.2. В оконном режиме отдельная кнопка возврата остаётся "
-                + "поверх карты.", 12, 0xFFB8C0CC), marginTop(8));
-        form.addView(label("Угол кнопки возврата в оконном режиме"), marginTop(8));
-        Spinner buttonPosition = windowButtonPositionSpinner(window.modeButtonPosition);
-        form.addView(buttonPosition);
+        form.addView(text("Кнопка режима находится слева под штатными кнопками дорожного "
+                + "события и голосового помощника. Она появляется по касанию карты и "
+                + "скрывается вместе с ними в оконном и полноэкранном режимах.",
+                12, 0xFFB8C0CC), marginTop(8));
         SliderField buttonSize = slider(form, "Размер кнопки",
                 window.modeButtonSizeDp, 28, 96, 1, " dp");
         SliderField buttonOpacity = slider(form, "Непрозрачность кнопки",
@@ -864,8 +865,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         window.shadowRadiusDp = shadowRadius.intValue();
                         window.shadowColor = shadowColor.value;
                         window.modeButtonVisible = modeButtonVisible.isChecked();
-                        window.modeButtonPosition = windowButtonPositionValue(
-                                buttonPosition.getSelectedItemPosition());
                         window.dragHandleVisible = dragHandleVisible.isChecked();
                         window.resizeHandleVisible = resizeHandleVisible.isChecked();
                         window.closeButtonVisible = closeButtonVisible.isChecked();
@@ -2009,33 +2008,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             case 3: return "FREE";
             case 0:
             default: return "FOLLOW_ROUTE";
-        }
-    }
-
-    private Spinner windowButtonPositionSpinner(@NonNull String position) {
-        Spinner result = spinner(new String[]{
-                "Сверху слева", "Сверху справа", "Снизу слева", "Снизу справа"
-        }, "");
-        int selected;
-        switch (position) {
-            case "TOP_RIGHT": selected = 1; break;
-            case "BOTTOM_LEFT": selected = 2; break;
-            case "BOTTOM_RIGHT": selected = 3; break;
-            case "TOP_LEFT":
-            default: selected = 0; break;
-        }
-        result.setSelection(selected);
-        return result;
-    }
-
-    @NonNull
-    private static String windowButtonPositionValue(int position) {
-        switch (position) {
-            case 1: return "TOP_RIGHT";
-            case 2: return "BOTTOM_LEFT";
-            case 3: return "BOTTOM_RIGHT";
-            case 0:
-            default: return "TOP_LEFT";
         }
     }
 

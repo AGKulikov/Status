@@ -43,6 +43,7 @@ final class NavigationMapProfile {
     boolean showWater = true;
     boolean showModels;
     boolean showRoute = true;
+    boolean showDestination = true;
     boolean showRouteTraffic = true;
     boolean showTraffic = true;
     /** Independent custom collection; unrelated to background traffic and route jams. */
@@ -100,6 +101,7 @@ final class NavigationMapProfile {
             result.showWater = source.optBoolean("showWater", true);
             result.showModels = source.optBoolean("showModels", false);
             result.showRoute = source.optBoolean("showRoute", true);
+            result.showDestination = source.optBoolean("showDestination", true);
             result.showTraffic = source.optBoolean("showTraffic", true);
             // Old configurations had one switch for both layers. Preserve that behaviour until
             // Natro sends the new independent route-traffic value.

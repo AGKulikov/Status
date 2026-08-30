@@ -361,6 +361,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(label("Оформление день / ночь"), marginTop(6));
         content.addView(dayNight);
         Switch route = switchView("Маршрут", map.showRoute);
+        Switch destination = switchView(
+                "Конечная точка маршрута", map.showDestination);
         Switch routeTraffic = switchView("Пробки на линии маршрута", map.showRouteTraffic);
         Switch traffic = switchView("Пробки на остальных дорогах", map.showTraffic);
         Switch trafficLights = switchView(
@@ -376,6 +378,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch cursor = switchView("Курсор автомобиля", map.showCursor);
         Switch roadsOnly = switchView("Только дороги — прозрачный фон", map.roadsOnly);
         content.addView(route);
+        content.addView(destination);
         content.addView(traffic);
         content.addView(routeTraffic);
         content.addView(trafficLights);
@@ -450,6 +453,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.maximumFps = maximumFps.intValue();
                     applyDayNight(dayNight, map);
                     map.showRoute = route.isChecked();
+                    map.showDestination = destination.isChecked();
                     map.showTraffic = traffic.isChecked();
                     map.showRouteTraffic = routeTraffic.isChecked();
                     map.showTrafficLights = trafficLights.isChecked();

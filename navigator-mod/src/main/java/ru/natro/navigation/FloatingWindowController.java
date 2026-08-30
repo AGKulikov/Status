@@ -20,6 +20,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.WindowInsets;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
@@ -77,6 +78,8 @@ final class FloatingWindowController {
     private TextView dragHandle;
     private TextView resizeHandle;
     private ViewGroup modeButtonHost;
+    private View modeButtonAnchor;
+    private View insetDispatchHost;
     private Drawable floatingBackground;
     private Drawable floatingFrame;
     private View contentRoot;
@@ -97,6 +100,24 @@ final class FloatingWindowController {
     private int roundedOutlineWidth = -1;
     private int roundedOutlineHeight = -1;
     private int roundedOutlineRadius = -1;
+    private final View.OnApplyWindowInsetsListener modeAwareInsetsListener =
+            new View.OnApplyWindowInsetsListener() {
+                @Override public WindowInsets onApplyWindowInsets(
+                        View view, WindowInsets insets) {
+                    if (!floating || Build.VERSION.SDK_INT < 20) {
+                        return view.onApplyWindowInsets(insets);
+                    }
+                    // A bounded Navigator window has no status bar inside its own map viewport.
+                    // Keep left/right/bottom safe areas intact, but do not make Navigator reserve
+                    // the head unit's global status-bar height a second time.
+                    WindowInsets adjusted = insets.replaceSystemWindowInsets(
+                            insets.getSystemWindowInsetLeft(),
+                            0,
+                            insets.getSystemWindowInsetRight(),
+                            insets.getSystemWindowInsetBottom());
+                    return view.onApplyWindowInsets(adjusted);
+                }
+            };
     private final ViewOutlineProvider roundedOutlineProvider = new ViewOutlineProvider() {
         @Override public void getOutline(View view, Outline outline) {
             int radius = Math.max(0, Math.round(profile.cornerRadiusDp
@@ -173,14 +194,12 @@ final class FloatingWindowController {
         modeButton.setTypeface(Typeface.DEFAULT_BOLD);
         modeButton.setOnClickListener(view -> restartInMode(true, null));
 
-        // In 29.4.2 the return control belongs to the floating header itself.  Reusing the
-        // full-screen button leaves it under Navigator's hidden voice-search hierarchy and makes
-        // the window impossible to expand again.
+        // Both directions live in Navigator's own left vanishing-controls column. The native
+        // ancestor then owns tap-to-reveal and auto-hide in full-screen and floating modes alike.
         floatingModeButton = control("◱", "Развернуть Навигатор на весь экран");
         floatingModeButton.setTextSize(32f);
         floatingModeButton.setTypeface(Typeface.DEFAULT_BOLD);
         floatingModeButton.setOnClickListener(view -> restartInMode(false, null));
-        controlLayer.addView(floatingModeButton);
         mainHandler.post(modeButtonPoller);
         updateControls();
     }
@@ -280,41 +299,61 @@ final class FloatingWindowController {
         return decor instanceof ViewGroup ? (ViewGroup) decor : null;
     }
 
-    /** The 29.4.2 button lives in the row containing Navigator's voice-search control. */
+    /** Left temporary column: road event, voice assistant, then Natro's mode button. */
     private ViewGroup findNavigatorButtonHost() {
         String[] anchorNames = {
                 "navi_service_open_voice_search",
                 "guidance_open_voice_search"
         };
-        for (String name : anchorNames) {
+        String[] roadEventNames = {
+                "navi_service_add_road_event",
+                "guidance_add_road_event"
+        };
+        for (int index = 0; index < anchorNames.length; index++) {
+            String name = anchorNames[index];
             int id = activity.getResources().getIdentifier(name, "id", activity.getPackageName());
             View anchor = id == 0 ? null : activity.findViewById(id);
             if (anchor == null || !(anchor.getParent() instanceof ViewGroup)) continue;
             ViewGroup parent = (ViewGroup) anchor.getParent();
-            if (parent.getVisibility() == View.VISIBLE) return parent;
+            if (!(parent instanceof LinearLayout)
+                    || ((LinearLayout) parent).getOrientation() != LinearLayout.VERTICAL) {
+                continue;
+            }
+            int roadId = activity.getResources().getIdentifier(
+                    roadEventNames[index], "id", activity.getPackageName());
+            View roadEvent = roadId == 0 ? null : activity.findViewById(roadId);
+            if (roadEvent != null && roadEvent.getParent() != parent) continue;
+            modeButtonAnchor = anchor;
+            return parent;
         }
+        modeButtonAnchor = null;
         return null;
     }
 
     private void attachModeButtonToNavigator() {
-        if (destroyed || modeButton == null) return;
-        if (floating) {
-            detachModeButtonFromNavigator();
-            updateModeButtons();
-            return;
+        if (destroyed || modeButton == null || floatingModeButton == null) return;
+        TextView active = floating ? floatingModeButton : modeButton;
+        TextView inactive = floating ? modeButton : floatingModeButton;
+        if (inactive.getParent() instanceof ViewGroup) {
+            ((ViewGroup) inactive.getParent()).removeView(inactive);
         }
         ViewGroup host = findNavigatorButtonHost();
-        if (host != null && host != modeButtonHost) {
-            if (modeButton.getParent() instanceof ViewGroup) {
-                ((ViewGroup) modeButton.getParent()).removeView(modeButton);
+        if (host != null && (host != modeButtonHost || active.getParent() != host)) {
+            if (active.getParent() instanceof ViewGroup) {
+                ((ViewGroup) active.getParent()).removeView(active);
             }
             int size = dp(profile.modeButtonSizeDp);
+            int insertion = modeButtonAnchor == null
+                    ? host.getChildCount() : host.indexOfChild(modeButtonAnchor) + 1;
+            if (insertion < 0 || insertion > host.getChildCount()) {
+                insertion = host.getChildCount();
+            }
             if (host instanceof LinearLayout) {
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
-                params.setMargins(dp(4), 0, 0, dp(9));
-                host.addView(modeButton, 0, params);
+                params.setMargins(0, dp(4), 0, dp(9));
+                host.addView(active, insertion, params);
             } else {
-                host.addView(modeButton, 0, new ViewGroup.LayoutParams(size, size));
+                host.addView(active, insertion, new ViewGroup.LayoutParams(size, size));
             }
             host.setClipChildren(false);
             host.setClipToPadding(false);
@@ -332,7 +371,11 @@ final class FloatingWindowController {
         if (modeButton != null && modeButton.getParent() instanceof ViewGroup) {
             ((ViewGroup) modeButton.getParent()).removeView(modeButton);
         }
+        if (floatingModeButton != null && floatingModeButton.getParent() instanceof ViewGroup) {
+            ((ViewGroup) floatingModeButton.getParent()).removeView(floatingModeButton);
+        }
         modeButtonHost = null;
+        modeButtonAnchor = null;
     }
 
     private final Runnable modeButtonPoller = new Runnable() {
@@ -340,11 +383,12 @@ final class FloatingWindowController {
             if (floating) enforceFloatingWindowContract();
             attachModeButtonToNavigator();
             if (destroyed) return;
-            boolean stableFullscreenHost = !floating && modeButton != null
-                    && modeButtonHost != null && modeButton.getParent() == modeButtonHost
+            TextView active = floating ? floatingModeButton : modeButton;
+            boolean stableNavigatorHost = active != null && modeButtonHost != null
+                    && active.getParent() == modeButtonHost
                     && modeButtonHost.isAttachedToWindow();
             long delay = floating ? FLOATING_CONTRACT_CHECK_MS
-                    : stableFullscreenHost ? MODE_BUTTON_STABLE_MS : MODE_BUTTON_SEARCH_MS;
+                    : stableNavigatorHost ? MODE_BUTTON_STABLE_MS : MODE_BUTTON_SEARCH_MS;
             mainHandler.postDelayed(this, delay);
         }
     };
@@ -353,6 +397,10 @@ final class FloatingWindowController {
         destroyed = true;
         mainHandler.removeCallbacks(modeButtonPoller);
         window.getDecorView().removeCallbacks(floatingSurfaceCommitter);
+        if (Build.VERSION.SDK_INT >= 20 && insetDispatchHost != null) {
+            insetDispatchHost.setOnApplyWindowInsetsListener(null);
+            insetDispatchHost = null;
+        }
         detachModeButtonFromNavigator();
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
         if (parent != null) parent.removeView(controlLayer);
@@ -441,6 +489,7 @@ final class FloatingWindowController {
         decor.setSystemUiVisibility(originalSystemUi);
         window.setStatusBarColor(originalStatusBarColor);
         window.setNavigationBarColor(originalNavigationBarColor);
+        requestNavigatorInsets();
         restoreTransparentLayers();
         updateControls();
     }
@@ -467,6 +516,8 @@ final class FloatingWindowController {
         window.setBackgroundDrawable(floatingBackground);
         decor.setBackground(floatingBackground);
         captureTransparentLayers(decor);
+        installModeAwareInsetDispatch();
+        requestNavigatorInsets();
         enforceTransparentLayers();
         window.setStatusBarColor(Color.TRANSPARENT);
 
@@ -533,6 +584,25 @@ final class FloatingWindowController {
         if (mapRoot != null) mapRoot.setBackground(originalMapRootBackground);
         if (mapWithControls != null) {
             mapWithControls.setBackground(originalMapWithControlsBackground);
+        }
+    }
+
+    /** Makes only the bounded window ignore the head unit's global status-bar top inset. */
+    private void installModeAwareInsetDispatch() {
+        if (Build.VERSION.SDK_INT < 20) return;
+        View host = contentRoot;
+        if (host == null) host = window.getDecorView().findViewById(android.R.id.content);
+        if (host == null || host == insetDispatchHost) return;
+        if (insetDispatchHost != null) {
+            insetDispatchHost.setOnApplyWindowInsetsListener(null);
+        }
+        insetDispatchHost = host;
+        insetDispatchHost.setOnApplyWindowInsetsListener(modeAwareInsetsListener);
+    }
+
+    private void requestNavigatorInsets() {
+        if (Build.VERSION.SDK_INT >= 20 && insetDispatchHost != null) {
+            insetDispatchHost.requestApplyInsets();
         }
     }
 
@@ -625,6 +695,7 @@ final class FloatingWindowController {
         if (decor.getSystemUiVisibility() != View.SYSTEM_UI_FLAG_VISIBLE) {
             decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
         }
+        installModeAwareInsetDispatch();
         enforceTransparentLayers();
         if (controlLayer != null && floatingFrame != null
                 && controlLayer.getBackground() != floatingFrame) {
@@ -667,56 +738,33 @@ final class FloatingWindowController {
         closeButton.setVisibility(floating && profile.closeButtonVisible
                 ? View.VISIBLE : View.GONE);
 
-        FrameLayout.LayoutParams floatingMode = new FrameLayout.LayoutParams(
-                dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp),
-                floatingModeButtonGravity());
-        int modeMargin = dp(8);
-        if (profile.modeButtonPosition.startsWith("TOP")) {
-            floatingMode.topMargin = modeMargin;
-        } else {
-            floatingMode.bottomMargin = modeMargin;
-        }
-        if (profile.modeButtonPosition.endsWith("LEFT")) {
-            floatingMode.leftMargin = modeMargin;
-            if (profile.closeButtonVisible && profile.modeButtonPosition.startsWith("TOP")) {
-                floatingMode.leftMargin += handle + modeMargin;
-            }
-        } else {
-            floatingMode.rightMargin = modeMargin;
-            if (profile.resizeHandleVisible && !profile.resizeLocked
-                    && profile.modeButtonPosition.startsWith("BOTTOM")) {
-                floatingMode.rightMargin += handle + modeMargin;
-            }
-        }
-        floatingModeButton.setLayoutParams(floatingMode);
-
-        updateModeButtons();
-    }
-
-    private int floatingModeButtonGravity() {
-        int vertical = profile.modeButtonPosition.startsWith("BOTTOM")
-                ? Gravity.BOTTOM : Gravity.TOP;
-        int horizontal = profile.modeButtonPosition.endsWith("RIGHT")
-                ? Gravity.END : Gravity.START;
-        return vertical | horizontal;
+        attachModeButtonToNavigator();
     }
 
     private void updateModeButtons() {
         if (modeButton == null || floatingModeButton == null) return;
-        ViewGroup.LayoutParams params = modeButton.getLayoutParams();
+        updateModeButtonSize(modeButton);
+        updateModeButtonSize(floatingModeButton);
+        float alpha = profile.modeButtonOpacityPercent / 100f;
+        modeButton.setAlpha(alpha);
+        floatingModeButton.setAlpha(alpha);
+        modeButton.setText("◲");
+        modeButton.setContentDescription("Открыть Навигатор в окне");
+        floatingModeButton.setText("◱");
+        floatingModeButton.setContentDescription("Развернуть Навигатор на весь экран");
+        modeButton.setVisibility(!floating && profile.enabled && profile.modeButtonVisible
+                ? View.VISIBLE : View.GONE);
+        floatingModeButton.setVisibility(floating && profile.enabled
+                && profile.modeButtonVisible ? View.VISIBLE : View.GONE);
+    }
+
+    private void updateModeButtonSize(TextView button) {
+        ViewGroup.LayoutParams params = button.getLayoutParams();
         if (params != null) {
             params.width = dp(profile.modeButtonSizeDp);
             params.height = dp(profile.modeButtonSizeDp);
-            modeButton.setLayoutParams(params);
+            button.setLayoutParams(params);
         }
-        modeButton.setAlpha(profile.modeButtonOpacityPercent / 100f);
-        modeButton.setVisibility(!floating && profile.enabled && profile.modeButtonVisible
-                ? View.VISIBLE : View.GONE);
-        modeButton.setText("◲");
-        modeButton.setContentDescription("Открыть Навигатор в окне");
-        floatingModeButton.setAlpha(profile.modeButtonOpacityPercent / 100f);
-        floatingModeButton.setVisibility(floating && profile.enabled
-                && profile.modeButtonVisible ? View.VISIBLE : View.GONE);
     }
 
     private TextView control(String text, String description) {

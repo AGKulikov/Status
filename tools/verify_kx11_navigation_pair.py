@@ -16,8 +16,8 @@ import zipfile
 
 KX11_ANDROID_API = 28
 NATRO_PACKAGE = "ru.natro.statuswidget"
-NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.5")
-NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021288")
+NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.6")
+NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021289")
 NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi"
 NAVIGATOR_VERSION_CODE = "739564630"
 NAVIGATOR_BASELINE_SHA256 = (
@@ -226,6 +226,7 @@ def verify_natro(aapt: Path, apksigner: Path, zipalign: Path, apk: Path) -> str:
         b"roadsOnly",
         b"showTrafficLights",
         b"showLaneGuidance",
+        b"showDestination",
         "Карточка ближайшего манёвра".encode("utf-8"),
     ))
     verify_zipalign(zipalign, apk)
@@ -308,6 +309,7 @@ def verify_navigator(
         b"route-matched road-events layer attached",
         b"showTrafficLights",
         b"showLaneGuidance",
+        b"showDestination",
         b"background MapKit lease active",
     ):
         if marker not in classes19:

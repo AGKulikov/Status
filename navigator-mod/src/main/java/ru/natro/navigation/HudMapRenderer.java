@@ -3,6 +3,11 @@ package ru.natro.navigation;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PointF;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.Surface;
@@ -63,6 +68,10 @@ final class HudMapRenderer {
     private Object guidanceCamera;
     private Object routeCollection;
     private Object routePolyline;
+    private Object routeDestinationPlacemark;
+    private Object destinationIconStyle;
+    private Object destinationImageProvider;
+    private Bitmap destinationIconBitmap;
     private Object activeRoute;
     private long activeRouteEpoch = -1L;
     private long activeJamFingerprint;
@@ -636,23 +645,114 @@ final class HudMapRenderer {
             }
             invoke(collection, "clear", new Class<?>[0]);
             routePolyline = null;
+            routeDestinationPlacemark = null;
             Object route = activeRoute;
-            if (!profile.showRoute || route == null) return;
+            if (route == null || (!profile.showRoute && !profile.showDestination)) return;
             RouteSlice slice = remainingRoute(route);
             if (slice == null) return;
-            Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
-            Object line = invoke(collection, "addPolyline",
-                    new Class<?>[]{polylineClass}, slice.geometry);
-            routePolyline = line;
             renderedRouteSegmentIndex = slice.firstSegmentIndex;
             renderedRouteSegmentPosition = slice.segmentPosition;
             renderedRouteSegmentCount = slice.segmentCount;
-            RoutePolylineStyler.apply(line, activeJamStyle, profile,
-                    slice.firstSegmentIndex, slice.segmentCount, routeColorScratch);
+            if (profile.showRoute) {
+                Class<?> polylineClass = Class.forName(
+                        "com.yandex.mapkit.geometry.Polyline");
+                Object line = invoke(collection, "addPolyline",
+                        new Class<?>[]{polylineClass}, slice.geometry);
+                routePolyline = line;
+                RoutePolylineStyler.apply(line, activeJamStyle, profile,
+                        slice.firstSegmentIndex, slice.segmentCount, routeColorScratch);
+            }
+            if (profile.showDestination && slice.destinationPoint != null) {
+                addDestinationMarker(collection, slice.destinationPoint);
+            }
             lastRouteGeometryElapsedMs = SystemClock.elapsedRealtime();
         } catch (Throwable failure) {
             Log.w(TAG, "Active route could not be rendered in the HUD MapWindow", failure);
         }
+    }
+
+    /** One immutable icon and the route's already-read last point; no extra Guidance polling. */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void addDestinationMarker(Object collection, Object point) throws Exception {
+        Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
+        Object placemark = invoke(collection, "addPlacemark",
+                new Class<?>[]{pointClass}, point);
+        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+        Object style = destinationIconStyle;
+        if (style == null) {
+            Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
+            style = styleClass.getConstructor().newInstance();
+            Object rotation = Enum.valueOf(
+                    (Class<? extends Enum>) rotationClass, "NO_ROTATION");
+            invoke(style, "setAnchor", new Class<?>[]{PointF.class},
+                    new PointF(0.5f, 0.96f));
+            invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
+            invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
+            invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
+            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(38f));
+            destinationIconStyle = style;
+        }
+        Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
+        Object provider = destinationImageProvider;
+        if (provider == null) {
+            Bitmap bitmap = createDestinationBitmap();
+            provider = providerClass.getMethod("fromBitmap", Bitmap.class)
+                    .invoke(null, bitmap);
+            destinationIconBitmap = bitmap;
+            destinationImageProvider = provider;
+        }
+        invoke(placemark, "setIcon", new Class<?>[]{providerClass, styleClass},
+                provider, style);
+        invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
+        routeDestinationPlacemark = placemark;
+    }
+
+    /** Compact neutral endpoint pin, readable on both day and night map styles. */
+    private Bitmap createDestinationBitmap() {
+        float density = context.getResources().getDisplayMetrics().density;
+        int width = Math.max(40, Math.round(48f * density));
+        int height = Math.max(50, Math.round(58f * density));
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        float unit = width / 48f;
+        float centerX = width / 2f;
+
+        Path pin = new Path();
+        pin.moveTo(centerX, height - 2f * unit);
+        pin.cubicTo(centerX - 4f * unit, height - 12f * unit,
+                centerX - 18f * unit, 31f * unit, centerX - 18f * unit, 20f * unit);
+        pin.cubicTo(centerX - 18f * unit, 9f * unit,
+                centerX - 10f * unit, 2f * unit, centerX, 2f * unit);
+        pin.cubicTo(centerX + 10f * unit, 2f * unit,
+                centerX + 18f * unit, 9f * unit, centerX + 18f * unit, 20f * unit);
+        pin.cubicTo(centerX + 18f * unit, 31f * unit,
+                centerX + 4f * unit, height - 12f * unit, centerX, height - 2f * unit);
+        pin.close();
+
+        Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        shadow.setStyle(Paint.Style.FILL);
+        shadow.setColor(0x55313842);
+        canvas.save();
+        canvas.translate(0f, 2f * unit);
+        canvas.drawPath(pin, shadow);
+        canvas.restore();
+
+        Paint body = new Paint(Paint.ANTI_ALIAS_FLAG);
+        body.setStyle(Paint.Style.FILL);
+        body.setColor(0xFFE5E8EC);
+        canvas.drawPath(pin, body);
+        body.setStyle(Paint.Style.STROKE);
+        body.setStrokeWidth(2f * unit);
+        body.setColor(0xFF3B414B);
+        canvas.drawPath(pin, body);
+
+        Paint target = new Paint(Paint.ANTI_ALIAS_FLAG);
+        target.setStyle(Paint.Style.FILL);
+        target.setColor(0xFF555C67);
+        canvas.drawCircle(centerX, 20f * unit, 7f * unit, target);
+        target.setColor(0xFFF8F9FA);
+        canvas.drawCircle(centerX, 20f * unit, 3f * unit, target);
+        return bitmap;
     }
 
     /** Updates traffic colours in place so MapKit never presents a frame without the route. */
@@ -736,7 +836,7 @@ final class HudMapRenderer {
         Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
         Object geometry = polylineClass.getConstructor(List.class).newInstance(remaining);
         return new RouteSlice(geometry, segmentIndex, segmentPosition,
-                Math.max(0, remaining.size() - 1));
+                Math.max(0, remaining.size() - 1), points.get(points.size() - 1));
     }
 
     /** RoutePosition-only read; deliberately does not touch or copy the full route geometry. */
@@ -778,13 +878,15 @@ final class HudMapRenderer {
         final int firstSegmentIndex;
         final double segmentPosition;
         final int segmentCount;
+        final Object destinationPoint;
 
         RouteSlice(Object geometry, int firstSegmentIndex, double segmentPosition,
-                   int segmentCount) {
+                   int segmentCount, Object destinationPoint) {
             this.geometry = geometry;
             this.firstSegmentIndex = firstSegmentIndex;
             this.segmentPosition = segmentPosition;
             this.segmentCount = segmentCount;
+            this.destinationPoint = destinationPoint;
         }
     }
 
@@ -852,6 +954,7 @@ final class HudMapRenderer {
         laneGuidanceMapLayer.detachMap();
         routeCollection = null;
         routePolyline = null;
+        routeDestinationPlacemark = null;
         routeColorScratch.clear();
         renderedRouteSegmentIndex = 0;
         renderedRouteSegmentPosition = Double.NaN;

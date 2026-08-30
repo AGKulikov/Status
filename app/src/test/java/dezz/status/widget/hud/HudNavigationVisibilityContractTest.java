@@ -54,12 +54,17 @@ public final class HudNavigationVisibilityContractTest {
         assertTrue(clusterSettings.contains("map.showTrafficLights"));
         assertTrue(hudSettings.contains("profile.showLaneGuidance"));
         assertTrue(clusterSettings.contains("map.showLaneGuidance"));
+        assertTrue(hudSettings.contains("profile.showDestination"));
+        assertTrue(clusterSettings.contains("map.showDestination"));
+        assertTrue(hudSettings.contains("Конечная точка маршрута"));
+        assertTrue(clusterSettings.contains("Конечная точка маршрута"));
         assertTrue(hudSettings.contains("Светофоры с отсчётом — отдельный слой"));
         assertTrue(clusterSettings.contains("Светофоры с отсчётом — отдельный слой"));
         assertTrue(hudSettings.contains("Подсказки по полосам — слой на маршруте"));
         assertTrue(clusterSettings.contains("Подсказки по полосам — слой на маршруте"));
         assertTrue(config.contains(".put(\"showTrafficLights\", showTrafficLights)"));
         assertTrue(config.contains(".put(\"showLaneGuidance\", showLaneGuidance)"));
+        assertTrue(config.contains(".put(\"showDestination\", showDestination)"));
         assertFalse(mainMap.contains("showTrafficLights"));
         assertFalse(mainMap.contains("showLaneGuidance"));
     }

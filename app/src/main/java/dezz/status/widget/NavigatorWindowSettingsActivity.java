@@ -6,11 +6,9 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,7 +52,6 @@ public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
     private SliderField shadowRadius;
     private SliderField buttonSize;
     private SliderField buttonOpacity;
-    private Spinner buttonPosition;
     private String borderColor;
     private String shadowColor;
 
@@ -137,9 +134,9 @@ public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
         page.addView(dragHandleVisible, topMargin(5));
         page.addView(resizeHandleVisible, topMargin(5));
         page.addView(closeButtonVisible, topMargin(5));
-        page.addView(label("Расположение кнопки возврата в полный экран"), topMargin(10));
-        buttonPosition = positionSpinner(window.modeButtonPosition);
-        page.addView(buttonPosition, matchWrap());
+        page.addView(hint("Кнопка режима находится слева под штатными кнопками дорожного "
+                + "события и голосового помощника. Она появляется по касанию карты и "
+                + "скрывается вместе с ними в обоих режимах."), topMargin(6));
         buttonSize = slider(page, "Размер кнопки", window.modeButtonSizeDp,
                 28, 96, " dp");
         buttonOpacity = slider(page, "Непрозрачность кнопки",
@@ -187,7 +184,6 @@ public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
         window.dragHandleVisible = dragHandleVisible.isChecked();
         window.resizeHandleVisible = resizeHandleVisible.isChecked();
         window.closeButtonVisible = closeButtonVisible.isChecked();
-        window.modeButtonPosition = positionValue(buttonPosition.getSelectedItemPosition());
         window.modeButtonSizeDp = buttonSize.value();
         window.modeButtonOpacityPercent = buttonOpacity.value();
         navigation.normalize();
@@ -256,27 +252,6 @@ public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
         host.addView(caption, topMargin(9));
         host.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
         return new SliderField(current);
-    }
-
-    @NonNull
-    private Spinner positionSpinner(@Nullable String value) {
-        Spinner spinner = new Spinner(this);
-        String[] labels = {"Сверху слева", "Сверху справа",
-                "Снизу слева", "Снизу справа"};
-        spinner.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, labels));
-        if ("TOP_RIGHT".equals(value)) spinner.setSelection(1);
-        else if ("BOTTOM_LEFT".equals(value)) spinner.setSelection(2);
-        else if ("BOTTOM_RIGHT".equals(value)) spinner.setSelection(3);
-        return spinner;
-    }
-
-    @NonNull
-    private static String positionValue(int position) {
-        if (position == 1) return "TOP_RIGHT";
-        if (position == 2) return "BOTTOM_LEFT";
-        if (position == 3) return "BOTTOM_RIGHT";
-        return "TOP_LEFT";
     }
 
     @NonNull
