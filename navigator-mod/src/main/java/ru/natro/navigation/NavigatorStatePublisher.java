@@ -17,6 +17,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -88,6 +89,8 @@ final class NavigatorStatePublisher {
         final long cameraDirectionsSampleElapsedMs;
         final LaneGuidanceFrame laneGuidance;
         final long laneGuidanceSampleElapsedMs;
+        final List<RouteStreetLabelFrame> routeStreetLabels;
+        final long routeStreetLabelsSampleElapsedMs;
 
         NavigationFrame(double latitude, double longitude, double bearingDegrees,
                         double speedKmh, boolean routeActive,
@@ -96,7 +99,8 @@ final class NavigatorStatePublisher {
             this(latitude, longitude, bearingDegrees, speedKmh, routeActive,
                     routeProgressValid, routeSegmentIndex, routeSegmentPosition,
                     currentRoutePoint, Collections.emptyList(), 0L,
-                    Collections.emptyList(), 0L, null, 0L);
+                    Collections.emptyList(), 0L, null, 0L,
+                    Collections.emptyList(), 0L);
         }
 
         NavigationFrame(double latitude, double longitude, double bearingDegrees,
@@ -108,7 +112,9 @@ final class NavigatorStatePublisher {
                         List<CameraDirectionFrame> cameraDirections,
                         long cameraDirectionsSampleElapsedMs,
                         LaneGuidanceFrame laneGuidance,
-                        long laneGuidanceSampleElapsedMs) {
+                        long laneGuidanceSampleElapsedMs,
+                        List<RouteStreetLabelFrame> routeStreetLabels,
+                        long routeStreetLabelsSampleElapsedMs) {
             this.latitude = latitude;
             this.longitude = longitude;
             this.bearingDegrees = finite(bearingDegrees) ? bearingDegrees : 0d;
@@ -127,6 +133,10 @@ final class NavigatorStatePublisher {
                     Math.max(0L, cameraDirectionsSampleElapsedMs);
             this.laneGuidance = laneGuidance;
             this.laneGuidanceSampleElapsedMs = Math.max(0L, laneGuidanceSampleElapsedMs);
+            this.routeStreetLabels = routeStreetLabels == null
+                    ? Collections.emptyList() : routeStreetLabels;
+            this.routeStreetLabelsSampleElapsedMs =
+                    Math.max(0L, routeStreetLabelsSampleElapsedMs);
         }
 
         NavigationFrame withMapOverlays(List<TrafficLightFrame> trafficLightValues,
@@ -140,13 +150,45 @@ final class NavigatorStatePublisher {
                     routeSegmentPosition, currentRoutePoint,
                     trafficLightValues, trafficLightsSampledAt,
                     cameraDirectionValues, cameraDirectionsSampledAt,
-                    laneGuidanceValue, laneGuidanceSampledAt);
+                    laneGuidanceValue, laneGuidanceSampledAt,
+                    routeStreetLabels, routeStreetLabelsSampleElapsedMs);
+        }
+
+        NavigationFrame withRouteStreetLabels(List<RouteStreetLabelFrame> labels,
+                                              long sampledAt) {
+            return new NavigationFrame(latitude, longitude, bearingDegrees, speedKmh,
+                    routeActive, routeProgressValid, routeSegmentIndex,
+                    routeSegmentPosition, currentRoutePoint,
+                    trafficLights, trafficLightsSampleElapsedMs,
+                    cameraDirections, cameraDirectionsSampleElapsedMs,
+                    laneGuidance, laneGuidanceSampleElapsedMs, labels, sampledAt);
         }
 
         boolean isValid() {
             return finite(latitude) && finite(longitude)
                     && latitude >= -90d && latitude <= 90d
                     && longitude >= -180d && longitude <= 180d;
+        }
+    }
+
+    /** A name supplied by Guidance and anchored to a verified position on the active route. */
+    static final class RouteStreetLabelFrame {
+        final String id;
+        final String text;
+        final double latitude;
+        final double longitude;
+
+        RouteStreetLabelFrame(String id, String text, double latitude, double longitude) {
+            this.id = id == null ? "" : id;
+            this.text = text == null ? "" : text;
+            this.latitude = latitude;
+            this.longitude = longitude;
+        }
+
+        boolean hasContent() {
+            return !id.isEmpty() && !text.isEmpty()
+                    && finite(latitude) && latitude >= -90d && latitude <= 90d
+                    && finite(longitude) && longitude >= -180d && longitude <= 180d;
         }
     }
 
@@ -277,14 +319,19 @@ final class NavigatorStatePublisher {
     private static final long SNAPSHOT_INTERVAL_MS = 100L;
     /** Signal phases change at one-second resolution; 2 Hz is ample and halves reflection work. */
     private static final long TRAFFIC_LIGHT_INTERVAL_MS = 500L;
+    /** Street names change slowly; one verified route scan per second avoids needless reflection. */
+    private static final long ROUTE_STREET_LABEL_INTERVAL_MS = 1_000L;
     /** MapKit defaults vary by host; request enough upcoming lights for both independent maps. */
     private static final int MAX_UPCOMING_TRAFFIC_LIGHTS = 8;
     /** Windshield returns only cameras which are active for the current route direction. */
     private static final int MAX_ACTIVE_SPEED_CAMERAS = 8;
     private static final int MAX_MAP_LANES = 8;
+    private static final int MAX_ROUTE_STREET_LABELS = 6;
     private static final long MIN_RESOLVE_RETRY_MS = 250L;
     private static final long MAX_RESOLVE_RETRY_MS = 5_000L;
     private static final long ROUTE_RECONCILE_CONFIRM_MS = 250L;
+    /** Hold the last map-matched point across a short RoutePosition publication gap. */
+    private static final long ROUTE_MATCH_HOLD_MS = 2_500L;
     private static final int MAX_POLYLINE_POINTS = 16_000;
     private static final int MAX_ENCODED_POLYLINE_CHARS = 190_000;
     private static final int MAX_TRAFFIC_RUNS = 2_048;
@@ -330,7 +377,14 @@ final class NavigatorStatePublisher {
     private long activeCameraDirectionsSampleElapsedMs;
     private LaneState activeLaneState = LaneState.EMPTY;
     private long activeLaneSampleElapsedMs;
+    private List<RouteStreetLabelFrame> activeRouteStreetLabels = Collections.emptyList();
+    private long activeRouteStreetLabelsSampleElapsedMs;
+    private long lastRouteStreetLabelsReadElapsedMs;
     private long lastTrafficLightsReadElapsedMs;
+    private double lastRouteMatchedLatitude = Double.NaN;
+    private double lastRouteMatchedLongitude = Double.NaN;
+    private double lastRouteMatchedBearing = Double.NaN;
+    private long lastRouteMatchedElapsedMs;
     private Object conditionsRoute;
     private Object conditionsListener;
     private long resolveRetryMs = MIN_RESOLVE_RETRY_MS;
@@ -564,10 +618,23 @@ final class NavigatorStatePublisher {
                 if (activeRoute == null) {
                     activeLaneState = LaneState.EMPTY;
                     activeLaneSampleElapsedMs = 0L;
+                    activeRouteStreetLabels = Collections.emptyList();
+                    activeRouteStreetLabelsSampleElapsedMs = 0L;
+                    lastRouteStreetLabelsReadElapsedMs = elapsedNow;
                 } else {
                     activeLaneState = readLanes(inputs.routePosition,
                             inputs.frame.bearingDegrees);
                     activeLaneSampleElapsedMs = elapsedNow;
+                    boolean streetLabelsDue = routeChanged || forceRoute
+                            || elapsedNow - lastRouteStreetLabelsReadElapsedMs
+                            >= ROUTE_STREET_LABEL_INTERVAL_MS;
+                    if (streetLabelsDue) {
+                        activeRouteStreetLabels = Collections.unmodifiableList(
+                                readRouteStreetLabels(currentGuidance,
+                                        inputs.routePosition, inputs.frame));
+                        activeRouteStreetLabelsSampleElapsedMs = elapsedNow;
+                        lastRouteStreetLabelsReadElapsedMs = elapsedNow;
+                    }
                 }
                 boolean trafficSampleDue = routeChanged || forceRoute
                         || elapsedNow - lastTrafficLightsReadElapsedMs
@@ -592,7 +659,9 @@ final class NavigatorStatePublisher {
             NavigationFrame navigationFrame = inputs.frame.withMapOverlays(
                     activeTrafficLights, activeTrafficLightsSampleElapsedMs,
                     activeCameraDirections, activeCameraDirectionsSampleElapsedMs,
-                    activeLaneState.mapFrame, activeLaneSampleElapsedMs);
+                    activeLaneState.mapFrame, activeLaneSampleElapsedMs)
+                    .withRouteStreetLabels(activeRouteStreetLabels,
+                            activeRouteStreetLabelsSampleElapsedMs);
             String snapshot = snapshotDue
                     ? buildSnapshot(currentGuidance, activeRoute, inputs,
                             activeTrafficLights, activeLaneState).toString() : null;
@@ -610,6 +679,9 @@ final class NavigatorStatePublisher {
             activeCameraDirectionsSampleElapsedMs = 0L;
             activeLaneState = LaneState.EMPTY;
             activeLaneSampleElapsedMs = 0L;
+            activeRouteStreetLabels = Collections.emptyList();
+            activeRouteStreetLabelsSampleElapsedMs = 0L;
+            lastRouteStreetLabelsReadElapsedMs = 0L;
             lastTrafficLightsReadElapsedMs = 0L;
             naviKitGuidance = null;
             if (navigation != null) sink.onNavigationRuntime(null);
@@ -702,6 +774,7 @@ final class NavigatorStatePublisher {
         if (initial || changed) {
             cachedDestinationEpoch = Long.MIN_VALUE;
             cachedDestination = "";
+            clearRouteMatchedPosition();
         }
         if (initial || changed || activeRouteTotalDistanceMeters <= 0) {
             activeRouteTotalDistanceMeters = readRouteTotalDistance(nextRoute);
@@ -731,16 +804,63 @@ final class NavigatorStatePublisher {
             double speedMps = number(invoke(location, "getSpeed"), Double.NaN);
             if (finite(speedMps)) speedKmh = Math.max(0d, speedMps * 3.6d);
         }
-        if (!finite(bearing) && routePosition != null) {
-            bearing = number(invoke(routePosition, "heading"), Double.NaN);
-        }
-
         RouteProgressSample progress = readRouteProgress(route, routePosition);
+        // Guidance.getLocation() is raw GNSS and can temporarily jump onto a parallel street.
+        // The stock Navigator renders RoutePosition.getPoint(), which is map-matched to the active
+        // route. Give both independent maps that same canonical point and heading while guidance is
+        // active; raw GNSS remains the bounded fallback during a transient RoutePosition gap.
+        if (routePosition != null) {
+            try {
+                double routeBearing = number(invoke(routePosition, "heading"), Double.NaN);
+                if (finite(routeBearing)) bearing = routeBearing;
+            } catch (Throwable unavailable) {
+                // Some vendor builds omit heading(); position matching remains independently useful.
+            }
+        }
+        long nowElapsedMs = SystemClock.elapsedRealtime();
+        boolean matchedThisFrame = false;
+        if (route != null && routePosition != null) {
+            try {
+                // getPoint() exists even during the short interval in which DrivingRoute.getPosition()
+                // cannot yet be projected. Do not couple cursor matching to polyline trimming.
+                Object matchedPoint = invoke(routePosition, "getPoint");
+                double routeLatitude = number(
+                        invoke(matchedPoint, "getLatitude"), Double.NaN);
+                double routeLongitude = number(
+                        invoke(matchedPoint, "getLongitude"), Double.NaN);
+                if (finite(routeLatitude) && routeLatitude >= -90d && routeLatitude <= 90d
+                        && finite(routeLongitude) && routeLongitude >= -180d
+                        && routeLongitude <= 180d) {
+                    latitude = routeLatitude;
+                    longitude = routeLongitude;
+                    lastRouteMatchedLatitude = routeLatitude;
+                    lastRouteMatchedLongitude = routeLongitude;
+                    lastRouteMatchedBearing = bearing;
+                    lastRouteMatchedElapsedMs = nowElapsedMs;
+                    matchedThisFrame = true;
+                }
+            } catch (Throwable unavailable) {
+                // Fall through to the last fresh matched point, then finally raw GNSS.
+            }
+        }
+        if (!matchedThisFrame && route != null && lastRouteMatchedElapsedMs > 0L
+                && nowElapsedMs - lastRouteMatchedElapsedMs <= ROUTE_MATCH_HOLD_MS) {
+            latitude = lastRouteMatchedLatitude;
+            longitude = lastRouteMatchedLongitude;
+            if (finite(lastRouteMatchedBearing)) bearing = lastRouteMatchedBearing;
+        }
         NavigationFrame frame = new NavigationFrame(
                 latitude, longitude, bearing, speedKmh, route != null,
                 progress.valid, progress.segmentIndex, progress.segmentPosition,
                 progress.currentPoint);
         return new SnapshotInputs(frame, routePosition);
+    }
+
+    private void clearRouteMatchedPosition() {
+        lastRouteMatchedLatitude = Double.NaN;
+        lastRouteMatchedLongitude = Double.NaN;
+        lastRouteMatchedBearing = Double.NaN;
+        lastRouteMatchedElapsedMs = 0L;
     }
 
     private static RouteProgressSample readRouteProgress(Object route, Object routePosition) {
@@ -845,6 +965,80 @@ final class NavigatorStatePublisher {
         String subtext = title.equals(toponym) ? "" : toponym;
         int distance = nonNegativeInt(distance(routePosition, position));
         return new Manoeuvre(type, title, subtext, distance);
+    }
+
+    /**
+     * Builds a small route-owned label set. Substrate labels are disabled by the map profile, so
+     * names from neighbouring streets can never enter this layer. The current Guidance road and
+     * upcoming manoeuvre toponyms are the only accepted sources.
+     */
+    private List<RouteStreetLabelFrame> readRouteStreetLabels(
+            Object currentGuidance, Object routePosition, NavigationFrame frame)
+            throws Exception {
+        ArrayList<RouteStreetLabelFrame> result = new ArrayList<>();
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+
+        try {
+            String currentStreet = text(invoke(currentGuidance, "getRoadName"));
+            double currentLatitude = frame.latitude;
+            double currentLongitude = frame.longitude;
+            Object currentPoint = frame.currentRoutePoint;
+            if (currentPoint != null) {
+                currentLatitude = number(invoke(currentPoint, "getLatitude"), currentLatitude);
+                currentLongitude = number(invoke(currentPoint, "getLongitude"), currentLongitude);
+            }
+            addRouteStreetLabel(result, seen,
+                    "route-street:" + routeEpoch + ":current", currentStreet,
+                    currentLatitude, currentLongitude);
+        } catch (Throwable unavailable) {
+            // Road-name support differs across automotive MapKit builds; upcoming names can remain.
+        }
+
+        List<?> manoeuvres;
+        try {
+            manoeuvres = windshield == null
+                    ? Collections.emptyList() : invokeList(windshield, "getManoeuvres");
+        } catch (Throwable unavailable) {
+            manoeuvres = Collections.emptyList();
+        }
+        for (Object upcoming : manoeuvres) {
+            if (result.size() >= MAX_ROUTE_STREET_LABELS) break;
+            try {
+                Object position = invoke(upcoming, "getPosition");
+                double ahead = routePosition == null ? 0d : distance(routePosition, position);
+                if (!finite(ahead) || ahead < -5d || ahead > 12_000d) continue;
+                Object annotation = invoke(upcoming, "getAnnotation");
+                if (annotation == null) continue;
+                // DescriptionText may be an instruction; Toponym is the verified street name.
+                String street = text(invoke(annotation, "getToponym"));
+                Object point = position == null ? null : invoke(position, "getPoint");
+                if (point == null) continue;
+                double latitude = number(invoke(point, "getLatitude"), Double.NaN);
+                double longitude = number(invoke(point, "getLongitude"), Double.NaN);
+                String id = "route-street:" + routeEpoch + ':'
+                        + Math.round(latitude * 100_000d) + ':'
+                        + Math.round(longitude * 100_000d);
+                addRouteStreetLabel(result, seen, id, street, latitude, longitude);
+            } catch (Throwable malformedItem) {
+                // One incomplete manoeuvre must not remove the other labels or guidance itself.
+            }
+        }
+        return result;
+    }
+
+    private static void addRouteStreetLabel(List<RouteStreetLabelFrame> result,
+                                            LinkedHashSet<String> seen,
+                                            String id, String rawText,
+                                            double latitude, double longitude) {
+        String value = rawText == null ? "" : rawText.trim();
+        if (value.isEmpty() || value.length() > 96 || !finite(latitude)
+                || latitude < -90d || latitude > 90d || !finite(longitude)
+                || longitude < -180d || longitude > 180d) return;
+        String key = value.toLowerCase(Locale.ROOT);
+        if (!seen.add(key)) return;
+        RouteStreetLabelFrame frame = new RouteStreetLabelFrame(id, value,
+                latitude, longitude);
+        if (frame.hasContent()) result.add(frame);
     }
 
     private String readDestination(Object route) {
@@ -1330,7 +1524,11 @@ final class NavigatorStatePublisher {
         activeCameraDirectionsSampleElapsedMs = 0L;
         activeLaneState = LaneState.EMPTY;
         activeLaneSampleElapsedMs = 0L;
+        activeRouteStreetLabels = Collections.emptyList();
+        activeRouteStreetLabelsSampleElapsedMs = 0L;
+        lastRouteStreetLabelsReadElapsedMs = 0L;
         lastTrafficLightsReadElapsedMs = 0L;
+        clearRouteMatchedPosition();
         activityReference = new WeakReference<>(null);
         pendingCamera = null;
         naviKitGuidance = null;

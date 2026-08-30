@@ -185,6 +185,8 @@ public final class NavigationIntegrationConfig {
         /** Upcoming lane sign anchored to its RoutePosition on the map. */
         public boolean showLaneGuidance = true;
         public boolean showLabels = true;
+        /** Hide substrate labels and draw only verified names attached to the active route. */
+        public boolean routeStreetLabelsOnly;
         public boolean showPois = true;
         public boolean showBuildings = true;
         public boolean showParks = true;
@@ -198,6 +200,8 @@ public final class NavigationIntegrationConfig {
         @NonNull public String cursorOutlineColor = "#FF17191E";
         @NonNull public String routeColor = "#FFFFC400";
         @NonNull public String routeOutlineColor = "#FF16181D";
+        /** Substrate road colour; route and traffic layers are rendered independently above it. */
+        @NonNull public String roadColor = "";
         public double routeWidth = 8d;
         public double routeOutlineWidth = 2d;
         @NonNull public String trafficFreeColor = "#FF39B54A";
@@ -225,10 +229,12 @@ public final class NavigationIntegrationConfig {
             result.enabled = true;
             result.maximumFps = target == Target.CLUSTER ? 60 : 30;
             if (target == Target.HUD) {
+                result.roadColor = "#FF536274";
                 result.showPois = false;
                 result.showBuildings = false;
                 result.showModels = false;
             } else if (target == Target.CLUSTER) {
+                result.roadColor = "#FF536274";
                 // The instrument display keeps the useful road context but avoids expensive 3D
                 // models by default. Its native-size surface is adaptively throttled by Navigator
                 // while the car is stationary.
@@ -258,6 +264,7 @@ public final class NavigationIntegrationConfig {
                     .put("showTrafficLights", showTrafficLights)
                     .put("showLaneGuidance", showLaneGuidance)
                     .put("showLabels", showLabels)
+                    .put("routeStreetLabelsOnly", routeStreetLabelsOnly)
                     .put("showPois", showPois)
                     .put("showBuildings", showBuildings)
                     .put("showParks", showParks)
@@ -270,6 +277,7 @@ public final class NavigationIntegrationConfig {
                     .put("cursorOutlineColor", cursorOutlineColor)
                     .put("routeColor", routeColor)
                     .put("routeOutlineColor", routeOutlineColor)
+                    .put("roadColor", roadColor)
                     .put("routeWidth", routeWidth)
                     .put("routeOutlineWidth", routeOutlineWidth)
                     .put("trafficFreeColor", trafficFreeColor)
@@ -311,6 +319,8 @@ public final class NavigationIntegrationConfig {
             result.showLaneGuidance = source.optBoolean(
                     "showLaneGuidance", result.showLaneGuidance);
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
+            result.routeStreetLabelsOnly = source.optBoolean(
+                    "routeStreetLabelsOnly", result.routeStreetLabelsOnly);
             result.showPois = source.optBoolean("showPois", result.showPois);
             result.showBuildings = source.optBoolean("showBuildings", result.showBuildings);
             result.showParks = source.optBoolean("showParks", result.showParks);
@@ -326,6 +336,7 @@ public final class NavigationIntegrationConfig {
             result.routeColor = source.optString("routeColor", result.routeColor);
             result.routeOutlineColor = source.optString(
                     "routeOutlineColor", result.routeOutlineColor);
+            result.roadColor = source.optString("roadColor", result.roadColor);
             result.routeWidth = source.optDouble("routeWidth", result.routeWidth);
             result.routeOutlineWidth = source.optDouble(
                     "routeOutlineWidth", result.routeOutlineWidth);
@@ -374,6 +385,8 @@ public final class NavigationIntegrationConfig {
             cursorOutlineColor = color(cursorOutlineColor, "#FF17191E");
             routeColor = color(routeColor, "#FFFFC400");
             routeOutlineColor = color(routeOutlineColor, "#FF16181D");
+            roadColor = color(roadColor,
+                    target == Target.MAIN ? "" : "#FF536274");
             trafficFreeColor = color(trafficFreeColor, "#FF39B54A");
             trafficLightColor = color(trafficLightColor, "#FFFFD54F");
             trafficHardColor = color(trafficHardColor, "#FFFF8A3D");

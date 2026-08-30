@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+import org.json.JSONObject;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,11 +19,14 @@ public final class InstrumentPanelContractTest {
         InstrumentPanelConfig config = InstrumentPanelConfig.defaults();
         config.displayId = 2;
         config.transparentBackground = true;
-        config.defaultStyle = InstrumentStyleFamily.M_SPORT_ARCS;
+        config.backgroundBottomColor = "#FF25384D";
+        config.blackZonePercent = 61;
+        config.defaultStyle = InstrumentStyleFamily.AEROWAVE;
         InstrumentElementConfig first = config.elements.get(0);
         first.responseMillis = 82;
         first.opacityPercent = 77;
-        first.style = InstrumentStyleFamily.RETRO_MECHANICAL;
+        first.style = InstrumentStyleFamily.CONTINUUM;
+        first.options.put("showValue", false);
 
         InstrumentPanelConfig restored = InstrumentPanelConfig.fromJson(config.toJson());
 
@@ -30,16 +34,20 @@ public final class InstrumentPanelContractTest {
         assertEquals(720, InstrumentPanelConfig.DESIGN_HEIGHT);
         assertEquals(2, restored.displayId);
         assertTrue(restored.transparentBackground);
-        assertEquals(InstrumentStyleFamily.M_SPORT_ARCS, restored.defaultStyle);
+        assertEquals("#FF25384D", restored.backgroundBottomColor);
+        assertEquals(61, restored.blackZonePercent);
+        assertEquals(InstrumentStyleFamily.AEROWAVE, restored.defaultStyle);
         assertEquals(config.elements.size(), restored.elements.size());
         assertEquals(82, restored.elements.get(0).responseMillis);
         assertEquals(77, restored.elements.get(0).opacityPercent);
-        assertEquals(InstrumentStyleFamily.RETRO_MECHANICAL,
+        assertEquals(InstrumentStyleFamily.CONTINUUM,
                 restored.elements.get(0).style);
+        assertFalse(restored.elements.get(0).options.optBoolean("showValue", true));
         assertNotNull(restored.elements.stream()
                 .filter(value -> value.type == InstrumentElementType.NAV_MAP)
                 .findFirst().orElse(null));
-        assertEquals(10, InstrumentStyleFamily.values().length);
+        assertEquals(5, InstrumentStyleFamily.values().length);
+        assertEquals(5, InstrumentPanelPreset.values().length);
         assertEquals(6, java.util.Arrays.stream(InstrumentElementType.values())
                 .filter(InstrumentElementType::isAnalogGauge).count());
         assertEquals(8, java.util.Arrays.stream(InstrumentElementType.values())
@@ -51,6 +59,29 @@ public final class InstrumentPanelContractTest {
         assertTrue(InstrumentElementType.DIGITAL_SPEEDOMETER.isDigitalGauge());
         assertTrue(InstrumentElementType.AVERAGE_CONSUMPTION.isDigitalGauge());
         assertFalse(InstrumentElementType.GEAR.isDigitalGauge());
+    }
+
+    @Test public void fiveApprovedPresetsAreModularAndOldSchemaMigrates() throws Exception {
+        for (InstrumentPanelPreset preset : InstrumentPanelPreset.values()) {
+            InstrumentPanelConfig config = preset.create();
+            assertEquals(preset.id, config.presetId);
+            assertNotNull(config.elements.stream()
+                    .filter(value -> value.type == InstrumentElementType.NAV_MAP)
+                    .findFirst().orElse(null));
+            assertNotNull(config.elements.stream()
+                    .filter(value -> value.type == InstrumentElementType.NAVIGATION_INFO)
+                    .findFirst().orElse(null));
+            assertNotNull(config.elements.stream()
+                    .filter(value -> value.type == InstrumentElementType.INFO_BLOCK)
+                    .findFirst().orElse(null));
+        }
+
+        InstrumentPanelConfig migrated = InstrumentPanelConfig.fromJson(new JSONObject()
+                .put("schema", 1).put("displayId", 7)
+                .put("defaultStyle", "M_SPORT_ARCS"));
+        assertEquals(7, migrated.displayId);
+        assertEquals(InstrumentPanelPreset.SLATE_HORIZON.id, migrated.presetId);
+        assertEquals(InstrumentStyleFamily.SLATE_HORIZON, migrated.defaultStyle);
     }
 
     @Test public void panelUsesOneFastChannelAndDirectNativeMapSurface() throws Exception {
@@ -90,6 +121,27 @@ public final class InstrumentPanelContractTest {
                 "telemetry.acquire(telemetryListener, config.telemetryMetricIds())"));
         assertTrue(renderer.contains("if (animating) scheduleFrame()"));
         assertTrue(renderer.contains("telemetryWakePosted.compareAndSet(false, true)"));
+    }
+
+    @Test public void editorExposesPresetsModulesAndIndependentGradient() throws Exception {
+        Path root = projectRoot();
+        String settings = read(root.resolve("app/src/main/java/dezz/status/widget/"
+                + "InstrumentPanelSettingsActivity.java"));
+        String renderer = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentClusterView.java"));
+
+        assertTrue(settings.contains("5 вариантов"));
+        assertTrue(settings.contains("Модули"));
+        assertTrue(settings.contains("Фон"));
+        assertTrue(settings.contains("setMultiChoiceItems"));
+        assertTrue(settings.contains("Цифровое значение внутри"));
+        assertTrue(settings.contains("Нижний цвет градиента"));
+        assertTrue(settings.contains("Чисто чёрная зона"));
+        assertTrue(renderer.contains("new LinearGradient("));
+        assertTrue(renderer.contains("config.backgroundBottomColor"));
+        assertTrue(renderer.contains("config.blackZonePercent"));
+        assertTrue(renderer.contains("NavigationBridgeStateStore.addListener"));
+        assertTrue(renderer.contains("if (navigation == null) return"));
     }
 
     @Test public void launcherMirrorsVerifiedDimSequenceAndAutostarts() throws Exception {

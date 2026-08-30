@@ -513,6 +513,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showLaneGuidance = switchView(
                 "Подсказки по полосам — слой на маршруте", profile.showLaneGuidance);
         Switch showLabels = switchView("Подписи", profile.showLabels);
+        Switch routeStreetLabelsOnly = switchView(
+                "Названия улиц только на маршруте", profile.routeStreetLabelsOnly);
         Switch showPois = switchView("Полезные места", profile.showPois);
         Switch showBuildings = switchView("Здания", profile.showBuildings);
         Switch showParks = switchView("Парки", profile.showParks);
@@ -524,7 +526,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         for (Switch control : new Switch[]{showRoute, destination,
                 showRouteTraffic, showTraffic, showTrafficLights,
                 showLaneGuidance,
-                showLabels, showPois, showBuildings,
+                showLabels, routeStreetLabelsOnly, showPois, showBuildings,
                 showParks, showWater,
                 showModels, showCursor, roadsOnly}) {
             form.addView(control, marginTop(4));
@@ -547,6 +549,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         ColorField routeOutline = navigationColorField(form, "Контур маршрута",
                 profile.routeOutlineColor, navigation,
                 value -> profile.routeOutlineColor = value);
+        ColorField roadColor = navigationColorField(form,
+                "Цвет дорог без маршрута и пробок", profile.roadColor,
+                navigation, value -> profile.roadColor = value);
         SliderField routeWidth = slider(form, "Толщина маршрута",
                 profile.routeWidth, 1, 40, 0.5, " px");
         SliderField routeOutlineWidth = slider(form, "Толщина контура маршрута",
@@ -612,6 +617,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showTrafficLights = showTrafficLights.isChecked();
                         profile.showLaneGuidance = showLaneGuidance.isChecked();
                         profile.showLabels = showLabels.isChecked();
+                        profile.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked();
                         profile.showPois = showPois.isChecked();
                         profile.showBuildings = showBuildings.isChecked();
                         profile.showParks = showParks.isChecked();
@@ -624,6 +630,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.cursorOutlineColor = cursorOutline.value;
                         profile.routeColor = routeColor.value;
                         profile.routeOutlineColor = routeOutline.value;
+                        profile.roadColor = roadColor.value;
                         profile.routeWidth = routeWidth.value();
                         profile.routeOutlineWidth = routeOutlineWidth.value();
                         profile.trafficFreeColor = trafficFreeColor.value;

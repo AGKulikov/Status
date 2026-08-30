@@ -39,12 +39,15 @@ final class HudMapRenderer {
             "[{\"types\":\"polyline\",\"stylers\":{\"scale\":0.45}}]";
     /** Geometry slicing is expensive; camera motion remains independent and full-rate. */
     private static final long ROUTE_GEOMETRY_INTERVAL_MS = 100L;
+    /** Two matching reverse samples restore route geometry after a GPS jump without following jitter. */
+    private static final int BACKWARD_PROGRESS_CONFIRMATIONS = 2;
     private final Context context;
     private final FailureReporter reporter;
     private final MapCursorStyler cursorStyler;
     private final TrafficLightMapLayer trafficLightMapLayer;
     private final CameraDirectionMapLayer cameraDirectionMapLayer;
     private final LaneGuidanceMapLayer laneGuidanceMapLayer;
+    private final RouteStreetLabelMapLayer routeStreetLabelMapLayer;
     private final String profileSection;
     private final String displayName;
     private final boolean adaptiveFrameRate;
@@ -82,6 +85,9 @@ final class HudMapRenderer {
     private double renderedRouteSegmentPosition = Double.NaN;
     private int renderedRouteSegmentCount;
     private long lastRouteGeometryElapsedMs;
+    private int pendingBackwardSegmentIndex = -1;
+    private double pendingBackwardSegmentPosition = Double.NaN;
+    private int pendingBackwardConfirmations;
     private NavigatorStatePublisher.CameraState initialCamera;
     private NavigatorStatePublisher.CameraState navigationCamera;
     private AppliedCamera lastAppliedCamera;
@@ -106,6 +112,7 @@ final class HudMapRenderer {
         trafficLightMapLayer = new TrafficLightMapLayer(this.context);
         cameraDirectionMapLayer = new CameraDirectionMapLayer(this.context);
         laneGuidanceMapLayer = new LaneGuidanceMapLayer(this.context);
+        routeStreetLabelMapLayer = new RouteStreetLabelMapLayer(this.context);
     }
 
     void applyConfiguration(String raw) {
@@ -179,6 +186,7 @@ final class HudMapRenderer {
             trafficLightMapLayer.clearData();
             cameraDirectionMapLayer.clearData();
             laneGuidanceMapLayer.clearData();
+            routeStreetLabelMapLayer.clearData();
             applyRoadEventVisibility();
             applyCamera(false);
         }
@@ -204,6 +212,8 @@ final class HudMapRenderer {
                 frame.cameraDirectionsSampleElapsedMs, frame.cameraDirections);
         laneGuidanceMapLayer.update(frame.routeActive,
                 frame.laneGuidanceSampleElapsedMs, frame.laneGuidance);
+        routeStreetLabelMapLayer.update(frame.routeActive,
+                frame.routeStreetLabelsSampleElapsedMs, frame.routeStreetLabels);
         if (!frame.isValid()) return;
         try {
             latestSpeedKmh = Math.max(0d, frame.speedKmh);
@@ -261,6 +271,7 @@ final class HudMapRenderer {
             renderedRouteSegmentPosition = Double.NaN;
             renderedRouteSegmentCount = 0;
             lastRouteGeometryElapsedMs = 0L;
+            clearPendingBackwardProgress();
         }
         activeRouteEpoch = routeEpoch;
         activeRoute = drivingRoute;
@@ -315,6 +326,7 @@ final class HudMapRenderer {
             trafficLightMapLayer.attach(map);
             cameraDirectionMapLayer.attach(map);
             laneGuidanceMapLayer.attach(map);
+            routeStreetLabelMapLayer.attach(map);
             cursorStyler.attach(map);
 
             Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
@@ -359,6 +371,8 @@ final class HudMapRenderer {
         cameraDirectionMapLayer.apply(
                 !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL")));
         laneGuidanceMapLayer.apply(profile.showLaneGuidance);
+        routeStreetLabelMapLayer.apply(
+                profile.showLabels && profile.routeStreetLabelsOnly);
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -773,7 +787,7 @@ final class HudMapRenderer {
         }
     }
 
-    /** Advances the visible route in place; it never re-adds the polyline or moves backwards. */
+    /** Re-slices the visible route in place, including a confirmed backward GPS correction. */
     private void updateRouteProgress(NavigatorStatePublisher.NavigationFrame frame) {
         Object line = routePolyline;
         Object route = activeRoute;
@@ -783,7 +797,7 @@ final class HudMapRenderer {
             RouteProgress progress = new RouteProgress(
                     frame.routeSegmentIndex, frame.routeSegmentPosition,
                     frame.currentRoutePoint);
-            if (!isForwardProgress(progress)) return;
+            if (!shouldApplyRouteProgress(progress)) return;
             long now = SystemClock.elapsedRealtime();
             if (progress.segmentIndex == renderedRouteSegmentIndex
                     && now - lastRouteGeometryElapsedMs < ROUTE_GEOMETRY_INTERVAL_MS) return;
@@ -804,11 +818,47 @@ final class HudMapRenderer {
         }
     }
 
-    private boolean isForwardProgress(RouteProgress progress) {
-        if (progress.segmentIndex > renderedRouteSegmentIndex) return true;
-        if (progress.segmentIndex < renderedRouteSegmentIndex) return false;
-        return Double.isNaN(renderedRouteSegmentPosition)
-                || progress.segmentPosition > renderedRouteSegmentPosition + 0.05d;
+    private boolean shouldApplyRouteProgress(RouteProgress progress) {
+        boolean forward = progress.segmentIndex > renderedRouteSegmentIndex
+                || (progress.segmentIndex == renderedRouteSegmentIndex
+                && (Double.isNaN(renderedRouteSegmentPosition)
+                || progress.segmentPosition > renderedRouteSegmentPosition + 0.05d));
+        if (forward) {
+            clearPendingBackwardProgress();
+            return true;
+        }
+        boolean meaningfulBackward = progress.segmentIndex < renderedRouteSegmentIndex
+                || (progress.segmentIndex == renderedRouteSegmentIndex
+                && !Double.isNaN(renderedRouteSegmentPosition)
+                // Forward geometry is applied at +0.05. A smaller reverse threshold plus two
+                // confirmations guarantees every already-applied jump can be restored while
+                // rejecting one-sample GNSS jitter.
+                && progress.segmentPosition < renderedRouteSegmentPosition - 0.02d);
+        if (!meaningfulBackward) return false;
+
+        boolean matchesPending = pendingBackwardSegmentIndex >= 0
+                && Math.abs(progress.segmentIndex - pendingBackwardSegmentIndex) <= 1
+                && (Double.isNaN(pendingBackwardSegmentPosition)
+                || Math.abs(progress.segmentPosition - pendingBackwardSegmentPosition) <= 0.25d);
+        if (matchesPending) {
+            pendingBackwardConfirmations++;
+        } else {
+            pendingBackwardSegmentIndex = progress.segmentIndex;
+            pendingBackwardSegmentPosition = progress.segmentPosition;
+            pendingBackwardConfirmations = 1;
+        }
+        if (pendingBackwardConfirmations < BACKWARD_PROGRESS_CONFIRMATIONS) return false;
+        // A confirmed correction must not be swallowed by the normal forward-geometry throttle;
+        // otherwise a same-segment jump could leave the beginning clipped for extra samples.
+        lastRouteGeometryElapsedMs = 0L;
+        clearPendingBackwardProgress();
+        return true;
+    }
+
+    private void clearPendingBackwardProgress() {
+        pendingBackwardSegmentIndex = -1;
+        pendingBackwardSegmentPosition = Double.NaN;
+        pendingBackwardConfirmations = 0;
     }
 
     private static RouteSlice remainingRoute(Object route) throws Exception {
@@ -952,6 +1002,7 @@ final class HudMapRenderer {
         trafficLightMapLayer.detachMap();
         cameraDirectionMapLayer.detachMap();
         laneGuidanceMapLayer.detachMap();
+        routeStreetLabelMapLayer.detachMap();
         routeCollection = null;
         routePolyline = null;
         routeDestinationPlacemark = null;
@@ -960,6 +1011,7 @@ final class HudMapRenderer {
         renderedRouteSegmentPosition = Double.NaN;
         renderedRouteSegmentCount = 0;
         lastRouteGeometryElapsedMs = 0L;
+        clearPendingBackwardProgress();
         freeCameraInitialized = false;
         lastAppliedCamera = null;
         if (releaseSurface && currentSurface != null) {

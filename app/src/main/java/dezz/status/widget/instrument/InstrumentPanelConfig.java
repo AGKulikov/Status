@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.instrument;
 
+import android.graphics.Color;
+
 import androidx.annotation.NonNull;
 
 import org.json.JSONArray;
@@ -16,7 +18,7 @@ import java.util.Set;
 
 /** Versioned 1920x720 dashboard document shared by the editor and the external activity. */
 public final class InstrumentPanelConfig {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     public static final int DESIGN_WIDTH = 1920;
     public static final int DESIGN_HEIGHT = 720;
     public static final int DEFAULT_COLUMNS = 48;
@@ -26,34 +28,16 @@ public final class InstrumentPanelConfig {
     public int columns = DEFAULT_COLUMNS;
     public int rows = DEFAULT_ROWS;
     public boolean transparentBackground;
-    @NonNull public InstrumentStyleFamily defaultStyle = InstrumentStyleFamily.GRAND_TOURER;
+    @NonNull public String presetId = InstrumentPanelPreset.SLATE_HORIZON.id;
+    @NonNull public String backgroundBottomColor = "#FF16283D";
+    /** Percentage of panel height which remains pure black before the bottom gradient begins. */
+    public int blackZonePercent = 46;
+    @NonNull public InstrumentStyleFamily defaultStyle = InstrumentStyleFamily.SLATE_HORIZON;
     @NonNull public final List<InstrumentElementConfig> elements = new ArrayList<>();
 
     @NonNull
     public static InstrumentPanelConfig defaults() {
-        InstrumentPanelConfig config = new InstrumentPanelConfig();
-        InstrumentElementConfig speed = new InstrumentElementConfig(
-                "cluster_speed", InstrumentElementType.ANALOG_SPEEDOMETER,
-                InstrumentStyleFamily.GRAND_TOURER);
-        speed.x = 2; speed.y = 3; speed.width = 12; speed.height = 12;
-        InstrumentElementConfig map = new InstrumentElementConfig(
-                "cluster_map", InstrumentElementType.NAV_MAP,
-                InstrumentStyleFamily.NAVIGATION_FIRST);
-        map.x = 14; map.y = 1; map.width = 20; map.height = 16;
-        InstrumentElementConfig rpm = new InstrumentElementConfig(
-                "cluster_rpm", InstrumentElementType.ANALOG_TACHOMETER,
-                InstrumentStyleFamily.GRAND_TOURER);
-        rpm.x = 34; rpm.y = 3; rpm.width = 12; rpm.height = 12;
-        InstrumentElementConfig gear = new InstrumentElementConfig(
-                "cluster_gear", InstrumentElementType.GEAR,
-                InstrumentStyleFamily.GRAND_TOURER);
-        gear.x = 21; gear.y = 12; gear.width = 6; gear.height = 4; gear.zIndex = 10;
-        config.elements.add(speed);
-        config.elements.add(map);
-        config.elements.add(rpm);
-        config.elements.add(gear);
-        config.normalize();
-        return config;
+        return InstrumentPanelPreset.SLATE_HORIZON.create();
     }
 
     @NonNull
@@ -63,6 +47,9 @@ public final class InstrumentPanelConfig {
         value.columns = columns;
         value.rows = rows;
         value.transparentBackground = transparentBackground;
+        value.presetId = presetId;
+        value.backgroundBottomColor = backgroundBottomColor;
+        value.blackZonePercent = blackZonePercent;
         value.defaultStyle = defaultStyle;
         for (InstrumentElementConfig element : elements) value.elements.add(element.copy());
         value.normalize();
@@ -73,6 +60,9 @@ public final class InstrumentPanelConfig {
         displayId = Math.max(0, displayId);
         columns = Math.max(12, Math.min(96, columns));
         rows = Math.max(6, Math.min(54, rows));
+        presetId = InstrumentPanelPreset.fromId(presetId).id;
+        backgroundBottomColor = color(backgroundBottomColor, "#FF16283D");
+        blackZonePercent = Math.max(0, Math.min(95, blackZonePercent));
         for (InstrumentElementConfig element : elements) element.normalize(columns, rows);
         Collections.sort(elements, Comparator.comparingInt(value -> value.zIndex));
     }
@@ -82,7 +72,20 @@ public final class InstrumentPanelConfig {
     public Set<String> telemetryMetricIds() {
         LinkedHashSet<String> result = new LinkedHashSet<>();
         for (InstrumentElementConfig element : elements) {
-            if (!element.enabled || element.type.metricId.isEmpty()) continue;
+            if (!element.enabled) continue;
+            if (element.type == InstrumentElementType.INFO_BLOCK) {
+                for (int row = 1; row <= 3; row++) {
+                    InstrumentInfoMetric metric = InstrumentInfoMetric.fromName(
+                            element.options.optString("row" + row),
+                            row == 1 ? InstrumentInfoMetric.RANGE
+                                    : row == 2 ? InstrumentInfoMetric.AVERAGE_CONSUMPTION
+                                    : InstrumentInfoMetric.AMBIENT_TEMPERATURE);
+                    if (!metric.metricId.isEmpty()) result.add(metric.metricId);
+                    if (!metric.fallbackMetricId.isEmpty()) result.add(metric.fallbackMetricId);
+                }
+                continue;
+            }
+            if (element.type.metricId.isEmpty()) continue;
             result.add(element.type.metricId);
             // Total range is absent on some KX11 firmware; retain the fuel-range fallback only
             // when a range element is actually visible.
@@ -100,6 +103,13 @@ public final class InstrumentPanelConfig {
         return false;
     }
 
+    public boolean hasVisibleNavigationInfo() {
+        for (InstrumentElementConfig element : elements) {
+            if (element.enabled && element.type.usesNavigationState()) return true;
+        }
+        return false;
+    }
+
     @NonNull
     public JSONObject toJson() throws JSONException {
         JSONArray items = new JSONArray();
@@ -110,17 +120,34 @@ public final class InstrumentPanelConfig {
                 .put("columns", columns)
                 .put("rows", rows)
                 .put("transparentBackground", transparentBackground)
+                .put("presetId", presetId)
+                .put("backgroundBottomColor", backgroundBottomColor)
+                .put("blackZonePercent", blackZonePercent)
                 .put("defaultStyle", defaultStyle.name())
                 .put("elements", items);
     }
 
     @NonNull
     public static InstrumentPanelConfig fromJson(@NonNull JSONObject json) {
+        int schema = json.optInt("schema", 1);
+        if (schema != SCHEMA_VERSION) {
+            // The ten experimental styles were intentionally retired. Preserve only launch and
+            // background ownership while moving old layouts to the first approved modular preset.
+            InstrumentPanelConfig migrated = defaults();
+            migrated.displayId = Math.max(0, json.optInt("displayId", 2));
+            migrated.transparentBackground = json.optBoolean(
+                    "transparentBackground", false);
+            return migrated;
+        }
         InstrumentPanelConfig value = new InstrumentPanelConfig();
         value.displayId = json.optInt("displayId", 2);
         value.columns = json.optInt("columns", DEFAULT_COLUMNS);
         value.rows = json.optInt("rows", DEFAULT_ROWS);
         value.transparentBackground = json.optBoolean("transparentBackground", false);
+        value.presetId = json.optString("presetId", InstrumentPanelPreset.SLATE_HORIZON.id);
+        value.backgroundBottomColor = json.optString(
+                "backgroundBottomColor", "#FF16283D");
+        value.blackZonePercent = json.optInt("blackZonePercent", 46);
         value.defaultStyle = InstrumentStyleFamily.fromName(json.optString("defaultStyle"));
         JSONArray items = json.optJSONArray("elements");
         if (items != null) {
@@ -133,6 +160,24 @@ public final class InstrumentPanelConfig {
             }
         }
         value.normalize();
-        return value.elements.isEmpty() ? defaults() : value;
+        if (!value.elements.isEmpty()) return value;
+        InstrumentPanelConfig fallback = InstrumentPanelPreset.fromId(value.presetId).create();
+        fallback.displayId = value.displayId;
+        fallback.transparentBackground = value.transparentBackground;
+        fallback.backgroundBottomColor = value.backgroundBottomColor;
+        fallback.blackZonePercent = value.blackZonePercent;
+        fallback.normalize();
+        return fallback;
+    }
+
+    @NonNull
+    private static String color(@NonNull String raw, @NonNull String fallback) {
+        String value = raw.trim();
+        try {
+            Color.parseColor(value);
+            return value;
+        } catch (IllegalArgumentException invalid) {
+            return fallback;
+        }
     }
 }

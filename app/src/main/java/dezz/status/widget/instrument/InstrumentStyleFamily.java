@@ -6,28 +6,18 @@ import androidx.annotation.Nullable;
 
 import java.util.Locale;
 
-/** Ten original, mixable instrument families inspired by established automotive conventions. */
+/** Five approved, mixable visual families used by the modular instrument presets. */
 public enum InstrumentStyleFamily {
-    GRAND_TOURER("Grand Tourer · тёплая классика",
-            0xFF080A0D, 0xFFF1E4C6, 0xFFC9A96B, 0xFF5B4931),
-    EXECUTIVE_GLASS("Executive Glass · стекло",
-            0xFF15171A, 0xFFF4F1E8, 0xFFD6C7A2, 0xFF5D636B),
-    M_SPORT_ARCS("Sport Arcs · угловые дуги",
-            0xFF05070B, 0xFFF4F7FA, 0xFF43A8FF, 0xFFE84B55),
-    VIRTUAL_CLASSIC("Virtual Classic · контраст",
-            0xFF07090C, 0xFFE9EEF4, 0xFFFF3038, 0xFF65717D),
-    FIVE_DIAL_HERITAGE("Five-Dial · приборные трубы",
-            0xFF090909, 0xFFF4F1E8, 0xFFFFC400, 0xFF65615B),
-    SUPERSPORT("Supersport · красная зона",
-            0xFF050609, 0xFFFFFFFF, 0xFFFF3B30, 0xFFFFB000),
-    NAVIGATION_FIRST("Navigation First · карта в центре",
-            0xB30A1018, 0xFFF5F8FC, 0xFF49A8FF, 0xFF4BD58A),
-    MINIMAL_PANORAMA("Minimal Panorama · чистый экран",
-            0xE6101216, 0xFFF8F9FB, 0xFF7AB9FF, 0xFF59626D),
-    EV_FLOW("EV Flow · энергетические дуги",
-            0xFF061018, 0xFFE8FAFF, 0xFF37D9C7, 0xFF4F8FFF),
-    RETRO_MECHANICAL("Retro Mechanical · кремовая шкала",
-            0xFF1A1610, 0xFFF2E6C9, 0xFFCB3A2E, 0xFF8D7650);
+    SLATE_HORIZON("11 · Slate Horizon",
+            0xFF03070C, 0xFFF4F7FA, 0xFF48C7F4, 0xFF56697E),
+    GLACIER_MAP("12 · Glacier Map",
+            0xFF02060B, 0xFFF4F8FC, 0xFF35CFFF, 0xFF2E526E),
+    AEROWAVE("13 · Aerowave",
+            0xFF03070C, 0xFFF5F7FA, 0xFF53B9FF, 0xFF5D6E84),
+    STEEL_VECTOR("14 · Steel Vector",
+            0xFF04070B, 0xFFF6F8FB, 0xFF2FC4FF, 0xFF637286),
+    CONTINUUM("15 · Continuum",
+            0xFF020509, 0xFFF8FAFC, 0xFF35D5FF, 0xFF3F566F);
 
     @NonNull public final String label;
     public final int backgroundColor;
@@ -50,8 +40,18 @@ public enum InstrumentStyleFamily {
             try {
                 return valueOf(raw.trim().toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException ignored) {
+                // Old families are deliberately absent from the editor. Keep imported documents
+                // readable by mapping them to the nearest one of the five approved families.
+                String legacy = raw.trim().toUpperCase(Locale.ROOT);
+                if ("NAVIGATION_FIRST".equals(legacy)) return GLACIER_MAP;
+                if ("M_SPORT_ARCS".equals(legacy) || "SUPERSPORT".equals(legacy)) {
+                    return AEROWAVE;
+                }
+                if ("MINIMAL_PANORAMA".equals(legacy)
+                        || "VIRTUAL_CLASSIC".equals(legacy)) return STEEL_VECTOR;
+                if ("EV_FLOW".equals(legacy)) return CONTINUUM;
             }
         }
-        return GRAND_TOURER;
+        return SLATE_HORIZON;
     }
 }

@@ -36,7 +36,9 @@ import dezz.status.widget.instrument.InstrumentClusterView;
 import dezz.status.widget.instrument.InstrumentDisplayLauncher;
 import dezz.status.widget.instrument.InstrumentElementConfig;
 import dezz.status.widget.instrument.InstrumentElementType;
+import dezz.status.widget.instrument.InstrumentInfoMetric;
 import dezz.status.widget.instrument.InstrumentPanelConfig;
+import dezz.status.widget.instrument.InstrumentPanelPreset;
 import dezz.status.widget.instrument.InstrumentPanelStore;
 import dezz.status.widget.instrument.InstrumentPanelView;
 import dezz.status.widget.instrument.InstrumentStyleFamily;
@@ -144,9 +146,15 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Button add = button("+ Элемент");
         add.setOnClickListener(view -> addElement());
         row.addView(add);
-        Button theme = button("Стиль панели");
-        theme.setOnClickListener(view -> choosePanelStyle());
-        row.addView(theme);
+        Button variants = button("5 вариантов");
+        variants.setOnClickListener(view -> choosePanelPreset());
+        row.addView(variants);
+        Button modules = button("Модули");
+        modules.setOnClickListener(view -> editModules());
+        row.addView(modules);
+        Button background = button("Фон");
+        background.setOnClickListener(view -> editBackground());
+        row.addView(background);
         Button map = button("Карта");
         map.setOnClickListener(view -> editMapPerformance());
         row.addView(map);
@@ -211,17 +219,77 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         refresh(element.id, true);
     }
 
-    private void choosePanelStyle() {
-        InstrumentStyleFamily[] styles = InstrumentStyleFamily.values();
-        String[] labels = styleLabels(styles);
+    private void choosePanelPreset() {
+        InstrumentPanelPreset[] presets = InstrumentPanelPreset.values();
+        String[] labels = new String[presets.length];
+        int selected = 0;
+        for (int index = 0; index < presets.length; index++) {
+            labels[index] = presets[index].label;
+            if (presets[index].id.equals(config.presetId)) selected = index;
+        }
         new AlertDialog.Builder(this)
-                .setTitle("Стиль всей панели")
-                .setSingleChoiceItems(labels, config.defaultStyle.ordinal(), (dialog, which) -> {
-                    config.defaultStyle = styles[which];
-                    for (InstrumentElementConfig element : config.elements) {
-                        element.style = styles[which];
-                    }
+                .setTitle("Базовая компоновка")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    InstrumentPanelConfig replacement = presets[which].create();
+                    replacement.displayId = config.displayId;
+                    replacement.transparentBackground = config.transparentBackground;
+                    replacement.backgroundBottomColor = config.backgroundBottomColor;
+                    replacement.blackZonePercent = config.blackZonePercent;
+                    config = replacement;
                     dialog.dismiss();
+                    refresh(null, true);
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void editModules() {
+        String[] labels = new String[config.elements.size()];
+        boolean[] checked = new boolean[config.elements.size()];
+        for (int index = 0; index < config.elements.size(); index++) {
+            InstrumentElementConfig element = config.elements.get(index);
+            labels[index] = element.type.label + " · " + element.style.label;
+            checked[index] = element.enabled;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Модули панели")
+                .setMultiChoiceItems(labels, checked,
+                        (dialog, which, value) -> checked[which] = value)
+                .setPositiveButton("Применить", (dialog, which) -> {
+                    for (int index = 0; index < config.elements.size(); index++) {
+                        config.elements.get(index).enabled = checked[index];
+                    }
+                    refresh(null, true);
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void editBackground() {
+        LinearLayout content = dialogColumn();
+        content.addView(text("Сверху всегда чистый чёрный. Ниже начинается плавный переход "
+                + "к выбранному цвету, которым можно визуально растворить штатные нижние крылья.",
+                12, 0xFFB8C0CC));
+        ColorField bottom = colorField(content, "Нижний цвет градиента",
+                config.backgroundBottomColor);
+        TextView blackValue = label("Чисто чёрная зона: " + config.blackZonePercent + "%");
+        SeekBar blackZone = new SeekBar(this);
+        blackZone.setMax(95);
+        blackZone.setProgress(config.blackZonePercent);
+        blackZone.setOnSeekBarChangeListener(seekListener(value ->
+                blackValue.setText("Чисто чёрная зона: " + value + "%")));
+        content.addView(blackValue, marginTop(8));
+        content.addView(blackZone);
+        Switch transparent = switchView(
+                "Прозрачный фон (градиент отключён)", config.transparentBackground);
+        content.addView(transparent);
+        new AlertDialog.Builder(this)
+                .setTitle("Фон приборной панели")
+                .setView(content)
+                .setPositiveButton("Применить", (dialog, which) -> {
+                    config.backgroundBottomColor = bottom.value;
+                    config.blackZonePercent = blackZone.getProgress();
+                    config.transparentBackground = transparent.isChecked();
                     refresh(null, true);
                 })
                 .setNegativeButton("Отмена", null)
@@ -254,6 +322,86 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(responseValue);
         content.addView(response);
 
+        final Switch showFace;
+        final Switch showScale;
+        final Switch showScaleLabels;
+        final Switch showNeedle;
+        final Switch showValue;
+        final Switch showUnit;
+        final Switch showProgress;
+        final Switch showStreet;
+        final Switch showArrival;
+        final Spinner[] infoRows = new Spinner[3];
+        if (element.type.isAnalogGauge()) {
+            showFace = switchView("Фон шкалы",
+                    element.options.optBoolean("showFace", true));
+            showScale = switchView("Шкала",
+                    element.options.optBoolean("showScale", true));
+            showScaleLabels = switchView("Цифры шкалы",
+                    element.options.optBoolean("showScaleLabels", true));
+            showNeedle = switchView("Стрелка",
+                    element.options.optBoolean("showNeedle", true));
+            showValue = switchView("Цифровое значение внутри",
+                    element.options.optBoolean("showValue", true));
+            showUnit = switchView("Единица измерения",
+                    element.options.optBoolean("showUnit", true));
+            showProgress = showStreet = showArrival = null;
+            content.addView(section("Состав аналогового прибора"), marginTop(10));
+            content.addView(showFace);
+            content.addView(showScale);
+            content.addView(showScaleLabels);
+            content.addView(showNeedle);
+            content.addView(showValue);
+            content.addView(showUnit);
+        } else if (element.type == InstrumentElementType.INFO_BLOCK) {
+            showFace = switchView("Фон блока",
+                    element.options.optBoolean("showFace", false));
+            showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
+            showProgress = showStreet = showArrival = null;
+            content.addView(showFace, marginTop(10));
+            InstrumentInfoMetric[] metrics = InstrumentInfoMetric.values();
+            String[] labels = infoMetricLabels(metrics);
+            for (int row = 0; row < infoRows.length; row++) {
+                content.addView(label("Строка " + (row + 1)), marginTop(5));
+                Spinner spinner = spinner(labels);
+                InstrumentInfoMetric current = InstrumentInfoMetric.fromName(
+                        element.options.optString("row" + (row + 1), null),
+                        row == 0 ? InstrumentInfoMetric.RANGE
+                                : row == 1 ? InstrumentInfoMetric.AVERAGE_CONSUMPTION
+                                : InstrumentInfoMetric.AMBIENT_TEMPERATURE);
+                spinner.setSelection(current.ordinal());
+                infoRows[row] = spinner;
+                content.addView(spinner);
+            }
+        } else if (element.type == InstrumentElementType.NAVIGATION_INFO) {
+            showFace = switchView("Фон блока",
+                    element.options.optBoolean("showFace", false));
+            showStreet = switchView("Название улицы",
+                    element.options.optBoolean("showStreet", true));
+            showArrival = switchView("Остаток пути и времени",
+                    element.options.optBoolean("showArrival", true));
+            showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
+            showProgress = null;
+            content.addView(showFace, marginTop(10));
+            content.addView(showStreet);
+            content.addView(showArrival);
+        } else if (isDigitalValueElement(element.type)) {
+            showFace = switchView("Фон элемента",
+                    element.options.optBoolean("showFace", true));
+            showUnit = switchView("Единица измерения",
+                    element.options.optBoolean("showUnit", true));
+            showProgress = switchView("Линия значения",
+                    element.options.optBoolean("showProgress", true));
+            showScale = showScaleLabels = showNeedle = showValue = null;
+            showStreet = showArrival = null;
+            content.addView(showFace, marginTop(10));
+            content.addView(showUnit);
+            content.addView(showProgress);
+        } else {
+            showFace = showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
+            showProgress = showStreet = showArrival = null;
+        }
+
         TextView opacityValue = label("Непрозрачность: " + element.opacityPercent + "%");
         SeekBar opacity = new SeekBar(this);
         opacity.setMax(90);
@@ -271,6 +419,32 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     element.enabled = visible.isChecked();
                     element.responseMillis = response.getProgress();
                     element.opacityPercent = opacity.getProgress() + 10;
+                    if (showFace != null) setOption(element, "showFace", showFace.isChecked());
+                    if (showScale != null) setOption(element, "showScale", showScale.isChecked());
+                    if (showScaleLabels != null) {
+                        setOption(element, "showScaleLabels", showScaleLabels.isChecked());
+                    }
+                    if (showNeedle != null) {
+                        setOption(element, "showNeedle", showNeedle.isChecked());
+                    }
+                    if (showValue != null) setOption(element, "showValue", showValue.isChecked());
+                    if (showUnit != null) setOption(element, "showUnit", showUnit.isChecked());
+                    if (showProgress != null) {
+                        setOption(element, "showProgress", showProgress.isChecked());
+                    }
+                    if (showStreet != null) {
+                        setOption(element, "showStreet", showStreet.isChecked());
+                    }
+                    if (showArrival != null) {
+                        setOption(element, "showArrival", showArrival.isChecked());
+                    }
+                    InstrumentInfoMetric[] metrics = InstrumentInfoMetric.values();
+                    for (int row = 0; row < infoRows.length; row++) {
+                        if (infoRows[row] != null) {
+                            setOption(element, "row" + (row + 1),
+                                    metrics[infoRows[row].getSelectedItemPosition()].name());
+                        }
+                    }
                     element.normalize(config.columns, config.rows);
                     refresh(element.id, true);
                 })
@@ -370,6 +544,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch laneGuidance = switchView(
                 "Подсказки по полосам — слой на маршруте", map.showLaneGuidance);
         Switch labels = switchView("Подписи дорог", map.showLabels);
+        Switch routeStreetLabelsOnly = switchView(
+                "Названия улиц только на маршруте", map.routeStreetLabelsOnly);
         Switch pois = switchView("Полезные места", map.showPois);
         Switch buildings = switchView("Здания", map.showBuildings);
         Switch parks = switchView("Парки", map.showParks);
@@ -384,6 +560,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(trafficLights);
         content.addView(laneGuidance);
         content.addView(labels);
+        content.addView(routeStreetLabelsOnly);
         content.addView(pois);
         content.addView(buildings);
         content.addView(parks);
@@ -411,6 +588,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         ColorField routeOutline = navigationColorField(content, "Контур маршрута",
                 map.routeOutlineColor, finalNavigation, preferences,
                 value -> map.routeOutlineColor = value);
+        ColorField roadColor = navigationColorField(content,
+                "Цвет дорог без маршрута и пробок", map.roadColor,
+                finalNavigation, preferences, value -> map.roadColor = value);
         SliderField routeWidth = slider(content, "Толщина маршрута",
                 map.routeWidth, 1, 40, 0.5, " px");
         SliderField routeOutlineWidth = slider(content, "Толщина контура маршрута",
@@ -461,6 +641,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showPois = pois.isChecked();
                     map.showBuildings = buildings.isChecked();
                     map.showLabels = labels.isChecked();
+                    map.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked();
                     map.showParks = parks.isChecked();
                     map.showWater = water.isChecked();
                     map.showModels = models.isChecked();
@@ -471,6 +652,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cursorOutlineColor = cursorOutline.value;
                     map.routeColor = routeColor.value;
                     map.routeOutlineColor = routeOutline.value;
+                    map.roadColor = roadColor.value;
                     map.routeWidth = routeWidth.value();
                     map.routeOutlineWidth = routeOutlineWidth.value();
                     map.trafficFreeColor = trafficFreeColor.value;
@@ -601,6 +783,49 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         String[] labels = new String[styles.length];
         for (int index = 0; index < styles.length; index++) labels[index] = styles[index].label;
         return labels;
+    }
+
+    @NonNull private static String[] infoMetricLabels(@NonNull InstrumentInfoMetric[] metrics) {
+        String[] labels = new String[metrics.length];
+        for (int index = 0; index < metrics.length; index++) labels[index] = metrics[index].label;
+        return labels;
+    }
+
+    private static boolean isDigitalValueElement(@NonNull InstrumentElementType type) {
+        switch (type) {
+            case DIGITAL_SPEEDOMETER:
+            case DIGITAL_TACHOMETER:
+            case ODOMETER:
+            case FUEL_GAUGE:
+            case BATTERY_GAUGE:
+            case RANGE:
+            case AMBIENT_TEMPERATURE:
+            case COOLANT_TEMPERATURE:
+            case INSTANT_CONSUMPTION:
+            case AVERAGE_CONSUMPTION:
+            case TRIP_CONSUMPTION:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static void setOption(@NonNull InstrumentElementConfig element,
+                                  @NonNull String key, boolean value) {
+        try {
+            element.options.put(key, value);
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private static void setOption(@NonNull InstrumentElementConfig element,
+                                  @NonNull String key, @NonNull String value) {
+        try {
+            element.options.put(key, value);
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     @NonNull private SeekBar.OnSeekBarChangeListener seekListener(@NonNull IntConsumer consumer) {

@@ -37,6 +37,8 @@ public enum InstrumentElementType {
     AMBIENT_TEMPERATURE("Температура снаружи", "Основное",
             "ISensor.ambient_temp", 7, 3),
     CLOCK("Часы", "Основное", "", 7, 3),
+    INFO_BLOCK("Информационный блок", "Основное", "", 10, 8),
+    NAVIGATION_INFO("Маршрутный блок", "Навигация", "", 12, 7),
     NAV_MAP("Независимая карта", "Навигация", "", 22, 14);
 
     @NonNull public final String label;
@@ -87,6 +89,10 @@ public enum InstrumentElementType {
 
     public boolean usesClock() {
         return this == CLOCK;
+    }
+
+    public boolean usesNavigationState() {
+        return this == NAVIGATION_INFO;
     }
 
     @Nullable

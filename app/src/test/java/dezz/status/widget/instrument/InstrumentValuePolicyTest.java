@@ -20,14 +20,14 @@ public final class InstrumentValuePolicyTest {
 
     @Test public void telemetryDemandTracksOnlyVisibleElements() {
         InstrumentPanelConfig config = InstrumentPanelConfig.defaults();
-        assertEquals(3, config.telemetryMetricIds().size());
+        assertEquals(2, config.telemetryMetricIds().size());
         assertTrue(config.telemetryMetricIds().contains("ISensor.speed"));
         assertTrue(config.telemetryMetricIds().contains("ISensor.rpm"));
-        assertTrue(config.telemetryMetricIds().contains("ISensor.gear"));
+        assertFalse(config.telemetryMetricIds().contains("ISensor.gear"));
         assertFalse(config.telemetryMetricIds().contains("ISensor.fuel_level"));
 
         InstrumentElementConfig range = new InstrumentElementConfig("range",
-                InstrumentElementType.RANGE, InstrumentStyleFamily.MINIMAL_PANORAMA);
+                InstrumentElementType.RANGE, InstrumentStyleFamily.STEEL_VECTOR);
         config.elements.add(range);
         assertTrue(config.telemetryMetricIds().contains("ISensor.range_total"));
         assertTrue(config.telemetryMetricIds().contains("ISensor.range_fuel"));

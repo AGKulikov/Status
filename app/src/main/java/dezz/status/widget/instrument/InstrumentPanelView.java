@@ -97,8 +97,9 @@ public final class InstrumentPanelView extends FrameLayout
     public void updateConfig(@NonNull InstrumentPanelConfig value) {
         config = value;
         config.normalize();
-        setBackgroundColor(config.transparentBackground
-                ? Color.TRANSPARENT : config.defaultStyle.backgroundColor);
+        // The cached instrument canvas owns the configurable black-to-colour gradient. Keeping
+        // this backing view black prevents a one-frame flash while a preset or map is re-laid out.
+        setBackgroundColor(config.transparentBackground ? Color.TRANSPARENT : Color.BLACK);
         instruments.setConfig(config);
         InstrumentElementConfig map = firstMap();
         NavigationIntegrationConfig.MapProfile profile = clusterProfile();

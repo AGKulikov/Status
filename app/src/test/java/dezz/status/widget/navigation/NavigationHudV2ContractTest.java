@@ -28,6 +28,8 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.trafficBlockedColor = "#FF414243";
         config.hudMap.trafficUnknownColor = "#FF515253";
         config.hudMap.trafficGradientLength = 24d;
+        config.hudMap.roadColor = "#FF556677";
+        config.hudMap.routeStreetLabelsOnly = true;
         config.hudMap.showTraffic = false;
         config.hudMap.showRouteTraffic = true;
         config.hudMap.showDestination = false;
@@ -56,6 +58,8 @@ public final class NavigationHudV2ContractTest {
         config.clusterMap.trafficVeryHardColor = "#FF919293";
         config.clusterMap.trafficBlockedColor = "#FFA1A2A3";
         config.clusterMap.trafficUnknownColor = "#FFB1B2B3";
+        config.clusterMap.roadColor = "#FF223344";
+        config.clusterMap.routeStreetLabelsOnly = true;
         config.clusterMap.setRoadEventMode("RECONSTRUCTION",
                 NavigationIntegrationConfig.RoadEventMode.ALWAYS);
         config.mainFloatingWindow.movementLocked = true;
@@ -81,6 +85,8 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FF414243", restored.hudMap.trafficBlockedColor);
         assertEquals("#FF515253", restored.hudMap.trafficUnknownColor);
         assertEquals(24d, restored.hudMap.trafficGradientLength, 0d);
+        assertEquals("#FF556677", restored.hudMap.roadColor);
+        assertTrue(restored.hudMap.routeStreetLabelsOnly);
         assertFalse(restored.hudMap.showTraffic);
         assertTrue(restored.hudMap.showRouteTraffic);
         assertFalse(restored.hudMap.showDestination);
@@ -109,6 +115,8 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FF919293", restored.clusterMap.trafficVeryHardColor);
         assertEquals("#FFA1A2A3", restored.clusterMap.trafficBlockedColor);
         assertEquals("#FFB1B2B3", restored.clusterMap.trafficUnknownColor);
+        assertEquals("#FF223344", restored.clusterMap.roadColor);
+        assertTrue(restored.clusterMap.routeStreetLabelsOnly);
         assertEquals(NavigationIntegrationConfig.RoadEventMode.ALWAYS,
                 restored.clusterMap.roadEventMode("RECONSTRUCTION"));
         assertTrue(restored.mainFloatingWindow.movementLocked);
@@ -178,6 +186,7 @@ public final class NavigationHudV2ContractTest {
                 "map.showTrafficLights = trafficLights.isChecked()",
                 "map.showLaneGuidance = laneGuidance.isChecked()",
                 "map.showLabels = labels.isChecked()",
+                "map.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked()",
                 "map.showPois = pois.isChecked()",
                 "map.showBuildings = buildings.isChecked()",
                 "map.showParks = parks.isChecked()",
@@ -189,6 +198,7 @@ public final class NavigationHudV2ContractTest {
                 "map.cursorOutlineColor = cursorOutline.value",
                 "map.routeColor = routeColor.value",
                 "map.routeOutlineColor = routeOutline.value",
+                "map.roadColor = roadColor.value",
                 "map.routeWidth = routeWidth.value()",
                 "map.routeOutlineWidth = routeOutlineWidth.value()",
                 "map.trafficFreeColor = trafficFreeColor.value",
@@ -765,6 +775,42 @@ public final class NavigationHudV2ContractTest {
         assertTrue(windowSettings.contains("window.resizeLocked = fullyLocked"));
         assertTrue(windowSettings.contains("window.dragHandleVisible"));
         assertTrue(windowSettings.contains("window.resizeHandleVisible"));
+    }
+
+    @Test public void routeLabelsAndCursorFollowCanonicalRouteState() throws Exception {
+        Path navigator = navigatorModRoot();
+        String publisher = read(navigator.resolve("NavigatorStatePublisher.java"));
+        String renderer = read(navigator.resolve("HudMapRenderer.java"));
+        String profile = read(navigator.resolve("NavigationMapProfile.java"));
+        String labels = read(navigator.resolve("RouteStreetLabelMapLayer.java"));
+
+        assertTrue(profile.contains("routeStreetLabelsOnly"));
+        assertTrue(profile.contains("roadColor"));
+        assertTrue(profile.contains("MapKit styles require #RRGGBBAA"));
+        assertTrue(profile.contains("\\\"elements\\\":\\\"label\\\""));
+        assertTrue(publisher.contains("readRouteStreetLabels("));
+        assertTrue(publisher.contains("RoutePosition.getPoint()"));
+        assertTrue(publisher.contains("invoke(routePosition, \"getPoint\")"));
+        assertTrue(publisher.contains("ROUTE_MATCH_HOLD_MS = 2_500L"));
+        assertTrue(publisher.contains("lastRouteMatchedLatitude"));
+        assertTrue(publisher.contains("latitude = routeLatitude"));
+        assertTrue(publisher.contains("longitude = routeLongitude"));
+        assertTrue(renderer.contains("routeStreetLabelMapLayer.update("));
+        assertTrue(labels.contains("FRESH_MS = 2_500L"));
+        assertTrue(labels.contains("Screen-facing street names sourced exclusively"));
+        assertTrue(labels.contains("setGeometry"));
+        assertTrue(labels.contains("com.yandex.mapkit.map.TextStyle"));
+        assertFalse(labels.contains("Bitmap.createBitmap"));
+    }
+
+    @Test public void confirmedBackwardProgressRestoresRouteAfterGpsJump() throws Exception {
+        String renderer = read(navigatorModRoot().resolve("HudMapRenderer.java"));
+        assertTrue(renderer.contains("BACKWARD_PROGRESS_CONFIRMATIONS = 2"));
+        assertTrue(renderer.contains("shouldApplyRouteProgress(progress)"));
+        assertTrue(renderer.contains("meaningfulBackward"));
+        assertTrue(renderer.contains("pendingBackwardConfirmations"));
+        assertTrue(renderer.contains("remainingRoute(route, progress)"));
+        assertFalse(renderer.contains("it never re-adds the polyline or moves backwards"));
     }
 
     private static Path sourceRoot() {

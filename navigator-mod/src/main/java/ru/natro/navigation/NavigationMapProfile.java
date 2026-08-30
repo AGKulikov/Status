@@ -18,13 +18,11 @@ final class NavigationMapProfile {
      * Hiding objects that have none of them preserves the complete road geometry while removing
      * land, water, buildings, boundaries, transit, POI and every other substrate object.
      */
-    private static final String ROADS_ONLY_STYLE = "["
-            + "{\"tags\":{\"none\":[\"road\",\"road_1\",\"road_2\",\"road_3\","
+    private static final String ROAD_TAGS_JSON = "[\"road\",\"road_1\",\"road_2\",\"road_3\","
             + "\"road_4\",\"road_5\",\"road_6\",\"road_7\",\"road_limited\","
             + "\"road_unclassified\",\"road_minor\",\"road_construction\",\"ferry\","
             + "\"ice_road\",\"path\",\"crosswalk\",\"underpass\",\"road_surface\","
-            + "\"road_marking\"]},\"stylers\":{\"visibility\":\"off\"}},"
-            + "{\"elements\":\"label\",\"stylers\":{\"visibility\":\"off\"}}]";
+            + "\"road_marking\"]";
     static final String[] ROAD_EVENT_TAGS = {
             "ACCIDENT", "RECONSTRUCTION", "CHAT", "LOCAL_CHAT", "CLOSED", "DRAWBRIDGE",
             "DANGER", "OTHER", "SPEED_CONTROL", "NO_STOPPING_CONTROL", "LANE_CONTROL",
@@ -51,6 +49,7 @@ final class NavigationMapProfile {
     /** Screen-facing sign anchored to the upcoming LaneSign RoutePosition. */
     boolean showLaneGuidance = true;
     boolean showCursor = true;
+    boolean routeStreetLabelsOnly;
     boolean roadsOnly;
     String cameraMode = "FOLLOW_ROUTE";
     double zoomDelta;
@@ -64,6 +63,7 @@ final class NavigationMapProfile {
     String cursorOutlineColor = "#FF17191E";
     String routeColor = "#FFFFC400";
     String routeOutlineColor = "#FF16181D";
+    String roadColor = "";
     double routeWidth = 8d;
     double routeOutlineWidth = 2d;
     String trafficFreeColor = "#FF39B54A";
@@ -109,6 +109,8 @@ final class NavigationMapProfile {
                     "showRouteTraffic", result.showTraffic);
             result.showTrafficLights = source.optBoolean("showTrafficLights", true);
             result.showLaneGuidance = source.optBoolean("showLaneGuidance", true);
+            result.routeStreetLabelsOnly = source.optBoolean(
+                    "routeStreetLabelsOnly", false);
             result.showCursor = source.optBoolean("showCursor", true);
             result.roadsOnly = source.optBoolean("roadsOnly", false);
             result.cameraMode = enumText(source.optString(
@@ -132,6 +134,8 @@ final class NavigationMapProfile {
             result.routeOutlineColor = color(source.optString(
                     "routeOutlineColor", result.routeOutlineColor),
                     result.routeOutlineColor);
+            result.roadColor = color(source.optString(
+                    "roadColor", result.roadColor), result.roadColor);
             result.routeWidth = clamp(
                     source.optDouble("routeWidth", 8d), 1d, 40d, 8d);
             result.routeOutlineWidth = clamp(source.optDouble(
@@ -173,12 +177,27 @@ final class NavigationMapProfile {
     }
 
     String visibilityStyleJson() {
-        if (roadsOnly) return ROADS_ONLY_STYLE;
-        StringBuilder rules = new StringBuilder(384).append('[');
+        StringBuilder rules = new StringBuilder(768).append('[');
         boolean needsComma = false;
-        if (!showLabels) {
+        if (roadsOnly) {
+            needsComma = appendRule(rules, needsComma,
+                    "{\"tags\":{\"none\":" + ROAD_TAGS_JSON + "},"
+                            + "\"stylers\":{\"visibility\":\"off\"}}");
+        }
+        if (!roadColor.isEmpty()) {
+            needsComma = appendRule(rules, needsComma,
+                    "{\"tags\":{\"any\":" + ROAD_TAGS_JSON + "},"
+                            + "\"elements\":\"geometry\",\"stylers\":{\"color\":\""
+                            + mapKitColor(roadColor) + "\"}}");
+        }
+        if (roadsOnly || !showLabels) {
             needsComma = appendRule(rules, needsComma,
                     "{\"elements\":\"label\",\"stylers\":{\"visibility\":\"off\"}}");
+        } else if (routeStreetLabelsOnly) {
+            needsComma = appendRule(rules, needsComma,
+                    "{\"tags\":{\"any\":" + ROAD_TAGS_JSON + "},"
+                            + "\"elements\":\"label\","
+                            + "\"stylers\":{\"visibility\":\"off\"}}");
         }
         if (!showBuildings) {
             needsComma = appendRule(rules, needsComma,
@@ -237,6 +256,13 @@ final class NavigationMapProfile {
         } catch (IllegalArgumentException invalid) {
             return fallback;
         }
+    }
+
+    /** Natro stores Android #AARRGGBB; MapKit styles require #RRGGBBAA. */
+    private static String mapKitColor(String androidColor) {
+        int value = Color.parseColor(androidColor);
+        return String.format(Locale.ROOT, "#%02X%02X%02X%02X",
+                Color.red(value), Color.green(value), Color.blue(value), Color.alpha(value));
     }
 
     private static String bounded(String raw) {
