@@ -10,3 +10,7 @@ deliverables/
 **/__pycache__/
 *.py[cod]
 /docs/README.md
+/docs/instrument-design/working/
+/docs/instrument-design/generated/
+/docs/instrument-design/v2/*-in-car.jpg
+/docs/instrument-design/v2/natro-cluster-v2-review.png
