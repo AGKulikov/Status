@@ -1008,6 +1008,41 @@ public final class NavigationHudV2ContractTest {
         assertFalse(renderer.contains("pendingBackwardConfirmations"));
     }
 
+    @Test public void hudSpeedWakeIsBoundedAndYandexCameraFallbackIsIndependent()
+            throws Exception {
+        Path root = projectRoot();
+        String client = read(root.resolve("app/src/main/java/dezz/status/widget/navigation/"
+                + "HudSpeedCameraBridgeClient.java"));
+        String endpoint = read(root.resolve("app/src/main/java/dezz/status/widget/navigation/"
+                + "NavigationHudEndpointService.java"));
+        String widget = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/WidgetService.java"));
+        String bridge = read(root.resolve("hud-speed-bridge/src/main/java/air/StrelkaSD/bridge/"
+                + "HudSpeedCameraBridgeService.java"));
+        String cameraLayer = read(navigatorModRoot().resolve("CameraDirectionMapLayer.java"));
+
+        assertTrue(client.contains("0L, 5_000L, 15_000L, 30_000L, 60_000L, 120_000L"));
+        assertTrue(client.contains("dueRuntimeWakeAttempt()"));
+        assertTrue(client.contains("hudRuntimeRunning"));
+        assertTrue(client.contains("publishEmpty()"));
+        assertTrue(bridge.contains("startForegroundService(runtime)"));
+        assertTrue(bridge.contains("air.StrelkaSD.MainService"));
+        assertTrue(bridge.contains("startFromReceiver"));
+        assertTrue(bridge.contains("catch (RuntimeException unavailable)"));
+        assertFalse(bridge.contains("startActivity("));
+        assertTrue(endpoint.contains("OPTIONAL_HUD_SPEED_BOOTSTRAP_MS = 135_000L"));
+        assertTrue(endpoint.contains("return START_NOT_STICKY"));
+        assertTrue(widget.indexOf("startForeground(NOTIFICATION_ID, createNotification())")
+                < widget.indexOf("startOptionalHudSpeedBootstrap(this)"));
+
+        assertTrue(cameraLayer.contains("private boolean yandexEnabled"));
+        assertTrue(cameraLayer.contains("private boolean externalEnabled"));
+        assertTrue(cameraLayer.contains("if (externalEnabled && latestExternalSampleElapsedMs"));
+        assertTrue(cameraLayer.contains("if (yandexEnabled && latestRouteActive"));
+        assertTrue(cameraLayer.contains("latestExternal = Collections.emptyList()"));
+        assertTrue(cameraLayer.contains("latestYandex = Collections.emptyList()"));
+    }
+
     private static Path sourceRoot() {
         Path root = Paths.get("app", "src", "main", "java", "dezz", "status", "widget");
         return Files.isDirectory(root) ? root

@@ -49,10 +49,17 @@ final class HudSpeedCameraBridgeClient {
     private static final String KEY_PROTOCOL_VERSION = "protocol_version";
     private static final String KEY_CLIENT_PACKAGE = "client_package";
     private static final String KEY_CAMERAS_JSON = "cameras_json";
+    private static final String KEY_ENSURE_RUNTIME = "ensure_runtime";
+    private static final String KEY_RUNTIME_RUNNING = "runtime_running";
+    private static final String KEY_WAKE_ATTEMPT = "wake_attempt";
     private static final int MAX_RAW_CHARS = 96 * 1024;
     private static final int MAX_CAMERAS = 64;
     private static final long POLL_MS = 1_000L;
     private static final long RETRY_MS = 10_000L;
+    /** Startup checkpoints; an already-running HUD Speed consumes the checkpoint without a wake. */
+    private static final long[] RUNTIME_WAKE_OFFSETS_MS = {
+            0L, 5_000L, 15_000L, 30_000L, 60_000L, 120_000L
+    };
     private static final Set<String> ALLOWED_TAGS = new HashSet<>(Arrays.asList(
             "SPEED_CONTROL", "LANE_CONTROL", "ROAD_MARKING_CONTROL",
             "TRAFFIC_CONTROL", "CROSS_ROAD_CONTROL", "NO_STOPPING_CONTROL",
@@ -69,6 +76,9 @@ final class HudSpeedCameraBridgeClient {
     private boolean bound;
     private boolean binding;
     private boolean started;
+    private long runtimeWakeStartedElapsedMs = -1L;
+    private int runtimeWakeOffsetIndex;
+    private boolean hudRuntimeRunning;
 
     @NonNull private final Runnable poll = this::requestFrame;
     @NonNull private final Runnable retry = this::bind;
@@ -82,6 +92,9 @@ final class HudSpeedCameraBridgeClient {
             }
             bound = true;
             remote = new Messenger(service);
+            if (runtimeWakeStartedElapsedMs < 0L) {
+                runtimeWakeStartedElapsedMs = SystemClock.elapsedRealtime();
+            }
             requestFrame();
         }
 
@@ -115,6 +128,9 @@ final class HudSpeedCameraBridgeClient {
         main.removeCallbacks(poll);
         main.removeCallbacks(retry);
         safeUnbind();
+        runtimeWakeStartedElapsedMs = -1L;
+        runtimeWakeOffsetIndex = 0;
+        hudRuntimeRunning = false;
         publishEmpty();
     }
 
@@ -144,25 +160,55 @@ final class HudSpeedCameraBridgeClient {
         main.removeCallbacks(poll);
         Messenger target = remote;
         if (!started || !bound || target == null) return;
+        int wakeAttempt = dueRuntimeWakeAttempt();
         Message request = Message.obtain(null, MSG_REQUEST_CAMERAS);
         request.replyTo = callbacks;
         Bundle data = new Bundle();
         data.putInt(KEY_PROTOCOL_VERSION, PROTOCOL_VERSION);
         data.putString(KEY_CLIENT_PACKAGE, context.getPackageName());
+        data.putBoolean(KEY_ENSURE_RUNTIME, wakeAttempt > 0);
+        if (wakeAttempt > 0) data.putInt(KEY_WAKE_ATTEMPT, wakeAttempt);
         request.setData(data);
         try {
             target.send(request);
+            if (wakeAttempt > 0) {
+                runtimeWakeOffsetIndex = wakeAttempt;
+                Log.i(TAG, "Requested optional HUD Speed runtime wake checkpoint "
+                        + wakeAttempt + '/' + RUNTIME_WAKE_OFFSETS_MS.length);
+            }
             main.postDelayed(poll, POLL_MS);
         } catch (RemoteException dead) {
             disconnectAndRetry();
         }
     }
 
+    /** Returns the latest due checkpoint, coalescing missed checkpoints after a reconnect. */
+    private int dueRuntimeWakeAttempt() {
+        if (runtimeWakeStartedElapsedMs < 0L
+                || runtimeWakeOffsetIndex >= RUNTIME_WAKE_OFFSETS_MS.length) return 0;
+        long elapsed = Math.max(0L,
+                SystemClock.elapsedRealtime() - runtimeWakeStartedElapsedMs);
+        int dueCount = runtimeWakeOffsetIndex;
+        while (dueCount < RUNTIME_WAKE_OFFSETS_MS.length
+                && elapsed >= RUNTIME_WAKE_OFFSETS_MS[dueCount]) {
+            dueCount++;
+        }
+        if (dueCount == runtimeWakeOffsetIndex) return 0;
+        if (hudRuntimeRunning) {
+            // This checkpoint verified that no force-start was needed.
+            runtimeWakeOffsetIndex = dueCount;
+            return 0;
+        }
+        return dueCount;
+    }
+
     private boolean onMessage(@NonNull Message message) {
         if (message.what != MSG_CAMERA_FRAME || !isTrustedHudSpeedUid(message.sendingUid)) {
             return true;
         }
-        String raw = message.getData().getString(KEY_CAMERAS_JSON, "");
+        Bundle data = message.getData();
+        hudRuntimeRunning = data.getBoolean(KEY_RUNTIME_RUNNING, false);
+        String raw = data.getString(KEY_CAMERAS_JSON, "");
         String normalized = normalizeFrame(raw);
         if (normalized != null) listener.onHudSpeedCameraFrame(normalized);
         return true;
@@ -252,6 +298,7 @@ final class HudSpeedCameraBridgeClient {
 
     private void disconnectAndRetry() {
         main.removeCallbacks(poll);
+        hudRuntimeRunning = false;
         safeUnbind();
         publishEmpty();
         if (started) main.postDelayed(retry, RETRY_MS);

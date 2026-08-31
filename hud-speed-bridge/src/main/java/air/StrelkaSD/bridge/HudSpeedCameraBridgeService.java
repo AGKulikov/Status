@@ -1,11 +1,14 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package air.StrelkaSD.bridge;
 
+import android.app.ActivityManager;
 import android.app.Service;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -42,6 +45,10 @@ public final class HudSpeedCameraBridgeService extends Service {
     private static final String KEY_PROTOCOL_VERSION = "protocol_version";
     private static final String KEY_CLIENT_PACKAGE = "client_package";
     private static final String KEY_CAMERAS_JSON = "cameras_json";
+    private static final String KEY_ENSURE_RUNTIME = "ensure_runtime";
+    private static final String KEY_RUNTIME_RUNNING = "runtime_running";
+    private static final String MAIN_SERVICE_CLASS = "air.StrelkaSD.MainService";
+    private static final String EXTRA_START_FROM_RECEIVER = "startFromReceiver";
     private static final int MAX_CAMERAS = 64;
 
     private final Messenger endpoint = new Messenger(
@@ -59,8 +66,12 @@ public final class HudSpeedCameraBridgeService extends Service {
                 || !NATRO_PACKAGE.equals(request.getString(KEY_CLIENT_PACKAGE, ""))
                 || !isTrustedNatro(message.sendingUid)) return true;
         try {
+            if (request.getBoolean(KEY_ENSURE_RUNTIME, false)) {
+                ensureMainServiceRunning();
+            }
             Bundle data = new Bundle();
             data.putString(KEY_CAMERAS_JSON, buildCameraFrame());
+            data.putBoolean(KEY_RUNTIME_RUNNING, isMainServiceRunning());
             Message response = Message.obtain(null, MSG_CAMERA_FRAME);
             response.setData(data);
             message.replyTo.send(response);
@@ -68,6 +79,46 @@ public final class HudSpeedCameraBridgeService extends Service {
             // The client disappeared between its request and this same-main-loop response.
         }
         return true;
+    }
+
+    /**
+     * Starts HUD Speed's own foreground runtime without opening its activity.
+     *
+     * <p>This service is injected into the same package, so it can address the original
+     * non-exported MainService directly. Any platform denial is deliberately swallowed: camera
+     * export is optional and must never make Natro or Yandex camera rendering fail.</p>
+     */
+    private void ensureMainServiceRunning() {
+        if (isMainServiceRunning()) return;
+        Intent runtime = new Intent()
+                .setComponent(new ComponentName(getPackageName(), MAIN_SERVICE_CLASS))
+                .putExtra(EXTRA_START_FROM_RECEIVER, true);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(runtime);
+            } else {
+                startService(runtime);
+            }
+        } catch (RuntimeException unavailable) {
+            // Permissions, OEM background policy or a stopped package may reject this attempt.
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private boolean isMainServiceRunning() {
+        ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        if (manager == null) return false;
+        ComponentName expected = new ComponentName(getPackageName(), MAIN_SERVICE_CLASS);
+        try {
+            for (ActivityManager.RunningServiceInfo service
+                    : manager.getRunningServices(Integer.MAX_VALUE)) {
+                if (service != null && expected.equals(service.service)) return true;
+            }
+        } catch (RuntimeException unavailable) {
+            // A vendor ActivityManager may suppress service inspection; the next bounded attempt
+            // remains safe because starting an already-running Android Service is idempotent.
+        }
+        return false;
     }
 
     private String buildCameraFrame() {

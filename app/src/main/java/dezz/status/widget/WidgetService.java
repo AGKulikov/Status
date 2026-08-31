@@ -136,6 +136,7 @@ import dezz.status.widget.ha.api.HaApiController;
 import dezz.status.widget.ha.api.HaEntityCatalog;
 import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.mqtt.MqttController;
+import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.phone.PhoneAppIconStore;
 import dezz.status.widget.phone.PhoneBluetoothIndicatorPolicy;
 import dezz.status.widget.phone.PhoneConnectorController;
@@ -1125,6 +1126,7 @@ public class WidgetService extends Service {
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, createNotification());
         StartupPerformanceTrace.mark("widget_foreground_promoted");
+        NavigationHudEndpointService.startOptionalHudSpeedBootstrap(this);
 
     }
 

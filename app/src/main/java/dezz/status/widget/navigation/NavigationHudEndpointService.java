@@ -2,6 +2,7 @@
 package dezz.status.widget.navigation;
 
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -33,6 +34,10 @@ import dezz.status.widget.launcher.NavigationDataRepository;
  */
 public final class NavigationHudEndpointService extends Service {
     private static final String TAG = "NavigationHudEndpoint";
+    private static final String ACTION_BOOTSTRAP_OPTIONAL_HUD_SPEED =
+            "ru.natro.statuswidget.navigation.BOOTSTRAP_OPTIONAL_HUD_SPEED";
+    /** Last wake checkpoint is at 120 seconds; leave time for its Binder response. */
+    private static final long OPTIONAL_HUD_SPEED_BOOTSTRAP_MS = 135_000L;
     static final int MAX_CONFIGURATION_CHARS = 384 * 1024;
     @NonNull private static final Object SURFACE_LOCK = new Object();
     @Nullable private static volatile NavigationHudEndpointService instance;
@@ -59,12 +64,35 @@ public final class NavigationHudEndpointService extends Service {
     @Nullable private PendingPayload pendingRouteGeometry;
     private boolean snapshotDrainPosted;
     private boolean routeGeometryDrainPosted;
+    private int optionalHudSpeedBootstrapStartId;
     @NonNull private final Runnable snapshotDrain = this::drainLatestSnapshot;
     @NonNull private final Runnable routeGeometryDrain = this::drainLatestRouteGeometry;
+    @NonNull private final Runnable finishOptionalHudSpeedBootstrap = () -> {
+        int startId = optionalHudSpeedBootstrapStartId;
+        optionalHudSpeedBootstrapStartId = 0;
+        if (startId != 0) stopSelfResult(startId);
+    };
 
     public interface InstrumentLaunchCallback {
         /** Delivered on Natro's main thread after the request entered Navigator's Binder queue. */
         void onPrepared(boolean prepared);
+    }
+
+    /**
+     * Gives the optional HUD Speed bridge a bounded startup window after Natro is foreground.
+     * Failure to start this helper is intentionally non-fatal; Navigator and Yandex cameras do
+     * not depend on the external source.
+     */
+    public static void startOptionalHudSpeedBootstrap(@NonNull Context context) {
+        Context app = context.getApplicationContext();
+        Context target = app == null ? context : app;
+        Intent command = new Intent(target, NavigationHudEndpointService.class)
+                .setAction(ACTION_BOOTSTRAP_OPTIONAL_HUD_SPEED);
+        try {
+            target.startService(command);
+        } catch (RuntimeException unavailable) {
+            Log.w(TAG, "Optional HUD Speed bootstrap was unavailable", unavailable);
+        }
     }
 
     /**
@@ -246,6 +274,20 @@ public final class NavigationHudEndpointService extends Service {
     }
 
     @Override
+    public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
+        if (intent != null
+                && ACTION_BOOTSTRAP_OPTIONAL_HUD_SPEED.equals(intent.getAction())) {
+            optionalHudSpeedBootstrapStartId = startId;
+            handler.removeCallbacks(finishOptionalHudSpeedBootstrap);
+            handler.postDelayed(finishOptionalHudSpeedBootstrap,
+                    OPTIONAL_HUD_SPEED_BOOTSTRAP_MS);
+        } else {
+            stopSelfResult(startId);
+        }
+        return START_NOT_STICKY;
+    }
+
+    @Override
     public boolean onUnbind(Intent intent) {
         disconnectCurrentClient();
         return false;
@@ -253,6 +295,8 @@ public final class NavigationHudEndpointService extends Service {
 
     @Override
     public void onDestroy() {
+        handler.removeCallbacks(finishOptionalHudSpeedBootstrap);
+        optionalHudSpeedBootstrapStartId = 0;
         if (instance == this) instance = null;
         disconnectCurrentClient();
         HudSpeedCameraBridgeClient cameraBridge = hudSpeedCameraBridge;
