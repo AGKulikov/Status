@@ -112,6 +112,7 @@ public enum InstrumentPanelPreset {
             fresh.responseMillis = old.responseMillis;
             fresh.opacityPercent = old.opacityPercent;
             fresh.style = old.style;
+            preserveUserGeometry(config.presetId, old, fresh);
             mergeUserOptions(old, fresh, approved.presetId);
         }
         for (InstrumentElementConfig old : config.elements) {
@@ -287,5 +288,61 @@ public enum InstrumentPanelPreset {
             Object value = old.options.opt(key);
             if (value != null && value != JSONObject.NULL) option(fresh, key, value);
         }
+    }
+
+    /** Replace only untouched 2.5.7 starter coordinates; real editor work must survive. */
+    private static void preserveUserGeometry(String presetId,
+                                             InstrumentElementConfig old,
+                                             InstrumentElementConfig fresh) {
+        fresh.zIndex = old.zIndex;
+        int[] legacy = legacyGeometry(presetId, old.id);
+        boolean untouchedStarter = legacy != null
+                && old.x == legacy[0] && old.y == legacy[1]
+                && old.width == legacy[2] && old.height == legacy[3];
+        if (untouchedStarter) return;
+        fresh.x = old.x;
+        fresh.y = old.y;
+        fresh.width = old.width;
+        fresh.height = old.height;
+    }
+
+    @Nullable
+    private static int[] legacyGeometry(String presetId, String elementId) {
+        if ("11".equals(presetId)) {
+            if ("tachometer".equals(elementId)) return box(1, 2, 13, 13);
+            if ("map".equals(elementId)) return box(14, 1, 20, 16);
+            if ("speedometer".equals(elementId)) return box(34, 2, 13, 13);
+            if ("navigation".equals(elementId)) return box(15, 2, 10, 6);
+            if ("information".equals(elementId)) return box(2, 5, 11, 8);
+        } else if ("12".equals(presetId)) {
+            if ("map".equals(elementId)) return box(8, 1, 32, 16);
+            if ("speedometer".equals(elementId)) return box(2, 5, 10, 7);
+            if ("tachometer".equals(elementId)) return box(2, 12, 10, 3);
+            if ("navigation".equals(elementId)) return box(36, 3, 11, 7);
+            if ("information".equals(elementId)) return box(2, 4, 11, 9);
+        } else if ("13".equals(presetId)) {
+            if ("tachometer".equals(elementId)) return box(1, 3, 12, 12);
+            if ("map".equals(elementId)) return box(12, 1, 24, 16);
+            if ("speedometer".equals(elementId)) return box(35, 3, 12, 12);
+            if ("navigation".equals(elementId)) return box(17, 2, 14, 5);
+            if ("information".equals(elementId)) return box(36, 5, 10, 8);
+        } else if ("14".equals(presetId)) {
+            if ("map".equals(elementId)) return box(13, 1, 22, 16);
+            if ("speedometer".equals(elementId)) return box(2, 5, 10, 7);
+            if ("tachometer".equals(elementId)) return box(10, 5, 4, 9);
+            if ("navigation".equals(elementId)) return box(35, 4, 12, 7);
+            if ("information".equals(elementId)) return box(2, 4, 11, 9);
+        } else if ("15".equals(presetId)) {
+            if ("map".equals(elementId)) return box(12, 1, 24, 16);
+            if ("tachometer".equals(elementId)) return box(1, 2, 10, 13);
+            if ("speedometer".equals(elementId)) return box(2, 5, 10, 7);
+            if ("navigation".equals(elementId)) return box(35, 4, 12, 7);
+            if ("information".equals(elementId)) return box(2, 4, 11, 9);
+        }
+        return null;
+    }
+
+    private static int[] box(int x, int y, int width, int height) {
+        return new int[]{x, y, width, height};
     }
 }

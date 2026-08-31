@@ -133,6 +133,10 @@ public final class InstrumentPanelContractTest {
         oldMap.x = 13;
         oldMap.width = 22;
         element(old, "speedometer").enabled = false;
+        InstrumentElementConfig customNavigation = element(old, "navigation");
+        customNavigation.x = 31;
+        customNavigation.y = 2;
+        customNavigation.zIndex = 71;
         JSONObject raw = old.toJson().put("presetLayoutRevision", 1);
 
         InstrumentPanelConfig upgraded = InstrumentPanelConfig.fromJson(raw);
@@ -144,6 +148,9 @@ public final class InstrumentPanelContractTest {
         assertFalse(element(upgraded, "speedometer").enabled);
         assertEquals("VERTICAL_RULER",
                 element(upgraded, "tachometer").options.optString("presentation"));
+        assertEquals(31, element(upgraded, "navigation").x);
+        assertEquals(2, element(upgraded, "navigation").y);
+        assertEquals(71, element(upgraded, "navigation").zIndex);
     }
 
     @Test public void panelUsesOneFastChannelAndDirectNativeMapSurface() throws Exception {
