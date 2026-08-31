@@ -27,7 +27,7 @@ final class RoutePolylineStyler {
         invoke(line, "setGradientLength", new Class<?>[]{float.class},
                 (float) profile.trafficGradientLength);
         invoke(line, "setZIndex", new Class<?>[]{float.class},
-                NavigationMapProfile.layerZ(profile.routeLayerPriority));
+                NavigationMapProfile.layerZ(profile.effectiveRoutePriority()));
         invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
         if (profile.showRouteTraffic) {
             for (int paletteIndex = 0; paletteIndex <= 6; paletteIndex++) {

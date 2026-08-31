@@ -184,11 +184,27 @@ public final class NavigationIntegrationConfig {
         public boolean showTrafficLights = true;
         /** Upcoming lane sign anchored to its RoutePosition on the map. */
         public boolean showLaneGuidance = true;
+        /** Camera objects supplied by the separately installed, signature-pinned HUD Speed. */
+        public boolean showHudSpeedCameras = true;
         /** Scale of Yandex's original lane-sign view; 100 keeps the stock MapKit size. */
         public int laneGuidanceScalePercent = 100;
+        /** One scale controls both source-specific camera signs and their optional detail badges. */
+        public int cameraScalePercent = 100;
+        /** Scale of Yandex's original signal-and-seconds traffic-light balloon. */
+        public int trafficLightScalePercent = 100;
+        /** Scale of labels whose anchor and text are verified against the active route. */
+        public int routeLabelScalePercent = 100;
+        /** Scale of stock Yandex road-event icons and their captions, excluding cameras. */
+        public int roadEventScalePercent = 100;
+        /** Scale of Natro's final-route-point marker. */
+        public int destinationScalePercent = 100;
+        /** Off keeps Yandex-compatible automatic collision order; stored sliders are untouched. */
+        public boolean manualLayerPrioritiesEnabled;
         /** User-controlled global stacking order; larger values are drawn above smaller ones. */
         public int cameraDirectionLayerPriority = 20;
+        public int roadEventLayerPriority = 30;
         public int routeLayerPriority = 40;
+        public int destinationLayerPriority = 45;
         public int trafficLightLayerPriority = 50;
         public int routeLabelLayerPriority = 60;
         public int laneGuidanceLayerPriority = 80;
@@ -275,9 +291,18 @@ public final class NavigationIntegrationConfig {
                     .put("showTraffic", showTraffic)
                     .put("showTrafficLights", showTrafficLights)
                     .put("showLaneGuidance", showLaneGuidance)
+                    .put("showHudSpeedCameras", showHudSpeedCameras)
                     .put("laneGuidanceScalePercent", laneGuidanceScalePercent)
+                    .put("cameraScalePercent", cameraScalePercent)
+                    .put("trafficLightScalePercent", trafficLightScalePercent)
+                    .put("routeLabelScalePercent", routeLabelScalePercent)
+                    .put("roadEventScalePercent", roadEventScalePercent)
+                    .put("destinationScalePercent", destinationScalePercent)
+                    .put("manualLayerPrioritiesEnabled", manualLayerPrioritiesEnabled)
                     .put("cameraDirectionLayerPriority", cameraDirectionLayerPriority)
+                    .put("roadEventLayerPriority", roadEventLayerPriority)
                     .put("routeLayerPriority", routeLayerPriority)
+                    .put("destinationLayerPriority", destinationLayerPriority)
                     .put("trafficLightLayerPriority", trafficLightLayerPriority)
                     .put("routeLabelLayerPriority", routeLabelLayerPriority)
                     .put("laneGuidanceLayerPriority", laneGuidanceLayerPriority)
@@ -339,12 +364,30 @@ public final class NavigationIntegrationConfig {
                     "showTrafficLights", result.showTrafficLights);
             result.showLaneGuidance = source.optBoolean(
                     "showLaneGuidance", result.showLaneGuidance);
+            result.showHudSpeedCameras = source.optBoolean(
+                    "showHudSpeedCameras", result.showHudSpeedCameras);
             result.laneGuidanceScalePercent = source.optInt(
                     "laneGuidanceScalePercent", result.laneGuidanceScalePercent);
+            result.cameraScalePercent = source.optInt(
+                    "cameraScalePercent", result.cameraScalePercent);
+            result.trafficLightScalePercent = source.optInt(
+                    "trafficLightScalePercent", result.trafficLightScalePercent);
+            result.routeLabelScalePercent = source.optInt(
+                    "routeLabelScalePercent", result.routeLabelScalePercent);
+            result.roadEventScalePercent = source.optInt(
+                    "roadEventScalePercent", result.roadEventScalePercent);
+            result.destinationScalePercent = source.optInt(
+                    "destinationScalePercent", result.destinationScalePercent);
+            result.manualLayerPrioritiesEnabled = source.optBoolean(
+                    "manualLayerPrioritiesEnabled", result.manualLayerPrioritiesEnabled);
             result.cameraDirectionLayerPriority = source.optInt(
                     "cameraDirectionLayerPriority", result.cameraDirectionLayerPriority);
+            result.roadEventLayerPriority = source.optInt(
+                    "roadEventLayerPriority", result.roadEventLayerPriority);
             result.routeLayerPriority = source.optInt(
                     "routeLayerPriority", result.routeLayerPriority);
+            result.destinationLayerPriority = source.optInt(
+                    "destinationLayerPriority", result.destinationLayerPriority);
             result.trafficLightLayerPriority = source.optInt(
                     "trafficLightLayerPriority", result.trafficLightLayerPriority);
             result.routeLabelLayerPriority = source.optInt(
@@ -417,8 +460,15 @@ public final class NavigationIntegrationConfig {
             mapScalePercent = clamp(mapScalePercent, 50, 300);
             cursorScalePercent = clamp(cursorScalePercent, 25, 300);
             laneGuidanceScalePercent = clamp(laneGuidanceScalePercent, 50, 250);
+            cameraScalePercent = clamp(cameraScalePercent, 50, 250);
+            trafficLightScalePercent = clamp(trafficLightScalePercent, 50, 250);
+            routeLabelScalePercent = clamp(routeLabelScalePercent, 50, 250);
+            roadEventScalePercent = clamp(roadEventScalePercent, 50, 250);
+            destinationScalePercent = clamp(destinationScalePercent, 50, 250);
             cameraDirectionLayerPriority = clamp(cameraDirectionLayerPriority, 0, 100);
+            roadEventLayerPriority = clamp(roadEventLayerPriority, 0, 100);
             routeLayerPriority = clamp(routeLayerPriority, 0, 100);
+            destinationLayerPriority = clamp(destinationLayerPriority, 0, 100);
             trafficLightLayerPriority = clamp(trafficLightLayerPriority, 0, 100);
             routeLabelLayerPriority = clamp(routeLabelLayerPriority, 0, 100);
             laneGuidanceLayerPriority = clamp(laneGuidanceLayerPriority, 0, 100);

@@ -223,9 +223,11 @@ public enum InstrumentPanelPreset {
                                                       InstrumentStyleFamily style) {
         InstrumentElementConfig result = element(id, InstrumentElementType.NAVIGATION_INFO,
                 x, y, width, height, z, style, true);
-        option(result, "showFace", false);
-        option(result, "showStreet", true);
-        option(result, "showArrival", true);
+        option(result, "showFace", true);
+        option(result, "showDistance", true);
+        option(result, "showEta", true);
+        option(result, "showDuration", true);
+        option(result, "showRouteProgress", true);
         return result;
     }
 

@@ -2,37 +2,67 @@
 package ru.natro.navigation;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PointF;
+import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Original-style translucent camera viewing sectors above the independent map. */
+/**
+ * Unified camera signs and source-backed translucent viewing sectors.
+ *
+ * <p>Yandex data comes directly from Windshield. HUD Speed data arrives through Natro's pinned
+ * bridge. HUD Speed is selected first, so a nearby Yandex copy is removed rather than painted
+ * under it. A sector is created only when the source supplied a usable direction.</p>
+ */
 final class CameraDirectionMapLayer {
-    private static final String TAG = "NatroCameraDirection";
-    private static final long FRESH_MS = 3_000L;
-    private static final int MAX_CAMERAS = 8;
+    private static final String TAG = "NatroCameraLayer";
+    private static final long YANDEX_FRESH_MS = 3_000L;
+    private static final long EXTERNAL_FRESH_MS = 3_500L;
+    private static final int MAX_CAMERAS = 32;
+    private static final int MAX_EXTERNAL_JSON_CHARS = 96 * 1024;
+    private static final double DUPLICATE_DISTANCE_METERS = 45d;
     private static final double EARTH_RADIUS_METERS = 6_371_000d;
     private static final double SECTOR_LENGTH_METERS = 105d;
     private static final double SECTOR_HALF_ANGLE_DEGREES = 13d;
-    /** Yandex's direction annotation is a blue translucent plane, not another pin/arrow. */
     private static final int SECTOR_FILL = 0x4D168BFF;
     private static final int SECTOR_STROKE = 0x66166BFF;
 
+    private static final String SOURCE_YANDEX = "YANDEX";
+    private static final String SOURCE_HUD_SPEED = "HUD_SPEED";
+
+    private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
+    private final ArrayList<Bitmap> iconBitmaps = new ArrayList<>();
+    private final ArrayList<Object> imageProviders = new ArrayList<>();
+    private final ArrayList<CameraMarker> visibleScratch = new ArrayList<>(MAX_CAMERAS);
     private Object map;
     private Object collection;
-    private boolean enabled;
+    private boolean yandexEnabled;
+    private boolean externalEnabled = true;
+    private int scalePercent = 100;
     private float zIndex = NavigationMapProfile.layerZ(20);
     private boolean latestRouteActive;
-    private List<NavigatorStatePublisher.CameraDirectionFrame> latest =
+    private List<NavigatorStatePublisher.CameraDirectionFrame> latestYandex =
             Collections.emptyList();
-    private long latestSampleElapsedMs;
+    private List<ExternalCamera> latestExternal = Collections.emptyList();
+    private long latestYandexSampleElapsedMs;
+    private long latestExternalSampleElapsedMs;
     private long latestVisualFingerprint = Long.MIN_VALUE;
     private long renderedFingerprint = Long.MIN_VALUE;
     private boolean expiryPosted;
@@ -40,31 +70,24 @@ final class CameraDirectionMapLayer {
     private final Runnable expire = new Runnable() {
         @Override public void run() {
             expiryPosted = false;
-            if (latestSampleElapsedMs <= 0L) return;
-            long remaining = FRESH_MS
-                    - (SystemClock.elapsedRealtime() - latestSampleElapsedMs);
-            if (remaining > 0L) {
-                expiryPosted = main.postDelayed(this, remaining);
-                return;
-            }
-            latest = Collections.emptyList();
-            latestSampleElapsedMs = 0L;
-            latestVisualFingerprint = Long.MIN_VALUE;
-            render();
+            discardExpiredSources();
+            refreshFingerprintAndRender();
+            scheduleExpiryIfNeeded();
         }
     };
 
     CameraDirectionMapLayer(Context context) {
-        // Kept for the same construction contract as the other MapKit object layers.
+        Context app = context.getApplicationContext();
+        this.context = app == null ? context : app;
     }
 
     void attach(Object nextMap) {
         if (map == nextMap) return;
         detachMap();
         map = nextMap;
-        discardExpiredSource();
+        discardExpiredSources();
         scheduleExpiryIfNeeded();
-        render();
+        refreshFingerprintAndRender();
     }
 
     void detachMap() {
@@ -75,75 +98,182 @@ final class CameraDirectionMapLayer {
         map = null;
     }
 
-    void apply(boolean nextEnabled, int layerPriority) {
+    void apply(boolean nextYandexEnabled, boolean nextExternalEnabled,
+               int nextScalePercent, int layerPriority) {
+        int nextScale = Math.max(50, Math.min(250, nextScalePercent));
         float nextZ = NavigationMapProfile.layerZ(layerPriority);
-        boolean priorityChanged = zIndex != nextZ;
-        if (enabled == nextEnabled && !priorityChanged) return;
-        enabled = nextEnabled;
+        boolean presentationChanged = scalePercent != nextScale || zIndex != nextZ;
+        boolean visibilityChanged = yandexEnabled != nextYandexEnabled
+                || externalEnabled != nextExternalEnabled;
+        if (!presentationChanged && !visibilityChanged) return;
+        yandexEnabled = nextYandexEnabled;
+        externalEnabled = nextExternalEnabled;
+        scalePercent = nextScale;
         zIndex = nextZ;
-        if (priorityChanged) renderedFingerprint = Long.MIN_VALUE;
-        if (!enabled) {
+        MapObjectLayerFactory.setZIndex(collection, nextZ);
+        if (presentationChanged) renderedFingerprint = Long.MIN_VALUE;
+        if (!yandexEnabled && !externalEnabled) {
             main.removeCallbacks(expire);
             expiryPosted = false;
         } else {
-            discardExpiredSource();
+            discardExpiredSources();
             scheduleExpiryIfNeeded();
         }
-        render();
+        refreshFingerprintAndRender();
     }
 
     void update(boolean routeActive, long sampleElapsedMs,
                 List<NavigatorStatePublisher.CameraDirectionFrame> values) {
-        if (routeActive == latestRouteActive && sampleElapsedMs == latestSampleElapsedMs
-                && values == latest) return;
         latestRouteActive = routeActive;
         long now = SystemClock.elapsedRealtime();
         boolean fresh = routeActive && sampleElapsedMs > 0L && now >= sampleElapsedMs
-                && now - sampleElapsedMs <= FRESH_MS;
-        latest = fresh && values != null ? values : Collections.emptyList();
-        if (fresh) {
-            latestSampleElapsedMs = sampleElapsedMs;
-            scheduleExpiryIfNeeded();
-        } else {
-            latestSampleElapsedMs = 0L;
-            main.removeCallbacks(expire);
-            expiryPosted = false;
-        }
-        long fingerprint = visualFingerprint(latest);
-        if (fingerprint == latestVisualFingerprint) return;
-        latestVisualFingerprint = fingerprint;
-        if (enabled && map != null) render();
+                && now - sampleElapsedMs <= YANDEX_FRESH_MS;
+        latestYandex = fresh && values != null ? values : Collections.emptyList();
+        latestYandexSampleElapsedMs = fresh ? sampleElapsedMs : 0L;
+        scheduleExpiryIfNeeded();
+        refreshFingerprintAndRender();
     }
 
+    /** Accepts only the bounded, normalized frame forwarded by the Natro host. */
+    void updateExternal(String raw) {
+        ArrayList<ExternalCamera> parsed = new ArrayList<>();
+        long sampledAt = 0L;
+        try {
+            if (raw == null || raw.isEmpty() || raw.length() > MAX_EXTERNAL_JSON_CHARS
+                    || raw.indexOf('\u0000') >= 0) {
+                throw new IllegalArgumentException("empty or oversized external camera frame");
+            }
+            JSONObject root = new JSONObject(raw);
+            if (root.optInt("schema", -1) != 1) {
+                throw new IllegalArgumentException("external camera schema mismatch");
+            }
+            sampledAt = root.optLong("sampleElapsedMs", 0L);
+            long now = SystemClock.elapsedRealtime();
+            if (sampledAt <= 0L || now < sampledAt || now - sampledAt > EXTERNAL_FRESH_MS) {
+                throw new IllegalArgumentException("stale external camera frame");
+            }
+            JSONArray cameras = root.optJSONArray("cameras");
+            if (cameras != null) {
+                for (int index = 0; index < cameras.length()
+                        && parsed.size() < MAX_CAMERAS; index++) {
+                    JSONObject item = cameras.optJSONObject(index);
+                    ExternalCamera camera = ExternalCamera.fromJson(item);
+                    if (camera != null) parsed.add(camera);
+                }
+            }
+        } catch (Exception invalid) {
+            parsed.clear();
+            sampledAt = 0L;
+        }
+        latestExternal = parsed.isEmpty()
+                ? Collections.emptyList() : Collections.unmodifiableList(parsed);
+        latestExternalSampleElapsedMs = sampledAt;
+        scheduleExpiryIfNeeded();
+        refreshFingerprintAndRender();
+    }
+
+    /** Ends only Navigator's route-owned stream; HUD Speed remains useful in free drive. */
     void clearData() {
-        main.removeCallbacks(expire);
-        expiryPosted = false;
-        latest = Collections.emptyList();
+        latestYandex = Collections.emptyList();
         latestRouteActive = false;
-        latestSampleElapsedMs = 0L;
-        latestVisualFingerprint = Long.MIN_VALUE;
-        render();
+        latestYandexSampleElapsedMs = 0L;
+        refreshFingerprintAndRender();
+        scheduleExpiryIfNeeded();
     }
 
     private void scheduleExpiryIfNeeded() {
-        if (!enabled || map == null || latestSampleElapsedMs <= 0L || expiryPosted) return;
-        long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
-        if (age < 0L || age > FRESH_MS) return;
-        expiryPosted = main.postDelayed(expire, Math.max(1L, FRESH_MS - age));
+        if (map == null || expiryPosted || (!yandexEnabled && !externalEnabled)) return;
+        long now = SystemClock.elapsedRealtime();
+        long delay = Long.MAX_VALUE;
+        if (latestYandexSampleElapsedMs > 0L) {
+            delay = Math.min(delay,
+                    latestYandexSampleElapsedMs + YANDEX_FRESH_MS - now);
+        }
+        if (latestExternalSampleElapsedMs > 0L) {
+            delay = Math.min(delay,
+                    latestExternalSampleElapsedMs + EXTERNAL_FRESH_MS - now);
+        }
+        if (delay == Long.MAX_VALUE) return;
+        expiryPosted = main.postDelayed(expire, Math.max(1L, delay));
     }
 
-    private void discardExpiredSource() {
-        if (latestSampleElapsedMs <= 0L) return;
-        long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
-        if (age >= 0L && age <= FRESH_MS) return;
-        latest = Collections.emptyList();
-        latestSampleElapsedMs = 0L;
-        latestVisualFingerprint = Long.MIN_VALUE;
+    private void discardExpiredSources() {
+        long now = SystemClock.elapsedRealtime();
+        if (latestYandexSampleElapsedMs > 0L
+                && (now < latestYandexSampleElapsedMs
+                || now - latestYandexSampleElapsedMs > YANDEX_FRESH_MS)) {
+            latestYandex = Collections.emptyList();
+            latestYandexSampleElapsedMs = 0L;
+        }
+        if (latestExternalSampleElapsedMs > 0L
+                && (now < latestExternalSampleElapsedMs
+                || now - latestExternalSampleElapsedMs > EXTERNAL_FRESH_MS)) {
+            latestExternal = Collections.emptyList();
+            latestExternalSampleElapsedMs = 0L;
+        }
+    }
+
+    private void refreshFingerprintAndRender() {
+        selectVisible(visibleScratch);
+        long fingerprint = visualFingerprint(visibleScratch);
+        if (fingerprint == latestVisualFingerprint) return;
+        latestVisualFingerprint = fingerprint;
+        if (map != null) render();
+    }
+
+    /** HUD Speed is inserted first and therefore wins every positional duplicate. */
+    private void selectVisible(ArrayList<CameraMarker> target) {
+        target.clear();
+        if (externalEnabled && latestExternalSampleElapsedMs > 0L) {
+            for (ExternalCamera value : latestExternal) {
+                if (value == null || !value.hasMapPosition()) continue;
+                CameraMarker candidate = CameraMarker.fromExternal(value);
+                if (!hasDuplicate(target, candidate, 18d)) target.add(candidate);
+                if (target.size() >= MAX_CAMERAS) return;
+            }
+        }
+        if (yandexEnabled && latestRouteActive && latestYandexSampleElapsedMs > 0L) {
+            for (NavigatorStatePublisher.CameraDirectionFrame value : latestYandex) {
+                if (value == null || !value.hasMapPosition()) continue;
+                CameraMarker candidate = CameraMarker.fromYandex(value);
+                if (!hasHudSpeedDuplicate(target, candidate)
+                        && !hasDuplicate(target, candidate, 18d)) {
+                    target.add(candidate);
+                }
+                if (target.size() >= MAX_CAMERAS) return;
+            }
+        }
+    }
+
+    private static boolean hasHudSpeedDuplicate(List<CameraMarker> values,
+                                                CameraMarker candidate) {
+        for (CameraMarker accepted : values) {
+            if (!SOURCE_HUD_SPEED.equals(accepted.source)) continue;
+            if (distanceMeters(accepted.latitude, accepted.longitude,
+                    candidate.latitude, candidate.longitude) <= DUPLICATE_DISTANCE_METERS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasDuplicate(List<CameraMarker> values, CameraMarker candidate,
+                                        double maximumDistanceMeters) {
+        for (CameraMarker accepted : values) {
+            if (accepted.source.equals(candidate.source)
+                    && accepted.id.equals(candidate.id)) return true;
+            if (accepted.source.equals(candidate.source)
+                    && distanceMeters(accepted.latitude, accepted.longitude,
+                    candidate.latitude, candidate.longitude) <= maximumDistanceMeters) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void render() {
         if (map == null) return;
-        if (!enabled || !latestRouteActive || latest.isEmpty()) {
+        if (visibleScratch.isEmpty()) {
             clearVisual();
             return;
         }
@@ -151,40 +281,40 @@ final class CameraDirectionMapLayer {
         try {
             Object currentCollection = collection;
             if (currentCollection == null) {
-                Object root = invoke(map, "getMapObjects", new Class<?>[0]);
-                currentCollection = invoke(root, "addCollection", new Class<?>[0]);
+                currentCollection = MapObjectLayerFactory.create(map,
+                        "ru.natro.navigation.cameras",
+                        MapObjectLayerFactory.EQUAL, zIndex);
                 collection = currentCollection;
             }
             invoke(currentCollection, "clear", new Class<?>[0]);
-            int count = 0;
-            for (NavigatorStatePublisher.CameraDirectionFrame camera : latest) {
-                if (count >= MAX_CAMERAS) break;
-                if (camera == null || !camera.hasMapPosition()
-                        || (!camera.inFace && !camera.inBack)) continue;
-                count++;
-                // inFace looks towards approaching traffic; inBack looks along its travel.
-                if (camera.inFace) addSector(currentCollection, camera,
-                        camera.bearingDegrees + 180d);
-                if (camera.inBack) addSector(currentCollection, camera,
-                        camera.bearingDegrees);
+            iconBitmaps.clear();
+            imageProviders.clear();
+            for (CameraMarker camera : visibleScratch) {
+                // No direction supplied means exactly one sign and no guessed circular plane.
+                for (Double direction : camera.directions) {
+                    if (direction != null && Double.isFinite(direction)) {
+                        addSector(currentCollection, camera.latitude, camera.longitude,
+                                direction.doubleValue());
+                    }
+                }
             }
+            for (CameraMarker camera : visibleScratch) addSign(currentCollection, camera);
             renderedFingerprint = latestVisualFingerprint;
         } catch (Throwable failure) {
-            Log.w(TAG, "Camera direction sector update failed", failure);
+            Log.w(TAG, "Camera sign/direction update failed", failure);
             clearVisual();
         }
     }
 
-    private void addSector(Object target,
-                           NavigatorStatePublisher.CameraDirectionFrame camera,
+    private void addSector(Object target, double latitude, double longitude,
                            double directionDegrees) throws Exception {
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         ArrayList<Object> points = new ArrayList<>(4);
         points.add(pointClass.getConstructor(double.class, double.class)
-                .newInstance(camera.latitude, camera.longitude));
-        double[] left = destination(camera.latitude, camera.longitude,
+                .newInstance(latitude, longitude));
+        double[] left = destination(latitude, longitude,
                 directionDegrees - SECTOR_HALF_ANGLE_DEGREES, SECTOR_LENGTH_METERS);
-        double[] right = destination(camera.latitude, camera.longitude,
+        double[] right = destination(latitude, longitude,
                 directionDegrees + SECTOR_HALF_ANGLE_DEGREES, SECTOR_LENGTH_METERS);
         points.add(pointClass.getConstructor(double.class, double.class)
                 .newInstance(left[0], left[1]));
@@ -207,6 +337,245 @@ final class CameraDirectionMapLayer {
         invoke(mapObject, "setVisible", new Class<?>[]{boolean.class}, true);
     }
 
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void addSign(Object target, CameraMarker camera) throws Exception {
+        Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
+        Object point = pointClass.getConstructor(double.class, double.class)
+                .newInstance(camera.latitude, camera.longitude);
+        Object placemark = invoke(target, "addPlacemark", new Class<?>[]{pointClass}, point);
+        Bitmap bitmap = createCameraBitmap(camera);
+        Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
+        Object provider = providerClass.getMethod("fromBitmap", Bitmap.class)
+                .invoke(null, bitmap);
+        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+        Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
+        Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass, "NO_ROTATION");
+        Object style = styleClass.getConstructor().newInstance();
+        invoke(style, "setAnchor", new Class<?>[]{PointF.class}, new PointF(0.5f, 0.92f));
+        invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
+        invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
+        invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
+        float sourceOffset = SOURCE_HUD_SPEED.equals(camera.source) ? 0.002f : 0.001f;
+        invoke(style, "setZIndex", new Class<?>[]{Float.class},
+                Float.valueOf(zIndex + sourceOffset));
+        invoke(placemark, "setIcon", new Class<?>[]{providerClass, styleClass}, provider, style);
+        invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
+        iconBitmaps.add(bitmap);
+        imageProviders.add(provider);
+    }
+
+    /** Stock-like white/red Yandex pin; HUD Speed uses a clearly distinct violet/amber pin. */
+    private Bitmap createCameraBitmap(CameraMarker camera) {
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        float scale = scalePercent / 100f;
+        int base = Math.max(34, Math.min(220, Math.round(48f * density * scale)));
+        int width = Math.round(base * 1.48f);
+        int height = Math.round(base * 1.18f);
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
+        boolean hud = SOURCE_HUD_SPEED.equals(camera.source);
+        int accent = hud ? 0xFFFFB300 : 0xFFE53935;
+        int face = hud ? 0xFF5B35B5 : Color.WHITE;
+        int glyph = hud ? Color.WHITE : 0xFF25282D;
+        float cx = base * .50f;
+        float cy = base * .49f;
+        float radius = base * .285f;
+
+        Path pin = new Path();
+        pin.moveTo(cx - radius * .50f, cy + radius * .72f);
+        pin.lineTo(cx, base * 1.02f);
+        pin.lineTo(cx + radius * .50f, cy + radius * .72f);
+        pin.close();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(accent);
+        canvas.drawPath(pin, paint);
+        paint.setColor(face);
+        canvas.drawCircle(cx, cy, radius, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(2f, base * .055f));
+        paint.setColor(accent);
+        canvas.drawCircle(cx, cy, radius, paint);
+        drawCameraGlyph(canvas, paint, cx, cy, radius, glyph);
+
+        if (hud) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTypeface(Typeface.DEFAULT_BOLD);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(base * .125f);
+            paint.setColor(0xFFFFD45A);
+            canvas.drawText("H", cx, cy + radius * .75f, paint);
+        }
+
+        if (camera.speedLimit > 0) {
+            float badgeX = base * .87f;
+            float badgeY = base * .27f;
+            float badgeR = base * .19f;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.WHITE);
+            canvas.drawCircle(badgeX, badgeY, badgeR, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(2f, base * .045f));
+            paint.setColor(0xFFE53935);
+            canvas.drawCircle(badgeX, badgeY, badgeR, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFF22252A);
+            paint.setTypeface(Typeface.DEFAULT_BOLD);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(base * (camera.speedLimit >= 100 ? .145f : .18f));
+            Paint.FontMetrics metrics = paint.getFontMetrics();
+            float baseline = badgeY - (metrics.ascent + metrics.descent) * .5f;
+            canvas.drawText(Integer.toString(camera.speedLimit), badgeX, baseline, paint);
+        }
+
+        ArrayList<String> details = visibleControlTags(camera.controlTags);
+        for (int index = 0; index < details.size() && index < 3; index++) {
+            float badgeX = base * (.86f + index * .225f);
+            float badgeY = base * .66f;
+            float badgeR = base * .105f;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFFF7F8FA);
+            canvas.drawCircle(badgeX, badgeY, badgeR, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(1.5f, base * .025f));
+            paint.setColor(accent);
+            canvas.drawCircle(badgeX, badgeY, badgeR, paint);
+            drawControlGlyph(canvas, paint, details.get(index), badgeX, badgeY,
+                    badgeR * .70f, 0xFF272A30);
+        }
+        return bitmap;
+    }
+
+    private static void drawCameraGlyph(Canvas canvas, Paint paint, float cx, float cy,
+                                        float radius, int color) {
+        float width = radius * 1.10f;
+        float height = radius * .70f;
+        RectF body = new RectF(cx - width * .5f, cy - height * .35f,
+                cx + width * .5f, cy + height * .65f);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(color);
+        canvas.drawRoundRect(body, radius * .15f, radius * .15f, paint);
+        RectF hump = new RectF(cx - width * .22f, cy - height * .58f,
+                cx + width * .14f, cy - height * .20f);
+        canvas.drawRoundRect(hump, radius * .08f, radius * .08f, paint);
+        paint.setColor(0xFFF4F5F7);
+        canvas.drawCircle(cx + width * .10f, cy + height * .15f, radius * .20f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, radius * .09f));
+        paint.setColor(color == Color.WHITE ? 0xFFDDD7FF : 0xFF63676F);
+        canvas.drawCircle(cx + width * .10f, cy + height * .15f, radius * .20f, paint);
+    }
+
+    private static ArrayList<String> visibleControlTags(List<String> source) {
+        ArrayList<String> result = new ArrayList<>(3);
+        if (source == null) return result;
+        for (String raw : source) {
+            String tag = raw == null ? "" : raw;
+            if ("SPEED_CONTROL".equals(tag) || !isCameraDetail(tag)
+                    || result.contains(tag)) continue;
+            result.add(tag);
+            if (result.size() >= 3) break;
+        }
+        return result;
+    }
+
+    private static boolean isCameraDetail(String tag) {
+        return "LANE_CONTROL".equals(tag) || "ROAD_MARKING_CONTROL".equals(tag)
+                || "TRAFFIC_CONTROL".equals(tag) || "CROSS_ROAD_CONTROL".equals(tag)
+                || "NO_STOPPING_CONTROL".equals(tag) || "MOBILE_CONTROL".equals(tag)
+                || "AVERAGE_SPEED_CONTROL".equals(tag) || "ALL_RULES_CONTROL".equals(tag)
+                || "STOP_SIGN_CONTROL".equals(tag) || "SHOULDER_CONTROL".equals(tag)
+                || "PEDESTRIAN_CONTROL".equals(tag) || "TRUCK_CONTROL".equals(tag);
+    }
+
+    private static void drawControlGlyph(Canvas canvas, Paint paint, String tag,
+                                         float cx, float cy, float size, int color) {
+        paint.setColor(color);
+        paint.setStrokeWidth(Math.max(1f, size * .22f));
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStyle(Paint.Style.STROKE);
+        if ("LANE_CONTROL".equals(tag)) {
+            canvas.drawLine(cx - size * .45f, cy - size * .55f,
+                    cx - size * .45f, cy + size * .55f, paint);
+            canvas.drawLine(cx + size * .45f, cy - size * .55f,
+                    cx + size * .45f, cy + size * .55f, paint);
+            canvas.drawCircle(cx, cy + size * .15f, size * .18f, paint);
+        } else if ("ROAD_MARKING_CONTROL".equals(tag)) {
+            for (int part = -1; part <= 1; part++) {
+                canvas.drawLine(cx, cy + part * size * .45f - size * .12f,
+                        cx, cy + part * size * .45f + size * .12f, paint);
+            }
+        } else if ("TRAFFIC_CONTROL".equals(tag)
+                || "CROSS_ROAD_CONTROL".equals(tag)) {
+            paint.setStyle(Paint.Style.FILL);
+            canvas.drawCircle(cx, cy - size * .48f, size * .18f, paint);
+            canvas.drawCircle(cx, cy, size * .18f, paint);
+            canvas.drawCircle(cx, cy + size * .48f, size * .18f, paint);
+        } else if ("NO_STOPPING_CONTROL".equals(tag)) {
+            canvas.drawLine(cx - size * .52f, cy - size * .52f,
+                    cx + size * .52f, cy + size * .52f, paint);
+            canvas.drawLine(cx + size * .52f, cy - size * .52f,
+                    cx - size * .52f, cy + size * .52f, paint);
+        } else if ("MOBILE_CONTROL".equals(tag)) {
+            canvas.drawLine(cx, cy - size * .55f, cx, cy + size * .05f, paint);
+            canvas.drawLine(cx, cy, cx - size * .52f, cy + size * .55f, paint);
+            canvas.drawLine(cx, cy, cx + size * .52f, cy + size * .55f, paint);
+        } else if ("AVERAGE_SPEED_CONTROL".equals(tag)) {
+            canvas.drawLine(cx - size * .50f, cy, cx + size * .50f, cy, paint);
+            canvas.drawLine(cx - size * .50f, cy, cx - size * .24f, cy - size * .28f, paint);
+            canvas.drawLine(cx + size * .50f, cy, cx + size * .24f, cy + size * .28f, paint);
+        } else if ("SHOULDER_CONTROL".equals(tag)) {
+            canvas.drawLine(cx - size * .45f, cy + size * .52f,
+                    cx + size * .35f, cy - size * .52f, paint);
+            canvas.drawLine(cx + size * .48f, cy - size * .52f,
+                    cx + size * .48f, cy + size * .52f, paint);
+        } else {
+            String letter = "ALL_RULES_CONTROL".equals(tag) ? "+"
+                    : "STOP_SIGN_CONTROL".equals(tag) ? "S"
+                    : "PEDESTRIAN_CONTROL".equals(tag) ? "P" : "T";
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTypeface(Typeface.DEFAULT_BOLD);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(size * 1.35f);
+            Paint.FontMetrics metrics = paint.getFontMetrics();
+            canvas.drawText(letter, cx, cy - (metrics.ascent + metrics.descent) * .5f, paint);
+        }
+        paint.setStrokeCap(Paint.Cap.BUTT);
+    }
+
+    private void clearVisual() {
+        if (collection != null) {
+            try { invoke(collection, "clear", new Class<?>[0]); }
+            catch (Throwable ignored) {}
+        }
+        iconBitmaps.clear();
+        imageProviders.clear();
+        renderedFingerprint = Long.MIN_VALUE;
+    }
+
+    private static long visualFingerprint(List<CameraMarker> values) {
+        long result = 0x517cc1b727220a95L;
+        int count = 0;
+        for (CameraMarker value : values) {
+            if (value == null || !value.hasMapPosition()) continue;
+            if (count++ >= MAX_CAMERAS) break;
+            result = mix(result, value.source.hashCode());
+            result = mix(result, value.id.hashCode());
+            result = mix(result, Math.round(value.latitude * 1_000_000d));
+            result = mix(result, Math.round(value.longitude * 1_000_000d));
+            result = mix(result, value.speedLimit);
+            for (String tag : value.controlTags) result = mix(result, tag.hashCode());
+            for (Double direction : value.directions) {
+                result = mix(result, Math.round(direction.doubleValue() * 10d));
+            }
+        }
+        return mix(result, count);
+    }
+
+    private static long mix(long value, long part) {
+        return (value ^ part) * 0x100000001b3L;
+    }
+
     private static double[] destination(double latitude, double longitude,
                                         double bearingDegrees, double distanceMeters) {
         double angular = distanceMeters / EARTH_RADIUS_METERS;
@@ -221,39 +590,128 @@ final class CameraDirectionMapLayer {
         return new double[]{Math.toDegrees(toLatitude), Math.toDegrees(toLongitude)};
     }
 
-    private void clearVisual() {
-        if (collection != null) {
-            try { invoke(collection, "clear", new Class<?>[0]); }
-            catch (Throwable ignored) {}
-        }
-        renderedFingerprint = Long.MIN_VALUE;
+    private static double distanceMeters(double latitudeA, double longitudeA,
+                                         double latitudeB, double longitudeB) {
+        double latitudeDelta = Math.toRadians(latitudeB - latitudeA);
+        double longitudeDelta = Math.toRadians(longitudeB - longitudeA);
+        double a = Math.sin(latitudeDelta * .5d) * Math.sin(latitudeDelta * .5d)
+                + Math.cos(Math.toRadians(latitudeA)) * Math.cos(Math.toRadians(latitudeB))
+                * Math.sin(longitudeDelta * .5d) * Math.sin(longitudeDelta * .5d);
+        return 2d * EARTH_RADIUS_METERS * Math.atan2(Math.sqrt(a), Math.sqrt(1d - a));
     }
 
-    private static long visualFingerprint(
-            List<NavigatorStatePublisher.CameraDirectionFrame> values) {
-        long result = 0x517cc1b727220a95L;
-        int count = 0;
-        for (NavigatorStatePublisher.CameraDirectionFrame value : values) {
-            if (value == null || !value.hasMapPosition()) continue;
-            if (count >= MAX_CAMERAS) break;
-            count++;
-            result = mix(result, value.id.hashCode());
-            result = mix(result, Math.round(value.latitude * 1_000_000d));
-            result = mix(result, Math.round(value.longitude * 1_000_000d));
-            result = mix(result, Math.round(value.bearingDegrees * 10f));
-            result = mix(result, value.inFace ? 1 : 0);
-            result = mix(result, value.inBack ? 1 : 0);
-        }
-        return mix(result, count);
-    }
-
-    private static long mix(long value, long part) {
-        return (value ^ part) * 0x100000001b3L;
+    private static double normalizedBearing(double value) {
+        if (!Double.isFinite(value)) return Double.NaN;
+        double normalized = value % 360d;
+        return normalized < 0d ? normalized + 360d : normalized;
     }
 
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,
                                  Object... arguments) throws Exception {
         Method method = ReflectMethods.publicMethod(target.getClass(), name, parameterTypes);
         return method.invoke(target, arguments);
+    }
+
+    private static final class ExternalCamera {
+        final String id;
+        final double latitude;
+        final double longitude;
+        final int speedLimit;
+        final List<String> controlTags;
+        final List<Double> directions;
+
+        ExternalCamera(String id, double latitude, double longitude, int speedLimit,
+                       List<String> controlTags, List<Double> directions) {
+            this.id = id;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.speedLimit = speedLimit;
+            this.controlTags = controlTags;
+            this.directions = directions;
+        }
+
+        static ExternalCamera fromJson(JSONObject source) {
+            if (source == null || !SOURCE_HUD_SPEED.equals(source.optString("source", ""))) {
+                return null;
+            }
+            String id = source.optString("id", "");
+            if (id.isEmpty() || id.length() > 96) return null;
+            double latitude = source.optDouble("latitude", Double.NaN);
+            double longitude = source.optDouble("longitude", Double.NaN);
+            if (!Double.isFinite(latitude) || latitude < -90d || latitude > 90d
+                    || !Double.isFinite(longitude) || longitude < -180d
+                    || longitude > 180d) return null;
+            int speed = source.optInt("speedLimit", -1);
+            if (speed <= 0 || speed > 400) speed = -1;
+            ArrayList<String> tags = new ArrayList<>();
+            JSONArray tagArray = source.optJSONArray("controlTags");
+            if (tagArray != null) {
+                for (int index = 0; index < tagArray.length() && tags.size() < 8; index++) {
+                    String tag = tagArray.optString(index, "");
+                    if (!tag.isEmpty() && tag.length() <= 48 && !tags.contains(tag)) {
+                        tags.add(tag);
+                    }
+                }
+            }
+            ArrayList<Double> directions = new ArrayList<>(2);
+            JSONArray directionArray = source.optJSONArray("directions");
+            if (directionArray != null) {
+                for (int index = 0; index < directionArray.length()
+                        && directions.size() < 2; index++) {
+                    double direction = normalizedBearing(
+                            directionArray.optDouble(index, Double.NaN));
+                    if (Double.isFinite(direction)) directions.add(direction);
+                }
+            }
+            return new ExternalCamera(id, latitude, longitude, speed,
+                    Collections.unmodifiableList(tags),
+                    Collections.unmodifiableList(directions));
+        }
+
+        boolean hasMapPosition() {
+            return Double.isFinite(latitude) && latitude >= -90d && latitude <= 90d
+                    && Double.isFinite(longitude) && longitude >= -180d && longitude <= 180d;
+        }
+    }
+
+    private static final class CameraMarker {
+        final String source;
+        final String id;
+        final double latitude;
+        final double longitude;
+        final int speedLimit;
+        final List<String> controlTags;
+        final List<Double> directions;
+
+        CameraMarker(String source, String id, double latitude, double longitude,
+                     int speedLimit, List<String> controlTags, List<Double> directions) {
+            this.source = source;
+            this.id = id;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.speedLimit = speedLimit;
+            this.controlTags = controlTags;
+            this.directions = directions;
+        }
+
+        static CameraMarker fromYandex(NavigatorStatePublisher.CameraDirectionFrame value) {
+            ArrayList<Double> directions = new ArrayList<>(2);
+            if (value.inFace) directions.add(normalizedBearing(value.bearingDegrees + 180d));
+            if (value.inBack) directions.add(normalizedBearing(value.bearingDegrees));
+            return new CameraMarker(SOURCE_YANDEX, value.id, value.latitude, value.longitude,
+                    value.speedLimitKmh, value.controlTags,
+                    Collections.unmodifiableList(directions));
+        }
+
+        static CameraMarker fromExternal(ExternalCamera value) {
+            return new CameraMarker(SOURCE_HUD_SPEED, value.id,
+                    value.latitude, value.longitude, value.speedLimit,
+                    value.controlTags, value.directions);
+        }
+
+        boolean hasMapPosition() {
+            return Double.isFinite(latitude) && latitude >= -90d && latitude <= 90d
+                    && Double.isFinite(longitude) && longitude >= -180d && longitude <= 180d;
+        }
     }
 }

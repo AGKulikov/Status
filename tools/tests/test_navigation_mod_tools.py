@@ -26,6 +26,7 @@ def load(name):
 PATCHER = load("patch_navigation_map_activity.py")
 MAP_VIEW_PATCHER = load("patch_navigation_map_view.py")
 MANIFEST_PATCHER = load("patch_navigation_manifest_theme.py")
+HUD_SPEED_MANIFEST_PATCHER = load("patch_hud_speed_bridge_manifest.py")
 
 
 class NavigationModToolsTest(unittest.TestCase):
@@ -193,6 +194,59 @@ class NavigationModToolsTest(unittest.TestCase):
                 self.assertEqual(b"new", archive.read("classes4.dex"))
                 self.assertEqual(b"isolated", archive.read("classes19.dex"))
 
+    def test_hud_speed_bridge_manifest_patch_is_exact_and_idempotence_safe(self):
+        source = (
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
+            'package="air.StrelkaHUDFREE">\n'
+            '    <application>\n'
+            '    </application>\n'
+            '</manifest>\n'
+        )
+        patched = HUD_SPEED_MANIFEST_PATCHER.patch(source)
+        self.assertEqual(1, patched.count(HUD_SPEED_MANIFEST_PATCHER.SERVICE_NAME))
+        self.assertIn('android:exported="true"', patched)
+        self.assertIn('ru.natro.hudspeed.camera.BIND_V1', patched)
+        with self.assertRaisesRegex(ValueError, "already present"):
+            HUD_SPEED_MANIFEST_PATCHER.patch(patched)
+        with self.assertRaisesRegex(ValueError, "expected HUD Speed package"):
+            HUD_SPEED_MANIFEST_PATCHER.patch(source.replace(
+                "air.StrelkaHUDFREE", "unexpected.package"))
+
+    def test_hud_speed_bridge_is_bounded_authenticated_and_reproducible(self):
+        service = (TOOLS.parent / "hud-speed-bridge" / "src" / "main" / "java"
+                   / "air" / "StrelkaSD" / "bridge"
+                   / "HudSpeedCameraBridgeService.java").read_text()
+        client = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                  / "status" / "widget" / "navigation"
+                  / "HudSpeedCameraBridgeClient.java").read_text()
+        dex_build = (TOOLS / "build_hud_speed_bridge_dex.sh").read_text()
+        apk_build = (TOOLS / "build_hud_speed_bridge_apk.sh").read_text()
+        signer = (TOOLS / "sign_hud_speed_bridge_apk.sh").read_text()
+
+        self.assertIn("MAX_CAMERAS = 64", service)
+        self.assertIn("message.sendingUid", service)
+        self.assertIn("NATRO_CERT_SHA256", service)
+        self.assertIn("liveCameraSnapshot", service)
+        self.assertIn("directions(type, camera)", service)
+        self.assertIn("controlTags(typeId", service)
+        self.assertIn("HUD_SPEED_CERT_SHA256", client)
+        self.assertIn("isTrustedHudSpeedUid(message.sendingUid)", client)
+        self.assertIn("MAX_RAW_CHARS", client)
+        self.assertIn("ALLOWED_TAGS", client)
+        self.assertIn("classes3.dex", apk_build)
+        self.assertIn(
+            "9b8a4a4a636968e9b2ca92c8399cdaf18112e9519aec433a9ee7fe42adb413dd",
+            apk_build,
+        )
+        self.assertIn("--min-api 28", dex_build)
+        self.assertIn("EXPECTED_CERT_SHA256", signer)
+        self.assertIn("--v2-signing-enabled true", signer)
+        self.assertIn("--v3-signing-enabled true", signer)
+        self.assertIn('--min-sdk-version 24 "$OUTPUT_APK"', signer)
+        self.assertIn('--min-sdk-version 28 "$OUTPUT_APK"', signer)
+        self.assertIn("Number of signers: 1", signer)
+        self.assertIn("requires uninstalling a differently signed HUD Speed", signer)
+
     def test_pair_signer_requires_one_stable_certificate_and_exact_baseline(self):
         pair = (TOOLS / "sign_navigation_hud_v2_pair.sh").read_text()
         navigator = (TOOLS / "sign_navigation_mod_30_3.sh").read_text()
@@ -213,9 +267,12 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.5.8}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021291}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.5.9}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021292}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
+        verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.9")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021292")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
@@ -233,6 +290,9 @@ class NavigationModToolsTest(unittest.TestCase):
         lanes = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                  / "ru" / "natro" / "navigation"
                  / "LaneGuidanceMapLayer.java").read_text()
+        layer_factory = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                         / "ru" / "natro" / "navigation"
+                         / "MapObjectLayerFactory.java").read_text()
 
         self.assertIn("NavigationLayerFactory", renderer)
         self.assertIn(
@@ -269,6 +329,12 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("setGeometry", cursor)
         self.assertIn("setDirection", cursor)
         self.assertNotIn("UserLocationObjectListener", cursor)
+        self.assertIn("addMapObjectLayer", layer_factory)
+        self.assertIn("setConflictResolutionMode", layer_factory)
+        self.assertIn("MapObjectLayerFactory.MAJOR", lanes)
+        self.assertIn("applyManualSublayerOrder", renderer)
+        self.assertIn("getSublayerManager", renderer)
+        self.assertIn("moveToEnd", renderer)
 
     def test_kx11_pair_gate_freezes_device_identity_and_hud_plane(self):
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()

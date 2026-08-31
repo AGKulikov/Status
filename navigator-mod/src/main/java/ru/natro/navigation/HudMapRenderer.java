@@ -61,6 +61,7 @@ final class HudMapRenderer {
     private Object map;
     private Object trafficLayer;
     private Object roadEventStyleProvider;
+    private ScaledRoadEventStyleProvider scaledRoadEventStyleProvider;
     private Object roadEventsManager;
     private Object roadEventsLayer;
     private Object navigationRuntime;
@@ -68,6 +69,7 @@ final class HudMapRenderer {
     private Object navigationLayer;
     private Object guidanceCamera;
     private Object routeCollection;
+    private Object destinationCollection;
     private Object routePolyline;
     private Object routeDestinationPlacemark;
     private Object destinationIconStyle;
@@ -90,6 +92,7 @@ final class HudMapRenderer {
     private boolean routeGuidanceActive;
     private double latestSpeedKmh = Double.NaN;
     private int appliedMaximumFps = -1;
+    private long appliedLayerOrderFingerprint = Long.MIN_VALUE;
     private NavigationMapProfile profile = new NavigationMapProfile();
 
     HudMapRenderer(Context context, FailureReporter reporter) {
@@ -114,12 +117,19 @@ final class HudMapRenderer {
         NavigationMapProfile next = NavigationMapProfile.fromConfiguration(raw, profileSection);
         boolean enabledChanged = profile.enabled != next.enabled;
         boolean cameraModeChanged = !profile.cameraMode.equals(next.cameraMode);
+        boolean automaticOrderRestored = profile.manualLayerPrioritiesEnabled
+                && !next.manualLayerPrioritiesEnabled;
         profile = next;
         if (cameraModeChanged) freeCameraInitialized = false;
         if (surface == null) return;
         if (enabledChanged) {
             if (profile.enabled) startRenderer();
             else stopRenderer(false);
+        } else if (mapWindow != null && automaticOrderRestored) {
+            // Recreating the independent MapWindow is the only exact way to restore every
+            // Yandex-owned sublayer to the order selected by its internal scenario stack.
+            stopRenderer(false);
+            startRenderer();
         } else if (mapWindow != null) {
             applyProfile();
         } else if (profile.enabled) {
@@ -209,6 +219,7 @@ final class HudMapRenderer {
                 frame.laneGuidanceSampleElapsedMs, frame.laneGuidance);
         routeStreetLabelMapLayer.update(frame.routeActive,
                 frame.routeStreetLabelsSampleElapsedMs, frame.routeStreetLabels);
+        applyManualSublayerOrder();
         if (!frame.isValid()) return;
         try {
             latestSpeedKmh = Math.max(0d, frame.speedKmh);
@@ -227,6 +238,12 @@ final class HudMapRenderer {
         } catch (Exception invalid) {
             Log.w(TAG, "Guidance frame could not be applied to " + displayName, invalid);
         }
+    }
+
+    /** Live HUD Speed cameras forwarded by the authenticated Natro bridge. */
+    void updateExternalCameras(String raw) {
+        cameraDirectionMapLayer.updateExternal(raw);
+        applyManualSublayerOrder();
     }
 
     private static boolean finite(double value) {
@@ -364,18 +381,25 @@ final class HudMapRenderer {
         boolean systemNight = (context.getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         boolean night = profile.automaticDayNight ? systemNight : profile.nightMode;
+        boolean roadEventScaleChanged = scaledRoadEventStyleProvider != null
+                && scaledRoadEventStyleProvider.setScales(
+                profile.roadEventScalePercent, profile.cameraScalePercent);
         trafficLightMapLayer.apply(profile.showTrafficLights, night,
-                profile.trafficLightLayerPriority);
+                profile.trafficLightScalePercent,
+                profile.effectiveTrafficLightPriority());
         cameraDirectionMapLayer.apply(
                 !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL")),
-                profile.cameraDirectionLayerPriority);
+                profile.showHudSpeedCameras,
+                profile.cameraScalePercent,
+                profile.effectiveCameraPriority());
         laneGuidanceMapLayer.apply(profile.showLaneGuidance,
                 profile.laneGuidanceScalePercent, night,
-                profile.laneGuidanceLayerPriority);
+                profile.effectiveLanePriority());
         // This explicit route-owned layer is the replacement for substrate road labels. Its
         // switch must work even when the generic "Подписи" switch is off.
         routeStreetLabelMapLayer.apply(profile.routeStreetLabelsOnly,
-                profile.routeLabelLayerPriority);
+                profile.routeLabelScalePercent,
+                profile.effectiveRouteLabelPriority());
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -388,7 +412,7 @@ final class HudMapRenderer {
             applyTrafficPresentation();
             cursorStyler.apply(profile.showCursor, profile.cursorScalePercent,
                     profile.cursorColor, profile.cursorOutlineColor,
-                    profile.cursorLayerPriority);
+                    profile.effectiveCursorPriority());
             invoke(currentMap, "setNightModeEnabled", new Class<?>[]{boolean.class}, night);
             invoke(currentMap, "setModelsEnabled", new Class<?>[]{boolean.class},
                     profile.showModels && !profile.roadsOnly);
@@ -407,6 +431,8 @@ final class HudMapRenderer {
             applyStyleSlot(currentMap, VISIBILITY_STYLE_ID,
                     profile.visibilityStyleJson());
             applyCamera(false);
+            applyManualSublayerOrder();
+            if (roadEventScaleChanged) resetRoadEventVisibilityForStyleRefresh();
             applyRoadEventVisibility();
             destinationIconStyle = null;
             rebuildRoute();
@@ -489,13 +515,19 @@ final class HudMapRenderer {
                     .newInstance(context);
             Class<?> styleProviderClass = Class.forName(
                     "com.yandex.mapkit.road_events_layer.StyleProvider");
+            ScaledRoadEventStyleProvider scaledProvider =
+                    new ScaledRoadEventStyleProvider(stockProvider, styleProviderClass);
+            scaledProvider.setScales(profile.roadEventScalePercent,
+                    profile.cameraScalePercent);
+            Object provider = scaledProvider.proxy();
             Class<?> managerClass = Class.forName(
                     "com.yandex.mapkit.road_events.RoadEventsManager");
             Object manager = mapKitClass.getMethod("createRoadEventsManager").invoke(mapKit);
             Object layer = mapKitClass.getMethod("createRoadEventsLayer", mapWindowClass,
                             styleProviderClass, managerClass)
-                    .invoke(mapKit, currentMapWindow, stockProvider, manager);
-            roadEventStyleProvider = stockProvider;
+                    .invoke(mapKit, currentMapWindow, provider, manager);
+            roadEventStyleProvider = provider;
+            scaledRoadEventStyleProvider = scaledProvider;
             roadEventsManager = manager;
             roadEventsLayer = layer;
             applyRoadEventVisibility();
@@ -505,6 +537,7 @@ final class HudMapRenderer {
                             + displayName + " MapWindow");
         } catch (Throwable failure) {
             roadEventStyleProvider = null;
+            scaledRoadEventStyleProvider = null;
             roadEventsManager = null;
             roadEventsLayer = null;
             Log.w(TAG, "HUD road-events layer unavailable: " + shortMessage(failure));
@@ -566,6 +599,7 @@ final class HudMapRenderer {
             guidanceCamera = invoke(layer, "getCamera", new Class<?>[0]);
             parkNativeGuidanceCamera();
             applyRoadEventVisibility();
+            applyManualSublayerOrder();
             Log.i(TAG, "Route-matched road-events layer attached to " + displayName);
             NavigationBridgeClient.reportDiagnostic(
                     "route-matched road-events layer attached to independent "
@@ -617,23 +651,112 @@ final class HudMapRenderer {
                 @SuppressWarnings({"rawtypes", "unchecked"})
                 Object tag = Enum.valueOf((Class) eventTagClass, tagName);
                 String mode = profile.roadEventMode(tagName);
+                boolean speedCamera = "SPEED_CONTROL".equals(tagName);
                 if (everywhere != null) {
                     // Never leave the user with an empty map if the automotive layer is absent:
                     // the fallback can include a nearby marker, but it preserves all selected data.
                     boolean fallbackRoute = onRoute == null && routeGuidanceActive
                             && "ROUTE_ONLY".equals(mode);
+                    // While guidance is active, the unified layer owns the Yandex speed sign so
+                    // it can merge HUD Speed duplicates and attach source-backed details. In free
+                    // drive the stock ALWAYS layer remains available.
+                    boolean alwaysVisible = "ALWAYS".equals(mode)
+                            && !(speedCamera && routeGuidanceActive);
                     invoke(everywhere, "setRoadEventVisible",
                             new Class<?>[]{eventTagClass, boolean.class}, tag,
-                            "ALWAYS".equals(mode) || fallbackRoute);
+                            alwaysVisible || (fallbackRoute && !speedCamera));
                 }
                 if (onRoute != null) {
                     invoke(onRoute, "setRoadEventVisibleOnRoute",
                             new Class<?>[]{eventTagClass, boolean.class}, tag,
-                            "ROUTE_ONLY".equals(mode));
+                            "ROUTE_ONLY".equals(mode) && !speedCamera);
                 }
             }
         } catch (Throwable failure) {
             Log.w(TAG, "HUD road-event visibility could not be applied", failure);
+        }
+    }
+
+    /** A visibility round-trip makes MapKit request stock styles again after a live scale edit. */
+    private void resetRoadEventVisibilityForStyleRefresh() {
+        Object everywhere = roadEventsLayer;
+        Object onRoute = navigationLayer;
+        if (everywhere == null && onRoute == null) return;
+        try {
+            Class<?> eventTagClass = Class.forName("com.yandex.mapkit.road_events.EventTag");
+            for (String tagName : NavigationMapProfile.ROAD_EVENT_TAGS) {
+                @SuppressWarnings({"rawtypes", "unchecked"})
+                Object tag = Enum.valueOf((Class) eventTagClass, tagName);
+                if (everywhere != null) {
+                    invoke(everywhere, "setRoadEventVisible",
+                            new Class<?>[]{eventTagClass, boolean.class}, tag, false);
+                }
+                if (onRoute != null) {
+                    invoke(onRoute, "setRoadEventVisibleOnRoute",
+                            new Class<?>[]{eventTagClass, boolean.class}, tag, false);
+                }
+            }
+        } catch (Throwable failure) {
+            Log.w(TAG, "Road-event scale refresh failed", failure);
+        }
+    }
+
+    /**
+     * Automatic mode leaves MapKit's own sublayer scenario untouched. Manual mode reorders only
+     * the explicitly exposed layers, from the smallest slider value to the largest.
+     */
+    private void applyManualSublayerOrder() {
+        Object currentMap = map;
+        if (currentMap == null || !profile.manualLayerPrioritiesEnabled) {
+            appliedLayerOrderFingerprint = Long.MIN_VALUE;
+            return;
+        }
+        try {
+            Object manager = invoke(currentMap, "getSublayerManager", new Class<?>[0]);
+            int count = ((Number) invoke(manager, "size", new Class<?>[0])).intValue();
+            long fingerprint = count;
+            fingerprint = fingerprint * 131L + profile.effectiveCameraPriority();
+            fingerprint = fingerprint * 131L + profile.effectiveRoadEventPriority();
+            fingerprint = fingerprint * 131L + profile.effectiveRoutePriority();
+            fingerprint = fingerprint * 131L + profile.effectiveDestinationPriority();
+            fingerprint = fingerprint * 131L + profile.effectiveTrafficLightPriority();
+            fingerprint = fingerprint * 131L + profile.effectiveRouteLabelPriority();
+            fingerprint = fingerprint * 131L + profile.effectiveLanePriority();
+            fingerprint = fingerprint * 131L + profile.effectiveCursorPriority();
+            if (fingerprint == appliedLayerOrderFingerprint) return;
+            Class<?> ids = Class.forName("com.yandex.mapkit.map.LayerIds");
+            String roadEvents = (String) ids.getMethod("getRoadEventsLayerId").invoke(null);
+            String navigationBase = (String) ids
+                    .getMethod("getDrivingNavigationBaseLayerId").invoke(null);
+            ArrayList<LayerOrder> layers = new ArrayList<>();
+            layers.add(new LayerOrder("ru.natro.navigation.cameras",
+                    profile.effectiveCameraPriority()));
+            layers.add(new LayerOrder(roadEvents, profile.effectiveRoadEventPriority()));
+            layers.add(new LayerOrder(navigationBase, profile.effectiveRoadEventPriority()));
+            layers.add(new LayerOrder("ru.natro.navigation.route",
+                    profile.effectiveRoutePriority()));
+            layers.add(new LayerOrder("ru.natro.navigation.destination",
+                    profile.effectiveDestinationPriority()));
+            layers.add(new LayerOrder("ru.natro.navigation.traffic_lights",
+                    profile.effectiveTrafficLightPriority()));
+            layers.add(new LayerOrder("ru.natro.navigation.route_street_labels",
+                    profile.effectiveRouteLabelPriority()));
+            layers.add(new LayerOrder("ru.natro.navigation.lane_guidance",
+                    profile.effectiveLanePriority()));
+            layers.add(new LayerOrder("ru.natro.navigation.cursor",
+                    profile.effectiveCursorPriority()));
+            layers.sort((left, right) -> Integer.compare(left.priority, right.priority));
+            for (LayerOrder layer : layers) {
+                if (layer.id == null || layer.id.isEmpty()) continue;
+                Object rawIndex = invoke(manager, "findFirstOf",
+                        new Class<?>[]{String.class}, layer.id);
+                if (!(rawIndex instanceof Integer) || ((Integer) rawIndex) < 0) continue;
+                invoke(manager, "moveToEnd", new Class<?>[]{int.class},
+                        ((Integer) rawIndex).intValue());
+            }
+            appliedLayerOrderFingerprint = fingerprint;
+        } catch (Throwable failure) {
+            Log.w(TAG, "Manual HUD sublayer order could not be applied", failure);
         }
     }
 
@@ -655,11 +778,19 @@ final class HudMapRenderer {
         try {
             Object collection = routeCollection;
             if (collection == null) {
-                Object root = invoke(currentMap, "getMapObjects", new Class<?>[0]);
-                collection = invoke(root, "addCollection", new Class<?>[0]);
+                collection = MapObjectLayerFactory.create(currentMap,
+                        "ru.natro.navigation.route",
+                        MapObjectLayerFactory.IGNORE,
+                        NavigationMapProfile.layerZ(profile.effectiveRoutePriority()));
                 routeCollection = collection;
+            } else {
+                MapObjectLayerFactory.setZIndex(collection,
+                        NavigationMapProfile.layerZ(profile.effectiveRoutePriority()));
             }
             invoke(collection, "clear", new Class<?>[0]);
+            if (destinationCollection != null) {
+                invoke(destinationCollection, "clear", new Class<?>[0]);
+            }
             routePolyline = null;
             routeDestinationPlacemark = null;
             Object route = activeRoute;
@@ -679,9 +810,23 @@ final class HudMapRenderer {
                         slice.firstSegmentIndex, slice.segmentCount, routeColorScratch);
             }
             if (profile.showDestination && slice.destinationPoint != null) {
-                addDestinationMarker(collection, slice.destinationPoint);
+                Object destinations = destinationCollection;
+                if (destinations == null) {
+                    destinations = MapObjectLayerFactory.create(currentMap,
+                            "ru.natro.navigation.destination",
+                            MapObjectLayerFactory.EQUAL,
+                            NavigationMapProfile.layerZ(
+                                    profile.effectiveDestinationPriority()));
+                    destinationCollection = destinations;
+                } else {
+                    MapObjectLayerFactory.setZIndex(destinations,
+                            NavigationMapProfile.layerZ(
+                                    profile.effectiveDestinationPriority()));
+                }
+                addDestinationMarker(destinations, slice.destinationPoint);
             }
             lastRouteGeometryElapsedMs = SystemClock.elapsedRealtime();
+            applyManualSublayerOrder();
         } catch (Throwable failure) {
             Log.w(TAG, "Active route could not be rendered in the HUD MapWindow", failure);
         }
@@ -705,8 +850,11 @@ final class HudMapRenderer {
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
+            invoke(style, "setScale", new Class<?>[]{Float.class},
+                    Float.valueOf(profile.destinationScalePercent / 100f));
             invoke(style, "setZIndex", new Class<?>[]{Float.class},
-                    Float.valueOf(NavigationMapProfile.layerZ(profile.routeLayerPriority) + 0.5f));
+                    Float.valueOf(NavigationMapProfile.layerZ(
+                            profile.effectiveDestinationPriority())));
             destinationIconStyle = style;
         }
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
@@ -940,6 +1088,16 @@ final class HudMapRenderer {
         }
     }
 
+    private static final class LayerOrder {
+        final String id;
+        final int priority;
+
+        LayerOrder(String id, int priority) {
+            this.id = id;
+            this.priority = priority;
+        }
+    }
+
     private static Object createOptionalLayer(Object mapKit, Class<?> mapKitClass,
                                               Class<?> mapWindowClass, Object mapWindow,
                                               String methodName) {
@@ -981,17 +1139,20 @@ final class HudMapRenderer {
         offscreenMapWindow = null;
         mapWindow = null;
         appliedMaximumFps = -1;
+        appliedLayerOrderFingerprint = Long.MIN_VALUE;
         map = null;
         trafficLayer = null;
         roadEventsLayer = null;
         roadEventsManager = null;
         roadEventStyleProvider = null;
+        scaledRoadEventStyleProvider = null;
         cursorStyler.detach();
         trafficLightMapLayer.detachMap();
         cameraDirectionMapLayer.detachMap();
         laneGuidanceMapLayer.detachMap();
         routeStreetLabelMapLayer.detachMap();
         routeCollection = null;
+        destinationCollection = null;
         routePolyline = null;
         routeDestinationPlacemark = null;
         routeColorScratch.clear();

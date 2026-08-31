@@ -1,9 +1,10 @@
-name: Build Natro 2.5.8 and Navigator HUD v2 candidate
+name: Build Natro 2.5.9 and Navigator HUD v2 candidate
 
 on:
   push:
     branches:
       - 'feature/navigation-hud-v2'
+      - 'release/natro-2.5.9*'
       - 'release/natro-2.5.8*'
       - 'release/natro-2.5.7*'
       - 'release/natro-2.5.6*'
@@ -37,8 +38,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '2.5.8'
-      VERSION_CODE: '208021291'
+      VERSION_NAME: '2.5.9'
+      VERSION_CODE: '208021292'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
@@ -62,6 +63,8 @@ jobs:
         run: sh ios/KX11-iPhone-ANCS-Helper-v70-personal/verify-v70-personal-contract.sh
       - name: Compile isolated Navigator classes19.dex
         run: bash tools/build_navigation_patch_dex.sh build/navigation-mod-ci
+      - name: Compile isolated HUD Speed bridge classes3.dex
+        run: bash tools/build_hud_speed_bridge_dex.sh build/hud-speed-bridge-ci
       - name: Navigation APK baseline verifier self-tests
         run: |
           python3 -m py_compile \
@@ -163,10 +166,10 @@ jobs:
     permissions:
       contents: read
     env:
-      VERSION_NAME: '2.5.8'
-      VERSION_CODE: '208021291'
-      EXPECTED_NATRO_VERSION_NAME: '2.5.8'
-      EXPECTED_NATRO_VERSION_CODE: '208021291'
+      VERSION_NAME: '2.5.9'
+      VERSION_CODE: '208021292'
+      EXPECTED_NATRO_VERSION_NAME: '2.5.9'
+      EXPECTED_NATRO_VERSION_CODE: '208021292'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
@@ -192,6 +195,7 @@ jobs:
           set -euo pipefail
           ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
           bash tools/build_navigation_patch_dex.sh build/navigation-mod-ci
+          bash tools/build_hud_speed_bridge_dex.sh build/hud-speed-bridge-ci
           python3 tools/tests/test_verify_navigation_mod_baseline.py
           python3 tools/tests/test_navigation_mod_tools.py
           CANDIDATE="$RUNNER_TEMP/candidate"
@@ -301,7 +305,7 @@ jobs:
       - name: Upload only the verified signed pair
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: navigation-hud-v2-signed-2.5.8-${{ github.run_number }}
+          name: navigation-hud-v2-signed-2.5.9-${{ github.run_number }}
           if-no-files-found: error
           retention-days: 14
           path: ${{ runner.temp }}/signed-pair/*

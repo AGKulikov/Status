@@ -31,6 +31,7 @@ final class TrafficLightMapLayer {
     private Object collection;
     private boolean enabled;
     private boolean nightMode;
+    private int scalePercent = 100;
     private float zIndex = NavigationMapProfile.layerZ(50);
     private boolean latestRouteActive;
     private List<NavigatorStatePublisher.TrafficLightFrame> latest =
@@ -80,14 +81,19 @@ final class TrafficLightMapLayer {
         map = null;
     }
 
-    void apply(boolean nextEnabled, boolean nextNightMode, int layerPriority) {
+    void apply(boolean nextEnabled, boolean nextNightMode, int nextScalePercent,
+               int layerPriority) {
+        int nextScale = Math.max(50, Math.min(250, nextScalePercent));
         float nextZ = NavigationMapProfile.layerZ(layerPriority);
-        boolean presentationChanged = nightMode != nextNightMode || zIndex != nextZ;
+        boolean presentationChanged = nightMode != nextNightMode || scalePercent != nextScale
+                || zIndex != nextZ;
         boolean enabledChanged = enabled != nextEnabled;
         if (!presentationChanged && !enabledChanged) return;
         enabled = nextEnabled;
         nightMode = nextNightMode;
+        scalePercent = nextScale;
         zIndex = nextZ;
+        MapObjectLayerFactory.setZIndex(collection, nextZ);
         if (presentationChanged) renderedVisualFingerprint = Long.MIN_VALUE;
         if (!enabled) {
             main.removeCallbacks(expire);
@@ -214,8 +220,9 @@ final class TrafficLightMapLayer {
                          long structure, long visual) throws Exception {
         Object currentCollection = collection;
         if (currentCollection == null) {
-            Object root = invoke(map, "getMapObjects", new Class<?>[0]);
-            currentCollection = invoke(root, "addCollection", new Class<?>[0]);
+            currentCollection = MapObjectLayerFactory.create(map,
+                    "ru.natro.navigation.traffic_lights",
+                    MapObjectLayerFactory.EQUAL, zIndex);
             collection = currentCollection;
         }
         invoke(currentCollection, "clear", new Class<?>[0]);
@@ -258,7 +265,7 @@ final class TrafficLightMapLayer {
             NavigatorStatePublisher.TrafficLightFrame light = values.get(index);
             Marker marker = markers.get(index);
             Object view = viewClass.getConstructor(Context.class, float.class)
-                    .newInstance(context, 1f);
+                    .newInstance(context, scalePercent / 100f);
             Object signal = enumValue(signalClass, light.signal, "GREEN");
             Object arrow = enumValue(arrowClass, light.arrow, "FORWARD");
             viewClass.getMethod("setSignal", signalClass).invoke(view, signal);

@@ -245,10 +245,15 @@ final class NavigatorStatePublisher {
         final float bearingDegrees;
         final boolean inFace;
         final boolean inBack;
+        /** Positive source value only; -1 means MapKit did not publish a limit. */
+        final int speedLimitKmh;
+        /** Exact EventTag names supplied by MapKit, never inferred from the camera icon. */
+        final List<String> controlTags;
 
         CameraDirectionFrame(String id, double latitude, double longitude,
                              int distanceMeters, float bearingDegrees,
-                             boolean inFace, boolean inBack) {
+                             boolean inFace, boolean inBack,
+                             int speedLimitKmh, List<String> controlTags) {
             this.id = id == null ? "" : id;
             this.latitude = latitude;
             this.longitude = longitude;
@@ -256,6 +261,10 @@ final class NavigatorStatePublisher {
             this.bearingDegrees = normalizeBearing(bearingDegrees);
             this.inFace = inFace;
             this.inBack = inBack;
+            this.speedLimitKmh = speedLimitKmh > 0 ? speedLimitKmh : -1;
+            this.controlTags = controlTags == null
+                    ? Collections.emptyList() : Collections.unmodifiableList(
+                    new ArrayList<>(controlTags));
         }
 
         boolean hasMapPosition() {
@@ -1311,15 +1320,14 @@ final class NavigatorStatePublisher {
         for (Object camera : cameras) {
             if (result.size() >= MAX_ACTIVE_SPEED_CAMERAS) break;
             try {
-                Object directions = invoke(camera, "getActiveDirections");
-                if (directions == null) continue;
-                boolean inFace = Boolean.TRUE.equals(invoke(directions, "getInFace"));
-                boolean inBack = Boolean.TRUE.equals(invoke(directions, "getInBack"));
-                if (!inFace && !inBack) continue;
-
                 Object event = invoke(camera, "getEvent");
                 Object point = event == null ? null : invoke(event, "getLocation");
                 if (point == null) continue;
+                Object directions = invoke(camera, "getActiveDirections");
+                boolean inFace = directions != null
+                        && Boolean.TRUE.equals(invoke(directions, "getInFace"));
+                boolean inBack = directions != null
+                        && Boolean.TRUE.equals(invoke(directions, "getInBack"));
                 double latitude = number(invoke(point, "getLatitude"), Double.NaN);
                 double longitude = number(invoke(point, "getLongitude"), Double.NaN);
                 if (!finite(latitude) || latitude < -90d || latitude > 90d
@@ -1336,14 +1344,33 @@ final class NavigatorStatePublisher {
                         number(invoke(camera, "getDistanceToCamera"), -1d));
                 float bearing = routeBearingAtEvent(
                         routePoints, event, fallbackBearingDegrees);
+                int speedLimitKmh = positiveRounded(
+                        number(invoke(event, "getSpeedLimit"), Double.NaN));
+                if (speedLimitKmh < 0) {
+                    speedLimitKmh = positiveRounded(number(
+                            invoke(camera, "getEffectiveSpeedLimit"), Double.NaN));
+                }
+                ArrayList<String> controlTags = new ArrayList<>();
+                for (Object tag : invokeList(event, "getTags")) {
+                    String name = enumName(tag);
+                    if (!name.isEmpty() && !controlTags.contains(name)) {
+                        controlTags.add(name);
+                    }
+                }
                 result.add(new CameraDirectionFrame(id, latitude, longitude,
-                        distanceMeters, bearing, inFace, inBack));
+                        distanceMeters, bearing, inFace, inBack,
+                        speedLimitKmh, controlTags));
             } catch (Throwable malformedCamera) {
                 // One vendor object can be invalid during route replacement. Keep every other
                 // valid camera and, most importantly, keep the navigation stream alive.
             }
         }
         return result;
+    }
+
+    private static int positiveRounded(double value) {
+        if (!finite(value) || value <= 0d || value > 400d) return -1;
+        return Math.max(1, (int) Math.round(value));
     }
 
     private static float routeBearingAtEvent(List<?> routePoints, Object event,
@@ -1425,17 +1452,23 @@ final class NavigatorStatePublisher {
             Object geometry = invoke(route, "getGeometry");
             List<?> points = invokeList(geometry, "getPoints");
             if (points.size() < 2) return "[]";
+            // Progress in the snapshot is expressed in physical metres. Keep the congestion
+            // ranges in the same coordinate system so a progress marker cannot drift merely
+            // because one part of the polyline contains more geometry points than another.
+            double[] cumulativeMeters = cumulativeRouteMeters(points);
             int stride = Math.max(1, (points.size() + MAX_POLYLINE_POINTS - 1)
                     / MAX_POLYLINE_POINTS);
             ArrayList<TrafficSample> samples = new ArrayList<>();
             int previousPoint = 0;
             for (int point = stride; point < points.size(); point += stride) {
-                samples.add(sampleTraffic(segments, previousPoint, point));
+                samples.add(sampleTraffic(segments, previousPoint, point,
+                        cumulativeMeters[previousPoint], cumulativeMeters[point]));
                 previousPoint = point;
             }
             int finalPoint = points.size() - 1;
             if (previousPoint != finalPoint) {
-                samples.add(sampleTraffic(segments, previousPoint, finalPoint));
+                samples.add(sampleTraffic(segments, previousPoint, finalPoint,
+                        cumulativeMeters[previousPoint], cumulativeMeters[finalPoint]));
             }
             if (samples.isEmpty()) return "[]";
 
@@ -1456,16 +1489,26 @@ final class NavigatorStatePublisher {
                     continue;
                 }
                 JSONObject run = new JSONObject()
-                        .put("from", start)
-                        .put("to", index)
+                        .put("from", roundedRouteMeters(samples.get(start).fromMeters))
+                        .put("to", roundedRouteMeters(samples.get(index - 1).toMeters))
+                        .put("fromMeters", roundedRouteMeters(
+                                samples.get(start).fromMeters))
+                        .put("toMeters", roundedRouteMeters(
+                                samples.get(index - 1).toMeters))
                         .put("type", type);
                 if (speedCount > 0) {
                     run.put("speedMps", Math.round(speedTotal / speedCount * 10d) / 10d);
                 }
                 if (runs.length() >= MAX_TRAFFIC_RUNS - 1 && index < samples.size()) {
                     runs.put(new JSONObject()
-                            .put("from", start)
-                            .put("to", samples.size())
+                            .put("from", roundedRouteMeters(
+                                    samples.get(start).fromMeters))
+                            .put("to", roundedRouteMeters(
+                                    samples.get(samples.size() - 1).toMeters))
+                            .put("fromMeters", roundedRouteMeters(
+                                    samples.get(start).fromMeters))
+                            .put("toMeters", roundedRouteMeters(
+                                    samples.get(samples.size() - 1).toMeters))
                             .put("type", "UNKNOWN")
                             .put("partial", true));
                     break;
@@ -1486,7 +1529,29 @@ final class NavigatorStatePublisher {
         }
     }
 
-    private static TrafficSample sampleTraffic(List<?> segments, int from, int to)
+    private static double[] cumulativeRouteMeters(List<?> points) throws Exception {
+        double[] result = new double[points.size()];
+        double previousLatitude = number(invoke(points.get(0), "getLatitude"), Double.NaN);
+        double previousLongitude = number(invoke(points.get(0), "getLongitude"), Double.NaN);
+        for (int index = 1; index < points.size(); index++) {
+            Object point = points.get(index);
+            double latitude = number(invoke(point, "getLatitude"), Double.NaN);
+            double longitude = number(invoke(point, "getLongitude"), Double.NaN);
+            result[index] = result[index - 1] + geoDistanceMeters(
+                    previousLatitude, previousLongitude, latitude, longitude);
+            previousLatitude = latitude;
+            previousLongitude = longitude;
+        }
+        return result;
+    }
+
+    private static int roundedRouteMeters(double value) {
+        if (!finite(value) || value <= 0d) return 0;
+        return (int) Math.min(Integer.MAX_VALUE, Math.round(value));
+    }
+
+    private static TrafficSample sampleTraffic(List<?> segments, int from, int to,
+                                               double fromMeters, double toMeters)
             throws Exception {
         String type = "UNKNOWN";
         int priority = 0;
@@ -1507,7 +1572,8 @@ final class NavigatorStatePublisher {
             }
         }
         return new TrafficSample(type,
-                speedCount == 0 ? Double.NaN : speedTotal / speedCount);
+                speedCount == 0 ? Double.NaN : speedTotal / speedCount,
+                fromMeters, toMeters);
     }
 
     private static int jamPriority(String type) {
@@ -1743,10 +1809,15 @@ final class NavigatorStatePublisher {
     private static final class TrafficSample {
         final String type;
         final double speedMps;
+        final double fromMeters;
+        final double toMeters;
 
-        TrafficSample(String type, double speedMps) {
+        TrafficSample(String type, double speedMps,
+                      double fromMeters, double toMeters) {
             this.type = type;
             this.speedMps = speedMps;
+            this.fromMeters = Math.max(0d, fromMeters);
+            this.toMeters = Math.max(this.fromMeters, toMeters);
         }
     }
 

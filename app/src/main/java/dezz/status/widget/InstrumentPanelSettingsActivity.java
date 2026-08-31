@@ -326,6 +326,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         final Switch showProgress;
         final Switch showStreet;
         final Switch showArrival;
+        final Switch showDistance;
+        final Switch showEta;
+        final Switch showDuration;
         final Spinner[] infoRows = new Spinner[3];
         if (element.type.isAnalogGauge()) {
             showFace = switchView("Фон шкалы",
@@ -341,6 +344,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             showUnit = switchView("Единица измерения",
                     element.options.optBoolean("showUnit", true));
             showProgress = showStreet = showArrival = null;
+            showDistance = showEta = showDuration = null;
             content.addView(section("Состав аналогового прибора"), marginTop(10));
             content.addView(showFace);
             content.addView(showScale);
@@ -353,6 +357,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     element.options.optBoolean("showFace", false));
             showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
             showProgress = showStreet = showArrival = null;
+            showDistance = showEta = showDuration = null;
             content.addView(showFace, marginTop(10));
             InstrumentInfoMetric[] metrics = InstrumentInfoMetric.values();
             String[] labels = infoMetricLabels(metrics);
@@ -370,16 +375,22 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             }
         } else if (element.type == InstrumentElementType.NAVIGATION_INFO) {
             showFace = switchView("Фон блока",
-                    element.options.optBoolean("showFace", false));
-            showStreet = switchView("Название улицы",
-                    element.options.optBoolean("showStreet", true));
-            showArrival = switchView("Остаток пути и времени",
-                    element.options.optBoolean("showArrival", true));
+                    element.options.optBoolean("showFace", true));
+            showDistance = switchView("Оставшееся расстояние",
+                    element.options.optBoolean("showDistance", true));
+            showEta = switchView("Время прибытия",
+                    element.options.optBoolean("showEta", true));
+            showDuration = switchView("Оставшееся время",
+                    element.options.optBoolean("showDuration", true));
+            showProgress = switchView("Прогресс маршрута с пробками",
+                    element.options.optBoolean("showRouteProgress", true));
             showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
-            showProgress = null;
+            showStreet = showArrival = null;
             content.addView(showFace, marginTop(10));
-            content.addView(showStreet);
-            content.addView(showArrival);
+            content.addView(showDistance);
+            content.addView(showEta);
+            content.addView(showDuration);
+            content.addView(showProgress);
         } else if (isDigitalValueElement(element.type)) {
             showFace = switchView("Фон элемента",
                     element.options.optBoolean("showFace", true));
@@ -389,12 +400,14 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     element.options.optBoolean("showProgress", true));
             showScale = showScaleLabels = showNeedle = showValue = null;
             showStreet = showArrival = null;
+            showDistance = showEta = showDuration = null;
             content.addView(showFace, marginTop(10));
             content.addView(showUnit);
             content.addView(showProgress);
         } else {
             showFace = showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
             showProgress = showStreet = showArrival = null;
+            showDistance = showEta = showDuration = null;
         }
 
         TextView opacityValue = label("Непрозрачность: " + element.opacityPercent + "%");
@@ -425,13 +438,25 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     if (showValue != null) setOption(element, "showValue", showValue.isChecked());
                     if (showUnit != null) setOption(element, "showUnit", showUnit.isChecked());
                     if (showProgress != null) {
-                        setOption(element, "showProgress", showProgress.isChecked());
+                        setOption(element,
+                                element.type == InstrumentElementType.NAVIGATION_INFO
+                                        ? "showRouteProgress" : "showProgress",
+                                showProgress.isChecked());
                     }
                     if (showStreet != null) {
                         setOption(element, "showStreet", showStreet.isChecked());
                     }
                     if (showArrival != null) {
                         setOption(element, "showArrival", showArrival.isChecked());
+                    }
+                    if (showDistance != null) {
+                        setOption(element, "showDistance", showDistance.isChecked());
+                    }
+                    if (showEta != null) {
+                        setOption(element, "showEta", showEta.isChecked());
+                    }
+                    if (showDuration != null) {
+                        setOption(element, "showDuration", showDuration.isChecked());
                     }
                     InstrumentInfoMetric[] metrics = InstrumentInfoMetric.values();
                     for (int row = 0; row < infoRows.length; row++) {
@@ -517,7 +542,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 map.focusXPercent, 0, 100, 1, " %");
         SliderField focusY = slider(content, "Автомобиль по вертикали",
                 map.focusYPercent, 0, 100, 1, " %");
-        SliderField mapScale = slider(content, "Размер подписей и объектов",
+        SliderField mapScale = slider(content,
+                "Общий размер подписей и объектов основы карты",
                 map.mapScalePercent, 50, 300, 5, " %");
         addCameraPresets(content, cameraMode, zoom, tilt, focusX, focusY);
 
@@ -538,6 +564,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 "Светофоры с отсчётом — отдельный слой", map.showTrafficLights);
         Switch laneGuidance = switchView(
                 "Подсказки по полосам — слой на маршруте", map.showLaneGuidance);
+        Switch hudSpeedCameras = switchView(
+                "Камеры из HUD Speed — отдельный знак", map.showHudSpeedCameras);
         Switch labels = switchView("Подписи дорог", map.showLabels);
         Switch routeStreetLabelsOnly = switchView(
                 "Названия улиц только на маршруте", map.routeStreetLabelsOnly);
@@ -554,6 +582,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(routeTraffic);
         content.addView(trafficLights);
         content.addView(laneGuidance);
+        content.addView(hudSpeedCameras);
         content.addView(labels);
         content.addView(routeStreetLabelsOnly);
         content.addView(pois);
@@ -568,12 +597,27 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 finalNavigation, map, preferences));
         content.addView(roadEvents);
 
-        content.addView(section("Маршрут и курсор"), marginTop(14));
+        content.addView(section("Размер каждого слоя"), marginTop(14));
         SliderField cursorScale = slider(content, "Размер курсора",
                 map.cursorScalePercent, 25, 300, 5, " %");
         SliderField laneGuidanceScale = slider(content,
                 "Размер знаков движения по полосам",
                 map.laneGuidanceScalePercent, 50, 250, 5, " %");
+        SliderField cameraScale = slider(content,
+                "Размер знаков камер и маленьких обозначений",
+                map.cameraScalePercent, 50, 250, 5, " %");
+        SliderField trafficLightScale = slider(content,
+                "Размер светофоров и плашек секунд",
+                map.trafficLightScalePercent, 50, 250, 5, " %");
+        SliderField routeLabelScale = slider(content,
+                "Размер названий улиц на маршруте",
+                map.routeLabelScalePercent, 50, 250, 5, " %");
+        SliderField roadEventScale = slider(content,
+                "Размер остальных дорожных событий",
+                map.roadEventScalePercent, 50, 250, 5, " %");
+        SliderField destinationScale = slider(content,
+                "Размер конечной точки маршрута",
+                map.destinationScalePercent, 50, 250, 5, " %");
         ColorField cursorColor = navigationColorField(content, "Цвет автомобиля",
                 map.cursorColor, finalNavigation, preferences,
                 value -> map.cursorColor = value);
@@ -598,12 +642,24 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField routeOutlineWidth = slider(content, "Толщина контура маршрута",
                 map.routeOutlineWidth, 0, 20, 0.5, " px");
 
-        content.addView(section("Порядок слоёв — большее значение выше"), marginTop(14));
+        content.addView(section("Порядок слоёв"), marginTop(14));
+        Switch manualLayerPriorities = switchView(
+                "Ручной порядок слоёв", map.manualLayerPrioritiesEnabled);
+        content.addView(manualLayerPriorities);
+        content.addView(text("Выключено: Яндекс автоматически разводит конфликтующие элементы. "
+                + "Включено: большее значение ползунка располагает слой выше.",
+                12, 0xFFB8C0CC));
         SliderField cameraDirectionLayerPriority = slider(content,
-                "Направления камер", map.cameraDirectionLayerPriority,
+                "Знаки камер и их направления", map.cameraDirectionLayerPriority,
+                0, 100, 1, "");
+        SliderField roadEventLayerPriority = slider(content,
+                "Остальные дорожные события", map.roadEventLayerPriority,
                 0, 100, 1, "");
         SliderField routeLayerPriority = slider(content,
                 "Маршрут", map.routeLayerPriority, 0, 100, 1, "");
+        SliderField destinationLayerPriority = slider(content,
+                "Конечная точка маршрута", map.destinationLayerPriority,
+                0, 100, 1, "");
         SliderField trafficLightLayerPriority = slider(content,
                 "Светофоры и секунды", map.trafficLightLayerPriority,
                 0, 100, 1, "");
@@ -616,6 +672,18 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField cursorLayerPriority = slider(content,
                 "Курсор автомобиля", map.cursorLayerPriority,
                 0, 100, 1, "");
+        SliderField[] layerPriorityControls = new SliderField[]{
+                cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
+                destinationLayerPriority, trafficLightLayerPriority,
+                routeLabelLayerPriority, laneGuidanceLayerPriority, cursorLayerPriority};
+        Runnable updateLayerPriorityControls = () -> {
+            for (SliderField field : layerPriorityControls) {
+                field.setEnabled(manualLayerPriorities.isChecked());
+            }
+        };
+        manualLayerPriorities.setOnCheckedChangeListener(
+                (button, checked) -> updateLayerPriorityControls.run());
+        updateLayerPriorityControls.run();
 
         content.addView(section("Цвета загруженности дорог"), marginTop(14));
         ColorField trafficFreeColor = navigationColorField(content, "Дорога свободна",
@@ -659,6 +727,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showRouteTraffic = routeTraffic.isChecked();
                     map.showTrafficLights = trafficLights.isChecked();
                     map.showLaneGuidance = laneGuidance.isChecked();
+                    map.showHudSpeedCameras = hudSpeedCameras.isChecked();
                     map.showPois = pois.isChecked();
                     map.showBuildings = buildings.isChecked();
                     map.showLabels = labels.isChecked();
@@ -670,6 +739,12 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.roadsOnly = roadsOnly.isChecked();
                     map.cursorScalePercent = cursorScale.intValue();
                     map.laneGuidanceScalePercent = laneGuidanceScale.intValue();
+                    map.cameraScalePercent = cameraScale.intValue();
+                    map.trafficLightScalePercent = trafficLightScale.intValue();
+                    map.routeLabelScalePercent = routeLabelScale.intValue();
+                    map.roadEventScalePercent = roadEventScale.intValue();
+                    map.destinationScalePercent = destinationScale.intValue();
+                    map.manualLayerPrioritiesEnabled = manualLayerPriorities.isChecked();
                     map.cursorColor = cursorColor.value;
                     map.cursorOutlineColor = cursorOutline.value;
                     map.routeColor = routeColor.value;
@@ -680,7 +755,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.routeOutlineWidth = routeOutlineWidth.value();
                     map.cameraDirectionLayerPriority =
                             cameraDirectionLayerPriority.intValue();
+                    map.roadEventLayerPriority = roadEventLayerPriority.intValue();
                     map.routeLayerPriority = routeLayerPriority.intValue();
+                    map.destinationLayerPriority = destinationLayerPriority.intValue();
                     map.trafficLightLayerPriority = trafficLightLayerPriority.intValue();
                     map.routeLabelLayerPriority = routeLabelLayerPriority.intValue();
                     map.laneGuidanceLayerPriority = laneGuidanceLayerPriority.intValue();
@@ -914,6 +991,12 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             int progress = (int) Math.round((value - minimum) / step);
             control.setProgress(Math.max(0, Math.min(control.getMax(), progress)));
             updateLabel();
+        }
+
+        void setEnabled(boolean enabled) {
+            control.setEnabled(enabled);
+            control.setAlpha(enabled ? 1f : 0.35f);
+            valueLabel.setAlpha(enabled ? 1f : 0.45f);
         }
 
         void updateLabel() {

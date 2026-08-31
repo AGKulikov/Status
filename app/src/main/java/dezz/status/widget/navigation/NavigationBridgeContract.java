@@ -49,6 +49,8 @@ public final class NavigationBridgeContract {
     public static final int MSG_CLUSTER_SURFACE_LOST = 17;
     /** Natro asks its authenticated Navigator peer to perform the external DIM task launch. */
     public static final int MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH = 18;
+    /** Natro forwards a bounded live camera frame from the separately authenticated HUD Speed. */
+    public static final int MSG_EXTERNAL_CAMERAS = 19;
 
     public static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     public static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -65,12 +67,14 @@ public final class NavigationBridgeContract {
     public static final long CAP_CLUSTER_INDEPENDENT_MAP_WINDOW = 1L << 10;
     public static final long CAP_CLUSTER_DIRECT_SURFACE = 1L << 11;
     public static final long CAP_EXTERNAL_INSTRUMENT_LAUNCHER = 1L << 12;
+    public static final long CAP_EXTERNAL_CAMERA_OVERLAY = 1L << 13;
     public static final long CAP_NATRO_CONFIGURATION_HOST = 1L << 32;
     public static final long CAP_NATRO_NAVIGATION_STATE_SINK = 1L << 33;
     /** Advertise only after Natro can lease a real Surface rather than a bitmap bridge. */
     public static final long CAP_NATRO_HUD_SURFACE_PROVIDER = 1L << 34;
     public static final long CAP_NATRO_WINDOW_COMMAND_SOURCE = 1L << 35;
     public static final long CAP_NATRO_CLUSTER_SURFACE_PROVIDER = 1L << 36;
+    public static final long CAP_NATRO_EXTERNAL_CAMERA_SOURCE = 1L << 37;
 
     public static final int WINDOW_MODE_FULLSCREEN = 0;
     public static final int WINDOW_MODE_FLOATING = 1;
@@ -85,6 +89,7 @@ public final class NavigationBridgeContract {
     public static final String KEY_CONFIGURATION_JSON = "configuration_json";
     public static final String KEY_SNAPSHOT_JSON = "snapshot_json";
     public static final String KEY_ROUTE_GEOMETRY_JSON = "route_geometry_json";
+    public static final String KEY_EXTERNAL_CAMERAS_JSON = "external_cameras_json";
     public static final String KEY_SURFACE = "surface";
     public static final String KEY_SURFACE_WIDTH = "surface_width";
     public static final String KEY_SURFACE_HEIGHT = "surface_height";

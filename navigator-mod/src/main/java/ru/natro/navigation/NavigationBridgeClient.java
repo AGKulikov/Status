@@ -50,6 +50,7 @@ final class NavigationBridgeClient {
     private static final int MSG_DETACH_CLUSTER_SURFACE = 16;
     private static final int MSG_CLUSTER_SURFACE_LOST = 17;
     private static final int MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH = 18;
+    private static final int MSG_EXTERNAL_CAMERAS = 19;
 
     private static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     private static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -62,6 +63,7 @@ final class NavigationBridgeClient {
     private static final long CAP_CLUSTER_INDEPENDENT_MAP_WINDOW = 1L << 10;
     private static final long CAP_CLUSTER_DIRECT_SURFACE = 1L << 11;
     private static final long CAP_EXTERNAL_INSTRUMENT_LAUNCHER = 1L << 12;
+    private static final long CAP_EXTERNAL_CAMERA_OVERLAY = 1L << 13;
 
     private static final String KEY_PROTOCOL_VERSION = "protocol_version";
     private static final String KEY_SESSION_ID = "session_id";
@@ -70,6 +72,7 @@ final class NavigationBridgeClient {
     private static final String KEY_CONFIGURATION_JSON = "configuration_json";
     private static final String KEY_SNAPSHOT_JSON = "snapshot_json";
     private static final String KEY_ROUTE_GEOMETRY_JSON = "route_geometry_json";
+    private static final String KEY_EXTERNAL_CAMERAS_JSON = "external_cameras_json";
     private static final String KEY_SURFACE = "surface";
     private static final String KEY_SURFACE_WIDTH = "surface_width";
     private static final String KEY_SURFACE_HEIGHT = "surface_height";
@@ -300,6 +303,13 @@ final class NavigationBridgeClient {
                     prepareInstrumentPanelLaunch(message.getData());
                 }
                 break;
+            case MSG_EXTERNAL_CAMERAS:
+                if (sessionMatches(message.getData())) {
+                    String raw = message.getData().getString(KEY_EXTERNAL_CAMERAS_JSON, "");
+                    hudMapRenderer.updateExternalCameras(raw);
+                    clusterMapRenderer.updateExternalCameras(raw);
+                }
+                break;
             case MSG_HEARTBEAT:
                 sendHello();
                 break;
@@ -327,7 +337,8 @@ final class NavigationBridgeClient {
                         | CAP_LEGACY_WINDOW_INTENTS
                         | CAP_CLUSTER_INDEPENDENT_MAP_WINDOW
                         | CAP_CLUSTER_DIRECT_SURFACE
-                        | CAP_EXTERNAL_INSTRUMENT_LAUNCHER);
+                        | CAP_EXTERNAL_INSTRUMENT_LAUNCHER
+                        | CAP_EXTERNAL_CAMERA_OVERLAY);
         Message hello = Message.obtain(null, MSG_HELLO);
         hello.replyTo = callbacks;
         hello.setData(data);

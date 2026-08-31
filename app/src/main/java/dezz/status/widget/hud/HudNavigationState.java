@@ -402,8 +402,10 @@ public final class HudNavigationState {
             for (int index = 0; index < Math.min(2_048, values.length()); index++) {
                 JSONObject value = values.optJSONObject(index);
                 if (value == null) continue;
-                int from = Math.max(0, value.optInt("from", 0));
-                int to = Math.max(from, value.optInt("to", from));
+                int from = Math.max(0, value.has("fromMeters")
+                        ? value.optInt("fromMeters", 0) : value.optInt("from", 0));
+                int to = Math.max(from, value.has("toMeters")
+                        ? value.optInt("toMeters", from) : value.optInt("to", from));
                 if (to > from) result.add(new TrafficRun(from, to,
                         value.optString("type", "UNKNOWN")));
             }

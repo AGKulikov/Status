@@ -88,6 +88,7 @@ final class LaneGuidanceMapLayer {
         scalePercent = nextScale;
         nightMode = nextNightMode;
         zIndex = nextZ;
+        MapObjectLayerFactory.setZIndex(collection, nextZ);
         if (presentationChanged) {
             iconStyle = null;
             renderedFingerprint = Long.MIN_VALUE;
@@ -184,8 +185,9 @@ final class LaneGuidanceMapLayer {
         if (currentPlacemark != null) return currentPlacemark;
         Object currentCollection = collection;
         if (currentCollection == null) {
-            Object root = invoke(map, "getMapObjects", new Class<?>[0]);
-            currentCollection = invoke(root, "addCollection", new Class<?>[0]);
+            currentCollection = MapObjectLayerFactory.create(map,
+                    "ru.natro.navigation.lane_guidance",
+                    MapObjectLayerFactory.MAJOR, zIndex);
             collection = currentCollection;
         }
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");

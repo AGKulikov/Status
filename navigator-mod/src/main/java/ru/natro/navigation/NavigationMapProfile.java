@@ -48,9 +48,18 @@ final class NavigationMapProfile {
     boolean showTrafficLights = true;
     /** Screen-facing sign anchored to the upcoming LaneSign RoutePosition. */
     boolean showLaneGuidance = true;
+    boolean showHudSpeedCameras = true;
     int laneGuidanceScalePercent = 100;
+    int cameraScalePercent = 100;
+    int trafficLightScalePercent = 100;
+    int routeLabelScalePercent = 100;
+    int roadEventScalePercent = 100;
+    int destinationScalePercent = 100;
+    boolean manualLayerPrioritiesEnabled;
     int cameraDirectionLayerPriority = 20;
+    int roadEventLayerPriority = 30;
     int routeLayerPriority = 40;
+    int destinationLayerPriority = 45;
     int trafficLightLayerPriority = 50;
     int routeLabelLayerPriority = 60;
     int laneGuidanceLayerPriority = 80;
@@ -118,12 +127,29 @@ final class NavigationMapProfile {
                     "showRouteTraffic", result.showTraffic);
             result.showTrafficLights = source.optBoolean("showTrafficLights", true);
             result.showLaneGuidance = source.optBoolean("showLaneGuidance", true);
+            result.showHudSpeedCameras = source.optBoolean("showHudSpeedCameras", true);
             result.laneGuidanceScalePercent = clamp(
                     source.optInt("laneGuidanceScalePercent", 100), 50, 250);
+            result.cameraScalePercent = clamp(
+                    source.optInt("cameraScalePercent", 100), 50, 250);
+            result.trafficLightScalePercent = clamp(
+                    source.optInt("trafficLightScalePercent", 100), 50, 250);
+            result.routeLabelScalePercent = clamp(
+                    source.optInt("routeLabelScalePercent", 100), 50, 250);
+            result.roadEventScalePercent = clamp(
+                    source.optInt("roadEventScalePercent", 100), 50, 250);
+            result.destinationScalePercent = clamp(
+                    source.optInt("destinationScalePercent", 100), 50, 250);
+            result.manualLayerPrioritiesEnabled = source.optBoolean(
+                    "manualLayerPrioritiesEnabled", false);
             result.cameraDirectionLayerPriority = clamp(
                     source.optInt("cameraDirectionLayerPriority", 20), 0, 100);
+            result.roadEventLayerPriority = clamp(
+                    source.optInt("roadEventLayerPriority", 30), 0, 100);
             result.routeLayerPriority = clamp(
                     source.optInt("routeLayerPriority", 40), 0, 100);
+            result.destinationLayerPriority = clamp(
+                    source.optInt("destinationLayerPriority", 45), 0, 100);
             result.trafficLightLayerPriority = clamp(
                     source.optInt("trafficLightLayerPriority", 50), 0, 100);
             result.routeLabelLayerPriority = clamp(
@@ -201,6 +227,38 @@ final class NavigationMapProfile {
     String roadEventMode(String tag) {
         String value = roadEventModes.get(tag);
         return value == null ? "HIDDEN" : value;
+    }
+
+    int effectiveCameraPriority() {
+        return manualLayerPrioritiesEnabled ? cameraDirectionLayerPriority : 20;
+    }
+
+    int effectiveRoadEventPriority() {
+        return manualLayerPrioritiesEnabled ? roadEventLayerPriority : 30;
+    }
+
+    int effectiveRoutePriority() {
+        return manualLayerPrioritiesEnabled ? routeLayerPriority : 40;
+    }
+
+    int effectiveDestinationPriority() {
+        return manualLayerPrioritiesEnabled ? destinationLayerPriority : 45;
+    }
+
+    int effectiveTrafficLightPriority() {
+        return manualLayerPrioritiesEnabled ? trafficLightLayerPriority : 50;
+    }
+
+    int effectiveRouteLabelPriority() {
+        return manualLayerPrioritiesEnabled ? routeLabelLayerPriority : 60;
+    }
+
+    int effectiveLanePriority() {
+        return manualLayerPrioritiesEnabled ? laneGuidanceLayerPriority : 80;
+    }
+
+    int effectiveCursorPriority() {
+        return manualLayerPrioritiesEnabled ? cursorLayerPriority : 90;
     }
 
     String visibilityStyleJson() {

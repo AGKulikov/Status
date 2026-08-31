@@ -44,7 +44,8 @@ public final class NavigationHudEndpointService extends Service {
             NavigationBridgeContract.CAP_NATRO_CONFIGURATION_HOST
                     | NavigationBridgeContract.CAP_NATRO_NAVIGATION_STATE_SINK
                     | NavigationBridgeContract.CAP_NATRO_HUD_SURFACE_PROVIDER
-                    | NavigationBridgeContract.CAP_NATRO_CLUSTER_SURFACE_PROVIDER;
+                    | NavigationBridgeContract.CAP_NATRO_CLUSTER_SURFACE_PROVIDER
+                    | NavigationBridgeContract.CAP_NATRO_EXTERNAL_CAMERA_SOURCE;
 
     @NonNull private final Handler handler = new Handler(Looper.getMainLooper(), this::onMessage);
     @NonNull private final Messenger endpoint = new Messenger(handler);
@@ -52,6 +53,8 @@ public final class NavigationHudEndpointService extends Service {
     @Nullable private HandlerThread parserThread;
     @Nullable private Handler parser;
     @Nullable private Client client;
+    @Nullable private HudSpeedCameraBridgeClient hudSpeedCameraBridge;
+    @NonNull private String latestExternalCamerasJson = "";
     @Nullable private PendingPayload pendingSnapshot;
     @Nullable private PendingPayload pendingRouteGeometry;
     private boolean snapshotDrainPosted;
@@ -221,6 +224,11 @@ public final class NavigationHudEndpointService extends Service {
         parserThread = thread;
         parser = new Handler(thread.getLooper());
         instance = this;
+        hudSpeedCameraBridge = new HudSpeedCameraBridgeClient(this, raw -> handler.post(() -> {
+            latestExternalCamerasJson = raw;
+            sendExternalCameras();
+        }));
+        hudSpeedCameraBridge.start();
         DiagnosticJournal.info("navigation-bridge", "HUD endpoint service created in main Natro process");
     }
 
@@ -247,6 +255,9 @@ public final class NavigationHudEndpointService extends Service {
     public void onDestroy() {
         if (instance == this) instance = null;
         disconnectCurrentClient();
+        HudSpeedCameraBridgeClient cameraBridge = hudSpeedCameraBridge;
+        hudSpeedCameraBridge = null;
+        if (cameraBridge != null) cameraBridge.stop();
         HandlerThread thread = parserThread;
         synchronized (parserQueueLock) {
             pendingSnapshot = null;
@@ -370,6 +381,7 @@ public final class NavigationHudEndpointService extends Service {
         requestNavigationState(client);
         sendPublishedSurface();
         sendPublishedClusterSurface();
+        sendExternalCameras();
         Log.i(TAG, "Authenticated Navigator bridge session started");
         DiagnosticJournal.info("navigation-bridge",
                 "authenticated Navigator session started; capabilities="
@@ -609,6 +621,18 @@ public final class NavigationHudEndpointService extends Service {
         data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
         data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, generation);
         send(current.messenger, NavigationBridgeContract.MSG_DETACH_CLUSTER_SURFACE, data);
+    }
+
+    private void sendExternalCameras() {
+        Client current = client;
+        String raw = latestExternalCamerasJson;
+        if (current == null || raw.isEmpty()
+                || (current.capabilities
+                & NavigationBridgeContract.CAP_EXTERNAL_CAMERA_OVERLAY) == 0L) return;
+        Bundle data = new Bundle();
+        data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
+        data.putString(NavigationBridgeContract.KEY_EXTERNAL_CAMERAS_JSON, raw);
+        send(current.messenger, NavigationBridgeContract.MSG_EXTERNAL_CAMERAS, data);
     }
 
     private static boolean supportsDirectHudMap(@NonNull Client value) {

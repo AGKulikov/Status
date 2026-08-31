@@ -66,6 +66,7 @@ final class MapCursorStyler {
         fillColor = normalizedFill;
         outlineColor = normalizedOutline;
         zIndex = normalizedZ;
+        MapObjectLayerFactory.setZIndex(collection, normalizedZ);
         if (styleChanged) {
             imageProvider = null;
             iconBitmap = null;
@@ -124,8 +125,9 @@ final class MapCursorStyler {
         if (currentMap == null || !hasPosition()) return null;
         Object currentCollection = collection;
         if (currentCollection == null) {
-            Object root = invoke(currentMap, "getMapObjects", new Class<?>[0]);
-            currentCollection = invoke(root, "addCollection", new Class<?>[0]);
+            currentCollection = MapObjectLayerFactory.create(currentMap,
+                    "ru.natro.navigation.cursor",
+                    MapObjectLayerFactory.MAJOR, zIndex);
             collection = currentCollection;
         }
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");

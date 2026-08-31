@@ -7,6 +7,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -18,12 +19,19 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dezz.status.widget.navigation.NavigationBridgeStateStore;
+import dezz.status.widget.navigation.NavigationIntegrationConfig;
+import dezz.status.widget.navigation.NavigationRouteGeometryV2;
 import dezz.status.widget.navigation.NavigationSnapshotV2;
 
 /**
@@ -53,6 +61,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @NonNull private final Paint clearPaint = new Paint();
     @NonNull private final RectF rect = new RectF();
     @NonNull private final RectF gaugeArc = new RectF();
+    @NonNull private final RectF routeBarRect = new RectF();
+    @NonNull private final Path routeProgressPath = new Path();
     @NonNull private final Calendar calendar = Calendar.getInstance();
     @NonNull private final char[] clockBuffer = {'0', '0', ':', '0', '0'};
     @NonNull private final List<RuntimeElement> runtimeElements = new ArrayList<>();
@@ -60,6 +70,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     private final boolean editorMode;
     @Nullable private final EditorListener editorListener;
     @NonNull private InstrumentPanelConfig config;
+    @NonNull private NavigationIntegrationConfig.MapProfile navigationProfile =
+            NavigationIntegrationConfig.MapProfile.defaults(
+                    NavigationIntegrationConfig.Target.CLUSTER);
     @NonNull private final AtomicBoolean telemetryWakePosted = new AtomicBoolean();
     @NonNull private final InstrumentTelemetryRepository.UpdateListener telemetryListener =
             this::onTelemetryChanged;
@@ -76,6 +89,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     };
     @NonNull private final Runnable navigationExpiry = () -> {
         navigationSnapshot = null;
+        navigationGeometry = null;
         invalidate();
     };
     @NonNull private final Runnable clockWake = () -> {
@@ -98,6 +112,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @Nullable private String selectedId;
     @Nullable private InstrumentElementConfig dragging;
     @Nullable private NavigationSnapshotV2 navigationSnapshot;
+    @Nullable private NavigationRouteGeometryV2 navigationGeometry;
     private boolean resizing;
     private float touchStartX;
     private float touchStartY;
@@ -139,6 +154,13 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         invalidate();
         scheduleClockWake();
         scheduleFrame();
+    }
+
+    /** Keeps the route card on the same user-selected congestion palette as the cluster map. */
+    public void setNavigationProfile(
+            @NonNull NavigationIntegrationConfig.MapProfile value) {
+        navigationProfile = value;
+        invalidate();
     }
 
     @NonNull
@@ -262,6 +284,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             navigationAcquired = false;
             NavigationBridgeStateStore.removeListener(navigationListener);
             navigationSnapshot = null;
+            navigationGeometry = null;
             removeCallbacks(navigationWake);
             removeCallbacks(navigationExpiry);
             navigationWakePosted.set(false);
@@ -280,6 +303,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         navigationSnapshot = value != null && value.routeActive
                 && value.isFreshAt(now, NAVIGATION_FRESH_MS) ? value : null;
         NavigationSnapshotV2 accepted = navigationSnapshot;
+        NavigationRouteGeometryV2 geometry = NavigationBridgeStateStore.routeGeometry();
+        navigationGeometry = accepted != null && geometry != null
+                && geometry.routeEpoch == accepted.routeEpoch ? geometry : null;
         if (accepted != null) {
             long delay = accepted.sourceTimestampMs + NAVIGATION_FRESH_MS - now;
             postDelayed(navigationExpiry, Math.max(1L, delay));
@@ -963,41 +989,143 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                                     @Nullable NavigationSnapshotV2 navigation) {
         // Route-bound information must disappear completely when the publisher is stale.
         if (navigation == null) return;
-        runtime.updateNavigation(navigation);
+        runtime.updateNavigation(navigation, navigationGeometry);
         InstrumentElementConfig element = runtime.config;
         int alpha = Math.round(255f * element.opacityPercent / 100f);
-        if (option(element, "showFace", false)) drawDigitalFace(canvas, element, bounds, alpha);
+        if (option(element, "showFace", true)) {
+            float corner = Math.min(bounds.width(), bounds.height()) * .16f;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(0xFF15171B, Math.min(alpha, 238)));
+            canvas.drawRoundRect(bounds, corner, corner, paint);
+        }
 
+        boolean showDistance = option(element, "showDistance", true);
+        boolean showEta = option(element, "showEta", true);
+        boolean showDuration = option(element, "showDuration", true);
+        boolean showProgress = option(element, "showRouteProgress", true);
+        int metricCount = (showDistance ? 1 : 0) + (showEta ? 1 : 0)
+                + (showDuration ? 1 : 0);
+        if (metricCount > 0) {
+            float left = bounds.left + bounds.width() * .055f;
+            float width = bounds.width() * .89f;
+            float cellWidth = width / metricCount;
+            float baselineCenter = bounds.top + bounds.height() * (showProgress ? .41f : .53f);
+            float maximumTextSize = bounds.height() * (metricCount == 1 ? .38f : .30f);
+            float x = left + cellWidth * .5f;
+            if (showDistance) {
+                drawNavigationMetric(canvas, runtime.navigationRemainingDistance,
+                        x, baselineCenter, cellWidth * .86f, maximumTextSize,
+                        element, alpha);
+                x += cellWidth;
+            }
+            if (showEta) {
+                drawNavigationMetric(canvas, runtime.navigationArrival,
+                        x, baselineCenter, cellWidth * .86f, maximumTextSize,
+                        element, alpha);
+                x += cellWidth;
+            }
+            if (showDuration) {
+                drawNavigationMetric(canvas, runtime.navigationDuration,
+                        x, baselineCenter, cellWidth * .86f, maximumTextSize,
+                        element, alpha);
+            }
+        }
+        if (showProgress) {
+            drawNavigationRouteProgress(canvas, runtime, bounds, alpha);
+        }
+    }
+
+    private void drawNavigationMetric(@NonNull Canvas canvas, @NonNull String raw,
+                                      float centerX, float centerY, float maximumWidth,
+                                      float maximumTextSize,
+                                      @NonNull InstrumentElementConfig element, int alpha) {
+        String value = raw.isEmpty() ? "—" : raw;
         paint.setStyle(Paint.Style.FILL);
         paint.setTypeface(digitalTypeface(element.style, true));
-        paint.setTextAlign(Paint.Align.LEFT);
-        paint.setTextSize(bounds.height() * .42f);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(Math.max(8f, maximumTextSize));
+        float measured = paint.measureText(value);
+        if (measured > maximumWidth && measured > 0f) {
+            paint.setTextSize(Math.max(8f, paint.getTextSize() * maximumWidth / measured));
+        }
         paint.setColor(withAlpha(element.style.primaryColor, alpha));
-        canvas.drawText(runtime.navigationArrow,
-                bounds.left + bounds.width() * .07f, bounds.top + bounds.height() * .51f, paint);
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        canvas.drawText(value, centerX,
+                centerY - (metrics.ascent + metrics.descent) * .5f, paint);
+    }
 
-        paint.setTextSize(bounds.height() * .30f);
-        canvas.drawText(runtime.navigationDistance,
-                bounds.left + bounds.width() * .27f, bounds.top + bounds.height() * .48f, paint);
-        paint.setTypeface(digitalTypeface(element.style, false));
-        paint.setTextSize(bounds.height() * .15f);
-        paint.setColor(withAlpha(element.style.primaryColor, Math.min(alpha, 220)));
-        canvas.drawText(runtime.navigationTitle,
-                bounds.left + bounds.width() * .27f, bounds.top + bounds.height() * .70f, paint);
+    private void drawNavigationRouteProgress(@NonNull Canvas canvas,
+                                             @NonNull RuntimeElement runtime,
+                                             @NonNull RectF bounds, int alpha) {
+        float horizontalInset = bounds.width() * .075f;
+        float top = bounds.top + bounds.height() * .70f;
+        float bottom = bounds.top + bounds.height() * .82f;
+        routeBarRect.set(bounds.left + horizontalInset, top,
+                bounds.right - horizontalInset, bottom);
+        float radius = routeBarRect.height() * .5f;
+        int unknownColor = trafficColor("UNKNOWN", navigationProfile);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(withAlpha(unknownColor, Math.min(alpha, 185)));
+        canvas.drawRoundRect(routeBarRect, radius, radius, paint);
 
-        if (option(element, "showStreet", true) && !runtime.navigationStreet.isEmpty()) {
-            paint.setTextSize(bounds.height() * .12f);
-            paint.setColor(withAlpha(element.style.secondaryColor, Math.min(alpha, 210)));
-            canvas.drawText(runtime.navigationStreet,
-                    bounds.left + bounds.width() * .27f, bounds.top + bounds.height() * .88f, paint);
+        routeProgressPath.reset();
+        routeProgressPath.addRoundRect(routeBarRect, radius, radius, Path.Direction.CW);
+        int clipped = canvas.save();
+        canvas.clipPath(routeProgressPath);
+        float maximumMeters = Math.max(runtime.navigationTotalDistanceMeters,
+                runtime.trafficTotalMeters);
+        if (maximumMeters > 0f) {
+            for (RouteTrafficRun run : runtime.navigationTrafficRuns) {
+                float from = Math.max(0f, Math.min(1f, run.fromMeters / maximumMeters));
+                float to = Math.max(from, Math.min(1f, run.toMeters / maximumMeters));
+                if (to <= from) continue;
+                paint.setColor(withAlpha(trafficColor(run.type, navigationProfile), alpha));
+                canvas.drawRect(routeBarRect.left + routeBarRect.width() * from,
+                        routeBarRect.top,
+                        routeBarRect.left + routeBarRect.width() * to,
+                        routeBarRect.bottom, paint);
+            }
         }
-        if (option(element, "showArrival", true) && !runtime.navigationRemaining.isEmpty()) {
-            paint.setTextAlign(Paint.Align.RIGHT);
-            paint.setTextSize(bounds.height() * .12f);
-            paint.setColor(withAlpha(element.style.accentColor, Math.min(alpha, 220)));
-            canvas.drawText(runtime.navigationRemaining,
-                    bounds.right - bounds.width() * .06f, bounds.top + bounds.height() * .18f, paint);
+        float progress = Double.isFinite(runtime.navigationProgress)
+                ? (float) Math.max(0d, Math.min(1d, runtime.navigationProgress)) : Float.NaN;
+        if (Float.isFinite(progress) && progress > 0f) {
+            paint.setColor(withAlpha(0xFF0A0B0D, Math.min(alpha, 145)));
+            canvas.drawRect(routeBarRect.left, routeBarRect.top,
+                    routeBarRect.left + routeBarRect.width() * progress,
+                    routeBarRect.bottom, paint);
         }
+        canvas.restoreToCount(clipped);
+
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, routeBarRect.height() * .09f));
+        paint.setColor(withAlpha(0xFF08090B, Math.min(alpha, 210)));
+        canvas.drawRoundRect(routeBarRect, radius, radius, paint);
+
+        if (!Float.isFinite(progress)) return;
+        float markerX = routeBarRect.left + routeBarRect.width() * progress;
+        float markerWidth = Math.max(8f, bounds.height() * .075f);
+        float markerHeight = Math.max(10f, bounds.height() * .15f);
+        markerX = Math.max(routeBarRect.left + markerWidth * .45f,
+                Math.min(routeBarRect.right - markerWidth * .55f, markerX));
+        float markerY = routeBarRect.centerY();
+        routeProgressPath.reset();
+        routeProgressPath.moveTo(markerX + markerWidth * .55f, markerY);
+        routeProgressPath.lineTo(markerX - markerWidth * .45f,
+                markerY - markerHeight * .5f);
+        routeProgressPath.lineTo(markerX - markerWidth * .20f, markerY);
+        routeProgressPath.lineTo(markerX - markerWidth * .45f,
+                markerY + markerHeight * .5f);
+        routeProgressPath.close();
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setStrokeWidth(Math.max(2f, markerWidth * .13f));
+        paint.setColor(withAlpha(0xFF111318, alpha));
+        canvas.drawPath(routeProgressPath, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(withAlpha(navigationColor(navigationProfile.cursorColor,
+                0xFFFFC400), alpha));
+        canvas.drawPath(routeProgressPath, paint);
+        paint.setStrokeJoin(Paint.Join.MITER);
     }
 
     private float infoValue(@NonNull InstrumentInfoMetric metric) {
@@ -1302,17 +1430,6 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     }
 
     @NonNull
-    private static String navigationArrow(@NonNull String raw) {
-        String value = raw.trim().toUpperCase(java.util.Locale.ROOT);
-        if (value.contains("UTURN") || value.contains("U_TURN")) return "↶";
-        if (value.contains("LEFT")) return "↰";
-        if (value.contains("RIGHT")) return "↱";
-        if (value.contains("ROUNDABOUT")) return "↻";
-        if (value.contains("FINISH")) return "⚑";
-        return "↑";
-    }
-
-    @NonNull
     private static String distanceText(int meters) {
         if (meters < 0) return "";
         if (meters < 1_000) return meters + " м";
@@ -1332,16 +1449,83 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     }
 
     @NonNull
-    private static String firstText(@NonNull String first, @NonNull String second,
-                                    @NonNull String third) {
-        if (!first.isEmpty()) return first;
-        if (!second.isEmpty()) return second;
-        return third;
+    private static String arrivalText(long epochMs) {
+        if (epochMs <= 0L) return "";
+        Calendar value = Calendar.getInstance();
+        value.setTimeInMillis(epochMs);
+        return String.format(Locale.getDefault(), "%02d:%02d",
+                value.get(Calendar.HOUR_OF_DAY), value.get(Calendar.MINUTE));
+    }
+
+    @NonNull
+    private static List<RouteTrafficRun> parseRouteTrafficRuns(@NonNull String raw) {
+        if (raw.isEmpty()) return Collections.emptyList();
+        ArrayList<RouteTrafficRun> result = new ArrayList<>();
+        try {
+            JSONArray values = new JSONArray(raw);
+            for (int index = 0; index < Math.min(2_048, values.length()); index++) {
+                JSONObject value = values.optJSONObject(index);
+                if (value == null) continue;
+                int from = Math.max(0, value.has("fromMeters")
+                        ? value.optInt("fromMeters", 0) : value.optInt("from", 0));
+                int to = Math.max(from, value.has("toMeters")
+                        ? value.optInt("toMeters", from) : value.optInt("to", from));
+                if (to <= from) continue;
+                result.add(new RouteTrafficRun(from, to,
+                        value.optString("type", "UNKNOWN").trim()
+                                .toUpperCase(Locale.ROOT)));
+            }
+        } catch (Exception ignored) {
+            return Collections.emptyList();
+        }
+        return result.isEmpty() ? Collections.emptyList()
+                : Collections.unmodifiableList(result);
+    }
+
+    private static int trafficColor(@NonNull String type,
+                                    @NonNull NavigationIntegrationConfig.MapProfile profile) {
+        if ("FREE".equals(type)) {
+            return navigationColor(profile.trafficFreeColor, 0xFF39B54A);
+        }
+        if ("LIGHT".equals(type)) {
+            return navigationColor(profile.trafficLightColor, 0xFFFFD54F);
+        }
+        if ("HARD".equals(type)) {
+            return navigationColor(profile.trafficHardColor, 0xFFFF8A3D);
+        }
+        if ("VERY_HARD".equals(type)) {
+            return navigationColor(profile.trafficVeryHardColor, 0xFFF04444);
+        }
+        if ("BLOCKED".equals(type)) {
+            return navigationColor(profile.trafficBlockedColor, 0xFF7E1D2D);
+        }
+        return navigationColor(profile.trafficUnknownColor, 0xFF8A9099);
+    }
+
+    private static int navigationColor(@Nullable String raw, int fallback) {
+        if (raw == null || raw.trim().isEmpty()) return fallback;
+        try {
+            return Color.parseColor(raw.trim());
+        } catch (IllegalArgumentException invalid) {
+            return fallback;
+        }
     }
 
     private static int withAlpha(int color, int alpha) {
         return Color.argb(Math.max(0, Math.min(255, alpha)),
                 Color.red(color), Color.green(color), Color.blue(color));
+    }
+
+    private static final class RouteTrafficRun {
+        final int fromMeters;
+        final int toMeters;
+        @NonNull final String type;
+
+        RouteTrafficRun(int fromMeters, int toMeters, @NonNull String type) {
+            this.fromMeters = Math.max(0, fromMeters);
+            this.toMeters = Math.max(this.fromMeters, toMeters);
+            this.type = type;
+        }
     }
 
     private static final class RuntimeElement {
@@ -1362,11 +1546,15 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         int cachedGear = Integer.MIN_VALUE;
         @NonNull String cachedGearText = "—";
         long cachedNavigationSequence = Long.MIN_VALUE;
-        @NonNull String navigationArrow = "↑";
-        @NonNull String navigationDistance = "";
-        @NonNull String navigationTitle = "";
-        @NonNull String navigationStreet = "";
-        @NonNull String navigationRemaining = "";
+        long cachedNavigationRouteEpoch = Long.MIN_VALUE;
+        @NonNull String cachedNavigationTrafficJson = "";
+        @NonNull String navigationRemainingDistance = "";
+        @NonNull String navigationArrival = "";
+        @NonNull String navigationDuration = "";
+        @NonNull List<RouteTrafficRun> navigationTrafficRuns = Collections.emptyList();
+        int navigationTotalDistanceMeters = -1;
+        int trafficTotalMeters;
+        double navigationProgress = Double.NaN;
 
         RuntimeElement(@NonNull InstrumentElementConfig config) {
             this.config = config;
@@ -1402,18 +1590,32 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             return cachedRowTenthsText[row];
         }
 
-        void updateNavigation(@NonNull NavigationSnapshotV2 value) {
-            if (cachedNavigationSequence == value.sequence) return;
-            cachedNavigationSequence = value.sequence;
-            navigationArrow = InstrumentClusterView.navigationArrow(value.maneuverType);
-            navigationDistance = distanceText(value.maneuverDistanceMeters);
-            navigationTitle = firstText(value.maneuverTitle, value.street, value.destination);
-            navigationStreet = value.street.equals(navigationTitle) ? "" : value.street;
-            String remainingDistance = distanceText(value.remainingDistanceMeters);
-            String remainingTime = durationText(value.remainingDurationSeconds);
-            navigationRemaining = remainingDistance.isEmpty() ? remainingTime
-                    : remainingTime.isEmpty() ? remainingDistance
-                    : remainingDistance + " · " + remainingTime;
+        void updateNavigation(@NonNull NavigationSnapshotV2 value,
+                              @Nullable NavigationRouteGeometryV2 geometry) {
+            if (cachedNavigationSequence != value.sequence) {
+                cachedNavigationSequence = value.sequence;
+                navigationRemainingDistance = distanceText(value.remainingDistanceMeters);
+                navigationArrival = arrivalText(value.arrivalEpochMs);
+                navigationDuration = durationText(value.remainingDurationSeconds);
+                navigationTotalDistanceMeters = value.routeTotalDistanceMeters;
+                if (value.routeTotalDistanceMeters > 0
+                        && value.remainingDistanceMeters >= 0) {
+                    navigationProgress = 1d - value.remainingDistanceMeters
+                            / (double) value.routeTotalDistanceMeters;
+                    navigationProgress = Math.max(0d, Math.min(1d, navigationProgress));
+                } else {
+                    navigationProgress = Double.NaN;
+                }
+            }
+            String trafficJson = geometry == null || geometry.routeEpoch != value.routeEpoch
+                    ? "" : geometry.trafficSegmentsJson;
+            if (cachedNavigationRouteEpoch == value.routeEpoch
+                    && cachedNavigationTrafficJson.equals(trafficJson)) return;
+            cachedNavigationRouteEpoch = value.routeEpoch;
+            cachedNavigationTrafficJson = trafficJson;
+            navigationTrafficRuns = parseRouteTrafficRuns(trafficJson);
+            trafficTotalMeters = navigationTrafficRuns.isEmpty() ? 0
+                    : navigationTrafficRuns.get(navigationTrafficRuns.size() - 1).toMeters;
         }
 
         @NonNull String integerText(float value) {

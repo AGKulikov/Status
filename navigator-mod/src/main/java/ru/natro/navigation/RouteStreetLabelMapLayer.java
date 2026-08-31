@@ -26,6 +26,7 @@ final class RouteStreetLabelMapLayer {
     private Object collection;
     private Object textStyle;
     private boolean enabled;
+    private int scalePercent = 100;
     private float zIndex = NavigationMapProfile.layerZ(60);
     private boolean latestRouteActive;
     private List<NavigatorStatePublisher.RouteStreetLabelFrame> latest =
@@ -74,13 +75,20 @@ final class RouteStreetLabelMapLayer {
         map = null;
     }
 
-    void apply(boolean nextEnabled, int layerPriority) {
+    void apply(boolean nextEnabled, int nextScalePercent, int layerPriority) {
+        int nextScale = Math.max(50, Math.min(250, nextScalePercent));
         float nextZ = NavigationMapProfile.layerZ(layerPriority);
         boolean priorityChanged = zIndex != nextZ;
-        if (enabled == nextEnabled && !priorityChanged) return;
+        boolean scaleChanged = scalePercent != nextScale;
+        if (enabled == nextEnabled && !priorityChanged && !scaleChanged) return;
         enabled = nextEnabled;
+        scalePercent = nextScale;
         zIndex = nextZ;
-        if (priorityChanged) renderedStructureFingerprint = Long.MIN_VALUE;
+        MapObjectLayerFactory.setZIndex(collection, nextZ);
+        if (priorityChanged || scaleChanged) {
+            textStyle = null;
+            renderedStructureFingerprint = Long.MIN_VALUE;
+        }
         if (enabled) {
             discardExpiredSource();
             scheduleExpiryIfNeeded();
@@ -175,8 +183,9 @@ final class RouteStreetLabelMapLayer {
                          long structure) throws Exception {
         Object currentCollection = collection;
         if (currentCollection == null) {
-            Object root = invoke(map, "getMapObjects", new Class<?>[0]);
-            currentCollection = invoke(root, "addCollection", new Class<?>[0]);
+            currentCollection = MapObjectLayerFactory.create(map,
+                    "ru.natro.navigation.route_street_labels",
+                    MapObjectLayerFactory.MINOR, zIndex);
             collection = currentCollection;
         }
         invoke(currentCollection, "clear", new Class<?>[0]);
@@ -227,9 +236,10 @@ final class RouteStreetLabelMapLayer {
         style = styleClass.getConstructor().newInstance();
         Object placement = Enum.valueOf(
                 (Class<? extends Enum>) placementClass, "CENTER");
-        invoke(style, "setSize", new Class<?>[]{float.class}, 17f);
+        float scale = scalePercent / 100f;
+        invoke(style, "setSize", new Class<?>[]{float.class}, 17f * scale);
         invoke(style, "setColor", new Class<?>[]{int.class}, 0xFFF4F8FC);
-        invoke(style, "setOutlineWidth", new Class<?>[]{float.class}, 3f);
+        invoke(style, "setOutlineWidth", new Class<?>[]{float.class}, 3f * scale);
         invoke(style, "setOutlineColor", new Class<?>[]{int.class}, 0xE8172230);
         invoke(style, "setPlacement", new Class<?>[]{placementClass}, placement);
         invoke(style, "setOffsetFromIcon", new Class<?>[]{boolean.class}, false);

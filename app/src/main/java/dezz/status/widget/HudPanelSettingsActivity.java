@@ -491,7 +491,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 profile.focusXPercent, 0, 100, 1, " %");
         SliderField focusY = slider(form, "Автомобиль по вертикали",
                 profile.focusYPercent, 0, 100, 1, " %");
-        SliderField mapScale = slider(form, "Размер подписей и объектов карты",
+        SliderField mapScale = slider(form,
+                "Общий размер подписей и объектов основы карты",
                 profile.mapScalePercent, 50, 300, 5, " %");
         addNavigationCameraPresets(form, cameraMode, zoom, tilt, focusX, focusY);
         SliderField maximumFps = slider(form,
@@ -512,6 +513,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Светофоры с отсчётом — отдельный слой", profile.showTrafficLights);
         Switch showLaneGuidance = switchView(
                 "Подсказки по полосам — слой на маршруте", profile.showLaneGuidance);
+        Switch showHudSpeedCameras = switchView(
+                "Камеры из HUD Speed — отдельный знак", profile.showHudSpeedCameras);
         Switch showLabels = switchView("Подписи", profile.showLabels);
         Switch routeStreetLabelsOnly = switchView(
                 "Названия улиц только на маршруте", profile.routeStreetLabelsOnly);
@@ -525,7 +528,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Только дороги — прозрачный фон", profile.roadsOnly);
         for (Switch control : new Switch[]{showRoute, destination,
                 showRouteTraffic, showTraffic, showTrafficLights,
-                showLaneGuidance,
+                showLaneGuidance, showHudSpeedCameras,
                 showLabels, routeStreetLabelsOnly, showPois, showBuildings,
                 showParks, showWater,
                 showModels, showCursor, roadsOnly}) {
@@ -535,13 +538,30 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         roadEvents.setOnClickListener(view -> editHudRoadEvents(navigation, profile));
         form.addView(roadEvents, marginTop(10));
         form.addView(text("Для каждой отметки: скрыть, показывать всегда или только вдоль "
-                + "активного маршрута. Направление камер берётся из данных Яндекса.",
+                + "активного маршрута. Скорость, тип и направление камер берутся только из "
+                + "данных Яндекса или HUD Speed.",
                 12, 0xFF95A0AF), marginTop(5));
+        form.addView(section("Размер каждого слоя"), marginTop(16));
         SliderField cursorScale = slider(form, "Размер курсора",
                 profile.cursorScalePercent, 25, 300, 5, " %");
         SliderField laneGuidanceScale = slider(form,
                 "Размер знаков движения по полосам",
                 profile.laneGuidanceScalePercent, 50, 250, 5, " %");
+        SliderField cameraScale = slider(form,
+                "Размер знаков камер и маленьких обозначений",
+                profile.cameraScalePercent, 50, 250, 5, " %");
+        SliderField trafficLightScale = slider(form,
+                "Размер светофоров и плашек секунд",
+                profile.trafficLightScalePercent, 50, 250, 5, " %");
+        SliderField routeLabelScale = slider(form,
+                "Размер названий улиц на маршруте",
+                profile.routeLabelScalePercent, 50, 250, 5, " %");
+        SliderField roadEventScale = slider(form,
+                "Размер остальных дорожных событий",
+                profile.roadEventScalePercent, 50, 250, 5, " %");
+        SliderField destinationScale = slider(form,
+                "Размер конечной точки маршрута",
+                profile.destinationScalePercent, 50, 250, 5, " %");
         ColorField cursorColor = navigationColorField(form, "Цвет автомобиля",
                 profile.cursorColor, navigation, value -> profile.cursorColor = value);
         ColorField cursorOutline = navigationColorField(form, "Контур автомобиля",
@@ -563,12 +583,24 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 profile.roadWidthPercent, 25, 300, 5, " %");
         SliderField routeOutlineWidth = slider(form, "Толщина контура маршрута",
                 profile.routeOutlineWidth, 0, 20, 0.5, " px");
-        form.addView(section("Порядок слоёв — большее значение выше"), marginTop(16));
+        form.addView(section("Порядок слоёв"), marginTop(16));
+        Switch manualLayerPriorities = switchView(
+                "Ручной порядок слоёв", profile.manualLayerPrioritiesEnabled);
+        form.addView(manualLayerPriorities, marginTop(4));
+        form.addView(text("Выключено: Яндекс автоматически разводит конфликтующие элементы. "
+                + "Включено: большее значение ползунка располагает слой выше.",
+                12, 0xFF95A0AF), marginTop(4));
         SliderField cameraDirectionLayerPriority = slider(form,
-                "Направления камер", profile.cameraDirectionLayerPriority,
+                "Знаки камер и их направления", profile.cameraDirectionLayerPriority,
+                0, 100, 1, "");
+        SliderField roadEventLayerPriority = slider(form,
+                "Остальные дорожные события", profile.roadEventLayerPriority,
                 0, 100, 1, "");
         SliderField routeLayerPriority = slider(form,
                 "Маршрут", profile.routeLayerPriority, 0, 100, 1, "");
+        SliderField destinationLayerPriority = slider(form,
+                "Конечная точка маршрута", profile.destinationLayerPriority,
+                0, 100, 1, "");
         SliderField trafficLightLayerPriority = slider(form,
                 "Светофоры и секунды", profile.trafficLightLayerPriority,
                 0, 100, 1, "");
@@ -581,6 +613,18 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField cursorLayerPriority = slider(form,
                 "Курсор автомобиля", profile.cursorLayerPriority,
                 0, 100, 1, "");
+        SliderField[] layerPriorityControls = new SliderField[]{
+                cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
+                destinationLayerPriority, trafficLightLayerPriority,
+                routeLabelLayerPriority, laneGuidanceLayerPriority, cursorLayerPriority};
+        Runnable updateLayerPriorityControls = () -> {
+            for (SliderField field : layerPriorityControls) {
+                field.setEnabled(manualLayerPriorities.isChecked());
+            }
+        };
+        manualLayerPriorities.setOnCheckedChangeListener(
+                (button, checked) -> updateLayerPriorityControls.run());
+        updateLayerPriorityControls.run();
         form.addView(section("Цвета загруженности дорог"), marginTop(16));
         ColorField trafficFreeColor = navigationColorField(form, "Дорога свободна",
                 profile.trafficFreeColor, navigation,
@@ -641,6 +685,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showTraffic = showTraffic.isChecked();
                         profile.showTrafficLights = showTrafficLights.isChecked();
                         profile.showLaneGuidance = showLaneGuidance.isChecked();
+                        profile.showHudSpeedCameras = showHudSpeedCameras.isChecked();
                         profile.showLabels = showLabels.isChecked();
                         profile.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked();
                         profile.showPois = showPois.isChecked();
@@ -652,6 +697,13 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.roadsOnly = roadsOnly.isChecked();
                         profile.cursorScalePercent = cursorScale.intValue();
                         profile.laneGuidanceScalePercent = laneGuidanceScale.intValue();
+                        profile.cameraScalePercent = cameraScale.intValue();
+                        profile.trafficLightScalePercent = trafficLightScale.intValue();
+                        profile.routeLabelScalePercent = routeLabelScale.intValue();
+                        profile.roadEventScalePercent = roadEventScale.intValue();
+                        profile.destinationScalePercent = destinationScale.intValue();
+                        profile.manualLayerPrioritiesEnabled =
+                                manualLayerPriorities.isChecked();
                         profile.cursorColor = cursorColor.value;
                         profile.cursorOutlineColor = cursorOutline.value;
                         profile.routeColor = routeColor.value;
@@ -662,7 +714,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.routeOutlineWidth = routeOutlineWidth.value();
                         profile.cameraDirectionLayerPriority =
                                 cameraDirectionLayerPriority.intValue();
+                        profile.roadEventLayerPriority = roadEventLayerPriority.intValue();
                         profile.routeLayerPriority = routeLayerPriority.intValue();
+                        profile.destinationLayerPriority =
+                                destinationLayerPriority.intValue();
                         profile.trafficLightLayerPriority =
                                 trafficLightLayerPriority.intValue();
                         profile.routeLabelLayerPriority = routeLabelLayerPriority.intValue();
@@ -1941,6 +1996,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             int progress = (int) Math.round((value - minimum) / step);
             control.setProgress(Math.max(0, Math.min(control.getMax(), progress)));
             updateLabel();
+        }
+
+        void setEnabled(boolean enabled) {
+            control.setEnabled(enabled);
+            control.setAlpha(enabled ? 1f : 0.35f);
+            valueLabel.setAlpha(enabled ? 1f : 0.45f);
         }
 
         void updateLabel() {

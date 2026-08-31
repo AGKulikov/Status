@@ -104,6 +104,7 @@ public final class InstrumentPanelView extends FrameLayout
         instruments.setConfig(config);
         InstrumentElementConfig map = firstMap();
         NavigationIntegrationConfig.MapProfile profile = clusterProfile();
+        instruments.setNavigationProfile(profile);
         clusterMapEnabled = profile.enabled;
         if (map == null || !map.enabled || !profile.enabled) {
             mapView.setVisibility(GONE);
