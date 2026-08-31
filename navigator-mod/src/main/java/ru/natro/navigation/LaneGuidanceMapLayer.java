@@ -4,21 +4,16 @@ package ru.natro.navigation;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.LinearGradient;
-import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.PointF;
-import android.graphics.RectF;
-import android.graphics.Shader;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
+import android.view.View;
 
 import java.lang.reflect.Method;
-import java.util.List;
 
-/** A screen-facing lane sign whose geographic anchor is the upcoming route position. */
+/** The stock Yandex lane balloon, anchored to its upcoming RoutePosition. */
 final class LaneGuidanceMapLayer {
     private static final String TAG = "NatroLaneMap";
     private static final long FRESH_MS = 1_500L;
@@ -32,6 +27,9 @@ final class LaneGuidanceMapLayer {
     private Object imageProvider;
     private Bitmap iconBitmap;
     private boolean enabled;
+    private boolean nightMode;
+    private int scalePercent = 100;
+    private float zIndex = NavigationMapProfile.layerZ(80);
     private boolean latestRouteActive;
     private NavigatorStatePublisher.LaneGuidanceFrame latest;
     private long latestSampleElapsedMs;
@@ -78,9 +76,22 @@ final class LaneGuidanceMapLayer {
         map = null;
     }
 
-    void apply(boolean nextEnabled) {
-        if (enabled == nextEnabled) return;
+    void apply(boolean nextEnabled, int nextScalePercent, boolean nextNightMode,
+               int layerPriority) {
+        int nextScale = Math.max(50, Math.min(250, nextScalePercent));
+        float nextZ = NavigationMapProfile.layerZ(layerPriority);
+        boolean presentationChanged = scalePercent != nextScale || nightMode != nextNightMode
+                || zIndex != nextZ;
+        boolean enabledChanged = enabled != nextEnabled;
+        if (!presentationChanged && !enabledChanged) return;
         enabled = nextEnabled;
+        scalePercent = nextScale;
+        nightMode = nextNightMode;
+        zIndex = nextZ;
+        if (presentationChanged) {
+            iconStyle = null;
+            renderedFingerprint = Long.MIN_VALUE;
+        }
         if (!enabled) {
             main.removeCallbacks(expire);
             expiryPosted = false;
@@ -151,7 +162,7 @@ final class LaneGuidanceMapLayer {
         try {
             Object currentPlacemark = ensurePlacemark(frame);
             if (renderedFingerprint != latestFingerprint) {
-                applyIcon(currentPlacemark, frame);
+                applyOriginalYandexIcon(currentPlacemark, frame);
                 renderedFingerprint = latestFingerprint;
             }
             Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
@@ -160,7 +171,9 @@ final class LaneGuidanceMapLayer {
             invoke(currentPlacemark, "setGeometry", new Class<?>[]{pointClass}, point);
             invoke(currentPlacemark, "setVisible", new Class<?>[]{boolean.class}, true);
         } catch (Throwable failure) {
-            Log.w(TAG, "Lane guidance map layer update failed", failure);
+            // Do not draw guessed arrows: if the stock renderer is unavailable, hiding the item is
+            // safer than presenting incorrect lane information to the driver.
+            Log.w(TAG, "Original Yandex lane renderer failed", failure);
             clearVisual();
         }
     }
@@ -185,9 +198,38 @@ final class LaneGuidanceMapLayer {
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void applyIcon(Object currentPlacemark,
-                           NavigatorStatePublisher.LaneGuidanceFrame frame)
+    private void applyOriginalYandexIcon(Object currentPlacemark,
+                                         NavigatorStatePublisher.LaneGuidanceFrame frame)
             throws Exception {
+        Class<?> laneSignClass = Class.forName(
+                "com.yandex.mapkit.directions.driving.LaneSign");
+        if (!laneSignClass.isInstance(frame.laneSign)) {
+            throw new IllegalArgumentException("LaneSign type mismatch");
+        }
+        Class<?> directionSignClass = Class.forName(
+                "com.yandex.mapkit.directions.driving.DirectionSign");
+        Class<?> laneBalloonClass = Class.forName(
+                "com.yandex.mapkit.navigation.automotive.layer.LaneSignBalloon");
+        Object laneBalloon = laneBalloonClass
+                .getConstructor(laneSignClass, directionSignClass)
+                .newInstance(frame.laneSign, null);
+        Class<?> balloonClass = Class.forName(
+                "com.yandex.mapkit.navigation.automotive.layer.Balloon");
+        Object balloon = balloonClass.getMethod("fromLaneSign", laneBalloonClass)
+                .invoke(null, laneBalloon);
+
+        Class<?> colorsClass = Class.forName(
+                "com.yandex.mapkit.styling.automotive.balloons.BalloonColors");
+        Class<?> factoryClass = Class.forName(
+                "com.yandex.mapkit.styling.automotivenavigation.balloons."
+                        + "LaneSignBalloonTextureFactory");
+        Object factory = factoryClass.getConstructor(Context.class, colorsClass)
+                .newInstance(context, null);
+        View original = (View) factoryClass
+                .getMethod("createView", balloonClass, boolean.class)
+                .invoke(factory, balloon, nightMode);
+        Bitmap bitmap = drawView(original, scalePercent / 100f);
+
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
         Object style = iconStyle;
@@ -197,14 +239,13 @@ final class LaneGuidanceMapLayer {
             Object rotation = Enum.valueOf(
                     (Class<? extends Enum>) rotationClass, "NO_ROTATION");
             invoke(style, "setAnchor", new Class<?>[]{PointF.class},
-                    new PointF(0.5f, 1.08f));
+                    new PointF(0.5f, 1.04f));
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
-            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(42f));
+            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
             iconStyle = style;
         }
-        Bitmap bitmap = createLaneBitmap(frame.lanes);
         Object provider = providerClass.getMethod("fromBitmap", Bitmap.class)
                 .invoke(null, bitmap);
         imageProvider = provider;
@@ -213,135 +254,22 @@ final class LaneGuidanceMapLayer {
                 new Class<?>[]{providerClass, styleClass}, provider, style);
     }
 
-    private Bitmap createLaneBitmap(List<NavigatorStatePublisher.LaneFrame> lanes) {
-        float density = context.getResources().getDisplayMetrics().density;
-        int laneCount = Math.max(1, Math.min(8, lanes.size()));
-        float laneWidthDp = laneCount <= 4 ? 31f : 27f;
-        int width = Math.max(Math.round(76f * density),
-                Math.round((18f + laneCount * laneWidthDp) * density));
-        int height = Math.max(56, Math.round(70f * density));
+    private static Bitmap drawView(View view, float scale) {
+        int unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        view.measure(unspecified, unspecified);
+        int naturalWidth = Math.max(1, view.getMeasuredWidth());
+        int naturalHeight = Math.max(1, view.getMeasuredHeight());
+        if (naturalWidth > 2_048 || naturalHeight > 2_048) {
+            throw new IllegalArgumentException("Lane view is unbounded");
+        }
+        view.layout(0, 0, naturalWidth, naturalHeight);
+        int width = Math.max(1, Math.round(naturalWidth * scale));
+        int height = Math.max(1, Math.round(naturalHeight * scale));
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
-        float unit = density;
-        RectF panel = new RectF(2f * unit, 2f * unit,
-                width - 2f * unit, height - 10f * unit);
-
-        Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        shadow.setColor(0x66111828);
-        shadow.setStyle(Paint.Style.FILL);
-        canvas.drawRoundRect(new RectF(panel.left, panel.top + 3f * unit,
-                panel.right, panel.bottom + 3f * unit), 12f * unit, 12f * unit, shadow);
-
-        Paint background = new Paint(Paint.ANTI_ALIAS_FLAG);
-        background.setShader(new LinearGradient(panel.left, panel.top,
-                panel.right, panel.bottom, 0xFF0758E8, 0xFF0838A8,
-                Shader.TileMode.CLAMP));
-        canvas.drawRoundRect(panel, 11f * unit, 11f * unit, background);
-        background.setShader(null);
-        background.setStyle(Paint.Style.STROKE);
-        background.setStrokeWidth(Math.max(1f, unit));
-        background.setColor(0x667FC5FF);
-        canvas.drawRoundRect(panel, 11f * unit, 11f * unit, background);
-
-        Path pointer = new Path();
-        pointer.moveTo(width / 2f - 7f * unit, panel.bottom - 1f * unit);
-        pointer.lineTo(width / 2f + 7f * unit, panel.bottom - 1f * unit);
-        pointer.lineTo(width / 2f, height - 2f * unit);
-        pointer.close();
-        background.setStyle(Paint.Style.FILL);
-        background.setColor(0xFF0838A8);
-        canvas.drawPath(pointer, background);
-
-        float contentLeft = (width - laneCount * laneWidthDp * unit) / 2f;
-        for (int index = 0; index < laneCount; index++) {
-            NavigatorStatePublisher.LaneFrame lane = lanes.get(index);
-            float left = contentLeft + index * laneWidthDp * unit;
-            RectF laneBounds = new RectF(left + 2f * unit, panel.top + 7f * unit,
-                    left + (laneWidthDp - 2f) * unit, panel.bottom - 6f * unit);
-            drawLane(canvas, lane, laneBounds, unit);
-            if (index > 0) {
-                Paint separator = new Paint(Paint.ANTI_ALIAS_FLAG);
-                separator.setColor(0x266ED0FF);
-                separator.setStrokeWidth(Math.max(1f, 0.7f * unit));
-                canvas.drawLine(left, panel.top + 9f * unit,
-                        left, panel.bottom - 8f * unit, separator);
-            }
-        }
+        canvas.scale(scale, scale);
+        view.draw(canvas);
         return bitmap;
-    }
-
-    private static void drawLane(Canvas canvas, NavigatorStatePublisher.LaneFrame lane,
-                                 RectF bounds, float density) {
-        if (lane == null || lane.directions.isEmpty()) return;
-        String highlighted = lane.highlightedDirection;
-        boolean recommended = highlighted != null && !highlighted.isEmpty()
-                && !"UNKNOWN_DIRECTION".equals(highlighted);
-        int count = Math.min(3, lane.directions.size());
-        for (int index = 0; index < count; index++) {
-            String direction = lane.directions.get(index);
-            boolean selected = recommended && direction.equals(highlighted);
-            int color = selected ? 0xFFFFFFFF
-                    : recommended ? 0x669EC8FF : 0xE8FFFFFF;
-            float offset = (index - (count - 1) / 2f) * 4.4f * density;
-            drawDirection(canvas, direction, bounds, offset, color, density);
-        }
-        if ("BUS_LANE".equals(lane.kind) || "TAXI_LANE".equals(lane.kind)) {
-            Paint badge = new Paint(Paint.ANTI_ALIAS_FLAG);
-            badge.setColor(0xE6FFFFFF);
-            badge.setStyle(Paint.Style.FILL);
-            canvas.drawCircle(bounds.centerX(), bounds.bottom - 1.5f * density,
-                    2f * density, badge);
-        }
-    }
-
-    private static void drawDirection(Canvas canvas, String direction, RectF bounds,
-                                      float xOffset, int color, float density) {
-        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        paint.setColor(color);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setStrokeJoin(Paint.Join.ROUND);
-        paint.setStrokeWidth(Math.max(2f, 3.2f * density));
-        float centerX = bounds.centerX() + xOffset;
-        float bottom = bounds.bottom - 4f * density;
-        float top = bounds.top + 2f * density;
-        float side = Math.min(bounds.width() * 0.36f, 8.5f * density);
-        boolean left = direction != null && direction.startsWith("LEFT");
-        boolean right = direction != null && direction.startsWith("RIGHT");
-        Path path = new Path();
-        if (!left && !right) {
-            path.moveTo(centerX, bottom);
-            path.lineTo(centerX, top + 5f * density);
-            path.moveTo(centerX - 4.5f * density, top + 9.5f * density);
-            path.lineTo(centerX, top + 5f * density);
-            path.lineTo(centerX + 4.5f * density, top + 9.5f * density);
-        } else {
-            float sign = left ? -1f : 1f;
-            float turnY = top + 14f * density;
-            path.moveTo(centerX, bottom);
-            path.lineTo(centerX, turnY + 4f * density);
-            path.quadTo(centerX, turnY, centerX + sign * side, turnY);
-            path.moveTo(centerX + sign * (side - 4.5f * density),
-                    turnY - 4.5f * density);
-            path.lineTo(centerX + sign * side, turnY);
-            path.lineTo(centerX + sign * (side - 4.5f * density),
-                    turnY + 4.5f * density);
-            if (direction.contains("135") || direction.contains("180")) {
-                path.reset();
-                float outer = side * 0.85f;
-                path.moveTo(centerX, bottom);
-                path.lineTo(centerX, turnY + 2f * density);
-                path.cubicTo(centerX, top + 3f * density,
-                        centerX + sign * outer, top + 3f * density,
-                        centerX + sign * outer, turnY + 1f * density);
-                path.moveTo(centerX + sign * (outer - 4f * density),
-                        turnY - 3f * density);
-                path.lineTo(centerX + sign * outer, turnY + 1f * density);
-                path.lineTo(centerX + sign * (outer - 4f * density),
-                        turnY + 5f * density);
-            }
-        }
-        canvas.drawPath(path, paint);
     }
 
     private void clearVisual() {
@@ -365,9 +293,7 @@ final class LaneGuidanceMapLayer {
         for (NavigatorStatePublisher.LaneFrame lane : frame.lanes) {
             result = mix(result, lane.kind.hashCode());
             result = mix(result, lane.highlightedDirection.hashCode());
-            for (String direction : lane.directions) {
-                result = mix(result, direction.hashCode());
-            }
+            for (String direction : lane.directions) result = mix(result, direction.hashCode());
         }
         return mix(result, frame.lanes.size());
     }

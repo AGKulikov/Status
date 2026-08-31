@@ -91,6 +91,7 @@ public final class InstrumentPanelView extends FrameLayout
         }
         mapView.setVisibility(VISIBLE);
         mapView.setLayoutParams(mapParams(map));
+        mapView.setAlpha(map.opacityPercent / 100f);
         mapView.invalidate();
     }
 
@@ -110,6 +111,7 @@ public final class InstrumentPanelView extends FrameLayout
             return;
         }
         mapView.setVisibility(VISIBLE);
+        mapView.setAlpha(map.opacityPercent / 100f);
         LayoutParams params = mapParams(map);
         mapView.setLayoutParams(params);
         if (mapTexture != null) mapTexture.setOpaque(!profile.roadsOnly);

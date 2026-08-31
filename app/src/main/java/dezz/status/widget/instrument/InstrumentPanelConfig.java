@@ -27,6 +27,7 @@ public final class InstrumentPanelConfig {
     public int rows = DEFAULT_ROWS;
     public boolean transparentBackground;
     @NonNull public String presetId = InstrumentPanelPreset.SLATE_HORIZON.id;
+    public int presetLayoutRevision = InstrumentPanelPreset.LAYOUT_REVISION;
     @NonNull public String backgroundBottomColor = "#FF16283D";
     /** Percentage of panel height which remains pure black before the bottom gradient begins. */
     public int blackZonePercent = 46;
@@ -46,6 +47,7 @@ public final class InstrumentPanelConfig {
         value.rows = rows;
         value.transparentBackground = transparentBackground;
         value.presetId = presetId;
+        value.presetLayoutRevision = presetLayoutRevision;
         value.backgroundBottomColor = backgroundBottomColor;
         value.blackZonePercent = blackZonePercent;
         value.defaultStyle = defaultStyle;
@@ -119,6 +121,7 @@ public final class InstrumentPanelConfig {
                 .put("rows", rows)
                 .put("transparentBackground", transparentBackground)
                 .put("presetId", presetId)
+                .put("presetLayoutRevision", presetLayoutRevision)
                 .put("backgroundBottomColor", backgroundBottomColor)
                 .put("blackZonePercent", blackZonePercent)
                 .put("defaultStyle", defaultStyle.name())
@@ -143,6 +146,7 @@ public final class InstrumentPanelConfig {
         value.rows = json.optInt("rows", DEFAULT_ROWS);
         value.transparentBackground = json.optBoolean("transparentBackground", false);
         value.presetId = json.optString("presetId", InstrumentPanelPreset.SLATE_HORIZON.id);
+        value.presetLayoutRevision = json.optInt("presetLayoutRevision", 1);
         value.backgroundBottomColor = json.optString(
                 "backgroundBottomColor", "#FF16283D");
         value.blackZonePercent = json.optInt("blackZonePercent", 46);
@@ -157,6 +161,7 @@ public final class InstrumentPanelConfig {
                 }
             }
         }
+        InstrumentPanelPreset.upgradeLegacyLayout(value);
         value.normalize();
         if (!value.elements.isEmpty()) return value;
         InstrumentPanelConfig fallback = InstrumentPanelPreset.fromId(value.presetId).create();

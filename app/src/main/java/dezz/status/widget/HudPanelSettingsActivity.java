@@ -539,6 +539,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 12, 0xFF95A0AF), marginTop(5));
         SliderField cursorScale = slider(form, "Размер курсора",
                 profile.cursorScalePercent, 25, 300, 5, " %");
+        SliderField laneGuidanceScale = slider(form,
+                "Размер знаков движения по полосам",
+                profile.laneGuidanceScalePercent, 50, 250, 5, " %");
         ColorField cursorColor = navigationColorField(form, "Цвет автомобиля",
                 profile.cursorColor, navigation, value -> profile.cursorColor = value);
         ColorField cursorOutline = navigationColorField(form, "Контур автомобиля",
@@ -552,10 +555,32 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         ColorField roadColor = navigationColorField(form,
                 "Цвет дорог без маршрута и пробок", profile.roadColor,
                 navigation, value -> profile.roadColor = value);
-        SliderField routeWidth = slider(form, "Толщина маршрута",
-                profile.routeWidth, 1, 40, 0.5, " px");
+        SliderField routeWidthPercent = slider(form,
+                "Толщина линии маршрута: 100% — как сейчас",
+                profile.routeWidthPercent, 25, 300, 5, " %");
+        SliderField roadWidthPercent = slider(form,
+                "Толщина улиц без маршрута: 100% — как сейчас",
+                profile.roadWidthPercent, 25, 300, 5, " %");
         SliderField routeOutlineWidth = slider(form, "Толщина контура маршрута",
                 profile.routeOutlineWidth, 0, 20, 0.5, " px");
+        form.addView(section("Порядок слоёв — большее значение выше"), marginTop(16));
+        SliderField cameraDirectionLayerPriority = slider(form,
+                "Направления камер", profile.cameraDirectionLayerPriority,
+                0, 100, 1, "");
+        SliderField routeLayerPriority = slider(form,
+                "Маршрут", profile.routeLayerPriority, 0, 100, 1, "");
+        SliderField trafficLightLayerPriority = slider(form,
+                "Светофоры и секунды", profile.trafficLightLayerPriority,
+                0, 100, 1, "");
+        SliderField routeLabelLayerPriority = slider(form,
+                "Названия улиц на маршруте", profile.routeLabelLayerPriority,
+                0, 100, 1, "");
+        SliderField laneGuidanceLayerPriority = slider(form,
+                "Знаки движения по полосам", profile.laneGuidanceLayerPriority,
+                0, 100, 1, "");
+        SliderField cursorLayerPriority = slider(form,
+                "Курсор автомобиля", profile.cursorLayerPriority,
+                0, 100, 1, "");
         form.addView(section("Цвета загруженности дорог"), marginTop(16));
         ColorField trafficFreeColor = navigationColorField(form, "Дорога свободна",
                 profile.trafficFreeColor, navigation,
@@ -626,13 +651,24 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showCursor = showCursor.isChecked();
                         profile.roadsOnly = roadsOnly.isChecked();
                         profile.cursorScalePercent = cursorScale.intValue();
+                        profile.laneGuidanceScalePercent = laneGuidanceScale.intValue();
                         profile.cursorColor = cursorColor.value;
                         profile.cursorOutlineColor = cursorOutline.value;
                         profile.routeColor = routeColor.value;
                         profile.routeOutlineColor = routeOutline.value;
                         profile.roadColor = roadColor.value;
-                        profile.routeWidth = routeWidth.value();
+                        profile.routeWidthPercent = routeWidthPercent.intValue();
+                        profile.roadWidthPercent = roadWidthPercent.intValue();
                         profile.routeOutlineWidth = routeOutlineWidth.value();
+                        profile.cameraDirectionLayerPriority =
+                                cameraDirectionLayerPriority.intValue();
+                        profile.routeLayerPriority = routeLayerPriority.intValue();
+                        profile.trafficLightLayerPriority =
+                                trafficLightLayerPriority.intValue();
+                        profile.routeLabelLayerPriority = routeLabelLayerPriority.intValue();
+                        profile.laneGuidanceLayerPriority =
+                                laneGuidanceLayerPriority.intValue();
+                        profile.cursorLayerPriority = cursorLayerPriority.intValue();
                         profile.trafficFreeColor = trafficFreeColor.value;
                         profile.trafficLightColor = trafficLightColor.value;
                         profile.trafficHardColor = trafficHardColor.value;

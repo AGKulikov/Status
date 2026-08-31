@@ -27,6 +27,7 @@ final class MapCursorStyler {
     private int scalePercent = 100;
     private int fillColor = Color.parseColor("#FFFFC400");
     private int outlineColor = Color.parseColor("#FF17191E");
+    private float zIndex = NavigationMapProfile.layerZ(90);
     private double latitude = Double.NaN;
     private double longitude = Double.NaN;
     private float bearingDegrees;
@@ -52,16 +53,19 @@ final class MapCursorStyler {
     }
 
     void apply(boolean nextVisible, int nextScalePercent, String nextFill,
-               String nextOutline) throws Exception {
+               String nextOutline, int layerPriority) throws Exception {
         int normalizedScale = Math.max(25, Math.min(300, nextScalePercent));
         int normalizedFill = Color.parseColor(nextFill);
         int normalizedOutline = Color.parseColor(nextOutline);
+        float normalizedZ = NavigationMapProfile.layerZ(layerPriority);
         boolean styleChanged = scalePercent != normalizedScale
-                || fillColor != normalizedFill || outlineColor != normalizedOutline;
+                || fillColor != normalizedFill || outlineColor != normalizedOutline
+                || zIndex != normalizedZ;
         visible = nextVisible;
         scalePercent = normalizedScale;
         fillColor = normalizedFill;
         outlineColor = normalizedOutline;
+        zIndex = normalizedZ;
         if (styleChanged) {
             imageProvider = null;
             iconBitmap = null;
@@ -154,7 +158,7 @@ final class MapCursorStyler {
                     Float.valueOf(scalePercent / 100f));
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
-            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(50f));
+            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
             iconStyle = style;
         }
         Object provider = imageProvider;

@@ -88,6 +88,64 @@ public final class InstrumentPanelContractTest {
         assertEquals(InstrumentStyleFamily.SLATE_HORIZON, migrated.defaultStyle);
     }
 
+    @Test public void fiveApprovedPresetsKeepTheirReferenceSilhouettes() throws Exception {
+        InstrumentPanelConfig slate = InstrumentPanelPreset.SLATE_HORIZON.create();
+        assertEquals(6, element(slate, "map").x);
+        assertEquals(36, element(slate, "map").width);
+        assertFalse(element(slate, "tachometer").options.optBoolean("showValue", true));
+        assertTrue(element(slate, "speedometer").options.optBoolean("showValue", false));
+
+        InstrumentPanelConfig glacier = InstrumentPanelPreset.GLACIER_MAP.create();
+        assertEquals("HORIZONTAL_RULER",
+                element(glacier, "tachometer").options.optString("presentation"));
+        assertEquals(44, element(glacier, "map").width);
+
+        InstrumentPanelConfig aerowave = InstrumentPanelPreset.AEROWAVE.create();
+        assertEquals(135d, element(aerowave, "tachometer").options
+                .optDouble("arcStartDegrees"), 0d);
+        assertEquals(225d, element(aerowave, "speedometer").options
+                .optDouble("arcStartDegrees"), 0d);
+        assertFalse(element(aerowave, "tachometer").options
+                .optBoolean("showNeedle", true));
+        assertFalse(element(aerowave, "speedometer").options
+                .optBoolean("showNeedle", true));
+
+        InstrumentPanelConfig steel = InstrumentPanelPreset.STEEL_VECTOR.create();
+        assertEquals("VERTICAL_RULER",
+                element(steel, "tachometer").options.optString("presentation"));
+        assertTrue(element(steel, "tachometer").height
+                > element(steel, "tachometer").width);
+
+        InstrumentPanelConfig continuum = InstrumentPanelPreset.CONTINUUM.create();
+        assertFalse(element(continuum, "tachometer").options
+                .optBoolean("showNeedle", true));
+        assertFalse(element(continuum, "tachometer").options
+                .optBoolean("showValue", true));
+        assertFalse(element(continuum, "information").enabled);
+        assertTrue(element(continuum, "information").x
+                <= element(continuum, "speedometer").x);
+    }
+
+    @Test public void generic257PresetMigratesOnceToApprovedGeometry() throws Exception {
+        InstrumentPanelConfig old = InstrumentPanelPreset.STEEL_VECTOR.create();
+        old.presetLayoutRevision = 1;
+        InstrumentElementConfig oldMap = element(old, "map");
+        oldMap.x = 13;
+        oldMap.width = 22;
+        element(old, "speedometer").enabled = false;
+        JSONObject raw = old.toJson().put("presetLayoutRevision", 1);
+
+        InstrumentPanelConfig upgraded = InstrumentPanelConfig.fromJson(raw);
+
+        assertEquals(InstrumentPanelPreset.LAYOUT_REVISION,
+                upgraded.presetLayoutRevision);
+        assertEquals(14, element(upgraded, "map").x);
+        assertEquals(18, element(upgraded, "map").width);
+        assertFalse(element(upgraded, "speedometer").enabled);
+        assertEquals("VERTICAL_RULER",
+                element(upgraded, "tachometer").options.optString("presentation"));
+    }
+
     @Test public void panelUsesOneFastChannelAndDirectNativeMapSurface() throws Exception {
         Path root = projectRoot();
         String repository = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
@@ -210,6 +268,11 @@ public final class InstrumentPanelContractTest {
     private static Path projectRoot() {
         return Files.isRegularFile(Paths.get("app", "src", "main", "AndroidManifest.xml"))
                 ? Paths.get("") : Paths.get("..");
+    }
+
+    private static InstrumentElementConfig element(InstrumentPanelConfig config, String id) {
+        return config.elements.stream().filter(value -> id.equals(value.id))
+                .findFirst().orElseThrow(() -> new AssertionError("Missing element " + id));
     }
 
     private static String read(Path path) throws Exception {

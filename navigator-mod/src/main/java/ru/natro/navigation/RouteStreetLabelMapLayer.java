@@ -26,6 +26,7 @@ final class RouteStreetLabelMapLayer {
     private Object collection;
     private Object textStyle;
     private boolean enabled;
+    private float zIndex = NavigationMapProfile.layerZ(60);
     private boolean latestRouteActive;
     private List<NavigatorStatePublisher.RouteStreetLabelFrame> latest =
             Collections.emptyList();
@@ -73,9 +74,13 @@ final class RouteStreetLabelMapLayer {
         map = null;
     }
 
-    void apply(boolean nextEnabled) {
-        if (enabled == nextEnabled) return;
+    void apply(boolean nextEnabled, int layerPriority) {
+        float nextZ = NavigationMapProfile.layerZ(layerPriority);
+        boolean priorityChanged = zIndex != nextZ;
+        if (enabled == nextEnabled && !priorityChanged) return;
         enabled = nextEnabled;
+        zIndex = nextZ;
+        if (priorityChanged) renderedStructureFingerprint = Long.MIN_VALUE;
         if (enabled) {
             discardExpiredSource();
             scheduleExpiryIfNeeded();
@@ -207,7 +212,7 @@ final class RouteStreetLabelMapLayer {
                     new Class<?>[]{String.class, styleClass}, frame.text,
                     textStyle(styleClass));
         }
-        invoke(marker.placemark, "setZIndex", new Class<?>[]{float.class}, 36f);
+        invoke(marker.placemark, "setZIndex", new Class<?>[]{float.class}, zIndex);
         invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
         marker.text = frame.text;
         marker.latitude = frame.latitude;
@@ -222,7 +227,7 @@ final class RouteStreetLabelMapLayer {
         style = styleClass.getConstructor().newInstance();
         Object placement = Enum.valueOf(
                 (Class<? extends Enum>) placementClass, "CENTER");
-        invoke(style, "setSize", new Class<?>[]{float.class}, 15f);
+        invoke(style, "setSize", new Class<?>[]{float.class}, 17f);
         invoke(style, "setColor", new Class<?>[]{int.class}, 0xFFF4F8FC);
         invoke(style, "setOutlineWidth", new Class<?>[]{float.class}, 3f);
         invoke(style, "setOutlineColor", new Class<?>[]{int.class}, 0xE8172230);

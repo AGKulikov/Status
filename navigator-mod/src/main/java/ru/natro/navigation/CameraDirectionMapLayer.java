@@ -2,11 +2,6 @@
 package ru.natro.navigation;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.PointF;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -17,26 +12,29 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Direction chevrons for the route-relevant cameras reported by Windshield. */
+/** Original-style translucent camera viewing sectors above the independent map. */
 final class CameraDirectionMapLayer {
     private static final String TAG = "NatroCameraDirection";
     private static final long FRESH_MS = 3_000L;
     private static final int MAX_CAMERAS = 8;
+    private static final double EARTH_RADIUS_METERS = 6_371_000d;
+    private static final double SECTOR_LENGTH_METERS = 105d;
+    private static final double SECTOR_HALF_ANGLE_DEGREES = 13d;
+    /** Yandex's direction annotation is a blue translucent plane, not another pin/arrow. */
+    private static final int SECTOR_FILL = 0x4D168BFF;
+    private static final int SECTOR_STROKE = 0x66166BFF;
 
-    private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ArrayList<Marker> markers = new ArrayList<>();
-    private final Object[] providers = new Object[4];
-    private final Bitmap[] bitmaps = new Bitmap[4];
     private Object map;
     private Object collection;
     private boolean enabled;
+    private float zIndex = NavigationMapProfile.layerZ(20);
     private boolean latestRouteActive;
     private List<NavigatorStatePublisher.CameraDirectionFrame> latest =
             Collections.emptyList();
     private long latestSampleElapsedMs;
     private long latestVisualFingerprint = Long.MIN_VALUE;
-    private long renderedStructureFingerprint = Long.MIN_VALUE;
+    private long renderedFingerprint = Long.MIN_VALUE;
     private boolean expiryPosted;
 
     private final Runnable expire = new Runnable() {
@@ -57,8 +55,7 @@ final class CameraDirectionMapLayer {
     };
 
     CameraDirectionMapLayer(Context context) {
-        Context app = context.getApplicationContext();
-        this.context = app == null ? context : app;
+        // Kept for the same construction contract as the other MapKit object layers.
     }
 
     void attach(Object nextMap) {
@@ -70,7 +67,6 @@ final class CameraDirectionMapLayer {
         render();
     }
 
-    /** Drops only MapKit objects; a fresh Windshield sample survives a Surface recreation. */
     void detachMap() {
         main.removeCallbacks(expire);
         expiryPosted = false;
@@ -79,9 +75,13 @@ final class CameraDirectionMapLayer {
         map = null;
     }
 
-    void apply(boolean nextEnabled) {
-        if (enabled == nextEnabled) return;
+    void apply(boolean nextEnabled, int layerPriority) {
+        float nextZ = NavigationMapProfile.layerZ(layerPriority);
+        boolean priorityChanged = zIndex != nextZ;
+        if (enabled == nextEnabled && !priorityChanged) return;
         enabled = nextEnabled;
+        zIndex = nextZ;
+        if (priorityChanged) renderedFingerprint = Long.MIN_VALUE;
         if (!enabled) {
             main.removeCallbacks(expire);
             expiryPosted = false;
@@ -147,151 +147,78 @@ final class CameraDirectionMapLayer {
             clearVisual();
             return;
         }
-        ArrayList<NavigatorStatePublisher.CameraDirectionFrame> visible = new ArrayList<>();
-        for (NavigatorStatePublisher.CameraDirectionFrame camera : latest) {
-            if (visible.size() >= MAX_CAMERAS) break;
-            if (camera != null && camera.hasMapPosition()
-                    && (camera.inFace || camera.inBack)) visible.add(camera);
-        }
-        if (visible.isEmpty()) {
-            clearVisual();
-            return;
-        }
+        if (renderedFingerprint == latestVisualFingerprint) return;
         try {
-            long structure = structureFingerprint(visible);
-            if (structure != renderedStructureFingerprint || markers.size() != visible.size()) {
-                rebuild(visible, structure);
-                return;
+            Object currentCollection = collection;
+            if (currentCollection == null) {
+                Object root = invoke(map, "getMapObjects", new Class<?>[0]);
+                currentCollection = invoke(root, "addCollection", new Class<?>[0]);
+                collection = currentCollection;
             }
-            for (int index = 0; index < visible.size(); index++) {
-                NavigatorStatePublisher.CameraDirectionFrame camera = visible.get(index);
-                Marker marker = markers.get(index);
-                if (!marker.sameContent(camera)) updateMarker(marker, camera);
+            invoke(currentCollection, "clear", new Class<?>[0]);
+            int count = 0;
+            for (NavigatorStatePublisher.CameraDirectionFrame camera : latest) {
+                if (count >= MAX_CAMERAS) break;
+                if (camera == null || !camera.hasMapPosition()
+                        || (!camera.inFace && !camera.inBack)) continue;
+                count++;
+                // inFace looks towards approaching traffic; inBack looks along its travel.
+                if (camera.inFace) addSector(currentCollection, camera,
+                        camera.bearingDegrees + 180d);
+                if (camera.inBack) addSector(currentCollection, camera,
+                        camera.bearingDegrees);
             }
+            renderedFingerprint = latestVisualFingerprint;
         } catch (Throwable failure) {
-            Log.w(TAG, "Camera-direction layer update failed", failure);
+            Log.w(TAG, "Camera direction sector update failed", failure);
             clearVisual();
         }
     }
 
-    private void rebuild(List<NavigatorStatePublisher.CameraDirectionFrame> values,
-                         long structure) throws Exception {
-        Object currentCollection = collection;
-        if (currentCollection == null) {
-            Object root = invoke(map, "getMapObjects", new Class<?>[0]);
-            currentCollection = invoke(root, "addCollection", new Class<?>[0]);
-            collection = currentCollection;
-        }
-        invoke(currentCollection, "clear", new Class<?>[0]);
-        markers.clear();
-        renderedStructureFingerprint = Long.MIN_VALUE;
+    private void addSector(Object target,
+                           NavigatorStatePublisher.CameraDirectionFrame camera,
+                           double directionDegrees) throws Exception {
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
-        for (NavigatorStatePublisher.CameraDirectionFrame camera : values) {
-            Object point = pointClass.getConstructor(double.class, double.class)
-                    .newInstance(camera.latitude, camera.longitude);
-            Object placemark = invoke(currentCollection, "addPlacemark",
-                    new Class<?>[]{pointClass}, point);
-            Marker marker = new Marker(placemark, camera.id);
-            updateMarker(marker, camera);
-            markers.add(marker);
-        }
-        renderedStructureFingerprint = structure;
+        ArrayList<Object> points = new ArrayList<>(4);
+        points.add(pointClass.getConstructor(double.class, double.class)
+                .newInstance(camera.latitude, camera.longitude));
+        double[] left = destination(camera.latitude, camera.longitude,
+                directionDegrees - SECTOR_HALF_ANGLE_DEGREES, SECTOR_LENGTH_METERS);
+        double[] right = destination(camera.latitude, camera.longitude,
+                directionDegrees + SECTOR_HALF_ANGLE_DEGREES, SECTOR_LENGTH_METERS);
+        points.add(pointClass.getConstructor(double.class, double.class)
+                .newInstance(left[0], left[1]));
+        points.add(pointClass.getConstructor(double.class, double.class)
+                .newInstance(right[0], right[1]));
+        points.add(points.get(0));
+
+        Class<?> ringClass = Class.forName("com.yandex.mapkit.geometry.LinearRing");
+        Object ring = ringClass.getConstructor(List.class).newInstance(points);
+        Class<?> polygonClass = Class.forName("com.yandex.mapkit.geometry.Polygon");
+        Object polygon = polygonClass.getConstructor(ringClass, List.class)
+                .newInstance(ring, Collections.emptyList());
+        Object mapObject = invoke(target, "addPolygon",
+                new Class<?>[]{polygonClass}, polygon);
+        invoke(mapObject, "setFillColor", new Class<?>[]{int.class}, SECTOR_FILL);
+        invoke(mapObject, "setStrokeColor", new Class<?>[]{int.class}, SECTOR_STROKE);
+        invoke(mapObject, "setStrokeWidth", new Class<?>[]{float.class}, 0.8f);
+        invoke(mapObject, "setGeodesic", new Class<?>[]{boolean.class}, false);
+        invoke(mapObject, "setZIndex", new Class<?>[]{float.class}, zIndex);
+        invoke(mapObject, "setVisible", new Class<?>[]{boolean.class}, true);
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private void updateMarker(Marker marker,
-                              NavigatorStatePublisher.CameraDirectionFrame camera)
-            throws Exception {
-        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
-        Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
-        Object style = marker.iconStyle;
-        if (style == null) {
-            Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
-            style = styleClass.getConstructor().newInstance();
-            Object rotation = Enum.valueOf((Class<? extends Enum>) rotationClass, "ROTATE");
-            invoke(style, "setAnchor", new Class<?>[]{PointF.class},
-                    new PointF(0.5f, 0.5f));
-            invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
-            invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
-            invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
-            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(45f));
-            marker.iconStyle = style;
-        }
-        int providerIndex = (camera.inFace ? 1 : 0) | (camera.inBack ? 2 : 0);
-        if (providerIndex != marker.providerIndex) {
-            Object provider = imageProvider(providerIndex, providerClass);
-            invoke(marker.placemark, "setIcon",
-                    new Class<?>[]{providerClass, styleClass}, provider, style);
-            marker.providerIndex = providerIndex;
-        }
-        if (Math.abs(marker.bearingDegrees - camera.bearingDegrees) >= 0.5f
-                || !finite(marker.bearingDegrees)) {
-            invoke(marker.placemark, "setDirection", new Class<?>[]{float.class},
-                    camera.bearingDegrees);
-        }
-        invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
-        marker.bearingDegrees = camera.bearingDegrees;
-        marker.inFace = camera.inFace;
-        marker.inBack = camera.inBack;
-    }
-
-    private Object imageProvider(int index, Class<?> providerClass) throws Exception {
-        Object provider = providers[index];
-        if (provider != null) return provider;
-        Bitmap bitmap = createDirectionBitmap(index);
-        provider = providerClass.getMethod("fromBitmap", Bitmap.class).invoke(null, bitmap);
-        bitmaps[index] = bitmap;
-        providers[index] = provider;
-        return provider;
-    }
-
-    /**
-     * Leaves the middle transparent so the stock Yandex camera icon remains visible. The
-     * chevron itself is rotated to the active route direction at the event's polyline segment.
-     */
-    private Bitmap createDirectionBitmap(int directionFlags) {
-        float density = context.getResources().getDisplayMetrics().density;
-        int size = Math.max(44, Math.round(64f * density));
-        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        float unit = size / 64f;
-        float center = size / 2f;
-        Path arrow = new Path();
-        arrow.moveTo(center, 1f * unit);
-        arrow.lineTo(center + 12f * unit, 15f * unit);
-        arrow.lineTo(center + 5f * unit, 14f * unit);
-        arrow.lineTo(center + 5f * unit, 22f * unit);
-        arrow.lineTo(center - 5f * unit, 22f * unit);
-        arrow.lineTo(center - 5f * unit, 14f * unit);
-        arrow.lineTo(center - 12f * unit, 15f * unit);
-        arrow.close();
-
-        Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        shadow.setStyle(Paint.Style.STROKE);
-        shadow.setStrokeJoin(Paint.Join.ROUND);
-        shadow.setStrokeWidth(5f * unit);
-        shadow.setColor(0xDD17191E);
-        canvas.drawPath(arrow, shadow);
-
-        Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
-        outline.setStyle(Paint.Style.STROKE);
-        outline.setStrokeJoin(Paint.Join.ROUND);
-        outline.setStrokeWidth(2.2f * unit);
-        outline.setColor(0xFFFFFFFF);
-        canvas.drawPath(arrow, outline);
-
-        Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-        fill.setStyle(Paint.Style.FILL);
-        boolean inFace = (directionFlags & 1) != 0;
-        boolean inBack = (directionFlags & 2) != 0;
-        fill.setColor(inFace ? 0xFFFF3B30 : 0xFFFF9F0A);
-        canvas.drawPath(arrow, fill);
-
-        if (inFace && inBack) {
-            fill.setColor(0xFFFFCC00);
-            canvas.drawCircle(center, 17f * unit, 2.2f * unit, fill);
-        }
-        return bitmap;
+    private static double[] destination(double latitude, double longitude,
+                                        double bearingDegrees, double distanceMeters) {
+        double angular = distanceMeters / EARTH_RADIUS_METERS;
+        double bearing = Math.toRadians(bearingDegrees);
+        double fromLatitude = Math.toRadians(latitude);
+        double fromLongitude = Math.toRadians(longitude);
+        double toLatitude = Math.asin(Math.sin(fromLatitude) * Math.cos(angular)
+                + Math.cos(fromLatitude) * Math.sin(angular) * Math.cos(bearing));
+        double toLongitude = fromLongitude + Math.atan2(
+                Math.sin(bearing) * Math.sin(angular) * Math.cos(fromLatitude),
+                Math.cos(angular) - Math.sin(fromLatitude) * Math.sin(toLatitude));
+        return new double[]{Math.toDegrees(toLatitude), Math.toDegrees(toLongitude)};
     }
 
     private void clearVisual() {
@@ -299,19 +226,7 @@ final class CameraDirectionMapLayer {
             try { invoke(collection, "clear", new Class<?>[0]); }
             catch (Throwable ignored) {}
         }
-        markers.clear();
-        renderedStructureFingerprint = Long.MIN_VALUE;
-    }
-
-    private static long structureFingerprint(
-            List<NavigatorStatePublisher.CameraDirectionFrame> values) {
-        long result = 0xcbf29ce484222325L;
-        for (NavigatorStatePublisher.CameraDirectionFrame value : values) {
-            result = mix(result, value.id.hashCode());
-            result = mix(result, Math.round(value.latitude * 1_000_000d));
-            result = mix(result, Math.round(value.longitude * 1_000_000d));
-        }
-        return mix(result, values.size());
+        renderedFingerprint = Long.MIN_VALUE;
     }
 
     private static long visualFingerprint(
@@ -336,34 +251,9 @@ final class CameraDirectionMapLayer {
         return (value ^ part) * 0x100000001b3L;
     }
 
-    private static boolean finite(float value) {
-        return !Float.isNaN(value) && !Float.isInfinite(value);
-    }
-
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,
                                  Object... arguments) throws Exception {
         Method method = ReflectMethods.publicMethod(target.getClass(), name, parameterTypes);
         return method.invoke(target, arguments);
-    }
-
-    private static final class Marker {
-        final Object placemark;
-        final String id;
-        Object iconStyle;
-        int providerIndex = -1;
-        float bearingDegrees = Float.NaN;
-        boolean inFace;
-        boolean inBack;
-
-        Marker(Object placemark, String id) {
-            this.placemark = placemark;
-            this.id = id;
-        }
-
-        boolean sameContent(NavigatorStatePublisher.CameraDirectionFrame camera) {
-            return id.equals(camera.id) && inFace == camera.inFace && inBack == camera.inBack
-                    && finite(bearingDegrees)
-                    && Math.abs(bearingDegrees - camera.bearingDegrees) < 0.5f;
-        }
     }
 }

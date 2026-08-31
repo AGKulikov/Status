@@ -2,12 +2,7 @@
 package ru.natro.navigation;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.PointF;
-import android.graphics.RectF;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -18,31 +13,33 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * A map-object collection dedicated only to fresh route traffic lights.
- *
- * <p>The publisher samples Windshield once for both independent maps. This layer performs no
- * Guidance reflection, does not touch Navigator's primary map and replaces its bitmap icon only
- * when a signal/countdown actually changes.</p>
- */
+/** Stock Yandex signal-and-seconds balloons anchored to upcoming route traffic lights. */
 final class TrafficLightMapLayer {
     private static final String TAG = "NatroTrafficLights";
     private static final long FRESH_MS = 3_000L;
-    private static final int MAX_LIGHTS = 8;
+    private static final int MAX_LIGHTS = 12;
+    /** Windshield may expose several lane sections for one physical intersection. */
+    private static final double MIN_SEPARATION_METERS = 30d;
+    private static final double EARTH_RADIUS_METERS = 6_371_000d;
 
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ArrayList<Marker> markers = new ArrayList<>();
+    private final ArrayList<NavigatorStatePublisher.TrafficLightFrame> visibleScratch =
+            new ArrayList<>(MAX_LIGHTS);
     private Object map;
     private Object collection;
     private boolean enabled;
+    private boolean nightMode;
+    private float zIndex = NavigationMapProfile.layerZ(50);
+    private boolean latestRouteActive;
     private List<NavigatorStatePublisher.TrafficLightFrame> latest =
             Collections.emptyList();
     private long latestSampleElapsedMs;
     private long latestVisualFingerprint = Long.MIN_VALUE;
     private long renderedStructureFingerprint = Long.MIN_VALUE;
+    private long renderedVisualFingerprint = Long.MIN_VALUE;
     private boolean expiryPosted;
-    private boolean latestRouteActive;
 
     private final Runnable expire = new Runnable() {
         @Override public void run() {
@@ -75,7 +72,6 @@ final class TrafficLightMapLayer {
         render();
     }
 
-    /** Drops only MapKit objects; fresh source data remains ready for the next Surface. */
     void detachMap() {
         main.removeCallbacks(expire);
         expiryPosted = false;
@@ -84,9 +80,15 @@ final class TrafficLightMapLayer {
         map = null;
     }
 
-    void apply(boolean nextEnabled) {
-        if (enabled == nextEnabled) return;
+    void apply(boolean nextEnabled, boolean nextNightMode, int layerPriority) {
+        float nextZ = NavigationMapProfile.layerZ(layerPriority);
+        boolean presentationChanged = nightMode != nextNightMode || zIndex != nextZ;
+        boolean enabledChanged = enabled != nextEnabled;
+        if (!presentationChanged && !enabledChanged) return;
         enabled = nextEnabled;
+        nightMode = nextNightMode;
+        zIndex = nextZ;
+        if (presentationChanged) renderedVisualFingerprint = Long.MIN_VALUE;
         if (!enabled) {
             main.removeCallbacks(expire);
             expiryPosted = false;
@@ -100,27 +102,24 @@ final class TrafficLightMapLayer {
     void update(boolean routeActive, long sampleElapsedMs,
                 List<NavigatorStatePublisher.TrafficLightFrame> values) {
         if (routeActive == latestRouteActive
-                && sampleElapsedMs == latestSampleElapsedMs && values == latest) {
-            return;
-        }
+                && sampleElapsedMs == latestSampleElapsedMs && values == latest) return;
         latestRouteActive = routeActive;
         long now = SystemClock.elapsedRealtime();
         boolean fresh = routeActive && sampleElapsedMs > 0L
                 && now >= sampleElapsedMs && now - sampleElapsedMs <= FRESH_MS;
         latest = fresh && values != null ? values : Collections.emptyList();
-        if (!fresh) {
+        if (fresh) {
+            latestSampleElapsedMs = sampleElapsedMs;
+            scheduleExpiryIfNeeded();
+        } else {
             latestSampleElapsedMs = 0L;
             main.removeCallbacks(expire);
             expiryPosted = false;
-        } else {
-            latestSampleElapsedMs = sampleElapsedMs;
-            scheduleExpiryIfNeeded();
         }
         long fingerprint = visualFingerprint(latest);
         if (fingerprint == latestVisualFingerprint) return;
         latestVisualFingerprint = fingerprint;
-        if (!enabled || map == null) return;
-        render();
+        if (enabled && map != null) render();
     }
 
     void clearData() {
@@ -133,7 +132,6 @@ final class TrafficLightMapLayer {
         render();
     }
 
-    /** Hidden/detached layers keep the latest sample but own no periodic deadline wake. */
     private void scheduleExpiryIfNeeded() {
         if (!enabled || map == null || latestSampleElapsedMs <= 0L || expiryPosted) return;
         long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
@@ -152,42 +150,68 @@ final class TrafficLightMapLayer {
 
     private void render() {
         if (map == null) return;
-        if (!enabled || latest.isEmpty()) {
+        if (!enabled || !latestRouteActive || latest.isEmpty()) {
             clearVisual();
             return;
         }
-        ArrayList<NavigatorStatePublisher.TrafficLightFrame> visible = new ArrayList<>();
-        for (NavigatorStatePublisher.TrafficLightFrame light : latest) {
-            if (visible.size() >= MAX_LIGHTS) break;
-            // This is specifically the countdown layer. A signal without a timer remains useful
-            // to the standalone HUD module, but must not become another static map POI.
-            if (light != null && light.hasMapPosition() && light.secondsLeft >= 0) {
-                visible.add(light);
-            }
-        }
-        if (visible.isEmpty()) {
+        selectSeparatedLights(latest, visibleScratch);
+        if (visibleScratch.isEmpty()) {
             clearVisual();
             return;
         }
         try {
-            long structure = structureFingerprint(visible);
-            if (structure != renderedStructureFingerprint || markers.size() != visible.size()) {
-                rebuild(visible, structure);
-                return;
-            }
-            for (int index = 0; index < visible.size(); index++) {
-                NavigatorStatePublisher.TrafficLightFrame light = visible.get(index);
-                Marker marker = markers.get(index);
-                if (!marker.sameContent(light)) updateMarker(marker, light);
+            long structure = structureFingerprint(visibleScratch);
+            long visual = visualFingerprint(visibleScratch);
+            if (structure != renderedStructureFingerprint
+                    || markers.size() != visibleScratch.size()) {
+                rebuild(visibleScratch, structure, visual);
+            } else if (visual != renderedVisualFingerprint) {
+                applyOriginalYandexViews(visibleScratch);
+                renderedVisualFingerprint = visual;
             }
         } catch (Throwable failure) {
-            Log.w(TAG, "Traffic-light map layer update failed", failure);
+            // A guessed fallback could show a wrong phase to the driver. Hide instead.
+            Log.w(TAG, "Original Yandex traffic-light renderer failed", failure);
             clearVisual();
         }
     }
 
+    private static void selectSeparatedLights(
+            List<NavigatorStatePublisher.TrafficLightFrame> source,
+            ArrayList<NavigatorStatePublisher.TrafficLightFrame> target) {
+        target.clear();
+        for (NavigatorStatePublisher.TrafficLightFrame candidate : source) {
+            if (candidate == null || !candidate.hasMapPosition()) continue;
+            int overlapIndex = -1;
+            for (int index = 0; index < target.size(); index++) {
+                NavigatorStatePublisher.TrafficLightFrame accepted = target.get(index);
+                if (distanceMeters(candidate.latitude, candidate.longitude,
+                        accepted.latitude, accepted.longitude) < MIN_SEPARATION_METERS) {
+                    overlapIndex = index;
+                    break;
+                }
+            }
+            if (overlapIndex < 0) {
+                target.add(candidate);
+            } else if (prefer(candidate, target.get(overlapIndex))) {
+                target.set(overlapIndex, candidate);
+            }
+            if (target.size() >= MAX_LIGHTS) break;
+        }
+    }
+
+    /** Prefer the main section, then the nearest sample, for one physical intersection. */
+    private static boolean prefer(NavigatorStatePublisher.TrafficLightFrame candidate,
+                                  NavigatorStatePublisher.TrafficLightFrame accepted) {
+        boolean candidateMain = "MAIN".equals(candidate.sectionType);
+        boolean acceptedMain = "MAIN".equals(accepted.sectionType);
+        if (candidateMain != acceptedMain) return candidateMain;
+        if (candidate.distanceMeters < 0) return false;
+        return accepted.distanceMeters < 0 || candidate.distanceMeters < accepted.distanceMeters;
+    }
+
     private void rebuild(List<NavigatorStatePublisher.TrafficLightFrame> values,
-                         long structure) throws Exception {
+                         long structure, long visual) throws Exception {
         Object currentCollection = collection;
         if (currentCollection == null) {
             Object root = invoke(map, "getMapObjects", new Class<?>[0]);
@@ -197,60 +221,84 @@ final class TrafficLightMapLayer {
         invoke(currentCollection, "clear", new Class<?>[0]);
         markers.clear();
         renderedStructureFingerprint = Long.MIN_VALUE;
+        renderedVisualFingerprint = Long.MIN_VALUE;
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         for (NavigatorStatePublisher.TrafficLightFrame light : values) {
             Object point = pointClass.getConstructor(double.class, double.class)
                     .newInstance(light.latitude, light.longitude);
             Object placemark = invoke(currentCollection, "addPlacemark",
                     new Class<?>[]{pointClass}, point);
-            Marker marker = new Marker(placemark, light);
-            updateMarker(marker, light);
-            markers.add(marker);
+            markers.add(new Marker(placemark));
         }
+        applyOriginalYandexViews(values);
         renderedStructureFingerprint = structure;
+        renderedVisualFingerprint = visual;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void updateMarker(Marker marker,
-                              NavigatorStatePublisher.TrafficLightFrame light)
-            throws Exception {
-        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+    private void applyOriginalYandexViews(
+            List<NavigatorStatePublisher.TrafficLightFrame> values) throws Exception {
+        Class<?> viewClass = Class.forName(
+                "ru.yandex.yandexnavi.ui.traffic.TrafficLightViewImpl");
+        Class<?> signalClass = Class.forName(
+                "com.yandex.mapkit.directions.traffic_lights.Signal");
+        Class<?> arrowClass = Class.forName(
+                "com.yandex.mapkit.directions.traffic_lights.RouteDirectionArrow");
+        Class<?> legClass = Class.forName("com.yandex.navikit.ui.balloons.LegPlacement");
+        Class<?> accentClass = Class.forName("com.yandex.navikit.ui.balloons.BalloonAccent");
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
-        Object style = marker.iconStyle;
-        if (style == null) {
-            Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
-            style = styleClass.getConstructor().newInstance();
-            Object rotation = Enum.valueOf(
-                    (Class<? extends Enum>) rotationClass, "NO_ROTATION");
-            invoke(style, "setAnchor", new Class<?>[]{PointF.class}, new PointF(0.5f, 1f));
-            invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
+        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+        Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
+        Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass,
+                "NO_ROTATION");
+        Object noLeg = Enum.valueOf((Class<? extends Enum>) legClass, "NONE");
+        Object primary = Enum.valueOf((Class<? extends Enum>) accentClass, "PRIMARY");
+
+        for (int index = 0; index < values.size(); index++) {
+            NavigatorStatePublisher.TrafficLightFrame light = values.get(index);
+            Marker marker = markers.get(index);
+            Object view = viewClass.getConstructor(Context.class, float.class)
+                    .newInstance(context, 1f);
+            Object signal = enumValue(signalClass, light.signal, "GREEN");
+            Object arrow = enumValue(arrowClass, light.arrow, "FORWARD");
+            viewClass.getMethod("setSignal", signalClass).invoke(view, signal);
+            viewClass.getMethod("setTime", Integer.class).invoke(view,
+                    light.secondsLeft < 0 ? null : Integer.valueOf(light.secondsLeft));
+            viewClass.getMethod("setArrowDirection", arrowClass).invoke(view, arrow);
+            viewClass.getMethod("setIsAdditional", boolean.class).invoke(view,
+                    "ADDITIONAL".equals(light.sectionType));
+            viewClass.getMethod("setLegPlacement", legClass).invoke(view, noLeg);
+            viewClass.getMethod("setAccent", accentClass).invoke(view, primary);
+            viewClass.getMethod("setIsNightMode", boolean.class).invoke(view, nightMode);
+            Object provider = viewClass.getMethod("createTexture").invoke(view);
+            Object anchor = viewClass.getMethod("getAnchor").invoke(view);
+            float anchorX = ((Number) invoke(anchor, "getX", new Class<?>[0])).floatValue();
+            float anchorY = ((Number) invoke(anchor, "getY", new Class<?>[0])).floatValue();
+
+            Object style = styleClass.getConstructor().newInstance();
+            invoke(style, "setAnchor", new Class<?>[]{PointF.class},
+                    new PointF(anchorX, anchorY));
+            invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
-            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(30f));
+            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
+            invoke(marker.placemark, "setIcon",
+                    new Class<?>[]{providerClass, styleClass}, provider, style);
+            invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
+            marker.view = view;
+            marker.imageProvider = provider;
             marker.iconStyle = style;
         }
-
-        RenderedIcon rendered = createImageProvider(light, providerClass);
-        invoke(marker.placemark, "setIcon", new Class<?>[]{providerClass, styleClass},
-                rendered.provider, style);
-        marker.imageProvider = rendered.provider;
-        marker.iconBitmap = rendered.bitmap;
-        marker.signal = light.signal;
-        marker.secondsLeft = light.secondsLeft;
-        marker.arrow = light.arrow;
     }
 
-    private RenderedIcon createImageProvider(
-            NavigatorStatePublisher.TrafficLightFrame light, Class<?> providerClass)
-            throws Exception {
-        float density = context.getResources().getDisplayMetrics().density;
-        int width = Math.max(56, Math.round(70f * density));
-        int height = Math.max(52, Math.round(64f * density));
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        drawTrafficLightIcon(new Canvas(bitmap), light, density, width, height);
-        Object provider = providerClass.getMethod("fromBitmap", Bitmap.class)
-                .invoke(null, bitmap);
-        return new RenderedIcon(provider, bitmap);
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static Object enumValue(Class<?> enumClass, String raw, String fallback) {
+        String name = raw == null || raw.isEmpty() ? fallback : raw;
+        try {
+            return Enum.valueOf((Class<? extends Enum>) enumClass, name);
+        } catch (IllegalArgumentException invalid) {
+            return Enum.valueOf((Class<? extends Enum>) enumClass, fallback);
+        }
     }
 
     private void clearVisual() {
@@ -260,35 +308,49 @@ final class TrafficLightMapLayer {
         }
         markers.clear();
         renderedStructureFingerprint = Long.MIN_VALUE;
+        renderedVisualFingerprint = Long.MIN_VALUE;
     }
 
     private static long structureFingerprint(
             List<NavigatorStatePublisher.TrafficLightFrame> values) {
         long result = 0xcbf29ce484222325L;
-        for (NavigatorStatePublisher.TrafficLightFrame value : values) {
-            result = mix(result, value.id.hashCode());
-            result = mix(result, Math.round(value.latitude * 1_000_000d));
-            result = mix(result, Math.round(value.longitude * 1_000_000d));
-        }
-        return mix(result, values.size());
-    }
-
-    private static long visualFingerprint(
-            List<NavigatorStatePublisher.TrafficLightFrame> values) {
-        long result = 0x517cc1b727220a95L;
         int count = 0;
         for (NavigatorStatePublisher.TrafficLightFrame value : values) {
-            if (value == null || !value.hasMapPosition() || value.secondsLeft < 0) continue;
-            if (count >= MAX_LIGHTS) break;
+            if (value == null || !value.hasMapPosition()) continue;
             count++;
             result = mix(result, value.id.hashCode());
             result = mix(result, Math.round(value.latitude * 1_000_000d));
             result = mix(result, Math.round(value.longitude * 1_000_000d));
-            result = mix(result, value.signal.hashCode());
+        }
+        return mix(result, count);
+    }
+
+    private static long visualFingerprint(
+            List<NavigatorStatePublisher.TrafficLightFrame> values) {
+        long result = structureFingerprint(values);
+        int count = 0;
+        for (NavigatorStatePublisher.TrafficLightFrame value : values) {
+            if (value == null || !value.hasMapPosition()) continue;
+            if (count++ >= MAX_LIGHTS) break;
             result = mix(result, value.secondsLeft);
+            result = mix(result, value.signal.hashCode());
+            result = mix(result, value.sectionType.hashCode());
             result = mix(result, value.arrow.hashCode());
         }
         return mix(result, count);
+    }
+
+    private static double distanceMeters(double fromLatitude, double fromLongitude,
+                                         double toLatitude, double toLongitude) {
+        double latitudeDelta = Math.toRadians(toLatitude - fromLatitude);
+        double longitudeDelta = Math.toRadians(toLongitude - fromLongitude);
+        double from = Math.toRadians(fromLatitude);
+        double to = Math.toRadians(toLatitude);
+        double sinLatitude = Math.sin(latitudeDelta / 2d);
+        double sinLongitude = Math.sin(longitudeDelta / 2d);
+        double value = sinLatitude * sinLatitude
+                + Math.cos(from) * Math.cos(to) * sinLongitude * sinLongitude;
+        return 2d * EARTH_RADIUS_METERS * Math.asin(Math.min(1d, Math.sqrt(value)));
     }
 
     private static long mix(long value, long part) {
@@ -303,109 +365,12 @@ final class TrafficLightMapLayer {
 
     private static final class Marker {
         final Object placemark;
-        String signal = "";
-        int secondsLeft = Integer.MIN_VALUE;
-        String arrow = "";
-        Object iconStyle;
+        Object view;
         Object imageProvider;
-        Bitmap iconBitmap;
+        Object iconStyle;
 
-        Marker(Object placemark, NavigatorStatePublisher.TrafficLightFrame ignored) {
+        Marker(Object placemark) {
             this.placemark = placemark;
         }
-
-        boolean sameContent(NavigatorStatePublisher.TrafficLightFrame light) {
-            return secondsLeft == light.secondsLeft && signal.equals(light.signal)
-                    && arrow.equals(light.arrow);
-        }
-    }
-
-    private static final class RenderedIcon {
-        final Object provider;
-        final Bitmap bitmap;
-
-        RenderedIcon(Object provider, Bitmap bitmap) {
-            this.provider = provider;
-            this.bitmap = bitmap;
-        }
-    }
-
-    /** One direct Canvas pass avoids allocating and laying out an Android View per countdown. */
-    private static void drawTrafficLightIcon(
-            Canvas canvas, NavigatorStatePublisher.TrafficLightFrame light,
-            float density, int width, int height) {
-        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        RectF box = new RectF();
-        String signal = light.signal;
-        int seconds = light.secondsLeft;
-        String arrow = arrowGlyph(light.arrow);
-        float left = 2f * density;
-        float top = 2f * density;
-        float housingWidth = 25f * density;
-        float housingHeight = 56f * density;
-        float radius = 7f * density;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xED17191E);
-        box.set(left, top, left + housingWidth, top + housingHeight);
-        canvas.drawRoundRect(box, radius, radius, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(1f, density));
-        paint.setColor(0xCCFFFFFF);
-        canvas.drawRoundRect(box, radius, radius, paint);
-
-        float centerX = left + housingWidth / 2f;
-        float lightRadius = 6.2f * density;
-        drawLamp(canvas, paint, signal, density, centerX,
-                top + 10.5f * density, lightRadius, "RED", 0xFFFF3B30);
-        drawLamp(canvas, paint, signal, density, centerX,
-                top + 27.5f * density, lightRadius, "YELLOW", 0xFFFFCC00);
-        drawLamp(canvas, paint, signal, density, centerX,
-                top + 44.5f * density, lightRadius, "GREEN", 0xFF34C759);
-
-        if (seconds < 0 && arrow.isEmpty()) return;
-        float badgeLeft = left + housingWidth - 1f * density;
-        float badgeTop = top + 13f * density;
-        box.set(badgeLeft, badgeTop, width - 2f * density,
-                Math.min(height - 2f * density, top + 45f * density));
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xF2262930);
-        canvas.drawRoundRect(box, 9f * density, 9f * density, paint);
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        paint.setColor(Color.WHITE);
-        paint.setTextSize((seconds >= 10 ? 15f : 17f) * density);
-        String value = seconds < 0 ? arrow : Integer.toString(seconds);
-        Paint.FontMetrics metrics = paint.getFontMetrics();
-        float baseline = box.centerY() - (metrics.ascent + metrics.descent) / 2f;
-        canvas.drawText(value, box.centerX(), baseline, paint);
-        if (seconds >= 0 && !arrow.isEmpty()) {
-            paint.setTextSize(8f * density);
-            canvas.drawText(arrow, box.right - 6f * density,
-                    box.bottom - 3f * density, paint);
-        }
-    }
-
-    private static void drawLamp(Canvas canvas, Paint paint, String signal, float density,
-                                 float x, float y, float radius,
-                                 String lamp, int activeColor) {
-        boolean active = lamp.equals(signal) || "RED_AND_YELLOW".equals(signal)
-                && ("RED".equals(lamp) || "YELLOW".equals(lamp));
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(active ? activeColor : 0xFF3B3E44);
-        canvas.drawCircle(x, y, radius, paint);
-        if (active) {
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(Math.max(1f, density));
-            paint.setColor(0xE6FFFFFF);
-            canvas.drawCircle(x, y, radius, paint);
-        }
-    }
-
-    private static String arrowGlyph(String raw) {
-        if (raw == null) return "";
-        if (raw.contains("LEFT")) return "←";
-        if (raw.contains("RIGHT")) return "→";
-        if (raw.contains("STRAIGHT") || raw.contains("FORWARD")) return "↑";
-        return "";
     }
 }

@@ -571,6 +571,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(section("Маршрут и курсор"), marginTop(14));
         SliderField cursorScale = slider(content, "Размер курсора",
                 map.cursorScalePercent, 25, 300, 5, " %");
+        SliderField laneGuidanceScale = slider(content,
+                "Размер знаков движения по полосам",
+                map.laneGuidanceScalePercent, 50, 250, 5, " %");
         ColorField cursorColor = navigationColorField(content, "Цвет автомобиля",
                 map.cursorColor, finalNavigation, preferences,
                 value -> map.cursorColor = value);
@@ -586,10 +589,33 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         ColorField roadColor = navigationColorField(content,
                 "Цвет дорог без маршрута и пробок", map.roadColor,
                 finalNavigation, preferences, value -> map.roadColor = value);
-        SliderField routeWidth = slider(content, "Толщина маршрута",
-                map.routeWidth, 1, 40, 0.5, " px");
+        SliderField routeWidthPercent = slider(content,
+                "Толщина линии маршрута: 100% — как сейчас",
+                map.routeWidthPercent, 25, 300, 5, " %");
+        SliderField roadWidthPercent = slider(content,
+                "Толщина улиц без маршрута: 100% — как сейчас",
+                map.roadWidthPercent, 25, 300, 5, " %");
         SliderField routeOutlineWidth = slider(content, "Толщина контура маршрута",
                 map.routeOutlineWidth, 0, 20, 0.5, " px");
+
+        content.addView(section("Порядок слоёв — большее значение выше"), marginTop(14));
+        SliderField cameraDirectionLayerPriority = slider(content,
+                "Направления камер", map.cameraDirectionLayerPriority,
+                0, 100, 1, "");
+        SliderField routeLayerPriority = slider(content,
+                "Маршрут", map.routeLayerPriority, 0, 100, 1, "");
+        SliderField trafficLightLayerPriority = slider(content,
+                "Светофоры и секунды", map.trafficLightLayerPriority,
+                0, 100, 1, "");
+        SliderField routeLabelLayerPriority = slider(content,
+                "Названия улиц на маршруте", map.routeLabelLayerPriority,
+                0, 100, 1, "");
+        SliderField laneGuidanceLayerPriority = slider(content,
+                "Знаки движения по полосам", map.laneGuidanceLayerPriority,
+                0, 100, 1, "");
+        SliderField cursorLayerPriority = slider(content,
+                "Курсор автомобиля", map.cursorLayerPriority,
+                0, 100, 1, "");
 
         content.addView(section("Цвета загруженности дорог"), marginTop(14));
         ColorField trafficFreeColor = navigationColorField(content, "Дорога свободна",
@@ -643,13 +669,22 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showCursor = cursor.isChecked();
                     map.roadsOnly = roadsOnly.isChecked();
                     map.cursorScalePercent = cursorScale.intValue();
+                    map.laneGuidanceScalePercent = laneGuidanceScale.intValue();
                     map.cursorColor = cursorColor.value;
                     map.cursorOutlineColor = cursorOutline.value;
                     map.routeColor = routeColor.value;
                     map.routeOutlineColor = routeOutline.value;
                     map.roadColor = roadColor.value;
-                    map.routeWidth = routeWidth.value();
+                    map.routeWidthPercent = routeWidthPercent.intValue();
+                    map.roadWidthPercent = roadWidthPercent.intValue();
                     map.routeOutlineWidth = routeOutlineWidth.value();
+                    map.cameraDirectionLayerPriority =
+                            cameraDirectionLayerPriority.intValue();
+                    map.routeLayerPriority = routeLayerPriority.intValue();
+                    map.trafficLightLayerPriority = trafficLightLayerPriority.intValue();
+                    map.routeLabelLayerPriority = routeLabelLayerPriority.intValue();
+                    map.laneGuidanceLayerPriority = laneGuidanceLayerPriority.intValue();
+                    map.cursorLayerPriority = cursorLayerPriority.intValue();
                     map.trafficFreeColor = trafficFreeColor.value;
                     map.trafficLightColor = trafficLightColor.value;
                     map.trafficHardColor = trafficHardColor.value;

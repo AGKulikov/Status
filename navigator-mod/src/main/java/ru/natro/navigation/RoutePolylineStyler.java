@@ -19,13 +19,15 @@ final class RoutePolylineStyler {
                 Color.parseColor(profile.routeColor));
         invoke(line, "setOutlineColor", new Class<?>[]{int.class},
                 Color.parseColor(profile.routeOutlineColor));
+        float widthScale = profile.routeWidthPercent / 100f;
         invoke(line, "setStrokeWidth", new Class<?>[]{float.class},
-                (float) profile.routeWidth);
+                (float) profile.routeWidth * widthScale);
         invoke(line, "setOutlineWidth", new Class<?>[]{float.class},
-                (float) profile.routeOutlineWidth);
+                (float) profile.routeOutlineWidth * widthScale);
         invoke(line, "setGradientLength", new Class<?>[]{float.class},
                 (float) profile.trafficGradientLength);
-        invoke(line, "setZIndex", new Class<?>[]{float.class}, 100f);
+        invoke(line, "setZIndex", new Class<?>[]{float.class},
+                NavigationMapProfile.layerZ(profile.routeLayerPriority));
         invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
         if (profile.showRouteTraffic) {
             for (int paletteIndex = 0; paletteIndex <= 6; paletteIndex++) {

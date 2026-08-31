@@ -379,6 +379,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             if (element.type == InstrumentElementType.NAV_MAP) {
                 // Let the independent TextureView below this Canvas remain visible.
                 canvas.drawRect(rect, clearPaint);
+                drawMapVignette(canvas, element, rect);
             } else {
                 drawStaticElement(canvas, element, rect);
             }
@@ -405,17 +406,28 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(withAlpha(style.backgroundColor, Math.min(alpha, 118)));
                 canvas.drawCircle(cx, cy, radius, paint);
+            }
+            // The approved Aerowave and Continuum faces are open arcs over the map. The scale
+            // therefore owns the ring; hiding the optional dial background must not erase it.
+            if (option(element, "showScale", true)) {
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setStrokeWidth(Math.max(1f, radius * gaugeRingWidth(style)));
                 paint.setColor(withAlpha(style.secondaryColor, Math.min(alpha, 190)));
                 canvas.drawArc(new RectF(cx - radius, cy - radius,
-                        cx + radius, cy + radius), gaugeStart(style),
-                        gaugeSweep(style), false, paint);
-                drawStyleGaugeFace(canvas, style, cx, cy, radius, alpha);
-            }
-            if (option(element, "showScale", true)) {
+                        cx + radius, cy + radius), gaugeStart(element),
+                        gaugeSweep(element), false, paint);
+                drawStyleGaugeFace(canvas, element, cx, cy, radius, alpha);
                 drawGaugeTicks(canvas, element, cx, cy, radius, alpha);
             }
+            return;
+        }
+        String presentation = presentation(element);
+        if ("HORIZONTAL_RULER".equals(presentation)) {
+            drawHorizontalRulerFace(canvas, element, bounds, alpha);
+            return;
+        }
+        if ("VERTICAL_RULER".equals(presentation)) {
+            drawVerticalRulerFace(canvas, element, bounds, alpha);
             return;
         }
         boolean faceByDefault = element.type != InstrumentElementType.INFO_BLOCK;
@@ -497,7 +509,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         paint.setStrokeCap(Paint.Cap.ROUND);
         for (int tick = 0; tick <= total; tick++) {
             boolean major = tick % minorPerMajor == 0;
-            float angle = gaugeStart(element.style) + gaugeSweep(element.style) * tick / total;
+            float angle = gaugeStart(element) + gaugeSweep(element) * tick / total;
             double radians = Math.toRadians(angle);
             float outer = radius * .90f;
             float inner = radius * (major ? .76f : .83f);
@@ -528,7 +540,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         paint.setTextSize(Math.max(7f, radius * .083f));
         for (int index = 0; index < majorTicks; index += labelEvery) {
             float fraction = index / (float) (majorTicks - 1);
-            float angle = gaugeStart(element.style) + gaugeSweep(element.style) * fraction;
+            float angle = gaugeStart(element) + gaugeSweep(element) * fraction;
             double radians = Math.toRadians(angle);
             float value = minimum + (maximum - minimum) * fraction;
             String label = element.type == InstrumentElementType.ANALOG_TACHOMETER
@@ -560,7 +572,14 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 drawDigital(canvas, runtime, bounds, frame.speed, "км/ч", 0);
                 break;
             case DIGITAL_TACHOMETER:
-                drawDigital(canvas, runtime, bounds, frame.rpm, "об/мин", 0);
+                if ("HORIZONTAL_RULER".equals(presentation(element))) {
+                    drawHorizontalRulerValue(canvas, runtime, bounds, frame.rpm);
+                } else if ("VERTICAL_RULER".equals(presentation(element))) {
+                    drawVerticalRulerValue(canvas, runtime, bounds, frame.rpm);
+                } else {
+                    drawDigital(canvas, runtime, bounds, frame.rpm / 1_000f,
+                            "x1000 об/мин", 1);
+                }
                 break;
             case GEAR:
                 drawStyledText(canvas, runtime, bounds, runtime.gearText(frame.gear), .58f);
@@ -620,8 +639,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         float value = runtime.initialized ? runtime.smoothedValue : minimum;
         float fraction = Math.max(0f, Math.min(1f,
                 (value - minimum) / Math.max(1f, maximum - minimum)));
-        float start = gaugeStart(element.style);
-        float sweep = gaugeSweep(element.style);
+        float start = gaugeStart(element);
+        float sweep = gaugeSweep(element);
         float angle = start + sweep * fraction;
         double radians = Math.toRadians(angle);
         float needleLength = radius * .69f;
@@ -641,10 +660,12 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             canvas.drawCircle(cx, cy, radius * .055f, paint);
             paint.setStrokeCap(Paint.Cap.BUTT);
         }
-        if (element.style == InstrumentStyleFamily.CONTINUUM) {
+        if (element.style == InstrumentStyleFamily.AEROWAVE
+                || element.style == InstrumentStyleFamily.CONTINUUM) {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setStrokeWidth(Math.max(2f, radius * .018f));
+            paint.setStrokeWidth(Math.max(2f, radius
+                    * (element.style == InstrumentStyleFamily.AEROWAVE ? .038f : .018f)));
             paint.setColor(withAlpha(element.style.accentColor, Math.min(alpha, 210)));
             gaugeArc.set(cx - radius * .91f, cy - radius * .91f,
                     cx + radius * .91f, cy + radius * .91f);
@@ -653,8 +674,10 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         }
 
         if (option(element, "showValue", true)) {
+            float displayValue = element.type == InstrumentElementType.ANALOG_TACHOMETER
+                    ? rawValue / 1_000f : rawValue;
             String valueText = gaugeDecimals(element.type) == 0
-                    ? runtime.integerText(rawValue) : runtime.oneDecimalText(rawValue);
+                    ? runtime.integerText(displayValue) : runtime.oneDecimalText(displayValue);
             paint.setTypeface(digitalTypeface(element.style, true));
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setTextSize(radius * .28f);
@@ -802,6 +825,137 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             canvas.drawText(metric.unit, bounds.right - bounds.width() * .06f,
                     centerY + rowHeight * .18f, paint);
         }
+    }
+
+    /** Feather the live TextureView into the approved black/blue instrument artwork. */
+    private void drawMapVignette(@NonNull Canvas canvas,
+                                 @NonNull InstrumentElementConfig element,
+                                 @NonNull RectF bounds) {
+        if (!option(element, "fadeEdges", true)) return;
+        float fraction = Math.max(.04f, Math.min(.35f,
+                element.options.optInt("fadePercent", 16) / 100f));
+        float horizontal = bounds.width() * fraction;
+        float vertical = bounds.height() * fraction;
+        int edge = withAlpha(Color.BLACK,
+                Math.round(245f * element.opacityPercent / 100f));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setShader(new LinearGradient(bounds.left, 0f,
+                bounds.left + horizontal, 0f,
+                edge, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+        canvas.drawRect(bounds.left, bounds.top, bounds.left + horizontal, bounds.bottom, paint);
+        paint.setShader(new LinearGradient(bounds.right, 0f,
+                bounds.right - horizontal, 0f,
+                edge, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+        canvas.drawRect(bounds.right - horizontal, bounds.top, bounds.right, bounds.bottom, paint);
+        paint.setShader(new LinearGradient(0f, bounds.top, 0f,
+                bounds.top + vertical, edge, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+        canvas.drawRect(bounds.left, bounds.top, bounds.right, bounds.top + vertical, paint);
+        int bottomColor = withAlpha(Color.parseColor(config.backgroundBottomColor),
+                Math.round(235f * element.opacityPercent / 100f));
+        paint.setShader(new LinearGradient(0f, bounds.bottom, 0f,
+                bounds.bottom - vertical, bottomColor, Color.TRANSPARENT,
+                Shader.TileMode.CLAMP));
+        canvas.drawRect(bounds.left, bounds.bottom - vertical,
+                bounds.right, bounds.bottom, paint);
+        paint.setShader(null);
+    }
+
+    private void drawHorizontalRulerFace(@NonNull Canvas canvas,
+                                         @NonNull InstrumentElementConfig element,
+                                         @NonNull RectF bounds, int alpha) {
+        float left = bounds.left + bounds.width() * .08f;
+        float right = bounds.right - bounds.width() * .08f;
+        float y = bounds.top + bounds.height() * .62f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStrokeWidth(Math.max(1f, bounds.height() * .012f));
+        paint.setColor(withAlpha(element.style.secondaryColor, Math.min(alpha, 180)));
+        canvas.drawLine(left, y, right, y, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTypeface(digitalTypeface(element.style, false));
+        paint.setTextSize(Math.max(8f, bounds.height() * .17f));
+        for (int index = 0; index <= 8; index++) {
+            float x = left + (right - left) * index / 8f;
+            paint.setColor(withAlpha(index >= 7 ? 0xFFFF3B30
+                    : element.style.primaryColor, Math.min(alpha, 210)));
+            canvas.drawRect(x - 1f, y - bounds.height() * .10f,
+                    x + 1f, y + bounds.height() * .06f, paint);
+            canvas.drawText(Integer.toString(index), x,
+                    y - bounds.height() * .15f, paint);
+        }
+    }
+
+    private void drawHorizontalRulerValue(@NonNull Canvas canvas,
+                                          @NonNull RuntimeElement runtime,
+                                          @NonNull RectF bounds, float rpm) {
+        InstrumentElementConfig element = runtime.config;
+        int alpha = Math.round(255f * element.opacityPercent / 100f);
+        float fraction = Float.isFinite(rpm)
+                ? Math.max(0f, Math.min(1f, rpm / RPM_MAX)) : 0f;
+        float left = bounds.left + bounds.width() * .08f;
+        float right = bounds.right - bounds.width() * .08f;
+        float y = bounds.top + bounds.height() * .72f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeCap(Paint.Cap.SQUARE);
+        paint.setStrokeWidth(Math.max(4f, bounds.height() * .055f));
+        paint.setColor(withAlpha(element.style.accentColor, alpha));
+        canvas.drawLine(left, y, left + (right - left) * fraction, y, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTextAlign(Paint.Align.RIGHT);
+        paint.setTypeface(digitalTypeface(element.style, true));
+        paint.setTextSize(bounds.height() * .28f);
+        paint.setColor(withAlpha(element.style.primaryColor, alpha));
+        canvas.drawText(runtime.oneDecimalText(rpm / 1_000f), right,
+                bounds.bottom - bounds.height() * .03f, paint);
+    }
+
+    private void drawVerticalRulerFace(@NonNull Canvas canvas,
+                                       @NonNull InstrumentElementConfig element,
+                                       @NonNull RectF bounds, int alpha) {
+        float x = bounds.centerX();
+        float top = bounds.top + bounds.height() * .08f;
+        float bottom = bounds.bottom - bounds.height() * .08f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, bounds.width() * .015f));
+        paint.setColor(withAlpha(element.style.secondaryColor, Math.min(alpha, 185)));
+        canvas.drawLine(x, top, x, bottom, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTextAlign(Paint.Align.RIGHT);
+        paint.setTypeface(digitalTypeface(element.style, false));
+        paint.setTextSize(Math.max(8f, bounds.width() * .16f));
+        for (int index = 0; index <= 8; index++) {
+            float y = bottom - (bottom - top) * index / 8f;
+            float length = bounds.width() * (index % 2 == 0 ? .15f : .09f);
+            paint.setColor(withAlpha(index >= 7 ? 0xFFFF3B30
+                    : element.style.primaryColor, Math.min(alpha, 210)));
+            canvas.drawRect(x - length, y - 1f, x + bounds.width() * .04f, y + 1f, paint);
+            if (index % 2 == 0 && index > 0) {
+                canvas.drawText(Integer.toString(index), x - length - bounds.width() * .05f,
+                        y - (paint.ascent() + paint.descent()) * .5f, paint);
+            }
+        }
+    }
+
+    private void drawVerticalRulerValue(@NonNull Canvas canvas,
+                                        @NonNull RuntimeElement runtime,
+                                        @NonNull RectF bounds, float rpm) {
+        InstrumentElementConfig element = runtime.config;
+        int alpha = Math.round(255f * element.opacityPercent / 100f);
+        float fraction = Float.isFinite(rpm)
+                ? Math.max(0f, Math.min(1f, rpm / RPM_MAX)) : 0f;
+        float x = bounds.centerX() + bounds.width() * .08f;
+        float top = bounds.top + bounds.height() * .08f;
+        float bottom = bounds.bottom - bounds.height() * .08f;
+        float y = bottom - (bottom - top) * fraction;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(withAlpha(0xFF71D94B, alpha));
+        canvas.drawRoundRect(x, y - bounds.height() * .025f,
+                x + bounds.width() * .10f, bottom,
+                bounds.width() * .03f, bounds.width() * .03f, paint);
+        canvas.drawCircle(x + bounds.width() * .05f, y,
+                Math.max(3f, bounds.width() * .075f), paint);
     }
 
     private void drawNavigationInfo(@NonNull Canvas canvas, @NonNull RuntimeElement runtime,
@@ -975,8 +1129,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     }
 
     private void drawStyleGaugeFace(@NonNull Canvas canvas,
-                                    @NonNull InstrumentStyleFamily style,
+                                    @NonNull InstrumentElementConfig element,
                                     float cx, float cy, float radius, int alpha) {
+        InstrumentStyleFamily style = element.style;
         gaugeArc.set(cx - radius * .92f, cy - radius * .92f,
                 cx + radius * .92f, cy + radius * .92f);
         paint.setStyle(Paint.Style.STROKE);
@@ -989,24 +1144,31 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             case GLACIER_MAP:
                 paint.setStrokeWidth(Math.max(2f, radius * .018f));
                 paint.setColor(withAlpha(style.accentColor, alpha / 2));
-                canvas.drawArc(gaugeArc, gaugeStart(style), gaugeSweep(style), false, paint);
+                canvas.drawArc(gaugeArc, gaugeStart(element),
+                        gaugeSweep(element), false, paint);
                 break;
             case AEROWAVE:
                 paint.setStrokeWidth(Math.max(3f, radius * .030f));
                 paint.setColor(withAlpha(style.accentColor, Math.min(alpha, 220)));
-                canvas.drawArc(gaugeArc, 207f, 34f, false, paint);
+                float start = gaugeStart(element);
+                float sweep = gaugeSweep(element);
+                canvas.drawArc(gaugeArc, start + sweep * .10f,
+                        sweep * .22f, false, paint);
                 paint.setColor(withAlpha(style.secondaryColor, Math.min(alpha, 180)));
-                canvas.drawArc(gaugeArc, 242f, 34f, false, paint);
+                canvas.drawArc(gaugeArc, start + sweep * .33f,
+                        sweep * .24f, false, paint);
                 break;
             case STEEL_VECTOR:
                 paint.setStrokeWidth(Math.max(1f, radius * .009f));
                 paint.setColor(withAlpha(style.secondaryColor, alpha / 2));
-                canvas.drawArc(gaugeArc, gaugeStart(style), gaugeSweep(style), false, paint);
+                canvas.drawArc(gaugeArc, gaugeStart(element),
+                        gaugeSweep(element), false, paint);
                 break;
             case CONTINUUM:
                 paint.setStrokeWidth(Math.max(2f, radius * .020f));
                 paint.setColor(withAlpha(style.secondaryColor, Math.min(alpha, 175)));
-                canvas.drawArc(gaugeArc, gaugeStart(style), gaugeSweep(style), false, paint);
+                canvas.drawArc(gaugeArc, gaugeStart(element),
+                        gaugeSweep(element), false, paint);
                 break;
             default:
                 break;
@@ -1031,6 +1193,13 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         }
     }
 
+    private static float gaugeStart(@NonNull InstrumentElementConfig element) {
+        return element.options.has("arcStartDegrees")
+                ? (float) element.options.optDouble(
+                        "arcStartDegrees", gaugeStart(element.style))
+                : gaugeStart(element.style);
+    }
+
     private static float gaugeSweep(@NonNull InstrumentStyleFamily style) {
         switch (style) {
             case SLATE_HORIZON: return 280f;
@@ -1040,6 +1209,13 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             case CONTINUUM: return 230f;
             default: return GAUGE_SWEEP_DEGREES;
         }
+    }
+
+    private static float gaugeSweep(@NonNull InstrumentElementConfig element) {
+        return element.options.has("arcSweepDegrees")
+                ? (float) element.options.optDouble(
+                        "arcSweepDegrees", gaugeSweep(element.style))
+                : gaugeSweep(element.style);
     }
 
     private static int gaugeMajorTicks(@NonNull InstrumentStyleFamily style,
@@ -1080,7 +1256,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     private static String gaugeUnit(@NonNull InstrumentElementType type) {
         switch (type) {
             case ANALOG_SPEEDOMETER: return "км/ч";
-            case ANALOG_TACHOMETER: return "об/мин";
+            case ANALOG_TACHOMETER: return "x1000 об/мин";
             case ANALOG_FUEL_GAUGE: return "л";
             case ANALOG_BATTERY_GAUGE: return "%";
             case ANALOG_COOLANT_TEMPERATURE: return "°C";
@@ -1090,7 +1266,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     }
 
     private static int gaugeDecimals(@NonNull InstrumentElementType type) {
-        return type == InstrumentElementType.ANALOG_FUEL_GAUGE
+        return type == InstrumentElementType.ANALOG_TACHOMETER
+                || type == InstrumentElementType.ANALOG_FUEL_GAUGE
                 || type == InstrumentElementType.ANALOG_INSTANT_CONSUMPTION ? 1 : 0;
     }
 
@@ -1116,6 +1293,12 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     private static boolean option(@NonNull InstrumentElementConfig element,
                                   @NonNull String key, boolean fallback) {
         return element.options.optBoolean(key, fallback);
+    }
+
+    @NonNull
+    private static String presentation(@NonNull InstrumentElementConfig element) {
+        return element.options.optString("presentation", "").trim().toUpperCase(
+                java.util.Locale.ROOT);
     }
 
     @NonNull

@@ -13,6 +13,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.graphics.Typeface;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
@@ -24,7 +25,6 @@ import android.view.WindowInsets;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -39,8 +39,8 @@ final class FloatingWindowController {
     private static final int MODE_FULLSCREEN = 0;
     private static final int MODE_FLOATING = 1;
     private static final int MODE_TOGGLE = 2;
-    private static final long MODE_BUTTON_SEARCH_MS = 500L;
     private static final long MODE_BUTTON_STABLE_MS = 5_000L;
+    private static final long MODE_BUTTON_AUTO_HIDE_MS = 5_000L;
     private static final long FLOATING_CONTRACT_CHECK_MS = 1_000L;
     // Exact 29.4.2 KX11 window lane: 0x20 | 0x200 | 0x40000.
     private static final int FLOATING_FLAGS =
@@ -77,8 +77,6 @@ final class FloatingWindowController {
     private TextView closeButton;
     private TextView dragHandle;
     private TextView resizeHandle;
-    private ViewGroup modeButtonHost;
-    private View modeButtonAnchor;
     private View insetDispatchHost;
     private Drawable floatingBackground;
     private Drawable floatingFrame;
@@ -97,9 +95,23 @@ final class FloatingWindowController {
     private boolean destroyed;
     private boolean geometryLoaded;
     private boolean transparentLayersCaptured;
+    private long modeButtonVisibleUntilElapsedMs;
+    private final int[] originalContentPadding = new int[4];
+    private final int[] originalMapRootPadding = new int[4];
+    private final int[] originalMapWithControlsPadding = new int[4];
     private int roundedOutlineWidth = -1;
     private int roundedOutlineHeight = -1;
     private int roundedOutlineRadius = -1;
+    private final Runnable hideModeButtons = new Runnable() {
+        @Override public void run() {
+            long remaining = modeButtonVisibleUntilElapsedMs - SystemClock.elapsedRealtime();
+            if (remaining > 0L) {
+                mainHandler.postDelayed(this, remaining);
+                return;
+            }
+            updateModeButtons();
+        }
+    };
     private final View.OnApplyWindowInsetsListener modeAwareInsetsListener =
             new View.OnApplyWindowInsetsListener() {
                 @Override public WindowInsets onApplyWindowInsets(
@@ -170,7 +182,15 @@ final class FloatingWindowController {
         if (destroyed || controlLayer != null) return;
         ViewGroup host = findControlHost();
         if (host == null) return;
-        controlLayer = new FrameLayout(activity);
+        controlLayer = new FrameLayout(activity) {
+            @Override public boolean dispatchTouchEvent(MotionEvent event) {
+                if (event != null && event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    revealModeButton();
+                }
+                // Returning super's result lets an unhandled event continue to Navigator below.
+                return super.dispatchTouchEvent(event);
+            }
+        };
         controlLayer.setClipChildren(false);
         controlLayer.setClipToPadding(false);
         controlLayer.setElevation(dp(100));
@@ -193,13 +213,16 @@ final class FloatingWindowController {
         modeButton.setTextSize(32f);
         modeButton.setTypeface(Typeface.DEFAULT_BOLD);
         modeButton.setOnClickListener(view -> restartInMode(true, null));
+        controlLayer.addView(modeButton);
 
-        // Both directions live in Navigator's own left vanishing-controls column. The native
-        // ancestor then owns tap-to-reveal and auto-hide in full-screen and floating modes alike.
+        // Keep both directions in our top overlay. Every map tap reveals the applicable control;
+        // it then hides again so it never occupies permanent map space.
         floatingModeButton = control("◱", "Развернуть Навигатор на весь экран");
         floatingModeButton.setTextSize(32f);
         floatingModeButton.setTypeface(Typeface.DEFAULT_BOLD);
         floatingModeButton.setOnClickListener(view -> restartInMode(false, null));
+        controlLayer.addView(floatingModeButton);
+        revealModeButton();
         mainHandler.post(modeButtonPoller);
         updateControls();
     }
@@ -299,96 +322,13 @@ final class FloatingWindowController {
         return decor instanceof ViewGroup ? (ViewGroup) decor : null;
     }
 
-    /** Left temporary column: road event, voice assistant, then Natro's mode button. */
-    private ViewGroup findNavigatorButtonHost() {
-        String[] anchorNames = {
-                "navi_service_open_voice_search",
-                "guidance_open_voice_search"
-        };
-        String[] roadEventNames = {
-                "navi_service_add_road_event",
-                "guidance_add_road_event"
-        };
-        for (int index = 0; index < anchorNames.length; index++) {
-            String name = anchorNames[index];
-            int id = activity.getResources().getIdentifier(name, "id", activity.getPackageName());
-            View anchor = id == 0 ? null : activity.findViewById(id);
-            if (anchor == null || !(anchor.getParent() instanceof ViewGroup)) continue;
-            ViewGroup parent = (ViewGroup) anchor.getParent();
-            if (!(parent instanceof LinearLayout)
-                    || ((LinearLayout) parent).getOrientation() != LinearLayout.VERTICAL) {
-                continue;
-            }
-            int roadId = activity.getResources().getIdentifier(
-                    roadEventNames[index], "id", activity.getPackageName());
-            View roadEvent = roadId == 0 ? null : activity.findViewById(roadId);
-            if (roadEvent != null && roadEvent.getParent() != parent) continue;
-            modeButtonAnchor = anchor;
-            return parent;
-        }
-        modeButtonAnchor = null;
-        return null;
-    }
-
-    private void attachModeButtonToNavigator() {
-        if (destroyed || modeButton == null || floatingModeButton == null) return;
-        TextView active = floating ? floatingModeButton : modeButton;
-        TextView inactive = floating ? modeButton : floatingModeButton;
-        if (inactive.getParent() instanceof ViewGroup) {
-            ((ViewGroup) inactive.getParent()).removeView(inactive);
-        }
-        ViewGroup host = findNavigatorButtonHost();
-        if (host != null && (host != modeButtonHost || active.getParent() != host)) {
-            if (active.getParent() instanceof ViewGroup) {
-                ((ViewGroup) active.getParent()).removeView(active);
-            }
-            int size = dp(profile.modeButtonSizeDp);
-            int insertion = modeButtonAnchor == null
-                    ? host.getChildCount() : host.indexOfChild(modeButtonAnchor) + 1;
-            if (insertion < 0 || insertion > host.getChildCount()) {
-                insertion = host.getChildCount();
-            }
-            if (host instanceof LinearLayout) {
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
-                params.setMargins(0, dp(4), 0, dp(9));
-                host.addView(active, insertion, params);
-            } else {
-                host.addView(active, insertion, new ViewGroup.LayoutParams(size, size));
-            }
-            host.setClipChildren(false);
-            host.setClipToPadding(false);
-            if (host.getParent() instanceof ViewGroup) {
-                ViewGroup parent = (ViewGroup) host.getParent();
-                parent.setClipChildren(false);
-                parent.setClipToPadding(false);
-            }
-            modeButtonHost = host;
-        }
-        updateModeButtons();
-    }
-
-    private void detachModeButtonFromNavigator() {
-        if (modeButton != null && modeButton.getParent() instanceof ViewGroup) {
-            ((ViewGroup) modeButton.getParent()).removeView(modeButton);
-        }
-        if (floatingModeButton != null && floatingModeButton.getParent() instanceof ViewGroup) {
-            ((ViewGroup) floatingModeButton.getParent()).removeView(floatingModeButton);
-        }
-        modeButtonHost = null;
-        modeButtonAnchor = null;
-    }
-
     private final Runnable modeButtonPoller = new Runnable() {
         @Override public void run() {
             if (floating) enforceFloatingWindowContract();
-            attachModeButtonToNavigator();
+            if (controlLayer != null) controlLayer.bringToFront();
+            updateModeButtons();
             if (destroyed) return;
-            TextView active = floating ? floatingModeButton : modeButton;
-            boolean stableNavigatorHost = active != null && modeButtonHost != null
-                    && active.getParent() == modeButtonHost
-                    && modeButtonHost.isAttachedToWindow();
-            long delay = floating ? FLOATING_CONTRACT_CHECK_MS
-                    : stableNavigatorHost ? MODE_BUTTON_STABLE_MS : MODE_BUTTON_SEARCH_MS;
+            long delay = floating ? FLOATING_CONTRACT_CHECK_MS : MODE_BUTTON_STABLE_MS;
             mainHandler.postDelayed(this, delay);
         }
     };
@@ -396,12 +336,12 @@ final class FloatingWindowController {
     void destroy() {
         destroyed = true;
         mainHandler.removeCallbacks(modeButtonPoller);
+        mainHandler.removeCallbacks(hideModeButtons);
         window.getDecorView().removeCallbacks(floatingSurfaceCommitter);
         if (Build.VERSION.SDK_INT >= 20 && insetDispatchHost != null) {
             insetDispatchHost.setOnApplyWindowInsetsListener(null);
             insetDispatchHost = null;
         }
-        detachModeButtonFromNavigator();
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
         if (parent != null) parent.removeView(controlLayer);
         controlLayer = null;
@@ -489,8 +429,8 @@ final class FloatingWindowController {
         decor.setSystemUiVisibility(originalSystemUi);
         window.setStatusBarColor(originalStatusBarColor);
         window.setNavigationBarColor(originalNavigationBarColor);
-        requestNavigatorInsets();
         restoreTransparentLayers();
+        requestNavigatorInsets();
         updateControls();
     }
 
@@ -537,8 +477,10 @@ final class FloatingWindowController {
         decor.setClipToOutline(false);
         decor.setElevation(0f);
         decor.setAlpha(profile.opacityPercent / 100f);
-        // Reference default: both KX11 system bars stay visible while the map is windowed.
-        decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+        // Lay this bounded surface through the global status-bar area. The real system bar remains
+        // outside the window; only Navigator's duplicated internal top reservation is removed.
+        decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
     }
 
     /**
@@ -558,6 +500,9 @@ final class FloatingWindowController {
         originalContentBackground = backgroundOf(contentRoot);
         originalMapRootBackground = backgroundOf(mapRoot);
         originalMapWithControlsBackground = backgroundOf(mapWithControls);
+        capturePadding(contentRoot, originalContentPadding);
+        capturePadding(mapRoot, originalMapRootPadding);
+        capturePadding(mapWithControls, originalMapWithControlsPadding);
         transparentContentBackground = new ColorDrawable(Color.TRANSPARENT);
         transparentMapRootBackground = new ColorDrawable(Color.TRANSPARENT);
         transparentMapWithControlsBackground = new ColorDrawable(Color.TRANSPARENT);
@@ -574,6 +519,9 @@ final class FloatingWindowController {
         setBackground(contentRoot, transparentContentBackground);
         setBackground(mapRoot, transparentMapRootBackground);
         setBackground(mapWithControls, transparentMapWithControlsBackground);
+        removeFloatingTopInset(contentRoot);
+        removeFloatingTopInset(mapRoot);
+        removeFloatingTopInset(mapWithControls);
         WindowManager.LayoutParams attributes = window.getAttributes();
         if (attributes.dimAmount != 0f) attributes.dimAmount = 0f;
     }
@@ -585,6 +533,9 @@ final class FloatingWindowController {
         if (mapWithControls != null) {
             mapWithControls.setBackground(originalMapWithControlsBackground);
         }
+        restorePadding(contentRoot, originalContentPadding);
+        restorePadding(mapRoot, originalMapRootPadding);
+        restorePadding(mapWithControls, originalMapWithControlsPadding);
     }
 
     /** Makes only the bounded window ignore the head unit's global status-bar top inset. */
@@ -614,6 +565,25 @@ final class FloatingWindowController {
         if (view != null && background != null && view.getBackground() != background) {
             view.setBackground(background);
         }
+    }
+
+    private static void capturePadding(View view, int[] target) {
+        if (view == null) return;
+        target[0] = view.getPaddingLeft();
+        target[1] = view.getPaddingTop();
+        target[2] = view.getPaddingRight();
+        target[3] = view.getPaddingBottom();
+    }
+
+    private static void removeFloatingTopInset(View view) {
+        if (view != null && view.getPaddingTop() != 0) {
+            view.setPadding(view.getPaddingLeft(), 0,
+                    view.getPaddingRight(), view.getPaddingBottom());
+        }
+    }
+
+    private static void restorePadding(View view, int[] source) {
+        if (view != null) view.setPadding(source[0], source[1], source[2], source[3]);
     }
 
     private void reportCommittedFrame() {
@@ -692,8 +662,10 @@ final class FloatingWindowController {
             catch (RuntimeException ignored) { return; }
         }
         View decor = window.getDecorView();
-        if (decor.getSystemUiVisibility() != View.SYSTEM_UI_FLAG_VISIBLE) {
-            decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+        int floatingSystemUi = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+        if (decor.getSystemUiVisibility() != floatingSystemUi) {
+            decor.setSystemUiVisibility(floatingSystemUi);
         }
         installModeAwareInsetDispatch();
         enforceTransparentLayers();
@@ -738,7 +710,8 @@ final class FloatingWindowController {
         closeButton.setVisibility(floating && profile.closeButtonVisible
                 ? View.VISIBLE : View.GONE);
 
-        attachModeButtonToNavigator();
+        layoutModeButtons();
+        updateModeButtons();
     }
 
     private void updateModeButtons() {
@@ -752,10 +725,44 @@ final class FloatingWindowController {
         modeButton.setContentDescription("Открыть Навигатор в окне");
         floatingModeButton.setText("◱");
         floatingModeButton.setContentDescription("Развернуть Навигатор на весь экран");
-        modeButton.setVisibility(!floating && profile.enabled && profile.modeButtonVisible
+        boolean revealed = SystemClock.elapsedRealtime() <= modeButtonVisibleUntilElapsedMs;
+        modeButton.setVisibility(revealed && !floating
+                && profile.enabled && profile.modeButtonVisible
                 ? View.VISIBLE : View.GONE);
-        floatingModeButton.setVisibility(floating && profile.enabled
+        floatingModeButton.setVisibility(revealed && floating && profile.enabled
                 && profile.modeButtonVisible ? View.VISIBLE : View.GONE);
+    }
+
+    private void revealModeButton() {
+        modeButtonVisibleUntilElapsedMs = SystemClock.elapsedRealtime()
+                + MODE_BUTTON_AUTO_HIDE_MS;
+        mainHandler.removeCallbacks(hideModeButtons);
+        mainHandler.postDelayed(hideModeButtons, MODE_BUTTON_AUTO_HIDE_MS);
+        updateModeButtons();
+    }
+
+    private void layoutModeButtons() {
+        layoutModeButton(modeButton);
+        layoutModeButton(floatingModeButton);
+    }
+
+    private void layoutModeButton(TextView button) {
+        if (button == null) return;
+        String position = profile.modeButtonPosition;
+        boolean right = "TOP_RIGHT".equals(position) || "BOTTOM_RIGHT".equals(position);
+        boolean bottom = "BOTTOM_LEFT".equals(position) || "BOTTOM_RIGHT".equals(position);
+        int gravity = (right ? Gravity.END : Gravity.START)
+                | (bottom ? Gravity.BOTTOM : Gravity.TOP);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp), gravity);
+        int margin = dp(8);
+        params.leftMargin = margin;
+        params.rightMargin = margin;
+        params.bottomMargin = margin;
+        // In floating mode the close control owns the first top-left slot.
+        params.topMargin = floating && !right && !bottom && profile.closeButtonVisible
+                ? dp(52) : margin;
+        button.setLayoutParams(params);
     }
 
     private void updateModeButtonSize(TextView button) {

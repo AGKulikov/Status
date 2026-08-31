@@ -136,6 +136,7 @@ final class FloatingWindowProfile {
 
     private static String color(String raw, String fallback) {
         String value = raw == null ? "" : raw.trim().toUpperCase(java.util.Locale.ROOT);
+        if (value.matches("#[0-9A-F]{6}")) return "#FF" + value.substring(1);
         return value.matches("#[0-9A-F]{8}") ? value : fallback;
     }
 }

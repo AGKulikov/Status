@@ -5,8 +5,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.json.JSONException;
+import org.json.JSONObject;
 
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Set;
 
 /** The five approved starting compositions; every created item remains an ordinary module. */
 public enum InstrumentPanelPreset {
@@ -15,6 +19,9 @@ public enum InstrumentPanelPreset {
     AEROWAVE("13", "Aerowave · гибридный", InstrumentStyleFamily.AEROWAVE),
     STEEL_VECTOR("14", "Steel Vector · цифровой", InstrumentStyleFamily.STEEL_VECTOR),
     CONTINUUM("15", "Continuum · флагманский", InstrumentStyleFamily.CONTINUUM);
+
+    /** Revision 2 replaces the first generic approximation with the approved 11–15 geometry. */
+    public static final int LAYOUT_REVISION = 2;
 
     @NonNull public final String id;
     @NonNull public final String label;
@@ -31,53 +38,53 @@ public enum InstrumentPanelPreset {
     public InstrumentPanelConfig create() {
         InstrumentPanelConfig config = new InstrumentPanelConfig();
         config.presetId = id;
+        config.presetLayoutRevision = LAYOUT_REVISION;
         config.defaultStyle = style;
         config.backgroundBottomColor = defaultBottomColor();
         config.blackZonePercent = 46;
         switch (this) {
             case SLATE_HORIZON:
                 add(config, analog("tachometer", InstrumentElementType.ANALOG_TACHOMETER,
-                        1, 2, 13, 13, 4, style, true));
-                add(config, map("map", 14, 1, 20, 16, style));
+                        1, 2, 13, 12, 4, style, false));
+                add(config, map("map", 6, 1, 36, 16, style));
                 add(config, analog("speedometer", InstrumentElementType.ANALOG_SPEEDOMETER,
-                        34, 2, 13, 13, 4, style, true));
-                add(config, navigation("navigation", 15, 2, 10, 6, 8, style));
-                add(config, info("information", 2, 5, 11, 8, 9, style, false));
+                        34, 2, 13, 12, 4, style, true));
+                add(config, navigation("navigation", 15, 2, 9, 6, 8, style));
+                add(config, info("information", 2, 4, 11, 9, 9, style, false));
                 break;
             case GLACIER_MAP:
-                add(config, map("map", 8, 1, 32, 16, style));
+                add(config, map("map", 1, 1, 44, 16, style));
                 add(config, digital("speedometer", InstrumentElementType.DIGITAL_SPEEDOMETER,
-                        2, 5, 10, 7, 5, style, false));
-                add(config, digital("tachometer", InstrumentElementType.DIGITAL_TACHOMETER,
-                        2, 12, 10, 3, 5, style, false));
-                add(config, navigation("navigation", 36, 3, 11, 7, 8, style));
+                        2, 4, 10, 7, 5, style, false));
+                add(config, ruler("tachometer", InstrumentElementType.DIGITAL_TACHOMETER,
+                        2, 9, 11, 4, 6, style, "HORIZONTAL_RULER"));
+                add(config, navigation("navigation", 34, 3, 12, 7, 8, style));
                 add(config, info("information", 2, 4, 11, 9, 9, style, false));
                 break;
             case AEROWAVE:
-                add(config, analog("tachometer", InstrumentElementType.ANALOG_TACHOMETER,
-                        1, 3, 12, 12, 4, style, true));
-                add(config, map("map", 12, 1, 24, 16, style));
-                add(config, analog("speedometer", InstrumentElementType.ANALOG_SPEEDOMETER,
-                        35, 3, 12, 12, 4, style, true));
+                add(config, arcAnalog("tachometer", InstrumentElementType.ANALOG_TACHOMETER,
+                        1, 3, 14, 12, 4, style, true, 135d, 180d));
+                add(config, map("map", 5, 1, 38, 16, style));
+                add(config, arcAnalog("speedometer", InstrumentElementType.ANALOG_SPEEDOMETER,
+                        33, 3, 14, 12, 4, style, true, 225d, 180d));
                 add(config, navigation("navigation", 17, 2, 14, 5, 8, style));
-                add(config, info("information", 36, 5, 10, 8, 9, style, false));
+                add(config, info("information", 35, 5, 11, 8, 9, style, false));
                 break;
             case STEEL_VECTOR:
-                add(config, map("map", 13, 1, 22, 16, style));
+                add(config, map("map", 14, 1, 18, 16, style));
                 add(config, digital("speedometer", InstrumentElementType.DIGITAL_SPEEDOMETER,
                         2, 5, 10, 7, 5, style, false));
-                add(config, digital("tachometer", InstrumentElementType.DIGITAL_TACHOMETER,
-                        10, 5, 4, 9, 5, style, false));
-                add(config, navigation("navigation", 35, 4, 12, 7, 8, style));
+                add(config, ruler("tachometer", InstrumentElementType.DIGITAL_TACHOMETER,
+                        12, 4, 5, 10, 6, style, "VERTICAL_RULER"));
+                add(config, navigation("navigation", 34, 3, 12, 8, 8, style));
                 add(config, info("information", 2, 4, 11, 9, 9, style, false));
                 break;
             case CONTINUUM:
-                add(config, map("map", 12, 1, 24, 16, style));
-                add(config, analog("tachometer", InstrumentElementType.ANALOG_TACHOMETER,
-                        1, 2, 10, 13, 4, style, true));
+                add(config, map("map", 8, 1, 34, 16, style));
+                add(config, continuumTachometer("tachometer", 1, 3, 13, 12, 4, style));
                 add(config, digital("speedometer", InstrumentElementType.DIGITAL_SPEEDOMETER,
-                        2, 5, 10, 7, 7, style, false));
-                add(config, navigation("navigation", 35, 4, 12, 7, 8, style));
+                        3, 5, 10, 7, 7, style, false));
+                add(config, navigation("navigation", 34, 4, 12, 7, 8, style));
                 // It shares the left zone deliberately: disable speed and enable this module to
                 // reproduce the user-requested information-first Continuum composition.
                 add(config, info("information", 2, 4, 11, 9, 9, style, false));
@@ -87,6 +94,33 @@ public enum InstrumentPanelPreset {
         }
         config.normalize();
         return config;
+    }
+
+    /**
+     * Upgrades the generic 2.5.7 approximation once while preserving module visibility and every
+     * user-added element. Geometry and preset-owned presentation keys follow the approved sheet.
+     */
+    static void upgradeLegacyLayout(@NonNull InstrumentPanelConfig config) {
+        if (config.presetLayoutRevision >= LAYOUT_REVISION) return;
+        InstrumentPanelConfig approved = fromId(config.presetId).create();
+        Set<String> consumed = new HashSet<>();
+        for (InstrumentElementConfig fresh : approved.elements) {
+            InstrumentElementConfig old = find(config, fresh.id);
+            if (old == null) continue;
+            consumed.add(old.id);
+            fresh.enabled = old.enabled;
+            fresh.responseMillis = old.responseMillis;
+            fresh.opacityPercent = old.opacityPercent;
+            fresh.style = old.style;
+            mergeUserOptions(old, fresh, approved.presetId);
+        }
+        for (InstrumentElementConfig old : config.elements) {
+            if (!consumed.contains(old.id)) approved.elements.add(old.copy());
+        }
+        config.elements.clear();
+        config.elements.addAll(approved.elements);
+        config.defaultStyle = approved.defaultStyle;
+        config.presetLayoutRevision = LAYOUT_REVISION;
     }
 
     @NonNull
@@ -116,7 +150,11 @@ public enum InstrumentPanelPreset {
 
     private static InstrumentElementConfig map(String id, int x, int y, int width, int height,
                                                InstrumentStyleFamily style) {
-        return element(id, InstrumentElementType.NAV_MAP, x, y, width, height, 0, style, true);
+        InstrumentElementConfig result = element(
+                id, InstrumentElementType.NAV_MAP, x, y, width, height, 0, style, true);
+        option(result, "fadeEdges", true);
+        option(result, "fadePercent", 16);
+        return result;
     }
 
     private static InstrumentElementConfig analog(String id, InstrumentElementType type,
@@ -141,6 +179,41 @@ public enum InstrumentPanelPreset {
         option(result, "showFace", showFace);
         option(result, "showUnit", true);
         option(result, "showProgress", true);
+        return result;
+    }
+
+    private static InstrumentElementConfig ruler(String id, InstrumentElementType type,
+                                                  int x, int y, int width, int height, int z,
+                                                  InstrumentStyleFamily style,
+                                                  String presentation) {
+        InstrumentElementConfig result = digital(id, type, x, y, width, height, z, style, false);
+        option(result, "presentation", presentation);
+        option(result, "showProgress", false);
+        option(result, "showUnit", false);
+        return result;
+    }
+
+    private static InstrumentElementConfig arcAnalog(
+            String id, InstrumentElementType type, int x, int y, int width, int height, int z,
+            InstrumentStyleFamily style, boolean showValue, double start, double sweep) {
+        InstrumentElementConfig result = analog(
+                id, type, x, y, width, height, z, style, showValue);
+        option(result, "showFace", false);
+        // The open-arc faces encode the value in their illuminated arc. A radial needle belonged
+        // to the retired generic approximation and visibly changes the approved silhouette.
+        option(result, "showNeedle", false);
+        option(result, "arcStartDegrees", start);
+        option(result, "arcSweepDegrees", sweep);
+        return result;
+    }
+
+    private static InstrumentElementConfig continuumTachometer(
+            String id, int x, int y, int width, int height, int z,
+            InstrumentStyleFamily style) {
+        InstrumentElementConfig result = arcAnalog(id, InstrumentElementType.ANALOG_TACHOMETER,
+                x, y, width, height, z, style, false, 145d, 220d);
+        option(result, "showNeedle", false);
+        option(result, "showUnit", false);
         return result;
     }
 
@@ -185,6 +258,34 @@ public enum InstrumentPanelPreset {
             element.options.put(key, value);
         } catch (JSONException impossible) {
             throw new IllegalStateException(impossible);
+        }
+    }
+
+    private static InstrumentElementConfig find(InstrumentPanelConfig config, String id) {
+        for (InstrumentElementConfig element : config.elements) {
+            if (id.equals(element.id)) return element;
+        }
+        return null;
+    }
+
+    private static void mergeUserOptions(InstrumentElementConfig old,
+                                         InstrumentElementConfig fresh,
+                                         String presetId) {
+        Iterator<String> keys = old.options.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            if ("presentation".equals(key) || "arcStartDegrees".equals(key)
+                    || "arcSweepDegrees".equals(key) || "fadeEdges".equals(key)
+                    || "fadePercent".equals(key)) continue;
+            // These false values are part of the corrected preset silhouette, not optional art.
+            if ("tachometer".equals(old.id)
+                    && ("11".equals(presetId) || "15".equals(presetId))
+                    && ("showValue".equals(key) || "showUnit".equals(key)
+                    || "15".equals(presetId)
+                    && ("showFace".equals(key) || "showNeedle".equals(key)))) continue;
+            if ("13".equals(presetId) && "showNeedle".equals(key)) continue;
+            Object value = old.options.opt(key);
+            if (value != null && value != JSONObject.NULL) option(fresh, key, value);
         }
     }
 }

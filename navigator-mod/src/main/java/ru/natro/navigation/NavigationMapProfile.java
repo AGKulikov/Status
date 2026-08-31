@@ -48,6 +48,13 @@ final class NavigationMapProfile {
     boolean showTrafficLights = true;
     /** Screen-facing sign anchored to the upcoming LaneSign RoutePosition. */
     boolean showLaneGuidance = true;
+    int laneGuidanceScalePercent = 100;
+    int cameraDirectionLayerPriority = 20;
+    int routeLayerPriority = 40;
+    int trafficLightLayerPriority = 50;
+    int routeLabelLayerPriority = 60;
+    int laneGuidanceLayerPriority = 80;
+    int cursorLayerPriority = 90;
     boolean showCursor = true;
     boolean routeStreetLabelsOnly;
     boolean roadsOnly;
@@ -64,6 +71,8 @@ final class NavigationMapProfile {
     String routeColor = "#FFFFC400";
     String routeOutlineColor = "#FF16181D";
     String roadColor = "";
+    int routeWidthPercent = 100;
+    int roadWidthPercent = 100;
     double routeWidth = 8d;
     double routeOutlineWidth = 2d;
     String trafficFreeColor = "#FF39B54A";
@@ -109,6 +118,20 @@ final class NavigationMapProfile {
                     "showRouteTraffic", result.showTraffic);
             result.showTrafficLights = source.optBoolean("showTrafficLights", true);
             result.showLaneGuidance = source.optBoolean("showLaneGuidance", true);
+            result.laneGuidanceScalePercent = clamp(
+                    source.optInt("laneGuidanceScalePercent", 100), 50, 250);
+            result.cameraDirectionLayerPriority = clamp(
+                    source.optInt("cameraDirectionLayerPriority", 20), 0, 100);
+            result.routeLayerPriority = clamp(
+                    source.optInt("routeLayerPriority", 40), 0, 100);
+            result.trafficLightLayerPriority = clamp(
+                    source.optInt("trafficLightLayerPriority", 50), 0, 100);
+            result.routeLabelLayerPriority = clamp(
+                    source.optInt("routeLabelLayerPriority", 60), 0, 100);
+            result.laneGuidanceLayerPriority = clamp(
+                    source.optInt("laneGuidanceLayerPriority", 80), 0, 100);
+            result.cursorLayerPriority = clamp(
+                    source.optInt("cursorLayerPriority", 90), 0, 100);
             result.routeStreetLabelsOnly = source.optBoolean(
                     "routeStreetLabelsOnly", false);
             result.showCursor = source.optBoolean("showCursor", true);
@@ -136,6 +159,10 @@ final class NavigationMapProfile {
                     result.routeOutlineColor);
             result.roadColor = color(source.optString(
                     "roadColor", result.roadColor), result.roadColor);
+            result.routeWidthPercent = clamp(
+                    source.optInt("routeWidthPercent", 100), 25, 300);
+            result.roadWidthPercent = clamp(
+                    source.optInt("roadWidthPercent", 100), 25, 300);
             result.routeWidth = clamp(
                     source.optDouble("routeWidth", 8d), 1d, 40d, 8d);
             result.routeOutlineWidth = clamp(source.optDouble(
@@ -184,11 +211,24 @@ final class NavigationMapProfile {
                     "{\"tags\":{\"none\":" + ROAD_TAGS_JSON + "},"
                             + "\"stylers\":{\"visibility\":\"off\"}}");
         }
-        if (!roadColor.isEmpty()) {
+        if (!roadColor.isEmpty() || roadWidthPercent != 100) {
+            StringBuilder stylers = new StringBuilder("{");
+            boolean stylerComma = false;
+            if (!roadColor.isEmpty()) {
+                stylers.append("\"color\":\"").append(mapKitColor(roadColor)).append('"');
+                stylerComma = true;
+            }
+            if (roadWidthPercent != 100) {
+                if (stylerComma) stylers.append(',');
+                // MapKit's geometry scale styler changes the substrate stroke only; icons,
+                // labels, route and traffic overlays remain independently sized.
+                stylers.append("\"scale\":")
+                        .append(String.format(Locale.ROOT, "%.2f", roadWidthPercent / 100d));
+            }
+            stylers.append('}');
             needsComma = appendRule(rules, needsComma,
                     "{\"tags\":{\"any\":" + ROAD_TAGS_JSON + "},"
-                            + "\"elements\":\"geometry\",\"stylers\":{\"color\":\""
-                            + mapKitColor(roadColor) + "\"}}");
+                            + "\"elements\":\"geometry\",\"stylers\":" + stylers + "}");
         }
         if (roadsOnly || !showLabels) {
             needsComma = appendRule(rules, needsComma,
@@ -242,6 +282,11 @@ final class NavigationMapProfile {
         return Math.max(minimum, Math.min(maximum, value));
     }
 
+    /** One shared numeric range makes the order comparable across separate collections. */
+    static float layerZ(int priority) {
+        return 50f + clamp(priority, 0, 100);
+    }
+
     private static double clamp(double value, double minimum, double maximum,
                                 double fallback) {
         return Double.isNaN(value) || Double.isInfinite(value)
@@ -249,7 +294,8 @@ final class NavigationMapProfile {
     }
 
     private static String color(String raw, String fallback) {
-        String value = raw == null ? "" : raw.trim();
+        String value = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        if (value.matches("#[0-9A-F]{6}")) value = "#FF" + value.substring(1);
         try {
             Color.parseColor(value);
             return value;

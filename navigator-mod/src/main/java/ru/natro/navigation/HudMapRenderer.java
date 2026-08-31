@@ -361,12 +361,21 @@ final class HudMapRenderer {
         Object currentWindow = mapWindow;
         Object currentMap = map;
         if (currentWindow == null || currentMap == null) return;
-        trafficLightMapLayer.apply(profile.showTrafficLights);
+        boolean systemNight = (context.getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        boolean night = profile.automaticDayNight ? systemNight : profile.nightMode;
+        trafficLightMapLayer.apply(profile.showTrafficLights, night,
+                profile.trafficLightLayerPriority);
         cameraDirectionMapLayer.apply(
-                !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL")));
-        laneGuidanceMapLayer.apply(profile.showLaneGuidance);
-        routeStreetLabelMapLayer.apply(
-                profile.showLabels && profile.routeStreetLabelsOnly);
+                !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL")),
+                profile.cameraDirectionLayerPriority);
+        laneGuidanceMapLayer.apply(profile.showLaneGuidance,
+                profile.laneGuidanceScalePercent, night,
+                profile.laneGuidanceLayerPriority);
+        // This explicit route-owned layer is the replacement for substrate road labels. Its
+        // switch must work even when the generic "Подписи" switch is off.
+        routeStreetLabelMapLayer.apply(profile.routeStreetLabelsOnly,
+                profile.routeLabelLayerPriority);
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -378,10 +387,8 @@ final class HudMapRenderer {
             invoke(currentWindow, "setFocusPoint", new Class<?>[]{pointClass}, focus);
             applyTrafficPresentation();
             cursorStyler.apply(profile.showCursor, profile.cursorScalePercent,
-                    profile.cursorColor, profile.cursorOutlineColor);
-            boolean systemNight = (context.getResources().getConfiguration().uiMode
-                    & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-            boolean night = profile.automaticDayNight ? systemNight : profile.nightMode;
+                    profile.cursorColor, profile.cursorOutlineColor,
+                    profile.cursorLayerPriority);
             invoke(currentMap, "setNightModeEnabled", new Class<?>[]{boolean.class}, night);
             invoke(currentMap, "setModelsEnabled", new Class<?>[]{boolean.class},
                     profile.showModels && !profile.roadsOnly);
@@ -401,6 +408,7 @@ final class HudMapRenderer {
                     profile.visibilityStyleJson());
             applyCamera(false);
             applyRoadEventVisibility();
+            destinationIconStyle = null;
             rebuildRoute();
         } catch (Throwable failure) {
             Log.w(TAG, "Some HUD MapProfile fields could not be applied", failure);
@@ -697,7 +705,8 @@ final class HudMapRenderer {
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
-            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(38f));
+            invoke(style, "setZIndex", new Class<?>[]{Float.class},
+                    Float.valueOf(NavigationMapProfile.layerZ(profile.routeLayerPriority) + 0.5f));
             destinationIconStyle = style;
         }
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");

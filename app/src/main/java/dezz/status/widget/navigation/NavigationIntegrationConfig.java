@@ -184,6 +184,15 @@ public final class NavigationIntegrationConfig {
         public boolean showTrafficLights = true;
         /** Upcoming lane sign anchored to its RoutePosition on the map. */
         public boolean showLaneGuidance = true;
+        /** Scale of Yandex's original lane-sign view; 100 keeps the stock MapKit size. */
+        public int laneGuidanceScalePercent = 100;
+        /** User-controlled global stacking order; larger values are drawn above smaller ones. */
+        public int cameraDirectionLayerPriority = 20;
+        public int routeLayerPriority = 40;
+        public int trafficLightLayerPriority = 50;
+        public int routeLabelLayerPriority = 60;
+        public int laneGuidanceLayerPriority = 80;
+        public int cursorLayerPriority = 90;
         public boolean showLabels = true;
         /** Hide substrate labels and draw only verified names attached to the active route. */
         public boolean routeStreetLabelsOnly;
@@ -202,6 +211,9 @@ public final class NavigationIntegrationConfig {
         @NonNull public String routeOutlineColor = "#FF16181D";
         /** Substrate road colour; route and traffic layers are rendered independently above it. */
         @NonNull public String roadColor = "";
+        /** Multipliers keep 100% bit-for-bit compatible with the 2.5.7 rendering. */
+        public int routeWidthPercent = 100;
+        public int roadWidthPercent = 100;
         public double routeWidth = 8d;
         public double routeOutlineWidth = 2d;
         @NonNull public String trafficFreeColor = "#FF39B54A";
@@ -263,6 +275,13 @@ public final class NavigationIntegrationConfig {
                     .put("showTraffic", showTraffic)
                     .put("showTrafficLights", showTrafficLights)
                     .put("showLaneGuidance", showLaneGuidance)
+                    .put("laneGuidanceScalePercent", laneGuidanceScalePercent)
+                    .put("cameraDirectionLayerPriority", cameraDirectionLayerPriority)
+                    .put("routeLayerPriority", routeLayerPriority)
+                    .put("trafficLightLayerPriority", trafficLightLayerPriority)
+                    .put("routeLabelLayerPriority", routeLabelLayerPriority)
+                    .put("laneGuidanceLayerPriority", laneGuidanceLayerPriority)
+                    .put("cursorLayerPriority", cursorLayerPriority)
                     .put("showLabels", showLabels)
                     .put("routeStreetLabelsOnly", routeStreetLabelsOnly)
                     .put("showPois", showPois)
@@ -278,6 +297,8 @@ public final class NavigationIntegrationConfig {
                     .put("routeColor", routeColor)
                     .put("routeOutlineColor", routeOutlineColor)
                     .put("roadColor", roadColor)
+                    .put("routeWidthPercent", routeWidthPercent)
+                    .put("roadWidthPercent", roadWidthPercent)
                     .put("routeWidth", routeWidth)
                     .put("routeOutlineWidth", routeOutlineWidth)
                     .put("trafficFreeColor", trafficFreeColor)
@@ -318,6 +339,20 @@ public final class NavigationIntegrationConfig {
                     "showTrafficLights", result.showTrafficLights);
             result.showLaneGuidance = source.optBoolean(
                     "showLaneGuidance", result.showLaneGuidance);
+            result.laneGuidanceScalePercent = source.optInt(
+                    "laneGuidanceScalePercent", result.laneGuidanceScalePercent);
+            result.cameraDirectionLayerPriority = source.optInt(
+                    "cameraDirectionLayerPriority", result.cameraDirectionLayerPriority);
+            result.routeLayerPriority = source.optInt(
+                    "routeLayerPriority", result.routeLayerPriority);
+            result.trafficLightLayerPriority = source.optInt(
+                    "trafficLightLayerPriority", result.trafficLightLayerPriority);
+            result.routeLabelLayerPriority = source.optInt(
+                    "routeLabelLayerPriority", result.routeLabelLayerPriority);
+            result.laneGuidanceLayerPriority = source.optInt(
+                    "laneGuidanceLayerPriority", result.laneGuidanceLayerPriority);
+            result.cursorLayerPriority = source.optInt(
+                    "cursorLayerPriority", result.cursorLayerPriority);
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
             result.routeStreetLabelsOnly = source.optBoolean(
                     "routeStreetLabelsOnly", result.routeStreetLabelsOnly);
@@ -337,6 +372,10 @@ public final class NavigationIntegrationConfig {
             result.routeOutlineColor = source.optString(
                     "routeOutlineColor", result.routeOutlineColor);
             result.roadColor = source.optString("roadColor", result.roadColor);
+            result.routeWidthPercent = source.optInt(
+                    "routeWidthPercent", result.routeWidthPercent);
+            result.roadWidthPercent = source.optInt(
+                    "roadWidthPercent", result.roadWidthPercent);
             result.routeWidth = source.optDouble("routeWidth", result.routeWidth);
             result.routeOutlineWidth = source.optDouble(
                     "routeOutlineWidth", result.routeOutlineWidth);
@@ -377,6 +416,15 @@ public final class NavigationIntegrationConfig {
             focusYPercent = clamp(focusYPercent, 0, 100);
             mapScalePercent = clamp(mapScalePercent, 50, 300);
             cursorScalePercent = clamp(cursorScalePercent, 25, 300);
+            laneGuidanceScalePercent = clamp(laneGuidanceScalePercent, 50, 250);
+            cameraDirectionLayerPriority = clamp(cameraDirectionLayerPriority, 0, 100);
+            routeLayerPriority = clamp(routeLayerPriority, 0, 100);
+            trafficLightLayerPriority = clamp(trafficLightLayerPriority, 0, 100);
+            routeLabelLayerPriority = clamp(routeLabelLayerPriority, 0, 100);
+            laneGuidanceLayerPriority = clamp(laneGuidanceLayerPriority, 0, 100);
+            cursorLayerPriority = clamp(cursorLayerPriority, 0, 100);
+            routeWidthPercent = clamp(routeWidthPercent, 25, 300);
+            roadWidthPercent = clamp(roadWidthPercent, 25, 300);
             routeWidth = clamp(routeWidth, 1d, 40d, 8d);
             routeOutlineWidth = clamp(routeOutlineWidth, 0d, 20d, 2d);
             trafficGradientLength = clamp(trafficGradientLength, 0d, 100d, 12d);
@@ -585,6 +633,9 @@ public final class NavigationIntegrationConfig {
     @NonNull
     private static String color(String raw, String fallback) {
         String value = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        // AppleColorPicker intentionally omits FF alpha for an opaque swatch. Accept its
+        // #RRGGBB output and canonicalise it so every persisted/wire colour remains #AARRGGBB.
+        if (value.matches("#[0-9A-F]{6}")) return "#FF" + value.substring(1);
         return value.matches("#[0-9A-F]{8}") ? value : fallback;
     }
 

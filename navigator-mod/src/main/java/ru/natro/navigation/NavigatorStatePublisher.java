@@ -271,16 +271,19 @@ final class NavigatorStatePublisher {
         final double longitude;
         final int distanceMeters;
         final float bearingDegrees;
+        /** Original MapKit object retained in-process for the stock Yandex renderer. */
+        final Object laneSign;
         final List<LaneFrame> lanes;
 
         LaneGuidanceFrame(String id, double latitude, double longitude,
                           int distanceMeters, float bearingDegrees,
-                          List<LaneFrame> lanes) {
+                          Object laneSign, List<LaneFrame> lanes) {
             this.id = id == null ? "" : id;
             this.latitude = latitude;
             this.longitude = longitude;
             this.distanceMeters = Math.max(-1, distanceMeters);
             this.bearingDegrees = normalizeBearing(bearingDegrees);
+            this.laneSign = laneSign;
             this.lanes = lanes == null ? Collections.emptyList() : lanes;
         }
 
@@ -290,7 +293,7 @@ final class NavigatorStatePublisher {
         }
 
         boolean hasContent() {
-            if (!hasMapPosition() || lanes.isEmpty()) return false;
+            if (!hasMapPosition() || laneSign == null || lanes.isEmpty()) return false;
             for (LaneFrame lane : lanes) {
                 if (lane != null && !lane.directions.isEmpty()) return true;
             }
@@ -1031,7 +1034,9 @@ final class NavigatorStatePublisher {
             String currentStreet = text(invoke(currentGuidance, "getRoadName"));
             double currentLatitude = frame.latitude;
             double currentLongitude = frame.longitude;
-            Object currentPoint = frame.currentRoutePoint;
+            // Put the name ahead of the cursor instead of directly under the route/cursor stack.
+            // The anchor remains an actual point of the active route geometry.
+            Object currentPoint = currentStreetLabelPoint(frame);
             if (currentPoint != null) {
                 currentLatitude = number(invoke(currentPoint, "getLatitude"), currentLatitude);
                 currentLongitude = number(invoke(currentPoint, "getLongitude"), currentLongitude);
@@ -1073,6 +1078,52 @@ final class NavigatorStatePublisher {
             }
         }
         return result;
+    }
+
+    private Object currentStreetLabelPoint(NavigationFrame frame) {
+        Object fallback = frame.currentRoutePoint;
+        if (!frame.routeProgressValid || activeRoute == null) return fallback;
+        try {
+            Object geometry = invoke(activeRoute, "getGeometry");
+            List<?> points = invokeList(geometry, "getPoints");
+            if (points.isEmpty()) return fallback;
+            int start = Math.max(0, Math.min(points.size() - 1, frame.routeSegmentIndex));
+            Object previous = points.get(start);
+            double previousLatitude = number(invoke(previous, "getLatitude"), Double.NaN);
+            double previousLongitude = number(invoke(previous, "getLongitude"), Double.NaN);
+            double travelled = 0d;
+            Object candidate = previous;
+            int limit = Math.min(points.size(), start + 96);
+            for (int index = start + 1; index < limit; index++) {
+                Object point = points.get(index);
+                double latitude = number(invoke(point, "getLatitude"), Double.NaN);
+                double longitude = number(invoke(point, "getLongitude"), Double.NaN);
+                travelled += geoDistanceMeters(previousLatitude, previousLongitude,
+                        latitude, longitude);
+                candidate = point;
+                previousLatitude = latitude;
+                previousLongitude = longitude;
+                if (travelled >= 90d) break;
+            }
+            return candidate;
+        } catch (Throwable unavailable) {
+            return fallback;
+        }
+    }
+
+    private static double geoDistanceMeters(double fromLatitude, double fromLongitude,
+                                            double toLatitude, double toLongitude) {
+        if (!finite(fromLatitude) || !finite(fromLongitude)
+                || !finite(toLatitude) || !finite(toLongitude)) return 0d;
+        double latitudeDelta = Math.toRadians(toLatitude - fromLatitude);
+        double longitudeDelta = Math.toRadians(toLongitude - fromLongitude);
+        double from = Math.toRadians(fromLatitude);
+        double to = Math.toRadians(toLatitude);
+        double sinLatitude = Math.sin(latitudeDelta / 2d);
+        double sinLongitude = Math.sin(longitudeDelta / 2d);
+        double value = sinLatitude * sinLatitude
+                + Math.cos(from) * Math.cos(to) * sinLongitude * sinLongitude;
+        return 12_742_000d * Math.asin(Math.min(1d, Math.sqrt(value)));
     }
 
     private static void addRouteStreetLabel(List<RouteStreetLabelFrame> result,
@@ -1172,7 +1223,7 @@ final class NavigatorStatePublisher {
                         + ':' + Math.round(longitude * 100_000d)
                 : "";
         LaneGuidanceFrame frame = new LaneGuidanceFrame(id, latitude, longitude,
-                distanceMeters, bearing, Collections.unmodifiableList(mapLanes));
+                distanceMeters, bearing, sign, Collections.unmodifiableList(mapLanes));
         return new LaneState(result, distanceMeters, frame.hasContent() ? frame : null);
     }
 
