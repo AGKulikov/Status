@@ -220,6 +220,38 @@ public final class InstrumentPanelContractTest {
         assertTrue(renderer.contains("if (navigation == null) return"));
     }
 
+    @Test public void routeSummaryUsesTheOriginalSignAndHasPerElementLayoutControls()
+            throws Exception {
+        Path root = projectRoot();
+        String settings = read(root.resolve("app/src/main/java/dezz/status/widget/"
+                + "InstrumentPanelSettingsActivity.java"));
+        String renderer = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentClusterView.java"));
+        String preset = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentPanelPreset.java"));
+        String repository = read(root.resolve("app/src/main/java/dezz/status/widget/launcher/"
+                + "NavigationDataRepository.java"));
+
+        assertTrue(repository.contains("readFreshManeuverImage"));
+        assertTrue(renderer.contains("navigationManeuverImage"));
+        assertTrue(renderer.contains("NavigationDataRepository.ACTION_UPDATED"));
+        assertTrue(renderer.contains("navigationGraphicReceiver"));
+        assertTrue(renderer.contains("drawSourceBitmap(canvas, navigationManeuverImage"));
+        assertFalse(renderer.contains("drawManeuverIcon("));
+        assertTrue(settings.contains("Исходный знак Навигатора"));
+        assertTrue(settings.contains("ScrollView scroll = new ScrollView(this)"));
+        assertTrue(settings.contains("Размер исходного знака"));
+        assertTrue(settings.contains("Оставшееся расстояние"));
+        assertTrue(settings.contains("Время прибытия"));
+        assertTrue(settings.contains("Оставшееся время"));
+        assertTrue(settings.contains("Карточка и внутренние отступы"));
+        assertTrue(preset.contains("distanceTextSizeSp"));
+        assertTrue(preset.contains("arrivalTextSizeSp"));
+        assertTrue(preset.contains("durationTextSizeSp"));
+        assertTrue(preset.contains("contentPaddingLeftPx"));
+        assertTrue(preset.contains("maneuverIconPaddingLeftPx"));
+    }
+
     @Test public void launcherMirrorsVerifiedDimSequenceAndAutostarts() throws Exception {
         Path root = projectRoot();
         String launcher = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"

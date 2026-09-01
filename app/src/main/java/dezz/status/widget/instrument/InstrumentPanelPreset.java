@@ -228,6 +228,36 @@ public enum InstrumentPanelPreset {
         option(result, "showEta", true);
         option(result, "showDuration", true);
         option(result, "showRouteProgress", true);
+        option(result, "showManeuverIcon", true);
+        option(result, "reserveManeuverIconSpace", true);
+        option(result, "contentPaddingLeftPx", 14);
+        option(result, "contentPaddingTopPx", 10);
+        option(result, "contentPaddingRightPx", 14);
+        option(result, "contentPaddingBottomPx", 10);
+        option(result, "maneuverIconAreaPercent", 15);
+        option(result, "maneuverIconScalePercent", 100);
+        option(result, "maneuverIconGapPx", 10);
+        option(result, "maneuverIconPaddingLeftPx", 5);
+        option(result, "maneuverIconPaddingTopPx", 5);
+        option(result, "maneuverIconPaddingRightPx", 5);
+        option(result, "maneuverIconPaddingBottomPx", 5);
+        option(result, "maneuverIconBackgroundColor", "#FF2B2E35");
+        option(result, "maneuverIconBackgroundOpacityPercent", 100);
+        option(result, "maneuverIconCornerRadiusPx", 12);
+        option(result, "metricGapPx", 10);
+        option(result, "distanceTextSizeSp", 25);
+        option(result, "arrivalTextSizeSp", 25);
+        option(result, "durationTextSizeSp", 25);
+        option(result, "metricsVerticalPercent", 44);
+        option(result, "progressBarHeightPx", 14);
+        option(result, "progressBarTopGapPx", 9);
+        option(result, "progressBarCornerRadiusPx", 7);
+        option(result, "progressMarkerScalePercent", 100);
+        option(result, "faceColor", "#FF15171B");
+        option(result, "faceOpacityPercent", 93);
+        option(result, "faceCornerRadiusPx", 18);
+        option(result, "faceBorderColor", "#00000000");
+        option(result, "faceBorderWidthPx", 0);
         return result;
     }
 

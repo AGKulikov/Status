@@ -671,6 +671,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
             WidgetServiceStarter.startIfNeeded(this);
         }
         dezz.status.widget.driver.DriverPanelService.apply(this);
+        dezz.status.widget.dim.DimMenuPanelService.apply(this);
         ClimatePanelService.apply(this);
         Toast.makeText(this, R.string.import_success_toast, Toast.LENGTH_SHORT).show();
         recreate();
@@ -703,6 +704,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
 
     private void finishResetAllSettings() {
         if (WidgetService.isRunning()) stopService(new Intent(this, WidgetService.class));
+        dezz.status.widget.dim.DimMenuPanelService.stop(this);
         if (preferences.climatePanelEnabled.get()
                 || new ScreenReservationStateStore(this).hasManagedReservation()) {
             ClimatePanelService.stopAndRestore(this);
@@ -728,6 +730,8 @@ public final class SettingsHubActivity extends AppCompatActivity {
                 return isDefaultHome() ? "Выбран как HOME" : "Другой HOME";
             case "panel_floating_climate":
                 return enabledLabel(preferences.climatePanelEnabled.get());
+            case "panel_dim_menu":
+                return enabledLabel(preferences.dimMenuPanelEnabled.get());
             case "panel_popup":
                 return enabledLabel(preferences.popupEnabled.get());
             case "connector_ha": {

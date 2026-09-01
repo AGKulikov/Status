@@ -167,6 +167,10 @@ public final class NavigationIntegrationConfig {
         @NonNull public final Target target;
         public boolean enabled;
         @NonNull public String cameraMode = "FOLLOW_ROUTE";
+        /** Disables Natro's speed-dependent zoom and keeps one configured map zoom. */
+        public boolean fixedZoomEnabled;
+        /** Absolute MapKit zoom used while {@link #fixedZoomEnabled} is active. */
+        public double fixedZoomLevel = 16d;
         public double zoomDelta;
         public int tiltDegrees = 60;
         public int focusXPercent = 50;
@@ -182,6 +186,8 @@ public final class NavigationIntegrationConfig {
         public boolean showTraffic = true;
         /** Fresh Windshield traffic lights, rendered in their own map-object collection. */
         public boolean showTrafficLights = true;
+        /** Original-style direction arrows placed directly on upcoming route turns. */
+        public boolean showRouteTurns = true;
         /** Upcoming lane sign anchored to its RoutePosition on the map. */
         public boolean showLaneGuidance = true;
         /** Camera objects supplied by the separately installed, signature-pinned HUD Speed. */
@@ -190,8 +196,14 @@ public final class NavigationIntegrationConfig {
         public int laneGuidanceScalePercent = 100;
         /** One scale controls both source-specific camera signs and their optional detail badges. */
         public int cameraScalePercent = 100;
+        /** Geometric length/width multiplier of the source-backed camera direction sector. */
+        public int cameraDirectionScalePercent = 100;
+        /** Fill opacity of the camera direction sector. */
+        public int cameraDirectionOpacityPercent = 30;
         /** Scale of Yandex's original signal-and-seconds traffic-light balloon. */
         public int trafficLightScalePercent = 100;
+        /** Scale of arrows painted directly onto upcoming route turns. */
+        public int routeTurnScalePercent = 100;
         /** Scale of labels whose anchor and text are verified against the active route. */
         public int routeLabelScalePercent = 100;
         /** Scale of stock Yandex road-event icons and their captions, excluding cameras. */
@@ -206,6 +218,7 @@ public final class NavigationIntegrationConfig {
         public int routeLayerPriority = 40;
         public int destinationLayerPriority = 45;
         public int trafficLightLayerPriority = 50;
+        public int routeTurnLayerPriority = 55;
         public int routeLabelLayerPriority = 60;
         public int laneGuidanceLayerPriority = 80;
         public int cursorLayerPriority = 90;
@@ -278,6 +291,8 @@ public final class NavigationIntegrationConfig {
                     .put("target", target.name())
                     .put("enabled", enabled)
                     .put("cameraMode", cameraMode)
+                    .put("fixedZoomEnabled", fixedZoomEnabled)
+                    .put("fixedZoomLevel", fixedZoomLevel)
                     .put("zoomDelta", zoomDelta)
                     .put("tiltDegrees", tiltDegrees)
                     .put("focusXPercent", focusXPercent)
@@ -290,11 +305,15 @@ public final class NavigationIntegrationConfig {
                     .put("showRouteTraffic", showRouteTraffic)
                     .put("showTraffic", showTraffic)
                     .put("showTrafficLights", showTrafficLights)
+                    .put("showRouteTurns", showRouteTurns)
                     .put("showLaneGuidance", showLaneGuidance)
                     .put("showHudSpeedCameras", showHudSpeedCameras)
                     .put("laneGuidanceScalePercent", laneGuidanceScalePercent)
                     .put("cameraScalePercent", cameraScalePercent)
+                    .put("cameraDirectionScalePercent", cameraDirectionScalePercent)
+                    .put("cameraDirectionOpacityPercent", cameraDirectionOpacityPercent)
                     .put("trafficLightScalePercent", trafficLightScalePercent)
+                    .put("routeTurnScalePercent", routeTurnScalePercent)
                     .put("routeLabelScalePercent", routeLabelScalePercent)
                     .put("roadEventScalePercent", roadEventScalePercent)
                     .put("destinationScalePercent", destinationScalePercent)
@@ -304,6 +323,7 @@ public final class NavigationIntegrationConfig {
                     .put("routeLayerPriority", routeLayerPriority)
                     .put("destinationLayerPriority", destinationLayerPriority)
                     .put("trafficLightLayerPriority", trafficLightLayerPriority)
+                    .put("routeTurnLayerPriority", routeTurnLayerPriority)
                     .put("routeLabelLayerPriority", routeLabelLayerPriority)
                     .put("laneGuidanceLayerPriority", laneGuidanceLayerPriority)
                     .put("cursorLayerPriority", cursorLayerPriority)
@@ -345,6 +365,10 @@ public final class NavigationIntegrationConfig {
             if (source == null) return result;
             result.enabled = source.optBoolean("enabled", result.enabled);
             result.cameraMode = source.optString("cameraMode", result.cameraMode);
+            result.fixedZoomEnabled = source.optBoolean(
+                    "fixedZoomEnabled", result.fixedZoomEnabled);
+            result.fixedZoomLevel = source.optDouble(
+                    "fixedZoomLevel", result.fixedZoomLevel);
             result.zoomDelta = source.optDouble("zoomDelta", result.zoomDelta);
             result.tiltDegrees = source.optInt("tiltDegrees", result.tiltDegrees);
             result.focusXPercent = source.optInt("focusXPercent", result.focusXPercent);
@@ -362,6 +386,8 @@ public final class NavigationIntegrationConfig {
                     "showRouteTraffic", result.showRouteTraffic);
             result.showTrafficLights = source.optBoolean(
                     "showTrafficLights", result.showTrafficLights);
+            result.showRouteTurns = source.optBoolean(
+                    "showRouteTurns", result.showRouteTurns);
             result.showLaneGuidance = source.optBoolean(
                     "showLaneGuidance", result.showLaneGuidance);
             result.showHudSpeedCameras = source.optBoolean(
@@ -370,8 +396,14 @@ public final class NavigationIntegrationConfig {
                     "laneGuidanceScalePercent", result.laneGuidanceScalePercent);
             result.cameraScalePercent = source.optInt(
                     "cameraScalePercent", result.cameraScalePercent);
+            result.cameraDirectionScalePercent = source.optInt(
+                    "cameraDirectionScalePercent", result.cameraDirectionScalePercent);
+            result.cameraDirectionOpacityPercent = source.optInt(
+                    "cameraDirectionOpacityPercent", result.cameraDirectionOpacityPercent);
             result.trafficLightScalePercent = source.optInt(
                     "trafficLightScalePercent", result.trafficLightScalePercent);
+            result.routeTurnScalePercent = source.optInt(
+                    "routeTurnScalePercent", result.routeTurnScalePercent);
             result.routeLabelScalePercent = source.optInt(
                     "routeLabelScalePercent", result.routeLabelScalePercent);
             result.roadEventScalePercent = source.optInt(
@@ -390,6 +422,8 @@ public final class NavigationIntegrationConfig {
                     "destinationLayerPriority", result.destinationLayerPriority);
             result.trafficLightLayerPriority = source.optInt(
                     "trafficLightLayerPriority", result.trafficLightLayerPriority);
+            result.routeTurnLayerPriority = source.optInt(
+                    "routeTurnLayerPriority", result.routeTurnLayerPriority);
             result.routeLabelLayerPriority = source.optInt(
                     "routeLabelLayerPriority", result.routeLabelLayerPriority);
             result.laneGuidanceLayerPriority = source.optInt(
@@ -453,6 +487,7 @@ public final class NavigationIntegrationConfig {
         void normalize() {
             cameraMode = enumText(cameraMode, "FOLLOW_ROUTE",
                     "FOLLOW_ROUTE", "NORTH_UP", "HEADING_UP", "FREE");
+            fixedZoomLevel = clamp(fixedZoomLevel, 2d, 21d, 16d);
             zoomDelta = clamp(zoomDelta, -8d, 8d, 0d);
             tiltDegrees = clamp(tiltDegrees, 0, 80);
             focusXPercent = clamp(focusXPercent, 0, 100);
@@ -461,7 +496,10 @@ public final class NavigationIntegrationConfig {
             cursorScalePercent = clamp(cursorScalePercent, 25, 300);
             laneGuidanceScalePercent = clamp(laneGuidanceScalePercent, 50, 250);
             cameraScalePercent = clamp(cameraScalePercent, 50, 250);
+            cameraDirectionScalePercent = clamp(cameraDirectionScalePercent, 25, 300);
+            cameraDirectionOpacityPercent = clamp(cameraDirectionOpacityPercent, 0, 100);
             trafficLightScalePercent = clamp(trafficLightScalePercent, 50, 250);
+            routeTurnScalePercent = clamp(routeTurnScalePercent, 50, 250);
             routeLabelScalePercent = clamp(routeLabelScalePercent, 50, 250);
             roadEventScalePercent = clamp(roadEventScalePercent, 50, 250);
             destinationScalePercent = clamp(destinationScalePercent, 50, 250);
@@ -470,6 +508,7 @@ public final class NavigationIntegrationConfig {
             routeLayerPriority = clamp(routeLayerPriority, 0, 100);
             destinationLayerPriority = clamp(destinationLayerPriority, 0, 100);
             trafficLightLayerPriority = clamp(trafficLightLayerPriority, 0, 100);
+            routeTurnLayerPriority = clamp(routeTurnLayerPriority, 0, 100);
             routeLabelLayerPriority = clamp(routeLabelLayerPriority, 0, 100);
             laneGuidanceLayerPriority = clamp(laneGuidanceLayerPriority, 0, 100);
             cursorLayerPriority = clamp(cursorLayerPriority, 0, 100);

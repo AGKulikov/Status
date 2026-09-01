@@ -80,7 +80,8 @@ public final class ShortcutActionPicker {
     public void showLong(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         LauncherShortcutStore.Shortcut value = shortcut.copy();
         String[] values = {"Без действия", "Приложение", "Готовая функция",
-                "Функция автомобиля", "Устройство умного дома / сценарий", "Android Intent"};
+                "Функция автомобиля", "Устройство умного дома / сценарий",
+                "Телефонный звонок", "Android Intent"};
         new AlertDialog.Builder(activity).setTitle("Долгое нажатие")
                 .setItems(values, (dialog, which) -> {
                     if (which == 0) {
@@ -100,7 +101,7 @@ public final class ShortcutActionPicker {
     private void chooseKind(@Nullable LauncherShortcutStore.Shortcut value,
                             @NonNull String title) {
         String[] values = {"Приложение", "Готовая функция", "Функция автомобиля",
-                "Устройство умного дома / сценарий", "Android Intent",
+                "Устройство умного дома / сценарий", "Телефонный звонок", "Android Intent",
                 "Информационная плитка (без нажатия)", "Разделитель"};
         new AlertDialog.Builder(activity).setTitle(title)
                 .setItems(values, (dialog, which) -> chooseKindIndex(value, which))
@@ -112,8 +113,9 @@ public final class ShortcutActionPicker {
         else if (which == 1) chooseBuiltin(value);
         else if (which == 2) chooseCarControl(value);
         else if (which == 3) chooseSmartHome(value);
-        else if (which == 4) editIntent(value);
-        else if (which == 5) chooseInformation(value);
+        else if (which == 4) editPhone(value);
+        else if (which == 5) editIntent(value);
+        else if (which == 6) chooseInformation(value);
         else chooseDivider(value);
     }
 
@@ -721,6 +723,49 @@ public final class ShortcutActionPicker {
                         value.packageName = packageName.getText().toString().trim();
                         if (existing == null) value.title = target;
                         value.icon = "power";
+                        value.iconColor = "#FFFFFFFF";
+                        value.stateBinding = null;
+                        save(value);
+                    }
+                }));
+        dialog.show();
+    }
+
+    private void editPhone(@Nullable LauncherShortcutStore.Shortcut existing) {
+        LauncherShortcutStore.Shortcut value = existing == null
+                ? new LauncherShortcutStore.Shortcut() : existing;
+        String currentNumber = longPress && value.hasLongAction
+                && value.longKind == LauncherShortcutStore.Kind.PHONE
+                ? value.longTarget
+                : value.kind == LauncherShortcutStore.Kind.PHONE ? value.target : "";
+        LinearLayout form = column();
+        EditText title = field("Имя или подпись", existing == null ? "" : value.title);
+        EditText number = field("Номер телефона", currentNumber);
+        number.setInputType(InputType.TYPE_CLASS_PHONE);
+        form.addView(title);
+        form.addView(number);
+        AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("Телефонный звонок")
+                .setView(form).setPositiveButton("Сохранить", null)
+                .setNegativeButton("Отмена", null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    String target = number.getText().toString().trim();
+                    if (target.isEmpty() || !target.matches(".*[0-9].*")) {
+                        number.setError("Укажите номер");
+                        return;
+                    }
+                    dialog.dismiss();
+                    if (longPress) {
+                        saveLong(value, LauncherShortcutStore.Kind.PHONE, target, "",
+                                CarControlCommand.Operation.TOGGLE, 0);
+                    } else {
+                        value.kind = LauncherShortcutStore.Kind.PHONE;
+                        value.target = target;
+                        value.packageName = "";
+                        String label = title.getText().toString().trim();
+                        value.title = label.isEmpty() ? target : label;
+                        value.icon = "phone";
+                        value.iconCustomized = false;
                         value.iconColor = "#FFFFFFFF";
                         value.stateBinding = null;
                         save(value);

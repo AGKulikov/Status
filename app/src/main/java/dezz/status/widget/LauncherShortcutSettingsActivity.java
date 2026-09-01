@@ -1734,6 +1734,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         switch (value.kind) {
             case APP: return longSuffix("Приложение · " + value.packageName, value);
             case RULE: return longSuffix("Действие устройства · " + value.target, value);
+            case PHONE: return longSuffix("Телефон · " + value.target, value);
             case INTENT: return longSuffix("Intent · " + value.target, value);
             case CAR: return longSuffix("Автомобиль · " + value.target + " · "
                     + carOperationLabel(value.command, value.commandValue), value);

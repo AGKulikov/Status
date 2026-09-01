@@ -160,7 +160,8 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresIntegrationHost(@NonNull Preferences preferences) {
-        return hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
+        return preferences.dimMenuPanelEnabled.get()
+                || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresIntegrationHost(
                 preferences.widgetEnabled.get(),
                 preferences.driverPanelEnabled.get(),
@@ -177,7 +178,8 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresHeadlessHost(@NonNull Preferences preferences) {
-        return hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
+        return preferences.dimMenuPanelEnabled.get()
+                || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresHeadlessHost(
                 preferences.driverPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
@@ -188,7 +190,9 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresAutomaticIntegrationHost(@NonNull Preferences preferences) {
-        return hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
+        return (preferences.dimMenuPanelEnabled.get()
+                && preferences.dimMenuPanelAutostart.get())
+                || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresAutomaticIntegrationHost(
                 preferences.widgetEnabled.get(),
                 preferences.driverPanelEnabled.get(),
@@ -201,7 +205,9 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresAutomaticHeadlessHost(@NonNull Preferences preferences) {
-        return hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
+        return (preferences.dimMenuPanelEnabled.get()
+                && preferences.dimMenuPanelAutostart.get())
+                || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresAutomaticHeadlessHost(
                 preferences.driverPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),

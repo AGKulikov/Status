@@ -122,6 +122,10 @@ public final class HudElementConfig {
                     options.put("arrowAnimation", true);
                     options.put("arrowLayout", "LEFT");
                     options.put("preferSourceImage", true);
+                    // The stock maneuver bitmap is authoritative. A guessed replacement can
+                    // communicate a different lane/exit geometry, so the card leaves the icon
+                    // area empty if Yandex has not supplied its bitmap yet.
+                    options.put("sourceImageOnly", true);
                     options.put("hideWhenInactive", true);
                     options.put("hideWhenEmpty", true);
                     options.put("showCardBackground", true);
@@ -131,6 +135,30 @@ public final class HudElementConfig {
                     options.put("roadBadgeColor", "#FF16A34A");
                     options.put("cardOpacityPercent", 94);
                     options.put("cardCornerRadiusPx", 18);
+                    options.put("cardBorderColor", "#00000000");
+                    options.put("cardBorderWidthPx", 0);
+                    options.put("paddingLeftPx", 10);
+                    options.put("paddingTopPx", 8);
+                    options.put("paddingRightPx", 10);
+                    options.put("paddingBottomPx", 8);
+                    options.put("arrowAreaPercent", 38);
+                    options.put("arrowTextGapPx", 6);
+                    options.put("arrowPaddingLeftPx", 3);
+                    options.put("arrowPaddingTopPx", 3);
+                    options.put("arrowPaddingRightPx", 3);
+                    options.put("arrowPaddingBottomPx", 3);
+                    options.put("sourceIconScalePercent", 100);
+                    options.put("textPaddingLeftPx", 0);
+                    options.put("textPaddingTopPx", 0);
+                    options.put("textPaddingRightPx", 0);
+                    options.put("textPaddingBottomPx", 0);
+                    options.put("distanceFontSizeSp", 34);
+                    options.put("directionFontSizeSp", 18);
+                    options.put("roadBadgeFontSizeSp", 17);
+                    options.put("distanceAreaPercent", 56);
+                    options.put("textRowGapPx", 2);
+                    options.put("roadBadgePaddingHorizontalPx", 5);
+                    options.put("roadBadgePaddingVerticalPx", 2);
                     break;
                 case NAV_LANES:
                     options.put("laneDistancePosition", "BOTTOM");
@@ -276,8 +304,68 @@ public final class HudElementConfig {
                 throw new IllegalStateException(impossible);
             }
         }
+        if (type == HudElementType.NAV_COMBINED) {
+            normalizeCombinedNavigationOptions();
+        }
         if (type == HudElementType.HORIZONTAL_GROUP) {
             HudHorizontalGroup.normalizeOptions(this);
+        }
+    }
+
+    private void normalizeCombinedNavigationOptions() {
+        try {
+            // The combined card is a faithful transport surface, never a guessed maneuver.
+            options.put("preferSourceImage", true);
+            options.put("sourceImageOnly", true);
+            options.put("cardOpacityPercent", clamp(
+                    options.optInt("cardOpacityPercent", 94), 0, 100));
+            options.put("cardCornerRadiusPx", clamp(
+                    options.optInt("cardCornerRadiusPx", 18), 0, 160));
+            options.put("cardBorderWidthPx", clamp(
+                    options.optInt("cardBorderWidthPx", 0), 0, 24));
+            options.put("paddingLeftPx", clamp(
+                    options.optInt("paddingLeftPx", 10), 0, 160));
+            options.put("paddingTopPx", clamp(
+                    options.optInt("paddingTopPx", 8), 0, 160));
+            options.put("paddingRightPx", clamp(
+                    options.optInt("paddingRightPx", 10), 0, 160));
+            options.put("paddingBottomPx", clamp(
+                    options.optInt("paddingBottomPx", 8), 0, 160));
+            options.put("arrowAreaPercent", clamp(
+                    options.optInt("arrowAreaPercent", 38), 10, 75));
+            options.put("arrowTextGapPx", clamp(
+                    options.optInt("arrowTextGapPx", 6), 0, 80));
+            for (String key : new String[]{"arrowPaddingLeftPx", "arrowPaddingTopPx",
+                    "arrowPaddingRightPx", "arrowPaddingBottomPx", "textPaddingLeftPx",
+                    "textPaddingTopPx", "textPaddingRightPx", "textPaddingBottomPx"}) {
+                options.put(key, clamp(options.optInt(key,
+                        key.startsWith("arrowPadding") ? 3 : 0), 0, 120));
+            }
+            options.put("sourceIconScalePercent", clamp(
+                    options.optInt("sourceIconScalePercent", 100), 25, 250));
+            options.put("distanceFontSizeSp", clamp(
+                    options.optInt("distanceFontSizeSp", 34), 8, 160));
+            options.put("directionFontSizeSp", clamp(
+                    options.optInt("directionFontSizeSp", 18), 8, 120));
+            options.put("roadBadgeFontSizeSp", clamp(
+                    options.optInt("roadBadgeFontSizeSp", 17), 8, 120));
+            options.put("distanceAreaPercent", clamp(
+                    options.optInt("distanceAreaPercent", 56), 20, 80));
+            options.put("textRowGapPx", clamp(
+                    options.optInt("textRowGapPx", 2), 0, 60));
+            options.put("roadBadgePaddingHorizontalPx", clamp(
+                    options.optInt("roadBadgePaddingHorizontalPx", 5), 0, 60));
+            options.put("roadBadgePaddingVerticalPx", clamp(
+                    options.optInt("roadBadgePaddingVerticalPx", 2), 0, 40));
+            options.put("cardColor", bounded(
+                    options.optString("cardColor", "#FF0758E8"), 32, "#FF0758E8"));
+            options.put("roadBadgeColor", bounded(
+                    options.optString("roadBadgeColor", "#FF16A34A"), 32, "#FF16A34A"));
+            options.put("cardBorderColor", bounded(
+                    options.optString("cardBorderColor", "#00000000"),
+                    32, "#00000000"));
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
         }
     }
 

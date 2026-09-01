@@ -485,6 +485,20 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField zoom = slider(form,
                 "Приближение: 0 — стандартное, + ближе, − дальше",
                 profile.zoomDelta, -8, 8, 0.25, "");
+        Switch fixedZoom = switchView(
+                "Фиксировать масштаб — не менять его от скорости",
+                profile.fixedZoomEnabled);
+        form.addView(fixedZoom, marginTop(4));
+        SliderField fixedZoomLevel = slider(form,
+                "Фиксированное увеличение карты",
+                profile.fixedZoomLevel, 2, 21, 0.25, "");
+        Runnable updateFixedZoomControl = () -> {
+            zoom.setEnabled(!fixedZoom.isChecked());
+            fixedZoomLevel.setEnabled(fixedZoom.isChecked());
+        };
+        fixedZoom.setOnCheckedChangeListener(
+                (button, checked) -> updateFixedZoomControl.run());
+        updateFixedZoomControl.run();
         SliderField tilt = slider(form, "Наклон карты: 0° — сверху, 60° — перспектива",
                 profile.tiltDegrees, 0, 80, 1, "°");
         SliderField focusX = slider(form, "Автомобиль по горизонтали",
@@ -511,6 +525,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showTraffic = switchView("Пробки на остальных дорогах", profile.showTraffic);
         Switch showTrafficLights = switchView(
                 "Светофоры с отсчётом — отдельный слой", profile.showTrafficLights);
+        Switch showRouteTurns = switchView(
+                "Стрелки поворотов прямо на линии маршрута", profile.showRouteTurns);
         Switch showLaneGuidance = switchView(
                 "Подсказки по полосам — слой на маршруте", profile.showLaneGuidance);
         Switch showHudSpeedCameras = switchView(
@@ -528,7 +544,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Только дороги — прозрачный фон", profile.roadsOnly);
         for (Switch control : new Switch[]{showRoute, destination,
                 showRouteTraffic, showTraffic, showTrafficLights,
-                showLaneGuidance, showHudSpeedCameras,
+                showRouteTurns, showLaneGuidance, showHudSpeedCameras,
                 showLabels, routeStreetLabelsOnly, showPois, showBuildings,
                 showParks, showWater,
                 showModels, showCursor, roadsOnly}) {
@@ -548,11 +564,20 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Размер знаков движения по полосам",
                 profile.laneGuidanceScalePercent, 50, 250, 5, " %");
         SliderField cameraScale = slider(form,
-                "Размер знаков камер и маленьких обозначений",
+                "Размер единых знаков камер",
                 profile.cameraScalePercent, 50, 250, 5, " %");
+        SliderField cameraDirectionScale = slider(form,
+                "Размер полупрозрачного направления камер",
+                profile.cameraDirectionScalePercent, 25, 300, 5, " %");
+        SliderField cameraDirectionOpacity = slider(form,
+                "Прозрачность направления камер",
+                profile.cameraDirectionOpacityPercent, 0, 100, 5, " %");
         SliderField trafficLightScale = slider(form,
                 "Размер светофоров и плашек секунд",
                 profile.trafficLightScalePercent, 50, 250, 5, " %");
+        SliderField routeTurnScale = slider(form,
+                "Размер стрелок поворотов на маршруте",
+                profile.routeTurnScalePercent, 50, 250, 5, " %");
         SliderField routeLabelScale = slider(form,
                 "Размер названий улиц на маршруте",
                 profile.routeLabelScalePercent, 50, 250, 5, " %");
@@ -604,6 +629,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightLayerPriority = slider(form,
                 "Светофоры и секунды", profile.trafficLightLayerPriority,
                 0, 100, 1, "");
+        SliderField routeTurnLayerPriority = slider(form,
+                "Стрелки поворотов на маршруте", profile.routeTurnLayerPriority,
+                0, 100, 1, "");
         SliderField routeLabelLayerPriority = slider(form,
                 "Названия улиц на маршруте", profile.routeLabelLayerPriority,
                 0, 100, 1, "");
@@ -616,7 +644,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
                 destinationLayerPriority, trafficLightLayerPriority,
-                routeLabelLayerPriority, laneGuidanceLayerPriority, cursorLayerPriority};
+                routeTurnLayerPriority, routeLabelLayerPriority,
+                laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
             for (SliderField field : layerPriorityControls) {
                 field.setEnabled(manualLayerPriorities.isChecked());
@@ -673,6 +702,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.cameraMode = navigationCameraModeValue(
                                 cameraMode.getSelectedItemPosition());
                         profile.zoomDelta = zoom.value();
+                        profile.fixedZoomEnabled = fixedZoom.isChecked();
+                        profile.fixedZoomLevel = fixedZoomLevel.value();
                         profile.tiltDegrees = tilt.intValue();
                         profile.focusXPercent = focusX.intValue();
                         profile.focusYPercent = focusY.intValue();
@@ -684,6 +715,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showRouteTraffic = showRouteTraffic.isChecked();
                         profile.showTraffic = showTraffic.isChecked();
                         profile.showTrafficLights = showTrafficLights.isChecked();
+                        profile.showRouteTurns = showRouteTurns.isChecked();
                         profile.showLaneGuidance = showLaneGuidance.isChecked();
                         profile.showHudSpeedCameras = showHudSpeedCameras.isChecked();
                         profile.showLabels = showLabels.isChecked();
@@ -698,7 +730,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.cursorScalePercent = cursorScale.intValue();
                         profile.laneGuidanceScalePercent = laneGuidanceScale.intValue();
                         profile.cameraScalePercent = cameraScale.intValue();
+                        profile.cameraDirectionScalePercent =
+                                cameraDirectionScale.intValue();
+                        profile.cameraDirectionOpacityPercent =
+                                cameraDirectionOpacity.intValue();
                         profile.trafficLightScalePercent = trafficLightScale.intValue();
+                        profile.routeTurnScalePercent = routeTurnScale.intValue();
                         profile.routeLabelScalePercent = routeLabelScale.intValue();
                         profile.roadEventScalePercent = roadEventScale.intValue();
                         profile.destinationScalePercent = destinationScale.intValue();
@@ -720,6 +757,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                                 destinationLayerPriority.intValue();
                         profile.trafficLightLayerPriority =
                                 trafficLightLayerPriority.intValue();
+                        profile.routeTurnLayerPriority =
+                                routeTurnLayerPriority.intValue();
                         profile.routeLabelLayerPriority = routeLabelLayerPriority.intValue();
                         profile.laneGuidanceLayerPriority =
                                 laneGuidanceLayerPriority.intValue();
@@ -1042,12 +1081,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.options.optString("arrowLayout", "LEFT"));
                 break;
             case NAV_COMBINED:
-                visualSwitch(form, controls, "bool:arrowAnimation",
-                        "Анимация стрелки",
-                        item.options.optBoolean("arrowAnimation", true));
-                visualSwitch(form, controls, "bool:preferSourceImage",
-                        "Использовать штатную графику манёвра",
-                        item.options.optBoolean("preferSourceImage", true));
+                form.addView(text("Знак передаётся из Яндекс Навигатора как есть. "
+                        + "Собственная стрелка для этой карточки не рисуется.",
+                        12, 0xFF95A0AF), marginTop(5));
                 visualSpinner(form, controls, "string:arrowLayout",
                         "Положение стрелки", new String[]{"LEFT", "RIGHT", "TOP", "BOTTOM"},
                         item.options.optString("arrowLayout", "LEFT"));
@@ -1072,6 +1108,79 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         "Скругление карточки",
                         item.options.optInt("cardCornerRadiusPx", 18),
                         0, 80, 1, " px"));
+                visualColor(form, controls, item, "cardBorderColor",
+                        "Цвет рамки карточки ARGB", "#00000000");
+                controls.put("int:cardBorderWidthPx", slider(form,
+                        "Толщина рамки карточки",
+                        item.options.optInt("cardBorderWidthPx", 0),
+                        0, 24, 1, " px"));
+
+                form.addView(section("Компоновка карточки"), marginTop(14));
+                controls.put("int:arrowAreaPercent", slider(form,
+                        "Доля места для исходного знака",
+                        item.options.optInt("arrowAreaPercent", 38),
+                        10, 75, 1, " %"));
+                controls.put("int:sourceIconScalePercent", slider(form,
+                        "Размер исходного знака",
+                        item.options.optInt("sourceIconScalePercent", 100),
+                        25, 250, 5, " %"));
+                controls.put("int:arrowTextGapPx", slider(form,
+                        "Расстояние между знаком и текстом",
+                        item.options.optInt("arrowTextGapPx", 6),
+                        0, 80, 1, " px"));
+                controls.put("int:paddingLeftPx", slider(form,
+                        "Внутренний отступ карточки слева",
+                        item.options.optInt("paddingLeftPx", 10),
+                        0, 160, 1, " px"));
+                controls.put("int:paddingTopPx", slider(form,
+                        "Внутренний отступ карточки сверху",
+                        item.options.optInt("paddingTopPx", 8),
+                        0, 160, 1, " px"));
+                controls.put("int:paddingRightPx", slider(form,
+                        "Внутренний отступ карточки справа",
+                        item.options.optInt("paddingRightPx", 10),
+                        0, 160, 1, " px"));
+                controls.put("int:paddingBottomPx", slider(form,
+                        "Внутренний отступ карточки снизу",
+                        item.options.optInt("paddingBottomPx", 8),
+                        0, 160, 1, " px"));
+
+                form.addView(section("Отступы исходного знака"), marginTop(14));
+                addCombinedPaddingControls(form, controls, item, "arrowPadding",
+                        3, 120);
+                form.addView(section("Отступы текстового блока"), marginTop(14));
+                addCombinedPaddingControls(form, controls, item, "textPadding",
+                        0, 120);
+
+                form.addView(section("Шрифты и строки"), marginTop(14));
+                controls.put("int:distanceFontSizeSp", slider(form,
+                        "Размер шрифта расстояния",
+                        item.options.optInt("distanceFontSizeSp", item.fontSizeSp),
+                        8, 160, 1, " sp"));
+                controls.put("int:roadBadgeFontSizeSp", slider(form,
+                        "Размер шрифта номера дороги",
+                        item.options.optInt("roadBadgeFontSizeSp", 17),
+                        8, 120, 1, " sp"));
+                controls.put("int:directionFontSizeSp", slider(form,
+                        "Размер шрифта улицы / направления",
+                        item.options.optInt("directionFontSizeSp", 18),
+                        8, 120, 1, " sp"));
+                controls.put("int:distanceAreaPercent", slider(form,
+                        "Высота строки расстояния",
+                        item.options.optInt("distanceAreaPercent", 56),
+                        20, 80, 1, " %"));
+                controls.put("int:textRowGapPx", slider(form,
+                        "Интервал между строками",
+                        item.options.optInt("textRowGapPx", 2),
+                        0, 60, 1, " px"));
+                controls.put("int:roadBadgePaddingHorizontalPx", slider(form,
+                        "Отступ номера дороги по горизонтали",
+                        item.options.optInt("roadBadgePaddingHorizontalPx", 5),
+                        0, 60, 1, " px"));
+                controls.put("int:roadBadgePaddingVerticalPx", slider(form,
+                        "Отступ номера дороги по вертикали",
+                        item.options.optInt("roadBadgePaddingVerticalPx", 2),
+                        0, 40, 1, " px"));
                 break;
             case NAV_LANES:
                 visualSwitch(form, controls, "bool:preferSourceImage",
@@ -1154,6 +1263,18 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch control = switchView(title, checked);
         form.addView(control, marginTop(4));
         controls.put(key, control);
+    }
+
+    private void addCombinedPaddingControls(@NonNull LinearLayout form,
+            @NonNull Map<String, Object> controls, @NonNull HudElementConfig item,
+            @NonNull String prefix, int fallback, int maximum) {
+        String[] keys = {"LeftPx", "TopPx", "RightPx", "BottomPx"};
+        String[] labels = {"Слева", "Сверху", "Справа", "Снизу"};
+        for (int index = 0; index < keys.length; index++) {
+            String key = prefix + keys[index];
+            controls.put("int:" + key, slider(form, labels[index],
+                    item.options.optInt(key, fallback), 0, maximum, 1, " px"));
+        }
     }
 
     private void visualInt(LinearLayout form, Map<String, Object> controls, String key,

@@ -1,7 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.instrument;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -18,6 +21,7 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -29,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.navigation.NavigationBridgeStateStore;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
 import dezz.status.widget.navigation.NavigationRouteGeometryV2;
@@ -83,6 +88,14 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @NonNull private final AtomicBoolean navigationWakePosted = new AtomicBoolean();
     @NonNull private final NavigationBridgeStateStore.Listener navigationListener =
             this::onNavigationChanged;
+    @NonNull private final BroadcastReceiver navigationGraphicReceiver =
+            new BroadcastReceiver() {
+                @Override public void onReceive(Context context, Intent intent) {
+                    if (NavigationDataRepository.ACTION_UPDATED.equals(intent.getAction())) {
+                        onNavigationChanged();
+                    }
+                }
+            };
     @NonNull private final Runnable navigationWake = () -> {
         navigationWakePosted.set(false);
         refreshNavigationSnapshot();
@@ -90,6 +103,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @NonNull private final Runnable navigationExpiry = () -> {
         navigationSnapshot = null;
         navigationGeometry = null;
+        navigationManeuverImage = null;
         invalidate();
     };
     @NonNull private final Runnable clockWake = () -> {
@@ -105,6 +119,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     private boolean windowVisible;
     private boolean telemetryAcquired;
     private boolean navigationAcquired;
+    private boolean navigationGraphicReceiverRegistered;
     private boolean frameCallbackPosted;
     private long lastFrameNanos;
     private long lastGeneration = Long.MIN_VALUE;
@@ -113,6 +128,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @Nullable private InstrumentElementConfig dragging;
     @Nullable private NavigationSnapshotV2 navigationSnapshot;
     @Nullable private NavigationRouteGeometryV2 navigationGeometry;
+    /** Untouched maneuver graphic from Yandex/MConfig; never synthesized in this view. */
+    @Nullable private Bitmap navigationManeuverImage;
     private boolean resizing;
     private float touchStartX;
     private float touchStartY;
@@ -279,12 +296,26 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         if (needed && !navigationAcquired) {
             navigationAcquired = true;
             NavigationBridgeStateStore.addListener(navigationListener);
+            try {
+                ContextCompat.registerReceiver(getContext(), navigationGraphicReceiver,
+                        new IntentFilter(NavigationDataRepository.ACTION_UPDATED),
+                        ContextCompat.RECEIVER_NOT_EXPORTED);
+                navigationGraphicReceiverRegistered = true;
+            } catch (RuntimeException ignored) {
+                navigationGraphicReceiverRegistered = false;
+            }
             refreshNavigationSnapshot();
         } else if (!needed && navigationAcquired) {
             navigationAcquired = false;
             NavigationBridgeStateStore.removeListener(navigationListener);
+            if (navigationGraphicReceiverRegistered) {
+                try { getContext().unregisterReceiver(navigationGraphicReceiver); }
+                catch (RuntimeException ignored) { }
+                navigationGraphicReceiverRegistered = false;
+            }
             navigationSnapshot = null;
             navigationGeometry = null;
+            navigationManeuverImage = null;
             removeCallbacks(navigationWake);
             removeCallbacks(navigationExpiry);
             navigationWakePosted.set(false);
@@ -306,6 +337,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         NavigationRouteGeometryV2 geometry = NavigationBridgeStateStore.routeGeometry();
         navigationGeometry = accepted != null && geometry != null
                 && geometry.routeEpoch == accepted.routeEpoch ? geometry : null;
+        navigationManeuverImage = accepted == null ? null
+                : NavigationDataRepository.readFreshManeuverImage(getContext());
         if (accepted != null) {
             long delay = accepted.sourceTimestampMs + NAVIGATION_FRESH_MS - now;
             postDelayed(navigationExpiry, Math.max(1L, delay));
@@ -993,57 +1026,141 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         InstrumentElementConfig element = runtime.config;
         int alpha = Math.round(255f * element.opacityPercent / 100f);
         if (option(element, "showFace", true)) {
-            float corner = Math.min(bounds.width(), bounds.height()) * .16f;
+            int faceColor = navigationColor(element.options.optString(
+                    "faceColor", "#FF15171B"), 0xFF15171B);
+            int faceOpacity = Math.max(0, Math.min(100,
+                    element.options.optInt("faceOpacityPercent", 93)));
+            float corner = Math.min(Math.min(bounds.width(), bounds.height()) * .5f,
+                    Math.max(0f, element.options.optInt("faceCornerRadiusPx", 18)));
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(withAlpha(0xFF15171B, Math.min(alpha, 238)));
+            paint.setColor(withAlpha(faceColor, Math.round(
+                    Color.alpha(faceColor) * faceOpacity / 100f * alpha / 255f)));
             canvas.drawRoundRect(bounds, corner, corner, paint);
+            float borderWidth = Math.max(0f,
+                    element.options.optInt("faceBorderWidthPx", 0));
+            if (borderWidth > 0f) {
+                int borderColor = navigationColor(element.options.optString(
+                        "faceBorderColor", "#00000000"), 0x00000000);
+                rect.set(bounds);
+                rect.inset(borderWidth * .5f, borderWidth * .5f);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(borderWidth);
+                paint.setColor(withAlpha(borderColor, Math.round(
+                        Color.alpha(borderColor) * alpha / 255f)));
+                canvas.drawRoundRect(rect, corner, corner, paint);
+            }
         }
 
         boolean showDistance = option(element, "showDistance", true);
         boolean showEta = option(element, "showEta", true);
         boolean showDuration = option(element, "showDuration", true);
         boolean showProgress = option(element, "showRouteProgress", true);
+        RectF content = insetSides(bounds,
+                element.options.optInt("contentPaddingLeftPx", 14),
+                element.options.optInt("contentPaddingTopPx", 10),
+                element.options.optInt("contentPaddingRightPx", 14),
+                element.options.optInt("contentPaddingBottomPx", 10));
+        if (content.isEmpty()) return;
+
+        boolean showIcon = option(element, "showManeuverIcon", true);
+        boolean sourceIconAvailable = navigationManeuverImage != null
+                && !navigationManeuverImage.isRecycled();
+        boolean reserveIcon = option(element, "reserveManeuverIconSpace", true);
+        RectF metricsArea = new RectF(content);
+        if (showIcon && (sourceIconAvailable || reserveIcon)) {
+            float iconWidth = content.width() * Math.max(5, Math.min(40,
+                    element.options.optInt("maneuverIconAreaPercent", 15))) / 100f;
+            RectF iconArea = new RectF(content.left, content.top,
+                    Math.min(content.right, content.left + iconWidth), content.bottom);
+            int iconBackground = navigationColor(element.options.optString(
+                    "maneuverIconBackgroundColor", "#FF2B2E35"), 0xFF2B2E35);
+            int iconBackgroundOpacity = Math.max(0, Math.min(100,
+                    element.options.optInt("maneuverIconBackgroundOpacityPercent", 100)));
+            float iconCorner = Math.min(Math.min(iconArea.width(), iconArea.height()) * .5f,
+                    Math.max(0f, element.options.optInt("maneuverIconCornerRadiusPx", 12)));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(iconBackground, Math.round(
+                    Color.alpha(iconBackground) * iconBackgroundOpacity / 100f
+                            * alpha / 255f)));
+            canvas.drawRoundRect(iconArea, iconCorner, iconCorner, paint);
+            if (sourceIconAvailable) {
+                RectF iconTarget = insetSides(iconArea,
+                        element.options.optInt("maneuverIconPaddingLeftPx", 5),
+                        element.options.optInt("maneuverIconPaddingTopPx", 5),
+                        element.options.optInt("maneuverIconPaddingRightPx", 5),
+                        element.options.optInt("maneuverIconPaddingBottomPx", 5));
+                float iconScale = Math.max(25, Math.min(250,
+                        element.options.optInt("maneuverIconScalePercent", 100))) / 100f;
+                iconTarget = scaleAroundCenter(iconTarget, iconScale, iconArea);
+                drawSourceBitmap(canvas, navigationManeuverImage, iconTarget, alpha);
+            }
+            metricsArea.left = Math.min(metricsArea.right,
+                    iconArea.right + Math.max(0,
+                            element.options.optInt("maneuverIconGapPx", 10)));
+        }
+
+        RectF valuesArea = new RectF(metricsArea);
+        if (showProgress) {
+            float barHeight = Math.max(2f, Math.min(metricsArea.height(),
+                    element.options.optInt("progressBarHeightPx", 14)));
+            float barGap = Math.max(0f,
+                    element.options.optInt("progressBarTopGapPx", 9));
+            routeBarRect.set(metricsArea.left,
+                    Math.max(metricsArea.top, metricsArea.bottom - barHeight),
+                    metricsArea.right, metricsArea.bottom);
+            valuesArea.bottom = Math.max(valuesArea.top, routeBarRect.top - barGap);
+        }
+
         int metricCount = (showDistance ? 1 : 0) + (showEta ? 1 : 0)
                 + (showDuration ? 1 : 0);
-        if (metricCount > 0) {
-            float left = bounds.left + bounds.width() * .055f;
-            float width = bounds.width() * .89f;
-            float cellWidth = width / metricCount;
-            float baselineCenter = bounds.top + bounds.height() * (showProgress ? .41f : .53f);
-            float maximumTextSize = bounds.height() * (metricCount == 1 ? .38f : .30f);
-            float x = left + cellWidth * .5f;
+        if (metricCount > 0 && !valuesArea.isEmpty()) {
+            float metricGap = Math.max(0f, element.options.optInt("metricGapPx", 10));
+            float totalGap = metricGap * Math.max(0, metricCount - 1);
+            float cellWidth = Math.max(1f, (valuesArea.width() - totalGap) / metricCount);
+            float vertical = Math.max(0, Math.min(100,
+                    element.options.optInt("metricsVerticalPercent", 44))) / 100f;
+            float baselineCenter = valuesArea.top + valuesArea.height() * vertical;
+            float x = valuesArea.left + cellWidth * .5f;
             if (showDistance) {
                 drawNavigationMetric(canvas, runtime.navigationRemainingDistance,
-                        x, baselineCenter, cellWidth * .86f, maximumTextSize,
+                        x, baselineCenter, cellWidth,
+                        element.options.optInt("distanceTextSizeSp", 25),
+                        valuesArea.height(),
                         element, alpha);
-                x += cellWidth;
+                x += cellWidth + metricGap;
             }
             if (showEta) {
                 drawNavigationMetric(canvas, runtime.navigationArrival,
-                        x, baselineCenter, cellWidth * .86f, maximumTextSize,
+                        x, baselineCenter, cellWidth,
+                        element.options.optInt("arrivalTextSizeSp", 25),
+                        valuesArea.height(),
                         element, alpha);
-                x += cellWidth;
+                x += cellWidth + metricGap;
             }
             if (showDuration) {
                 drawNavigationMetric(canvas, runtime.navigationDuration,
-                        x, baselineCenter, cellWidth * .86f, maximumTextSize,
+                        x, baselineCenter, cellWidth,
+                        element.options.optInt("durationTextSizeSp", 25),
+                        valuesArea.height(),
                         element, alpha);
             }
         }
         if (showProgress) {
-            drawNavigationRouteProgress(canvas, runtime, bounds, alpha);
+            drawNavigationRouteProgress(canvas, runtime, routeBarRect, alpha, element);
         }
     }
 
     private void drawNavigationMetric(@NonNull Canvas canvas, @NonNull String raw,
                                       float centerX, float centerY, float maximumWidth,
-                                      float maximumTextSize,
+                                      int requestedTextSizeSp, float maximumHeight,
                                       @NonNull InstrumentElementConfig element, int alpha) {
         String value = raw.isEmpty() ? "—" : raw;
         paint.setStyle(Paint.Style.FILL);
         paint.setTypeface(digitalTypeface(element.style, true));
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(Math.max(8f, maximumTextSize));
+        float requested = Math.max(8f, requestedTextSizeSp
+                * getResources().getDisplayMetrics().scaledDensity);
+        paint.setTextSize(Math.min(requested, Math.max(8f, maximumHeight * .82f)));
         float measured = paint.measureText(value);
         if (measured > maximumWidth && measured > 0f) {
             paint.setTextSize(Math.max(8f, paint.getTextSize() * maximumWidth / measured));
@@ -1056,13 +1173,12 @@ public final class InstrumentClusterView extends View implements Choreographer.F
 
     private void drawNavigationRouteProgress(@NonNull Canvas canvas,
                                              @NonNull RuntimeElement runtime,
-                                             @NonNull RectF bounds, int alpha) {
-        float horizontalInset = bounds.width() * .075f;
-        float top = bounds.top + bounds.height() * .70f;
-        float bottom = bounds.top + bounds.height() * .82f;
-        routeBarRect.set(bounds.left + horizontalInset, top,
-                bounds.right - horizontalInset, bottom);
-        float radius = routeBarRect.height() * .5f;
+                                             @NonNull RectF bounds, int alpha,
+                                             @NonNull InstrumentElementConfig element) {
+        if (bounds.isEmpty()) return;
+        routeBarRect.set(bounds);
+        float radius = Math.min(routeBarRect.height() * .5f, Math.max(0f,
+                element.options.optInt("progressBarCornerRadiusPx", 7)));
         int unknownColor = trafficColor("UNKNOWN", navigationProfile);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(withAlpha(unknownColor, Math.min(alpha, 185)));
@@ -1103,8 +1219,10 @@ public final class InstrumentClusterView extends View implements Choreographer.F
 
         if (!Float.isFinite(progress)) return;
         float markerX = routeBarRect.left + routeBarRect.width() * progress;
-        float markerWidth = Math.max(8f, bounds.height() * .075f);
-        float markerHeight = Math.max(10f, bounds.height() * .15f);
+        float markerScale = Math.max(25, Math.min(250,
+                element.options.optInt("progressMarkerScalePercent", 100))) / 100f;
+        float markerWidth = Math.max(8f, routeBarRect.height() * 1.05f) * markerScale;
+        float markerHeight = Math.max(10f, routeBarRect.height() * 1.7f) * markerScale;
         markerX = Math.max(routeBarRect.left + markerWidth * .45f,
                 Math.min(routeBarRect.right - markerWidth * .55f, markerX));
         float markerY = routeBarRect.centerY();
@@ -1126,6 +1244,48 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 0xFFFFC400), alpha));
         canvas.drawPath(routeProgressPath, paint);
         paint.setStrokeJoin(Paint.Join.MITER);
+    }
+
+    private void drawSourceBitmap(@NonNull Canvas canvas, @NonNull Bitmap bitmap,
+                                  @NonNull RectF bounds, int alpha) {
+        if (bounds.isEmpty() || bitmap.isRecycled()
+                || bitmap.getWidth() <= 0 || bitmap.getHeight() <= 0) return;
+        float scale = Math.min(bounds.width() / bitmap.getWidth(),
+                bounds.height() / bitmap.getHeight());
+        float width = bitmap.getWidth() * scale;
+        float height = bitmap.getHeight() * scale;
+        RectF target = new RectF(bounds.centerX() - width * .5f,
+                bounds.centerY() - height * .5f,
+                bounds.centerX() + width * .5f,
+                bounds.centerY() + height * .5f);
+        paint.setAlpha(alpha);
+        paint.setFilterBitmap(true);
+        canvas.drawBitmap(bitmap, null, target, paint);
+        paint.setAlpha(255);
+    }
+
+    @NonNull
+    private static RectF insetSides(@NonNull RectF source, float left, float top,
+                                    float right, float bottom) {
+        return new RectF(source.left + Math.max(0f, left),
+                source.top + Math.max(0f, top),
+                source.right - Math.max(0f, right),
+                source.bottom - Math.max(0f, bottom));
+    }
+
+    @NonNull
+    private static RectF scaleAroundCenter(@NonNull RectF source, float factor,
+                                           @NonNull RectF limit) {
+        if (source.isEmpty()) return new RectF(source);
+        float safe = Math.max(.05f, factor);
+        float halfWidth = source.width() * safe * .5f;
+        float halfHeight = source.height() * safe * .5f;
+        RectF result = new RectF(source.centerX() - halfWidth,
+                source.centerY() - halfHeight,
+                source.centerX() + halfWidth,
+                source.centerY() + halfHeight);
+        if (!result.intersect(limit)) return new RectF();
+        return result;
     }
 
     private float infoValue(@NonNull InstrumentInfoMetric metric) {

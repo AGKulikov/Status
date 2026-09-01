@@ -174,6 +174,15 @@ public final class HudNavigationState {
     public static HudNavigationState fromBridge(@NonNull NavigationSnapshotV2 source,
             @Nullable NavigationRouteGeometryV2 geometry,
             @Nullable HudNavigationState previous) {
+        return fromBridge(source, geometry, previous, null);
+    }
+
+    /** Direct route values plus the untouched maneuver bitmap supplied by Yandex/MConfig. */
+    @NonNull
+    public static HudNavigationState fromBridge(@NonNull NavigationSnapshotV2 source,
+            @Nullable NavigationRouteGeometryV2 geometry,
+            @Nullable HudNavigationState previous,
+            @Nullable Bitmap sourceManeuverImage) {
         boolean previousDirect = previous != null && previous.direct;
         boolean routeActive = source.routeActive;
         List<Lane> lanes = previousDirect && previous.routeActive && routeActive
@@ -215,7 +224,8 @@ public final class HudNavigationState {
                 first == null ? "" : first.color, first == null ? "" : first.countdown,
                 first == null ? "" : first.arrow,
                 routeActive && !lights.isEmpty(), lights, runs, progress,
-                null, null, null, null, source.lanesJson, source.trafficLightsJson,
+                routeActive ? sourceManeuverImage : null,
+                null, null, null, source.lanesJson, source.trafficLightsJson,
                 routeActive ? geometry : null);
     }
 

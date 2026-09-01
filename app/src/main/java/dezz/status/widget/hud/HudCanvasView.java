@@ -414,11 +414,16 @@ public final class HudCanvasView extends View {
 
     private void drawManeuver(Canvas canvas, HudElementConfig item, RectF bounds, int color) {
         HudNavigationState nav = data.navigation();
-        if (item.options.optBoolean("preferSourceImage", true)
+        boolean exactSource = item.type == HudElementType.NAV_COMBINED;
+        if ((exactSource || item.options.optBoolean("preferSourceImage", true))
                 && nav != null && nav.maneuverImage != null) {
             drawBitmap(canvas, nav.maneuverImage, bounds);
             return;
         }
+        // Combined cards default to the exact source graphic. A guessed vector can describe the
+        // wrong fork or exit, so live mode leaves the slot empty until Yandex supplies a bitmap.
+        // The editor keeps a placeholder so its geometry remains configurable.
+        if (!editor && (exactSource || item.options.optBoolean("sourceImageOnly", false))) return;
         String hint = nav == null ? "" : (nav.maneuverTitle + " " + nav.maneuverText)
                 .toLowerCase(Locale.ROOT);
         HudNavigationVisuals.Maneuver visual = HudNavigationVisuals.maneuver(
@@ -641,34 +646,68 @@ public final class HudCanvasView extends View {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(withAlpha(card, alpha));
             canvas.drawRoundRect(bounds, radius, radius, paint);
+            float borderWidth = Math.max(0f,
+                    item.options.optInt("cardBorderWidthPx", 0) * scale);
+            if (borderWidth > 0f) {
+                int border = optionColor(item, "cardBorderColor", 0x00000000);
+                RectF borderBounds = inset(bounds, borderWidth * .5f);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(borderWidth);
+                paint.setColor(withAlpha(border, Math.round(
+                        Color.alpha(border) * item.brightness / 100f)));
+                canvas.drawRoundRect(borderBounds, radius, radius, paint);
+                paint.setStyle(Paint.Style.FILL);
+            }
         }
 
-        float padding = Math.max(3f, 5f * scale);
-        RectF content = inset(bounds, padding);
+        RectF content = insetSides(bounds,
+                item.options.optInt("paddingLeftPx", 10) * scale,
+                item.options.optInt("paddingTopPx", 8) * scale,
+                item.options.optInt("paddingRightPx", 10) * scale,
+                item.options.optInt("paddingBottomPx", 8) * scale);
+        if (content.isEmpty()) return;
         String layout = item.options.optString("arrowLayout", "LEFT");
         RectF arrow = new RectF(content);
         RectF text = new RectF(content);
+        float arrowFraction = clamp(item.options.optInt("arrowAreaPercent", 38),
+                10, 75) / 100f;
+        float gap = Math.max(0f, item.options.optInt("arrowTextGapPx", 6) * scale);
         if ("TOP".equals(layout) || "BOTTOM".equals(layout)) {
-            float split = content.height() * .56f;
+            float split = content.height() * arrowFraction;
             if ("TOP".equals(layout)) {
-                arrow.bottom = arrow.top + split;
-                text.top = arrow.bottom;
+                arrow.bottom = Math.max(arrow.top, arrow.top + split - gap * .5f);
+                text.top = Math.min(text.bottom, arrow.top + split + gap * .5f);
             } else {
-                text.bottom = text.top + content.height() - split;
-                arrow.top = text.bottom;
+                text.bottom = Math.max(text.top, text.bottom - split - gap * .5f);
+                arrow.top = Math.min(arrow.bottom, content.bottom - split + gap * .5f);
             }
         } else {
-            float split = content.width() * .38f;
+            float split = content.width() * arrowFraction;
             if ("RIGHT".equals(layout)) {
-                text.right = text.left + content.width() - split;
-                arrow.left = text.right;
+                text.right = Math.max(text.left, content.right - split - gap * .5f);
+                arrow.left = Math.min(arrow.right, content.right - split + gap * .5f);
             } else {
-                arrow.right = arrow.left + split;
-                text.left = arrow.right;
+                arrow.right = Math.max(arrow.left, content.left + split - gap * .5f);
+                text.left = Math.min(text.right, content.left + split + gap * .5f);
             }
         }
-        drawManeuver(canvas, item, inset(arrow, Math.max(1f, scale * 3f)), color);
-        drawManeuverCardText(canvas, item, text, color, unitColor, scale);
+        RectF arrowContent = insetSides(arrow,
+                item.options.optInt("arrowPaddingLeftPx", 3) * scale,
+                item.options.optInt("arrowPaddingTopPx", 3) * scale,
+                item.options.optInt("arrowPaddingRightPx", 3) * scale,
+                item.options.optInt("arrowPaddingBottomPx", 3) * scale);
+        float iconScale = clamp(item.options.optInt("sourceIconScalePercent", 100),
+                25, 250) / 100f;
+        arrowContent = scaleAroundCenter(arrowContent, iconScale, content);
+        RectF textContent = insetSides(text,
+                item.options.optInt("textPaddingLeftPx", 0) * scale,
+                item.options.optInt("textPaddingTopPx", 0) * scale,
+                item.options.optInt("textPaddingRightPx", 0) * scale,
+                item.options.optInt("textPaddingBottomPx", 0) * scale);
+        if (!arrowContent.isEmpty()) drawManeuver(canvas, item, arrowContent, color);
+        if (!textContent.isEmpty()) {
+            drawManeuverCardText(canvas, item, textContent, color, unitColor, scale);
+        }
     }
 
     /** Draws Navigator's information card without coupling it to the native map Surface. */
@@ -688,37 +727,54 @@ public final class HudCanvasView extends View {
         if (!showDirection) direction = "";
         if (sameCardText(direction, roadBadge)) direction = "";
 
-        float distanceHeight = bounds.height() * .56f;
+        float distanceHeight = bounds.height() * clamp(
+                item.options.optInt("distanceAreaPercent", 56), 20, 80) / 100f;
+        float rowGap = Math.max(0f, item.options.optInt("textRowGapPx", 2) * scale);
         RectF distanceBounds = new RectF(bounds.left, bounds.top,
-                bounds.right, bounds.top + distanceHeight);
-        RectF detailBounds = new RectF(bounds.left, distanceBounds.bottom,
+                bounds.right, Math.max(bounds.top, bounds.top + distanceHeight - rowGap * .5f));
+        RectF detailBounds = new RectF(bounds.left,
+                Math.min(bounds.bottom, bounds.top + distanceHeight + rowGap * .5f),
                 bounds.right, bounds.bottom);
-        float distanceSize = Math.max(10f, Math.min(item.fontSizeSp * scale,
+        float distanceSize = Math.max(8f, Math.min(
+                item.options.optInt("distanceFontSizeSp", item.fontSizeSp) * scale,
                 distanceBounds.height() * .72f));
-        float detailSize = Math.max(8f, Math.min(item.fontSizeSp * scale * .52f,
+        float directionSize = Math.max(8f, Math.min(
+                item.options.optInt("directionFontSizeSp",
+                        Math.max(8, Math.round(item.fontSizeSp * .52f))) * scale,
+                detailBounds.height() * .62f));
+        float badgeSize = Math.max(8f, Math.min(
+                item.options.optInt("roadBadgeFontSizeSp",
+                        Math.max(8, Math.round(item.fontSizeSp * .50f))) * scale,
                 detailBounds.height() * .62f));
         drawStyledText(canvas, distance, distanceBounds, color, distanceSize,
                 Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
 
         float detailLeft = detailBounds.left;
         if (!roadBadge.isEmpty()) {
-            textPaint.setTextSize(detailSize);
+            textPaint.setTextSize(badgeSize);
             textPaint.setTypeface(typeface(Math.max(600, item.fontWeight)));
-            float horizontalPadding = Math.max(3f, 5f * scale);
+            float horizontalPadding = Math.max(0f,
+                    item.options.optInt("roadBadgePaddingHorizontalPx", 5) * scale);
+            float verticalPadding = Math.max(0f,
+                    item.options.optInt("roadBadgePaddingVerticalPx", 2) * scale);
             float badgeWidth = Math.min(detailBounds.width() * .42f,
                     textPaint.measureText(roadBadge) + horizontalPadding * 2f);
+            float badgeHalfHeight = Math.min(detailBounds.height() * .5f,
+                    badgeSize * .62f + verticalPadding);
             RectF badge = new RectF(detailBounds.left,
-                    detailBounds.centerY() - detailSize * .72f,
+                    detailBounds.centerY() - badgeHalfHeight,
                     detailBounds.left + badgeWidth,
-                    detailBounds.centerY() + detailSize * .72f);
+                    detailBounds.centerY() + badgeHalfHeight);
             int badgeColor = optionColor(item, "roadBadgeColor", 0xFF16A34A);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(withAlpha(badgeColor, Math.round(
                     Color.alpha(badgeColor) * Color.alpha(color) / 255f)));
             canvas.drawRoundRect(badge, Math.max(2f, 3f * scale),
                     Math.max(2f, 3f * scale), paint);
-            drawStyledText(canvas, roadBadge, inset(badge, Math.max(1f, 2f * scale)),
-                    color, detailSize, Layout.Alignment.ALIGN_CENTER, false,
+            drawStyledText(canvas, roadBadge,
+                    insetSides(badge, horizontalPadding, verticalPadding,
+                            horizontalPadding, verticalPadding),
+                    color, badgeSize, Layout.Alignment.ALIGN_CENTER, false,
                     Math.max(600, item.fontWeight));
             detailLeft = badge.right + Math.max(3f, 5f * scale);
         } else if (showDirection && !roadCandidate.isEmpty()
@@ -728,7 +784,7 @@ public final class HudCanvasView extends View {
         if (!direction.isEmpty() && detailLeft < detailBounds.right) {
             drawStyledText(canvas, direction,
                     new RectF(detailLeft, detailBounds.top, detailBounds.right,
-                            detailBounds.bottom), unitColor, detailSize,
+                            detailBounds.bottom), unitColor, directionSize,
                     Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
         }
     }
@@ -1691,6 +1747,27 @@ public final class HudCanvasView extends View {
     private static RectF inset(RectF source, float amount) {
         RectF result = new RectF(source);
         result.inset(amount, amount);
+        return result;
+    }
+
+    private static RectF insetSides(RectF source, float left, float top,
+                                    float right, float bottom) {
+        return new RectF(source.left + Math.max(0f, left),
+                source.top + Math.max(0f, top),
+                source.right - Math.max(0f, right),
+                source.bottom - Math.max(0f, bottom));
+    }
+
+    private static RectF scaleAroundCenter(RectF source, float factor, RectF limit) {
+        if (source.isEmpty()) return new RectF(source);
+        float safe = Math.max(.05f, factor);
+        float halfWidth = source.width() * safe * .5f;
+        float halfHeight = source.height() * safe * .5f;
+        RectF result = new RectF(source.centerX() - halfWidth,
+                source.centerY() - halfHeight,
+                source.centerX() + halfWidth,
+                source.centerY() + halfHeight);
+        if (!result.intersect(limit)) return new RectF();
         return result;
     }
 

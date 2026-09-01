@@ -5,18 +5,21 @@
 
 package dezz.status.widget;
 
+import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -4091,6 +4094,10 @@ public final class LauncherActivity extends AppCompatActivity {
                 executeSavedRule(shortcut.target);
                 return;
             }
+            if (shortcut.kind == LauncherShortcutStore.Kind.PHONE) {
+                executePhoneCall(shortcut.target);
+                return;
+            }
             if (shortcut.kind == LauncherShortcutStore.Kind.INFO
                     || shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) return;
             executeBuiltin(LauncherShortcutStore.Builtin.fromKey(shortcut.target),
@@ -4102,6 +4109,15 @@ public final class LauncherActivity extends AppCompatActivity {
             Toast.makeText(this, "Действие не выполнено: " + shortcut.title,
                     Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void executePhoneCall(@NonNull String number) {
+        Uri phone = Uri.fromParts("tel", number.trim(), null);
+        boolean canCall = ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE)
+                == PackageManager.PERMISSION_GRANTED;
+        Intent action = new Intent(canCall ? Intent.ACTION_CALL : Intent.ACTION_DIAL, phone)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(action);
     }
 
     private void executeCarControl(@NonNull LauncherShortcutStore.Shortcut shortcut,

@@ -46,6 +46,7 @@ final class HudMapRenderer {
     private final CameraDirectionMapLayer cameraDirectionMapLayer;
     private final LaneGuidanceMapLayer laneGuidanceMapLayer;
     private final RouteStreetLabelMapLayer routeStreetLabelMapLayer;
+    private final RouteTurnMapLayer routeTurnMapLayer;
     private final String profileSection;
     private final String displayName;
     private final boolean adaptiveFrameRate;
@@ -87,8 +88,9 @@ final class HudMapRenderer {
     private long lastRouteGeometryElapsedMs;
     private NavigatorStatePublisher.CameraState initialCamera;
     private NavigatorStatePublisher.CameraState navigationCamera;
+    /** Frozen source position for FREE mode; profile tilt/zoom may still change around it. */
+    private NavigatorStatePublisher.CameraState freeCameraSource;
     private AppliedCamera lastAppliedCamera;
-    private boolean freeCameraInitialized;
     private boolean routeGuidanceActive;
     private double latestSpeedKmh = Double.NaN;
     private int appliedMaximumFps = -1;
@@ -111,6 +113,7 @@ final class HudMapRenderer {
         cameraDirectionMapLayer = new CameraDirectionMapLayer(this.context);
         laneGuidanceMapLayer = new LaneGuidanceMapLayer(this.context);
         routeStreetLabelMapLayer = new RouteStreetLabelMapLayer(this.context);
+        routeTurnMapLayer = new RouteTurnMapLayer(this.context);
     }
 
     void applyConfiguration(String raw) {
@@ -120,7 +123,9 @@ final class HudMapRenderer {
         boolean automaticOrderRestored = profile.manualLayerPrioritiesEnabled
                 && !next.manualLayerPrioritiesEnabled;
         profile = next;
-        if (cameraModeChanged) freeCameraInitialized = false;
+        if (cameraModeChanged) {
+            freeCameraSource = null;
+        }
         if (surface == null) return;
         if (enabledChanged) {
             if (profile.enabled) startRenderer();
@@ -192,6 +197,7 @@ final class HudMapRenderer {
             cameraDirectionMapLayer.clearData();
             laneGuidanceMapLayer.clearData();
             routeStreetLabelMapLayer.clearData();
+            routeTurnMapLayer.clearData();
             applyRoadEventVisibility();
             applyCamera(false);
         }
@@ -219,13 +225,17 @@ final class HudMapRenderer {
                 frame.laneGuidanceSampleElapsedMs, frame.laneGuidance);
         routeStreetLabelMapLayer.update(frame.routeActive,
                 frame.routeStreetLabelsSampleElapsedMs, frame.routeStreetLabels);
+        routeTurnMapLayer.update(frame.routeActive,
+                frame.routeTurnsSampleElapsedMs, frame.routeTurns);
         applyManualSublayerOrder();
         if (!frame.isValid()) return;
         try {
             latestSpeedKmh = Math.max(0d, frame.speedKmh);
             cursorStyler.update(frame.latitude, frame.longitude, frame.bearingDegrees);
             applyMaximumFps();
-            float baseZoom = frame.routeActive
+            float baseZoom = profile.fixedZoomEnabled
+                    ? (float) profile.fixedZoomLevel
+                    : frame.routeActive
                     ? frame.speedKmh >= 90d ? 14.5f : frame.speedKmh >= 50d ? 15.2f : 16f
                     : 15.5f;
             navigationCamera = new NavigatorStatePublisher.CameraState(
@@ -338,6 +348,7 @@ final class HudMapRenderer {
             cameraDirectionMapLayer.attach(map);
             laneGuidanceMapLayer.attach(map);
             routeStreetLabelMapLayer.attach(map);
+            routeTurnMapLayer.attach(map);
             cursorStyler.attach(map);
 
             Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
@@ -391,15 +402,21 @@ final class HudMapRenderer {
                 !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL")),
                 profile.showHudSpeedCameras,
                 profile.cameraScalePercent,
+                profile.cameraDirectionScalePercent,
+                profile.cameraDirectionOpacityPercent,
                 profile.effectiveCameraPriority());
         laneGuidanceMapLayer.apply(profile.showLaneGuidance,
                 profile.laneGuidanceScalePercent, night,
+                profile.focusXPercent <= 55,
                 profile.effectiveLanePriority());
         // This explicit route-owned layer is the replacement for substrate road labels. Its
         // switch must work even when the generic "Подписи" switch is off.
         routeStreetLabelMapLayer.apply(profile.routeStreetLabelsOnly,
                 profile.routeLabelScalePercent,
                 profile.effectiveRouteLabelPriority());
+        routeTurnMapLayer.apply(profile.showRouteTurns,
+                profile.routeTurnScalePercent,
+                profile.effectiveRouteTurnPriority());
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -462,22 +479,33 @@ final class HudMapRenderer {
     /** Follows Guidance location only; all HUD camera parameters remain independently editable. */
     private void applyCamera(boolean animate) {
         Object currentMap = map;
-        NavigatorStatePublisher.CameraState source = navigationCamera != null
-                ? navigationCamera : initialCamera;
-        if (currentMap == null || source == null || !source.isValid()) return;
         boolean free = "FREE".equals(profile.cameraMode);
-        if (free && freeCameraInitialized) return;
+        NavigatorStatePublisher.CameraState liveSource = navigationCamera != null
+                ? navigationCamera : initialCamera;
+        if (currentMap == null || liveSource == null || !liveSource.isValid()) return;
+        if (!free) freeCameraSource = null;
+        if (free && freeCameraSource == null) freeCameraSource = liveSource;
+        // FREE freezes the camera's geographical anchor, not the user's camera settings. The old
+        // early return also froze tilt/zoom after the first frame, which made their sliders appear
+        // broken until the renderer was recreated.
+        NavigatorStatePublisher.CameraState source = free ? freeCameraSource : liveSource;
         try {
             Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
             Object target = pointClass.getConstructor(double.class, double.class)
                     .newInstance(source.latitude, source.longitude);
-            float zoom = (float) Math.max(0d, Math.min(23d,
-                    source.zoom + profile.zoomDelta));
+            double requestedZoom = profile.fixedZoomEnabled
+                    ? profile.fixedZoomLevel : source.zoom + profile.zoomDelta;
+            float zoom = (float) Math.max(0d, Math.min(23d, requestedZoom));
             float azimuth = "NORTH_UP".equals(profile.cameraMode) ? 0f : source.azimuth;
             float tilt = profile.tiltDegrees;
             AppliedCamera next = new AppliedCamera(
                     source.latitude, source.longitude, zoom, azimuth, tilt);
-            if (next.nearlyEquals(lastAppliedCamera)) return;
+            if (next.nearlyEquals(lastAppliedCamera)) {
+                AppliedCamera actual = readAppliedCamera(currentMap);
+                // GuidanceCamera and OEM lifecycle can replace a camera position after our move.
+                // Trust a cached request only while MapKit still reports the same output values.
+                if (next.nearlyEquals(actual)) return;
+            }
             Class<?> cameraClass = Class.forName("com.yandex.mapkit.map.CameraPosition");
             Object camera = cameraClass.getConstructor(
                     pointClass, float.class, float.class, float.class)
@@ -494,10 +522,26 @@ final class HudMapRenderer {
             } else {
                 invoke(currentMap, "move", new Class<?>[]{cameraClass}, camera);
             }
-            lastAppliedCamera = next;
-            if (free) freeCameraInitialized = true;
+            AppliedCamera actual = readAppliedCamera(currentMap);
+            lastAppliedCamera = actual == null ? next : actual;
         } catch (Throwable failure) {
             Log.w(TAG, "HUD camera synchronization failed", failure);
+        }
+    }
+
+    /** Reads MapKit's effective position so a silent clamp or later native override is corrected. */
+    private static AppliedCamera readAppliedCamera(Object currentMap) {
+        try {
+            Object camera = invoke(currentMap, "getCameraPosition", new Class<?>[0]);
+            Object target = invoke(camera, "getTarget", new Class<?>[0]);
+            return new AppliedCamera(
+                    ((Number) invoke(target, "getLatitude", new Class<?>[0])).doubleValue(),
+                    ((Number) invoke(target, "getLongitude", new Class<?>[0])).doubleValue(),
+                    ((Number) invoke(camera, "getZoom", new Class<?>[0])).floatValue(),
+                    ((Number) invoke(camera, "getAzimuth", new Class<?>[0])).floatValue(),
+                    ((Number) invoke(camera, "getTilt", new Class<?>[0])).floatValue());
+        } catch (Throwable unavailable) {
+            return null;
         }
     }
 
@@ -647,11 +691,14 @@ final class HudMapRenderer {
         if (everywhere == null && onRoute == null) return;
         try {
             Class<?> eventTagClass = Class.forName("com.yandex.mapkit.road_events.EventTag");
+            boolean unifiedCameraLayer = routeGuidanceActive
+                    && !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL"));
             for (String tagName : NavigationMapProfile.ROAD_EVENT_TAGS) {
                 @SuppressWarnings({"rawtypes", "unchecked"})
                 Object tag = Enum.valueOf((Class) eventTagClass, tagName);
                 String mode = profile.roadEventMode(tagName);
-                boolean speedCamera = "SPEED_CONTROL".equals(tagName);
+                boolean mergedCameraTag = unifiedCameraLayer
+                        && isUnifiedCameraControlTag(tagName);
                 if (everywhere != null) {
                     // Never leave the user with an empty map if the automotive layer is absent:
                     // the fallback can include a nearby marker, but it preserves all selected data.
@@ -661,20 +708,28 @@ final class HudMapRenderer {
                     // it can merge HUD Speed duplicates and attach source-backed details. In free
                     // drive the stock ALWAYS layer remains available.
                     boolean alwaysVisible = "ALWAYS".equals(mode)
-                            && !(speedCamera && routeGuidanceActive);
+                            && !mergedCameraTag;
                     invoke(everywhere, "setRoadEventVisible",
                             new Class<?>[]{eventTagClass, boolean.class}, tag,
-                            alwaysVisible || (fallbackRoute && !speedCamera));
+                            alwaysVisible || (fallbackRoute && !mergedCameraTag));
                 }
                 if (onRoute != null) {
                     invoke(onRoute, "setRoadEventVisibleOnRoute",
                             new Class<?>[]{eventTagClass, boolean.class}, tag,
-                            "ROUTE_ONLY".equals(mode) && !speedCamera);
+                            "ROUTE_ONLY".equals(mode) && !mergedCameraTag);
                 }
             }
         } catch (Throwable failure) {
             Log.w(TAG, "HUD road-event visibility could not be applied", failure);
         }
+    }
+
+    /** These tags are rendered as compact detail glyphs inside one unified camera marker. */
+    private static boolean isUnifiedCameraControlTag(String tag) {
+        return "SPEED_CONTROL".equals(tag) || "NO_STOPPING_CONTROL".equals(tag)
+                || "LANE_CONTROL".equals(tag) || "ROAD_MARKING_CONTROL".equals(tag)
+                || "MOBILE_CONTROL".equals(tag) || "CROSS_ROAD_CONTROL".equals(tag)
+                || "TRAFFIC_CONTROL".equals(tag);
     }
 
     /** A visibility round-trip makes MapKit request stock styles again after a live scale edit. */
@@ -720,6 +775,7 @@ final class HudMapRenderer {
             fingerprint = fingerprint * 131L + profile.effectiveRoutePriority();
             fingerprint = fingerprint * 131L + profile.effectiveDestinationPriority();
             fingerprint = fingerprint * 131L + profile.effectiveTrafficLightPriority();
+            fingerprint = fingerprint * 131L + profile.effectiveRouteTurnPriority();
             fingerprint = fingerprint * 131L + profile.effectiveRouteLabelPriority();
             fingerprint = fingerprint * 131L + profile.effectiveLanePriority();
             fingerprint = fingerprint * 131L + profile.effectiveCursorPriority();
@@ -739,6 +795,8 @@ final class HudMapRenderer {
                     profile.effectiveDestinationPriority()));
             layers.add(new LayerOrder("ru.natro.navigation.traffic_lights",
                     profile.effectiveTrafficLightPriority()));
+            layers.add(new LayerOrder("ru.natro.navigation.route_turns",
+                    profile.effectiveRouteTurnPriority()));
             layers.add(new LayerOrder("ru.natro.navigation.route_street_labels",
                     profile.effectiveRouteLabelPriority()));
             layers.add(new LayerOrder("ru.natro.navigation.lane_guidance",
@@ -1151,6 +1209,7 @@ final class HudMapRenderer {
         cameraDirectionMapLayer.detachMap();
         laneGuidanceMapLayer.detachMap();
         routeStreetLabelMapLayer.detachMap();
+        routeTurnMapLayer.detachMap();
         routeCollection = null;
         destinationCollection = null;
         routePolyline = null;
@@ -1160,7 +1219,7 @@ final class HudMapRenderer {
         renderedRouteSegmentPosition = Double.NaN;
         renderedRouteSegmentCount = 0;
         lastRouteGeometryElapsedMs = 0L;
-        freeCameraInitialized = false;
+        freeCameraSource = null;
         lastAppliedCamera = null;
         if (releaseSurface && currentSurface != null) {
             try { currentSurface.release(); } catch (RuntimeException ignored) {}

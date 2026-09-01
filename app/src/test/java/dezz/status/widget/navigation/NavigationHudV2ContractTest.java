@@ -29,9 +29,14 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.trafficUnknownColor = "#FF515253";
         config.hudMap.trafficGradientLength = 24d;
         config.hudMap.roadColor = "#FF556677";
+        config.hudMap.fixedZoomEnabled = true;
+        config.hudMap.fixedZoomLevel = 17.25d;
         config.hudMap.laneGuidanceScalePercent = 135;
         config.hudMap.cameraScalePercent = 145;
+        config.hudMap.cameraDirectionScalePercent = 180;
+        config.hudMap.cameraDirectionOpacityPercent = 45;
         config.hudMap.trafficLightScalePercent = 95;
+        config.hudMap.routeTurnScalePercent = 115;
         config.hudMap.routeLabelScalePercent = 125;
         config.hudMap.roadEventScalePercent = 80;
         config.hudMap.destinationScalePercent = 165;
@@ -43,6 +48,7 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.routeLayerPriority = 22;
         config.hudMap.destinationLayerPriority = 27;
         config.hudMap.trafficLightLayerPriority = 33;
+        config.hudMap.routeTurnLayerPriority = 38;
         config.hudMap.routeLabelLayerPriority = 44;
         config.hudMap.laneGuidanceLayerPriority = 88;
         config.hudMap.cursorLayerPriority = 99;
@@ -51,6 +57,7 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.showRouteTraffic = true;
         config.hudMap.showDestination = false;
         config.hudMap.showTrafficLights = false;
+        config.hudMap.showRouteTurns = false;
         config.hudMap.showLaneGuidance = false;
         config.hudMap.enabled = true;
         config.hudMap.roadsOnly = true;
@@ -107,9 +114,14 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FF515253", restored.hudMap.trafficUnknownColor);
         assertEquals(24d, restored.hudMap.trafficGradientLength, 0d);
         assertEquals("#FF556677", restored.hudMap.roadColor);
+        assertTrue(restored.hudMap.fixedZoomEnabled);
+        assertEquals(17.25d, restored.hudMap.fixedZoomLevel, 0d);
         assertEquals(135, restored.hudMap.laneGuidanceScalePercent);
         assertEquals(145, restored.hudMap.cameraScalePercent);
+        assertEquals(180, restored.hudMap.cameraDirectionScalePercent);
+        assertEquals(45, restored.hudMap.cameraDirectionOpacityPercent);
         assertEquals(95, restored.hudMap.trafficLightScalePercent);
+        assertEquals(115, restored.hudMap.routeTurnScalePercent);
         assertEquals(125, restored.hudMap.routeLabelScalePercent);
         assertEquals(80, restored.hudMap.roadEventScalePercent);
         assertEquals(165, restored.hudMap.destinationScalePercent);
@@ -121,6 +133,7 @@ public final class NavigationHudV2ContractTest {
         assertEquals(22, restored.hudMap.routeLayerPriority);
         assertEquals(27, restored.hudMap.destinationLayerPriority);
         assertEquals(33, restored.hudMap.trafficLightLayerPriority);
+        assertEquals(38, restored.hudMap.routeTurnLayerPriority);
         assertEquals(44, restored.hudMap.routeLabelLayerPriority);
         assertEquals(88, restored.hudMap.laneGuidanceLayerPriority);
         assertEquals(99, restored.hudMap.cursorLayerPriority);
@@ -129,6 +142,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(restored.hudMap.showRouteTraffic);
         assertFalse(restored.hudMap.showDestination);
         assertFalse(restored.hudMap.showTrafficLights);
+        assertFalse(restored.hudMap.showRouteTurns);
         assertFalse(restored.hudMap.showLaneGuidance);
         assertTrue(restored.hudMap.enabled);
         assertTrue(restored.hudMap.roadsOnly);
@@ -191,6 +205,7 @@ public final class NavigationHudV2ContractTest {
 
         for (String source : new String[]{hud, cluster}) {
             assertTrue(source.contains("SliderField zoom = slider("));
+            assertTrue(source.contains("SliderField fixedZoomLevel = slider("));
             assertTrue(source.contains("SliderField tilt = slider("));
             assertTrue(source.contains("SliderField focusX = slider("));
             assertTrue(source.contains("SliderField focusY = slider("));
@@ -212,6 +227,8 @@ public final class NavigationHudV2ContractTest {
         assertFalse(cluster.contains("android.widget.EditText"));
         assertTrue(cluster.contains("map.cameraMode = navigationCameraModeValue("));
         assertTrue(cluster.contains("map.zoomDelta = zoom.value()"));
+        assertTrue(cluster.contains("map.fixedZoomEnabled = fixedZoom.isChecked()"));
+        assertTrue(cluster.contains("map.fixedZoomLevel = fixedZoomLevel.value()"));
         assertTrue(cluster.contains("map.tiltDegrees = tilt.intValue()"));
         assertTrue(cluster.contains("map.focusXPercent = focusX.intValue()"));
         assertTrue(cluster.contains("map.focusYPercent = focusY.intValue()"));
@@ -225,6 +242,7 @@ public final class NavigationHudV2ContractTest {
                 .replace("showRouteTraffic.isChecked()", "routeTraffic.isChecked()")
                 .replace("showTraffic.isChecked()", "traffic.isChecked()")
                 .replace("showTrafficLights.isChecked()", "trafficLights.isChecked()")
+                .replace("showRouteTurns.isChecked()", "routeTurns.isChecked()")
                 .replace("showLaneGuidance.isChecked()", "laneGuidance.isChecked()")
                 .replace("showLabels.isChecked()", "labels.isChecked()")
                 .replace("showPois.isChecked()", "pois.isChecked()")
@@ -240,6 +258,7 @@ public final class NavigationHudV2ContractTest {
                 "map.showRouteTraffic = routeTraffic.isChecked()",
                 "map.showTraffic = traffic.isChecked()",
                 "map.showTrafficLights = trafficLights.isChecked()",
+                "map.showRouteTurns = routeTurns.isChecked()",
                 "map.showLaneGuidance = laneGuidance.isChecked()",
                 "map.showLabels = labels.isChecked()",
                 "map.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked()",
@@ -257,7 +276,10 @@ public final class NavigationHudV2ContractTest {
                 "map.roadColor = roadColor.value",
                 "map.laneGuidanceScalePercent = laneGuidanceScale.intValue()",
                 "map.cameraScalePercent = cameraScale.intValue()",
+                "map.cameraDirectionScalePercent = cameraDirectionScale.intValue()",
+                "map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue()",
                 "map.trafficLightScalePercent = trafficLightScale.intValue()",
+                "map.routeTurnScalePercent = routeTurnScale.intValue()",
                 "map.routeLabelScalePercent = routeLabelScale.intValue()",
                 "map.roadEventScalePercent = roadEventScale.intValue()",
                 "map.destinationScalePercent = destinationScale.intValue()",
@@ -286,6 +308,7 @@ public final class NavigationHudV2ContractTest {
                 "map.routeLayerPriority=routeLayerPriority.intValue();",
                 "map.destinationLayerPriority=destinationLayerPriority.intValue();",
                 "map.trafficLightLayerPriority=trafficLightLayerPriority.intValue();",
+                "map.routeTurnLayerPriority=routeTurnLayerPriority.intValue();",
                 "map.routeLabelLayerPriority=routeLabelLayerPriority.intValue();",
                 "map.laneGuidanceLayerPriority=laneGuidanceLayerPriority.intValue();",
                 "map.cursorLayerPriority=cursorLayerPriority.intValue();"
@@ -300,6 +323,7 @@ public final class NavigationHudV2ContractTest {
     @Test public void nonFiniteMapValuesRestoreFieldDefaults() {
         NavigationIntegrationConfig config = new NavigationIntegrationConfig();
         config.hudMap.zoomDelta = Double.NaN;
+        config.hudMap.fixedZoomLevel = Double.NaN;
         config.hudMap.routeWidth = Double.POSITIVE_INFINITY;
         config.hudMap.routeOutlineWidth = Double.NEGATIVE_INFINITY;
         config.hudMap.trafficGradientLength = Double.NaN;
@@ -307,11 +331,15 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.routeWidthPercent = 0;
         config.hudMap.roadWidthPercent = 999;
         config.hudMap.cameraDirectionLayerPriority = -1;
+        config.hudMap.cameraDirectionScalePercent = 999;
+        config.hudMap.cameraDirectionOpacityPercent = -1;
+        config.hudMap.routeTurnScalePercent = 0;
         config.hudMap.laneGuidanceLayerPriority = 101;
 
         config.normalize();
 
         assertEquals(0d, config.hudMap.zoomDelta, 0d);
+        assertEquals(16d, config.hudMap.fixedZoomLevel, 0d);
         assertEquals(8d, config.hudMap.routeWidth, 0d);
         assertEquals(2d, config.hudMap.routeOutlineWidth, 0d);
         assertEquals(12d, config.hudMap.trafficGradientLength, 0d);
@@ -319,6 +347,9 @@ public final class NavigationHudV2ContractTest {
         assertEquals(25, config.hudMap.routeWidthPercent);
         assertEquals(300, config.hudMap.roadWidthPercent);
         assertEquals(0, config.hudMap.cameraDirectionLayerPriority);
+        assertEquals(300, config.hudMap.cameraDirectionScalePercent);
+        assertEquals(0, config.hudMap.cameraDirectionOpacityPercent);
+        assertEquals(50, config.hudMap.routeTurnScalePercent);
         assertEquals(100, config.hudMap.laneGuidanceLayerPriority);
     }
 
@@ -336,6 +367,7 @@ public final class NavigationHudV2ContractTest {
         String cameras = read(navigator.resolve("CameraDirectionMapLayer.java"));
         String laneSigns = read(navigator.resolve("LaneGuidanceMapLayer.java"));
         String routeLabels = read(navigator.resolve("RouteStreetLabelMapLayer.java"));
+        String routeTurns = read(navigator.resolve("RouteTurnMapLayer.java"));
         String hudSettings = read(projectRoot().resolve(
                 "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
         String clusterSettings = read(projectRoot().resolve(
@@ -349,6 +381,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cameras.contains("MapObjectLayerFactory.EQUAL"));
         assertTrue(laneSigns.contains("MapObjectLayerFactory.MAJOR"));
         assertTrue(routeLabels.contains("MapObjectLayerFactory.MINOR"));
+        assertTrue(routeTurns.contains("MapObjectLayerFactory.MAJOR"));
         assertTrue(renderer.contains("if (currentMap == null"
                 + " || !profile.manualLayerPrioritiesEnabled)"));
         assertTrue(renderer.contains("getSublayerManager"));
@@ -479,6 +512,8 @@ public final class NavigationHudV2ContractTest {
         String trafficLights = read(patchRoot.resolve("TrafficLightMapLayer.java"));
         String cameraDirections = read(patchRoot.resolve("CameraDirectionMapLayer.java"));
         String laneGuidance = read(patchRoot.resolve("LaneGuidanceMapLayer.java"));
+        String routeTurns = read(patchRoot.resolve("RouteTurnMapLayer.java"));
+        String routeLabels = read(patchRoot.resolve("RouteStreetLabelMapLayer.java"));
         String backgroundLease = read(patchRoot.resolve("BackgroundMapLease.java"));
         String mapViewPatch = read(projectRoot().resolve(
                 "tools/patch_navigation_map_view.py"));
@@ -541,6 +576,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("removeFloatingTopInset(contentRoot)"));
         assertTrue(controller.contains("restorePadding(contentRoot"));
         assertTrue(controller.contains("requestNavigatorInsets()"));
+        assertTrue(controller.contains("View host = window.getDecorView()"));
+        assertTrue(controller.contains("setFitsSystemWindows(contentRoot, false)"));
         assertTrue(controller.contains("restartInMode("));
         assertTrue(controller.contains("activity.finish()"));
         assertTrue(controller.contains("activity.startActivity(restart)"));
@@ -595,6 +632,12 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("guidanceCamera"));
         assertFalse(renderer.contains("applyNativeCameraProfile"));
         assertTrue(renderer.contains("float tilt = profile.tiltDegrees"));
+        assertTrue(renderer.contains("freeCameraSource"));
+        assertFalse(renderer.contains("if (free && freeCameraInitialized) return"));
+        assertTrue(renderer.contains("readAppliedCamera(currentMap)"));
+        assertTrue(renderer.contains("getCameraPosition"));
+        assertTrue(renderer.contains("profile.fixedZoomEnabled"));
+        assertTrue(renderer.contains("profile.fixedZoomLevel"));
         assertTrue(renderer.contains("applyCamera(false)"));
         assertTrue(renderer.contains("cursorStyler.update(frame.latitude"));
         assertTrue(renderer.contains("com.yandex.mapkit.Animation$Type"));
@@ -613,10 +656,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(mapProfile.contains("showRouteTraffic"));
         assertTrue(mapProfile.contains("showDestination"));
         assertTrue(mapProfile.contains("showTrafficLights"));
+        assertTrue(mapProfile.contains("showRouteTurns"));
         assertTrue(mapProfile.contains("showLaneGuidance"));
         assertTrue(renderer.contains("trafficLightMapLayer.update(frame.routeActive"));
         assertTrue(renderer.contains("trafficLightMapLayer.apply(profile.showTrafficLights, night,"));
         assertTrue(renderer.contains("profile.effectiveTrafficLightPriority()"));
+        assertTrue(renderer.contains("routeTurnMapLayer.update(frame.routeActive"));
+        assertTrue(renderer.contains("routeTurnMapLayer.apply(profile.showRouteTurns"));
+        assertTrue(renderer.contains("profile.effectiveRouteTurnPriority()"));
         assertTrue(renderer.contains("cameraDirectionMapLayer.update(frame.routeActive"));
         assertTrue(renderer.contains("profile.effectiveCameraPriority()"));
         assertTrue(renderer.contains("laneGuidanceMapLayer.update(frame.routeActive"));
@@ -637,6 +684,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(trafficLights.contains("setIcon"));
         assertFalse(trafficLights.contains("ViewProvider"));
         assertTrue(trafficLights.contains("TrafficLightViewImpl"));
+        assertTrue(trafficLights.contains("applyCompactFallbackViews"));
+        assertTrue(trafficLights.contains("compactTrafficLightBitmap"));
         assertTrue(trafficLights.contains("setSignal"));
         assertTrue(trafficLights.contains("setTime"));
         assertTrue(trafficLights.contains("createTexture"));
@@ -651,14 +700,18 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cameraDirections.contains("YANDEX_FRESH_MS = 3_000L"));
         assertTrue(cameraDirections.contains("SOURCE_HUD_SPEED"));
         assertTrue(cameraDirections.contains("hasHudSpeedDuplicate"));
+        assertTrue(cameraDirections.contains("addOrPreferRicherDuplicate"));
+        assertTrue(cameraDirections.contains("SAME_SOURCE_DUPLICATE_DISTANCE_METERS"));
         assertTrue(cameraDirections.contains("addPolygon"));
         assertTrue(cameraDirections.contains("LinearRing"));
-        assertTrue(cameraDirections.contains("SECTOR_FILL"));
+        assertTrue(cameraDirections.contains("directionScalePercent"));
+        assertTrue(cameraDirections.contains("directionOpacityPercent"));
         assertTrue(cameraDirections.contains("No direction supplied means exactly one sign"));
         assertTrue(cameraDirections.contains("ImageProvider"));
         assertTrue(cameraDirections.contains("createCameraBitmap"));
         assertTrue(cameraDirections.contains("camera.speedLimit > 0"));
         assertTrue(cameraDirections.contains("visibleControlTags(camera.controlTags)"));
+        assertTrue(cameraDirections.contains("One cohesive sign"));
         assertTrue(laneGuidance.contains("FRESH_MS = 1_500L"));
         assertTrue(laneGuidance.contains("LaneSignBalloonTextureFactory"));
         assertTrue(laneGuidance.contains("LaneSignBalloon"));
@@ -667,6 +720,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(laneGuidance.contains("RotationType"));
         assertTrue(laneGuidance.contains("NO_ROTATION"));
         assertTrue(laneGuidance.contains("setGeometry"));
+        assertTrue(laneGuidance.contains("placeOnRight ? -0.08f : 1.08f"));
+        assertTrue(routeTurns.contains("ru.natro.navigation.route_turns"));
+        assertTrue(routeTurns.contains("RotationType"));
+        assertTrue(routeTurns.contains("\"ROTATE\""));
+        assertTrue(routeTurns.contains("Boolean.TRUE"));
+        assertTrue(routeLabels.contains("ru.natro.navigation.route_street_labels"));
+        assertTrue(routeLabels.contains("createLabelBitmap"));
         assertFalse(renderer.contains("drivingRoute != activeRoute"));
         assertFalse(routeStyler.contains("Double.doubleToLongBits"));
         assertTrue(renderer.contains("applyStyleSlot"));
@@ -749,10 +809,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("getManoeuvres"));
         assertTrue(publisher.contains("getLaneSigns"));
         assertTrue(publisher.contains("getActiveSpeedCameras"));
+        assertTrue(publisher.contains("getSpeedLimit\"), Double.NaN) * 3.6d"));
         assertTrue(publisher.contains("getActiveDirections"));
         assertTrue(publisher.contains("getInFace"));
         assertTrue(publisher.contains("getInBack"));
         assertTrue(publisher.contains("LaneGuidanceFrame"));
+        assertTrue(publisher.contains("RouteTurnFrame"));
+        assertTrue(publisher.contains("readRouteTurns("));
         assertTrue(publisher.contains("invoke(position, \"getPoint\")"));
         assertTrue(publisher.contains("invoke(position, \"heading\")"));
         assertTrue(publisher.contains("getTrafficLightsWithSignal"));
@@ -924,7 +987,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("Скорость, тип и направление камер берутся только из"));
         assertTrue(settings.contains("Ручной порядок слоёв"));
         assertTrue(settings.contains("SliderField cameraDirectionLayerPriority = slider"));
+        assertTrue(settings.contains("SliderField cameraDirectionScale = slider"));
+        assertTrue(settings.contains("SliderField cameraDirectionOpacity = slider"));
         assertTrue(settings.contains("SliderField trafficLightLayerPriority = slider"));
+        assertTrue(settings.contains("SliderField routeTurnLayerPriority = slider"));
         assertTrue(settings.contains("SliderField routeLabelLayerPriority = slider"));
         assertTrue(settings.contains("SliderField laneGuidanceLayerPriority = slider"));
         assertTrue(settings.contains("SliderField cursorLayerPriority = slider"));
@@ -937,6 +1003,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("SliderField brightness = slider"));
         assertTrue(settings.contains("SliderField borderOpacity = slider"));
         assertTrue(settings.contains("SliderField zoom = slider"));
+        assertTrue(settings.contains("SliderField fixedZoomLevel = slider"));
         assertTrue(settings.contains("SliderField focusX = slider"));
         assertTrue(settings.contains("SliderField width = slider"));
         assertTrue(settings.contains("SliderField columns = slider"));
@@ -985,13 +1052,17 @@ public final class NavigationHudV2ContractTest {
                 "routeStreetLabelMapLayer.apply(profile.routeStreetLabelsOnly,"));
         assertTrue(renderer.contains("profile.effectiveRouteLabelPriority()"));
         assertTrue(labels.contains("FRESH_MS = 2_500L"));
-        assertTrue(labels.contains("Screen-facing street names sourced exclusively"));
+        assertTrue(labels.contains("painted directly over the active route"));
         assertTrue(labels.contains("setGeometry"));
         assertTrue(labels.contains("setZIndex"));
         assertTrue(labels.contains("NavigationMapProfile.layerZ(layerPriority)"));
         assertTrue(labels.contains("MapObjectLayerFactory.MINOR"));
-        assertTrue(labels.contains("com.yandex.mapkit.map.TextStyle"));
-        assertFalse(labels.contains("Bitmap.createBitmap"));
+        assertTrue(labels.contains("Bitmap.createBitmap"));
+        assertTrue(labels.contains("createLabelBitmap"));
+        assertTrue(labels.contains("\"ROTATE\""));
+        assertTrue(labels.contains("Boolean.TRUE"));
+        assertTrue(labels.contains("readableBearing(frame.bearingDegrees)"));
+        assertFalse(labels.contains("com.yandex.mapkit.map.TextStyle"));
     }
 
     @Test public void backwardProgressImmediatelyRestoresRouteFromCursor() throws Exception {

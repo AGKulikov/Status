@@ -28,6 +28,7 @@ final class LaneGuidanceMapLayer {
     private Bitmap iconBitmap;
     private boolean enabled;
     private boolean nightMode;
+    private boolean placeOnRight = true;
     private int scalePercent = 100;
     private float zIndex = NavigationMapProfile.layerZ(80);
     private boolean latestRouteActive;
@@ -77,16 +78,17 @@ final class LaneGuidanceMapLayer {
     }
 
     void apply(boolean nextEnabled, int nextScalePercent, boolean nextNightMode,
-               int layerPriority) {
+               boolean nextPlaceOnRight, int layerPriority) {
         int nextScale = Math.max(50, Math.min(250, nextScalePercent));
         float nextZ = NavigationMapProfile.layerZ(layerPriority);
         boolean presentationChanged = scalePercent != nextScale || nightMode != nextNightMode
-                || zIndex != nextZ;
+                || placeOnRight != nextPlaceOnRight || zIndex != nextZ;
         boolean enabledChanged = enabled != nextEnabled;
         if (!presentationChanged && !enabledChanged) return;
         enabled = nextEnabled;
         scalePercent = nextScale;
         nightMode = nextNightMode;
+        placeOnRight = nextPlaceOnRight;
         zIndex = nextZ;
         MapObjectLayerFactory.setZIndex(collection, nextZ);
         if (presentationChanged) {
@@ -240,8 +242,11 @@ final class LaneGuidanceMapLayer {
             style = styleClass.getConstructor().newInstance();
             Object rotation = Enum.valueOf(
                     (Class<? extends Enum>) rotationClass, "NO_ROTATION");
+            // The stock Navigator keeps this balloon beside the road. An out-of-bounds anchor
+            // places the complete screen-facing card to one side of the route point instead of
+            // centring it over the lanes and hiding the road ahead.
             invoke(style, "setAnchor", new Class<?>[]{PointF.class},
-                    new PointF(0.5f, 1.04f));
+                    new PointF(placeOnRight ? -0.08f : 1.08f, 0.55f));
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);

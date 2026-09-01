@@ -1598,6 +1598,8 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 return "Функция автомобиля";
             case RULE:
                 return "Сценарий";
+            case PHONE:
+                return "Телефон · " + shortcut.target;
             case INTENT:
                 return "Системное действие";
             case INFO:
@@ -1628,6 +1630,8 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 return "автомобиль";
             case RULE:
                 return "умный дом";
+            case PHONE:
+                return "телефон";
             case INTENT:
                 return "Intent";
             case INFO:

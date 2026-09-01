@@ -41,6 +41,7 @@ public final class LiveClimateIconPolicyTest {
                 LauncherShortcutStore.Kind.BUILTIN,
                 LauncherShortcutStore.Kind.CAR,
                 LauncherShortcutStore.Kind.RULE,
+                LauncherShortcutStore.Kind.PHONE,
                 LauncherShortcutStore.Kind.INTENT
         };
         for (LauncherShortcutStore.Kind kind : interactive) {

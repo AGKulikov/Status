@@ -46,12 +46,16 @@ final class NavigationMapProfile {
     boolean showTraffic = true;
     /** Independent custom collection; unrelated to background traffic and route jams. */
     boolean showTrafficLights = true;
+    boolean showRouteTurns = true;
     /** Screen-facing sign anchored to the upcoming LaneSign RoutePosition. */
     boolean showLaneGuidance = true;
     boolean showHudSpeedCameras = true;
     int laneGuidanceScalePercent = 100;
     int cameraScalePercent = 100;
+    int cameraDirectionScalePercent = 100;
+    int cameraDirectionOpacityPercent = 30;
     int trafficLightScalePercent = 100;
+    int routeTurnScalePercent = 100;
     int routeLabelScalePercent = 100;
     int roadEventScalePercent = 100;
     int destinationScalePercent = 100;
@@ -61,6 +65,7 @@ final class NavigationMapProfile {
     int routeLayerPriority = 40;
     int destinationLayerPriority = 45;
     int trafficLightLayerPriority = 50;
+    int routeTurnLayerPriority = 55;
     int routeLabelLayerPriority = 60;
     int laneGuidanceLayerPriority = 80;
     int cursorLayerPriority = 90;
@@ -68,6 +73,8 @@ final class NavigationMapProfile {
     boolean routeStreetLabelsOnly;
     boolean roadsOnly;
     String cameraMode = "FOLLOW_ROUTE";
+    boolean fixedZoomEnabled;
+    double fixedZoomLevel = 16d;
     double zoomDelta;
     int tiltDegrees = 60;
     int focusXPercent = 50;
@@ -126,14 +133,21 @@ final class NavigationMapProfile {
             result.showRouteTraffic = source.optBoolean(
                     "showRouteTraffic", result.showTraffic);
             result.showTrafficLights = source.optBoolean("showTrafficLights", true);
+            result.showRouteTurns = source.optBoolean("showRouteTurns", true);
             result.showLaneGuidance = source.optBoolean("showLaneGuidance", true);
             result.showHudSpeedCameras = source.optBoolean("showHudSpeedCameras", true);
             result.laneGuidanceScalePercent = clamp(
                     source.optInt("laneGuidanceScalePercent", 100), 50, 250);
             result.cameraScalePercent = clamp(
                     source.optInt("cameraScalePercent", 100), 50, 250);
+            result.cameraDirectionScalePercent = clamp(
+                    source.optInt("cameraDirectionScalePercent", 100), 25, 300);
+            result.cameraDirectionOpacityPercent = clamp(
+                    source.optInt("cameraDirectionOpacityPercent", 30), 0, 100);
             result.trafficLightScalePercent = clamp(
                     source.optInt("trafficLightScalePercent", 100), 50, 250);
+            result.routeTurnScalePercent = clamp(
+                    source.optInt("routeTurnScalePercent", 100), 50, 250);
             result.routeLabelScalePercent = clamp(
                     source.optInt("routeLabelScalePercent", 100), 50, 250);
             result.roadEventScalePercent = clamp(
@@ -152,6 +166,8 @@ final class NavigationMapProfile {
                     source.optInt("destinationLayerPriority", 45), 0, 100);
             result.trafficLightLayerPriority = clamp(
                     source.optInt("trafficLightLayerPriority", 50), 0, 100);
+            result.routeTurnLayerPriority = clamp(
+                    source.optInt("routeTurnLayerPriority", 55), 0, 100);
             result.routeLabelLayerPriority = clamp(
                     source.optInt("routeLabelLayerPriority", 60), 0, 100);
             result.laneGuidanceLayerPriority = clamp(
@@ -164,6 +180,9 @@ final class NavigationMapProfile {
             result.roadsOnly = source.optBoolean("roadsOnly", false);
             result.cameraMode = enumText(source.optString(
                     "cameraMode", "FOLLOW_ROUTE"));
+            result.fixedZoomEnabled = source.optBoolean("fixedZoomEnabled", false);
+            result.fixedZoomLevel = clamp(source.optDouble(
+                    "fixedZoomLevel", 16d), 2d, 21d, 16d);
             result.zoomDelta = clamp(source.optDouble("zoomDelta", 0d), -8d, 8d, 0d);
             result.tiltDegrees = clamp(source.optInt("tiltDegrees", 60), 0, 80);
             result.focusXPercent = clamp(source.optInt("focusXPercent", 50), 0, 100);
@@ -247,6 +266,10 @@ final class NavigationMapProfile {
 
     int effectiveTrafficLightPriority() {
         return manualLayerPrioritiesEnabled ? trafficLightLayerPriority : 50;
+    }
+
+    int effectiveRouteTurnPriority() {
+        return manualLayerPrioritiesEnabled ? routeTurnLayerPriority : 55;
     }
 
     int effectiveRouteLabelPriority() {

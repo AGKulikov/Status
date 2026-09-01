@@ -128,6 +128,7 @@ import dezz.status.widget.integration.IntentScenarioController;
 import dezz.status.widget.integration.LocalScenarioController;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.driver.DriverPanelService;
+import dezz.status.widget.dim.DimMenuPanelService;
 import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.MediaPlaybackHistoryStore;
@@ -2183,6 +2184,9 @@ public class WidgetService extends Service {
         // overrides are already reflected in its very first stable configuration.
         automaticSurfaceReconcilePending = false;
         if (prefs.driverPanelEnabled.get()) DriverPanelService.apply(this);
+        if (prefs.dimMenuPanelEnabled.get() && prefs.dimMenuPanelAutostart.get()) {
+            DimMenuPanelService.reconcileAutomatic(this);
+        }
         if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
             mainHandler.post(() -> {
                 if (!destroyed && prefs != null && prefs.hudPanelEnabled.get()) {
@@ -2991,6 +2995,10 @@ public class WidgetService extends Service {
         if (prefs.driverPanelEnabled.get()) {
             runIntegrationStep("automatic Driver surface reconcile",
                     () -> DriverPanelService.apply(this));
+        }
+        if (prefs.dimMenuPanelEnabled.get() && prefs.dimMenuPanelAutostart.get()) {
+            runIntegrationStep("automatic DIM menu reconcile",
+                    () -> DimMenuPanelService.reconcileAutomatic(this));
         }
         if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
             mainHandler.post(() -> {

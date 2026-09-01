@@ -26,6 +26,7 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.AutomationSettingsActivity",
             "dezz.status.widget.ClimatePanelSettingsActivity",
             "dezz.status.widget.DiagnosticsActivity",
+            "dezz.status.widget.DimMenuPanelSettingsActivity",
             "dezz.status.widget.DriverPanelSettingsActivity",
             "dezz.status.widget.DriverFavoritesSettingsActivity",
             "dezz.status.widget.HomeAssistantSettingsActivity",
@@ -109,6 +110,7 @@ public final class SettingsDestinationCatalogTest {
         assertSearchContains("скругление", "navigator_window");
         assertSearchContains("зафиксировать", "navigator_window");
         assertSearchContains("приборка", "panel_instrument_cluster");
+        assertSearchContains("кнопками руля", "panel_dim_menu");
         assertEquals(SettingsDestinationCatalog.all().size(),
                 SettingsDestinationCatalog.search("  ").size());
         assertTrue(SettingsDestinationCatalog.search("несуществующий-запрос").isEmpty());

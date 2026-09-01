@@ -556,6 +556,7 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
             case APP: return "Приложение";
             case CAR: return "Автомобиль";
             case RULE: return "Умный дом";
+            case PHONE: return "Телефон · " + shortcut.target;
             case INTENT: return "Android Intent";
             case INFO: return "Информация · без нажатия";
             case DIVIDER: return "Разделитель";

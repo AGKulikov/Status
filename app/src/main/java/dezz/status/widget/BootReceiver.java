@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.hud.HudPresentationService;
+import dezz.status.widget.dim.DimMenuPanelService;
 import dezz.status.widget.instrument.InstrumentDisplayLauncher;
 import dezz.status.widget.launcher.MediaAutoResumeController;
 import dezz.status.widget.phone.PackageReplaceBleRecoveryGate;
@@ -206,6 +207,11 @@ public class BootReceiver extends BroadcastReceiver {
             InstrumentDisplayLauncher.reconcileAutomatic(context);
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not restore instrument panel at lifecycle boundary", failure);
+        }
+        try {
+            DimMenuPanelService.reconcileAutomatic(context);
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not restore DIM menu at lifecycle boundary", failure);
         }
     }
 

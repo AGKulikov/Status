@@ -99,6 +99,9 @@ final class FloatingWindowController {
     private final int[] originalContentPadding = new int[4];
     private final int[] originalMapRootPadding = new int[4];
     private final int[] originalMapWithControlsPadding = new int[4];
+    private boolean originalContentFitsSystemWindows;
+    private boolean originalMapRootFitsSystemWindows;
+    private boolean originalMapWithControlsFitsSystemWindows;
     private int roundedOutlineWidth = -1;
     private int roundedOutlineHeight = -1;
     private int roundedOutlineRadius = -1;
@@ -308,12 +311,10 @@ final class FloatingWindowController {
         return floating;
     }
 
-    /**
-     * The working 29.4.2 mod adds its window controls to the Navigator map root. Keeping the
-     * controls inside that root prevents MapWithControlsView from covering them during its late
-     * post-resume layout pass. The decor fallback keeps the patch tolerant of resource renames.
-     */
+    /** Keep controls as a sibling above the complete map tree, including its late-added views. */
     private ViewGroup findControlHost() {
+        View content = window.getDecorView().findViewById(android.R.id.content);
+        if (content instanceof ViewGroup) return (ViewGroup) content;
         int rootId = activity.getResources().getIdentifier(
                 "map_activity_root", "id", activity.getPackageName());
         View mapRoot = rootId == 0 ? null : activity.findViewById(rootId);
@@ -489,29 +490,47 @@ final class FloatingWindowController {
      * keep the content and both map containers transparent while the bounded window is active.
      */
     private void captureTransparentLayers(View decor) {
-        if (transparentLayersCaptured) return;
-        contentRoot = decor.findViewById(android.R.id.content);
-        int mapRootId = activity.getResources().getIdentifier(
-                "map_activity_root", "id", activity.getPackageName());
-        mapRoot = mapRootId == 0 ? null : activity.findViewById(mapRootId);
-        int mapViewId = activity.getResources().getIdentifier(
-                "activity_search_map_view", "id", activity.getPackageName());
-        mapWithControls = mapViewId == 0 ? null : activity.findViewById(mapViewId);
-        originalContentBackground = backgroundOf(contentRoot);
-        originalMapRootBackground = backgroundOf(mapRoot);
-        originalMapWithControlsBackground = backgroundOf(mapWithControls);
-        capturePadding(contentRoot, originalContentPadding);
-        capturePadding(mapRoot, originalMapRootPadding);
-        capturePadding(mapWithControls, originalMapWithControlsPadding);
-        transparentContentBackground = new ColorDrawable(Color.TRANSPARENT);
-        transparentMapRootBackground = new ColorDrawable(Color.TRANSPARENT);
-        transparentMapWithControlsBackground = new ColorDrawable(Color.TRANSPARENT);
-        transparentLayersCaptured = true;
+        // MapWithControlsView can be installed after the first onResumeFragments callback. Resolve
+        // each missing root independently on every bounded-window contract pass, while retaining
+        // the original state of roots already captured.
+        if (contentRoot == null) {
+            contentRoot = decor.findViewById(android.R.id.content);
+            originalContentBackground = backgroundOf(contentRoot);
+            capturePadding(contentRoot, originalContentPadding);
+            originalContentFitsSystemWindows = fitsSystemWindows(contentRoot);
+        }
+        if (mapRoot == null) {
+            int mapRootId = activity.getResources().getIdentifier(
+                    "map_activity_root", "id", activity.getPackageName());
+            mapRoot = mapRootId == 0 ? null : activity.findViewById(mapRootId);
+            originalMapRootBackground = backgroundOf(mapRoot);
+            capturePadding(mapRoot, originalMapRootPadding);
+            originalMapRootFitsSystemWindows = fitsSystemWindows(mapRoot);
+        }
+        if (mapWithControls == null) {
+            int mapViewId = activity.getResources().getIdentifier(
+                    "activity_search_map_view", "id", activity.getPackageName());
+            mapWithControls = mapViewId == 0 ? null : activity.findViewById(mapViewId);
+            originalMapWithControlsBackground = backgroundOf(mapWithControls);
+            capturePadding(mapWithControls, originalMapWithControlsPadding);
+            originalMapWithControlsFitsSystemWindows = fitsSystemWindows(mapWithControls);
+        }
+        if (transparentContentBackground == null) {
+            transparentContentBackground = new ColorDrawable(Color.TRANSPARENT);
+        }
+        if (transparentMapRootBackground == null) {
+            transparentMapRootBackground = new ColorDrawable(Color.TRANSPARENT);
+        }
+        if (transparentMapWithControlsBackground == null) {
+            transparentMapWithControlsBackground = new ColorDrawable(Color.TRANSPARENT);
+        }
+        transparentLayersCaptured = contentRoot != null || mapRoot != null
+                || mapWithControls != null;
     }
 
     private void enforceTransparentLayers() {
         View decor = window.getDecorView();
-        if (!transparentLayersCaptured) captureTransparentLayers(decor);
+        captureTransparentLayers(decor);
         if (floatingBackground != null && decor.getBackground() != floatingBackground) {
             window.setBackgroundDrawable(floatingBackground);
             decor.setBackground(floatingBackground);
@@ -522,6 +541,12 @@ final class FloatingWindowController {
         removeFloatingTopInset(contentRoot);
         removeFloatingTopInset(mapRoot);
         removeFloatingTopInset(mapWithControls);
+        setFitsSystemWindows(contentRoot, false);
+        setFitsSystemWindows(mapRoot, false);
+        setFitsSystemWindows(mapWithControls, false);
+        requestLayout(contentRoot);
+        requestLayout(mapRoot);
+        requestLayout(mapWithControls);
         WindowManager.LayoutParams attributes = window.getAttributes();
         if (attributes.dimAmount != 0f) attributes.dimAmount = 0f;
     }
@@ -536,13 +561,17 @@ final class FloatingWindowController {
         restorePadding(contentRoot, originalContentPadding);
         restorePadding(mapRoot, originalMapRootPadding);
         restorePadding(mapWithControls, originalMapWithControlsPadding);
+        setFitsSystemWindows(contentRoot, originalContentFitsSystemWindows);
+        setFitsSystemWindows(mapRoot, originalMapRootFitsSystemWindows);
+        setFitsSystemWindows(mapWithControls, originalMapWithControlsFitsSystemWindows);
     }
 
     /** Makes only the bounded window ignore the head unit's global status-bar top inset. */
     private void installModeAwareInsetDispatch() {
         if (Build.VERSION.SDK_INT < 20) return;
-        View host = contentRoot;
-        if (host == null) host = window.getDecorView().findViewById(android.R.id.content);
+        // Intercept at DecorView before AppCompat/Navigator can turn the top inset into a second
+        // reserved strip inside the already bounded floating window.
+        View host = window.getDecorView();
         if (host == null || host == insetDispatchHost) return;
         if (insetDispatchHost != null) {
             insetDispatchHost.setOnApplyWindowInsetsListener(null);
@@ -584,6 +613,20 @@ final class FloatingWindowController {
 
     private static void restorePadding(View view, int[] source) {
         if (view != null) view.setPadding(source[0], source[1], source[2], source[3]);
+    }
+
+    private static boolean fitsSystemWindows(View view) {
+        return view != null && view.getFitsSystemWindows();
+    }
+
+    private static void setFitsSystemWindows(View view, boolean value) {
+        if (view != null && view.getFitsSystemWindows() != value) {
+            view.setFitsSystemWindows(value);
+        }
+    }
+
+    private static void requestLayout(View view) {
+        if (view != null) view.requestLayout();
     }
 
     private void reportCommittedFrame() {

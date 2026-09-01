@@ -29,8 +29,10 @@ import com.google.android.material.button.MaterialButton;
 import org.json.JSONException;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import dezz.status.widget.instrument.InstrumentClusterView;
 import dezz.status.widget.instrument.InstrumentDisplayLauncher;
@@ -294,7 +296,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
     private void editSelected() {
         InstrumentElementConfig element = preview.instruments().selected();
         if (element == null) return;
+        ScrollView scroll = new ScrollView(this);
         LinearLayout content = dialogColumn();
+        scroll.addView(content);
         content.addView(text(element.type.label, 17, Color.WHITE));
 
         InstrumentStyleFamily[] styles = InstrumentStyleFamily.values();
@@ -329,6 +333,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         final Switch showDistance;
         final Switch showEta;
         final Switch showDuration;
+        final NavigationInfoControls navigationInfoControls;
         final Spinner[] infoRows = new Spinner[3];
         if (element.type.isAnalogGauge()) {
             showFace = switchView("Фон шкалы",
@@ -345,6 +350,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     element.options.optBoolean("showUnit", true));
             showProgress = showStreet = showArrival = null;
             showDistance = showEta = showDuration = null;
+            navigationInfoControls = null;
             content.addView(section("Состав аналогового прибора"), marginTop(10));
             content.addView(showFace);
             content.addView(showScale);
@@ -358,6 +364,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
             showProgress = showStreet = showArrival = null;
             showDistance = showEta = showDuration = null;
+            navigationInfoControls = null;
             content.addView(showFace, marginTop(10));
             InstrumentInfoMetric[] metrics = InstrumentInfoMetric.values();
             String[] labels = infoMetricLabels(metrics);
@@ -386,11 +393,13 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     element.options.optBoolean("showRouteProgress", true));
             showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
             showStreet = showArrival = null;
+            navigationInfoControls = new NavigationInfoControls(content, element);
             content.addView(showFace, marginTop(10));
             content.addView(showDistance);
             content.addView(showEta);
             content.addView(showDuration);
             content.addView(showProgress);
+            navigationInfoControls.addViews();
         } else if (isDigitalValueElement(element.type)) {
             showFace = switchView("Фон элемента",
                     element.options.optBoolean("showFace", true));
@@ -401,6 +410,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             showScale = showScaleLabels = showNeedle = showValue = null;
             showStreet = showArrival = null;
             showDistance = showEta = showDuration = null;
+            navigationInfoControls = null;
             content.addView(showFace, marginTop(10));
             content.addView(showUnit);
             content.addView(showProgress);
@@ -408,6 +418,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             showFace = showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
             showProgress = showStreet = showArrival = null;
             showDistance = showEta = showDuration = null;
+            navigationInfoControls = null;
         }
 
         TextView opacityValue = label("Непрозрачность: " + element.opacityPercent + "%");
@@ -421,7 +432,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
 
         new AlertDialog.Builder(this)
                 .setTitle("Настройка элемента")
-                .setView(content)
+                .setView(scroll)
                 .setPositiveButton("Применить", (dialog, which) -> {
                     element.style = styles[style.getSelectedItemPosition()];
                     element.enabled = visible.isChecked();
@@ -457,6 +468,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     }
                     if (showDuration != null) {
                         setOption(element, "showDuration", showDuration.isChecked());
+                    }
+                    if (navigationInfoControls != null) {
+                        navigationInfoControls.apply(element);
                     }
                     InstrumentInfoMetric[] metrics = InstrumentInfoMetric.values();
                     for (int row = 0; row < infoRows.length; row++) {
@@ -535,6 +549,20 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField zoom = slider(content,
                 "Приближение: 0 — стандартное, + ближе, − дальше",
                 map.zoomDelta, -8, 8, 0.25, "");
+        Switch fixedZoom = switchView(
+                "Фиксировать масштаб — не менять его от скорости",
+                map.fixedZoomEnabled);
+        content.addView(fixedZoom);
+        SliderField fixedZoomLevel = slider(content,
+                "Фиксированное увеличение карты",
+                map.fixedZoomLevel, 2, 21, 0.25, "");
+        Runnable updateFixedZoomControl = () -> {
+            zoom.setEnabled(!fixedZoom.isChecked());
+            fixedZoomLevel.setEnabled(fixedZoom.isChecked());
+        };
+        fixedZoom.setOnCheckedChangeListener(
+                (button, checked) -> updateFixedZoomControl.run());
+        updateFixedZoomControl.run();
         SliderField tilt = slider(content,
                 "Наклон: 0° — сверху, 60° — перспектива",
                 map.tiltDegrees, 0, 80, 1, "°");
@@ -562,6 +590,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch traffic = switchView("Пробки на остальных дорогах", map.showTraffic);
         Switch trafficLights = switchView(
                 "Светофоры с отсчётом — отдельный слой", map.showTrafficLights);
+        Switch routeTurns = switchView(
+                "Стрелки поворотов прямо на линии маршрута", map.showRouteTurns);
         Switch laneGuidance = switchView(
                 "Подсказки по полосам — слой на маршруте", map.showLaneGuidance);
         Switch hudSpeedCameras = switchView(
@@ -581,6 +611,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(traffic);
         content.addView(routeTraffic);
         content.addView(trafficLights);
+        content.addView(routeTurns);
         content.addView(laneGuidance);
         content.addView(hudSpeedCameras);
         content.addView(labels);
@@ -604,11 +635,20 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 "Размер знаков движения по полосам",
                 map.laneGuidanceScalePercent, 50, 250, 5, " %");
         SliderField cameraScale = slider(content,
-                "Размер знаков камер и маленьких обозначений",
+                "Размер единых знаков камер",
                 map.cameraScalePercent, 50, 250, 5, " %");
+        SliderField cameraDirectionScale = slider(content,
+                "Размер полупрозрачного направления камер",
+                map.cameraDirectionScalePercent, 25, 300, 5, " %");
+        SliderField cameraDirectionOpacity = slider(content,
+                "Прозрачность направления камер",
+                map.cameraDirectionOpacityPercent, 0, 100, 5, " %");
         SliderField trafficLightScale = slider(content,
                 "Размер светофоров и плашек секунд",
                 map.trafficLightScalePercent, 50, 250, 5, " %");
+        SliderField routeTurnScale = slider(content,
+                "Размер стрелок поворотов на маршруте",
+                map.routeTurnScalePercent, 50, 250, 5, " %");
         SliderField routeLabelScale = slider(content,
                 "Размер названий улиц на маршруте",
                 map.routeLabelScalePercent, 50, 250, 5, " %");
@@ -663,6 +703,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightLayerPriority = slider(content,
                 "Светофоры и секунды", map.trafficLightLayerPriority,
                 0, 100, 1, "");
+        SliderField routeTurnLayerPriority = slider(content,
+                "Стрелки поворотов на маршруте", map.routeTurnLayerPriority,
+                0, 100, 1, "");
         SliderField routeLabelLayerPriority = slider(content,
                 "Названия улиц на маршруте", map.routeLabelLayerPriority,
                 0, 100, 1, "");
@@ -675,7 +718,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
                 destinationLayerPriority, trafficLightLayerPriority,
-                routeLabelLayerPriority, laneGuidanceLayerPriority, cursorLayerPriority};
+                routeTurnLayerPriority, routeLabelLayerPriority,
+                laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
             for (SliderField field : layerPriorityControls) {
                 field.setEnabled(manualLayerPriorities.isChecked());
@@ -715,6 +759,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cameraMode = navigationCameraModeValue(
                             cameraMode.getSelectedItemPosition());
                     map.zoomDelta = zoom.value();
+                    map.fixedZoomEnabled = fixedZoom.isChecked();
+                    map.fixedZoomLevel = fixedZoomLevel.value();
                     map.tiltDegrees = tilt.intValue();
                     map.focusXPercent = focusX.intValue();
                     map.focusYPercent = focusY.intValue();
@@ -726,6 +772,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showTraffic = traffic.isChecked();
                     map.showRouteTraffic = routeTraffic.isChecked();
                     map.showTrafficLights = trafficLights.isChecked();
+                    map.showRouteTurns = routeTurns.isChecked();
                     map.showLaneGuidance = laneGuidance.isChecked();
                     map.showHudSpeedCameras = hudSpeedCameras.isChecked();
                     map.showPois = pois.isChecked();
@@ -740,7 +787,10 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cursorScalePercent = cursorScale.intValue();
                     map.laneGuidanceScalePercent = laneGuidanceScale.intValue();
                     map.cameraScalePercent = cameraScale.intValue();
+                    map.cameraDirectionScalePercent = cameraDirectionScale.intValue();
+                    map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue();
                     map.trafficLightScalePercent = trafficLightScale.intValue();
+                    map.routeTurnScalePercent = routeTurnScale.intValue();
                     map.routeLabelScalePercent = routeLabelScale.intValue();
                     map.roadEventScalePercent = roadEventScale.intValue();
                     map.destinationScalePercent = destinationScale.intValue();
@@ -759,6 +809,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.routeLayerPriority = routeLayerPriority.intValue();
                     map.destinationLayerPriority = destinationLayerPriority.intValue();
                     map.trafficLightLayerPriority = trafficLightLayerPriority.intValue();
+                    map.routeTurnLayerPriority = routeTurnLayerPriority.intValue();
                     map.routeLabelLayerPriority = routeLabelLayerPriority.intValue();
                     map.laneGuidanceLayerPriority = laneGuidanceLayerPriority.intValue();
                     map.cursorLayerPriority = cursorLayerPriority.intValue();
@@ -917,8 +968,125 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         }
     }
 
+    /** Fine-grained editor for the stock-like route summary card. */
+    private final class NavigationInfoControls {
+        @NonNull private final LinearLayout parent;
+        @NonNull private final InstrumentElementConfig source;
+        @NonNull private final Map<String, SliderField> numbers = new LinkedHashMap<>();
+        @NonNull private final Map<String, ColorField> colors = new LinkedHashMap<>();
+        private Switch showIcon;
+        private Switch reserveIconSpace;
+
+        NavigationInfoControls(@NonNull LinearLayout parent,
+                               @NonNull InstrumentElementConfig source) {
+            this.parent = parent;
+            this.source = source;
+        }
+
+        void addViews() {
+            parent.addView(section("Исходный знак Навигатора"), marginTop(12));
+            showIcon = switchView("Показывать исходный знак слева",
+                    source.options.optBoolean("showManeuverIcon", true));
+            reserveIconSpace = switchView("Сохранять место, пока знак ещё не пришёл",
+                    source.options.optBoolean("reserveManeuverIconSpace", true));
+            parent.addView(showIcon);
+            parent.addView(reserveIconSpace);
+            number("maneuverIconAreaPercent", "Ширина области знака",
+                    15, 5, 40, 1, " %");
+            number("maneuverIconScalePercent", "Размер исходного знака",
+                    100, 25, 250, 5, " %");
+            number("maneuverIconGapPx", "Расстояние от знака до данных",
+                    10, 0, 100, 1, " px");
+            color("maneuverIconBackgroundColor", "Фон области знака",
+                    "#FF2B2E35");
+            number("maneuverIconBackgroundOpacityPercent", "Непрозрачность фона знака",
+                    100, 0, 100, 1, " %");
+            number("maneuverIconCornerRadiusPx", "Скругление фона знака",
+                    12, 0, 100, 1, " px");
+
+            parent.addView(section("Отступы знака"), marginTop(12));
+            padding("maneuverIconPadding", 5, 5, 5, 5, 160);
+
+            parent.addView(section("Шрифты данных"), marginTop(12));
+            number("distanceTextSizeSp", "Оставшееся расстояние",
+                    25, 8, 120, 1, " sp");
+            number("arrivalTextSizeSp", "Время прибытия",
+                    25, 8, 120, 1, " sp");
+            number("durationTextSizeSp", "Оставшееся время",
+                    25, 8, 120, 1, " sp");
+            number("metricGapPx", "Расстояние между значениями",
+                    10, 0, 100, 1, " px");
+            number("metricsVerticalPercent", "Положение значений по высоте",
+                    44, 0, 100, 1, " %");
+
+            parent.addView(section("Прогресс маршрута"), marginTop(12));
+            number("progressBarHeightPx", "Толщина прогресс-бара",
+                    14, 2, 80, 1, " px");
+            number("progressBarTopGapPx", "Отступ над прогресс-баром",
+                    9, 0, 100, 1, " px");
+            number("progressBarCornerRadiusPx", "Скругление прогресс-бара",
+                    7, 0, 60, 1, " px");
+            number("progressMarkerScalePercent", "Размер маркера на прогресс-баре",
+                    100, 25, 250, 5, " %");
+
+            parent.addView(section("Карточка и внутренние отступы"), marginTop(12));
+            color("faceColor", "Цвет карточки", "#FF15171B");
+            number("faceOpacityPercent", "Непрозрачность карточки",
+                    93, 0, 100, 1, " %");
+            number("faceCornerRadiusPx", "Скругление карточки",
+                    18, 0, 160, 1, " px");
+            color("faceBorderColor", "Цвет рамки карточки", "#00000000");
+            number("faceBorderWidthPx", "Толщина рамки карточки",
+                    0, 0, 24, 1, " px");
+            padding("contentPadding", 14, 10, 14, 10, 160);
+        }
+
+        private void number(@NonNull String key, @NonNull String title, int fallback,
+                            int minimum, int maximum, int step, @NonNull String suffix) {
+            numbers.put(key, slider(parent, title, source.options.optInt(key, fallback),
+                    minimum, maximum, step, suffix));
+        }
+
+        private void padding(@NonNull String prefix, int left, int top,
+                             int right, int bottom, int maximum) {
+            String[] suffixes = {"LeftPx", "TopPx", "RightPx", "BottomPx"};
+            String[] labels = {"Слева", "Сверху", "Справа", "Снизу"};
+            int[] fallbacks = {left, top, right, bottom};
+            for (int index = 0; index < suffixes.length; index++) {
+                String key = prefix + suffixes[index];
+                number(key, labels[index], fallbacks[index], 0, maximum, 1, " px");
+            }
+        }
+
+        private void color(@NonNull String key, @NonNull String title,
+                           @NonNull String fallback) {
+            colors.put(key, colorField(parent, title,
+                    source.options.optString(key, fallback)));
+        }
+
+        void apply(@NonNull InstrumentElementConfig target) {
+            setOption(target, "showManeuverIcon", showIcon.isChecked());
+            setOption(target, "reserveManeuverIconSpace", reserveIconSpace.isChecked());
+            for (Map.Entry<String, SliderField> entry : numbers.entrySet()) {
+                setOption(target, entry.getKey(), entry.getValue().intValue());
+            }
+            for (Map.Entry<String, ColorField> entry : colors.entrySet()) {
+                setOption(target, entry.getKey(), entry.getValue().value);
+            }
+        }
+    }
+
     private static void setOption(@NonNull InstrumentElementConfig element,
                                   @NonNull String key, boolean value) {
+        try {
+            element.options.put(key, value);
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private static void setOption(@NonNull InstrumentElementConfig element,
+                                  @NonNull String key, int value) {
         try {
             element.options.put(key, value);
         } catch (JSONException impossible) {

@@ -5,9 +5,12 @@
 
 package dezz.status.widget.driver;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.media.AudioManager;
 import android.os.SystemClock;
 import android.view.View;
@@ -16,6 +19,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import java.util.List;
 
@@ -38,8 +42,8 @@ import dezz.status.widget.settings.SettingsDestinationCatalog;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /** Executes the same shortcut model outside {@code LauncherActivity}. */
-final class DriverPanelActionExecutor {
-    interface Host {
+public final class DriverPanelActionExecutor {
+    public interface Host {
         void showAllApps(@Nullable View anchor);
         void showFavorites(@NonNull String panelId, @Nullable View anchor);
         void triggerStockClimate();
@@ -50,19 +54,20 @@ final class DriverPanelActionExecutor {
     private final Preferences preferences;
     private final Host host;
 
-    DriverPanelActionExecutor(@NonNull Context context, @NonNull Preferences preferences,
-                              @NonNull Host host) {
+    public DriverPanelActionExecutor(@NonNull Context context,
+                                     @NonNull Preferences preferences,
+                                     @NonNull Host host) {
         this.context = context.getApplicationContext();
         this.preferences = preferences;
         this.host = host;
     }
 
-    void execute(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+    public void execute(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         execute(shortcut, null);
     }
 
-    void execute(@NonNull LauncherShortcutStore.Shortcut shortcut,
-                 @Nullable View anchor) {
+    public void execute(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                        @Nullable View anchor) {
         try {
             switch (shortcut.kind) {
                 case APP:
@@ -75,6 +80,9 @@ final class DriverPanelActionExecutor {
                     return;
                 case RULE:
                     executeRule(shortcut.target);
+                    return;
+                case PHONE:
+                    call(shortcut.target);
                     return;
                 case CAR:
                     CarControlCommand requested = new CarControlCommand(
@@ -105,12 +113,12 @@ final class DriverPanelActionExecutor {
         }
     }
 
-    boolean executeLong(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+    public boolean executeLong(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         return executeLong(shortcut, null);
     }
 
-    boolean executeLong(@NonNull LauncherShortcutStore.Shortcut shortcut,
-                        @Nullable View anchor) {
+    public boolean executeLong(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                               @Nullable View anchor) {
         if (!shortcut.hasLongAction) return false;
         LauncherShortcutStore.Shortcut action = shortcut.copy();
         action.kind = shortcut.longKind;
@@ -274,6 +282,17 @@ final class DriverPanelActionExecutor {
         long time = SystemClock.uptimeMillis();
         audio.dispatchMediaKeyEvent(new KeyEvent(time, time, KeyEvent.ACTION_DOWN, keyCode, 0));
         audio.dispatchMediaKeyEvent(new KeyEvent(time, time, KeyEvent.ACTION_UP, keyCode, 0));
+    }
+
+    private void call(@NonNull String rawNumber) {
+        String number = rawNumber.trim();
+        if (number.isEmpty()) throw new IllegalArgumentException("Missing phone number");
+        Uri uri = Uri.fromParts("tel", number, null);
+        boolean direct = ContextCompat.checkSelfPermission(context,
+                Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED;
+        Intent intent = new Intent(direct ? Intent.ACTION_CALL : Intent.ACTION_DIAL, uri)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
     }
 
     private void toast(String text) {

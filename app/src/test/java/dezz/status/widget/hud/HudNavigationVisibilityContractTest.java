@@ -86,7 +86,13 @@ public final class HudNavigationVisibilityContractTest {
         assertTrue(element.contains("showCardBackground"));
         assertTrue(element.contains("showRoadBadge"));
         assertTrue(element.contains("cardOpacityPercent"));
+        assertTrue(element.contains("sourceImageOnly"));
+        assertTrue(element.contains("distanceFontSizeSp"));
+        assertTrue(element.contains("arrowPaddingLeftPx"));
         assertTrue(canvas.contains("drawManeuverCardText"));
+        assertTrue(canvas.contains("nav.maneuverImage"));
+        assertTrue(canvas.contains("boolean exactSource = item.type == HudElementType.NAV_COMBINED"));
+        assertTrue(canvas.contains("sourceImageOnly"));
         assertTrue(canvas.contains("nav.turnDistance"));
         assertTrue(canvas.contains("nav.maneuverSubtext"));
         assertTrue(canvas.contains("nav.street"));
@@ -94,6 +100,7 @@ public final class HudNavigationVisibilityContractTest {
         assertTrue(runtime.contains("navigation.turnDistance"));
         assertTrue(state.contains("case NAV_COMBINED:"));
         assertTrue(state.contains("return routeActive && (maneuverImage != null"));
+        assertTrue(runtime.contains("readFreshManeuverImage(context)"));
     }
 
     private static Path projectRoot() {

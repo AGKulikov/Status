@@ -21,6 +21,7 @@ import dezz.status.widget.Fonts;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.driver.DriverFavoritesPanelConfig;
+import dezz.status.widget.dim.DimMenuShortcutDefaults;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.SourceBinding;
 
@@ -37,7 +38,7 @@ public final class LauncherShortcutStore {
     public static final int MIN_INFORMATION_VALUE_TEXT_SIZE_SP = 8;
     public static final int MAX_INFORMATION_VALUE_TEXT_SIZE_SP = 96;
 
-    public enum Kind { APP, BUILTIN, RULE, INTENT, CAR, INFO, DIVIDER }
+    public enum Kind { APP, BUILTIN, RULE, PHONE, INTENT, CAR, INFO, DIVIDER }
 
     public static final class Shortcut {
         @NonNull public String id = UUID.randomUUID().toString();
@@ -317,20 +318,23 @@ public final class LauncherShortcutStore {
     private final Preferences.Str storage;
     private final boolean driverPanel;
     private final boolean driverFavorites;
+    private final boolean dimMenu;
     private final List<Shortcut> shortcuts = new ArrayList<>();
 
     public LauncherShortcutStore(@NonNull Preferences preferences) {
-        this(preferences, preferences.launcherShortcutsJson, false, false);
+        this(preferences, preferences.launcherShortcutsJson, false, false, false);
     }
 
     private LauncherShortcutStore(@NonNull Preferences preferences,
                                   @NonNull Preferences.Str storage,
                                   boolean driverPanel,
-                                  boolean driverFavorites) {
+                                  boolean driverFavorites,
+                                  boolean dimMenu) {
         this.preferences = preferences;
         this.storage = storage;
         this.driverPanel = driverPanel;
         this.driverFavorites = driverFavorites;
+        this.dimMenu = dimMenu;
         load();
     }
 
@@ -343,7 +347,8 @@ public final class LauncherShortcutStore {
     public static LauncherShortcutStore forDriverPanel(
             @NonNull Preferences preferences,
             @NonNull Preferences.DriverPanelProfile profile) {
-        return new LauncherShortcutStore(preferences, profile.shortcutsJson, true, false);
+        return new LauncherShortcutStore(preferences, profile.shortcutsJson,
+                true, false, false);
     }
 
     @NonNull
@@ -356,7 +361,14 @@ public final class LauncherShortcutStore {
     public static LauncherShortcutStore forDriverFavorites(
             @NonNull Preferences preferences, @NonNull String panelId) {
         return new LauncherShortcutStore(preferences,
-                preferences.driverFavoritesShortcuts(panelId), false, true);
+                preferences.driverFavoritesShortcuts(panelId), false, true, false);
+    }
+
+    /** Actions presented in the independent DIM navigation-tab menu. */
+    @NonNull
+    public static LauncherShortcutStore forDimMenu(@NonNull Preferences preferences) {
+        return new LauncherShortcutStore(preferences,
+                preferences.dimMenuPanelShortcutsJson, false, false, true);
     }
 
     public void load() {
@@ -966,6 +978,7 @@ public final class LauncherShortcutStore {
 
     @NonNull
     private List<Shortcut> defaults() {
+        if (dimMenu) return DimMenuShortcutDefaults.create(preferences);
         if (driverFavorites) return Collections.emptyList();
         if (driverPanel) {
             List<Shortcut> values = new ArrayList<>();

@@ -2,7 +2,13 @@
 package ru.natro.navigation;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.PointF;
+import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -245,6 +251,19 @@ final class TrafficLightMapLayer {
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void applyOriginalYandexViews(
             List<NavigatorStatePublisher.TrafficLightFrame> values) throws Exception {
+        try {
+            applyStockYandexViews(values);
+        } catch (Throwable unavailable) {
+            // Some 30.3.0 regional builds move the private Navigator view implementation while
+            // preserving the public Windshield payload. Keep the compact signal+seconds contract
+            // alive instead of deleting the complete traffic-light layer.
+            applyCompactFallbackViews(values);
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void applyStockYandexViews(
+            List<NavigatorStatePublisher.TrafficLightFrame> values) throws Exception {
         Class<?> viewClass = Class.forName(
                 "ru.yandex.yandexnavi.ui.traffic.TrafficLightViewImpl");
         Class<?> signalClass = Class.forName(
@@ -296,6 +315,85 @@ final class TrafficLightMapLayer {
             marker.imageProvider = provider;
             marker.iconStyle = style;
         }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void applyCompactFallbackViews(
+            List<NavigatorStatePublisher.TrafficLightFrame> values) throws Exception {
+        Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
+        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+        Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
+        Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass,
+                "NO_ROTATION");
+        for (int index = 0; index < values.size(); index++) {
+            NavigatorStatePublisher.TrafficLightFrame light = values.get(index);
+            Marker marker = markers.get(index);
+            Bitmap bitmap = compactTrafficLightBitmap(light);
+            Object provider = providerClass.getMethod("fromBitmap", Bitmap.class)
+                    .invoke(null, bitmap);
+            Object style = styleClass.getConstructor().newInstance();
+            invoke(style, "setAnchor", new Class<?>[]{PointF.class},
+                    new PointF(0.5f, 0.92f));
+            invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
+            invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
+            invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
+            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
+            invoke(marker.placemark, "setIcon",
+                    new Class<?>[]{providerClass, styleClass}, provider, style);
+            invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
+            marker.view = bitmap;
+            marker.imageProvider = provider;
+            marker.iconStyle = style;
+        }
+    }
+
+    /** Yandex-like compact circle and countdown pill; never a full vertical traffic light. */
+    private Bitmap compactTrafficLightBitmap(
+            NavigatorStatePublisher.TrafficLightFrame light) {
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        float scale = scalePercent / 100f;
+        int unit = Math.max(28, Math.min(180, Math.round(38f * density * scale)));
+        boolean countdown = light.secondsLeft >= 0;
+        int width = countdown ? Math.round(unit * 1.95f) : unit;
+        int height = unit;
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
+        float radius = unit * .36f;
+        float centerX = unit * .50f;
+        float centerY = unit * .50f;
+        if (countdown) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(nightMode ? 0xE8171A20 : 0xE82B2E34);
+            RectF pill = new RectF(unit * .34f, unit * .13f,
+                    width - unit * .06f, unit * .87f);
+            canvas.drawRoundRect(pill, unit * .30f, unit * .30f, paint);
+        }
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(signalColor(light.signal));
+        canvas.drawCircle(centerX, centerY, radius, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1.5f, unit * .045f));
+        paint.setColor(0xB8FFFFFF);
+        canvas.drawCircle(centerX, centerY, radius, paint);
+        if (countdown) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTypeface(Typeface.DEFAULT_BOLD);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(unit * .42f);
+            paint.setColor(Color.WHITE);
+            Paint.FontMetrics metrics = paint.getFontMetrics();
+            float baseline = centerY - (metrics.ascent + metrics.descent) * .5f;
+            canvas.drawText(Integer.toString(light.secondsLeft),
+                    unit * 1.34f, baseline, paint);
+        }
+        return bitmap;
+    }
+
+    private static int signalColor(String signal) {
+        if ("RED".equals(signal) || "RED_AND_YELLOW".equals(signal)) return 0xFFFF3045;
+        if ("YELLOW".equals(signal)) return 0xFFFFC928;
+        return 0xFF35D46F;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

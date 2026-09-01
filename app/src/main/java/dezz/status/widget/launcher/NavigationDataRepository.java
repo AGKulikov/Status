@@ -759,6 +759,22 @@ public final class NavigationDataRepository {
     }
 
     /**
+     * Reads only the fresh, source-rendered Yandex manoeuvre graphic.
+     *
+     * <p>The authenticated navigation bridge deliberately transports semantic route state, while
+     * the existing Yandex/MConfig broadcast transports the original bitmap. HUD consumers use
+     * this lightweight path to combine both sources without decoding the lane, jam and route
+     * graphics on every guidance tick.</p>
+     */
+    @Nullable
+    public static Bitmap readFreshManeuverImage(@NonNull Context context) {
+        SharedPreferences prefs = preferences(context);
+        return loadFreshGraphic(context, prefs, PREF_MANEUVER_IMAGE_UPDATED_AT,
+                MANEUVER_IMAGE_STALE_MS, NavigationGraphicStore.MANEUVER,
+                System.currentTimeMillis());
+    }
+
+    /**
      * Adapts the authenticated direct bridge for HOME without touching persisted notification
      * caches. Route-only fields are blank when guidance is inactive and no legacy bitmap can leak
      * from an older maneuver into this exact snapshot.

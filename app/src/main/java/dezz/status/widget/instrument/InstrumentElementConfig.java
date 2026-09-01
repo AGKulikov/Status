@@ -59,6 +59,57 @@ public final class InstrumentElementConfig {
         responseMillis = clamp(responseMillis, 0, 500);
         opacityPercent = clamp(opacityPercent, 10, 100);
         if (options == null || options.toString().length() > 32_768) options = new JSONObject();
+        if (type == InstrumentElementType.NAVIGATION_INFO) normalizeNavigationInfoOptions();
+    }
+
+    private void normalizeNavigationInfoOptions() {
+        try {
+            String[] paddingKeys = {"contentPaddingLeftPx", "contentPaddingTopPx",
+                    "contentPaddingRightPx", "contentPaddingBottomPx",
+                    "maneuverIconPaddingLeftPx", "maneuverIconPaddingTopPx",
+                    "maneuverIconPaddingRightPx", "maneuverIconPaddingBottomPx"};
+            for (String key : paddingKeys) {
+                int fallback = key.startsWith("content")
+                        ? (key.endsWith("LeftPx") || key.endsWith("RightPx") ? 14 : 10)
+                        : 5;
+                options.put(key, clamp(options.optInt(key, fallback), 0, 160));
+            }
+            options.put("maneuverIconAreaPercent", clamp(
+                    options.optInt("maneuverIconAreaPercent", 15), 5, 40));
+            options.put("maneuverIconScalePercent", clamp(
+                    options.optInt("maneuverIconScalePercent", 100), 25, 250));
+            options.put("maneuverIconGapPx", clamp(
+                    options.optInt("maneuverIconGapPx", 10), 0, 100));
+            options.put("maneuverIconBackgroundOpacityPercent", clamp(
+                    options.optInt("maneuverIconBackgroundOpacityPercent", 100), 0, 100));
+            options.put("maneuverIconCornerRadiusPx", clamp(
+                    options.optInt("maneuverIconCornerRadiusPx", 12), 0, 100));
+            options.put("metricGapPx", clamp(options.optInt("metricGapPx", 10), 0, 100));
+            options.put("distanceTextSizeSp", clamp(
+                    options.optInt("distanceTextSizeSp", 25), 8, 120));
+            options.put("arrivalTextSizeSp", clamp(
+                    options.optInt("arrivalTextSizeSp", 25), 8, 120));
+            options.put("durationTextSizeSp", clamp(
+                    options.optInt("durationTextSizeSp", 25), 8, 120));
+            options.put("metricsVerticalPercent", clamp(
+                    options.optInt("metricsVerticalPercent", 44), 0, 100));
+            options.put("progressBarHeightPx", clamp(
+                    options.optInt("progressBarHeightPx", 14), 2, 80));
+            options.put("progressBarTopGapPx", clamp(
+                    options.optInt("progressBarTopGapPx", 9), 0, 100));
+            options.put("progressBarCornerRadiusPx", clamp(
+                    options.optInt("progressBarCornerRadiusPx", 7), 0, 60));
+            options.put("progressMarkerScalePercent", clamp(
+                    options.optInt("progressMarkerScalePercent", 100), 25, 250));
+            options.put("faceOpacityPercent", clamp(
+                    options.optInt("faceOpacityPercent", 93), 0, 100));
+            options.put("faceCornerRadiusPx", clamp(
+                    options.optInt("faceCornerRadiusPx", 18), 0, 160));
+            options.put("faceBorderWidthPx", clamp(
+                    options.optInt("faceBorderWidthPx", 0), 0, 24));
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     @NonNull

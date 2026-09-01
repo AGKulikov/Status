@@ -6,8 +6,9 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PointF;
-import android.graphics.Typeface;
+import android.graphics.RectF;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -18,11 +19,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Flat street-name glyphs aligned with and painted directly over the active route. */
-final class RouteStreetLabelMapLayer {
-    private static final String TAG = "NatroRouteLabels";
+/** Flat, original-style manoeuvre arrows painted directly on the active route. */
+final class RouteTurnMapLayer {
+    private static final String TAG = "NatroRouteTurns";
     private static final long FRESH_MS = 2_500L;
-    private static final int MAX_LABELS = 6;
+    private static final int MAX_TURNS = 10;
 
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -32,10 +33,9 @@ final class RouteStreetLabelMapLayer {
     private Object collection;
     private boolean enabled;
     private int scalePercent = 100;
-    private float zIndex = NavigationMapProfile.layerZ(60);
+    private float zIndex = NavigationMapProfile.layerZ(55);
     private boolean latestRouteActive;
-    private List<NavigatorStatePublisher.RouteStreetLabelFrame> latest =
-            Collections.emptyList();
+    private List<NavigatorStatePublisher.RouteTurnFrame> latest = Collections.emptyList();
     private long latestSampleElapsedMs;
     private long latestFingerprint = Long.MIN_VALUE;
     private long renderedFingerprint = Long.MIN_VALUE;
@@ -58,7 +58,7 @@ final class RouteStreetLabelMapLayer {
         }
     };
 
-    RouteStreetLabelMapLayer(Context context) {
+    RouteTurnMapLayer(Context context) {
         Context app = context.getApplicationContext();
         this.context = app == null ? context : app;
     }
@@ -101,7 +101,7 @@ final class RouteStreetLabelMapLayer {
     }
 
     void update(boolean routeActive, long sampleElapsedMs,
-                List<NavigatorStatePublisher.RouteStreetLabelFrame> frames) {
+                List<NavigatorStatePublisher.RouteTurnFrame> frames) {
         latestRouteActive = routeActive;
         long now = SystemClock.elapsedRealtime();
         boolean fresh = routeActive && sampleElapsedMs > 0L && now >= sampleElapsedMs
@@ -156,35 +156,34 @@ final class RouteStreetLabelMapLayer {
             Object currentCollection = collection;
             if (currentCollection == null) {
                 currentCollection = MapObjectLayerFactory.create(map,
-                        "ru.natro.navigation.route_street_labels",
-                        MapObjectLayerFactory.MINOR, zIndex);
+                        "ru.natro.navigation.route_turns",
+                        MapObjectLayerFactory.MAJOR, zIndex);
                 collection = currentCollection;
             }
             invoke(currentCollection, "clear", new Class<?>[0]);
             bitmaps.clear();
             providers.clear();
             int count = 0;
-            for (NavigatorStatePublisher.RouteStreetLabelFrame frame : latest) {
-                if (count++ >= MAX_LABELS) break;
+            for (NavigatorStatePublisher.RouteTurnFrame frame : latest) {
+                if (count++ >= MAX_TURNS) break;
                 if (frame == null || !frame.hasContent()) continue;
-                addLabel(currentCollection, frame);
+                addArrow(currentCollection, frame);
             }
             renderedFingerprint = latestFingerprint;
         } catch (Throwable failure) {
-            Log.w(TAG, "Route street label layer update failed", failure);
+            Log.w(TAG, "Route-turn layer update failed", failure);
             clearVisual();
         }
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void addLabel(Object target,
-                          NavigatorStatePublisher.RouteStreetLabelFrame frame)
+    private void addArrow(Object target, NavigatorStatePublisher.RouteTurnFrame frame)
             throws Exception {
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         Object point = pointClass.getConstructor(double.class, double.class)
                 .newInstance(frame.latitude, frame.longitude);
         Object placemark = invoke(target, "addPlacemark", new Class<?>[]{pointClass}, point);
-        Bitmap bitmap = createLabelBitmap(frame.text);
+        Bitmap bitmap = createArrowBitmap(frame.action);
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
         Object provider = providerClass.getMethod("fromBitmap", Bitmap.class)
                 .invoke(null, bitmap);
@@ -198,47 +197,97 @@ final class RouteStreetLabelMapLayer {
         invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
         invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
         invoke(placemark, "setIcon", new Class<?>[]{providerClass, styleClass}, provider, style);
-        invoke(placemark, "setDirection", new Class<?>[]{float.class},
-                readableBearing(frame.bearingDegrees));
+        invoke(placemark, "setDirection", new Class<?>[]{float.class}, frame.bearingDegrees);
         invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
         bitmaps.add(bitmap);
         providers.add(provider);
     }
 
-    private Bitmap createLabelBitmap(String text) {
+    private Bitmap createArrowBitmap(String rawAction) {
         float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
         float scale = scalePercent / 100f;
-        Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
-        fill.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-        fill.setTextSize(15f * density * scale);
-        fill.setTextAlign(Paint.Align.LEFT);
-        Paint.FontMetrics metrics = fill.getFontMetrics();
-        float padding = 5f * density * scale;
-        int width = Math.max(1, Math.min(1024,
-                Math.round(fill.measureText(text) + padding * 2f)));
-        int height = Math.max(1, Math.min(256,
-                Math.round(metrics.descent - metrics.ascent + padding * 2f)));
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        int size = Math.max(30, Math.min(220, Math.round(46f * density * scale)));
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
-        float baseline = padding - metrics.ascent;
-        Paint outline = new Paint(fill);
-        outline.setStyle(Paint.Style.STROKE);
-        outline.setStrokeJoin(Paint.Join.ROUND);
-        outline.setStrokeWidth(Math.max(2f, 2.5f * density * scale));
-        outline.setColor(0xE8172230);
-        canvas.drawText(text, padding, baseline, outline);
-        fill.setStyle(Paint.Style.FILL);
-        fill.setColor(Color.WHITE);
-        canvas.drawText(text, padding, baseline, fill);
+        String action = rawAction == null ? "" : rawAction;
+        int direction = action.contains("LEFT") ? -1 : action.contains("RIGHT") ? 1 : 0;
+        Paint outline = arrowPaint(size, 0xCC1A2029, size * .19f);
+        Paint white = arrowPaint(size, Color.WHITE, size * .115f);
+        Path path = arrowPath(action, direction, size);
+        canvas.drawPath(path, outline);
+        canvas.drawPath(path, white);
+        drawArrowHead(canvas, outline, pathEnd(action, direction, size), direction, size);
+        drawArrowHead(canvas, white, pathEnd(action, direction, size), direction, size);
         return bitmap;
     }
 
-    /** Keep text upright when the route geometry itself runs south/west. */
-    private static float readableBearing(float raw) {
-        float value = raw % 360f;
-        if (value < 0f) value += 360f;
-        if (value > 90f && value < 270f) value = (value + 180f) % 360f;
-        return value;
+    private static Paint arrowPaint(int size, int color, float width) {
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setStrokeWidth(Math.max(2f, width));
+        paint.setColor(color);
+        return paint;
+    }
+
+    private static Path arrowPath(String action, int direction, int size) {
+        float s = size;
+        Path path = new Path();
+        path.moveTo(.50f * s, .86f * s);
+        if (action.contains("UTURN")) {
+            float side = direction < 0 ? .25f : .75f;
+            path.lineTo(.50f * s, .48f * s);
+            path.cubicTo(.50f * s, .20f * s, side, .18f * s, side, .42f * s);
+        } else if (action.contains("ROUNDABOUT")) {
+            RectF circle = new RectF(.27f * s, .25f * s, .73f * s, .71f * s);
+            path.lineTo(.50f * s, .68f * s);
+            path.addArc(circle, 90f, direction < 0 ? 245f : -245f);
+        } else if (direction != 0) {
+            float endX = direction < 0 ? .18f * s : .82f * s;
+            float bendY = action.contains("SLIGHT") ? .48f * s : .56f * s;
+            float endY = action.contains("SLIGHT") ? .30f * s : .34f * s;
+            path.lineTo(.50f * s, bendY);
+            path.quadTo(.50f * s, endY, endX, endY);
+        } else {
+            path.lineTo(.50f * s, .20f * s);
+        }
+        return path;
+    }
+
+    private static PointF pathEnd(String action, int direction, int size) {
+        float s = size;
+        if (action.contains("UTURN")) {
+            return new PointF((direction < 0 ? .25f : .75f) * s, .42f * s);
+        }
+        if (action.contains("ROUNDABOUT")) {
+            return new PointF((direction < 0 ? .28f : .72f) * s, .39f * s);
+        }
+        if (direction != 0) {
+            return new PointF((direction < 0 ? .18f : .82f) * s,
+                    (action.contains("SLIGHT") ? .30f : .34f) * s);
+        }
+        return new PointF(.50f * s, .20f * s);
+    }
+
+    private static void drawArrowHead(Canvas canvas, Paint paint, PointF end,
+                                      int direction, int size) {
+        float s = size;
+        Path head = new Path();
+        if (direction < 0) {
+            head.moveTo(end.x + .15f * s, end.y - .12f * s);
+            head.lineTo(end.x, end.y);
+            head.lineTo(end.x + .15f * s, end.y + .12f * s);
+        } else if (direction > 0) {
+            head.moveTo(end.x - .15f * s, end.y - .12f * s);
+            head.lineTo(end.x, end.y);
+            head.lineTo(end.x - .15f * s, end.y + .12f * s);
+        } else {
+            head.moveTo(end.x - .13f * s, end.y + .15f * s);
+            head.lineTo(end.x, end.y);
+            head.lineTo(end.x + .13f * s, end.y + .15f * s);
+        }
+        canvas.drawPath(head, paint);
     }
 
     private void clearVisual() {
@@ -251,25 +300,23 @@ final class RouteStreetLabelMapLayer {
         renderedFingerprint = Long.MIN_VALUE;
     }
 
-    private static boolean hasContent(
-            List<NavigatorStatePublisher.RouteStreetLabelFrame> values) {
+    private static boolean hasContent(List<NavigatorStatePublisher.RouteTurnFrame> values) {
         if (values == null || values.isEmpty()) return false;
-        for (NavigatorStatePublisher.RouteStreetLabelFrame value : values) {
+        for (NavigatorStatePublisher.RouteTurnFrame value : values) {
             if (value != null && value.hasContent()) return true;
         }
         return false;
     }
 
-    private static long fingerprint(
-            List<NavigatorStatePublisher.RouteStreetLabelFrame> values) {
+    private static long fingerprint(List<NavigatorStatePublisher.RouteTurnFrame> values) {
         if (!hasContent(values)) return 0L;
-        long result = 0x517cc1b727220a95L;
+        long result = 0xcbf29ce484222325L;
         int count = 0;
-        for (NavigatorStatePublisher.RouteStreetLabelFrame value : values) {
+        for (NavigatorStatePublisher.RouteTurnFrame value : values) {
             if (value == null || !value.hasContent()) continue;
-            if (count++ >= MAX_LABELS) break;
+            if (count++ >= MAX_TURNS) break;
             result = mix(result, value.id.hashCode());
-            result = mix(result, value.text.hashCode());
+            result = mix(result, value.action.hashCode());
             result = mix(result, Math.round(value.latitude * 1_000_000d));
             result = mix(result, Math.round(value.longitude * 1_000_000d));
             result = mix(result, Math.round(value.bearingDegrees * 10f));

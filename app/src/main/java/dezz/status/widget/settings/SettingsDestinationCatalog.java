@@ -157,6 +157,11 @@ public final class SettingsDestinationCatalog {
                 "vehicle", "dezz.status.widget.InstrumentPanelSettingsActivity",
                 "приборка", "панель приборов", "спидометр", "тахометр", "одометр",
                 "аналоговый", "цифровой", "карта", "display 2", "dim", "1920 720"));
+        values.add(activity("panel_dim_menu", Group.PANELS, "Меню экрана водителя",
+                "Отдельная панель во вкладке навигации с управлением кнопками руля",
+                "navigation", "dezz.status.widget.DimMenuPanelSettingsActivity",
+                "dim", "mNavi", "руль", "меню водителя", "экран водителя",
+                "маршруты", "умный дом", "звонки", "display 2"));
         values.add(activity("navigator_window", Group.PANELS,
                 "Оконный режим Навигатора",
                 "Размер, положение, скругление, прозрачный фон и фиксация окна",
