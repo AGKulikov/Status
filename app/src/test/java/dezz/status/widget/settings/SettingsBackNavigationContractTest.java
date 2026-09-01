@@ -32,6 +32,7 @@ public final class SettingsBackNavigationContractTest {
     private static final String[] SHARED_CHROME_DETAILS = {
             "AllAppsSettingsActivity.java",
             "ClimatePanelSettingsActivity.java",
+            "DimMenuPanelSettingsActivity.java",
             "DriverFavoritesSettingsActivity.java",
             "DriverPanelSettingsActivity.java",
             "FavoriteAppsSettingsActivity.java",

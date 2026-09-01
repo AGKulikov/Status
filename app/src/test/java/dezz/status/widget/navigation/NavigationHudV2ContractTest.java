@@ -251,6 +251,8 @@ public final class NavigationHudV2ContractTest {
                 .replace("showWater.isChecked()", "water.isChecked()")
                 .replace("showModels.isChecked()", "models.isChecked()")
                 .replace("showCursor.isChecked()", "cursor.isChecked()");
+        String flatCluster = cluster.replaceAll("\\s+", " ");
+        String flatHud = normalizedHud.replaceAll("\\s+", " ");
         for (String assignment : new String[]{
                 "map.enabled = mapEnabled.isChecked()",
                 "map.showRoute = route.isChecked()",
@@ -295,9 +297,9 @@ public final class NavigationHudV2ContractTest {
                 "map.maximumFps = maximumFps.intValue()"
         }) {
             assertTrue("Missing cluster visual setting assignment: " + assignment,
-                    cluster.contains(assignment));
+                    flatCluster.contains(assignment));
             assertTrue("Missing HUD visual setting assignment: " + assignment,
-                    normalizedHud.contains(assignment));
+                    flatHud.contains(assignment));
         }
         String compactCluster = cluster.replaceAll("\\s+", "");
         String compactHud = normalizedHud.replaceAll("\\s+", "");
@@ -1053,7 +1055,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("profile.effectiveRouteLabelPriority()"));
         assertTrue(labels.contains("FRESH_MS = 2_500L"));
         assertTrue(labels.contains("painted directly over the active route"));
-        assertTrue(labels.contains("setGeometry"));
+        assertTrue(labels.contains("addPlacemark"));
         assertTrue(labels.contains("setZIndex"));
         assertTrue(labels.contains("NavigationMapProfile.layerZ(layerPriority)"));
         assertTrue(labels.contains("MapObjectLayerFactory.MINOR"));
