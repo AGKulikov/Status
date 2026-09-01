@@ -16,8 +16,8 @@ import zipfile
 
 KX11_ANDROID_API = 28
 NATRO_PACKAGE = "ru.natro.statuswidget"
-NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.6.0")
-NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021293")
+NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.6.1")
+NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021294")
 NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi"
 NAVIGATOR_VERSION_CODE = "739564630"
 NAVIGATOR_BASELINE_SHA256 = (
@@ -304,9 +304,8 @@ def verify_navigator(
         b"getActiveSpeedCameras",
         b"getActiveDirections",
         b"setMaxNumberOfUpcomingTrafficLights",
-        b"NavigationLayerFactory",
-        b"setRoadEventVisibleOnRoute",
-        b"route-matched road-events layer attached",
+        b"safe standalone road-events layer attached",
+        b"Automotive NavigationLayer is deliberately forbidden",
         b"showTrafficLights",
         b"showLaneGuidance",
         b"showDestination",
@@ -315,6 +314,16 @@ def verify_navigator(
         if marker not in classes19:
             raise VerificationError(
                 f"Navigator classes19.dex has no required HUD/navigation marker {marker!r}"
+            )
+    for forbidden in (
+        b"NavigationLayerFactory",
+        b"setRoadEventVisibleOnRoute",
+        b"route-matched road-events layer attached",
+        b"native GuidanceCamera attached",
+    ):
+        if forbidden in classes19:
+            raise VerificationError(
+                f"Navigator classes19.dex retains forbidden native crash marker {forbidden!r}"
             )
     if (b"Lru/natro/navigation/NatroEntryPoint;" not in classes12
             or b"shouldUseMovableMap" not in classes12):

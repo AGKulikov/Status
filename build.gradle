@@ -170,6 +170,9 @@ int getVersionCode() {
     if (version == '2.6.0') {
         return 208021293
     }
+    if (version == '2.6.1') {
+        return 208021294
+    }
     if (version == '2.3.0') {
         return 208021254
     }

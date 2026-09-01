@@ -350,24 +350,24 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.6.0}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021293}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.6.1}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021294}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.6.0")', verifier)
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021293")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.6.1")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021294")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
         build = (TOOLS.parent / "build.gradle").read_text()
         workflow = (TOOLS.parent / ".github" / "workflows"
                     / "verify-navigation-hud-v2.yml").read_text()
-        self.assertIn("if (version == '2.6.0')", build)
-        self.assertIn("VERSION_NAME: '2.6.0'", workflow)
+        self.assertIn("if (version == '2.6.1')", build)
+        self.assertIn("VERSION_NAME: '2.6.1'", workflow)
         self.assertNotIn("2.5.10", build)
         self.assertNotIn("2.5.10", workflow)
 
-    def test_hud_renderer_uses_route_bound_layer_with_parked_camera(self):
+    def test_hud_renderer_forbids_native_navigation_layer_on_external_map(self):
         renderer = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                     / "ru" / "natro" / "navigation" / "HudMapRenderer.java").read_text()
         publisher = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
@@ -385,17 +385,14 @@ public final class CameraSpeedNormalizerHarness {
                          / "ru" / "natro" / "navigation"
                          / "MapObjectLayerFactory.java").read_text()
 
-        self.assertIn("NavigationLayerFactory", renderer)
-        self.assertIn(
-            '"setUseLayerCamera", new Class<?>[]{boolean.class}, true', renderer
-        )
-        self.assertIn("setRoadEventVisibleOnRoute", renderer)
-        self.assertIn("createNativeNavigationLayer", renderer)
-        self.assertIn("parkNativeGuidanceCamera", renderer)
-        self.assertIn('Enum.valueOf((Class) cameraModeClass, "FREE")', renderer)
-        self.assertIn("setSwitchModesAutomatically", renderer)
+        self.assertNotIn("NavigationLayerFactory", renderer)
+        self.assertNotIn("setUseLayerCamera", renderer)
+        self.assertNotIn("setRoadEventVisibleOnRoute", renderer)
+        self.assertNotIn("createNativeNavigationLayer", renderer)
+        self.assertNotIn("parkNativeGuidanceCamera", renderer)
         self.assertIn("safe standalone road-events layer attached", renderer)
-        self.assertIn("nearby fallback active", renderer)
+        self.assertIn("Automotive NavigationLayer is deliberately forbidden", renderer)
+        self.assertIn('routeGuidanceActive && "ROUTE_ONLY".equals(mode)', renderer)
         self.assertNotIn("routeAwareRoadEventStyleProvider", renderer)
         self.assertNotIn('properties, "isOnRoute"', renderer)
         self.assertIn("setMaxNumberOfUpcomingTrafficLights", publisher)
@@ -433,9 +430,9 @@ public final class CameraSpeedNormalizerHarness {
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
         pair = (TOOLS / "sign_navigation_hud_v2_pair.sh").read_text()
 
-        self.assertIn("NavigationLayerFactory", verifier)
-        self.assertIn("setRoadEventVisibleOnRoute", verifier)
-        self.assertIn("route-matched road-events layer attached", verifier)
+        self.assertIn("for forbidden in (", verifier)
+        self.assertIn("forbidden native crash marker", verifier)
+        self.assertIn("if forbidden in classes19", verifier)
         self.assertNotIn('b"isOnRoute"', verifier)
 
         self.assertIn('KX11_ANDROID_API = 28', verifier)

@@ -163,10 +163,14 @@ public final class AppRuntimeBootstrap {
         PrivilegedShell.get(appContext).ensurePrivileges(request.build(), result -> {
             if (!result.transportAvailable) return;
             if (result.anyGranted()) {
-                Toast.makeText(appContext,
-                        appContext.getString(R.string.privileged_grant_success,
-                                joinPermissionLabels(appContext, result.grantedKinds)),
-                        Toast.LENGTH_LONG).show();
+                List<PrivilegedShell.PermissionKind> visibleGrants =
+                        successKindsForToast(result.grantedKinds);
+                if (!visibleGrants.isEmpty()) {
+                    Toast.makeText(appContext,
+                            appContext.getString(R.string.privileged_grant_success,
+                                    joinPermissionLabels(appContext, visibleGrants)),
+                            Toast.LENGTH_LONG).show();
+                }
                 reconcileServices(appContext, preferences);
             }
             if (result.anyFailed()) {
@@ -176,6 +180,21 @@ public final class AppRuntimeBootstrap {
                         Toast.LENGTH_LONG).show();
             }
         });
+    }
+
+    /**
+     * Accessibility is maintained automatically on KX11 and may be restored after every head-unit
+     * boot. That background maintenance must not cover the settings screen with a success Toast.
+     * Failures remain visible, and unrelated permissions still announce a real first grant.
+     */
+    @NonNull
+    static List<PrivilegedShell.PermissionKind> successKindsForToast(
+            @NonNull List<PrivilegedShell.PermissionKind> grantedKinds) {
+        List<PrivilegedShell.PermissionKind> visible = new ArrayList<>(grantedKinds.size());
+        for (PrivilegedShell.PermissionKind kind : grantedKinds) {
+            if (kind != PrivilegedShell.PermissionKind.ACCESSIBILITY) visible.add(kind);
+        }
+        return visible;
     }
 
     @NonNull

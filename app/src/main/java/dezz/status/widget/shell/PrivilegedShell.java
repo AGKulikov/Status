@@ -17,6 +17,7 @@
 
 package dezz.status.widget.shell;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Handler;
@@ -720,20 +721,18 @@ public class PrivilegedShell {
             if (current == null) current = "";
             current = current.trim();
             if ("null".equals(current)) current = "";
-            String updated;
-            if (current.isEmpty()) {
-                updated = component;
-            } else {
-                String[] entries = current.split(":");
-                boolean alreadyPresent = false;
-                for (String e : entries) {
-                    if (component.equals(e.trim())) {
-                        alreadyPresent = true;
-                        break;
-                    }
-                }
-                updated = alreadyPresent ? current : (current + ":" + component);
+            boolean alreadyPresent = containsFlattenedComponent(current, component);
+            String globallyEnabled = transport.exec("settings get secure accessibility_enabled");
+            if (alreadyPresent && globallyEnabled != null
+                    && "1".equals(globallyEnabled.trim())) {
+                // Android may publish Settings.Secure to this process a little later than the
+                // privileged shell. The service is already configured; do not rewrite the list
+                // or report a newly granted permission on every KX11 reboot.
+                Log.i(TAG, "Accessibility service already enabled in secure settings");
+                return;
             }
+            String updated = current.isEmpty()
+                    ? component : alreadyPresent ? current : (current + ":" + component);
             transport.exec("settings put secure enabled_accessibility_services " + updated);
             transport.exec("settings put secure accessibility_enabled 1");
             Log.i(TAG, "Wrote enabled_accessibility_services = " + updated);
@@ -758,6 +757,19 @@ public class PrivilegedShell {
         } else {
             failed.add(PermissionKind.ACCESSIBILITY);
         }
+    }
+
+    /** Accepts both full and Android's canonical short component notation. */
+    private static boolean containsFlattenedComponent(String entries, String component) {
+        if (entries == null || entries.trim().isEmpty()) return false;
+        ComponentName target = ComponentName.unflattenFromString(component);
+        for (String entry : entries.split(":")) {
+            String candidate = entry == null ? "" : entry.trim();
+            if (component.equals(candidate)) return true;
+            ComponentName parsed = ComponentName.unflattenFromString(candidate);
+            if (target != null && target.equals(parsed)) return true;
+        }
+        return false;
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
