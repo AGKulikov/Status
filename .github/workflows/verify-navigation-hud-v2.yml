@@ -26,6 +26,10 @@ on:
         description: 'Short-lived private URL for the exact reviewed Navigator baseline'
         required: false
         type: string
+      hud_speed_baseline_url:
+        description: 'Optional short-lived URL for reviewed HUD Speed 76.0-L13 baseline'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -96,6 +100,7 @@ jobs:
           test -s "$NATRO"
           cp "$NATRO" "$OUT/Natro-${VERSION_NAME}-unsigned-release.apk"
           cp build/navigation-mod-ci/classes19.dex "$OUT/classes19.dex"
+          cp build/hud-speed-bridge-ci/classes3.dex "$OUT/classes3.dex"
           cp "$RUNNER_TEMP/apktool_3.0.3.jar" "$OUT/apktool_3.0.3.jar"
           tar -C "$ANDROID_HOME/build-tools" -czf \
             "$OUT/android-build-tools-${BUILD_TOOLS_VERSION}.tar.gz" \
@@ -140,13 +145,17 @@ jobs:
               patchDex: "classes19.dex",
               rendererPatch: "classes12.dex:MapView movable TextureView for floating launches",
               themePatch: "existing-translucent-bootstrap+original-theme-restore"},
+              hudSpeed: {optional: true, package: "air.StrelkaHUDFREE",
+              versionName: "76.0-L13",
+              baselineSha256: "9b8a4a4a636968e9b2ca92c8399cdaf18112e9519aec433a9ee7fe42adb413dd",
+              patchDex: "classes3.dex"},
               toolchain: {apktoolSha256: $apktoolSha256,
               androidBuildTools: $buildTools}}' > "$OUT/candidate.json"
           (
             cd "$OUT"
             sha256sum \
               "Natro-${VERSION_NAME}-unsigned-release.apk" \
-              classes19.dex apktool_3.0.3.jar \
+              classes19.dex classes3.dex apktool_3.0.3.jar \
               "android-build-tools-${BUILD_TOOLS_VERSION}.tar.gz" \
               candidate.json > SHA256SUMS.txt
             sha256sum -c SHA256SUMS.txt
@@ -175,6 +184,7 @@ jobs:
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
       EXPECTED_BASELINE_SHA256: '663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f'
+      EXPECTED_HUD_SPEED_BASELINE_SHA256: '9b8a4a4a636968e9b2ca92c8399cdaf18112e9519aec433a9ee7fe42adb413dd'
       EXPECTED_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -205,6 +215,7 @@ jobs:
           test -s "$NATRO"
           cp "$NATRO" "$CANDIDATE/Natro-${VERSION_NAME}-unsigned-release.apk"
           cp build/navigation-mod-ci/classes19.dex "$CANDIDATE/classes19.dex"
+          cp build/hud-speed-bridge-ci/classes3.dex "$CANDIDATE/classes3.dex"
           curl --fail --location --retry 3 \
             --output "$CANDIDATE/apktool_3.0.3.jar" \
             https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar
@@ -226,13 +237,18 @@ jobs:
               patchDex: "classes19.dex",
               rendererPatch: "classes12.dex:MapView movable TextureView for floating launches",
               themePatch: "existing-translucent-bootstrap+original-theme-restore"},
+              hudSpeed: {optional: true, package: "air.StrelkaHUDFREE",
+              versionName: "76.0-L13",
+              baselineSha256: "9b8a4a4a636968e9b2ca92c8399cdaf18112e9519aec433a9ee7fe42adb413dd",
+              patchDex: "classes3.dex"},
               toolchain: {apktoolSha256: $apktoolSha256,
               androidBuildTools: $buildTools}}' > "$CANDIDATE/candidate.json"
           (
             cd "$CANDIDATE"
             sha256sum \
               "Natro-${VERSION_NAME}-unsigned-release.apk" \
-              classes19.dex apktool_3.0.3.jar candidate.json > SHA256SUMS.txt
+              classes19.dex classes3.dex apktool_3.0.3.jar candidate.json \
+              > SHA256SUMS.txt
             sha256sum -c SHA256SUMS.txt
           )
       - name: Fetch exact reviewed Navigator baseline
@@ -248,6 +264,19 @@ jobs:
             --silent --show-error --output "$BASELINE" "$BASELINE_URL"
           test "$(sha256sum "$BASELINE" | awk '{print $1}')" = \
             "$EXPECTED_BASELINE_SHA256"
+      - name: Fetch optional reviewed HUD Speed baseline
+        if: inputs.hud_speed_baseline_url != ''
+        shell: bash
+        env:
+          HUD_SPEED_BASELINE_URL: ${{ inputs.hud_speed_baseline_url }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$HUD_SPEED_BASELINE_URL"
+          BASELINE="$RUNNER_TEMP/HUD_Speed_v76_L_v13_FineControls.apk"
+          curl --fail --location --retry 5 --retry-all-errors \
+            --silent --show-error --output "$BASELINE" "$HUD_SPEED_BASELINE_URL"
+          test "$(sha256sum "$BASELINE" | awk '{print $1}')" = \
+            "$EXPECTED_HUD_SPEED_BASELINE_SHA256"
       - name: Materialize and verify stable update key
         shell: bash
         env:
@@ -281,9 +310,11 @@ jobs:
           CANDIDATE="$RUNNER_TEMP/candidate"
           KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
           BASELINE="$RUNNER_TEMP/YN_30.3.0_T2_.apk"
+          HUD_SPEED_BASELINE="$RUNNER_TEMP/HUD_Speed_v76_L_v13_FineControls.apk"
           OUTPUT="$RUNNER_TEMP/signed-pair"
           cleanup() {
-            shred -u -- "$KEYSTORE" "$BASELINE" 2>/dev/null || true
+            shred -u -- "$KEYSTORE" "$BASELINE" "$HUD_SPEED_BASELINE" \
+              2>/dev/null || true
           }
           trap cleanup EXIT HUP INT TERM
           test -s "$KEYSTORE"
@@ -297,6 +328,33 @@ jobs:
               "$CANDIDATE" \
               "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}" \
               "$OUTPUT"
+          if test -s "$HUD_SPEED_BASELINE"; then
+            HUD_SPEED_APK="$OUTPUT/HUD-Speed-76.0-L13-NatroBridge-signed.apk"
+            APKTOOL_JAR="$CANDIDATE/apktool_3.0.3.jar" \
+              KEYSTORE_FILE="$KEYSTORE" KEY_PASSWORD="$KEY_PASSWORD" \
+              KEY_ALIAS="$KEY_ALIAS" \
+              bash tools/sign_hud_speed_bridge_apk.sh \
+                "$HUD_SPEED_BASELINE" \
+                "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}" \
+                "$HUD_SPEED_APK"
+            HUD_SPEED_SHA256=$(sha256sum "$HUD_SPEED_APK" | awk '{print $1}')
+            REPORT_TMP=$(mktemp "$RUNNER_TEMP/release-report.XXXXXX.json")
+            jq --arg apk "$(basename "$HUD_SPEED_APK")" \
+              --arg sha256 "$HUD_SPEED_SHA256" \
+              --arg baselineSha256 "$EXPECTED_HUD_SPEED_BASELINE_SHA256" \
+              '.hudSpeed = {versionName: "76.0-L13", package: "air.StrelkaHUDFREE",
+                apk: $apk, sha256: $sha256, baselineSha256: $baselineSha256,
+                signatureSchemes: ["v2", "v3"], requiresUninstallOriginal: true}' \
+              "$OUTPUT/release-report.json" > "$REPORT_TMP"
+            mv "$REPORT_TMP" "$OUTPUT/release-report.json"
+            (
+              cd "$OUTPUT"
+              sha256sum Natro-*.apk YN_*.apk HUD-Speed-*.apk \
+                signature-reports.txt release-report.json KX11-COMPATIBILITY.txt \
+                > SHA256SUMS.txt
+              sha256sum -c SHA256SUMS.txt
+            )
+          fi
           test "$(jq -er '.source.commit' "$OUTPUT/release-report.json")" = \
             "$GITHUB_SHA"
           test "$(jq -er '.source.tree' "$OUTPUT/release-report.json")" = \

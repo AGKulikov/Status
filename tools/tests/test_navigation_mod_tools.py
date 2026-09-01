@@ -222,6 +222,8 @@ class NavigationModToolsTest(unittest.TestCase):
         dex_build = (TOOLS / "build_hud_speed_bridge_dex.sh").read_text()
         apk_build = (TOOLS / "build_hud_speed_bridge_apk.sh").read_text()
         signer = (TOOLS / "sign_hud_speed_bridge_apk.sh").read_text()
+        workflow = (TOOLS.parent / ".github" / "workflows"
+                    / "verify-navigation-hud-v2.yml").read_text()
 
         self.assertIn("MAX_CAMERAS = 64", service)
         self.assertIn("message.sendingUid", service)
@@ -257,6 +259,11 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn('--min-sdk-version 28 "$OUTPUT_APK"', signer)
         self.assertIn("Number of signers: 1", signer)
         self.assertIn("requires uninstalling a differently signed HUD Speed", signer)
+        self.assertIn('cp build/hud-speed-bridge-ci/classes3.dex "$OUT/classes3.dex"',
+                      workflow)
+        self.assertIn("hud_speed_baseline_url", workflow)
+        self.assertIn("sign_hud_speed_bridge_apk.sh", workflow)
+        self.assertIn("HUD-Speed-76.0-L13-NatroBridge-signed.apk", workflow)
 
     def test_pair_signer_requires_one_stable_certificate_and_exact_baseline(self):
         pair = (TOOLS / "sign_navigation_hud_v2_pair.sh").read_text()
