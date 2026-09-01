@@ -507,6 +507,7 @@ public final class NavigationHudV2ContractTest {
         String client = read(patchRoot.resolve("NavigationBridgeClient.java"));
         String renderer = read(patchRoot.resolve("HudMapRenderer.java"));
         String publisher = read(patchRoot.resolve("NavigatorStatePublisher.java"));
+        String speedNormalizer = read(patchRoot.resolve("CameraSpeedNormalizer.java"));
         String mainMap = read(patchRoot.resolve("MainMapController.java"));
         String cursor = read(patchRoot.resolve("MapCursorStyler.java"));
         String routeStyler = read(patchRoot.resolve("RoutePolylineStyler.java"));
@@ -811,7 +812,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("getManoeuvres"));
         assertTrue(publisher.contains("getLaneSigns"));
         assertTrue(publisher.contains("getActiveSpeedCameras"));
-        assertTrue(publisher.contains("getSpeedLimit\"), Double.NaN) * 3.6d"));
+        assertTrue(publisher.contains("CameraSpeedNormalizer.fromMapKitMetersPerSecond"));
+        assertTrue(speedNormalizer.contains("metresPerSecond * MPS_TO_KMH"));
+        assertTrue(speedNormalizer.contains("value * MPH_TO_KMH"));
+        assertTrue(speedNormalizer.contains("fromExternal(double rawSpeed, String rawUnit)"));
         assertTrue(publisher.contains("getActiveDirections"));
         assertTrue(publisher.contains("getInFace"));
         assertTrue(publisher.contains("getInBack"));
