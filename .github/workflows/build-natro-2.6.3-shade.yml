@@ -51,8 +51,61 @@ jobs:
           bash -n tools/kx11-shade-audit.sh tools/kx11-shade-component.sh
           python3 -m unittest discover -s tools/tests -p 'test_*.py' -v
           ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+      - name: Prepare verified offline signing handoff
+        id: handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLS="$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}"
+          INPUT=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
+          test -s "$INPUT"
+          OUT="$RUNNER_TEMP/natro-2.6.3-signing-handoff"
+          mkdir -p "$OUT/tools/lib"
+          cp "$INPUT" "$OUT/Natro-2.6.3-unsigned.apk"
+          cp "$TOOLS/zipalign" "$OUT/tools/"
+          cp "$TOOLS/aapt" "$OUT/tools/"
+          cp "$TOOLS/apksigner" "$OUT/tools/"
+          cp "$TOOLS/lib/apksigner.jar" "$OUT/tools/lib/"
+          chmod 755 "$OUT/tools/zipalign" "$OUT/tools/aapt" \
+            "$OUT/tools/apksigner"
+          BADGING=$("$OUT/tools/aapt" dump badging \
+            "$OUT/Natro-2.6.3-unsigned.apk")
+          printf '%s\n' "$BADGING" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='208021296' versionName='2.6.3'"
+          sha256sum "$OUT/Natro-2.6.3-unsigned.apk" \
+            > "$OUT/Natro-2.6.3-unsigned.apk.sha256"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+      - name: Upload offline signing handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-2.6.3-offline-signing-${{ github.run_number }}
+          path: ${{ steps.handoff.outputs.path }}/*
+          if-no-files-found: error
+          retention-days: 3
+      - name: Detect repository signing secrets
+        id: signing-secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          CONFIGURED=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || CONFIGURED=$((CONFIGURED + 1))
+          done
+          case "$CONFIGURED" in
+            3) echo 'available=true' >> "$GITHUB_OUTPUT" ;;
+            0) echo 'available=false' >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo 'Signing secrets must be configured completely' >&2
+              exit 1
+              ;;
+          esac
       - name: Sign with stable Natro key and verify
         id: artifact
+        if: steps.signing-secrets.outputs.available == 'true'
         shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -91,6 +144,7 @@ jobs:
           rm -f "$KEYSTORE" "$ALIGNED"
           echo "path=$OUT" >> "$GITHUB_OUTPUT"
       - name: Upload signed APK
+        if: steps.signing-secrets.outputs.available == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Natro-2.6.3-system-shade-signed-${{ github.run_number }}
