@@ -872,8 +872,9 @@ final class FloatingWindowController {
         layer.getLocationOnScreen(layerLocation);
         int bottom = -1;
         String[] anchors = new String[]{
-                "guidance_add_road_event", "alice_fab_container", "alice_fab",
-                "map_controls_menu_button"
+                "guidance_open_voice_search", "alice_fab_container", "alice_fab",
+                "guidance_add_road_event", "guidance_refuel_search_map_control",
+                "guidance_search_map_control_ghost"
         };
         for (String name : anchors) {
             int id = activity.getResources().getIdentifier(

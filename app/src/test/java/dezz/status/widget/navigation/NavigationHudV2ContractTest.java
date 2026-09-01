@@ -584,6 +584,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("ensureControlLayerAttached()"));
         assertTrue(controller.contains("dispatchFloatingInsetsToMapControls()"));
         assertTrue(controller.contains("guidance_add_road_event"));
+        assertTrue(controller.contains("guidance_refuel_search_map_control"));
+        assertFalse(controller.contains("map_controls_menu_button"));
         assertTrue(controller.contains("View host = window.getDecorView()"));
         assertTrue(controller.contains("setFitsSystemWindows(contentRoot, false)"));
         assertTrue(controller.contains("restartInMode("));
