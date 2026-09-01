@@ -84,10 +84,8 @@ final class SystemShadeOverlayController implements DisplayManager.DisplayListen
         SystemShadeRootLayout host = new SystemShadeRootLayout(displayContext, config);
         SystemShadePanelView content = new SystemShadePanelView(displayContext, preferences, config,
                 () -> { if (config.closeAfterAction) host.close(true); });
-        host.setPanel(content, config);
-        host.setSuppressed(vehicleOverlayActive);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT, config.gestureHandleHeightPx,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
@@ -104,6 +102,19 @@ final class SystemShadeOverlayController implements DisplayManager.DisplayListen
             params.setFitInsetsTypes(0);
             params.setFitInsetsSides(0);
         }
+        host.setListener(new SystemShadeRootLayout.Listener() {
+            @Override public void onGestureCaptureStarted() {
+                updateWindowHeight(host, params, WindowManager.LayoutParams.MATCH_PARENT);
+            }
+
+            @Override public void onOpenStateChanged(boolean open) {
+                updateWindowHeight(host, params, open
+                        ? WindowManager.LayoutParams.MATCH_PARENT
+                        : config.gestureHandleHeightPx);
+            }
+        });
+        host.setPanel(content, config);
+        host.setSuppressed(vehicleOverlayActive);
         try {
             manager.addView(host, params);
             root = host;
@@ -114,6 +125,15 @@ final class SystemShadeOverlayController implements DisplayManager.DisplayListen
             root = null;
             panel = null;
         }
+    }
+
+    private void updateWindowHeight(@NonNull SystemShadeRootLayout host,
+                                    @NonNull WindowManager.LayoutParams params, int height) {
+        WindowManager current = manager;
+        if (current == null || root != host || params.height == height) return;
+        params.height = height;
+        try { current.updateViewLayout(host, params); }
+        catch (RuntimeException ignored) { }
     }
 
     private void dismiss() {

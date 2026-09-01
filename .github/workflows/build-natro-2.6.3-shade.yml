@@ -1,4 +1,5 @@
 name: Build signed Natro 2.6.3 system shade
+# Dedicated candidate workflow: Navigator and HUD Speed remain unchanged in this release.
 
 on:
   push:

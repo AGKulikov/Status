@@ -4,14 +4,11 @@ package dezz.status.widget.shade;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Color;
-import android.graphics.Rect;
-import android.graphics.Region;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
-import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
@@ -20,6 +17,7 @@ import androidx.annotation.Nullable;
 /** Full-screen transparent host whose closed touch region is limited to the top gesture strip. */
 public final class SystemShadeRootLayout extends FrameLayout {
     public interface Listener {
+        void onGestureCaptureStarted();
         void onOpenStateChanged(boolean open);
     }
 
@@ -36,20 +34,6 @@ public final class SystemShadeRootLayout extends FrameLayout {
     private boolean dragging;
     private boolean outsideTap;
     private boolean suppressed;
-
-    private final ViewTreeObserver.OnComputeInternalInsetsListener insetsListener = info -> {
-        info.setTouchableInsets(
-                ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_REGION);
-        Region region = info.touchableRegion;
-        region.setEmpty();
-        if (suppressed || getWidth() <= 0 || getHeight() <= 0) return;
-        if (open || dragging || revealPx > 0f) {
-            region.set(new Rect(0, 0, getWidth(), getHeight()));
-        } else {
-            region.set(new Rect(0, 0, getWidth(),
-                    Math.min(getHeight(), config.gestureHandleHeightPx)));
-        }
-    };
 
     public SystemShadeRootLayout(@NonNull Context context,
                                  @NonNull SystemShadeConfig config) {
@@ -90,16 +74,7 @@ public final class SystemShadeRootLayout extends FrameLayout {
         if (!suppressed) settle(true, animate);
     }
 
-    @Override protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        getViewTreeObserver().addOnComputeInternalInsetsListener(insetsListener);
-        requestTouchableRegion();
-    }
-
     @Override protected void onDetachedFromWindow() {
-        if (getViewTreeObserver().isAlive()) {
-            getViewTreeObserver().removeOnComputeInternalInsetsListener(insetsListener);
-        }
         recycleVelocityTracker();
         cancelAnimation();
         super.onDetachedFromWindow();
@@ -119,6 +94,7 @@ public final class SystemShadeRootLayout extends FrameLayout {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 cancelAnimation();
+                if (listener != null) listener.onGestureCaptureStarted();
                 downY = event.getRawY();
                 initiallyOpen = open;
                 dragging = false;
