@@ -815,7 +815,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("CameraSpeedNormalizer.fromMapKitMetersPerSecond"));
         assertTrue(speedNormalizer.contains("metresPerSecond * MPS_TO_KMH"));
         assertTrue(speedNormalizer.contains("value * MPH_TO_KMH"));
-        assertTrue(speedNormalizer.contains("fromExternal(double rawSpeed, String rawUnit)"));
+        assertTrue(speedNormalizer.contains("fromExternal(double value, String rawUnit)"));
         assertTrue(publisher.contains("getActiveDirections"));
         assertTrue(publisher.contains("getInFace"));
         assertTrue(publisher.contains("getInBack"));
