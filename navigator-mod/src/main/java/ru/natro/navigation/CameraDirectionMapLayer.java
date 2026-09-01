@@ -659,8 +659,9 @@ final class CameraDirectionMapLayer {
             if (!Double.isFinite(latitude) || latitude < -90d || latitude > 90d
                     || !Double.isFinite(longitude) || longitude < -180d
                     || longitude > 180d) return null;
-            int speed = source.optInt("speedLimit", -1);
-            if (speed <= 0 || speed > 400) speed = -1;
+            int speed = CameraSpeedNormalizer.fromExternal(
+                    source.optDouble("speedLimit", Double.NaN),
+                    source.optString("speedUnit", "KPH"));
             ArrayList<String> tags = new ArrayList<>();
             JSONArray tagArray = source.optJSONArray("controlTags");
             if (tagArray != null) {

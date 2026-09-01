@@ -1466,11 +1466,11 @@ final class NavigatorStatePublisher {
                         number(invoke(camera, "getDistanceToCamera"), -1d));
                 float bearing = routeBearingAtEvent(
                         routePoints, event, fallbackBearingDegrees);
-                int speedLimitKmh = positiveRounded(
-                        number(invoke(event, "getSpeedLimit"), Double.NaN) * 3.6d);
+                int speedLimitKmh = CameraSpeedNormalizer.fromMapKitMetersPerSecond(
+                        number(invoke(event, "getSpeedLimit"), Double.NaN));
                 if (speedLimitKmh < 0) {
-                    speedLimitKmh = positiveRounded(number(
-                            invoke(camera, "getEffectiveSpeedLimit"), Double.NaN) * 3.6d);
+                    speedLimitKmh = CameraSpeedNormalizer.fromMapKitMetersPerSecond(number(
+                            invoke(camera, "getEffectiveSpeedLimit"), Double.NaN));
                 }
                 ArrayList<String> controlTags = new ArrayList<>();
                 for (Object tag : invokeList(event, "getTags")) {

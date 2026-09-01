@@ -1,5 +1,8 @@
 # Status Widget HA
 
+Единый реестр пользовательских требований и критериев приёмки:
+[`PROJECT_REQUIREMENTS_RU.md`](PROJECT_REQUIREMENTS_RU.md).
+
 > Полноценный форк официального Status Widget 2.8.2. Он устанавливается рядом с оригиналом
 > (`applicationId: ru.natro.statuswidget`) и добавляет три независимых коннектора — прямой
 > Home Assistant API, MQTT и прямой Sprut.hub, независимые информационные кирпичики,

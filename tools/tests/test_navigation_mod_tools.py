@@ -3,6 +3,8 @@
 import hashlib
 import importlib.util
 from pathlib import Path
+import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -30,6 +32,69 @@ HUD_SPEED_MANIFEST_PATCHER = load("patch_hud_speed_bridge_manifest.py")
 
 
 class NavigationModToolsTest(unittest.TestCase):
+    def test_living_requirements_ledger_is_unique_and_mandatory(self):
+        root = TOOLS.parent
+        ledger = (root / "PROJECT_REQUIREMENTS_RU.md").read_text()
+        agents = (root / "AGENTS.md").read_text()
+        readme = (root / "README.md").read_text()
+        requirement_ids = re.findall(r"\| ([A-Z]+-[0-9]{3}) \|", ledger)
+        self.assertGreaterEqual(len(requirement_ids), 100)
+        self.assertEqual(len(requirement_ids), len(set(requirement_ids)))
+        self.assertIn("25.08.2026–01.09.2026", ledger)
+        self.assertIn("В КОДЕ / НУЖЕН KX11", ledger)
+        self.assertIn("REL-004", ledger)
+        self.assertIn("MAP-003", ledger)
+        self.assertIn("PROJECT_REQUIREMENTS_RU.md", agents)
+        self.assertIn("PROJECT_REQUIREMENTS_RU.md", readme)
+
+    def test_camera_speed_units_are_normalized_to_kmh(self):
+        source = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                  / "ru" / "natro" / "navigation"
+                  / "CameraSpeedNormalizer.java")
+        publisher = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                     / "ru" / "natro" / "navigation"
+                     / "NavigatorStatePublisher.java").read_text()
+        camera_layer = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                        / "ru" / "natro" / "navigation"
+                        / "CameraDirectionMapLayer.java").read_text()
+        self.assertIn("CameraSpeedNormalizer.fromMapKitMetersPerSecond", publisher)
+        self.assertIn("CameraSpeedNormalizer.fromExternal", camera_layer)
+
+        javac = shutil.which("javac")
+        java = shutil.which("java")
+        if javac is None or java is None:
+            self.skipTest("JDK is unavailable locally; GitHub CI executes this Java contract")
+        harness = """package ru.natro.navigation;
+public final class CameraSpeedNormalizerHarness {
+    private static void expect(int expected, int actual) {
+        if (expected != actual) throw new AssertionError(expected + " != " + actual);
+    }
+    public static void main(String[] args) {
+        expect(60, CameraSpeedNormalizer.fromMapKitMetersPerSecond(60d / 3.6d));
+        expect(90, CameraSpeedNormalizer.fromMapKitMetersPerSecond(25d));
+        expect(60, CameraSpeedNormalizer.fromExternal(60d, "KPH"));
+        expect(90, CameraSpeedNormalizer.fromExternal(90d, "km/h"));
+        expect(97, CameraSpeedNormalizer.fromExternal(60d, "MPH"));
+        expect(60, CameraSpeedNormalizer.fromExternal(60d / 3.6d, "MPS"));
+        expect(-1, CameraSpeedNormalizer.fromExternal(0d, "KPH"));
+        expect(-1, CameraSpeedNormalizer.fromExternal(401d, "KPH"));
+    }
+}
+"""
+        with tempfile.TemporaryDirectory() as work:
+            work_path = Path(work)
+            harness_path = work_path / "CameraSpeedNormalizerHarness.java"
+            harness_path.write_text(harness)
+            subprocess.run(
+                [javac, "-d", str(work_path), str(source), str(harness_path)],
+                check=True,
+            )
+            subprocess.run(
+                [java, "-cp", str(work_path),
+                 "ru.natro.navigation.CameraSpeedNormalizerHarness"],
+                check=True,
+            )
+
     def test_binary_theme_patch_is_scoped_to_map_activity(self):
         splash = struct.pack("<I", MANIFEST_PATCHER.SPLASH_APP_THEME)
         bootstrap = struct.pack("<I", MANIFEST_PATCHER.TRANSLUCENT_BOOTSTRAP_THEME)
