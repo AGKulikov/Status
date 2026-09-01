@@ -230,6 +230,21 @@ final class FloatingWindowController {
         updateControls();
     }
 
+    /** Global MapActivity touch hook: late MapKit views cannot hide or bypass this reveal path. */
+    void onMapTouch(MotionEvent event) {
+        if (destroyed || event == null || event.getActionMasked() != MotionEvent.ACTION_DOWN) return;
+        ensureControlLayerAttached();
+        revealModeButton();
+        if (controlLayer != null) {
+            controlLayer.post(() -> {
+                if (destroyed) return;
+                ensureControlLayerAttached();
+                layoutModeButtons();
+                updateModeButtons();
+            });
+        }
+    }
+
     void consumeIntent(Intent intent) {
         if (destroyed || intent == null) return;
         boolean requestedFloating = requestsFloating(intent);
@@ -325,6 +340,7 @@ final class FloatingWindowController {
 
     private final Runnable modeButtonPoller = new Runnable() {
         @Override public void run() {
+            ensureControlLayerAttached();
             if (floating) enforceFloatingWindowContract();
             if (controlLayer != null) controlLayer.bringToFront();
             updateModeButtons();
@@ -333,6 +349,29 @@ final class FloatingWindowController {
             mainHandler.postDelayed(this, delay);
         }
     };
+
+    /** Reparents the overlay if Navigator replaced its content root during a late fragment pass. */
+    private void ensureControlLayerAttached() {
+        FrameLayout layer = controlLayer;
+        if (destroyed || layer == null) return;
+        ViewGroup host = findControlHost();
+        if (host == null) return;
+        ViewGroup parent = layer.getParent() instanceof ViewGroup
+                ? (ViewGroup) layer.getParent() : null;
+        if (parent != host || !layer.isAttachedToWindow()) {
+            if (parent != null) {
+                try { parent.removeView(layer); } catch (RuntimeException ignored) {}
+            }
+            if (layer.getParent() == null) {
+                host.addView(layer, new ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+        }
+        layer.setVisibility(View.VISIBLE);
+        layer.setElevation(dp(100));
+        layer.bringToFront();
+    }
 
     void destroy() {
         destroyed = true;
@@ -547,6 +586,7 @@ final class FloatingWindowController {
         requestLayout(contentRoot);
         requestLayout(mapRoot);
         requestLayout(mapWithControls);
+        dispatchFloatingInsetsToMapControls();
         WindowManager.LayoutParams attributes = window.getAttributes();
         if (attributes.dimAmount != 0f) attributes.dimAmount = 0f;
     }
@@ -572,11 +612,13 @@ final class FloatingWindowController {
         // Intercept at DecorView before AppCompat/Navigator can turn the top inset into a second
         // reserved strip inside the already bounded floating window.
         View host = window.getDecorView();
-        if (host == null || host == insetDispatchHost) return;
-        if (insetDispatchHost != null) {
+        if (host == null) return;
+        if (insetDispatchHost != null && insetDispatchHost != host) {
             insetDispatchHost.setOnApplyWindowInsetsListener(null);
         }
         insetDispatchHost = host;
+        // Navigator can replace DecorView's listener after onResumeFragments. Reinstall our
+        // mode-aware listener on each bounded-window contract pass instead of trusting identity.
         insetDispatchHost.setOnApplyWindowInsetsListener(modeAwareInsetsListener);
     }
 
@@ -584,6 +626,20 @@ final class FloatingWindowController {
         if (Build.VERSION.SDK_INT >= 20 && insetDispatchHost != null) {
             insetDispatchHost.requestApplyInsets();
         }
+    }
+
+    /** Sends the zero-top contract directly to the late MapWithControls subtree on Android 9. */
+    private void dispatchFloatingInsetsToMapControls() {
+        if (!floating || Build.VERSION.SDK_INT < 23) return;
+        View decor = window.getDecorView();
+        WindowInsets raw = decor == null ? null : decor.getRootWindowInsets();
+        View target = mapWithControls != null ? mapWithControls
+                : mapRoot != null ? mapRoot : contentRoot;
+        if (raw == null || target == null || !target.isAttachedToWindow()) return;
+        WindowInsets adjusted = raw.replaceSystemWindowInsets(
+                raw.getSystemWindowInsetLeft(), 0,
+                raw.getSystemWindowInsetRight(), raw.getSystemWindowInsetBottom());
+        target.dispatchApplyWindowInsets(adjusted);
     }
 
     private static Drawable backgroundOf(View view) {
@@ -712,6 +768,7 @@ final class FloatingWindowController {
         }
         installModeAwareInsetDispatch();
         enforceTransparentLayers();
+        requestNavigatorInsets();
         if (controlLayer != null && floatingFrame != null
                 && controlLayer.getBackground() != floatingFrame) {
             controlLayer.setBackground(floatingFrame);
@@ -802,10 +859,39 @@ final class FloatingWindowController {
         params.leftMargin = margin;
         params.rightMargin = margin;
         params.bottomMargin = margin;
-        // In floating mode the close control owns the first top-left slot.
-        params.topMargin = floating && !right && !bottom && profile.closeButtonVisible
-                ? dp(52) : margin;
+        // TOP_LEFT means the next slot in Navigator's own left control rail, not a control over
+        // the road. The resolved Alice/road-event bottom makes this the third stock-column item.
+        params.topMargin = !right && !bottom ? leftControlColumnNextTop(margin) : margin;
         button.setLayoutParams(params);
+    }
+
+    private int leftControlColumnNextTop(int fallbackMargin) {
+        FrameLayout layer = controlLayer;
+        if (layer == null || layer.getHeight() <= 0) return dp(116);
+        int[] layerLocation = new int[2];
+        layer.getLocationOnScreen(layerLocation);
+        int bottom = -1;
+        String[] anchors = new String[]{
+                "guidance_add_road_event", "alice_fab_container", "alice_fab",
+                "map_controls_menu_button"
+        };
+        for (String name : anchors) {
+            int id = activity.getResources().getIdentifier(
+                    name, "id", activity.getPackageName());
+            View anchor = id == 0 ? null : activity.findViewById(id);
+            if (anchor == null || anchor.getVisibility() != View.VISIBLE
+                    || anchor.getWidth() <= 0 || anchor.getHeight() <= 0) continue;
+            int[] location = new int[2];
+            anchor.getLocationOnScreen(location);
+            int localLeft = location[0] - layerLocation[0];
+            if (localLeft > Math.max(dp(160), layer.getWidth() / 4)) continue;
+            bottom = Math.max(bottom,
+                    location[1] - layerLocation[1] + anchor.getHeight());
+        }
+        int top = bottom >= 0 ? bottom + dp(8) : dp(116);
+        int maximum = Math.max(fallbackMargin,
+                layer.getHeight() - dp(profile.modeButtonSizeDp) - fallbackMargin);
+        return Math.max(fallbackMargin, Math.min(maximum, top));
     }
 
     private void updateModeButtonSize(TextView button) {

@@ -175,6 +175,7 @@ public final class InstrumentPanelView extends FrameLayout
         if (width <= 1 || height <= 1 || !mapSurface.isValid()) return;
         SurfaceTexture texture = mapTexture.getSurfaceTexture();
         if (texture != null) texture.setDefaultBufferSize(width, height);
+        NavigationHudEndpointService.ensureClusterEndpointStarted(getContext());
         long generation = NavigationHudEndpointService.publishClusterSurface(
                 mapSurface, width, height,
                 Math.max(1, getResources().getDisplayMetrics().densityDpi));

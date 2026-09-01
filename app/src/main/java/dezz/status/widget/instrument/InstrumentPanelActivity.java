@@ -20,6 +20,7 @@ import java.lang.ref.WeakReference;
 import dezz.status.widget.AppRuntimeBootstrap;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.StatusWidgetApplication;
+import dezz.status.widget.navigation.NavigationHudEndpointService;
 
 /** Touch-free 1920x720 activity projected to the driver's instrument display. */
 public final class InstrumentPanelActivity extends Activity {
@@ -65,6 +66,9 @@ public final class InstrumentPanelActivity extends Activity {
         }
         active = new WeakReference<>(this);
         configureWindow();
+        // Create the direct-map endpoint before TextureView's first available callback. The panel
+        // is often the first Natro component after Navigator externally launches a cold process.
+        NavigationHudEndpointService.ensureClusterEndpointStarted(this);
         panel = new InstrumentPanelView(this, store.load(), false, null);
         setContentView(panel);
         StatusWidgetApplication.notifyFirstUsefulSurface(this);

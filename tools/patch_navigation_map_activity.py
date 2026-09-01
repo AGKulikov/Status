@@ -60,6 +60,19 @@ def patch(source: str) -> str:
         "onStart",
     )
 
+    touch = (
+        ".method public final dispatchTouchEvent(Landroid/view/MotionEvent;)Z\n"
+        "    .locals 3\n"
+    )
+    source = replace_once(
+        source,
+        touch,
+        touch
+        + "\n    invoke-static {p0, p1}, " + ENTRY_POINT
+        + "->onMapTouch(Landroid/app/Activity;Landroid/view/MotionEvent;)V\n",
+        "dispatchTouchEvent",
+    )
+
     destroy = ".method public final onDestroy()V\n    .locals 3\n"
     source = replace_once(
         source,

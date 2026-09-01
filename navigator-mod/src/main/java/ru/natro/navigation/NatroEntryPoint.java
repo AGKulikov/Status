@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.util.Log;
+import android.view.MotionEvent;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -44,6 +45,17 @@ public final class NatroEntryPoint {
             NavigationBridgeClient.attachActivity(activity);
         } catch (Throwable failure) {
             reportFailure("onActivityResumed", failure);
+        }
+    }
+
+    /** Called by MapActivity.dispatchTouchEvent before Navigator consumes the map gesture. */
+    public static void onMapTouch(Activity activity, MotionEvent event) {
+        if (activity == null || event == null || activity.isFinishing()) return;
+        if (event.getActionMasked() != MotionEvent.ACTION_DOWN) return;
+        try {
+            controllerFor(activity).onMapTouch(event);
+        } catch (Throwable failure) {
+            reportFailure("onMapTouch", failure);
         }
     }
 

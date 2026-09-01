@@ -16,8 +16,8 @@ import zipfile
 
 KX11_ANDROID_API = 28
 NATRO_PACKAGE = "ru.natro.statuswidget"
-NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.6.1")
-NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021294")
+NATRO_VERSION_NAME = os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.6.2")
+NATRO_VERSION_CODE = os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021295")
 NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi"
 NAVIGATOR_VERSION_CODE = "739564630"
 NAVIGATOR_BASELINE_SHA256 = (
@@ -310,6 +310,10 @@ def verify_navigator(
         b"showLaneGuidance",
         b"showDestination",
         b"background MapKit lease active",
+        b"createDefaultManeuverStyle",
+        b"applyManeuverStyle",
+        b"addArrow",
+        b"KEEP_CLUSTER_ENDPOINT",
     ):
         if marker not in classes19:
             raise VerificationError(

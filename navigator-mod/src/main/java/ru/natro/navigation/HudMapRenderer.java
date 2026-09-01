@@ -334,7 +334,6 @@ final class HudMapRenderer {
             cameraDirectionMapLayer.attach(map);
             laneGuidanceMapLayer.attach(map);
             routeStreetLabelMapLayer.attach(map);
-            routeTurnMapLayer.attach(map);
             cursorStyler.attach(map);
 
             Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
@@ -697,6 +696,7 @@ final class HudMapRenderer {
         Object currentMap = map;
         if (currentMap == null) return;
         try {
+            routeTurnMapLayer.attachRoute(null, 0, 0d, 0);
             Object collection = routeCollection;
             if (collection == null) {
                 collection = MapObjectLayerFactory.create(currentMap,
@@ -729,6 +729,8 @@ final class HudMapRenderer {
                 routePolyline = line;
                 RoutePolylineStyler.apply(line, activeJamStyle, profile,
                         slice.firstSegmentIndex, slice.segmentCount, routeColorScratch);
+                routeTurnMapLayer.attachRoute(line, slice.firstSegmentIndex,
+                        slice.segmentPosition, slice.segmentCount);
             }
             if (profile.showDestination && slice.destinationPoint != null) {
                 Object destinations = destinationCollection;
@@ -880,6 +882,12 @@ final class HudMapRenderer {
                     frame.routeSegmentIndex, frame.routeSegmentPosition,
                     cursorPoint);
             if (!routeProgressChanged(progress)) return;
+            if (progress.segmentIndex != renderedRouteSegmentIndex) {
+                // Polyline arrows cannot change their PolylinePosition. Rebuild once per segment
+                // transition so removed manoeuvres never accumulate as hidden native objects.
+                rebuildRoute();
+                return;
+            }
             boolean movingBackward = isBehindRenderedProgress(progress);
             long now = SystemClock.elapsedRealtime();
             // Forward/current movement is capped at 10 geometry updates per second on the KX11.
@@ -899,6 +907,8 @@ final class HudMapRenderer {
             lastRouteGeometryElapsedMs = now;
             RoutePolylineStyler.applyProgressColors(line, activeJamStyle, profile,
                     slice.firstSegmentIndex, slice.segmentCount, routeColorScratch);
+            routeTurnMapLayer.attachRoute(line, slice.firstSegmentIndex,
+                    slice.segmentPosition, slice.segmentCount);
         } catch (Throwable failure) {
             Log.w(TAG, "HUD route progress could not be advanced", failure);
         }

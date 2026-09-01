@@ -36,6 +36,8 @@ public final class NavigationHudEndpointService extends Service {
     private static final String TAG = "NavigationHudEndpoint";
     private static final String ACTION_BOOTSTRAP_OPTIONAL_HUD_SPEED =
             "ru.natro.statuswidget.navigation.BOOTSTRAP_OPTIONAL_HUD_SPEED";
+    private static final String ACTION_KEEP_CLUSTER_ENDPOINT =
+            "ru.natro.statuswidget.navigation.KEEP_CLUSTER_ENDPOINT";
     /** Last wake checkpoint is at 120 seconds; leave time for its Binder response. */
     private static final long OPTIONAL_HUD_SPEED_BOOTSTRAP_MS = 135_000L;
     static final int MAX_CONFIGURATION_CHARS = 384 * 1024;
@@ -65,6 +67,7 @@ public final class NavigationHudEndpointService extends Service {
     private boolean snapshotDrainPosted;
     private boolean routeGeometryDrainPosted;
     private int optionalHudSpeedBootstrapStartId;
+    private int clusterEndpointStartId;
     @NonNull private final Runnable snapshotDrain = this::drainLatestSnapshot;
     @NonNull private final Runnable routeGeometryDrain = this::drainLatestRouteGeometry;
     @NonNull private final Runnable finishOptionalHudSpeedBootstrap = () -> {
@@ -92,6 +95,22 @@ public final class NavigationHudEndpointService extends Service {
             target.startService(command);
         } catch (RuntimeException unavailable) {
             Log.w(TAG, "Optional HUD Speed bootstrap was unavailable", unavailable);
+        }
+    }
+
+    /**
+     * Starts the Binder endpoint before a cold instrument-panel TextureView publishes its lease.
+     * Opening Settings must never be the event that accidentally creates the map bridge.
+     */
+    public static void ensureClusterEndpointStarted(@NonNull Context context) {
+        Context app = context.getApplicationContext();
+        Context target = app == null ? context : app;
+        Intent command = new Intent(target, NavigationHudEndpointService.class)
+                .setAction(ACTION_KEEP_CLUSTER_ENDPOINT);
+        try {
+            target.startService(command);
+        } catch (RuntimeException unavailable) {
+            Log.w(TAG, "Could not start cold cluster-map endpoint", unavailable);
         }
     }
 
@@ -189,7 +208,10 @@ public final class NavigationHudEndpointService extends Service {
         }
         NavigationHudEndpointService current = instance;
         if (current != null) {
-            current.handler.post(() -> current.sendClusterSurfaceDetach(generation));
+            current.handler.post(() -> {
+                current.sendClusterSurfaceDetach(generation);
+                current.stopClusterEndpointIfIdle();
+            });
         }
     }
 
@@ -281,6 +303,8 @@ public final class NavigationHudEndpointService extends Service {
             handler.removeCallbacks(finishOptionalHudSpeedBootstrap);
             handler.postDelayed(finishOptionalHudSpeedBootstrap,
                     OPTIONAL_HUD_SPEED_BOOTSTRAP_MS);
+        } else if (intent != null && ACTION_KEEP_CLUSTER_ENDPOINT.equals(intent.getAction())) {
+            clusterEndpointStartId = startId;
         } else {
             stopSelfResult(startId);
         }
@@ -297,6 +321,7 @@ public final class NavigationHudEndpointService extends Service {
     public void onDestroy() {
         handler.removeCallbacks(finishOptionalHudSpeedBootstrap);
         optionalHudSpeedBootstrapStartId = 0;
+        clusterEndpointStartId = 0;
         if (instance == this) instance = null;
         disconnectCurrentClient();
         HudSpeedCameraBridgeClient cameraBridge = hudSpeedCameraBridge;
@@ -313,6 +338,15 @@ public final class NavigationHudEndpointService extends Service {
         parserThread = null;
         if (thread != null) thread.quitSafely();
         super.onDestroy();
+    }
+
+    private void stopClusterEndpointIfIdle() {
+        synchronized (SURFACE_LOCK) {
+            if (publishedClusterSurface != null) return;
+        }
+        int startId = clusterEndpointStartId;
+        clusterEndpointStartId = 0;
+        if (startId != 0) stopSelfResult(startId);
     }
 
     private boolean onMessage(@NonNull Message message) {

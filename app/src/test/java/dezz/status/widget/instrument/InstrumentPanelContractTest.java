@@ -163,6 +163,10 @@ public final class InstrumentPanelContractTest {
                 + "GeelyPassengerControlIntegration.java"));
         String panel = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
                 + "InstrumentPanelView.java"));
+        String activity = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentPanelActivity.java"));
+        String endpoint = read(root.resolve("app/src/main/java/dezz/status/widget/navigation/"
+                + "NavigationHudEndpointService.java"));
         String renderer = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
                 + "InstrumentClusterView.java"));
 
@@ -183,6 +187,10 @@ public final class InstrumentPanelContractTest {
                 "delegate.unsubscribeRealtimeTelemetry(listener)"));
         assertTrue(panel.contains("publishClusterSurface("));
         assertTrue(panel.contains("revokeClusterSurface("));
+        assertTrue(panel.contains("ensureClusterEndpointStarted(getContext())"));
+        assertTrue(activity.contains("ensureClusterEndpointStarted(this)"));
+        assertTrue(endpoint.contains("ACTION_KEEP_CLUSTER_ENDPOINT"));
+        assertTrue(endpoint.contains("stopClusterEndpointIfIdle()"));
         assertFalse(panel.contains("Bitmap.createBitmap"));
         assertTrue(renderer.contains("staticLayerDirty"));
         assertTrue(renderer.contains("Choreographer.FrameCallback"));

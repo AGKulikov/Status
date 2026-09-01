@@ -383,7 +383,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cameras.contains("MapObjectLayerFactory.EQUAL"));
         assertTrue(laneSigns.contains("MapObjectLayerFactory.MAJOR"));
         assertTrue(routeLabels.contains("MapObjectLayerFactory.MINOR"));
-        assertTrue(routeTurns.contains("MapObjectLayerFactory.MAJOR"));
+        assertFalse(routeTurns.contains("MapObjectLayerFactory"));
+        assertTrue(routeTurns.contains("applyManeuverStyle"));
         assertTrue(renderer.contains("if (currentMap == null"
                 + " || !profile.manualLayerPrioritiesEnabled)"));
         assertTrue(renderer.contains("getSublayerManager"));
@@ -555,6 +556,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(client.contains("getContentResolver().call("));
         assertTrue(entry.contains("applyHostedConfiguration(activity, controller)"));
         assertTrue(entry.contains("public static boolean onNewIntent"));
+        assertTrue(entry.contains("onMapTouch(Activity activity, MotionEvent event)"));
         assertTrue(entry.contains("return isPureWindowCommand(intent)"));
         assertFalse(controller.contains("decor.setClipToOutline(profile.cornerRadiusDp > 0)"));
         assertFalse(controller.contains("View.SYSTEM_UI_FLAG_HIDE_NAVIGATION"));
@@ -579,6 +581,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("removeFloatingTopInset(contentRoot)"));
         assertTrue(controller.contains("restorePadding(contentRoot"));
         assertTrue(controller.contains("requestNavigatorInsets()"));
+        assertTrue(controller.contains("ensureControlLayerAttached()"));
+        assertTrue(controller.contains("dispatchFloatingInsetsToMapControls()"));
+        assertTrue(controller.contains("guidance_add_road_event"));
         assertTrue(controller.contains("View host = window.getDecorView()"));
         assertTrue(controller.contains("setFitsSystemWindows(contentRoot, false)"));
         assertTrue(controller.contains("restartInMode("));
@@ -719,10 +724,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(laneGuidance.contains("NO_ROTATION"));
         assertTrue(laneGuidance.contains("setGeometry"));
         assertTrue(laneGuidance.contains("placeOnRight ? -0.08f : 1.08f"));
-        assertTrue(routeTurns.contains("ru.natro.navigation.route_turns"));
-        assertTrue(routeTurns.contains("RotationType"));
-        assertTrue(routeTurns.contains("\"ROTATE\""));
-        assertTrue(routeTurns.contains("Boolean.TRUE"));
+        assertTrue(routeTurns.contains("createDefaultManeuverStyle"));
+        assertTrue(routeTurns.contains("applyManeuverStyle"));
+        assertTrue(routeTurns.contains("addArrow"));
+        assertTrue(routeTurns.contains("PolylinePosition"));
+        assertFalse(routeTurns.contains("Canvas"));
+        assertFalse(routeTurns.contains("createArrowBitmap"));
+        assertTrue(renderer.contains("routeTurnMapLayer.attachRoute"));
         assertTrue(routeLabels.contains("ru.natro.navigation.route_street_labels"));
         assertTrue(routeLabels.contains("createLabelBitmap"));
         assertFalse(renderer.contains("drivingRoute != activeRoute"));
@@ -817,6 +825,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("LaneGuidanceFrame"));
         assertTrue(publisher.contains("RouteTurnFrame"));
         assertTrue(publisher.contains("readRouteTurns("));
+        assertTrue(publisher.contains("positionOnRoute"));
         assertTrue(publisher.contains("invoke(position, \"getPoint\")"));
         assertTrue(publisher.contains("invoke(position, \"heading\")"));
         assertTrue(publisher.contains("getTrafficLightsWithSignal"));
@@ -1062,7 +1071,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(labels.contains("createLabelBitmap"));
         assertTrue(labels.contains("\"ROTATE\""));
         assertTrue(labels.contains("Boolean.TRUE"));
-        assertTrue(labels.contains("readableBearing(frame.bearingDegrees)"));
+        assertTrue(labels.contains("readableBearing(frame.bearingDegrees + 90f)"));
         assertFalse(labels.contains("com.yandex.mapkit.map.TextStyle"));
     }
 

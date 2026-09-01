@@ -198,8 +198,10 @@ final class RouteStreetLabelMapLayer {
         invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
         invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
         invoke(placemark, "setIcon", new Class<?>[]{providerClass, styleClass}, provider, style);
+        // Icon direction follows the bitmap's vertical axis, while the text baseline follows X.
+        // Rotate that baseline by a quarter turn so the glyph lies on, not across, the route.
         invoke(placemark, "setDirection", new Class<?>[]{float.class},
-                readableBearing(frame.bearingDegrees));
+                readableBearing(frame.bearingDegrees + 90f));
         invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
         bitmaps.add(bitmap);
         providers.add(provider);

@@ -221,20 +221,27 @@ final class NavigatorStatePublisher {
         final double latitude;
         final double longitude;
         final float bearingDegrees;
+        final int routeSegmentIndex;
+        final double routeSegmentPosition;
 
         RouteTurnFrame(String id, String action, double latitude, double longitude,
-                       float bearingDegrees) {
+                       float bearingDegrees, int routeSegmentIndex,
+                       double routeSegmentPosition) {
             this.id = id == null ? "" : id;
             this.action = action == null ? "" : action;
             this.latitude = latitude;
             this.longitude = longitude;
             this.bearingDegrees = normalizeBearing(bearingDegrees);
+            this.routeSegmentIndex = routeSegmentIndex;
+            this.routeSegmentPosition = routeSegmentPosition;
         }
 
         boolean hasContent() {
             return !id.isEmpty() && !action.isEmpty()
                     && finite(latitude) && latitude >= -90d && latitude <= 90d
-                    && finite(longitude) && longitude >= -180d && longitude <= 180d;
+                    && finite(longitude) && longitude >= -180d && longitude <= 180d
+                    && routeSegmentIndex >= 0 && finite(routeSegmentPosition)
+                    && routeSegmentPosition >= 0d && routeSegmentPosition <= 1d;
         }
     }
 
@@ -1103,7 +1110,17 @@ final class NavigatorStatePublisher {
             double currentLongitude = frame.longitude;
             // Put the name ahead of the cursor instead of directly under the route/cursor stack.
             // The anchor remains an actual point of the active route geometry.
-            Object currentPoint = currentStreetLabelPoint(frame);
+            Object labelPosition = null;
+            try {
+                labelPosition = routePosition == null ? null : invoke(routePosition,
+                        "advance", new Class<?>[]{double.class}, 90d);
+            } catch (Throwable ignored) {}
+            Object currentPoint = null;
+            try {
+                currentPoint = labelPosition == null ? null
+                        : invoke(labelPosition, "getPoint");
+            } catch (Throwable ignored) {}
+            if (currentPoint == null) currentPoint = currentStreetLabelPoint(frame);
             if (currentPoint != null) {
                 currentLatitude = number(invoke(currentPoint, "getLatitude"), currentLatitude);
                 currentLongitude = number(invoke(currentPoint, "getLongitude"), currentLongitude);
@@ -1111,7 +1128,8 @@ final class NavigatorStatePublisher {
             float currentBearing = normalizeBearing((float) frame.bearingDegrees);
             try {
                 currentBearing = normalizeBearing((float) number(
-                        invoke(routePosition, "heading"), currentBearing));
+                        invoke(labelPosition == null ? routePosition : labelPosition, "heading"),
+                        currentBearing));
             } catch (Throwable ignored) {}
             addRouteStreetLabel(result, seen,
                     "route-street:" + routeEpoch + ":current", currentStreet,
@@ -1251,12 +1269,29 @@ final class NavigatorStatePublisher {
                     bearing = normalizeBearing((float) number(
                             invoke(position, "heading"), bearing));
                 } catch (Throwable ignored) {}
+                int routeSegmentIndex = -1;
+                double routeSegmentPosition = Double.NaN;
+                try {
+                    Object route = activeRoute;
+                    String routeId = route == null ? ""
+                            : String.valueOf(invoke(route, "getRouteId"));
+                    Object polylinePosition = routeId.isEmpty() || position == null ? null
+                            : invoke(position, "positionOnRoute",
+                            new Class<?>[]{String.class}, routeId);
+                    if (polylinePosition != null) {
+                        routeSegmentIndex = ((Number) invoke(
+                                polylinePosition, "getSegmentIndex")).intValue();
+                        routeSegmentPosition = ((Number) invoke(
+                                polylinePosition, "getSegmentPosition")).doubleValue();
+                    }
+                } catch (Throwable ignored) {}
                 String key = action + ':' + Math.round(latitude * 100_000d)
                         + ':' + Math.round(longitude * 100_000d);
                 if (!seen.add(key)) continue;
                 RouteTurnFrame frame = new RouteTurnFrame(
                         "route-turn:" + routeEpoch + ':' + key,
-                        action, latitude, longitude, bearing);
+                        action, latitude, longitude, bearing,
+                        routeSegmentIndex, routeSegmentPosition);
                 if (frame.hasContent()) result.add(frame);
             } catch (Throwable malformedItem) {
                 // A single incomplete manoeuvre never interrupts route/camera publication.
