@@ -43,6 +43,7 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.PresetsActivity",
             "dezz.status.widget.ScenarioSettingsActivity",
             "dezz.status.widget.SprutHubSettingsActivity",
+            "dezz.status.widget.shade.SystemShadeSettingsActivity",
             "dezz.status.widget.VehicleControlActivity"
     ));
 

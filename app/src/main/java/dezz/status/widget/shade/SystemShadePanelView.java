@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 
 import dezz.status.widget.Preferences;
+import dezz.status.widget.LongPressFeedback;
 import dezz.status.widget.driver.DriverPanelActionExecutor;
 import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.launcher.LauncherIconResolver;
@@ -221,7 +222,11 @@ final class SystemShadePanelView extends FrameLayout {
                         android.view.HapticFeedbackConstants.VIRTUAL_KEY);
                 listener.onActionExecuted();
             });
-            tile.setOnLongClickListener(view -> executor.executeLong(shortcut, view));
+            tile.setOnLongClickListener(view -> {
+                boolean handled = executor.executeLong(shortcut, view);
+                if (handled) LongPressFeedback.play(view);
+                return handled;
+            });
             GridLayout.LayoutParams params = new GridLayout.LayoutParams();
             params.width = 0;
             params.height = 0;
