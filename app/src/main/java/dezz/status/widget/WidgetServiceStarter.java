@@ -160,7 +160,8 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresIntegrationHost(@NonNull Preferences preferences) {
-        return preferences.dimMenuPanelEnabled.get()
+        return preferences.systemShadeEnabled.get()
+                || preferences.dimMenuPanelEnabled.get()
                 || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresIntegrationHost(
                 preferences.widgetEnabled.get(),
@@ -178,7 +179,8 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresHeadlessHost(@NonNull Preferences preferences) {
-        return preferences.dimMenuPanelEnabled.get()
+        return preferences.systemShadeEnabled.get()
+                || preferences.dimMenuPanelEnabled.get()
                 || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresHeadlessHost(
                 preferences.driverPanelEnabled.get(),
@@ -190,7 +192,9 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresAutomaticIntegrationHost(@NonNull Preferences preferences) {
-        return (preferences.dimMenuPanelEnabled.get()
+        return (preferences.systemShadeEnabled.get()
+                && preferences.systemShadeAutostart.get())
+                || (preferences.dimMenuPanelEnabled.get()
                 && preferences.dimMenuPanelAutostart.get())
                 || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresAutomaticIntegrationHost(
@@ -205,7 +209,9 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresAutomaticHeadlessHost(@NonNull Preferences preferences) {
-        return (preferences.dimMenuPanelEnabled.get()
+        return (preferences.systemShadeEnabled.get()
+                && preferences.systemShadeAutostart.get())
+                || (preferences.dimMenuPanelEnabled.get()
                 && preferences.dimMenuPanelAutostart.get())
                 || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresAutomaticHeadlessHost(

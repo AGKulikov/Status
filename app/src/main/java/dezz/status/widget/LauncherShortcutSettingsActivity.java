@@ -78,6 +78,8 @@ import dezz.status.widget.performance.PerformancePickerTask;
 /** Visual, code-free editor for arbitrary HOME icons. */
 public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     public static final String EXTRA_ADD_NEW = "dezz.status.widget.extra.ADD_HOME_SHORTCUT";
+    public static final String EXTRA_SYSTEM_SHADE =
+            "dezz.status.widget.extra.EDIT_SYSTEM_SHADE_SHORTCUTS";
 
     private Preferences preferences;
     private LauncherShortcutStore store;
@@ -100,6 +102,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     private boolean addHandled;
     private boolean editingLongAction;
     private boolean syncingControls;
+    private boolean systemShadeMode;
     private int appPickerGeneration;
     @Nullable private List<AppChoice> preloadedAppChoices;
     @NonNull private final ExecutorService appCatalogLoader =
@@ -117,15 +120,17 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
-        store = new LauncherShortcutStore(preferences);
+        systemShadeMode = getIntent().getBooleanExtra(EXTRA_SYSTEM_SHADE, false);
+        store = systemShadeMode ? LauncherShortcutStore.forSystemShade(preferences)
+                : new LauncherShortcutStore(preferences);
         gridStore = new LauncherActionsGridConfigStore(preferences);
         panelElementStore = new PanelElementConfigStore(preferences);
         panelElements = panelElementStore.load(LauncherLayoutStore.ACTIONS);
         migrateRuleIcons();
         store.load();
         gridConfig = gridStore.load(store.all());
-        setTitle("Иконки HOME");
-        View screen = buildScreen();
+        setTitle(systemShadeMode ? "Кнопки системной шторки" : "Иконки HOME");
+        View screen = systemShadeMode ? buildShadeScreen() : buildScreen();
         setContentView(screen);
         dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
         refresh();
@@ -143,6 +148,13 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         // reload before touching controls: saving the object kept before HOME was opened would
         // silently restore stale positions and spans.
         refresh();
+    }
+
+    @Override protected void onPause() {
+        if (systemShadeMode) {
+            dezz.status.widget.shade.SystemShadeService.reconcile(this, false);
+        }
+        super.onPause();
     }
 
     @Override
@@ -308,8 +320,46 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         return root;
     }
 
+    @NonNull
+    private View buildShadeScreen() {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(28), dp(18), dp(28), dp(36));
+        scroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
+        MaterialButton back = new MaterialButton(this);
+        back.setText("←  Назад");
+        back.setAllCaps(false);
+        back.setOnClickListener(view -> finish());
+        content.addView(back, new LinearLayout.LayoutParams(dp(230), dp(52)));
+        TextView title = text(25, true);
+        title.setText("Кнопки системной шторки");
+        content.addView(title);
+        TextView hint = text(15, false);
+        hint.setText("Это отдельный набор: изменения не затрагивают кнопки HOME. Доступны "
+                + "приложения, системные действия, сценарии, умный дом и команды автомобиля.");
+        hint.setAlpha(.75f);
+        hint.setPadding(0, dp(4), 0, dp(12));
+        content.addView(hint);
+        MaterialButton add = new MaterialButton(this);
+        add.setText("+  Добавить кнопку");
+        add.setAllCaps(false);
+        add.setOnClickListener(view -> chooseKindForNew());
+        content.addView(add, new LinearLayout.LayoutParams(match(), dp(56)));
+        itemsHost = new LinearLayout(this);
+        itemsHost.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams host = new LinearLayout.LayoutParams(match(), wrap());
+        host.topMargin = dp(12);
+        content.addView(itemsHost, host);
+        return scroll;
+    }
+
     private void refresh() {
         store.load();
+        if (systemShadeMode) {
+            renderRows();
+            return;
+        }
         gridConfig = gridStore.load(store.all());
         panelElements = panelElementStore.load(LauncherLayoutStore.ACTIONS);
         syncGlobalControls();
@@ -349,14 +399,15 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         name.setText(shortcut.title);
         TextView type = text(13, false);
         type.setAlpha(.7f);
-        type.setText(typeLabel(shortcut) + "\n" + placementLabel(shortcut.id));
+        type.setText(systemShadeMode ? typeLabel(shortcut)
+                : typeLabel(shortcut) + "\n" + placementLabel(shortcut.id));
         type.setMaxLines(3);
         labels.addView(name);
         labels.addView(type);
         row.addView(labels, new LinearLayout.LayoutParams(0, wrap(), 1f));
 
         MaterialSwitch visible = new MaterialSwitch(this);
-        visible.setText("На HOME");
+        visible.setText(systemShadeMode ? "В шторке" : "На HOME");
         visible.setContentDescription("Показывать «" + shortcut.title + "»");
         visible.setChecked(shortcut.enabled);
         visible.setOnCheckedChangeListener((button, checked) ->
@@ -1675,30 +1726,35 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                     // Re-read the grid at commit time. The actual HOME editor may have changed
                     // position while this Activity was stopped, and an old dialog object must
                     // never write those coordinates back.
-                    store.load();
-                    LauncherActionsGridConfig latestGrid = gridStore.load(store.all());
-                    LauncherActionsGridConfig.Placement latestPlacement =
-                            latestGrid.placement(value.id);
                     boolean spanAccepted = true;
-                    if (latestPlacement == null) {
-                        // A brand-new shortcut is reconciled immediately after its definition is
-                        // saved; these legacy fields seed that first stable placement.
+                    if (systemShadeMode) {
                         value.columnSpan = width.value;
                         value.rowSpan = height.value;
                     } else {
-                        boolean unchanged = latestPlacement.columnSpan == width.value
-                                && latestPlacement.rowSpan == height.value;
-                        spanAccepted = unchanged || latestGrid.setPlacement(value.id,
-                                latestPlacement.column, latestPlacement.row,
-                                width.value, height.value);
-                        LauncherActionsGridConfig.Placement actual =
+                        store.load();
+                        LauncherActionsGridConfig latestGrid = gridStore.load(store.all());
+                        LauncherActionsGridConfig.Placement latestPlacement =
                                 latestGrid.placement(value.id);
-                        value.columnSpan = actual == null
-                                ? latestPlacement.columnSpan : actual.columnSpan;
-                        value.rowSpan = actual == null
-                                ? latestPlacement.rowSpan : actual.rowSpan;
-                        gridStore.save(latestGrid);
-                        gridConfig = latestGrid;
+                        if (latestPlacement == null) {
+                        // A brand-new shortcut is reconciled immediately after its definition is
+                        // saved; these legacy fields seed that first stable placement.
+                            value.columnSpan = width.value;
+                            value.rowSpan = height.value;
+                        } else {
+                            boolean unchanged = latestPlacement.columnSpan == width.value
+                                    && latestPlacement.rowSpan == height.value;
+                            spanAccepted = unchanged || latestGrid.setPlacement(value.id,
+                                    latestPlacement.column, latestPlacement.row,
+                                    width.value, height.value);
+                            LauncherActionsGridConfig.Placement actual =
+                                    latestGrid.placement(value.id);
+                            value.columnSpan = actual == null
+                                    ? latestPlacement.columnSpan : actual.columnSpan;
+                            value.rowSpan = actual == null
+                                    ? latestPlacement.rowSpan : actual.rowSpan;
+                            gridStore.save(latestGrid);
+                            gridConfig = latestGrid;
+                        }
                     }
                     store.upsert(value);
                     refresh();

@@ -790,6 +790,15 @@ public class Preferences {
     /** Ordered actions controlled by the steering-wheel scroll/confirm keys. */
     public final Str dimMenuPanelShortcutsJson = new Str(this,
             "dimMenuPanelShortcutsJson", "");
+    /** Independent editable replacement for the ECARX top notification shade. */
+    public final Bool systemShadeEnabled = new Bool(this, "systemShadeEnabled", false);
+    /** Restores only the Natro overlay; stock ECARX suppression remains an explicit ADB step. */
+    public final Bool systemShadeAutostart = new Bool(this, "systemShadeAutostart", true);
+    /** Versioned panel geometry, gesture thresholds and per-module appearance. */
+    public final Str systemShadeConfigJson = new Str(this, "systemShadeConfigJson", "");
+    /** Actions shown by the shade's independently editable shortcut module. */
+    public final Str systemShadeShortcutsJson = new Str(this,
+            "systemShadeShortcutsJson", "");
     /** Independent main-map, HUD-map and Navigator floating-window profiles. */
     public final Str navigationIntegrationConfigJson = new Str(this,
             "navigationIntegrationConfigJson", "");

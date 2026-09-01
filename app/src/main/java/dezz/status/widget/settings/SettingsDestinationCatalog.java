@@ -162,6 +162,11 @@ public final class SettingsDestinationCatalog {
                 "navigation", "dezz.status.widget.DimMenuPanelSettingsActivity",
                 "dim", "mNavi", "руль", "меню водителя", "экран водителя",
                 "маршруты", "умный дом", "звонки", "display 2"));
+        values.add(activity("panel_system_shade", Group.PANELS, "Системная шторка Natro",
+                "Жест сверху, отдельные элементы, кнопки и живая компоновка",
+                "panels", "dezz.status.widget.shade.SystemShadeSettingsActivity",
+                "шторка", "уведомления", "ecarx", "яркость", "громкость", "медиа",
+                "жест сверху", "компоновка"));
         values.add(activity("navigator_window", Group.PANELS,
                 "Оконный режим Навигатора",
                 "Размер, положение, скругление, прозрачный фон и фиксация окна",

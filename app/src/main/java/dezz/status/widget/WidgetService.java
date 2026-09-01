@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 103126)
+Total output lines: 8417
+
 /*
  * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
  *
@@ -138,6 +141,7 @@ import dezz.status.widget.ha.api.HaEntityCatalog;
 import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.mqtt.MqttController;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
+import dezz.status.widget.shade.SystemShadeService;
 import dezz.status.widget.phone.PhoneAppIconStore;
 import dezz.status.widget.phone.PhoneBluetoothIndicatorPolicy;
 import dezz.status.widget.phone.PhoneConnectorController;
@@ -2187,6 +2191,9 @@ public class WidgetService extends Service {
         if (prefs.dimMenuPanelEnabled.get() && prefs.dimMenuPanelAutostart.get()) {
             DimMenuPanelService.reconcileAutomatic(this);
         }
+        if (prefs.systemShadeEnabled.get() && prefs.systemShadeAutostart.get()) {
+            SystemShadeService.reconcile(this, true);
+        }
         if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
             mainHandler.post(() -> {
                 if (!destroyed && prefs != null && prefs.hudPanelEnabled.get()) {
@@ -2999,6 +3006,10 @@ public class WidgetService extends Service {
         if (prefs.dimMenuPanelEnabled.get() && prefs.dimMenuPanelAutostart.get()) {
             runIntegrationStep("automatic DIM menu reconcile",
                     () -> DimMenuPanelService.reconcileAutomatic(this));
+        }
+        if (prefs.systemShadeEnabled.get() && prefs.systemShadeAutostart.get()) {
+            runIntegrationStep("automatic system shade reconcile",
+                    () -> SystemShadeService.reconcile(this, true));
         }
         if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
             mainHandler.post(() -> {
@@ -4134,257 +4145,7 @@ public class WidgetService extends Service {
             if (automaticSurfaceRefreshSuppressed()) {
                 onAutomationStateChanged(AutomationContract.SCOPE_DRIVER,
                         "builtin.phone_ancs_ready");
-            } else {
-                DriverPanelService.apply(this);
-            }
-        }
-        schedulePopupRefresh();
-    }
-
-    private void rememberPhoneNotificationItems(@Nullable ConnectorValue value) {
-        if (value == null || !(value.rawValue instanceof List<?>)) return;
-        for (Object item : (List<?>) value.rawValue) {
-            rememberPhoneNotificationKey(PhoneStatusBarPolicy.notificationKey(item));
-        }
-    }
-
-    private void rememberPhoneNotificationKey(@Nullable String key) {
-        if (TextUtils.isEmpty(key)) return;
-        observedPhoneNotificationKeys.add(key);
-        while (observedPhoneNotificationKeys.size() > MAX_OBSERVED_PHONE_NOTIFICATIONS) {
-            java.util.Iterator<String> oldest = observedPhoneNotificationKeys.iterator();
-            if (!oldest.hasNext()) break;
-            oldest.next();
-            oldest.remove();
-        }
-    }
-
-    /**
-     * Keeps the visible card stable. The first newcomer waits one second; every later delivery is
-     * retained in arrival order and receives its own one-second slot.
-     */
-    private void enqueuePhoneNotification(
-            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
-            @NonNull Set<String> selectedFields) {
-        if (!phoneNotificationAllowedByLockState()) return;
-        QueuedPhoneNotification delivery = new QueuedPhoneNotification(
-                presentation, selectedFields);
-        enqueuePhoneDelivery(delivery);
-    }
-
-    /** Low-battery events use exactly the same lock, overlay-delay and destination queue. */
-    private boolean enqueuePhoneLowBatteryAlert(int level, @NonNull String color,
-                                                int stage) {
-        if (prefs == null || !phoneNotificationAllowedByLockState()
-                || (!prefs.phoneStatusBarNotificationsEnabled.get()
-                && !prefs.phonePopupNotificationsEnabled.get())) return false;
-        return enqueuePhoneDelivery(QueuedPhoneNotification.lowBattery(level, color, stage));
-    }
-
-    private boolean enqueuePhoneDelivery(@NonNull QueuedPhoneNotification delivery) {
-        if (phoneNotificationBlockedByForeground()) {
-            long now = SystemClock.elapsedRealtime();
-            if (!deferredPhoneNotifications.offer(delivery, now)) {
-                if (deferredPhoneNotificationOverflowCount == 0) {
-                    deferredPhoneNotificationOverflowStartedElapsed = now;
-                }
-                deferredPhoneNotificationOverflowCount = saturatingIncrement(
-                        deferredPhoneNotificationOverflowCount);
-                return false;
-            }
-            DiagnosticJournal.info("phone-notification",
-                    "delivery deferred reason="
-                            + (phoneExternalOverlayActive
-                            ? "vehicle-overlay" : "foreground-app")
-                            + " key=" + phoneNotificationDeliveryKey(delivery));
-            schedulePhoneNotificationDeferralDeadline();
-            return true;
-        }
-        // A missed/coalesced foreground callback must not let a newcomer overtake older held
-        // notifications. Release those first, then append this delivery to the normal sequencer.
-        if (!deferredPhoneNotifications.isEmpty()
-                || deferredPhoneNotificationOverflowCount > 0) {
-            releaseAllDeferredPhoneNotifications();
-        }
-        return enqueuePhoneNotificationNow(delivery);
-    }
-
-    /** Enters the existing one-second sequencer without re-applying foreground deferral. */
-    private boolean enqueuePhoneNotificationNow(@NonNull QueuedPhoneNotification delivery) {
-        long batteryRemaining = activePhoneLowBatteryRemaining();
-        if (batteryRemaining > 0L) {
-            boolean accepted = appendQueuedPhoneNotification(delivery);
-            if (!accepted) return false;
-            phoneNotificationBurstActive = true;
-            schedulePhoneNotificationQueueAdvanceAfter(batteryRemaining);
-            return true;
-        }
-        if (phoneNotificationBurstActive) {
-            return appendQueuedPhoneNotification(delivery);
-        }
-        if (hasActiveRoutinePhoneNotificationDestination()) {
-            boolean accepted = appendQueuedPhoneNotification(delivery);
-            if (!accepted) return false;
-            phoneNotificationBurstActive = true;
-            long delay = PHONE_NOTIFICATION_QUEUE_SLOT_MS;
-            holdPhoneNotificationDestinationsUntil(
-                    SystemClock.elapsedRealtime() + delay);
-            schedulePhoneNotificationQueueAdvanceAfter(delay);
-            return true;
-        }
-        return presentPhoneNotification(delivery);
-    }
-
-    private boolean appendQueuedPhoneNotification(@NonNull QueuedPhoneNotification delivery) {
-        if (queuedPhoneNotifications.size() >= PhoneNotificationDeferralQueue.MAX_ITEMS) {
-            queuedPhoneNotificationOverflowCount = saturatingIncrement(
-                    queuedPhoneNotificationOverflowCount);
-            return false;
-        }
-        queuedPhoneNotifications.addLast(delivery);
-        return true;
-    }
-
-    private void schedulePhoneNotificationQueueAdvanceAfter(long delayMillis) {
-        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-        if (phoneNotificationOverlayPaused) {
-            pausedPhoneNotificationQueueAdvance = true;
-            return;
-        }
-        mainHandler.postDelayed(phoneNotificationQueueAdvance,
-                Math.max(0L, delayMillis));
-    }
-
-    private boolean phoneNotificationForegroundTrackingNeeded() {
-        return prefs != null && prefs.phoneNotificationDelayInAppsEnabled.get()
-                && !prefs.phoneNotificationDelayInPackages.get().isEmpty();
-    }
-
-    private boolean phoneNotificationBlockedByForeground() {
-        if (prefs == null || !prefs.phoneNotificationDelayInAppsEnabled.get()) return false;
-        if (prefs.phoneNotificationDelayForExternalOverlays.get()
-                && phoneExternalOverlayActive) return true;
-        if (prefs.phoneNotificationDelayInPackages.get().isEmpty()) return false;
-        // Foreground identity can be briefly unknown while Accessibility reconnects, before the
-        // first UsageStats sample, or after its permission is revoked. Showing immediately would
-        // defeat the feature exactly for explicitly selected applications. Hold conservatively;
-        // each delivery still has its configured monotonic maximum-wait deadline.
-        if (lastForegroundPackage == null) return true;
-        return PhoneNotificationDeferralPolicy.isBlocking(true,
-                prefs.phoneNotificationDelayInPackages.get(), lastForegroundPackage);
-    }
-
-    /** Called by the shared event-driven foreground tracker only when its package really changes. */
-    private void onPhoneNotificationForegroundChanged() {
-        reconcileDeferredPhoneNotifications();
-    }
-
-    private boolean shouldPausePhoneNotificationForExternalOverlay() {
-        return prefs != null
-                && prefs.phoneNotificationDelayInAppsEnabled.get()
-                && prefs.phoneNotificationDelayForExternalOverlays.get()
-                && phoneExternalOverlayActive;
-    }
-
-    /** Keeps an already-rendered delivery alive while 360/PAS is confirmed active. */
-    private void syncPhoneNotificationExternalOverlayPause() {
-        boolean shouldPause = shouldPausePhoneNotificationForExternalOverlay();
-        if (shouldPause == phoneNotificationOverlayPaused) return;
-        if (shouldPause) pausePhoneNotificationForExternalOverlay();
-        else resumePhoneNotificationAfterExternalOverlay();
-    }
-
-    private void pausePhoneNotificationForExternalOverlay() {
-        phoneNotificationOverlayPaused = true;
-        long now = SystemClock.elapsedRealtime();
-        pausedPhoneNotificationRemainingMs = hasActivePhoneStatusAlert()
-                && activePhoneNotificationExpiresAt > 0L
-                ? Math.max(1L, activePhoneNotificationExpiresAt - now) : 0L;
-        pausedPhonePopupRemainingMs = activePhonePopupNotificationExpiresAt > 0L
-                ? Math.max(1L, activePhonePopupNotificationExpiresAt - now) : 0L;
-        pausedPhoneNotificationQueueAdvance = phoneNotificationBurstActive;
-        mainHandler.removeCallbacks(phoneNotificationExpiry);
-        mainHandler.removeCallbacks(phonePopupNotificationExpiry);
-        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-        if (pausedPhoneNotificationRemainingMs > 0L) {
-            activePhoneNotificationExpiresAt = Long.MAX_VALUE;
-        }
-        if (pausedPhonePopupRemainingMs > 0L) {
-            activePhonePopupNotificationExpiresAt = Long.MAX_VALUE;
-            updatePhonePopupAutomationExpiry(0L);
-        }
-        DiagnosticJournal.info("phone-notification",
-                "external overlay pause statusRemainingMs="
-                        + pausedPhoneNotificationRemainingMs
-                        + " popupRemainingMs=" + pausedPhonePopupRemainingMs
-                        + " queue=" + pausedPhoneNotificationQueueAdvance);
-        dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
-                "phone-notification-external", "PAUSED",
-                "statusRemainingMs=" + pausedPhoneNotificationRemainingMs
-                        + ", popupRemainingMs=" + pausedPhonePopupRemainingMs);
-    }
-
-    private void resumePhoneNotificationAfterExternalOverlay() {
-        phoneNotificationOverlayPaused = false;
-        long now = SystemClock.elapsedRealtime();
-        long statusRemaining = pausedPhoneNotificationRemainingMs;
-        long popupRemaining = pausedPhonePopupRemainingMs;
-        boolean resumeQueue = pausedPhoneNotificationQueueAdvance;
-        pausedPhoneNotificationRemainingMs = 0L;
-        pausedPhonePopupRemainingMs = 0L;
-        pausedPhoneNotificationQueueAdvance = false;
-        boolean staleStatus = activePhoneNotification != null
-                && !phoneNotificationStillCurrent(activePhoneNotification);
-        boolean stalePopup = activePhonePopupNotification != null
-                && !phoneNotificationStillCurrent(activePhonePopupNotification);
-        if (staleStatus) {
-            statusRemaining = 0L;
-            clearPhoneStatusNotification(true);
-        }
-        if (stalePopup) {
-            popupRemaining = 0L;
-            clearPhonePopupNotification();
-        }
-        if (statusRemaining > 0L && hasActivePhoneStatusAlert()) {
-            activePhoneNotificationExpiresAt = now + statusRemaining;
-            mainHandler.postDelayed(phoneNotificationExpiry, statusRemaining);
-        }
-        if (popupRemaining > 0L && activePhonePopupNotificationExpiresAt > 0L) {
-            activePhonePopupNotificationExpiresAt = now + popupRemaining;
-            updatePhonePopupAutomationExpiry(
-                    System.currentTimeMillis() + popupRemaining);
-            mainHandler.postDelayed(phonePopupNotificationExpiry, popupRemaining);
-        }
-        if (resumeQueue && phoneNotificationBurstActive) {
-            mainHandler.postDelayed(phoneNotificationQueueAdvance,
-                    PHONE_NOTIFICATION_QUEUE_SLOT_MS);
-        }
-        DiagnosticJournal.info("phone-notification",
-                "external overlay resume statusRemainingMs=" + statusRemaining
-                        + " popupRemainingMs=" + popupRemaining
-                        + " queue=" + resumeQueue
-                        + " staleStatus=" + staleStatus
-                        + " stalePopup=" + stalePopup);
-        dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
-                "phone-notification-external", "RESUMED",
-                "statusRemainingMs=" + statusRemaining
-                        + ", popupRemainingMs=" + popupRemaining);
-        if (binding != null) {
-            updateMediaInfo();
-            applyBrickVisibility(currentBrickSet());
-        }
-        schedulePopupRefresh();
-    }
-
-    /** Updates only phone-owned transient states; content and visibility remain unchanged. */
-    private void updatePhonePopupAutomationExpiry(long expiresAtWallMillis) {
-        if (automationStates == null) return;
-        long now = System.currentTimeMillis();
-        List<String> ids = new ArrayList<>(PhoneNotificationAutomation.fieldAutomationIds());
-        ids.add(PhoneNotificationAutomation.OVERLAY_ID);
-        ids.add(PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID);
-        for (String id : ids) {
-            String scope = PhoneNotificationAutomation.isFieldAutomationId(id)
+            } el…3126 tokens truncated…eldAutomationId(id)
                     ? AutomationContract.SCOPE_POPUP : AutomationContract.SCOPE_OVERLAY;
             AutomationState state = automationStates.get(scope, id);
             if (!state.present || state.source == null
@@ -7050,7 +6811,10 @@ public class WidgetService extends Service {
         boolean vehicleOverlayTrackingNeeded = prefs != null
                 && prefs.phoneNotificationDelayInAppsEnabled.get()
                 && prefs.phoneNotificationDelayForExternalOverlays.get();
-        if (!vehicleOverlayTrackingNeeded) phoneVehicleOverlayActive = false;
+        boolean shadeSafetyTrackingNeeded = prefs != null && prefs.systemShadeEnabled.get();
+        if (!vehicleOverlayTrackingNeeded && !shadeSafetyTrackingNeeded) {
+            phoneVehicleOverlayActive = false;
+        }
         recomputePhoneExternalOverlayActive();
         try {
             reconcileCarExternalOverlayListener(CarIntegrations.get(this));
@@ -7117,18 +6881,22 @@ public class WidgetService extends Service {
         mainHandler.post(() -> {
             if (destroyed) return;
             phoneVehicleOverlayActive = active;
+            SystemShadeService.setVehicleOverlayActive(active);
             recomputePhoneExternalOverlayActive();
         });
     }
 
     private void reconcileCarExternalOverlayListener(@NonNull CarIntegration car) {
-        boolean needed = prefs != null
+        boolean phoneNeeded = prefs != null
                 && prefs.phoneNotificationDelayInAppsEnabled.get()
                 && prefs.phoneNotificationDelayForExternalOverlays.get();
+        boolean shadeNeeded = prefs != null && prefs.systemShadeEnabled.get();
+        boolean needed = phoneNeeded || shadeNeeded;
         car.setExternalOverlayListener(needed ? phoneVehicleOverlayListener : null);
         phoneVehicleOverlayListenerInstalled = needed;
         if (!needed) {
             phoneVehicleOverlayActive = false;
+            SystemShadeService.setVehicleOverlayActive(false);
             recomputePhoneExternalOverlayActive();
         }
     }

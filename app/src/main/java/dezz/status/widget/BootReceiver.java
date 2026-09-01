@@ -34,6 +34,7 @@ import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.dim.DimMenuPanelService;
 import dezz.status.widget.instrument.InstrumentDisplayLauncher;
 import dezz.status.widget.launcher.MediaAutoResumeController;
+import dezz.status.widget.shade.SystemShadeService;
 import dezz.status.widget.phone.PackageReplaceBleRecoveryGate;
 import dezz.status.widget.phone.PhoneConnectionJournal;
 
@@ -212,6 +213,11 @@ public class BootReceiver extends BroadcastReceiver {
             DimMenuPanelService.reconcileAutomatic(context);
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not restore DIM menu at lifecycle boundary", failure);
+        }
+        try {
+            SystemShadeService.reconcile(context, true);
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not restore system shade at lifecycle boundary", failure);
         }
     }
 

@@ -319,22 +319,25 @@ public final class LauncherShortcutStore {
     private final boolean driverPanel;
     private final boolean driverFavorites;
     private final boolean dimMenu;
+    private final boolean systemShade;
     private final List<Shortcut> shortcuts = new ArrayList<>();
 
     public LauncherShortcutStore(@NonNull Preferences preferences) {
-        this(preferences, preferences.launcherShortcutsJson, false, false, false);
+        this(preferences, preferences.launcherShortcutsJson, false, false, false, false);
     }
 
     private LauncherShortcutStore(@NonNull Preferences preferences,
                                   @NonNull Preferences.Str storage,
                                   boolean driverPanel,
                                   boolean driverFavorites,
-                                  boolean dimMenu) {
+                                  boolean dimMenu,
+                                  boolean systemShade) {
         this.preferences = preferences;
         this.storage = storage;
         this.driverPanel = driverPanel;
         this.driverFavorites = driverFavorites;
         this.dimMenu = dimMenu;
+        this.systemShade = systemShade;
         load();
     }
 
@@ -348,7 +351,7 @@ public final class LauncherShortcutStore {
             @NonNull Preferences preferences,
             @NonNull Preferences.DriverPanelProfile profile) {
         return new LauncherShortcutStore(preferences, profile.shortcutsJson,
-                true, false, false);
+                true, false, false, false);
     }
 
     @NonNull
@@ -361,14 +364,21 @@ public final class LauncherShortcutStore {
     public static LauncherShortcutStore forDriverFavorites(
             @NonNull Preferences preferences, @NonNull String panelId) {
         return new LauncherShortcutStore(preferences,
-                preferences.driverFavoritesShortcuts(panelId), false, true, false);
+                preferences.driverFavoritesShortcuts(panelId), false, true, false, false);
     }
 
     /** Actions presented in the independent DIM navigation-tab menu. */
     @NonNull
     public static LauncherShortcutStore forDimMenu(@NonNull Preferences preferences) {
         return new LauncherShortcutStore(preferences,
-                preferences.dimMenuPanelShortcutsJson, false, false, true);
+                preferences.dimMenuPanelShortcutsJson, false, false, true, false);
+    }
+
+    /** Actions owned by the replacement system shade; never mutate the HOME arrangement. */
+    @NonNull
+    public static LauncherShortcutStore forSystemShade(@NonNull Preferences preferences) {
+        return new LauncherShortcutStore(preferences,
+                preferences.systemShadeShortcutsJson, false, false, false, true);
     }
 
     public void load() {
@@ -979,6 +989,16 @@ public final class LauncherShortcutStore {
     @NonNull
     private List<Shortcut> defaults() {
         if (dimMenu) return DimMenuShortcutDefaults.create(preferences);
+        if (systemShade) {
+            List<Shortcut> values = new ArrayList<>();
+            values.add(builtin(Builtin.STOCK_CLIMATE, "Климат"));
+            values.add(builtin(Builtin.NAVIGATOR_WINDOW, "Навигатор"));
+            values.add(builtin(Builtin.ALL_APPS, "Приложения"));
+            values.add(builtin(Builtin.MEDIA_PREVIOUS, "Назад"));
+            values.add(builtin(Builtin.MEDIA_PLAY_PAUSE, "Играть"));
+            values.add(builtin(Builtin.MEDIA_NEXT, "Далее"));
+            return values;
+        }
         if (driverFavorites) return Collections.emptyList();
         if (driverPanel) {
             List<Shortcut> values = new ArrayList<>();
