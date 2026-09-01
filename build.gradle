@@ -165,7 +165,9 @@ int getVersionCode() {
     if (version == '2.5.9') {
         return 208021292
     }
-    if (version == '2.5.10') {
+    // Public release numbering rolls 2.5.9 forward to 2.6.0; patch components above 9 are not
+    // used for new Natro releases. The Android versionCode still advances by exactly one.
+    if (version == '2.6.0') {
         return 208021293
     }
     if (version == '2.3.0') {

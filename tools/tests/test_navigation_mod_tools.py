@@ -285,14 +285,22 @@ class NavigationModToolsTest(unittest.TestCase):
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.5.10}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.6.0}"', pair)
         self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021293}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.5.10")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.6.0")', verifier)
         self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021293")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
+
+        build = (TOOLS.parent / "build.gradle").read_text()
+        workflow = (TOOLS.parent / ".github" / "workflows"
+                    / "verify-navigation-hud-v2.yml").read_text()
+        self.assertIn("if (version == '2.6.0')", build)
+        self.assertIn("VERSION_NAME: '2.6.0'", workflow)
+        self.assertNotIn("2.5.10", build)
+        self.assertNotIn("2.5.10", workflow)
 
     def test_hud_renderer_uses_route_bound_layer_with_parked_camera(self):
         renderer = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
