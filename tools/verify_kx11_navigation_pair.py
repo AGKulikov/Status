@@ -227,6 +227,7 @@ def verify_natro(aapt: Path, apksigner: Path, zipalign: Path, apk: Path) -> str:
         b"showTrafficLights",
         b"showLaneGuidance",
         b"showDestination",
+        b"KEEP_CLUSTER_ENDPOINT",
         "Карточка ближайшего манёвра".encode("utf-8"),
     ))
     verify_zipalign(zipalign, apk)
@@ -313,7 +314,6 @@ def verify_navigator(
         b"createDefaultManeuverStyle",
         b"applyManeuverStyle",
         b"addArrow",
-        b"KEEP_CLUSTER_ENDPOINT",
     ):
         if marker not in classes19:
             raise VerificationError(
