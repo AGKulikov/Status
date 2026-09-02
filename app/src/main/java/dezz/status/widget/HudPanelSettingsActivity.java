@@ -641,8 +641,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         form.addView(manualLayerPriorities, marginTop(4));
         form.addView(text("Выключено: порядок как в Навигаторе 30.3.0 — маршрут ниже "
                 + "подписей, курсор ниже подсказок, конечная точка выше. Включено: большее "
-                + "значение располагает слой выше внутри совместимой группы. Стрелки "
-                + "полилинии всегда следуют приоритету маршрута.",
+                + "значение располагает слой выше внутри совместимой группы. "
+                + "Стрелки полилинии всегда следуют приоритету маршрута.",
                 12, 0xFF95A0AF), marginTop(4));
         SliderField cameraDirectionLayerPriority = slider(form,
                 "Знаки камер и секторы направления", profile.cameraDirectionLayerPriority,

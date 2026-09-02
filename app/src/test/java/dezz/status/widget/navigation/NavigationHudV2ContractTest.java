@@ -824,7 +824,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("profile.routeTurnFillColor"));
         assertTrue(renderer.contains("profile.routeTurnOutlineColor"));
         assertTrue(renderer.contains("profile.routeTurnOutlineWidth"));
-        assertTrue(renderer.contains("profile.effectiveRouteTurnPriority()"));
+        assertFalse(renderer.contains("profile.effectiveRouteTurnPriority()"));
+        assertTrue(renderer.contains("MapSublayerOrder.apply(currentMap, profile)"));
         assertTrue(renderer.contains("cameraDirectionMapLayer.update(frame.routeActive"));
         assertTrue(renderer.contains("profile.effectiveCameraPriority()"));
         assertTrue(renderer.contains("laneGuidanceMapLayer.update(frame.routeActive"));

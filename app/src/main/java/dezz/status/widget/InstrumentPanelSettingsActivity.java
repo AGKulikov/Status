@@ -714,8 +714,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(manualLayerPriorities);
         content.addView(text("Выключено: порядок как в Навигаторе 30.3.0 — маршрут ниже "
                 + "подписей, курсор ниже подсказок, конечная точка выше. Включено: большее "
-                + "значение располагает слой выше внутри совместимой группы. Стрелки "
-                + "полилинии всегда следуют приоритету маршрута.",
+                + "значение располагает слой выше внутри совместимой группы. "
+                + "Стрелки полилинии всегда следуют приоритету маршрута.",
                 12, 0xFFB8C0CC));
         SliderField cameraDirectionLayerPriority = slider(content,
                 "Знаки камер и секторы направления", map.cameraDirectionLayerPriority,
