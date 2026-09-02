@@ -8,12 +8,12 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
-import android.os.SystemClock;
 import android.util.Log;
 import android.view.Surface;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -37,8 +37,6 @@ final class HudMapRenderer {
     /** Match the main map's road-width traffic instead of the custom thick route stroke. */
     private static final String BACKGROUND_TRAFFIC_STYLE =
             "[{\"types\":\"polyline\",\"stylers\":{\"scale\":0.45}}]";
-    /** Geometry slicing is expensive; camera motion remains independent and full-rate. */
-    private static final long ROUTE_GEOMETRY_INTERVAL_MS = 100L;
     private final Context context;
     private final FailureReporter reporter;
     private final MapCursorStyler cursorStyler;
@@ -81,7 +79,6 @@ final class HudMapRenderer {
     private int renderedRouteSegmentIndex;
     private double renderedRouteSegmentPosition = Double.NaN;
     private int renderedRouteSegmentCount;
-    private long lastRouteGeometryElapsedMs;
     private NavigatorStatePublisher.CameraState initialCamera;
     private NavigatorStatePublisher.CameraState navigationCamera;
     /** Frozen source position for FREE mode; profile tilt/zoom may still change around it. */
@@ -278,7 +275,6 @@ final class HudMapRenderer {
             renderedRouteSegmentIndex = 0;
             renderedRouteSegmentPosition = Double.NaN;
             renderedRouteSegmentCount = 0;
-            lastRouteGeometryElapsedMs = 0L;
         }
         activeRouteEpoch = routeEpoch;
         activeRoute = drivingRoute;
@@ -696,7 +692,7 @@ final class HudMapRenderer {
         Object currentMap = map;
         if (currentMap == null) return;
         try {
-            routeTurnMapLayer.attachRoute(null, 0, 0d, 0);
+            routeTurnMapLayer.attachRoute(null, null);
             Object collection = routeCollection;
             if (collection == null) {
                 collection = MapObjectLayerFactory.create(currentMap,
@@ -716,7 +712,11 @@ final class HudMapRenderer {
             routeDestinationPlacemark = null;
             Object route = activeRoute;
             if (route == null || (!profile.showRoute && !profile.showDestination)) return;
-            RouteSlice slice = remainingRoute(route);
+            // Keep the route geometry immutable for its whole epoch. MapKit documents
+            // PolylineMapObject.hide(Subpolyline) as the efficient way to hide travelled parts;
+            // replacing geometry on every location frame resets native line state and visibly
+            // flashes on both KX11 external surfaces.
+            RouteSlice slice = fullRoute(route);
             if (slice == null) return;
             renderedRouteSegmentIndex = slice.firstSegmentIndex;
             renderedRouteSegmentPosition = slice.segmentPosition;
@@ -729,8 +729,9 @@ final class HudMapRenderer {
                 routePolyline = line;
                 RoutePolylineStyler.apply(line, activeJamStyle, profile,
                         slice.firstSegmentIndex, slice.segmentCount, routeColorScratch);
-                routeTurnMapLayer.attachRoute(line, slice.firstSegmentIndex,
-                        slice.segmentPosition, slice.segmentCount);
+                routeTurnMapLayer.attachRoute(line, route);
+                RouteProgress progress = currentRouteProgress(route);
+                if (progress != null) applyRouteProgressMask(line, progress);
             }
             if (profile.showDestination && slice.destinationPoint != null) {
                 Object destinations = destinationCollection;
@@ -748,7 +749,6 @@ final class HudMapRenderer {
                 }
                 addDestinationMarker(destinations, slice.destinationPoint);
             }
-            lastRouteGeometryElapsedMs = SystemClock.elapsedRealtime();
             applyManualSublayerOrder();
         } catch (Throwable failure) {
             Log.w(TAG, "Active route could not be rendered in the HUD MapWindow", failure);
@@ -854,7 +854,7 @@ final class HudMapRenderer {
         }
         try {
             RoutePolylineStyler.apply(line, activeJamStyle, profile,
-                    renderedRouteSegmentIndex, renderedRouteSegmentCount,
+                    0, renderedRouteSegmentCount,
                     routeColorScratch);
         } catch (Throwable failure) {
             Log.w(TAG, "HUD route traffic palette could not be updated", failure);
@@ -862,9 +862,9 @@ final class HudMapRenderer {
     }
 
     /**
-     * Re-slices the visible route from the same map-matched point as the cursor. A backward GPS
-     * correction is applied immediately: route geometry is not historical progress and therefore
-     * must restore the previously hidden section whenever RoutePosition moves back.
+     * Hides the travelled prefix without replacing polyline geometry. A backward GPS correction
+     * simply replaces the hidden Subpolyline with a shorter one, immediately restoring the route
+     * while preserving MapKit's frame, traffic palette and native manoeuvre arrows.
      */
     private void updateRouteProgress(NavigatorStatePublisher.NavigationFrame frame) {
         Object line = routePolyline;
@@ -872,46 +872,42 @@ final class HudMapRenderer {
         if (line == null || route == null || !profile.showRoute
                 || !frame.routeProgressValid) return;
         try {
-            Object cursorPoint = frame.currentRoutePoint;
-            if (cursorPoint == null && finite(frame.latitude) && finite(frame.longitude)) {
-                Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
-                cursorPoint = pointClass.getConstructor(double.class, double.class)
-                        .newInstance(frame.latitude, frame.longitude);
-            }
             RouteProgress progress = new RouteProgress(
-                    frame.routeSegmentIndex, frame.routeSegmentPosition,
-                    cursorPoint);
+                    frame.routeSegmentIndex, frame.routeSegmentPosition);
             if (!routeProgressChanged(progress)) return;
-            if (progress.segmentIndex != renderedRouteSegmentIndex) {
-                // Polyline arrows cannot change their PolylinePosition. Rebuild once per segment
-                // transition so removed manoeuvres never accumulate as hidden native objects.
-                rebuildRoute();
-                return;
-            }
-            boolean movingBackward = isBehindRenderedProgress(progress);
-            long now = SystemClock.elapsedRealtime();
-            // Forward/current movement is capped at 10 geometry updates per second on the KX11.
-            // A reverse correction bypasses that performance throttle so the line immediately
-            // returns to the cursor instead of remaining irreversibly clipped ahead of it.
-            if (!movingBackward && progress.segmentIndex == renderedRouteSegmentIndex
-                    && now - lastRouteGeometryElapsedMs < ROUTE_GEOMETRY_INTERVAL_MS) return;
-            // Publisher already read RoutePosition once for both maps. The first geometry point
-            // is that exact map-matched cursor point; the rest comes from the active route.
-            RouteSlice slice = remainingRoute(route, progress);
-            if (slice == null) return;
-            Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
-            invoke(line, "setGeometry", new Class<?>[]{polylineClass}, slice.geometry);
-            renderedRouteSegmentIndex = slice.firstSegmentIndex;
-            renderedRouteSegmentPosition = slice.segmentPosition;
-            renderedRouteSegmentCount = slice.segmentCount;
-            lastRouteGeometryElapsedMs = now;
-            RoutePolylineStyler.applyProgressColors(line, activeJamStyle, profile,
-                    slice.firstSegmentIndex, slice.segmentCount, routeColorScratch);
-            routeTurnMapLayer.attachRoute(line, slice.firstSegmentIndex,
-                    slice.segmentPosition, slice.segmentCount);
+            applyRouteProgressMask(line, progress);
         } catch (Throwable failure) {
             Log.w(TAG, "HUD route progress could not be advanced", failure);
         }
+    }
+
+    /** One atomic hide call cancels the previous mask, including when progress moves backwards. */
+    private void applyRouteProgressMask(Object line, RouteProgress rawProgress) throws Exception {
+        int segmentCount = Math.max(0, renderedRouteSegmentCount);
+        if (segmentCount <= 0) return;
+        int segmentIndex = Math.max(0, Math.min(segmentCount - 1,
+                rawProgress.segmentIndex));
+        double segmentPosition = Math.max(0d, Math.min(1d,
+                rawProgress.segmentPosition));
+        if (segmentIndex == 0 && segmentPosition <= 0.000001d) {
+            // The List overload explicitly cancels every previous hidden range. This is the
+            // reversible zero-progress case and avoids constructing an invalid empty range.
+            invoke(line, "hide", new Class<?>[]{List.class}, Collections.emptyList());
+        } else {
+            Class<?> positionClass = Class.forName(
+                    "com.yandex.mapkit.geometry.PolylinePosition");
+            Object begin = positionClass.getConstructor(int.class, double.class)
+                    .newInstance(0, 0d);
+            Object end = positionClass.getConstructor(int.class, double.class)
+                    .newInstance(segmentIndex, segmentPosition);
+            Class<?> subpolylineClass = Class.forName(
+                    "com.yandex.mapkit.geometry.Subpolyline");
+            Object travelled = subpolylineClass.getConstructor(positionClass, positionClass)
+                    .newInstance(begin, end);
+            invoke(line, "hide", new Class<?>[]{subpolylineClass}, travelled);
+        }
+        renderedRouteSegmentIndex = segmentIndex;
+        renderedRouteSegmentPosition = segmentPosition;
     }
 
     private boolean routeProgressChanged(RouteProgress progress) {
@@ -920,50 +916,20 @@ final class HudMapRenderer {
                 || Math.abs(progress.segmentPosition - renderedRouteSegmentPosition) > 0.000001d;
     }
 
-    private boolean isBehindRenderedProgress(RouteProgress progress) {
-        return progress.segmentIndex < renderedRouteSegmentIndex
-                || (progress.segmentIndex == renderedRouteSegmentIndex
-                && !Double.isNaN(renderedRouteSegmentPosition)
-                && progress.segmentPosition < renderedRouteSegmentPosition);
-    }
-
-    private static RouteSlice remainingRoute(Object route) throws Exception {
-        return remainingRoute(route, currentRouteProgress(route));
-    }
-
-    private static RouteSlice remainingRoute(Object route, RouteProgress progress)
-            throws Exception {
-        if (progress == null) return null;
+    private static RouteSlice fullRoute(Object route) throws Exception {
         Object fullGeometry = invoke(route, "getGeometry", new Class<?>[0]);
         if (fullGeometry == null) return null;
         List<?> points = list(invoke(fullGeometry, "getPoints", new Class<?>[0]));
         if (points.size() < 2) return null;
-
-        int segmentIndex = Math.max(0, Math.min(points.size() - 2, progress.segmentIndex));
-        double segmentPosition = progress.segmentPosition;
-        Object currentPoint = progress.currentPoint;
-        if (currentPoint == null) currentPoint = points.get(segmentIndex);
-
-        ArrayList<Object> remaining = new ArrayList<>(points.size() - segmentIndex);
-        remaining.add(currentPoint);
-        for (int index = segmentIndex + 1; index < points.size(); index++) {
-            remaining.add(points.get(index));
-        }
-        Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
-        Object geometry = polylineClass.getConstructor(List.class).newInstance(remaining);
-        return new RouteSlice(geometry, segmentIndex, segmentPosition,
-                Math.max(0, remaining.size() - 1), points.get(points.size() - 1));
+        return new RouteSlice(fullGeometry, 0, 0d,
+                points.size() - 1, points.get(points.size() - 1));
     }
 
     /** RoutePosition-only read; deliberately does not touch or copy the full route geometry. */
     private static RouteProgress currentRouteProgress(Object route) throws Exception {
         int segmentIndex = 0;
         double segmentPosition = 0d;
-        Object currentPoint = null;
         Object routePosition = invoke(route, "getRoutePosition", new Class<?>[0]);
-        if (routePosition != null) {
-            currentPoint = invoke(routePosition, "getPoint", new Class<?>[0]);
-        }
         // The cursor-owned RoutePosition is reversible. DrivingRoute.getPosition() represents
         // completed guidance progress and is only a continuity fallback during native rerouting.
         Object polylinePosition = null;
@@ -983,7 +949,7 @@ final class HudMapRenderer {
         }
         segmentIndex = Math.max(0, segmentIndex);
         segmentPosition = Math.max(0d, Math.min(1d, segmentPosition));
-        return new RouteProgress(segmentIndex, segmentPosition, currentPoint);
+        return new RouteProgress(segmentIndex, segmentPosition);
     }
 
     private static List<?> list(Object value) {
@@ -1010,12 +976,9 @@ final class HudMapRenderer {
     private static final class RouteProgress {
         final int segmentIndex;
         final double segmentPosition;
-        final Object currentPoint;
-
-        RouteProgress(int segmentIndex, double segmentPosition, Object currentPoint) {
+        RouteProgress(int segmentIndex, double segmentPosition) {
             this.segmentIndex = segmentIndex;
             this.segmentPosition = segmentPosition;
-            this.currentPoint = currentPoint;
         }
     }
 
@@ -1090,7 +1053,6 @@ final class HudMapRenderer {
         renderedRouteSegmentIndex = 0;
         renderedRouteSegmentPosition = Double.NaN;
         renderedRouteSegmentCount = 0;
-        lastRouteGeometryElapsedMs = 0L;
         freeCameraSource = null;
         lastAppliedCamera = null;
         if (releaseSurface && currentSurface != null) {

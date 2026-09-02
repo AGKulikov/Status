@@ -187,6 +187,9 @@ public final class InstrumentPanelContractTest {
                 "delegate.unsubscribeRealtimeTelemetry(listener)"));
         assertTrue(panel.contains("publishClusterSurface("));
         assertTrue(panel.contains("revokeClusterSurface("));
+        assertTrue(panel.contains("replaceLeaseIfReady()"));
+        assertTrue(panel.contains("Keep the producer lease until the View/Surface"));
+        assertFalse(panel.contains("else revokeLease();"));
         assertTrue(panel.contains("ensureClusterEndpointStarted(getContext())"));
         assertTrue(activity.contains("ensureClusterEndpointStarted(this)"));
         assertTrue(endpoint.contains("ACTION_KEEP_CLUSTER_ENDPOINT"));

@@ -652,7 +652,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("Updates traffic colours in place"));
         assertTrue(renderer.contains("positionOnRoute"));
         assertTrue(renderer.contains("invoke(route, \"getPosition\""));
-        assertTrue(renderer.contains("setGeometry"));
+        assertFalse(renderer.contains("\"setGeometry\""));
+        assertTrue(renderer.contains("fullRoute(route)"));
+        assertTrue(renderer.contains("com.yandex.mapkit.geometry.Subpolyline"));
+        assertTrue(renderer.contains("invoke(line, \"hide\""));
         assertTrue("Missing reversible route progress in " + patchRoot.toAbsolutePath(),
                 renderer.contains("routeProgressChanged"));
         assertTrue(renderer.contains("slice.firstSegmentIndex"));
@@ -727,7 +730,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(laneGuidance.contains("setGeometry"));
         assertTrue(laneGuidance.contains("placeOnRight ? -0.08f : 1.08f"));
         assertTrue(routeTurns.contains("createDefaultManeuverStyle"));
+        assertTrue(routeTurns.contains("addManeuvers"));
         assertTrue(routeTurns.contains("applyManeuverStyle"));
+        assertTrue(routeTurns.contains("ArrowManeuverStyle"));
+        assertTrue(routeTurns.contains("boolean.class"));
+        assertTrue(routeTurns.contains("visible);"));
         assertTrue(routeTurns.contains("addArrow"));
         assertTrue(routeTurns.contains("PolylinePosition"));
         assertFalse(routeTurns.contains("Canvas"));
@@ -787,7 +794,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(routeStyler.contains("setStrokeColors"));
         assertTrue(routeStyler.contains("setPaletteColor"));
         assertTrue(routeStyler.contains("readJamStyle"));
-        assertTrue(renderer.contains("applyProgressColors"));
+        assertFalse(renderer.contains("applyProgressColors"));
         assertFalse(cursor.contains("UserLocationObjectListener"));
         assertFalse(cursor.contains("ViewProvider"));
         assertFalse(cursor.contains("setView"));
@@ -1077,18 +1084,43 @@ public final class NavigationHudV2ContractTest {
         assertFalse(labels.contains("com.yandex.mapkit.map.TextStyle"));
     }
 
-    @Test public void backwardProgressImmediatelyRestoresRouteFromCursor() throws Exception {
+    @Test public void routeProgressIsReversibleWithoutRecreatingGeometry() throws Exception {
         String renderer = read(navigatorModRoot().resolve("HudMapRenderer.java"));
         assertTrue(renderer.contains("routeProgressChanged(progress)"));
-        assertTrue(renderer.contains("isBehindRenderedProgress(progress)"));
-        assertTrue(renderer.contains("if (!movingBackward"));
-        assertTrue(renderer.contains("route geometry is not historical progress"));
-        assertTrue(renderer.contains("Object cursorPoint = frame.currentRoutePoint"));
-        assertTrue(renderer.contains("newInstance(frame.latitude, frame.longitude)"));
-        assertTrue(renderer.contains("remainingRoute(route, progress)"));
+        assertTrue(renderer.contains("applyRouteProgressMask(line, progress)"));
+        assertTrue(renderer.contains("Subpolyline"));
+        assertTrue(renderer.contains("Collections.emptyList()"));
+        assertTrue(renderer.contains("cancels the previous mask"));
+        assertTrue(renderer.contains("fullRoute(route)"));
         assertTrue(renderer.contains("The cursor-owned RoutePosition is reversible"));
+        assertFalse(renderer.contains("remainingRoute("));
+        assertFalse(renderer.contains("isBehindRenderedProgress"));
+        assertFalse(renderer.contains("ROUTE_GEOMETRY_INTERVAL_MS"));
+        assertFalse(renderer.contains("\"setGeometry\""));
         assertFalse(renderer.contains("BACKWARD_PROGRESS_CONFIRMATIONS"));
         assertFalse(renderer.contains("pendingBackwardConfirmations"));
+    }
+
+    @Test public void externalMapSurfacesKeepTheirLastFrameAcrossResizeAndVisibility()
+            throws Exception {
+        Path root = projectRoot();
+        String composite = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudCompositeView.java"));
+        String panel = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/instrument/InstrumentPanelView.java"));
+        String endpoint = read(root.resolve("app/src/main/java/dezz/status/widget/navigation/"
+                + "NavigationHudEndpointService.java"));
+
+        assertTrue(composite.contains("leasedSurface != null && leasedTexture == texture"));
+        assertTrue(composite.contains("Refresh only retained reconnect metadata"));
+        assertTrue(composite.contains("if (generation < 0L)"));
+        assertTrue(endpoint.contains("current.width = width"));
+        assertTrue(endpoint.contains("current.height = height"));
+        assertTrue(endpoint.contains("volatile int width"));
+        assertTrue(endpoint.contains("another ATTACH would tear down a"));
+        assertTrue(panel.contains("replaceLeaseIfReady()"));
+        assertTrue(panel.contains("Keep the producer lease until the View/Surface"));
+        assertFalse(panel.contains("else revokeLease();"));
     }
 
     @Test public void hudSpeedWakeIsBoundedAndYandexCameraFallbackIsIndependent()

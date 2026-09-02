@@ -150,7 +150,6 @@ final class HudCompositeView extends FrameLayout
     @Override
     public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture texture,
                                             int width, int height) {
-        revokeSurface();
         publishSurface(texture, width, height);
     }
 
@@ -172,16 +171,40 @@ final class HudCompositeView extends FrameLayout
         if (activeMap == null || width <= 1 || height <= 1) return;
         if (leasedSurface != null && leasedTexture == texture
                 && leasedWidth == width && leasedHeight == height) return;
-        revokeSurface();
         texture.setDefaultBufferSize(width, height);
-        Surface surface = new Surface(texture);
-        leasedSurface = surface;
+        if (leasedSurface != null && leasedTexture == texture) {
+            // A Surface keeps following its SurfaceTexture when the producer buffer is resized.
+            // Refresh only retained reconnect metadata: publishing another wrapper would make
+            // Navigator recreate the complete OffscreenMapWindow and flash the map.
+            long generation = NavigationHudEndpointService.publishHudSurface(
+                    leasedSurface, width, height,
+                    getResources().getDisplayMetrics().densityDpi);
+            if (generation >= 0L) {
+                leasedWidth = width;
+                leasedHeight = height;
+            }
+            return;
+        }
+        Surface previous = leasedSurface;
+        Surface replacement = new Surface(texture);
+        // Publish the replacement before releasing the previous wrapper. The endpoint replaces
+        // the lease atomically, so Navigator never receives a detach-only interval and the last
+        // composed TextureView buffer remains visible while MapKit reconciles the new dimensions.
+        int dpi = getResources().getDisplayMetrics().densityDpi;
+        long generation = NavigationHudEndpointService.publishHudSurface(
+                replacement, width, height, dpi);
+        if (generation < 0L) {
+            try { replacement.release(); } catch (RuntimeException ignored) {}
+            return;
+        }
+        leasedSurface = replacement;
         leasedTexture = texture;
         leasedWidth = width;
         leasedHeight = height;
-        int dpi = getResources().getDisplayMetrics().densityDpi;
-        long generation = NavigationHudEndpointService.publishHudSurface(
-                surface, width, height, dpi);
+        if (previous != null) {
+            NavigationHudEndpointService.revokeHudSurface(previous);
+            try { previous.release(); } catch (RuntimeException ignored) {}
+        }
         DiagnosticJournal.info("hud-map",
                 "HUD TextureView surface published; generation=" + generation
                         + ", size=" + width + "x" + height

@@ -159,9 +159,23 @@ public final class NavigationHudEndpointService extends Service {
     public static long publishHudSurface(@NonNull Surface surface,
                                          int width, int height, int dpi) {
         if (!surface.isValid() || width <= 0 || height <= 0) return -1L;
+        int safeDpi = Math.max(1, dpi);
         final SurfaceLease next;
         synchronized (SURFACE_LOCK) {
-            next = new SurfaceLease(surface, width, height, Math.max(1, dpi),
+            SurfaceLease current = publishedSurface;
+            if (current != null && current.surface == surface) {
+                if (current.width != width || current.height != height
+                        || current.dpi != safeDpi) {
+                    // The Surface continues to follow the same SurfaceTexture after a buffer
+                    // resize. Update only reconnect metadata: another ATTACH would tear down a
+                    // healthy OffscreenMapWindow for no visual gain.
+                    current.width = width;
+                    current.height = height;
+                    current.dpi = safeDpi;
+                }
+                return current.generation;
+            }
+            next = new SurfaceLease(surface, width, height, safeDpi,
                     ++nextSurfaceGeneration);
             publishedSurface = next;
         }
@@ -186,9 +200,20 @@ public final class NavigationHudEndpointService extends Service {
     public static long publishClusterSurface(@NonNull Surface surface,
                                              int width, int height, int dpi) {
         if (!surface.isValid() || width <= 0 || height <= 0) return -1L;
+        int safeDpi = Math.max(1, dpi);
         final SurfaceLease next;
         synchronized (SURFACE_LOCK) {
-            next = new SurfaceLease(surface, width, height, Math.max(1, dpi),
+            SurfaceLease current = publishedClusterSurface;
+            if (current != null && current.surface == surface) {
+                if (current.width != width || current.height != height
+                        || current.dpi != safeDpi) {
+                    current.width = width;
+                    current.height = height;
+                    current.dpi = safeDpi;
+                }
+                return current.generation;
+            }
+            next = new SurfaceLease(surface, width, height, safeDpi,
                     ++nextSurfaceGeneration);
             publishedClusterSurface = next;
         }
@@ -647,20 +672,26 @@ public final class NavigationHudEndpointService extends Service {
     private void sendSurface(@NonNull SurfaceLease lease) {
         Client current = client;
         if (current == null || !supportsDirectHudMap(current) || !lease.surface.isValid()) return;
+        final int width;
+        final int height;
+        final int dpi;
         synchronized (SURFACE_LOCK) {
             if (publishedSurface != lease) return;
+            width = lease.width;
+            height = lease.height;
+            dpi = lease.dpi;
         }
         Bundle data = new Bundle();
         data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
         data.putParcelable(NavigationBridgeContract.KEY_SURFACE, lease.surface);
-        data.putInt(NavigationBridgeContract.KEY_SURFACE_WIDTH, lease.width);
-        data.putInt(NavigationBridgeContract.KEY_SURFACE_HEIGHT, lease.height);
-        data.putInt(NavigationBridgeContract.KEY_SURFACE_DPI, lease.dpi);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_WIDTH, width);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_HEIGHT, height);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_DPI, dpi);
         data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, lease.generation);
         send(current.messenger, NavigationBridgeContract.MSG_ATTACH_HUD_SURFACE, data);
         DiagnosticJournal.info("hud-map",
                 "HUD surface lease sent to Navigator; generation=" + lease.generation
-                        + ", size=" + lease.width + "x" + lease.height);
+                        + ", size=" + width + "x" + height);
     }
 
     private void sendSurfaceDetach(long generation) {
@@ -676,20 +707,26 @@ public final class NavigationHudEndpointService extends Service {
         Client current = client;
         if (current == null || !supportsDirectClusterMap(current)
                 || !lease.surface.isValid()) return;
+        final int width;
+        final int height;
+        final int dpi;
         synchronized (SURFACE_LOCK) {
             if (publishedClusterSurface != lease) return;
+            width = lease.width;
+            height = lease.height;
+            dpi = lease.dpi;
         }
         Bundle data = new Bundle();
         data.putString(NavigationBridgeContract.KEY_SESSION_ID, current.sessionId);
         data.putParcelable(NavigationBridgeContract.KEY_SURFACE, lease.surface);
-        data.putInt(NavigationBridgeContract.KEY_SURFACE_WIDTH, lease.width);
-        data.putInt(NavigationBridgeContract.KEY_SURFACE_HEIGHT, lease.height);
-        data.putInt(NavigationBridgeContract.KEY_SURFACE_DPI, lease.dpi);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_WIDTH, width);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_HEIGHT, height);
+        data.putInt(NavigationBridgeContract.KEY_SURFACE_DPI, dpi);
         data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, lease.generation);
         send(current.messenger, NavigationBridgeContract.MSG_ATTACH_CLUSTER_SURFACE, data);
         DiagnosticJournal.info("cluster-map",
                 "instrument-cluster surface lease sent to Navigator; generation="
-                        + lease.generation + ", size=" + lease.width + "x" + lease.height);
+                        + lease.generation + ", size=" + width + "x" + height);
     }
 
     private void sendClusterSurfaceDetach(long generation) {
@@ -809,9 +846,11 @@ public final class NavigationHudEndpointService extends Service {
 
     private static final class SurfaceLease {
         @NonNull final Surface surface;
-        final int width;
-        final int height;
-        final int dpi;
+        // Mutable metadata keeps the lease object identity stable, so an already queued initial
+        // ATTACH is not discarded when layout settles to its final size before the handler runs.
+        volatile int width;
+        volatile int height;
+        volatile int dpi;
         final long generation;
 
         SurfaceLease(@NonNull Surface surface, int width, int height,

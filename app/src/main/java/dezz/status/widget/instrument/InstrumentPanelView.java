@@ -62,7 +62,8 @@ public final class InstrumentPanelView extends FrameLayout
                 int height = bottom - top;
                 if (width <= 1 || height <= 1) return;
                 if (leasePublished && (width != publishedWidth || height != publishedHeight)) {
-                    revokeLease();
+                    replaceLeaseIfReady();
+                    return;
                 }
                 publishLeaseIfReady();
             });
@@ -139,8 +140,10 @@ public final class InstrumentPanelView extends FrameLayout
     @Override protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
         windowVisible = visibility == VISIBLE;
-        if (windowVisible) publishLeaseIfReady();
-        else revokeLease();
+        if (windowVisible) replaceLeaseIfReady();
+        // Window visibility on the KX11 briefly changes for system overlays and DIM transitions.
+        // Keep the producer lease until the View/Surface is actually detached or destroyed so a
+        // transient visibility callback cannot tear down the OffscreenMapWindow and flash black.
     }
 
     @Override public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surfaceTexture,
@@ -153,8 +156,7 @@ public final class InstrumentPanelView extends FrameLayout
     @Override public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surfaceTexture,
                                                       int width, int height) {
         if (width == publishedWidth && height == publishedHeight) return;
-        revokeLease();
-        publishLeaseIfReady();
+        replaceLeaseIfReady();
     }
 
     @Override public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surfaceTexture) {
@@ -168,11 +170,21 @@ public final class InstrumentPanelView extends FrameLayout
     }
 
     private void publishLeaseIfReady() {
-        if (mapTexture == null || mapSurface == null || leasePublished
+        publishLeaseIfReady(false);
+    }
+
+    /** Replaces dimensions without sending a detach-only interval to Navigator. */
+    private void replaceLeaseIfReady() {
+        publishLeaseIfReady(true);
+    }
+
+    private void publishLeaseIfReady(boolean replace) {
+        if (mapTexture == null || mapSurface == null || (!replace && leasePublished)
                 || !attached || !windowVisible || mapView.getVisibility() != VISIBLE) return;
         int width = mapTexture.getWidth();
         int height = mapTexture.getHeight();
         if (width <= 1 || height <= 1 || !mapSurface.isValid()) return;
+        if (leasePublished && width == publishedWidth && height == publishedHeight) return;
         SurfaceTexture texture = mapTexture.getSurfaceTexture();
         if (texture != null) texture.setDefaultBufferSize(width, height);
         NavigationHudEndpointService.ensureClusterEndpointStarted(getContext());
