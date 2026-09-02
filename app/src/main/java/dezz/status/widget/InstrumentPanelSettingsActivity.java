@@ -638,18 +638,28 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField cameraScale = slider(content,
                 "Размер единых знаков камер",
                 map.cameraScalePercent, 50, 250, 5, " %");
-        SliderField cameraDirectionScale = slider(content,
-                "Размер полупрозрачного направления камер",
-                map.cameraDirectionScalePercent, 25, 300, 5, " %");
+        SliderField cameraDirectionLength = slider(content,
+                "Длина треугольника направления камер",
+                map.cameraDirectionLengthPercent, 10, 300, 5, " %");
+        SliderField cameraDirectionWidth = slider(content,
+                "Ширина основания треугольника",
+                map.cameraDirectionWidthPercent, 10, 300, 5, " %");
+        ColorField cameraDirectionColor = opaqueNavigationColorField(
+                content, "Цвет треугольника направления",
+                map.cameraDirectionColor, finalNavigation, preferences,
+                value -> map.cameraDirectionColor = value);
         SliderField cameraDirectionOpacity = slider(content,
                 "Прозрачность направления камер",
                 map.cameraDirectionOpacityPercent, 0, 100, 5, " %");
+        content.addView(text("Ширина меняет только дальнее широкое основание треугольника; "
+                + "длина и положение вершины при этом не меняются.",
+                12, 0xFFB8C0CC));
         SliderField trafficLightScale = slider(content,
                 "Размер светофоров и плашек секунд",
                 map.trafficLightScalePercent, 50, 250, 5, " %");
         SliderField routeTurnLength = slider(content,
                 "Длина стрелок поворотов на маршруте",
-                map.routeTurnLengthPercent, 50, 250, 5, " %");
+                map.routeTurnLengthPercent, 10, 250, 5, " %");
         InheritedColorField routeTurnFillColor = inheritableNavigationColorField(
                 content, "Цвет стрелок поворотов", map.routeTurnFillColor,
                 finalNavigation, preferences, value -> map.routeTurnFillColor = value);
@@ -796,7 +806,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cursorScalePercent = cursorScale.intValue();
                     map.laneGuidanceScalePercent = laneGuidanceScale.intValue();
                     map.cameraScalePercent = cameraScale.intValue();
-                    map.cameraDirectionScalePercent = cameraDirectionScale.intValue();
+                    map.cameraDirectionLengthPercent = cameraDirectionLength.intValue();
+                    map.cameraDirectionWidthPercent = cameraDirectionWidth.intValue();
+                    map.cameraDirectionColor = cameraDirectionColor.value;
                     map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue();
                     map.trafficLightScalePercent = trafficLightScale.intValue();
                     map.routeTurnLengthPercent = routeTurnLength.intValue();
@@ -1277,6 +1289,20 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         });
     }
 
+    @NonNull private ColorField opaqueNavigationColorField(
+            @NonNull LinearLayout parent,
+            @NonNull String title,
+            @NonNull String initial,
+            @NonNull NavigationIntegrationConfig navigation,
+            @NonNull Preferences preferences,
+            @NonNull ColorSelectionListener setter) {
+        return colorField(parent, title, initial,
+                AppleColorPickerDialog.Options.opaque(), selected -> {
+                    setter.onSelected(selected);
+                    persistNavigationConfiguration(navigation, preferences);
+                });
+    }
+
     @NonNull private InheritedColorField inheritableNavigationColorField(
             @NonNull LinearLayout parent,
             @NonNull String title,
@@ -1337,11 +1363,20 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
 
     @NonNull private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
                                            @NonNull String initial) {
-        return colorField(parent, title, initial, null);
+        return colorField(parent, title, initial,
+                AppleColorPickerDialog.Options.standard(), null);
     }
 
     @NonNull private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
                                            @NonNull String initial,
+                                           @Nullable ColorSelectionListener selectionListener) {
+        return colorField(parent, title, initial,
+                AppleColorPickerDialog.Options.standard(), selectionListener);
+    }
+
+    @NonNull private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
+                                           @NonNull String initial,
+                                           @NonNull AppleColorPickerDialog.Options options,
                                            @Nullable ColorSelectionListener selectionListener) {
         ColorField field = new ColorField(initial);
         MaterialButton button = new MaterialButton(this);
@@ -1349,7 +1384,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         button.setAllCaps(false);
         AppleColorPickerDialog.decorateButton(button, title, initial);
         button.setOnClickListener(view -> AppleColorPickerDialog.show(
-                this, title, field.value, AppleColorPickerDialog.Options.standard(),
+                this, title, field.value, options,
                 new AppleColorPickerDialog.Listener() {
                     private boolean apply(@Nullable String selected) {
                         if (selected == null || selected.trim().isEmpty()) return false;

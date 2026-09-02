@@ -173,9 +173,10 @@ final class HudCompositeView extends FrameLayout
                 && leasedWidth == width && leasedHeight == height) return;
         texture.setDefaultBufferSize(width, height);
         if (leasedSurface != null && leasedTexture == texture) {
-            // A Surface keeps following its SurfaceTexture when the producer buffer is resized.
-            // Refresh only retained reconnect metadata: publishing another wrapper would make
-            // Navigator recreate the complete OffscreenMapWindow and flash the map.
+            // Keep the same TextureView/Surface so its last complete buffer remains composed.
+            // The endpoint nevertheless publishes a new generation: OffscreenMapWindow has
+            // immutable creation dimensions and must rebuild its viewport instead of stretching
+            // the old raster to this new rectangle.
             long generation = NavigationHudEndpointService.publishHudSurface(
                     leasedSurface, width, height,
                     getResources().getDisplayMetrics().densityDpi);

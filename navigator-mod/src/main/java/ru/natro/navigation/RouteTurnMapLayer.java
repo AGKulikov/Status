@@ -108,7 +108,7 @@ final class RouteTurnMapLayer {
     void apply(boolean nextEnabled, int nextLengthPercent,
                String nextFillColor, String nextOutlineColor,
                double nextOutlineWidth, int ignoredLayerPriority) {
-        int nextLength = Math.max(50, Math.min(250, nextLengthPercent));
+        int nextLength = Math.max(10, Math.min(250, nextLengthPercent));
         float safeOutlineWidth = (float) Math.max(0d, Math.min(20d,
                 Double.isNaN(nextOutlineWidth) || Double.isInfinite(nextOutlineWidth)
                         ? 2d : nextOutlineWidth));

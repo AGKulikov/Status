@@ -40,6 +40,8 @@ public final class NavigationHudEndpointService extends Service {
             "ru.natro.statuswidget.navigation.KEEP_CLUSTER_ENDPOINT";
     /** Last wake checkpoint is at 120 seconds; leave time for its Binder response. */
     private static final long OPTIONAL_HUD_SPEED_BOOTSTRAP_MS = 135_000L;
+    /** Coalesces live editor drags so MapKit rebuilds only for the settled viewport. */
+    private static final long SURFACE_RESIZE_SETTLE_MS = 80L;
     static final int MAX_CONFIGURATION_CHARS = 384 * 1024;
     @NonNull private static final Object SURFACE_LOCK = new Object();
     @Nullable private static volatile NavigationHudEndpointService instance;
@@ -70,6 +72,9 @@ public final class NavigationHudEndpointService extends Service {
     private int clusterEndpointStartId;
     @NonNull private final Runnable snapshotDrain = this::drainLatestSnapshot;
     @NonNull private final Runnable routeGeometryDrain = this::drainLatestRouteGeometry;
+    @NonNull private final Runnable sendLatestHudSurface = this::sendPublishedSurface;
+    @NonNull private final Runnable sendLatestClusterSurface =
+            this::sendPublishedClusterSurface;
     @NonNull private final Runnable finishOptionalHudSpeedBootstrap = () -> {
         int startId = optionalHudSpeedBootstrapStartId;
         optionalHudSpeedBootstrapStartId = 0;
@@ -161,26 +166,29 @@ public final class NavigationHudEndpointService extends Service {
         if (!surface.isValid() || width <= 0 || height <= 0) return -1L;
         int safeDpi = Math.max(1, dpi);
         final SurfaceLease next;
+        final boolean resizedExistingSurface;
         synchronized (SURFACE_LOCK) {
             SurfaceLease current = publishedSurface;
             if (current != null && current.surface == surface) {
-                if (current.width != width || current.height != height
-                        || current.dpi != safeDpi) {
-                    // The Surface continues to follow the same SurfaceTexture after a buffer
-                    // resize. Update only reconnect metadata: another ATTACH would tear down a
-                    // healthy OffscreenMapWindow for no visual gain.
-                    current.width = width;
-                    current.height = height;
-                    current.dpi = safeDpi;
-                }
-                return current.generation;
+                if (current.width == width && current.height == height
+                        && current.dpi == safeDpi) return current.generation;
+                resizedExistingSurface = true;
+            } else {
+                resizedExistingSurface = false;
             }
+            // OffscreenMapWindow has immutable creation dimensions. A new generation instructs
+            // Navigator to rebuild that viewport while TextureView retains its last composed
+            // frame; mutating metadata alone permanently stretches the old map raster.
             next = new SurfaceLease(surface, width, height, safeDpi,
                     ++nextSurfaceGeneration);
             publishedSurface = next;
         }
         NavigationHudEndpointService current = instance;
-        if (current != null) current.handler.post(() -> current.sendSurface(next));
+        if (current != null) {
+            current.handler.removeCallbacks(current.sendLatestHudSurface);
+            current.handler.postDelayed(current.sendLatestHudSurface,
+                    resizedExistingSurface ? SURFACE_RESIZE_SETTLE_MS : 0L);
+        }
         return next.generation;
     }
 
@@ -193,7 +201,10 @@ public final class NavigationHudEndpointService extends Service {
             publishedSurface = null;
         }
         NavigationHudEndpointService current = instance;
-        if (current != null) current.handler.post(() -> current.sendSurfaceDetach(generation));
+        if (current != null) {
+            current.handler.removeCallbacks(current.sendLatestHudSurface);
+            current.handler.post(() -> current.sendSurfaceDetach(generation));
+        }
     }
 
     /** Called by the instrument-panel TextureView; this lease is independent from the HUD. */
@@ -202,23 +213,26 @@ public final class NavigationHudEndpointService extends Service {
         if (!surface.isValid() || width <= 0 || height <= 0) return -1L;
         int safeDpi = Math.max(1, dpi);
         final SurfaceLease next;
+        final boolean resizedExistingSurface;
         synchronized (SURFACE_LOCK) {
             SurfaceLease current = publishedClusterSurface;
             if (current != null && current.surface == surface) {
-                if (current.width != width || current.height != height
-                        || current.dpi != safeDpi) {
-                    current.width = width;
-                    current.height = height;
-                    current.dpi = safeDpi;
-                }
-                return current.generation;
+                if (current.width == width && current.height == height
+                        && current.dpi == safeDpi) return current.generation;
+                resizedExistingSurface = true;
+            } else {
+                resizedExistingSurface = false;
             }
             next = new SurfaceLease(surface, width, height, safeDpi,
                     ++nextSurfaceGeneration);
             publishedClusterSurface = next;
         }
         NavigationHudEndpointService current = instance;
-        if (current != null) current.handler.post(() -> current.sendClusterSurface(next));
+        if (current != null) {
+            current.handler.removeCallbacks(current.sendLatestClusterSurface);
+            current.handler.postDelayed(current.sendLatestClusterSurface,
+                    resizedExistingSurface ? SURFACE_RESIZE_SETTLE_MS : 0L);
+        }
         return next.generation;
     }
 
@@ -233,6 +247,7 @@ public final class NavigationHudEndpointService extends Service {
         }
         NavigationHudEndpointService current = instance;
         if (current != null) {
+            current.handler.removeCallbacks(current.sendLatestClusterSurface);
             current.handler.post(() -> {
                 current.sendClusterSurfaceDetach(generation);
                 current.stopClusterEndpointIfIdle();
@@ -846,11 +861,11 @@ public final class NavigationHudEndpointService extends Service {
 
     private static final class SurfaceLease {
         @NonNull final Surface surface;
-        // Mutable metadata keeps the lease object identity stable, so an already queued initial
-        // ATTACH is not discarded when layout settles to its final size before the handler runs.
-        volatile int width;
-        volatile int height;
-        volatile int dpi;
+        // Geometry is immutable per generation. A resize must create a new generation because
+        // MapKit fixes an OffscreenMapWindow's viewport at construction time.
+        final int width;
+        final int height;
+        final int dpi;
         final long generation;
 
         SurfaceLease(@NonNull Surface surface, int width, int height,

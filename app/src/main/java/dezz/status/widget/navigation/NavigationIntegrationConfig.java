@@ -195,10 +195,14 @@ public final class NavigationIntegrationConfig {
         public boolean showHudSpeedCameras = true;
         /** Scale of Yandex's original lane-sign view; 100 keeps the stock MapKit size. */
         public int laneGuidanceScalePercent = 100;
-        /** One scale controls both source-specific camera signs and their optional detail badges. */
+        /** Scale of the one compact source-independent camera/speed sign. */
         public int cameraScalePercent = 100;
-        /** Geometric length/width multiplier of the source-backed camera direction sector. */
-        public int cameraDirectionScalePercent = 100;
+        /** Longitudinal length of the source-backed camera direction triangle. */
+        public int cameraDirectionLengthPercent = 100;
+        /** Width of only the triangle's far/base edge; it never changes longitudinal length. */
+        public int cameraDirectionWidthPercent = 100;
+        /** Opaque RGB colour; transparency remains an independent control below. */
+        @NonNull public String cameraDirectionColor = "#FF168BFF";
         /** Fill opacity of the camera direction sector. */
         public int cameraDirectionOpacityPercent = 30;
         /** Scale of Yandex's original signal-and-seconds traffic-light balloon. */
@@ -314,7 +318,9 @@ public final class NavigationIntegrationConfig {
                     .put("showHudSpeedCameras", showHudSpeedCameras)
                     .put("laneGuidanceScalePercent", laneGuidanceScalePercent)
                     .put("cameraScalePercent", cameraScalePercent)
-                    .put("cameraDirectionScalePercent", cameraDirectionScalePercent)
+                    .put("cameraDirectionLengthPercent", cameraDirectionLengthPercent)
+                    .put("cameraDirectionWidthPercent", cameraDirectionWidthPercent)
+                    .put("cameraDirectionColor", cameraDirectionColor)
                     .put("cameraDirectionOpacityPercent", cameraDirectionOpacityPercent)
                     .put("trafficLightScalePercent", trafficLightScalePercent)
                     .put("routeTurnLengthPercent", routeTurnLengthPercent)
@@ -406,8 +412,16 @@ public final class NavigationIntegrationConfig {
                     "laneGuidanceScalePercent", result.laneGuidanceScalePercent);
             result.cameraScalePercent = source.optInt(
                     "cameraScalePercent", result.cameraScalePercent);
-            result.cameraDirectionScalePercent = source.optInt(
-                    "cameraDirectionScalePercent", result.cameraDirectionScalePercent);
+            // The former single scale changed both dimensions. Use it only as a migration
+            // fallback, then persist the two independent controls from now on.
+            int legacyCameraDirectionScale = source.optInt(
+                    "cameraDirectionScalePercent", result.cameraDirectionLengthPercent);
+            result.cameraDirectionLengthPercent = source.optInt(
+                    "cameraDirectionLengthPercent", legacyCameraDirectionScale);
+            result.cameraDirectionWidthPercent = source.optInt(
+                    "cameraDirectionWidthPercent", legacyCameraDirectionScale);
+            result.cameraDirectionColor = source.optString(
+                    "cameraDirectionColor", result.cameraDirectionColor);
             result.cameraDirectionOpacityPercent = source.optInt(
                     "cameraDirectionOpacityPercent", result.cameraDirectionOpacityPercent);
             result.trafficLightScalePercent = source.optInt(
@@ -514,10 +528,12 @@ public final class NavigationIntegrationConfig {
             cursorScalePercent = clamp(cursorScalePercent, 25, 300);
             laneGuidanceScalePercent = clamp(laneGuidanceScalePercent, 50, 250);
             cameraScalePercent = clamp(cameraScalePercent, 50, 250);
-            cameraDirectionScalePercent = clamp(cameraDirectionScalePercent, 25, 300);
+            cameraDirectionLengthPercent = clamp(cameraDirectionLengthPercent, 10, 300);
+            cameraDirectionWidthPercent = clamp(cameraDirectionWidthPercent, 10, 300);
+            cameraDirectionColor = color(cameraDirectionColor, "#FF168BFF");
             cameraDirectionOpacityPercent = clamp(cameraDirectionOpacityPercent, 0, 100);
             trafficLightScalePercent = clamp(trafficLightScalePercent, 50, 250);
-            routeTurnLengthPercent = clamp(routeTurnLengthPercent, 50, 250);
+            routeTurnLengthPercent = clamp(routeTurnLengthPercent, 10, 250);
             routeTurnFillColor = optionalColor(routeTurnFillColor);
             routeTurnOutlineColor = optionalColor(routeTurnOutlineColor);
             routeTurnOutlineWidth = clamp(routeTurnOutlineWidth, 0d, 20d, 2d);

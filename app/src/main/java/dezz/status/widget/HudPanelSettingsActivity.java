@@ -568,18 +568,28 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField cameraScale = slider(form,
                 "Размер единых знаков камер",
                 profile.cameraScalePercent, 50, 250, 5, " %");
-        SliderField cameraDirectionScale = slider(form,
-                "Размер полупрозрачного направления камер",
-                profile.cameraDirectionScalePercent, 25, 300, 5, " %");
+        SliderField cameraDirectionLength = slider(form,
+                "Длина треугольника направления камер",
+                profile.cameraDirectionLengthPercent, 10, 300, 5, " %");
+        SliderField cameraDirectionWidth = slider(form,
+                "Ширина основания треугольника",
+                profile.cameraDirectionWidthPercent, 10, 300, 5, " %");
+        ColorField cameraDirectionColor = opaqueNavigationColorField(
+                form, "Цвет треугольника направления",
+                profile.cameraDirectionColor, navigation,
+                value -> profile.cameraDirectionColor = value);
         SliderField cameraDirectionOpacity = slider(form,
                 "Прозрачность направления камер",
                 profile.cameraDirectionOpacityPercent, 0, 100, 5, " %");
+        form.addView(text("Ширина меняет только дальнее широкое основание треугольника; "
+                + "длина и положение вершины при этом не меняются.",
+                12, 0xFF95A0AF), marginTop(4));
         SliderField trafficLightScale = slider(form,
                 "Размер светофоров и плашек секунд",
                 profile.trafficLightScalePercent, 50, 250, 5, " %");
         SliderField routeTurnLength = slider(form,
                 "Длина стрелок поворотов на маршруте",
-                profile.routeTurnLengthPercent, 50, 250, 5, " %");
+                profile.routeTurnLengthPercent, 10, 250, 5, " %");
         InheritedColorField routeTurnFillColor = inheritableNavigationColorField(
                 form, "Цвет стрелок поворотов", profile.routeTurnFillColor,
                 navigation, value -> profile.routeTurnFillColor = value);
@@ -740,8 +750,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.cursorScalePercent = cursorScale.intValue();
                         profile.laneGuidanceScalePercent = laneGuidanceScale.intValue();
                         profile.cameraScalePercent = cameraScale.intValue();
-                        profile.cameraDirectionScalePercent =
-                                cameraDirectionScale.intValue();
+                        profile.cameraDirectionLengthPercent =
+                                cameraDirectionLength.intValue();
+                        profile.cameraDirectionWidthPercent =
+                                cameraDirectionWidth.intValue();
+                        profile.cameraDirectionColor = cameraDirectionColor.value;
                         profile.cameraDirectionOpacityPercent =
                                 cameraDirectionOpacity.intValue();
                         profile.trafficLightScalePercent = trafficLightScale.intValue();
@@ -2260,6 +2273,19 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         });
     }
 
+    private ColorField opaqueNavigationColorField(
+            @NonNull LinearLayout parent,
+            @NonNull String title,
+            @NonNull String initial,
+            @NonNull NavigationIntegrationConfig navigation,
+            @NonNull ColorSelectionListener setter) {
+        return colorField(parent, title, initial,
+                AppleColorPickerDialog.Options.opaque(), selected -> {
+                    setter.onSelected(selected);
+                    persistNavigationConfiguration(navigation);
+                });
+    }
+
     private InheritedColorField inheritableNavigationColorField(
             @NonNull LinearLayout parent,
             @NonNull String title,
@@ -2319,11 +2345,20 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
 
     private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
                                   @NonNull String initial) {
-        return colorField(parent, title, initial, null);
+        return colorField(parent, title, initial,
+                AppleColorPickerDialog.Options.standard(), null);
     }
 
     private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
                                   @NonNull String initial,
+                                  @Nullable ColorSelectionListener selectionListener) {
+        return colorField(parent, title, initial,
+                AppleColorPickerDialog.Options.standard(), selectionListener);
+    }
+
+    private ColorField colorField(@NonNull LinearLayout parent, @NonNull String title,
+                                  @NonNull String initial,
+                                  @NonNull AppleColorPickerDialog.Options options,
                                   @Nullable ColorSelectionListener selectionListener) {
         ColorField field = new ColorField(initial);
         MaterialButton button = new MaterialButton(this);
@@ -2332,7 +2367,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         field.button = button;
         AppleColorPickerDialog.decorateButton(button, title, initial);
         button.setOnClickListener(view -> AppleColorPickerDialog.show(
-                this, title, field.value, AppleColorPickerDialog.Options.standard(),
+                this, title, field.value, options,
                 new AppleColorPickerDialog.Listener() {
                     private boolean apply(@Nullable String selected) {
                         if (selected == null || selected.trim().isEmpty()) return false;

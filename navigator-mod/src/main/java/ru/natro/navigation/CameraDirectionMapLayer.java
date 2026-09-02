@@ -6,7 +6,6 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.Typeface;
@@ -40,8 +39,11 @@ final class CameraDirectionMapLayer {
     private static final double SAME_SOURCE_DUPLICATE_DISTANCE_METERS = 55d;
     private static final double EARTH_RADIUS_METERS = 6_371_000d;
     private static final double BASE_SECTOR_LENGTH_METERS = 105d;
-    private static final double BASE_SECTOR_HALF_ANGLE_DEGREES = 13d;
-    private static final int SECTOR_RGB = 0x00168BFF;
+    /** Matches the former 13 degree half-angle at the default 105 metre length. */
+    private static final double BASE_SECTOR_WIDTH_METERS = 48.5d;
+    private static final int DEFAULT_SECTOR_RGB = 0x00168BFF;
+    private static final int STANDARD_SIGN_RED = 0xFFF04444;
+    private static final int STANDARD_SIGN_TEXT = 0xFF24272C;
 
     private static final String SOURCE_YANDEX = "YANDEX";
     private static final String SOURCE_HUD_SPEED = "HUD_SPEED";
@@ -56,7 +58,9 @@ final class CameraDirectionMapLayer {
     private boolean yandexEnabled;
     private boolean externalEnabled = true;
     private int scalePercent = 100;
-    private int directionScalePercent = 100;
+    private int directionLengthPercent = 100;
+    private int directionWidthPercent = 100;
+    private int directionRgb = DEFAULT_SECTOR_RGB;
     private int directionOpacityPercent = 30;
     private float zIndex = NavigationMapProfile.layerZ(20);
     private boolean latestRouteActive;
@@ -101,14 +105,19 @@ final class CameraDirectionMapLayer {
     }
 
     void apply(boolean nextYandexEnabled, boolean nextExternalEnabled,
-               int nextScalePercent, int nextDirectionScalePercent,
+               int nextScalePercent, int nextDirectionLengthPercent,
+               int nextDirectionWidthPercent, String nextDirectionColor,
                int nextDirectionOpacityPercent, int layerPriority) {
         int nextScale = Math.max(50, Math.min(250, nextScalePercent));
-        int nextDirectionScale = Math.max(25, Math.min(300, nextDirectionScalePercent));
+        int nextDirectionLength = Math.max(10, Math.min(300, nextDirectionLengthPercent));
+        int nextDirectionWidth = Math.max(10, Math.min(300, nextDirectionWidthPercent));
+        int nextDirectionRgb = opaqueRgb(nextDirectionColor, DEFAULT_SECTOR_RGB);
         int nextDirectionOpacity = Math.max(0, Math.min(100, nextDirectionOpacityPercent));
         float nextZ = NavigationMapProfile.layerZ(layerPriority);
         boolean presentationChanged = scalePercent != nextScale
-                || directionScalePercent != nextDirectionScale
+                || directionLengthPercent != nextDirectionLength
+                || directionWidthPercent != nextDirectionWidth
+                || directionRgb != nextDirectionRgb
                 || directionOpacityPercent != nextDirectionOpacity || zIndex != nextZ;
         boolean visibilityChanged = yandexEnabled != nextYandexEnabled
                 || externalEnabled != nextExternalEnabled;
@@ -116,7 +125,9 @@ final class CameraDirectionMapLayer {
         yandexEnabled = nextYandexEnabled;
         externalEnabled = nextExternalEnabled;
         scalePercent = nextScale;
-        directionScalePercent = nextDirectionScale;
+        directionLengthPercent = nextDirectionLength;
+        directionWidthPercent = nextDirectionWidth;
+        directionRgb = nextDirectionRgb;
         directionOpacityPercent = nextDirectionOpacity;
         zIndex = nextZ;
         MapObjectLayerFactory.setZIndex(collection, nextZ);
@@ -227,8 +238,8 @@ final class CameraDirectionMapLayer {
         long fingerprint = visualFingerprint(visibleScratch);
         boolean dataChanged = fingerprint != latestVisualFingerprint;
         latestVisualFingerprint = fingerprint;
-        // Presentation-only edits (size, sector opacity, z-order) deliberately invalidate the
-        // rendered fingerprint without changing camera data. They must repaint immediately.
+        // Presentation-only edits (sign size, sector geometry/colour/opacity and z-order)
+        // deliberately invalidate the rendered fingerprint without changing camera data.
         if (map != null && (dataChanged || renderedFingerprint != fingerprint)) render();
     }
 
@@ -270,7 +281,7 @@ final class CameraDirectionMapLayer {
         return false;
     }
 
-    /** One physical camera may be repeated once for every active control tag. */
+    /** Collapses repeated source records into one physical camera marker. */
     private static void addOrPreferRicherDuplicate(ArrayList<CameraMarker> values,
                                                    CameraMarker candidate,
                                                    double maximumDistanceMeters) {
@@ -330,14 +341,15 @@ final class CameraDirectionMapLayer {
         ArrayList<Object> points = new ArrayList<>(4);
         points.add(pointClass.getConstructor(double.class, double.class)
                 .newInstance(latitude, longitude));
-        double scale = directionScalePercent / 100d;
-        double length = BASE_SECTOR_LENGTH_METERS * scale;
-        double halfAngle = Math.max(5d, Math.min(32d,
-                BASE_SECTOR_HALF_ANGLE_DEGREES * Math.sqrt(scale)));
-        double[] left = destination(latitude, longitude,
-                directionDegrees - halfAngle, length);
-        double[] right = destination(latitude, longitude,
-                directionDegrees + halfAngle, length);
+        double length = BASE_SECTOR_LENGTH_METERS * directionLengthPercent / 100d;
+        double halfWidth = BASE_SECTOR_WIDTH_METERS * directionWidthPercent / 200d;
+        // Length places the centre of the far edge. Width then moves only the two endpoints
+        // sideways, so changing the broad edge cannot alter the apex or longitudinal reach.
+        double[] farCenter = destination(latitude, longitude, directionDegrees, length);
+        double[] left = destination(farCenter[0], farCenter[1],
+                directionDegrees - 90d, halfWidth);
+        double[] right = destination(farCenter[0], farCenter[1],
+                directionDegrees + 90d, halfWidth);
         points.add(pointClass.getConstructor(double.class, double.class)
                 .newInstance(left[0], left[1]));
         points.add(pointClass.getConstructor(double.class, double.class)
@@ -354,9 +366,9 @@ final class CameraDirectionMapLayer {
         int fillAlpha = Math.round(255f * directionOpacityPercent / 100f);
         int strokeAlpha = Math.min(255, Math.round(fillAlpha * 1.30f));
         invoke(mapObject, "setFillColor", new Class<?>[]{int.class},
-                (fillAlpha << 24) | SECTOR_RGB);
+                (fillAlpha << 24) | directionRgb);
         invoke(mapObject, "setStrokeColor", new Class<?>[]{int.class},
-                (strokeAlpha << 24) | SECTOR_RGB);
+                (strokeAlpha << 24) | directionRgb);
         invoke(mapObject, "setStrokeWidth", new Class<?>[]{float.class}, 0.8f);
         invoke(mapObject, "setGeodesic", new Class<?>[]{boolean.class}, false);
         invoke(mapObject, "setZIndex", new Class<?>[]{float.class}, zIndex);
@@ -377,7 +389,7 @@ final class CameraDirectionMapLayer {
         Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
         Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass, "NO_ROTATION");
         Object style = styleClass.getConstructor().newInstance();
-        invoke(style, "setAnchor", new Class<?>[]{PointF.class}, new PointF(0.5f, 0.92f));
+        invoke(style, "setAnchor", new Class<?>[]{PointF.class}, new PointF(0.5f, 0.96f));
         invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
         invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
         invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
@@ -390,175 +402,76 @@ final class CameraDirectionMapLayer {
         imageProviders.add(provider);
     }
 
-    /** One cohesive sign: source, speed and supported controls never become adjacent markers. */
+    /** One compact stock-like sign: speed and camera never become adjacent map markers. */
     private Bitmap createCameraBitmap(CameraMarker camera) {
         float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
         float scale = scalePercent / 100f;
-        int base = Math.max(34, Math.min(220, Math.round(46f * density * scale)));
-        int width = Math.round(base * 1.18f);
-        int height = Math.round(base * 1.12f);
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        int diameter = Math.max(26, Math.min(180, Math.round(40f * density * scale)));
+        float padding = Math.max(1f, diameter * .035f);
+        int bitmapSize = Math.max(1, (int) Math.ceil(diameter + padding * 2f));
+        Bitmap bitmap = Bitmap.createBitmap(
+                bitmapSize, bitmapSize, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
-        boolean hud = SOURCE_HUD_SPEED.equals(camera.source);
-        int accent = hud ? 0xFFFFB300 : 0xFFE53935;
-        int face = hud ? 0xFF5B35B5 : Color.WHITE;
-        int glyph = hud ? Color.WHITE : 0xFF25282D;
-        float left = base * .06f;
-        float top = base * .07f;
-        float right = width - base * .06f;
-        float bottom = base * .80f;
-        float radius = base * .18f;
+        float cx = bitmapSize * .5f;
+        float cy = bitmapSize * .5f;
+        float stroke = Math.max(2f, diameter * .085f);
+        float radius = diameter * .5f - stroke * .5f;
 
-        Path pin = new Path();
-        float cx = width * .5f;
-        pin.moveTo(cx - base * .14f, bottom - base * .02f);
-        pin.lineTo(cx, height - base * .04f);
-        pin.lineTo(cx + base * .14f, bottom - base * .02f);
-        pin.close();
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(accent);
-        canvas.drawPath(pin, paint);
-        RectF body = new RectF(left, top, right, bottom);
-        paint.setColor(face);
-        canvas.drawRoundRect(body, radius, radius, paint);
+        paint.setColor(Color.WHITE);
+        canvas.drawCircle(cx, cy, radius, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(2f, base * .052f));
-        paint.setColor(accent);
-        canvas.drawRoundRect(body, radius, radius, paint);
+        paint.setStrokeWidth(stroke);
+        paint.setColor(STANDARD_SIGN_RED);
+        canvas.drawCircle(cx, cy, radius, paint);
 
-        float cameraX = left + base * .20f;
-        float mainY = top + base * .31f;
         if (camera.speedLimit > 0) {
-            drawCameraGlyph(canvas, paint, cameraX, mainY, base * .105f, glyph);
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(glyph);
+            paint.setColor(STANDARD_SIGN_TEXT);
             paint.setTypeface(Typeface.DEFAULT_BOLD);
             paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTextSize(base * (camera.speedLimit >= 100 ? .27f : .32f));
+            paint.setTextSize(diameter * (camera.speedLimit >= 100 ? .34f : .42f));
             Paint.FontMetrics metrics = paint.getFontMetrics();
-            float speedX = left + (right - left) * .62f;
-            float baseline = mainY - (metrics.ascent + metrics.descent) * .5f;
-            canvas.drawText(Integer.toString(camera.speedLimit), speedX, baseline, paint);
-        } else {
-            drawCameraGlyph(canvas, paint, cx, mainY, base * .19f, glyph);
-        }
+            float baseline = cy - (metrics.ascent + metrics.descent) * .5f;
+            canvas.drawText(Integer.toString(camera.speedLimit),
+                    cx - diameter * .025f, baseline, paint);
 
-        ArrayList<String> details = visibleControlTags(camera.controlTags);
-        for (int index = 0; index < details.size() && index < 3; index++) {
-            float badgeX = cx + (index - (Math.min(3, details.size()) - 1) * .5f)
-                    * base * .25f;
-            float badgeY = top + base * .61f;
-            float badgeR = base * .075f;
-            drawControlGlyph(canvas, paint, details.get(index), badgeX, badgeY,
-                    badgeR, glyph);
-        }
-        if (hud) {
+            // The small red camera badge overlaps the ring just like the standard Navigator
+            // marker. It stays inside the tight square bitmap, so no invisible card-sized field
+            // can enlarge collisions or cover the road.
+            float badgeSize = diameter * .30f;
+            float badgeCx = cx + diameter * .34f;
+            float badgeCy = cy - diameter * .34f;
+            RectF badge = new RectF(badgeCx - badgeSize * .5f,
+                    badgeCy - badgeSize * .5f, badgeCx + badgeSize * .5f,
+                    badgeCy + badgeSize * .5f);
             paint.setStyle(Paint.Style.FILL);
-            paint.setTypeface(Typeface.DEFAULT_BOLD);
-            paint.setTextAlign(Paint.Align.RIGHT);
-            paint.setTextSize(base * .10f);
-            paint.setColor(0xFFFFD45A);
-            canvas.drawText("H", right - base * .06f, bottom - base * .05f, paint);
+            paint.setColor(STANDARD_SIGN_RED);
+            canvas.drawRoundRect(badge, badgeSize * .24f, badgeSize * .24f, paint);
+            drawCameraGlyph(canvas, paint, badgeCx, badgeCy,
+                    badgeSize * .30f, Color.WHITE, STANDARD_SIGN_RED);
+        } else {
+            drawCameraGlyph(canvas, paint, cx, cy,
+                    diameter * .18f, STANDARD_SIGN_RED, Color.WHITE);
         }
         return bitmap;
     }
 
     private static void drawCameraGlyph(Canvas canvas, Paint paint, float cx, float cy,
-                                        float radius, int color) {
-        float width = radius * 1.10f;
-        float height = radius * .70f;
+                                        float radius, int color, int lensColor) {
+        float width = radius * 1.72f;
+        float height = radius * 1.02f;
         RectF body = new RectF(cx - width * .5f, cy - height * .35f,
                 cx + width * .5f, cy + height * .65f);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(color);
         canvas.drawRoundRect(body, radius * .15f, radius * .15f, paint);
-        RectF hump = new RectF(cx - width * .22f, cy - height * .58f,
-                cx + width * .14f, cy - height * .20f);
+        RectF hump = new RectF(cx - width * .30f, cy - height * .62f,
+                cx + width * .03f, cy - height * .25f);
         canvas.drawRoundRect(hump, radius * .08f, radius * .08f, paint);
-        paint.setColor(0xFFF4F5F7);
-        canvas.drawCircle(cx + width * .10f, cy + height * .15f, radius * .20f, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(1f, radius * .09f));
-        paint.setColor(color == Color.WHITE ? 0xFFDDD7FF : 0xFF63676F);
-        canvas.drawCircle(cx + width * .10f, cy + height * .15f, radius * .20f, paint);
-    }
-
-    private static ArrayList<String> visibleControlTags(List<String> source) {
-        ArrayList<String> result = new ArrayList<>(3);
-        if (source == null) return result;
-        for (String raw : source) {
-            String tag = raw == null ? "" : raw;
-            if ("SPEED_CONTROL".equals(tag) || !isCameraDetail(tag)
-                    || result.contains(tag)) continue;
-            result.add(tag);
-            if (result.size() >= 3) break;
-        }
-        return result;
-    }
-
-    private static boolean isCameraDetail(String tag) {
-        return "LANE_CONTROL".equals(tag) || "ROAD_MARKING_CONTROL".equals(tag)
-                || "TRAFFIC_CONTROL".equals(tag) || "CROSS_ROAD_CONTROL".equals(tag)
-                || "NO_STOPPING_CONTROL".equals(tag) || "MOBILE_CONTROL".equals(tag)
-                || "AVERAGE_SPEED_CONTROL".equals(tag) || "ALL_RULES_CONTROL".equals(tag)
-                || "STOP_SIGN_CONTROL".equals(tag) || "SHOULDER_CONTROL".equals(tag)
-                || "PEDESTRIAN_CONTROL".equals(tag) || "TRUCK_CONTROL".equals(tag);
-    }
-
-    private static void drawControlGlyph(Canvas canvas, Paint paint, String tag,
-                                         float cx, float cy, float size, int color) {
-        paint.setColor(color);
-        paint.setStrokeWidth(Math.max(1f, size * .22f));
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setStyle(Paint.Style.STROKE);
-        if ("LANE_CONTROL".equals(tag)) {
-            canvas.drawLine(cx - size * .45f, cy - size * .55f,
-                    cx - size * .45f, cy + size * .55f, paint);
-            canvas.drawLine(cx + size * .45f, cy - size * .55f,
-                    cx + size * .45f, cy + size * .55f, paint);
-            canvas.drawCircle(cx, cy + size * .15f, size * .18f, paint);
-        } else if ("ROAD_MARKING_CONTROL".equals(tag)) {
-            for (int part = -1; part <= 1; part++) {
-                canvas.drawLine(cx, cy + part * size * .45f - size * .12f,
-                        cx, cy + part * size * .45f + size * .12f, paint);
-            }
-        } else if ("TRAFFIC_CONTROL".equals(tag)
-                || "CROSS_ROAD_CONTROL".equals(tag)) {
-            paint.setStyle(Paint.Style.FILL);
-            canvas.drawCircle(cx, cy - size * .48f, size * .18f, paint);
-            canvas.drawCircle(cx, cy, size * .18f, paint);
-            canvas.drawCircle(cx, cy + size * .48f, size * .18f, paint);
-        } else if ("NO_STOPPING_CONTROL".equals(tag)) {
-            canvas.drawLine(cx - size * .52f, cy - size * .52f,
-                    cx + size * .52f, cy + size * .52f, paint);
-            canvas.drawLine(cx + size * .52f, cy - size * .52f,
-                    cx - size * .52f, cy + size * .52f, paint);
-        } else if ("MOBILE_CONTROL".equals(tag)) {
-            canvas.drawLine(cx, cy - size * .55f, cx, cy + size * .05f, paint);
-            canvas.drawLine(cx, cy, cx - size * .52f, cy + size * .55f, paint);
-            canvas.drawLine(cx, cy, cx + size * .52f, cy + size * .55f, paint);
-        } else if ("AVERAGE_SPEED_CONTROL".equals(tag)) {
-            canvas.drawLine(cx - size * .50f, cy, cx + size * .50f, cy, paint);
-            canvas.drawLine(cx - size * .50f, cy, cx - size * .24f, cy - size * .28f, paint);
-            canvas.drawLine(cx + size * .50f, cy, cx + size * .24f, cy + size * .28f, paint);
-        } else if ("SHOULDER_CONTROL".equals(tag)) {
-            canvas.drawLine(cx - size * .45f, cy + size * .52f,
-                    cx + size * .35f, cy - size * .52f, paint);
-            canvas.drawLine(cx + size * .48f, cy - size * .52f,
-                    cx + size * .48f, cy + size * .52f, paint);
-        } else {
-            String letter = "ALL_RULES_CONTROL".equals(tag) ? "+"
-                    : "STOP_SIGN_CONTROL".equals(tag) ? "S"
-                    : "PEDESTRIAN_CONTROL".equals(tag) ? "P" : "T";
-            paint.setStyle(Paint.Style.FILL);
-            paint.setTypeface(Typeface.DEFAULT_BOLD);
-            paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTextSize(size * 1.35f);
-            Paint.FontMetrics metrics = paint.getFontMetrics();
-            canvas.drawText(letter, cx, cy - (metrics.ascent + metrics.descent) * .5f, paint);
-        }
-        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setColor(lensColor);
+        canvas.drawCircle(cx + width * .10f, cy + height * .15f, radius * .27f, paint);
     }
 
     private void clearVisual() {
@@ -592,6 +505,16 @@ final class CameraDirectionMapLayer {
 
     private static long mix(long value, long part) {
         return (value ^ part) * 0x100000001b3L;
+    }
+
+    /** Opacity is configured independently, therefore only the selected RGB reaches MapKit. */
+    private static int opaqueRgb(String value, int fallback) {
+        if (value == null || value.trim().isEmpty()) return fallback;
+        try {
+            return Color.parseColor(value.trim()) & 0x00FFFFFF;
+        } catch (IllegalArgumentException invalid) {
+            return fallback;
+        }
     }
 
     private static double[] destination(double latitude, double longitude,

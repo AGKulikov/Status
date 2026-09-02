@@ -152,7 +152,10 @@ final class HudMapRenderer {
     }
 
     void detach(long detachedGeneration) {
-        if (detachedGeneration != generation) return;
+        // Ignore only an older revocation. The host may coalesce a resize generation and revoke
+        // it before its delayed ATTACH reaches us; that newer revocation must still stop the
+        // previously attached generation that points at the same destroyed producer Surface.
+        if (detachedGeneration < generation) return;
         stopRenderer(true);
     }
 
@@ -376,7 +379,9 @@ final class HudMapRenderer {
                 !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL")),
                 profile.showHudSpeedCameras,
                 profile.cameraScalePercent,
-                profile.cameraDirectionScalePercent,
+                profile.cameraDirectionLengthPercent,
+                profile.cameraDirectionWidthPercent,
+                profile.cameraDirectionColor,
                 profile.cameraDirectionOpacityPercent,
                 profile.effectiveCameraPriority());
         laneGuidanceMapLayer.apply(profile.showLaneGuidance,

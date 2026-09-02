@@ -52,7 +52,9 @@ final class NavigationMapProfile {
     boolean showHudSpeedCameras = true;
     int laneGuidanceScalePercent = 100;
     int cameraScalePercent = 100;
-    int cameraDirectionScalePercent = 100;
+    int cameraDirectionLengthPercent = 100;
+    int cameraDirectionWidthPercent = 100;
+    String cameraDirectionColor = "#FF168BFF";
     int cameraDirectionOpacityPercent = 30;
     int trafficLightScalePercent = 100;
     int routeTurnLengthPercent = 100;
@@ -149,15 +151,22 @@ final class NavigationMapProfile {
                     source.optInt("laneGuidanceScalePercent", 100), 50, 250);
             result.cameraScalePercent = clamp(
                     source.optInt("cameraScalePercent", 100), 50, 250);
-            result.cameraDirectionScalePercent = clamp(
-                    source.optInt("cameraDirectionScalePercent", 100), 25, 300);
+            int legacyCameraDirectionScale = source.optInt(
+                    "cameraDirectionScalePercent", 100);
+            result.cameraDirectionLengthPercent = clamp(source.optInt(
+                    "cameraDirectionLengthPercent", legacyCameraDirectionScale), 10, 300);
+            result.cameraDirectionWidthPercent = clamp(source.optInt(
+                    "cameraDirectionWidthPercent", legacyCameraDirectionScale), 10, 300);
+            result.cameraDirectionColor = color(source.optString(
+                    "cameraDirectionColor", result.cameraDirectionColor),
+                    result.cameraDirectionColor);
             result.cameraDirectionOpacityPercent = clamp(
                     source.optInt("cameraDirectionOpacityPercent", 30), 0, 100);
             result.trafficLightScalePercent = clamp(
                     source.optInt("trafficLightScalePercent", 100), 50, 250);
             result.routeTurnLengthPercent = clamp(source.optInt(
                     "routeTurnLengthPercent",
-                    source.optInt("routeTurnScalePercent", 100)), 50, 250);
+                    source.optInt("routeTurnScalePercent", 100)), 10, 250);
             result.routeTurnFillColor = optionalColor(source, "routeTurnFillColor");
             result.routeTurnOutlineColor = optionalColor(source, "routeTurnOutlineColor");
             result.routeTurnOutlineWidth = clamp(source.optDouble(

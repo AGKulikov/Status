@@ -34,7 +34,9 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.fixedZoomLevel = 17.25d;
         config.hudMap.laneGuidanceScalePercent = 135;
         config.hudMap.cameraScalePercent = 145;
-        config.hudMap.cameraDirectionScalePercent = 180;
+        config.hudMap.cameraDirectionLengthPercent = 180;
+        config.hudMap.cameraDirectionWidthPercent = 65;
+        config.hudMap.cameraDirectionColor = "#2468AC";
         config.hudMap.cameraDirectionOpacityPercent = 45;
         config.hudMap.trafficLightScalePercent = 95;
         config.hudMap.routeTurnLengthPercent = 115;
@@ -86,6 +88,9 @@ public final class NavigationHudV2ContractTest {
         config.clusterMap.trafficUnknownColor = "#FFB1B2B3";
         config.clusterMap.roadColor = "#FF223344";
         config.clusterMap.laneGuidanceScalePercent = 85;
+        config.clusterMap.cameraDirectionLengthPercent = 75;
+        config.clusterMap.cameraDirectionWidthPercent = 155;
+        config.clusterMap.cameraDirectionColor = "#FF13579B";
         config.clusterMap.routeTurnLengthPercent = 175;
         config.clusterMap.routeTurnFillColor = "#FF654321";
         config.clusterMap.routeTurnOutlineColor = "#FF102030";
@@ -123,7 +128,9 @@ public final class NavigationHudV2ContractTest {
         assertEquals(17.25d, restored.hudMap.fixedZoomLevel, 0d);
         assertEquals(135, restored.hudMap.laneGuidanceScalePercent);
         assertEquals(145, restored.hudMap.cameraScalePercent);
-        assertEquals(180, restored.hudMap.cameraDirectionScalePercent);
+        assertEquals(180, restored.hudMap.cameraDirectionLengthPercent);
+        assertEquals(65, restored.hudMap.cameraDirectionWidthPercent);
+        assertEquals("#FF2468AC", restored.hudMap.cameraDirectionColor);
         assertEquals(45, restored.hudMap.cameraDirectionOpacityPercent);
         assertEquals(95, restored.hudMap.trafficLightScalePercent);
         assertEquals(115, restored.hudMap.routeTurnLengthPercent);
@@ -175,6 +182,9 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FFB1B2B3", restored.clusterMap.trafficUnknownColor);
         assertEquals("#FF223344", restored.clusterMap.roadColor);
         assertEquals(85, restored.clusterMap.laneGuidanceScalePercent);
+        assertEquals(75, restored.clusterMap.cameraDirectionLengthPercent);
+        assertEquals(155, restored.clusterMap.cameraDirectionWidthPercent);
+        assertEquals("#FF13579B", restored.clusterMap.cameraDirectionColor);
         assertEquals(175, restored.clusterMap.routeTurnLengthPercent);
         assertEquals("#FF654321", restored.clusterMap.routeTurnFillColor);
         assertEquals("#FF102030", restored.clusterMap.routeTurnOutlineColor);
@@ -210,6 +220,21 @@ public final class NavigationHudV2ContractTest {
         assertEquals(85, restored.clusterMap.routeTurnLengthPercent);
         assertNull(restored.hudMap.routeTurnFillColor);
         assertNull(restored.hudMap.routeTurnOutlineColor);
+    }
+
+    @Test public void legacyCameraDirectionScaleMigratesToIndependentLengthAndWidth()
+            throws Exception {
+        NavigationIntegrationConfig restored = NavigationIntegrationConfig.fromJson(
+                "{\"hudMap\":{\"cameraDirectionScalePercent\":175},"
+                        + "\"clusterMap\":{\"cameraDirectionScalePercent\":60}}"
+        );
+
+        assertEquals(175, restored.hudMap.cameraDirectionLengthPercent);
+        assertEquals(175, restored.hudMap.cameraDirectionWidthPercent);
+        assertEquals(60, restored.clusterMap.cameraDirectionLengthPercent);
+        assertEquals(60, restored.clusterMap.cameraDirectionWidthPercent);
+        assertFalse(restored.toJson().getJSONObject("hudMap")
+                .has("cameraDirectionScalePercent"));
     }
 
     @Test public void opaquePickerColorsAreCanonicalizedBeforePersistence() throws Exception {
@@ -307,7 +332,9 @@ public final class NavigationHudV2ContractTest {
                 "map.roadColor = roadColor.value",
                 "map.laneGuidanceScalePercent = laneGuidanceScale.intValue()",
                 "map.cameraScalePercent = cameraScale.intValue()",
-                "map.cameraDirectionScalePercent = cameraDirectionScale.intValue()",
+                "map.cameraDirectionLengthPercent = cameraDirectionLength.intValue()",
+                "map.cameraDirectionWidthPercent = cameraDirectionWidth.intValue()",
+                "map.cameraDirectionColor = cameraDirectionColor.value",
                 "map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue()",
                 "map.trafficLightScalePercent = trafficLightScale.intValue()",
                 "map.routeTurnLengthPercent = routeTurnLength.intValue()",
@@ -364,7 +391,9 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.routeWidthPercent = 0;
         config.hudMap.roadWidthPercent = 999;
         config.hudMap.cameraDirectionLayerPriority = -1;
-        config.hudMap.cameraDirectionScalePercent = 999;
+        config.hudMap.cameraDirectionLengthPercent = 999;
+        config.hudMap.cameraDirectionWidthPercent = 0;
+        config.hudMap.cameraDirectionColor = "not-a-color";
         config.hudMap.cameraDirectionOpacityPercent = -1;
         config.hudMap.routeTurnLengthPercent = 0;
         config.hudMap.routeTurnFillColor = "not-a-color";
@@ -383,9 +412,11 @@ public final class NavigationHudV2ContractTest {
         assertEquals(25, config.hudMap.routeWidthPercent);
         assertEquals(300, config.hudMap.roadWidthPercent);
         assertEquals(0, config.hudMap.cameraDirectionLayerPriority);
-        assertEquals(300, config.hudMap.cameraDirectionScalePercent);
+        assertEquals(300, config.hudMap.cameraDirectionLengthPercent);
+        assertEquals(10, config.hudMap.cameraDirectionWidthPercent);
+        assertEquals("#FF168BFF", config.hudMap.cameraDirectionColor);
         assertEquals(0, config.hudMap.cameraDirectionOpacityPercent);
-        assertEquals(50, config.hudMap.routeTurnLengthPercent);
+        assertEquals(10, config.hudMap.routeTurnLengthPercent);
         assertNull(config.hudMap.routeTurnFillColor);
         assertEquals("#FF123456", config.hudMap.routeTurnOutlineColor);
         assertEquals(2d, config.hudMap.routeTurnOutlineWidth, 0d);
@@ -758,14 +789,26 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cameraDirections.contains("SAME_SOURCE_DUPLICATE_DISTANCE_METERS"));
         assertTrue(cameraDirections.contains("addPolygon"));
         assertTrue(cameraDirections.contains("LinearRing"));
-        assertTrue(cameraDirections.contains("directionScalePercent"));
+        assertTrue(cameraDirections.contains("directionLengthPercent"));
+        assertTrue(cameraDirections.contains("directionWidthPercent"));
+        assertTrue(cameraDirections.contains("double[] farCenter"));
+        assertTrue(cameraDirections.contains("directionDegrees - 90d"));
+        assertTrue(cameraDirections.contains("directionDegrees + 90d"));
+        assertTrue(cameraDirections.contains("opaqueRgb(nextDirectionColor"));
         assertTrue(cameraDirections.contains("directionOpacityPercent"));
         assertTrue(cameraDirections.contains("No direction supplied means exactly one sign"));
         assertTrue(cameraDirections.contains("ImageProvider"));
         assertTrue(cameraDirections.contains("createCameraBitmap"));
         assertTrue(cameraDirections.contains("camera.speedLimit > 0"));
-        assertTrue(cameraDirections.contains("visibleControlTags(camera.controlTags)"));
-        assertTrue(cameraDirections.contains("One cohesive sign"));
+        assertTrue(cameraDirections.contains("STANDARD_SIGN_RED"));
+        assertTrue(cameraDirections.contains("bitmapSize, bitmapSize"));
+        assertTrue(cameraDirections.contains("float badgeSize = diameter * .30f"));
+        assertTrue(cameraDirections.contains("canvas.drawCircle(cx, cy, radius, paint)"));
+        assertFalse(cameraDirections.contains("visibleControlTags"));
+        assertFalse(cameraDirections.contains("drawControlGlyph"));
+        assertFalse(cameraDirections.contains("Path pin"));
+        assertFalse(cameraDirections.contains("canvas.drawText(\"H\""));
+        assertTrue(cameraDirections.contains("One compact stock-like sign"));
         assertTrue(laneGuidance.contains("FRESH_MS = 1_500L"));
         assertTrue(laneGuidance.contains("LaneSignBalloonTextureFactory"));
         assertTrue(laneGuidance.contains("LaneSignBalloon"));
@@ -793,6 +836,7 @@ public final class NavigationHudV2ContractTest {
         assertFalse(routeTurns.contains("getOutlineWidth"));
         assertTrue(routeTurns.contains(
                 "arrow body tied to the route's current stroke width"));
+        assertTrue(routeTurns.contains("Math.max(10, Math.min(250, nextLengthPercent))"));
         assertFalse(routeTurns.contains("Canvas"));
         assertFalse(routeTurns.contains("createArrowBitmap"));
         assertTrue(renderer.contains("routeTurnMapLayer.attachRoute"));
@@ -1065,7 +1109,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("Скорость, тип и направление камер берутся только из"));
         assertTrue(settings.contains("Ручной порядок слоёв"));
         assertTrue(settings.contains("SliderField cameraDirectionLayerPriority = slider"));
-        assertTrue(settings.contains("SliderField cameraDirectionScale = slider"));
+        assertTrue(settings.contains("SliderField cameraDirectionLength = slider"));
+        assertTrue(settings.contains("SliderField cameraDirectionWidth = slider"));
+        assertTrue(settings.contains("ColorField cameraDirectionColor ="));
+        assertTrue(settings.contains("Ширина основания треугольника"));
+        assertFalse(settings.contains("Размер полупрозрачного направления камер"));
         assertTrue(settings.contains("SliderField cameraDirectionOpacity = slider"));
         assertTrue(settings.contains("SliderField trafficLightLayerPriority = slider"));
         assertTrue(settings.contains("SliderField routeTurnLayerPriority = slider"));
@@ -1150,7 +1198,7 @@ public final class NavigationHudV2ContractTest {
         assertFalse(renderer.contains("pendingBackwardConfirmations"));
     }
 
-    @Test public void externalMapSurfacesKeepTheirLastFrameAcrossResizeAndVisibility()
+    @Test public void externalMapResizePublishesANewViewportGenerationWithoutDetachGap()
             throws Exception {
         Path root = projectRoot();
         String composite = read(root.resolve(
@@ -1161,12 +1209,16 @@ public final class NavigationHudV2ContractTest {
                 + "NavigationHudEndpointService.java"));
 
         assertTrue(composite.contains("leasedSurface != null && leasedTexture == texture"));
-        assertTrue(composite.contains("Refresh only retained reconnect metadata"));
+        assertTrue(composite.contains("immutable creation dimensions"));
         assertTrue(composite.contains("if (generation < 0L)"));
-        assertTrue(endpoint.contains("current.width = width"));
-        assertTrue(endpoint.contains("current.height = height"));
-        assertTrue(endpoint.contains("volatile int width"));
-        assertTrue(endpoint.contains("another ATTACH would tear down a"));
+        assertTrue(endpoint.contains("SURFACE_RESIZE_SETTLE_MS = 80L"));
+        assertTrue(endpoint.contains("resizedExistingSurface"));
+        assertTrue(endpoint.contains("++nextSurfaceGeneration"));
+        assertTrue(endpoint.contains("immutable per generation"));
+        assertTrue(endpoint.contains("sendLatestHudSurface"));
+        assertFalse(endpoint.contains("current.width = width"));
+        assertFalse(endpoint.contains("volatile int width"));
+        assertTrue(renderer.contains("if (detachedGeneration < generation) return"));
         assertTrue(panel.contains("replaceLeaseIfReady()"));
         assertTrue(panel.contains("Keep the producer lease until the View/Surface"));
         assertFalse(panel.contains("else revokeLease();"));
