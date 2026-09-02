@@ -103,8 +103,13 @@ final class SystemShadeOverlayController implements DisplayManager.DisplayListen
             params.setFitInsetsSides(0);
         }
         host.setListener(new SystemShadeRootLayout.Listener() {
-            @Override public void onGestureCaptureStarted() {
+            @Override public void onWindowExpansionRequested() {
                 updateWindowHeight(host, params, WindowManager.LayoutParams.MATCH_PARENT);
+                // A transparent full-screen window must never survive a stalled/cancelled open
+                // animation. This fail-closed watchdog is intentionally independent of logs.
+                host.postDelayed(() -> {
+                    if (root == host && !host.isOpen()) host.close(false);
+                }, Math.max(1_000L, config.animationDurationMs + 500L));
             }
 
             @Override public void onOpenStateChanged(boolean open) {
@@ -131,9 +136,23 @@ final class SystemShadeOverlayController implements DisplayManager.DisplayListen
                                     @NonNull WindowManager.LayoutParams params, int height) {
         WindowManager current = manager;
         if (current == null || root != host || params.height == height) return;
+        int previousHeight = params.height;
         params.height = height;
         try { current.updateViewLayout(host, params); }
-        catch (RuntimeException ignored) { }
+        catch (RuntimeException ignored) {
+            // LayoutParams are mutable. Restore the value when WMS rejects the update, otherwise
+            // later repair callbacks incorrectly believe that the physical window already shrank.
+            params.height = previousHeight;
+            if (height != WindowManager.LayoutParams.MATCH_PARENT) {
+                host.post(() -> {
+                    if (root != host || host.isOpen()) return;
+                    // Removing the failed full-screen window is safer than leaving a transparent
+                    // touch blocker. Reconcile then recreates the narrow trigger from scratch.
+                    dismiss();
+                    reconcile();
+                });
+            }
+        }
     }
 
     private void dismiss() {

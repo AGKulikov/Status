@@ -45,4 +45,11 @@ public final class SystemShadeConfigTest {
         assertTrue(SystemShadeGesturePolicy.canOpen(true, true, false));
         assertFalse(SystemShadeGesturePolicy.canOpen(true, true, true));
     }
+
+    @Test public void closedWindowExpandsOnlyAfterGestureSettlesOpen() {
+        assertFalse(SystemShadeGesturePolicy.expandWindowBeforeSettle(false, false));
+        assertTrue(SystemShadeGesturePolicy.expandWindowBeforeSettle(false, true));
+        assertFalse(SystemShadeGesturePolicy.expandWindowBeforeSettle(true, false));
+        assertFalse(SystemShadeGesturePolicy.expandWindowBeforeSettle(true, true));
+    }
 }

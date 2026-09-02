@@ -17,7 +17,10 @@ import androidx.annotation.Nullable;
 /** Full-screen transparent host whose closed touch region is limited to the top gesture strip. */
 public final class SystemShadeRootLayout extends FrameLayout {
     public interface Listener {
-        void onGestureCaptureStarted();
+        /** Expand only after the closed trigger gesture has already been accepted. */
+        void onWindowExpansionRequested();
+
+        /** Called for every stable result, including closed -> closed after CANCEL/tap. */
         void onOpenStateChanged(boolean open);
     }
 
@@ -94,7 +97,6 @@ public final class SystemShadeRootLayout extends FrameLayout {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 cancelAnimation();
-                if (listener != null) listener.onGestureCaptureStarted();
                 downY = event.getRawY();
                 initiallyOpen = open;
                 dragging = false;
@@ -121,14 +123,19 @@ public final class SystemShadeRootLayout extends FrameLayout {
                 float velocity = 0f;
                 if (velocityTracker != null) {
                     velocityTracker.addMovement(event);
-                    velocityTracker.computeCurrentVelocity(1_000);
-                    velocity = velocityTracker.getYVelocity();
+                    if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                        velocityTracker.computeCurrentVelocity(1_000);
+                        velocity = velocityTracker.getYVelocity();
+                    }
                 }
                 float travel = event.getRawY() - downY;
-                boolean target = event.getActionMasked() != MotionEvent.ACTION_CANCEL
-                        && (outsideTap ? false : SystemShadeGesturePolicy.settleOpen(
+                // KX11 may end the top-edge stream with ACTION_CANCEL when ownership moves away
+                // from its stock shade. Preserve the user's measured travel instead of blindly
+                // forcing closed: a cancelled short tap remains closed, while a real downward
+                // pull can still replace the stock gesture.
+                boolean target = outsideTap ? false : SystemShadeGesturePolicy.settleOpen(
                         initiallyOpen, travel, velocity,
-                        config.openThresholdPx, config.closeThresholdPx));
+                        config.openThresholdPx, config.closeThresholdPx);
                 recycleVelocityTracker();
                 dragging = false;
                 settle(target, true);
@@ -158,6 +165,13 @@ public final class SystemShadeRootLayout extends FrameLayout {
 
     private void settle(boolean targetOpen, boolean animate) {
         if (targetOpen && suppressed) targetOpen = false;
+        // Never resize the WindowManager surface during ACTION_DOWN/MOVE. KX11 cancels the
+        // active input stream when an overlay changes from the thin trigger to full screen.
+        // The cancelled stream previously left an invisible full-screen touch blocker behind.
+        if (SystemShadeGesturePolicy.expandWindowBeforeSettle(open, targetOpen)
+                && listener != null) {
+            listener.onWindowExpansionRequested();
+        }
         float target = targetOpen ? config.panelHeightPx : 0f;
         if (!animate || Math.abs(target - revealPx) < 1f) {
             setReveal(target);
@@ -180,13 +194,14 @@ public final class SystemShadeRootLayout extends FrameLayout {
     }
 
     private void finishState(boolean value) {
-        boolean changed = open != value;
         open = value;
         setReveal(open ? config.panelHeightPx : 0f);
         if (open) requestFocus();
         else clearFocus();
         requestTouchableRegion();
-        if (changed && listener != null) listener.onOpenStateChanged(open);
+        // This must not be conditional on a logical state change. A cancelled or insufficient
+        // closed gesture is closed -> closed, but still has to repair the physical window height.
+        if (listener != null) listener.onOpenStateChanged(open);
     }
 
     private void setReveal(float value) {

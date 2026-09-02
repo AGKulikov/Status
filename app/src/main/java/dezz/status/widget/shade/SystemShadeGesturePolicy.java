@@ -25,6 +25,15 @@ public final class SystemShadeGesturePolicy {
         return enabled && screenInteractive && !vehicleOverlayActive;
     }
 
+    /**
+     * The closed trigger window stays thin while a gesture is in flight. It becomes full-screen
+     * only once the gesture has settled to open; an unaccepted or short cancelled gesture never
+     * expands it.
+     */
+    public static boolean expandWindowBeforeSettle(boolean currentlyOpen, boolean targetOpen) {
+        return !currentlyOpen && targetOpen;
+    }
+
     private static float clamp(float value, float minimum, float maximum) {
         return Math.max(minimum, Math.min(maximum, value));
     }

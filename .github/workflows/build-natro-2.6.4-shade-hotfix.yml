@@ -1,4 +1,4 @@
-name: Build signed Natro 2.6.3 system shade
+name: Build signed Natro 2.6.4 system shade hotfix
 # Dedicated candidate workflow: Navigator and HUD Speed remain unchanged in this release.
 
 on:
@@ -11,14 +11,14 @@ on:
       - 'gradle/**'
       - 'gradlew'
       - 'tools/kx11-shade-*.sh'
-      - '.github/workflows/build-natro-2.6.3-shade.yml'
+      - '.github/workflows/build-natro-2.6.4-shade-hotfix.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: natro-2.6.3-shade-${{ github.ref }}
+  group: natro-2.6.4-shade-hotfix-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -26,8 +26,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     env:
-      VERSION_NAME: '2.6.3'
-      VERSION_CODE: '208021296'
+      VERSION_NAME: '2.6.4'
+      VERSION_CODE: '208021297'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       EXPECTED_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
@@ -59,24 +59,24 @@ jobs:
           TOOLS="$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}"
           INPUT=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
           test -s "$INPUT"
-          OUT="$RUNNER_TEMP/natro-2.6.3-signing-handoff"
+          OUT="$RUNNER_TEMP/natro-2.6.4-signing-handoff"
           mkdir -p "$OUT/tools/lib"
-          cp "$INPUT" "$OUT/Natro-2.6.3-unsigned.apk"
+          cp "$INPUT" "$OUT/Natro-2.6.4-unsigned.apk"
           cp "$TOOLS/zipalign" "$OUT/tools/"
           cp "$TOOLS/apksigner" "$OUT/tools/"
           cp "$TOOLS/lib/apksigner.jar" "$OUT/tools/lib/"
           chmod 755 "$OUT/tools/zipalign" "$OUT/tools/apksigner"
           BADGING=$("$TOOLS/aapt" dump badging \
-            "$OUT/Natro-2.6.3-unsigned.apk")
+            "$OUT/Natro-2.6.4-unsigned.apk")
           printf '%s\n' "$BADGING" | grep -F \
-            "package: name='ru.natro.statuswidget' versionCode='208021296' versionName='2.6.3'"
-          sha256sum "$OUT/Natro-2.6.3-unsigned.apk" \
-            > "$OUT/Natro-2.6.3-unsigned.apk.sha256"
+            "package: name='ru.natro.statuswidget' versionCode='208021297' versionName='2.6.4'"
+          sha256sum "$OUT/Natro-2.6.4-unsigned.apk" \
+            > "$OUT/Natro-2.6.4-unsigned.apk.sha256"
           echo "path=$OUT" >> "$GITHUB_OUTPUT"
       - name: Upload offline signing handoff
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-2.6.3-offline-signing-${{ github.run_number }}
+          name: Natro-2.6.4-offline-signing-${{ github.run_number }}
           path: ${{ steps.handoff.outputs.path }}/*
           if-no-files-found: error
           retention-days: 3
@@ -117,11 +117,11 @@ jobs:
           TOOLS="$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}"
           INPUT=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
           test -s "$INPUT"
-          OUT="$RUNNER_TEMP/natro-2.6.3"
+          OUT="$RUNNER_TEMP/natro-2.6.4"
           mkdir -p "$OUT"
           KEYSTORE="$RUNNER_TEMP/natro-update.jks"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
-          ALIGNED="$RUNNER_TEMP/Natro-2.6.3-aligned.apk"
+          ALIGNED="$RUNNER_TEMP/Natro-2.6.4-aligned.apk"
           "$TOOLS/zipalign" -f -P 16 4 "$INPUT" "$ALIGNED"
           export KEY_PASSWORD
           "$TOOLS/apksigner" sign \
@@ -129,23 +129,23 @@ jobs:
             --ks-pass env:KEY_PASSWORD --key-pass env:KEY_PASSWORD \
             --v1-signing-enabled true --v2-signing-enabled true \
             --v3-signing-enabled true \
-            --out "$OUT/Natro-2.6.3-signed.apk" "$ALIGNED"
+            --out "$OUT/Natro-2.6.4-signed.apk" "$ALIGNED"
           CERTS=$("$TOOLS/apksigner" verify --verbose --print-certs \
-            "$OUT/Natro-2.6.3-signed.apk")
+            "$OUT/Natro-2.6.4-signed.apk")
           printf '%s\n' "$CERTS"
           printf '%s\n' "$CERTS" | grep -qi "$EXPECTED_CERT_SHA256"
-          BADGING=$("$TOOLS/aapt" dump badging "$OUT/Natro-2.6.3-signed.apk")
+          BADGING=$("$TOOLS/aapt" dump badging "$OUT/Natro-2.6.4-signed.apk")
           printf '%s\n' "$BADGING" | grep -F \
-            "package: name='ru.natro.statuswidget' versionCode='208021296' versionName='2.6.3'"
-          "$TOOLS/zipalign" -c -P 16 4 "$OUT/Natro-2.6.3-signed.apk"
-          sha256sum "$OUT/Natro-2.6.3-signed.apk" | tee "$OUT/Natro-2.6.3-signed.apk.sha256"
+            "package: name='ru.natro.statuswidget' versionCode='208021297' versionName='2.6.4'"
+          "$TOOLS/zipalign" -c -P 16 4 "$OUT/Natro-2.6.4-signed.apk"
+          sha256sum "$OUT/Natro-2.6.4-signed.apk" | tee "$OUT/Natro-2.6.4-signed.apk.sha256"
           rm -f "$KEYSTORE" "$ALIGNED"
           echo "path=$OUT" >> "$GITHUB_OUTPUT"
       - name: Upload signed APK
         if: steps.signing-secrets.outputs.available == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-2.6.3-system-shade-signed-${{ github.run_number }}
+          name: Natro-2.6.4-system-shade-signed-${{ github.run_number }}
           path: ${{ steps.artifact.outputs.path }}/*
           if-no-files-found: error
           retention-days: 30
