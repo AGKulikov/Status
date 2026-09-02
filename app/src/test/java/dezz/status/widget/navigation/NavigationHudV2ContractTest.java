@@ -648,10 +648,12 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("controlLayer.addView(modeButton)"));
         assertFalse(controller.contains("floatingModeButton"));
         assertTrue(controller.contains("restartInMode(!floating, null)"));
-        assertTrue(controller.contains("attachModeButtonToStockLeftRail()"));
+        assertTrue(controller.contains("ensureModeButtonInOverlay()"));
         assertTrue(controller.contains("guidance_open_voice_search"));
-        assertTrue(controller.contains("verticalLinearAncestor"));
-        assertTrue(controller.contains("rail.addView(button"));
+        assertTrue(controller.contains("leftControlColumnNextTop"));
+        assertTrue(controller.contains("layer.addView(button"));
+        assertFalse(controller.contains("rail.addView(button"));
+        assertTrue(controller.contains("if (controlLayer == null) install()"));
         assertTrue(windowProfile.contains("modeButtonPosition = \"TOP_LEFT\""));
         assertTrue(controller.contains("MODE_BUTTON_AUTO_HIDE_MS = 5_000L"));
         assertTrue(controller.contains("MODE_BUTTON_STABLE_MS = 5_000L"));
@@ -670,6 +672,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("removeFloatingTopInset(controlsInsetHost)"));
         assertTrue(controller.contains("paddingtonBaseTop"));
         assertTrue(controller.contains("floatingTopInsetGuard"));
+        assertTrue(controller.contains("neutralizePaddingtonTree"));
+        assertTrue(controller.contains("floatingPaddingtonInsetsListener"));
+        assertTrue(controller.contains("child.setOnApplyWindowInsetsListener"));
         assertTrue(controller.contains("setTopPadding(guidanceControls"));
         assertTrue(controller.contains("dispatchAdjustedInsets(controlsInsetHost != null"));
         assertTrue(controller.contains("guidance_add_road_event"));
@@ -694,6 +699,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(mapViewPatch.contains("shouldUseMovableMap(Landroid/content/Context;)Z"));
         assertTrue(client.contains("getPackagesForUid(sendingUid)"));
         assertTrue(client.contains("checkSignatures(NAVIGATOR_PACKAGE, NATRO_PACKAGE)"));
+        assertTrue(client.contains("INSTRUMENT_BRIDGE_RECONNECT_MS = 180L"));
+        assertTrue(client.contains("main.postDelayed(this::reconnectAfterInstrumentLaunch"));
+        assertTrue(client.contains("binder.isBinderAlive() && binder.pingBinder()"));
+        assertTrue(client.contains("retryMs = MIN_RETRY_MS"));
         assertTrue(client.contains("MSG_ATTACH_HUD_SURFACE"));
         assertTrue(client.contains("MSG_REQUEST_SNAPSHOT"));
         assertTrue(client.contains("MSG_REQUEST_ROUTE_GEOMETRY"));

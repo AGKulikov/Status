@@ -24,6 +24,9 @@ import dezz.status.widget.navigation.NavigationIntegrationConfig;
  */
 public final class InstrumentPanelView extends FrameLayout
         implements TextureView.SurfaceTextureListener {
+    private static final long COLD_LEASE_FAST_RETRY_MS = 150L;
+    private static final long COLD_LEASE_SLOW_RETRY_MS = 1_000L;
+    private static final int COLD_LEASE_FAST_RETRY_COUNT = 40;
     @NonNull private InstrumentPanelConfig config;
     @NonNull private final Preferences navigationPreferences;
     @NonNull private final InstrumentClusterView instruments;
@@ -36,8 +39,10 @@ public final class InstrumentPanelView extends FrameLayout
     private boolean clusterMapEnabled = true;
     private int publishedWidth;
     private int publishedHeight;
+    private int coldLeaseRetryCount;
     @Nullable private String cachedMapProfileRaw;
     @Nullable private NavigationIntegrationConfig.MapProfile cachedMapProfile;
+    @NonNull private final Runnable coldLeaseRetry = this::retryColdLease;
 
     public InstrumentPanelView(@NonNull Context context,
                                @NonNull InstrumentPanelConfig config,
@@ -119,6 +124,7 @@ public final class InstrumentPanelView extends FrameLayout
         if (mapTexture != null) mapTexture.setOpaque(!profile.roadsOnly);
         mapView.requestLayout();
         mapView.invalidate();
+        coldLeaseRetryCount = 0;
         mapView.post(this::publishLeaseIfReady);
     }
 
@@ -126,12 +132,14 @@ public final class InstrumentPanelView extends FrameLayout
         super.onAttachedToWindow();
         attached = true;
         windowVisible = getWindowVisibility() == VISIBLE;
+        coldLeaseRetryCount = 0;
         publishLeaseIfReady();
     }
 
     @Override protected void onDetachedFromWindow() {
         attached = false;
         windowVisible = false;
+        removeCallbacks(coldLeaseRetry);
         revokeLease();
         releaseOwnedSurface();
         super.onDetachedFromWindow();
@@ -150,6 +158,7 @@ public final class InstrumentPanelView extends FrameLayout
                                                     int width, int height) {
         releaseOwnedSurface();
         mapSurface = new Surface(surfaceTexture);
+        coldLeaseRetryCount = 0;
         publishLeaseIfReady();
     }
 
@@ -160,6 +169,7 @@ public final class InstrumentPanelView extends FrameLayout
     }
 
     @Override public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surfaceTexture) {
+        removeCallbacks(coldLeaseRetry);
         revokeLease();
         releaseOwnedSurface();
         return true;
@@ -179,11 +189,21 @@ public final class InstrumentPanelView extends FrameLayout
     }
 
     private void publishLeaseIfReady(boolean replace) {
-        if (mapTexture == null || mapSurface == null || (!replace && leasePublished)
-                || !attached || !windowVisible || mapView.getVisibility() != VISIBLE) return;
+        if (mapTexture == null || (!replace && leasePublished)
+                || !attached || mapView.getVisibility() != VISIBLE || !clusterMapEnabled) return;
+        // ECARX can expose the DIM TextureView before it reports the secondary window as visible.
+        // We intentionally keep an existing lease through later visibility changes, so admission
+        // must follow the real attached Surface instead of the unreliable initial visibility bit.
+        if (mapSurface == null || !mapSurface.isValid()) {
+            scheduleColdLeaseRetry();
+            return;
+        }
         int width = mapTexture.getWidth();
         int height = mapTexture.getHeight();
-        if (width <= 1 || height <= 1 || !mapSurface.isValid()) return;
+        if (width <= 1 || height <= 1) {
+            scheduleColdLeaseRetry();
+            return;
+        }
         if (leasePublished && width == publishedWidth && height == publishedHeight) return;
         SurfaceTexture texture = mapTexture.getSurfaceTexture();
         if (texture != null) texture.setDefaultBufferSize(width, height);
@@ -195,7 +215,32 @@ public final class InstrumentPanelView extends FrameLayout
             leasePublished = true;
             publishedWidth = width;
             publishedHeight = height;
+            coldLeaseRetryCount = 0;
+            removeCallbacks(coldLeaseRetry);
+        } else {
+            scheduleColdLeaseRetry();
         }
+    }
+
+    /**
+     * A cold multi-display launch occasionally misses every initial visibility/layout callback on
+     * KX11. Keep retrying the tiny lease admission check while this live panel owns the TextureView;
+     * after six seconds the cadence drops to one check per second and stops immediately on success.
+     */
+    private void scheduleColdLeaseRetry() {
+        if (!attached || leasePublished || mapTexture == null || !clusterMapEnabled
+                || mapView.getVisibility() != VISIBLE) return;
+        removeCallbacks(coldLeaseRetry);
+        long delay = coldLeaseRetryCount < COLD_LEASE_FAST_RETRY_COUNT
+                ? COLD_LEASE_FAST_RETRY_MS : COLD_LEASE_SLOW_RETRY_MS;
+        postDelayed(coldLeaseRetry, delay);
+    }
+
+    private void retryColdLease() {
+        if (!attached || leasePublished || mapTexture == null || !clusterMapEnabled
+                || mapView.getVisibility() != VISIBLE) return;
+        coldLeaseRetryCount++;
+        publishLeaseIfReady(false);
     }
 
     private void revokeLease() {

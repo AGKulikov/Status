@@ -191,6 +191,10 @@ public final class InstrumentPanelContractTest {
         assertTrue(panel.contains("Keep the producer lease until the View/Surface"));
         assertFalse(panel.contains("else revokeLease();"));
         assertTrue(panel.contains("ensureClusterEndpointStarted(getContext())"));
+        assertTrue(panel.contains("scheduleColdLeaseRetry()"));
+        assertTrue(panel.contains("COLD_LEASE_FAST_RETRY_MS = 150L"));
+        assertTrue(panel.contains("COLD_LEASE_SLOW_RETRY_MS = 1_000L"));
+        assertFalse(panel.contains("|| !attached || !windowVisible"));
         assertTrue(activity.contains("ensureClusterEndpointStarted(this)"));
         assertTrue(endpoint.contains("ACTION_KEEP_CLUSTER_ENDPOINT"));
         assertTrue(endpoint.contains("stopClusterEndpointIfIdle()"));
@@ -297,6 +301,9 @@ public final class InstrumentPanelContractTest {
         assertTrue(client.contains("CAP_EXTERNAL_INSTRUMENT_LAUNCHER"));
         assertTrue(client.contains("ActivityOptions.makeBasic()"));
         assertTrue(client.contains("setComponent(new ComponentName(NATRO_PACKAGE"));
+        assertTrue(client.contains("reconnectAfterInstrumentLaunch"));
+        assertTrue(client.contains("binder.isBinderAlive() && binder.pingBinder()"));
+        assertTrue(client.contains("retryMs = MIN_RETRY_MS"));
         assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_CLEAR_TOP"));
         assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_SINGLE_TOP"));
         assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_NO_ANIMATION"));

@@ -88,6 +88,8 @@ final class NavigationBridgeClient {
 
     private static final long MIN_RETRY_MS = 1_000L;
     private static final long MAX_RETRY_MS = 30_000L;
+    /** The externally launched panel has created its endpoint by the next display frame. */
+    private static final long INSTRUMENT_BRIDGE_RECONNECT_MS = 180L;
     private static final int MAX_CONFIGURATION_CHARS = 384 * 1024;
     private static NavigationBridgeClient instance;
 
@@ -376,6 +378,13 @@ final class NavigationBridgeClient {
             launchOptions.putInt("android.activity.SplitScreenShownPosition", 0);
             try {
                 context.startActivity(intent, launchOptions);
+                // InstrumentDisplayLauncher intentionally force-stops Natro before this runnable.
+                // Some Android 9 ECARX builds keep the old ServiceConnection marked as bound and
+                // therefore never run the normal exponential retry after the new panel process is
+                // alive. Revalidate the exact Binder immediately so the already-published cluster
+                // Surface does not wait for opening Natro Settings.
+                main.postDelayed(this::reconnectAfterInstrumentLaunch,
+                        INSTRUMENT_BRIDGE_RECONNECT_MS);
                 sendDiagnostic("Navigator externally launched Natro instrument panel on display "
                         + displayId);
             } catch (RuntimeException failure) {
@@ -385,6 +394,27 @@ final class NavigationBridgeClient {
         };
         pendingInstrumentLaunch = launch;
         main.postDelayed(launch, delayMillis);
+    }
+
+    /** Bypasses accumulated backoff only for the authenticated external instrument launch. */
+    private void reconnectAfterInstrumentLaunch() {
+        Messenger current = remote;
+        IBinder binder = current == null ? null : current.getBinder();
+        if (binder != null && binder.isBinderAlive() && binder.pingBinder()) {
+            // If package reset was unavailable, the existing connection is still authoritative;
+            // HELLO makes the endpoint replay the latest cluster lease without tearing MapKit down.
+            sendHello();
+            return;
+        }
+        main.removeCallbacks(retry);
+        remote = null;
+        binding = false;
+        if (bound) {
+            bound = false;
+            try { context.unbindService(connection); } catch (RuntimeException ignored) {}
+        }
+        retryMs = MIN_RETRY_MS;
+        start();
     }
 
     private void attachHudSurface(Bundle data) {

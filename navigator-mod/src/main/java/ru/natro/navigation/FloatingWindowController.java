@@ -25,9 +25,11 @@ import android.view.WindowInsets;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.util.IdentityHashMap;
+import java.util.Map;
 
 /** Activity-owned floating window with no resources or manifest additions. */
 final class FloatingWindowController {
@@ -120,6 +122,8 @@ final class FloatingWindowController {
     private int floatingControlsEngineTop;
     private int floatingGuidanceControlsTop;
     private int floatingTopNotificationContentTop;
+    private final Map<View, Integer> paddingtonBaseTopByChild = new IdentityHashMap<>();
+    private int reportedPaddingtonOverrideCount = -1;
     private int roundedOutlineWidth = -1;
     private int roundedOutlineHeight = -1;
     private int roundedOutlineRadius = -1;
@@ -149,6 +153,26 @@ final class FloatingWindowController {
                             insets.getSystemWindowInsetRight(),
                             insets.getSystemWindowInsetBottom());
                     return view.onApplyWindowInsets(adjusted);
+                }
+            };
+    private final View.OnApplyWindowInsetsListener floatingPaddingtonInsetsListener =
+            new View.OnApplyWindowInsetsListener() {
+                @Override public WindowInsets onApplyWindowInsets(
+                        View view, WindowInsets insets) {
+                    Integer captured = paddingtonBaseTopByChild.get(view);
+                    int baseTop = captured == null ? 0 : captured;
+                    if (floating) {
+                        // PaddingtonView's stock listener ignores the supplied WindowInsets and
+                        // reads the global root inset again. Own the child listener while this is
+                        // a bounded window so a late stock dispatch cannot put the gap back.
+                        setTopPadding(view, baseTop);
+                        return zeroTop(insets);
+                    }
+                    // Mode changes recreate MapActivity, but retain stock-equivalent behaviour if
+                    // a rejected window transition restores this same Activity in place.
+                    int topInset = insets == null ? 0 : insets.getSystemWindowInsetTop();
+                    setTopPadding(view, baseTop + Math.max(0, topInset));
+                    return insets;
                 }
             };
     private final View.OnLayoutChangeListener floatingTopInsetGuard =
@@ -228,6 +252,8 @@ final class FloatingWindowController {
         };
         controlLayer.setClipChildren(false);
         controlLayer.setClipToPadding(false);
+        controlLayer.setClickable(false);
+        controlLayer.setFocusable(false);
         controlLayer.setElevation(dp(100));
         host.addView(controlLayer, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -257,13 +283,17 @@ final class FloatingWindowController {
     /** Global MapActivity touch hook: late MapKit views cannot hide or bypass this reveal path. */
     void onMapTouch(MotionEvent event) {
         if (destroyed || event == null || event.getActionMasked() != MotionEvent.ACTION_DOWN) return;
+        // MapActivity may finish onResumeFragments before Conductor installs android.R.id.content.
+        // A failed first install used to leave this Activity without controls forever. The global
+        // touch hook is a safe second admission point because it runs before Yandex consumes DOWN.
+        if (controlLayer == null) install();
         ensureControlLayerAttached();
         revealModeButton();
         if (controlLayer != null) {
             controlLayer.post(() -> {
                 if (destroyed) return;
                 ensureControlLayerAttached();
-                attachModeButtonToStockLeftRail();
+                ensureModeButtonInOverlay();
                 layoutModeButtons();
                 updateModeButtons();
             });
@@ -368,7 +398,7 @@ final class FloatingWindowController {
             ensureControlLayerAttached();
             if (floating) enforceFloatingWindowContract();
             if (controlLayer != null) controlLayer.bringToFront();
-            attachModeButtonToStockLeftRail();
+            ensureModeButtonInOverlay();
             updateModeButtons();
             if (destroyed) return;
             long delay = floating ? FLOATING_CONTRACT_CHECK_MS : MODE_BUTTON_STABLE_MS;
@@ -409,6 +439,7 @@ final class FloatingWindowController {
             insetDispatchHost = null;
         }
         removeFloatingTopInsetGuards();
+        clearPaddingtonInsetsOverrides();
         detachFromParent(modeButton);
         modeButton = null;
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
@@ -659,6 +690,14 @@ final class FloatingWindowController {
         setBackground(contentRoot, transparentContentBackground);
         setBackground(mapRoot, transparentMapRootBackground);
         setBackground(mapWithControls, transparentMapWithControlsBackground);
+        int paddingtonCount = neutralizePaddingtonTree(controlsInsetHost != null
+                ? controlsInsetHost : controlsEngine);
+        paddingtonCount += neutralizePaddingtonTree(topNotificationRoot);
+        if (paddingtonCount != reportedPaddingtonOverrideCount) {
+            reportedPaddingtonOverrideCount = paddingtonCount;
+            NavigationBridgeClient.reportDiagnostic(
+                    "floating top inset: owned PaddingtonView children=" + paddingtonCount);
+        }
         removeFloatingTopInset(contentRoot);
         removeFloatingTopInset(mapRoot);
         removeFloatingTopInset(mapWithControls);
@@ -766,6 +805,51 @@ final class FloatingWindowController {
         setTopPadding(controlsEngine, floatingControlsEngineTop);
         setTopPadding(guidanceControls, floatingGuidanceControlsTop);
         setTopPadding(topNotificationContent, floatingTopNotificationContentTop);
+    }
+
+    /** Replaces every live PaddingtonView child listener in the bounded controls subtrees. */
+    private int neutralizePaddingtonTree(View root) {
+        if (!floating || Build.VERSION.SDK_INT < 20 || root == null) return 0;
+        int count = 0;
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            if (root.getClass().getName().endsWith(".PaddingtonView")
+                    && group.getChildCount() == 1) {
+                View child = group.getChildAt(0);
+                Integer baseTop = paddingtonBaseTopByChild.get(child);
+                if (baseTop == null) {
+                    baseTop = paddingtonBaseTop(child);
+                    paddingtonBaseTopByChild.put(child, baseTop);
+                }
+                // ViewCompat uses the platform listener on API 28. Setting ours directly replaces
+                // the stock wrapper which otherwise reads getRootView() and restores the gap.
+                child.setOnApplyWindowInsetsListener(floatingPaddingtonInsetsListener);
+                setTopPadding(child, baseTop);
+                count++;
+            }
+            int childCount = group.getChildCount();
+            for (int index = 0; index < childCount; index++) {
+                count += neutralizePaddingtonTree(group.getChildAt(index));
+            }
+        }
+        return count;
+    }
+
+    private void clearPaddingtonInsetsOverrides() {
+        if (Build.VERSION.SDK_INT >= 20) {
+            for (View child : paddingtonBaseTopByChild.keySet()) {
+                if (child != null) child.setOnApplyWindowInsetsListener(null);
+            }
+        }
+        paddingtonBaseTopByChild.clear();
+        reportedPaddingtonOverrideCount = -1;
+    }
+
+    private static WindowInsets zeroTop(WindowInsets insets) {
+        if (insets == null || Build.VERSION.SDK_INT < 20) return insets;
+        return insets.replaceSystemWindowInsets(
+                insets.getSystemWindowInsetLeft(), 0,
+                insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
     }
 
     private static void dispatchAdjustedInsets(View target, WindowInsets adjusted) {
@@ -991,14 +1075,14 @@ final class FloatingWindowController {
         closeButton.setVisibility(floating && profile.closeButtonVisible
                 ? View.VISIBLE : View.GONE);
 
-        attachModeButtonToStockLeftRail();
+        ensureModeButtonInOverlay();
         layoutModeButtons();
         updateModeButtons();
     }
 
     private void updateModeButtons() {
         if (modeButton == null) return;
-        attachModeButtonToStockLeftRail();
+        ensureModeButtonInOverlay();
         updateModeButtonSize(modeButton);
         float alpha = profile.modeButtonOpacityPercent / 100f;
         modeButton.setAlpha(alpha);
@@ -1009,6 +1093,7 @@ final class FloatingWindowController {
         boolean revealed = SystemClock.elapsedRealtime() <= modeButtonVisibleUntilElapsedMs;
         modeButton.setVisibility(revealed && profile.enabled && profile.modeButtonVisible
                 ? View.VISIBLE : View.GONE);
+        if (revealed && modeButton.getVisibility() == View.VISIBLE) modeButton.bringToFront();
     }
 
     private void revealModeButton() {
@@ -1025,16 +1110,9 @@ final class FloatingWindowController {
 
     private void layoutModeButton(TextView button) {
         if (button == null) return;
-        if (button.getParent() instanceof LinearLayout) {
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp));
-            params.topMargin = dp(4);
-            params.gravity = Gravity.CENTER_HORIZONTAL;
-            button.setLayoutParams(params);
-            return;
-        }
-        // Short fallback while Navigator is still inflating the stock rail. The poller reparents
-        // this same button as soon as guidance_open_voice_search becomes available.
+        // Keep ownership in Natro's stable touch-transparent layer. Screen coordinates are used
+        // only to visually continue Navigator's left column; Yandex may freely rebuild its rail
+        // without detaching or hiding our button.
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp),
                 Gravity.START | Gravity.TOP);
@@ -1044,41 +1122,22 @@ final class FloatingWindowController {
         button.setLayoutParams(params);
     }
 
-    /** Makes the toggle a real third child of Navigator's stock left vertical controls rail. */
-    private boolean attachModeButtonToStockLeftRail() {
+    /** Keeps the toggle above MapKit while visually aligning it with the stock left rail. */
+    private boolean ensureModeButtonInOverlay() {
         TextView button = modeButton;
-        if (button == null) return false;
-        View voice = viewByName("guidance_open_voice_search");
-        View roadEvent = viewByName("guidance_add_road_event");
-        LinearLayout rail = verticalLinearAncestor(voice != null ? voice : roadEvent);
-        if (rail == null || !rail.isAttachedToWindow()) {
-            FrameLayout fallback = controlLayer;
-            if (fallback != null && button.getParent() != fallback) {
-                detachFromParent(button);
-                fallback.addView(button);
-                layoutModeButton(button);
-            }
-            return false;
+        FrameLayout layer = controlLayer;
+        if (button == null || layer == null) return false;
+        if (button.getParent() == layer && button.isAttachedToWindow()) {
+            button.bringToFront();
+            return true;
         }
-
-        View anchor = voice != null ? voice : roadEvent;
-        View directAnchor = directChildOf(rail, anchor);
-        int wanted = directAnchor == null
-                ? rail.getChildCount() : rail.indexOfChild(directAnchor) + 1;
-        if (button.getParent() == rail && rail.indexOfChild(button) == wanted) return true;
         detachFromParent(button);
-        directAnchor = directChildOf(rail, anchor);
-        wanted = directAnchor == null
-                ? rail.getChildCount() : rail.indexOfChild(directAnchor) + 1;
         try {
-            rail.addView(button, Math.max(0, Math.min(wanted, rail.getChildCount())));
+            layer.addView(button);
             layoutModeButton(button);
+            button.bringToFront();
             return true;
         } catch (RuntimeException ignored) {
-            if (controlLayer != null && button.getParent() == null) {
-                controlLayer.addView(button);
-                layoutModeButton(button);
-            }
             return false;
         }
     }
@@ -1086,26 +1145,6 @@ final class FloatingWindowController {
     private View viewByName(String name) {
         int id = activity.getResources().getIdentifier(name, "id", activity.getPackageName());
         return id == 0 ? null : activity.findViewById(id);
-    }
-
-    private static LinearLayout verticalLinearAncestor(View view) {
-        View current = view;
-        for (int depth = 0; current != null && depth < 4; depth++) {
-            if (current instanceof LinearLayout
-                    && ((LinearLayout) current).getOrientation() == LinearLayout.VERTICAL) {
-                return (LinearLayout) current;
-            }
-            current = current.getParent() instanceof View ? (View) current.getParent() : null;
-        }
-        return null;
-    }
-
-    private static View directChildOf(ViewGroup parent, View descendant) {
-        View current = descendant;
-        while (current != null && current.getParent() != parent) {
-            current = current.getParent() instanceof View ? (View) current.getParent() : null;
-        }
-        return current;
     }
 
     private static void detachFromParent(View view) {

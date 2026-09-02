@@ -28,6 +28,8 @@ import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
+import android.util.SparseBooleanArray;
+import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
@@ -48,6 +50,7 @@ import dezz.status.widget.climate.StockHvacPopupClient;
 import dezz.status.widget.launcher.NavigationCollectionDemand;
 import dezz.status.widget.launcher.NavigationCollectionPolicy;
 import dezz.status.widget.launcher.NavigationDataRepository;
+import dezz.status.widget.launcher.SteeringMediaKeyRouter;
 import dezz.status.widget.diagnostics.ActionRecorder;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
 
@@ -92,6 +95,8 @@ public class WidgetAccessibilityService extends AccessibilityService {
     private volatile boolean serviceConnected;
     private volatile long lastNavigationScanElapsed;
     private long lastFrameworkFailureLogElapsed;
+    @Nullable private SteeringMediaKeyRouter steeringMediaKeyRouter;
+    @NonNull private final SparseBooleanArray consumedMediaKeys = new SparseBooleanArray();
     /** Accessed only on {@link #navigationThread}; prevents event storms postponing a scan. */
     private long nextNavigationScanElapsed;
     private static final class NavigationWindowScan {
@@ -265,6 +270,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        steeringMediaKeyRouter = new SteeringMediaKeyRouter(this);
         ActionRecorder.initialize(this);
         ActionRecorder.addRecordingListener(actionRecordingListener);
     }
@@ -277,6 +283,10 @@ public class WidgetAccessibilityService extends AccessibilityService {
                             "service", getClass().getName()));
         }
         ActionRecorder.removeRecordingListener(actionRecordingListener);
+        SteeringMediaKeyRouter mediaRouter = steeringMediaKeyRouter;
+        steeringMediaKeyRouter = null;
+        if (mediaRouter != null) mediaRouter.close();
+        consumedMediaKeys.clear();
         resetStockHvacObservation();
         serviceConnected = false;
         if (navigationDemand != null) {
@@ -302,6 +312,8 @@ public class WidgetAccessibilityService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        SteeringMediaKeyRouter mediaRouter = steeringMediaKeyRouter;
+        if (mediaRouter != null) mediaRouter.start();
         // Initial seed: walk all windows currently known to the accessibility framework and
         // remember the per-display foreground packages. Otherwise the first event-driven
         // update would have to wait for a real window change.
@@ -330,6 +342,32 @@ public class WidgetAccessibilityService extends AccessibilityService {
         if (widget != null) {
             widget.onForegroundTrackingPathChanged();
         }
+    }
+
+    /**
+     * KX11 delivers the physical previous/next/play keys here before the default media dispatcher.
+     * Consume only a key whose DOWN event reached one exact cached session; every other key keeps
+     * Android's stock path unchanged.
+     */
+    @Override protected boolean onKeyEvent(@NonNull KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (!SteeringMediaKeyRouter.isSupportedKey(keyCode)) {
+            return super.onKeyEvent(event);
+        }
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            if (event.getRepeatCount() > 0) return consumedMediaKeys.get(keyCode, false);
+            SteeringMediaKeyRouter mediaRouter = steeringMediaKeyRouter;
+            boolean handled = mediaRouter != null
+                    && mediaRouter.dispatch(keyCode, SystemClock.uptimeMillis());
+            consumedMediaKeys.put(keyCode, handled);
+            return handled || super.onKeyEvent(event);
+        }
+        if (event.getAction() == KeyEvent.ACTION_UP) {
+            boolean handled = consumedMediaKeys.get(keyCode, false);
+            consumedMediaKeys.delete(keyCode);
+            return handled || super.onKeyEvent(event);
+        }
+        return super.onKeyEvent(event);
     }
 
     @Override
