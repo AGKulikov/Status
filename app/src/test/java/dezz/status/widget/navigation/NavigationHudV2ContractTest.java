@@ -726,6 +726,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("neutralizePaddingtonTree"));
         assertTrue(controller.contains("floatingPaddingtonInsetsListener"));
         assertTrue(controller.contains("child.setOnApplyWindowInsetsListener"));
+        assertTrue(controller.contains("reportCallbackFailure(\"modeAwareInsets\""));
+        assertTrue(controller.contains("reportCallbackFailure(\"paddingtonInsets\""));
+        assertTrue(controller.contains("reportCallbackFailure(\"floatingTopInsetGuard\""));
+        assertTrue(controller.contains("reportCallbackFailure(\"hideModeButtons\""));
+        assertTrue(controller.contains("reportCallbackFailure(\"floatingSurfaceCommitter\""));
+        assertTrue(controller.contains("reportCallbackFailure(\"mapTouchReattach\""));
+        assertTrue(controller.contains("reportCallbackFailure(\"modeButtonPoller\""));
+        assertTrue(controller.contains("finally {"));
         assertTrue(controller.contains("setTopPadding(guidanceControls"));
         assertTrue(controller.contains("dispatchAdjustedInsets(controlsInsetHost != null"));
         assertTrue(controller.contains("guidance_add_road_event"));

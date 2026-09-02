@@ -189,7 +189,7 @@ public final class NatroEntryPoint {
                 || ACTION_FLOATING.equals(intent.getAction());
     }
 
-    private static void reportFailure(String stage, Throwable failure) {
+    static void reportFailure(String stage, Throwable failure) {
         String message = "Navigator hook " + stage + " failed: "
                 + failure.getClass().getSimpleName()
                 + (failure.getMessage() == null ? "" : ": " + failure.getMessage());

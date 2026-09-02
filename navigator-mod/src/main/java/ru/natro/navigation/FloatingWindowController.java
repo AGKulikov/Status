@@ -129,63 +129,81 @@ final class FloatingWindowController {
     private int roundedOutlineRadius = -1;
     private final Runnable hideModeButtons = new Runnable() {
         @Override public void run() {
-            long remaining = modeButtonVisibleUntilElapsedMs - SystemClock.elapsedRealtime();
-            if (remaining > 0L) {
-                mainHandler.postDelayed(this, remaining);
-                return;
+            try {
+                long remaining = modeButtonVisibleUntilElapsedMs - SystemClock.elapsedRealtime();
+                if (remaining > 0L) {
+                    mainHandler.postDelayed(this, remaining);
+                    return;
+                }
+                updateModeButtons();
+            } catch (Throwable failure) {
+                reportCallbackFailure("hideModeButtons", failure);
             }
-            updateModeButtons();
         }
     };
     private final View.OnApplyWindowInsetsListener modeAwareInsetsListener =
             new View.OnApplyWindowInsetsListener() {
                 @Override public WindowInsets onApplyWindowInsets(
                         View view, WindowInsets insets) {
-                    if (!floating || Build.VERSION.SDK_INT < 20) {
-                        return view.onApplyWindowInsets(insets);
+                    try {
+                        if (!floating || Build.VERSION.SDK_INT < 20) {
+                            return view.onApplyWindowInsets(insets);
+                        }
+                        // A bounded Navigator window has no status bar inside its own map viewport.
+                        // Keep left/right/bottom safe areas intact, but do not make Navigator reserve
+                        // the head unit's global status-bar height a second time.
+                        WindowInsets adjusted = insets.replaceSystemWindowInsets(
+                                insets.getSystemWindowInsetLeft(),
+                                0,
+                                insets.getSystemWindowInsetRight(),
+                                insets.getSystemWindowInsetBottom());
+                        return view.onApplyWindowInsets(adjusted);
+                    } catch (Throwable failure) {
+                        reportCallbackFailure("modeAwareInsets", failure);
+                        return insets;
                     }
-                    // A bounded Navigator window has no status bar inside its own map viewport.
-                    // Keep left/right/bottom safe areas intact, but do not make Navigator reserve
-                    // the head unit's global status-bar height a second time.
-                    WindowInsets adjusted = insets.replaceSystemWindowInsets(
-                            insets.getSystemWindowInsetLeft(),
-                            0,
-                            insets.getSystemWindowInsetRight(),
-                            insets.getSystemWindowInsetBottom());
-                    return view.onApplyWindowInsets(adjusted);
                 }
             };
     private final View.OnApplyWindowInsetsListener floatingPaddingtonInsetsListener =
             new View.OnApplyWindowInsetsListener() {
                 @Override public WindowInsets onApplyWindowInsets(
                         View view, WindowInsets insets) {
-                    Integer captured = paddingtonBaseTopByChild.get(view);
-                    int baseTop = captured == null ? 0 : captured;
-                    if (floating) {
-                        // PaddingtonView's stock listener ignores the supplied WindowInsets and
-                        // reads the global root inset again. Own the child listener while this is
-                        // a bounded window so a late stock dispatch cannot put the gap back.
-                        setTopPadding(view, baseTop);
-                        return zeroTop(insets);
+                    try {
+                        Integer captured = paddingtonBaseTopByChild.get(view);
+                        int baseTop = captured == null ? 0 : captured;
+                        if (floating) {
+                            // PaddingtonView's stock listener ignores the supplied WindowInsets and
+                            // reads the global root inset again. Own the child listener while this is
+                            // a bounded window so a late stock dispatch cannot put the gap back.
+                            setTopPadding(view, baseTop);
+                            return zeroTop(insets);
+                        }
+                        // Mode changes recreate MapActivity, but retain stock-equivalent behaviour if
+                        // a rejected window transition restores this same Activity in place.
+                        int topInset = insets == null ? 0 : insets.getSystemWindowInsetTop();
+                        setTopPadding(view, baseTop + Math.max(0, topInset));
+                        return insets;
+                    } catch (Throwable failure) {
+                        reportCallbackFailure("paddingtonInsets", failure);
+                        return insets;
                     }
-                    // Mode changes recreate MapActivity, but retain stock-equivalent behaviour if
-                    // a rejected window transition restores this same Activity in place.
-                    int topInset = insets == null ? 0 : insets.getSystemWindowInsetTop();
-                    setTopPadding(view, baseTop + Math.max(0, topInset));
-                    return insets;
                 }
             };
     private final View.OnLayoutChangeListener floatingTopInsetGuard =
             new View.OnLayoutChangeListener() {
                 @Override public void onLayoutChange(View view, int left, int top, int right,
                         int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
-                    if (!floating) return;
-                    if (view == controlsEngine) {
-                        setTopPadding(view, floatingControlsEngineTop);
-                    } else if (view == guidanceControls) {
-                        setTopPadding(view, floatingGuidanceControlsTop);
-                    } else if (view == topNotificationContent) {
-                        setTopPadding(view, floatingTopNotificationContentTop);
+                    try {
+                        if (!floating) return;
+                        if (view == controlsEngine) {
+                            setTopPadding(view, floatingControlsEngineTop);
+                        } else if (view == guidanceControls) {
+                            setTopPadding(view, floatingGuidanceControlsTop);
+                        } else if (view == topNotificationContent) {
+                            setTopPadding(view, floatingTopNotificationContentTop);
+                        }
+                    } catch (Throwable failure) {
+                        reportCallbackFailure("floatingTopInsetGuard", failure);
                     }
                 }
             };
@@ -210,9 +228,8 @@ final class FloatingWindowController {
                 enforceTransparentLayers();
                 applyRoundedClip();
                 reportCommittedFrame();
-            } catch (RuntimeException failure) {
-                NavigationBridgeClient.reportDiagnostic("floating surface commit rejected: "
-                        + failure.getClass().getSimpleName() + ": " + failure.getMessage());
+            } catch (Throwable failure) {
+                reportCallbackFailure("floatingSurfaceCommitter", failure);
             }
         }
     };
@@ -291,11 +308,15 @@ final class FloatingWindowController {
         revealModeButton();
         if (controlLayer != null) {
             controlLayer.post(() -> {
-                if (destroyed) return;
-                ensureControlLayerAttached();
-                ensureModeButtonInOverlay();
-                layoutModeButtons();
-                updateModeButtons();
+                try {
+                    if (destroyed) return;
+                    ensureControlLayerAttached();
+                    ensureModeButtonInOverlay();
+                    layoutModeButtons();
+                    updateModeButtons();
+                } catch (Throwable failure) {
+                    reportCallbackFailure("mapTouchReattach", failure);
+                }
             });
         }
     }
@@ -395,16 +416,29 @@ final class FloatingWindowController {
 
     private final Runnable modeButtonPoller = new Runnable() {
         @Override public void run() {
-            ensureControlLayerAttached();
-            if (floating) enforceFloatingWindowContract();
-            if (controlLayer != null) controlLayer.bringToFront();
-            ensureModeButtonInOverlay();
-            updateModeButtons();
             if (destroyed) return;
-            long delay = floating ? FLOATING_CONTRACT_CHECK_MS : MODE_BUTTON_STABLE_MS;
-            mainHandler.postDelayed(this, delay);
+            try {
+                ensureControlLayerAttached();
+                if (floating) enforceFloatingWindowContract();
+                if (controlLayer != null) controlLayer.bringToFront();
+                ensureModeButtonInOverlay();
+                updateModeButtons();
+            } catch (Throwable failure) {
+                reportCallbackFailure("modeButtonPoller", failure);
+            } finally {
+                if (!destroyed) {
+                    long delay = floating
+                            ? FLOATING_CONTRACT_CHECK_MS : MODE_BUTTON_STABLE_MS;
+                    mainHandler.postDelayed(this, delay);
+                }
+            }
         }
     };
+
+    /** Natro callbacks are guests in Navigator's main process and may never crash its looper. */
+    private void reportCallbackFailure(String stage, Throwable failure) {
+        NatroEntryPoint.reportFailure("FloatingWindowController." + stage, failure);
+    }
 
     /** Reparents the overlay if Navigator replaced its content root during a late fragment pass. */
     private void ensureControlLayerAttached() {

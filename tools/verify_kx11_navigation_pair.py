@@ -327,7 +327,12 @@ def verify_navigator(
             )
     for forbidden in (
         b"NavigationLayerFactory",
+        b"NavigationLayerSettings",
+        b"createNavigationLayer",
+        b"setUseLayerCamera",
+        b"setUseLayerRoadEvents",
         b"setRoadEventVisibleOnRoute",
+        b"GuidanceCamera",
         b"route-matched road-events layer attached",
         b"native GuidanceCamera attached",
     ):

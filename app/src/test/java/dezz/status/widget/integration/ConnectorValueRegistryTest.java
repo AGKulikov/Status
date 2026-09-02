@@ -100,6 +100,23 @@ public final class ConnectorValueRegistryTest {
         assertEquals(1, calls.get());
     }
 
+    @Test public void listenerBudgetExhaustionCannotCrashTheHostProcess() {
+        ConnectorValueRegistry registry = new ConnectorValueRegistry();
+        for (int index = 0; index < ConnectorValueRegistry.MAX_LISTENERS; index++) {
+            final int slot = index;
+            registry.addListener(changed -> {
+                if (slot < 0) fail("unreachable");
+            });
+        }
+        AtomicInteger rejectedCalls = new AtomicInteger();
+
+        // This used to throw IllegalStateException on the caller (normally the main thread).
+        registry.addListener(changed -> rejectedCalls.incrementAndGet());
+        registry.upsert(value(ConnectorType.HOME_ASSISTANT, "default", "sensor.one", 1));
+
+        assertEquals(0, rejectedCalls.get());
+    }
+
     @Test public void lookupKeysUseTheSameBoundsAsConnectorValues() {
         ConnectorValueRegistry registry = new ConnectorValueRegistry();
         try {

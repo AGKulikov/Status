@@ -1,0 +1,47 @@
+# Natro 2.6.9: повторный аудит регрессий прежних падений
+
+Дата аудита: 02.09.2026. Объект проверки — текущее дерево ветки
+`feature/navigation-hud-v2` после доработок 2.6.9. Этот документ фиксирует статический результат;
+он не заменяет длительную проверку на физическом ECARX KX11.
+
+## Результат
+
+В исполняемый код не вернулся ни один из подтверждённых аварийных путей Navigator. Дополнительно
+устранены два защитных пробела: исключение из отложенного poll/inset callback оконного режима
+теперь не выходит в главный looper Навигатора, а переполнение лимита слушателей коннекторов больше
+не бросает `IllegalStateException` в процесс Natro.
+
+| Проверенный механизм | Состояние текущего дерева | Автоматический барьер |
+|---|---|---|
+| Automotive `NavigationLayer` на независимом `OffscreenMapWindow`, даже с выключенной камерой | Исполняемых ссылок нет; дорожные события использует только standalone `RoadEventsLayer` | Release-verifier отклоняет factory/settings/create и on-route API |
+| Вторая `GuidanceCamera`, включая парковку в `FREE` | Исполняемых ссылок и второго владельца камеры нет | DEX-verifier отклоняет `GuidanceCamera` и `setUseLayerCamera` |
+| Применение type 2038 до появления Activity token | Вход в оконный режим остаётся только в конце `onResumeFragments` | Source-contract запрещает `onActivityPreCreate` и проверяет точку hook |
+| Повторный type-2038 `setAttributes` из обновления карты/слоёв | `sameWindowContract` отделяет оконные параметры от общего JSON; идентичный snapshot идемпотентен | Java source-contract проверяет обе отсечки |
+| Пересоздание renderer/`OffscreenMapWindow` по таймеру или на обычном обновлении данных | Таймер пересоздания отсутствует; новая generation создаётся только для новой surface/геометрии | Контракты `NAV-012/013`, surface-generation и no-flicker tests |
+| Освобождение Android surface до `MapWindow.removeSurface` | Сначала выполняется `removeSurface`, затем очищаются ссылки и release | Source-contract жизненного цикла renderer |
+| Исключение из новых отложенных оконных poll/inset callbacks | Каждый новый callback имеет локальный `try/catch`; poller сохраняет контролируемое расписание через `finally` | Два source-contract набора проверяют все семь границ |
+| `Too many connector value listeners` после повторного создания информационных плиток | Плитки по-прежнему делят один upstream-listener; лишний listener при полном лимите безопасно отклоняется и журналируется | Lifecycle/hub contracts плюс unit-тест заполненного лимита |
+
+## Расширенный DEX-запрет
+
+`tools/verify_kx11_navigation_pair.py` теперь отклоняет выпуск, если в добавленном Navigator DEX
+обнаружен любой из маркеров:
+
+- `NavigationLayerFactory`;
+- `NavigationLayerSettings`;
+- `createNavigationLayer`;
+- `setUseLayerCamera`;
+- `setUseLayerRoadEvents`;
+- `setRoadEventVisibleOnRoute`;
+- `GuidanceCamera`.
+
+Такой запрет специально шире прежнего: он ловит не только уже наблюдавшуюся диагностическую строку,
+но и попытку вернуть тот же механизм под другим вспомогательным методом.
+
+## Что ещё нельзя считать подтверждённым
+
+Статический аудит доказывает отсутствие известных Java/DEX-механизмов, но не доказывает отсутствие
+асинхронного сбоя в vendor MapKit/SurfaceFlinger на Android 9. Перед следующим APK остаётся открытым
+`GATE-007`: 30 минут без маршрута, 30 минут с маршрутом и три возврата из фона. Одновременно должен
+пройти `GATE-021`, а в журнале не должно быть завершения bridge, исчезновения окна или возврата на
+HOME.

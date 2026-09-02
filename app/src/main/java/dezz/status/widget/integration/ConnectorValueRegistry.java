@@ -43,7 +43,13 @@ public final class ConnectorValueRegistry implements ValueResolver {
         synchronized (listeners) {
             if (listeners.contains(checked)) return;
             if (listeners.size() >= MAX_LISTENERS) {
-                throw new IllegalStateException("Too many connector value listeners");
+                // A leaked or newly introduced UI consumer must not be able to terminate Natro's
+                // main process. Information tiles normally share one upstream subscription, and
+                // every direct owner removes its listener on lifecycle teardown; keep the hard
+                // memory bound, reject only the excess subscriber and leave an audit trail.
+                DiagnosticJournal.warn("connector",
+                        "connector value listener limit reached; excess listener rejected");
+                return;
             }
             listeners.add(checked);
         }
