@@ -531,9 +531,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Подсказки по полосам — слой на маршруте", profile.showLaneGuidance);
         Switch showHudSpeedCameras = switchView(
                 "Камеры из HUD Speed — отдельный знак", profile.showHudSpeedCameras);
-        Switch showLabels = switchView("Подписи", profile.showLabels);
-        Switch routeStreetLabelsOnly = switchView(
-                "Названия улиц только на маршруте", profile.routeStreetLabelsOnly);
+        Switch showLabels = switchView(
+                "Штатные названия улиц Яндекса", profile.showLabels);
         Switch showPois = switchView("Полезные места", profile.showPois);
         Switch showBuildings = switchView("Здания", profile.showBuildings);
         Switch showParks = switchView("Парки", profile.showParks);
@@ -545,11 +544,14 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         for (Switch control : new Switch[]{showRoute, destination,
                 showRouteTraffic, showTraffic, showTrafficLights,
                 showRouteTurns, showLaneGuidance, showHudSpeedCameras,
-                showLabels, routeStreetLabelsOnly, showPois, showBuildings,
+                showLabels, showPois, showBuildings,
                 showParks, showWater,
                 showModels, showCursor, roadsOnly}) {
             form.addView(control, marginTop(4));
         }
+        form.addView(text("Названия, шрифт, контур и изгиб текста рисует сам слой карты "
+                + "Яндекса. Отдельных нарисованных плашек Natro больше нет.",
+                12, 0xFF95A0AF), marginTop(4));
         Button roadEvents = button("Дорожные события — выбрать типы и режимы");
         roadEvents.setOnClickListener(view -> editHudRoadEvents(navigation, profile));
         form.addView(roadEvents, marginTop(10));
@@ -579,7 +581,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Размер стрелок поворотов на маршруте",
                 profile.routeTurnScalePercent, 50, 250, 5, " %");
         SliderField routeLabelScale = slider(form,
-                "Размер названий улиц на маршруте",
+                "Размер штатных названий улиц",
                 profile.routeLabelScalePercent, 50, 250, 5, " %");
         SliderField roadEventScale = slider(form,
                 "Размер остальных дорожных событий",
@@ -632,9 +634,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField routeTurnLayerPriority = slider(form,
                 "Стрелки поворотов на маршруте", profile.routeTurnLayerPriority,
                 0, 100, 1, "");
-        SliderField routeLabelLayerPriority = slider(form,
-                "Названия улиц на маршруте", profile.routeLabelLayerPriority,
-                0, 100, 1, "");
         SliderField laneGuidanceLayerPriority = slider(form,
                 "Знаки движения по полосам", profile.laneGuidanceLayerPriority,
                 0, 100, 1, "");
@@ -644,7 +643,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
                 destinationLayerPriority, trafficLightLayerPriority,
-                routeTurnLayerPriority, routeLabelLayerPriority,
+                routeTurnLayerPriority,
                 laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
             for (SliderField field : layerPriorityControls) {
@@ -719,7 +718,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showLaneGuidance = showLaneGuidance.isChecked();
                         profile.showHudSpeedCameras = showHudSpeedCameras.isChecked();
                         profile.showLabels = showLabels.isChecked();
-                        profile.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked();
                         profile.showPois = showPois.isChecked();
                         profile.showBuildings = showBuildings.isChecked();
                         profile.showParks = showParks.isChecked();
@@ -759,7 +757,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                                 trafficLightLayerPriority.intValue();
                         profile.routeTurnLayerPriority =
                                 routeTurnLayerPriority.intValue();
-                        profile.routeLabelLayerPriority = routeLabelLayerPriority.intValue();
                         profile.laneGuidanceLayerPriority =
                                 laneGuidanceLayerPriority.intValue();
                         profile.cursorLayerPriority = cursorLayerPriority.intValue();

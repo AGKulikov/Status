@@ -204,7 +204,7 @@ public final class NavigationIntegrationConfig {
         public int trafficLightScalePercent = 100;
         /** Scale of arrows painted directly onto upcoming route turns. */
         public int routeTurnScalePercent = 100;
-        /** Scale of labels whose anchor and text are verified against the active route. */
+        /** Scale of stock Yandex road-label text; 100 preserves the original MapKit size. */
         public int routeLabelScalePercent = 100;
         /** Scale of stock Yandex road-event icons and their captions, excluding cameras. */
         public int roadEventScalePercent = 100;
@@ -219,12 +219,9 @@ public final class NavigationIntegrationConfig {
         public int destinationLayerPriority = 45;
         public int trafficLightLayerPriority = 50;
         public int routeTurnLayerPriority = 55;
-        public int routeLabelLayerPriority = 60;
         public int laneGuidanceLayerPriority = 80;
         public int cursorLayerPriority = 90;
         public boolean showLabels = true;
-        /** Hide substrate labels and draw only verified names attached to the active route. */
-        public boolean routeStreetLabelsOnly;
         public boolean showPois = true;
         public boolean showBuildings = true;
         public boolean showParks = true;
@@ -324,11 +321,9 @@ public final class NavigationIntegrationConfig {
                     .put("destinationLayerPriority", destinationLayerPriority)
                     .put("trafficLightLayerPriority", trafficLightLayerPriority)
                     .put("routeTurnLayerPriority", routeTurnLayerPriority)
-                    .put("routeLabelLayerPriority", routeLabelLayerPriority)
                     .put("laneGuidanceLayerPriority", laneGuidanceLayerPriority)
                     .put("cursorLayerPriority", cursorLayerPriority)
                     .put("showLabels", showLabels)
-                    .put("routeStreetLabelsOnly", routeStreetLabelsOnly)
                     .put("showPois", showPois)
                     .put("showBuildings", showBuildings)
                     .put("showParks", showParks)
@@ -424,15 +419,16 @@ public final class NavigationIntegrationConfig {
                     "trafficLightLayerPriority", result.trafficLightLayerPriority);
             result.routeTurnLayerPriority = source.optInt(
                     "routeTurnLayerPriority", result.routeTurnLayerPriority);
-            result.routeLabelLayerPriority = source.optInt(
-                    "routeLabelLayerPriority", result.routeLabelLayerPriority);
             result.laneGuidanceLayerPriority = source.optInt(
                     "laneGuidanceLayerPriority", result.laneGuidanceLayerPriority);
             result.cursorLayerPriority = source.optInt(
                     "cursorLayerPriority", result.cursorLayerPriority);
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
-            result.routeStreetLabelsOnly = source.optBoolean(
-                    "routeStreetLabelsOnly", result.routeStreetLabelsOnly);
+            // Migration from 2.5.7-2.6.4: the removed route-only bitmap layer becomes stock
+            // MapKit road labels. Preserve the user's opt-in even if generic labels were off.
+            if (source.optBoolean("routeStreetLabelsOnly", false)) {
+                result.showLabels = true;
+            }
             result.showPois = source.optBoolean("showPois", result.showPois);
             result.showBuildings = source.optBoolean("showBuildings", result.showBuildings);
             result.showParks = source.optBoolean("showParks", result.showParks);
@@ -509,7 +505,6 @@ public final class NavigationIntegrationConfig {
             destinationLayerPriority = clamp(destinationLayerPriority, 0, 100);
             trafficLightLayerPriority = clamp(trafficLightLayerPriority, 0, 100);
             routeTurnLayerPriority = clamp(routeTurnLayerPriority, 0, 100);
-            routeLabelLayerPriority = clamp(routeLabelLayerPriority, 0, 100);
             laneGuidanceLayerPriority = clamp(laneGuidanceLayerPriority, 0, 100);
             cursorLayerPriority = clamp(cursorLayerPriority, 0, 100);
             routeWidthPercent = clamp(routeWidthPercent, 25, 300);

@@ -596,9 +596,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 "Подсказки по полосам — слой на маршруте", map.showLaneGuidance);
         Switch hudSpeedCameras = switchView(
                 "Камеры из HUD Speed — отдельный знак", map.showHudSpeedCameras);
-        Switch labels = switchView("Подписи дорог", map.showLabels);
-        Switch routeStreetLabelsOnly = switchView(
-                "Названия улиц только на маршруте", map.routeStreetLabelsOnly);
+        Switch labels = switchView(
+                "Штатные названия улиц Яндекса", map.showLabels);
         Switch pois = switchView("Полезные места", map.showPois);
         Switch buildings = switchView("Здания", map.showBuildings);
         Switch parks = switchView("Парки", map.showParks);
@@ -615,7 +614,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(laneGuidance);
         content.addView(hudSpeedCameras);
         content.addView(labels);
-        content.addView(routeStreetLabelsOnly);
+        content.addView(text("Названия, шрифт, контур и изгиб текста рисует сам слой карты "
+                + "Яндекса. Отдельных нарисованных плашек Natro больше нет.",
+                12, 0xFFB8C0CC));
         content.addView(pois);
         content.addView(buildings);
         content.addView(parks);
@@ -650,7 +651,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 "Размер стрелок поворотов на маршруте",
                 map.routeTurnScalePercent, 50, 250, 5, " %");
         SliderField routeLabelScale = slider(content,
-                "Размер названий улиц на маршруте",
+                "Размер штатных названий улиц",
                 map.routeLabelScalePercent, 50, 250, 5, " %");
         SliderField roadEventScale = slider(content,
                 "Размер остальных дорожных событий",
@@ -706,9 +707,6 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField routeTurnLayerPriority = slider(content,
                 "Стрелки поворотов на маршруте", map.routeTurnLayerPriority,
                 0, 100, 1, "");
-        SliderField routeLabelLayerPriority = slider(content,
-                "Названия улиц на маршруте", map.routeLabelLayerPriority,
-                0, 100, 1, "");
         SliderField laneGuidanceLayerPriority = slider(content,
                 "Знаки движения по полосам", map.laneGuidanceLayerPriority,
                 0, 100, 1, "");
@@ -718,7 +716,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
                 destinationLayerPriority, trafficLightLayerPriority,
-                routeTurnLayerPriority, routeLabelLayerPriority,
+                routeTurnLayerPriority,
                 laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
             for (SliderField field : layerPriorityControls) {
@@ -778,7 +776,6 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showPois = pois.isChecked();
                     map.showBuildings = buildings.isChecked();
                     map.showLabels = labels.isChecked();
-                    map.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked();
                     map.showParks = parks.isChecked();
                     map.showWater = water.isChecked();
                     map.showModels = models.isChecked();
@@ -810,7 +807,6 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.destinationLayerPriority = destinationLayerPriority.intValue();
                     map.trafficLightLayerPriority = trafficLightLayerPriority.intValue();
                     map.routeTurnLayerPriority = routeTurnLayerPriority.intValue();
-                    map.routeLabelLayerPriority = routeLabelLayerPriority.intValue();
                     map.laneGuidanceLayerPriority = laneGuidanceLayerPriority.intValue();
                     map.cursorLayerPriority = cursorLayerPriority.intValue();
                     map.trafficFreeColor = trafficFreeColor.value;

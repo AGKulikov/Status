@@ -49,10 +49,8 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.destinationLayerPriority = 27;
         config.hudMap.trafficLightLayerPriority = 33;
         config.hudMap.routeTurnLayerPriority = 38;
-        config.hudMap.routeLabelLayerPriority = 44;
         config.hudMap.laneGuidanceLayerPriority = 88;
         config.hudMap.cursorLayerPriority = 99;
-        config.hudMap.routeStreetLabelsOnly = true;
         config.hudMap.showTraffic = false;
         config.hudMap.showRouteTraffic = true;
         config.hudMap.showDestination = false;
@@ -86,7 +84,6 @@ public final class NavigationHudV2ContractTest {
         config.clusterMap.laneGuidanceScalePercent = 85;
         config.clusterMap.routeWidthPercent = 75;
         config.clusterMap.roadWidthPercent = 125;
-        config.clusterMap.routeStreetLabelsOnly = true;
         config.clusterMap.setRoadEventMode("RECONSTRUCTION",
                 NavigationIntegrationConfig.RoadEventMode.ALWAYS);
         config.mainFloatingWindow.movementLocked = true;
@@ -134,10 +131,8 @@ public final class NavigationHudV2ContractTest {
         assertEquals(27, restored.hudMap.destinationLayerPriority);
         assertEquals(33, restored.hudMap.trafficLightLayerPriority);
         assertEquals(38, restored.hudMap.routeTurnLayerPriority);
-        assertEquals(44, restored.hudMap.routeLabelLayerPriority);
         assertEquals(88, restored.hudMap.laneGuidanceLayerPriority);
         assertEquals(99, restored.hudMap.cursorLayerPriority);
-        assertTrue(restored.hudMap.routeStreetLabelsOnly);
         assertFalse(restored.hudMap.showTraffic);
         assertTrue(restored.hudMap.showRouteTraffic);
         assertFalse(restored.hudMap.showDestination);
@@ -171,7 +166,6 @@ public final class NavigationHudV2ContractTest {
         assertEquals(85, restored.clusterMap.laneGuidanceScalePercent);
         assertEquals(75, restored.clusterMap.routeWidthPercent);
         assertEquals(125, restored.clusterMap.roadWidthPercent);
-        assertTrue(restored.clusterMap.routeStreetLabelsOnly);
         assertEquals(NavigationIntegrationConfig.RoadEventMode.ALWAYS,
                 restored.clusterMap.roadEventMode("RECONSTRUCTION"));
         assertTrue(restored.mainFloatingWindow.movementLocked);
@@ -180,6 +174,16 @@ public final class NavigationHudV2ContractTest {
         assertEquals("BOTTOM_LEFT", restored.mainFloatingWindow.modeButtonPosition);
         assertEquals(52, restored.mainFloatingWindow.modeButtonSizeDp);
         assertEquals("#FFABCDEF", restored.mainFloatingWindow.borderColor);
+    }
+
+    @Test public void legacyRouteOnlyLabelsMigrateToStockYandexLabels() {
+        NavigationIntegrationConfig restored = NavigationIntegrationConfig.fromJson(
+                "{\"hudMap\":{\"showLabels\":false,\"routeStreetLabelsOnly\":true},"
+                        + "\"clusterMap\":{\"showLabels\":false,"
+                        + "\"routeStreetLabelsOnly\":true}}");
+
+        assertTrue(restored.hudMap.showLabels);
+        assertTrue(restored.clusterMap.showLabels);
     }
 
     @Test public void opaquePickerColorsAreCanonicalizedBeforePersistence() throws Exception {
@@ -263,7 +267,6 @@ public final class NavigationHudV2ContractTest {
                 "map.showRouteTurns = routeTurns.isChecked()",
                 "map.showLaneGuidance = laneGuidance.isChecked()",
                 "map.showLabels = labels.isChecked()",
-                "map.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked()",
                 "map.showPois = pois.isChecked()",
                 "map.showBuildings = buildings.isChecked()",
                 "map.showParks = parks.isChecked()",
@@ -311,7 +314,6 @@ public final class NavigationHudV2ContractTest {
                 "map.destinationLayerPriority=destinationLayerPriority.intValue();",
                 "map.trafficLightLayerPriority=trafficLightLayerPriority.intValue();",
                 "map.routeTurnLayerPriority=routeTurnLayerPriority.intValue();",
-                "map.routeLabelLayerPriority=routeLabelLayerPriority.intValue();",
                 "map.laneGuidanceLayerPriority=laneGuidanceLayerPriority.intValue();",
                 "map.cursorLayerPriority=cursorLayerPriority.intValue();"
         }) {
@@ -368,7 +370,6 @@ public final class NavigationHudV2ContractTest {
         String trafficLights = read(navigator.resolve("TrafficLightMapLayer.java"));
         String cameras = read(navigator.resolve("CameraDirectionMapLayer.java"));
         String laneSigns = read(navigator.resolve("LaneGuidanceMapLayer.java"));
-        String routeLabels = read(navigator.resolve("RouteStreetLabelMapLayer.java"));
         String routeTurns = read(navigator.resolve("RouteTurnMapLayer.java"));
         String hudSettings = read(projectRoot().resolve(
                 "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
@@ -382,7 +383,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(trafficLights.contains("MapObjectLayerFactory.EQUAL"));
         assertTrue(cameras.contains("MapObjectLayerFactory.EQUAL"));
         assertTrue(laneSigns.contains("MapObjectLayerFactory.MAJOR"));
-        assertTrue(routeLabels.contains("MapObjectLayerFactory.MINOR"));
+        assertTrue(renderer.contains("MapObjectLayerFactory.MINOR"));
+        assertFalse(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
         assertFalse(routeTurns.contains("MapObjectLayerFactory"));
         assertTrue(routeTurns.contains("applyManeuverStyle"));
         assertTrue(renderer.contains("if (currentMap == null"
@@ -517,7 +519,6 @@ public final class NavigationHudV2ContractTest {
         String cameraDirections = read(patchRoot.resolve("CameraDirectionMapLayer.java"));
         String laneGuidance = read(patchRoot.resolve("LaneGuidanceMapLayer.java"));
         String routeTurns = read(patchRoot.resolve("RouteTurnMapLayer.java"));
-        String routeLabels = read(patchRoot.resolve("RouteStreetLabelMapLayer.java"));
         String backgroundLease = read(patchRoot.resolve("BackgroundMapLease.java"));
         String mapViewPatch = read(projectRoot().resolve(
                 "tools/patch_navigation_map_view.py"));
@@ -741,8 +742,9 @@ public final class NavigationHudV2ContractTest {
         assertFalse(routeTurns.contains("Canvas"));
         assertFalse(routeTurns.contains("createArrowBitmap"));
         assertTrue(renderer.contains("routeTurnMapLayer.attachRoute"));
-        assertTrue(routeLabels.contains("ru.natro.navigation.route_street_labels"));
-        assertTrue(routeLabels.contains("createLabelBitmap"));
+        assertFalse(Files.exists(patchRoot.resolve("RouteStreetLabelMapLayer.java")));
+        assertFalse(renderer.contains("routeStreetLabelMapLayer"));
+        assertTrue(renderer.contains("MapObjectLayerFactory.MINOR"));
         assertFalse(renderer.contains("drivingRoute != activeRoute"));
         assertFalse(routeStyler.contains("Double.doubleToLongBits"));
         assertTrue(renderer.contains("applyStyleSlot"));
@@ -755,6 +757,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(mapProfile.contains("road_surface"));
         assertTrue(mapProfile.contains("roadWidthPercent"));
         assertTrue(mapProfile.contains("stylers.append(\"\\\"scale\\\":\")"));
+        assertTrue(mapProfile.contains("\\\"elements\\\":\\\"label.text\\\""));
+        assertTrue(mapProfile.contains("routeLabelScalePercent / 100d"));
         assertTrue(mapProfile.contains("cameraDirectionLayerPriority"));
         assertTrue(mapProfile.contains("manualLayerPrioritiesEnabled"));
         assertTrue(mapProfile.contains("effectiveCameraPriority()"));
@@ -1011,9 +1015,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("SliderField cameraDirectionOpacity = slider"));
         assertTrue(settings.contains("SliderField trafficLightLayerPriority = slider"));
         assertTrue(settings.contains("SliderField routeTurnLayerPriority = slider"));
-        assertTrue(settings.contains("SliderField routeLabelLayerPriority = slider"));
         assertTrue(settings.contains("SliderField laneGuidanceLayerPriority = slider"));
         assertTrue(settings.contains("SliderField cursorLayerPriority = slider"));
+        assertTrue(settings.contains("Штатные названия улиц Яндекса"));
+        assertTrue(settings.contains("рисует сам слой карты"));
+        assertFalse(settings.contains("Названия улиц только на маршруте"));
         assertTrue(settings.contains("profile.roadsOnly = roadsOnly.isChecked()"));
         assertTrue(settings.contains("Цвет рекомендуемой полосы"));
         assertTrue(settings.contains("Красный сигнал ARGB"));
@@ -1042,18 +1048,19 @@ public final class NavigationHudV2ContractTest {
         assertTrue(windowSettings.contains("window.resizeHandleVisible"));
     }
 
-    @Test public void routeLabelsAndCursorFollowCanonicalRouteState() throws Exception {
+    @Test public void stockRoadLabelsAndCursorFollowCanonicalRouteState() throws Exception {
         Path navigator = navigatorModRoot();
         String publisher = read(navigator.resolve("NavigatorStatePublisher.java"));
         String renderer = read(navigator.resolve("HudMapRenderer.java"));
         String profile = read(navigator.resolve("NavigationMapProfile.java"));
-        String labels = read(navigator.resolve("RouteStreetLabelMapLayer.java"));
 
+        assertFalse(profile.contains("boolean routeStreetLabelsOnly"));
         assertTrue(profile.contains("routeStreetLabelsOnly"));
         assertTrue(profile.contains("roadColor"));
         assertTrue(profile.contains("MapKit styles require #RRGGBBAA"));
         assertTrue(profile.contains("\\\"elements\\\":\\\"label\\\""));
-        assertTrue(publisher.contains("readRouteStreetLabels("));
+        assertTrue(profile.contains("\\\"elements\\\":\\\"label.text\\\""));
+        assertTrue(profile.contains("routeLabelScalePercent / 100d"));
         assertTrue(publisher.contains("RoutePosition.getPoint()"));
         assertTrue(publisher.contains("invoke(routePosition, \"getPoint\")"));
         assertTrue(publisher.contains("ROUTE_MATCH_HOLD_MS = 2_500L"));
@@ -1063,26 +1070,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("polylinePosition = invoke(routePosition, \"positionOnRoute\""));
         assertTrue(publisher.contains("closestPositionOnRoute(route, currentPoint)"));
         assertTrue(publisher.contains("CLOSEST_TO_RAW_POINT"));
-        assertTrue(publisher.contains("currentStreetLabelPoint(frame)"));
         assertTrue(publisher.contains("geoDistanceMeters("));
         assertTrue(publisher.indexOf("positionOnRoute")
                 < publisher.indexOf("polylinePosition = invoke(route, \"getPosition\")"));
-        assertTrue(renderer.contains("routeStreetLabelMapLayer.update("));
-        assertTrue(renderer.contains(
-                "routeStreetLabelMapLayer.apply(profile.routeStreetLabelsOnly,"));
-        assertTrue(renderer.contains("profile.effectiveRouteLabelPriority()"));
-        assertTrue(labels.contains("FRESH_MS = 2_500L"));
-        assertTrue(labels.contains("painted directly over the active route"));
-        assertTrue(labels.contains("addPlacemark"));
-        assertTrue(labels.contains("setZIndex"));
-        assertTrue(labels.contains("NavigationMapProfile.layerZ(layerPriority)"));
-        assertTrue(labels.contains("MapObjectLayerFactory.MINOR"));
-        assertTrue(labels.contains("Bitmap.createBitmap"));
-        assertTrue(labels.contains("createLabelBitmap"));
-        assertTrue(labels.contains("\"ROTATE\""));
-        assertTrue(labels.contains("Boolean.TRUE"));
-        assertTrue(labels.contains("readableBearing(frame.bearingDegrees + 90f)"));
-        assertFalse(labels.contains("com.yandex.mapkit.map.TextStyle"));
+        assertTrue(renderer.contains("MapObjectLayerFactory.MINOR"));
+        assertFalse(renderer.contains("routeStreetLabelMapLayer"));
+        assertFalse(publisher.contains("readRouteStreetLabels"));
+        assertFalse(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
     }
 
     @Test public void routeProgressIsReversibleWithoutRecreatingGeometry() throws Exception {

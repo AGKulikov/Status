@@ -66,11 +66,9 @@ final class NavigationMapProfile {
     int destinationLayerPriority = 45;
     int trafficLightLayerPriority = 50;
     int routeTurnLayerPriority = 55;
-    int routeLabelLayerPriority = 60;
     int laneGuidanceLayerPriority = 80;
     int cursorLayerPriority = 90;
     boolean showCursor = true;
-    boolean routeStreetLabelsOnly;
     boolean roadsOnly;
     String cameraMode = "FOLLOW_ROUTE";
     boolean fixedZoomEnabled;
@@ -121,6 +119,13 @@ final class NavigationMapProfile {
             result.nightMode = source.optBoolean("nightMode", false);
             result.showPois = source.optBoolean("showPois", false);
             result.showLabels = source.optBoolean("showLabels", true);
+            // 2.5.7-2.6.4 stored a request for a hand-drawn route-only label layer. Native
+            // substrate labels cannot be filtered by active-route membership through public
+            // MapKit. Migrate that old opt-in to visible stock Yandex road labels so an update
+            // never makes the street names disappear.
+            if (source.optBoolean("routeStreetLabelsOnly", false)) {
+                result.showLabels = true;
+            }
             result.showBuildings = source.optBoolean("showBuildings", true);
             result.showParks = source.optBoolean("showParks", true);
             result.showWater = source.optBoolean("showWater", true);
@@ -168,14 +173,10 @@ final class NavigationMapProfile {
                     source.optInt("trafficLightLayerPriority", 50), 0, 100);
             result.routeTurnLayerPriority = clamp(
                     source.optInt("routeTurnLayerPriority", 55), 0, 100);
-            result.routeLabelLayerPriority = clamp(
-                    source.optInt("routeLabelLayerPriority", 60), 0, 100);
             result.laneGuidanceLayerPriority = clamp(
                     source.optInt("laneGuidanceLayerPriority", 80), 0, 100);
             result.cursorLayerPriority = clamp(
                     source.optInt("cursorLayerPriority", 90), 0, 100);
-            result.routeStreetLabelsOnly = source.optBoolean(
-                    "routeStreetLabelsOnly", false);
             result.showCursor = source.optBoolean("showCursor", true);
             result.roadsOnly = source.optBoolean("roadsOnly", false);
             result.cameraMode = enumText(source.optString(
@@ -272,10 +273,6 @@ final class NavigationMapProfile {
         return manualLayerPrioritiesEnabled ? routeTurnLayerPriority : 55;
     }
 
-    int effectiveRouteLabelPriority() {
-        return manualLayerPrioritiesEnabled ? routeLabelLayerPriority : 60;
-    }
-
     int effectiveLanePriority() {
         return manualLayerPrioritiesEnabled ? laneGuidanceLayerPriority : 80;
     }
@@ -311,14 +308,17 @@ final class NavigationMapProfile {
                     "{\"tags\":{\"any\":" + ROAD_TAGS_JSON + "},"
                             + "\"elements\":\"geometry\",\"stylers\":" + stylers + "}");
         }
-        if (roadsOnly || !showLabels) {
+        if (!showLabels) {
             needsComma = appendRule(rules, needsComma,
                     "{\"elements\":\"label\",\"stylers\":{\"visibility\":\"off\"}}");
-        } else if (routeStreetLabelsOnly) {
+        } else if (routeLabelScalePercent != 100) {
+            // Keep the exact Yandex font, outline, road curvature and collision rules. Only the
+            // supported substrate scale styler is changed; no text is rasterized by Natro.
             needsComma = appendRule(rules, needsComma,
                     "{\"tags\":{\"any\":" + ROAD_TAGS_JSON + "},"
-                            + "\"elements\":\"label\","
-                            + "\"stylers\":{\"visibility\":\"off\"}}");
+                            + "\"elements\":\"label.text\",\"stylers\":{\"scale\":"
+                            + String.format(Locale.ROOT, "%.2f",
+                            routeLabelScalePercent / 100d) + "}}");
         }
         if (!showBuildings) {
             needsComma = appendRule(rules, needsComma,

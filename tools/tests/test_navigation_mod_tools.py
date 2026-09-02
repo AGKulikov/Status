@@ -359,20 +359,20 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.6.4}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021297}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.6.5}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021298}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.6.4")', verifier)
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021297")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.6.5")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021298")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
         build = (TOOLS.parent / "build.gradle").read_text()
         workflow = (TOOLS.parent / ".github" / "workflows"
                     / "verify-navigation-hud-v2.yml").read_text()
-        self.assertIn("if (version == '2.6.4')", build)
-        self.assertIn("VERSION_NAME: '2.6.4'", workflow)
+        self.assertIn("if (version == '2.6.5')", build)
+        self.assertIn("VERSION_NAME: '2.6.5'", workflow)
         self.assertNotIn("2.5.10", build)
         self.assertNotIn("2.5.10", workflow)
 
@@ -395,9 +395,12 @@ public final class CameraSpeedNormalizerHarness {
                          / "MapObjectLayerFactory.java").read_text()
         turns = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                  / "ru" / "natro" / "navigation" / "RouteTurnMapLayer.java").read_text()
-        labels = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
-                  / "ru" / "natro" / "navigation"
-                  / "RouteStreetLabelMapLayer.java").read_text()
+        label_path = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                      / "ru" / "natro" / "navigation"
+                      / "RouteStreetLabelMapLayer.java")
+        profile = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                   / "ru" / "natro" / "navigation"
+                   / "NavigationMapProfile.java").read_text()
         entry = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                  / "ru" / "natro" / "navigation" / "NatroEntryPoint.java").read_text()
         controller = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
@@ -460,7 +463,12 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("Subpolyline", renderer)
         self.assertIn('invoke(line, "hide"', renderer)
         self.assertNotIn('invoke(line, "setGeometry"', renderer)
-        self.assertIn("bearingDegrees + 90f", labels)
+        self.assertFalse(label_path.exists())
+        self.assertNotIn("routeStreetLabelMapLayer", renderer)
+        self.assertNotIn("readRouteStreetLabels", publisher)
+        self.assertIn("MapObjectLayerFactory.MINOR", renderer)
+        self.assertIn(r'\"elements\":\"label.text\"', profile)
+        self.assertIn('source.optBoolean("routeStreetLabelsOnly", false)', profile)
         self.assertIn("positionOnRoute", publisher)
         self.assertIn("onMapTouch(Activity activity, MotionEvent event)", entry)
         self.assertIn("ensureControlLayerAttached", controller)

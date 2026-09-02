@@ -1,9 +1,10 @@
-name: Build Natro 2.6.4 and Navigator HUD v2 candidate
+name: Build Natro 2.6.5 and Navigator HUD v2 candidate
 
 on:
   push:
     branches:
       - 'feature/navigation-hud-v2'
+      - 'release/natro-2.6.5*'
       - 'release/natro-2.6.4*'
       - 'release/natro-2.6.2*'
       - 'release/natro-2.5.9*'
@@ -44,8 +45,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '2.6.4'
-      VERSION_CODE: '208021297'
+      VERSION_NAME: '2.6.5'
+      VERSION_CODE: '208021298'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
@@ -177,10 +178,10 @@ jobs:
     permissions:
       contents: read
     env:
-      VERSION_NAME: '2.6.4'
-      VERSION_CODE: '208021297'
-      EXPECTED_NATRO_VERSION_NAME: '2.6.4'
-      EXPECTED_NATRO_VERSION_CODE: '208021297'
+      VERSION_NAME: '2.6.5'
+      VERSION_CODE: '208021298'
+      EXPECTED_NATRO_VERSION_NAME: '2.6.5'
+      EXPECTED_NATRO_VERSION_CODE: '208021298'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
@@ -365,7 +366,7 @@ jobs:
       - name: Upload only the verified signed pair
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: navigation-hud-v2-signed-2.6.4-${{ github.run_number }}
+          name: navigation-hud-v2-signed-2.6.5-${{ github.run_number }}
           if-no-files-found: error
           retention-days: 14
           path: ${{ runner.temp }}/signed-pair/*

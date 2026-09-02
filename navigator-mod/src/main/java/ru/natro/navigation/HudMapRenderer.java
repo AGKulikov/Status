@@ -43,7 +43,6 @@ final class HudMapRenderer {
     private final TrafficLightMapLayer trafficLightMapLayer;
     private final CameraDirectionMapLayer cameraDirectionMapLayer;
     private final LaneGuidanceMapLayer laneGuidanceMapLayer;
-    private final RouteStreetLabelMapLayer routeStreetLabelMapLayer;
     private final RouteTurnMapLayer routeTurnMapLayer;
     private final String profileSection;
     private final String displayName;
@@ -105,7 +104,6 @@ final class HudMapRenderer {
         trafficLightMapLayer = new TrafficLightMapLayer(this.context);
         cameraDirectionMapLayer = new CameraDirectionMapLayer(this.context);
         laneGuidanceMapLayer = new LaneGuidanceMapLayer(this.context);
-        routeStreetLabelMapLayer = new RouteStreetLabelMapLayer(this.context);
         routeTurnMapLayer = new RouteTurnMapLayer(this.context);
     }
 
@@ -185,7 +183,6 @@ final class HudMapRenderer {
             trafficLightMapLayer.clearData();
             cameraDirectionMapLayer.clearData();
             laneGuidanceMapLayer.clearData();
-            routeStreetLabelMapLayer.clearData();
             routeTurnMapLayer.clearData();
             applyRoadEventVisibility();
             applyCamera(false);
@@ -206,8 +203,6 @@ final class HudMapRenderer {
                 frame.cameraDirectionsSampleElapsedMs, frame.cameraDirections);
         laneGuidanceMapLayer.update(frame.routeActive,
                 frame.laneGuidanceSampleElapsedMs, frame.laneGuidance);
-        routeStreetLabelMapLayer.update(frame.routeActive,
-                frame.routeStreetLabelsSampleElapsedMs, frame.routeStreetLabels);
         routeTurnMapLayer.update(frame.routeActive,
                 frame.routeTurnsSampleElapsedMs, frame.routeTurns);
         applyManualSublayerOrder();
@@ -329,7 +324,6 @@ final class HudMapRenderer {
             trafficLightMapLayer.attach(map);
             cameraDirectionMapLayer.attach(map);
             laneGuidanceMapLayer.attach(map);
-            routeStreetLabelMapLayer.attach(map);
             cursorStyler.attach(map);
 
             Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
@@ -389,11 +383,6 @@ final class HudMapRenderer {
                 profile.laneGuidanceScalePercent, night,
                 profile.focusXPercent <= 55,
                 profile.effectiveLanePriority());
-        // This explicit route-owned layer is the replacement for substrate road labels. Its
-        // switch must work even when the generic "Подписи" switch is off.
-        routeStreetLabelMapLayer.apply(profile.routeStreetLabelsOnly,
-                profile.routeLabelScalePercent,
-                profile.effectiveRouteLabelPriority());
         routeTurnMapLayer.apply(profile.showRouteTurns,
                 profile.routeTurnScalePercent,
                 profile.effectiveRouteTurnPriority());
@@ -645,7 +634,6 @@ final class HudMapRenderer {
             fingerprint = fingerprint * 131L + profile.effectiveDestinationPriority();
             fingerprint = fingerprint * 131L + profile.effectiveTrafficLightPriority();
             fingerprint = fingerprint * 131L + profile.effectiveRouteTurnPriority();
-            fingerprint = fingerprint * 131L + profile.effectiveRouteLabelPriority();
             fingerprint = fingerprint * 131L + profile.effectiveLanePriority();
             fingerprint = fingerprint * 131L + profile.effectiveCursorPriority();
             if (fingerprint == appliedLayerOrderFingerprint) return;
@@ -666,8 +654,6 @@ final class HudMapRenderer {
                     profile.effectiveTrafficLightPriority()));
             layers.add(new LayerOrder("ru.natro.navigation.route_turns",
                     profile.effectiveRouteTurnPriority()));
-            layers.add(new LayerOrder("ru.natro.navigation.route_street_labels",
-                    profile.effectiveRouteLabelPriority()));
             layers.add(new LayerOrder("ru.natro.navigation.lane_guidance",
                     profile.effectiveLanePriority()));
             layers.add(new LayerOrder("ru.natro.navigation.cursor",
@@ -697,7 +683,10 @@ final class HudMapRenderer {
             if (collection == null) {
                 collection = MapObjectLayerFactory.create(currentMap,
                         "ru.natro.navigation.route",
-                        MapObjectLayerFactory.IGNORE,
+                        // MINOR keeps the route from displacing stock substrate labels. MapKit
+                        // therefore owns the street-name font, outline, curvature and collision
+                        // behaviour instead of Natro painting text placemarks over the map.
+                        MapObjectLayerFactory.MINOR,
                         NavigationMapProfile.layerZ(profile.effectiveRoutePriority()));
                 routeCollection = collection;
             } else {
@@ -1043,7 +1032,6 @@ final class HudMapRenderer {
         trafficLightMapLayer.detachMap();
         cameraDirectionMapLayer.detachMap();
         laneGuidanceMapLayer.detachMap();
-        routeStreetLabelMapLayer.detachMap();
         routeTurnMapLayer.detachMap();
         routeCollection = null;
         destinationCollection = null;
