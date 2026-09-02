@@ -60,15 +60,19 @@ public final class DiagnosticsContractTest {
     }
 
     @Test
-    public void steeringKeysAndScreensAreObservedButNeverConsumed() throws IOException {
+    public void onlyExactMediaKeysMayUseTheLowLatencySessionRoute() throws IOException {
         String accessibility = source("WidgetAccessibilityService.java");
         String config = resource("xml/widget_accessibility_service.xml");
         String application = source("StatusWidgetApplication.java");
 
-        assertFalse(accessibility.contains("protected boolean onKeyEvent(KeyEvent event)"));
+        assertTrue(accessibility.contains(
+                "protected boolean onKeyEvent(@NonNull KeyEvent event)"));
+        assertTrue(accessibility.contains("SteeringMediaKeyRouter.isSupportedKey(keyCode)"));
+        assertTrue(accessibility.contains("return super.onKeyEvent(event)"));
+        assertTrue(accessibility.contains("consumedMediaKeys.put(keyCode, handled)"));
         assertFalse(accessibility.contains("FLAG_REQUEST_FILTER_KEY_EVENTS"));
-        assertFalse(config.contains("flagRequestFilterKeyEvents"));
-        assertFalse(config.contains("android:canRequestFilterKeyEvents"));
+        assertTrue(config.contains("flagRequestFilterKeyEvents"));
+        assertTrue(config.contains("android:canRequestFilterKeyEvents=\"true\""));
         assertTrue(application.contains("registerActivityLifecycleCallbacks"));
         assertTrue(application.contains("\"intent_action\""));
         assertTrue(application.contains("\"data_scheme\""));
