@@ -1207,6 +1207,7 @@ public final class NavigationHudV2ContractTest {
                 "app/src/main/java/dezz/status/widget/instrument/InstrumentPanelView.java"));
         String endpoint = read(root.resolve("app/src/main/java/dezz/status/widget/navigation/"
                 + "NavigationHudEndpointService.java"));
+        String renderer = read(navigatorModRoot().resolve("HudMapRenderer.java"));
 
         assertTrue(composite.contains("leasedSurface != null && leasedTexture == texture"));
         assertTrue(composite.contains("immutable creation dimensions"));
