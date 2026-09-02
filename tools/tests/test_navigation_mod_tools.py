@@ -451,6 +451,7 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("ArrowManeuverStyle", turns)
         self.assertIn("boolean.class", turns)
         self.assertIn('"setVisible"', turns)
+        self.assertIn("discardExpiredSource();", turns)
         self.assertIn("addArrow", turns)
         self.assertIn("PolylinePosition", turns)
         self.assertNotIn("Canvas", turns)

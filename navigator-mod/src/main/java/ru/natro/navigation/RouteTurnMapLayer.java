@@ -111,8 +111,13 @@ final class RouteTurnMapLayer {
             hiddenManeuverStyle = null;
             cachedStyleScalePercent = -1;
         }
-        if (enabled) scheduleExpiryIfNeeded();
-        else {
+        if (enabled) {
+            // The layer can be disabled longer than FRESH_MS. Do not let the last route sample
+            // become visible again if the setting is re-enabled after the expiry callback was
+            // intentionally cancelled while hidden.
+            discardExpiredSource();
+            scheduleExpiryIfNeeded();
+        } else {
             main.removeCallbacks(expire);
             expiryPosted = false;
         }
@@ -158,6 +163,15 @@ final class RouteTurnMapLayer {
         long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
         if (age < 0L || age > FRESH_MS) return;
         expiryPosted = main.postDelayed(expire, Math.max(1L, FRESH_MS - age));
+    }
+
+    private void discardExpiredSource() {
+        if (latestSampleElapsedMs <= 0L) return;
+        long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
+        if (age >= 0L && age <= FRESH_MS) return;
+        latestSampleElapsedMs = 0L;
+        latest = Collections.emptyList();
+        routeActive = false;
     }
 
     private void render() {

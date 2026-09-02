@@ -735,6 +735,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(routeTurns.contains("ArrowManeuverStyle"));
         assertTrue(routeTurns.contains("boolean.class"));
         assertTrue(routeTurns.contains("visible);"));
+        assertTrue(routeTurns.contains("discardExpiredSource();"));
         assertTrue(routeTurns.contains("addArrow"));
         assertTrue(routeTurns.contains("PolylinePosition"));
         assertFalse(routeTurns.contains("Canvas"));
