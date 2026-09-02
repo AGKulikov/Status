@@ -33,6 +33,12 @@
 
 - Статические Python-регрессии проверяют отсутствие bitmap-слоя, миграцию старого ключа и
   использование `label.text`/`MINOR`.
-- Android unit-тесты, сборка `classes19.dex` и полный boundary gate выполняются в CI.
+- Android unit-тесты, сборка `classes19.dex` и полный boundary gate прошли в CI run 208 для
+  commit `21956ddf1c5b98ad85c1cb901972a5746013e183` и дерева
+  `91b066ce75d4b1e7905c2b02c7852afa22569071`.
+- Стабильным сертификатом Natro подписаны APK 2.6.5: Natro
+  `08c61c220a7e114d8e2992c9e4632570aef1b1c4df74ceb012a65247003a787f` и Navigator
+  `e6bb944a18d9f4d6659e61e3be50a863537f1a7c57b4cb4860070c5b6c67dcb5`; статическая
+  совместимость ECARX KX11, baseline boundary, v2/v3 и zipalign пройдены.
 - Итог нельзя считать визуально подтверждённым до `GATE-012` на KX11: маршрут/без маршрута,
   HUD/приборная панель и прозрачный режим «Только дороги».
