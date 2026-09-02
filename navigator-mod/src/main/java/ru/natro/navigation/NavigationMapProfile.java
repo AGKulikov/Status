@@ -55,7 +55,11 @@ final class NavigationMapProfile {
     int cameraDirectionScalePercent = 100;
     int cameraDirectionOpacityPercent = 30;
     int trafficLightScalePercent = 100;
-    int routeTurnScalePercent = 100;
+    int routeTurnLengthPercent = 100;
+    /** Null keeps the corresponding colour from MapKit's stock maneuver style. */
+    String routeTurnFillColor;
+    String routeTurnOutlineColor;
+    double routeTurnOutlineWidth = 2d;
     int routeLabelScalePercent = 100;
     int roadEventScalePercent = 100;
     int destinationScalePercent = 100;
@@ -151,8 +155,13 @@ final class NavigationMapProfile {
                     source.optInt("cameraDirectionOpacityPercent", 30), 0, 100);
             result.trafficLightScalePercent = clamp(
                     source.optInt("trafficLightScalePercent", 100), 50, 250);
-            result.routeTurnScalePercent = clamp(
-                    source.optInt("routeTurnScalePercent", 100), 50, 250);
+            result.routeTurnLengthPercent = clamp(source.optInt(
+                    "routeTurnLengthPercent",
+                    source.optInt("routeTurnScalePercent", 100)), 50, 250);
+            result.routeTurnFillColor = optionalColor(source, "routeTurnFillColor");
+            result.routeTurnOutlineColor = optionalColor(source, "routeTurnOutlineColor");
+            result.routeTurnOutlineWidth = clamp(source.optDouble(
+                    "routeTurnOutlineWidth", 2d), 0d, 20d, 2d);
             result.routeLabelScalePercent = clamp(
                     source.optInt("routeLabelScalePercent", 100), 50, 250);
             result.roadEventScalePercent = clamp(
@@ -382,6 +391,18 @@ final class NavigationMapProfile {
             return value;
         } catch (IllegalArgumentException invalid) {
             return fallback;
+        }
+    }
+
+    private static String optionalColor(JSONObject source, String key) {
+        if (!source.has(key) || source.isNull(key)) return null;
+        String value = source.optString(key, "").trim().toUpperCase(Locale.ROOT);
+        if (value.matches("#[0-9A-F]{6}")) value = "#FF" + value.substring(1);
+        try {
+            Color.parseColor(value);
+            return value;
+        } catch (IllegalArgumentException invalid) {
+            return null;
         }
     }
 

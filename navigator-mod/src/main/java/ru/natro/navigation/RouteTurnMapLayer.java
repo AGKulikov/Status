@@ -2,6 +2,7 @@
 package ru.natro.navigation;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -10,6 +11,7 @@ import android.util.Log;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /** Stock MapKit manoeuvre arrows attached to the exact active-route geometry. */
 final class RouteTurnMapLayer {
@@ -23,11 +25,13 @@ final class RouteTurnMapLayer {
     private Object defaultArrowStyle;
     private Object visibleManeuverStyle;
     private Object hiddenManeuverStyle;
-    private int cachedStyleScalePercent = -1;
     private boolean nativeManeuversAdded;
     private boolean fallbackArrowsAdded;
     private boolean enabled;
-    private int scalePercent = 100;
+    private int lengthPercent = 100;
+    private String fillColor;
+    private String outlineColor;
+    private float outlineWidth = 2f;
     private boolean routeActive;
     private List<NavigatorStatePublisher.RouteTurnFrame> latest = Collections.emptyList();
     private long latestSampleElapsedMs;
@@ -101,15 +105,26 @@ final class RouteTurnMapLayer {
         latestSampleElapsedMs = 0L;
     }
 
-    void apply(boolean nextEnabled, int nextScalePercent, int ignoredLayerPriority) {
-        int nextScale = Math.max(50, Math.min(250, nextScalePercent));
-        boolean changed = enabled != nextEnabled || scalePercent != nextScale;
+    void apply(boolean nextEnabled, int nextLengthPercent,
+               String nextFillColor, String nextOutlineColor,
+               double nextOutlineWidth, int ignoredLayerPriority) {
+        int nextLength = Math.max(50, Math.min(250, nextLengthPercent));
+        float safeOutlineWidth = (float) Math.max(0d, Math.min(20d,
+                Double.isNaN(nextOutlineWidth) || Double.isInfinite(nextOutlineWidth)
+                        ? 2d : nextOutlineWidth));
+        boolean styleChanged = lengthPercent != nextLength
+                || !Objects.equals(fillColor, nextFillColor)
+                || !Objects.equals(outlineColor, nextOutlineColor)
+                || Float.compare(outlineWidth, safeOutlineWidth) != 0;
+        boolean changed = enabled != nextEnabled || styleChanged;
         enabled = nextEnabled;
-        if (scalePercent != nextScale) {
-            scalePercent = nextScale;
+        if (styleChanged) {
+            lengthPercent = nextLength;
+            fillColor = nextFillColor;
+            outlineColor = nextOutlineColor;
+            outlineWidth = safeOutlineWidth;
             visibleManeuverStyle = null;
             hiddenManeuverStyle = null;
-            cachedStyleScalePercent = -1;
         }
         if (enabled) {
             // The layer can be disabled longer than FRESH_MS. Do not let the last route sample
@@ -203,8 +218,9 @@ final class RouteTurnMapLayer {
         Object arrowStyle = defaultArrowStyle();
         Class<?> positionClass = Class.forName(
                 "com.yandex.mapkit.geometry.PolylinePosition");
-        float length = number(arrowStyle, "getLength", 80f) * scalePercent / 100f;
-        int fillColor = integer(arrowStyle, "getFillColor", 0xFF000000);
+        float length = number(arrowStyle, "getLength", 80f) * lengthPercent / 100f;
+        int fallbackFillColor = configuredColor(
+                fillColor, integer(arrowStyle, "getFillColor", 0xFF000000));
         int count = 0;
         for (NavigatorStatePublisher.RouteTurnFrame frame : frames) {
             if (count >= MAX_FALLBACK_TURNS) break;
@@ -214,7 +230,7 @@ final class RouteTurnMapLayer {
                         .newInstance(frame.routeSegmentIndex, frame.routeSegmentPosition);
                 invoke(line, "addArrow",
                         new Class<?>[]{positionClass, float.class, int.class},
-                        position, length, fillColor);
+                        position, length, fallbackFillColor);
                 count++;
             } catch (Throwable invalidPosition) {
                 Log.w(TAG, "One fallback manoeuvre position was rejected", invalidPosition);
@@ -222,30 +238,34 @@ final class RouteTurnMapLayer {
         }
     }
 
-    /** Clones MapKit's stock dimensions and colours but explicitly enables the style. */
+    /**
+     * Clones MapKit's stock geometry and explicitly enables it. Length changes the complete
+     * arrow and its tip proportionally. There is deliberately no arrow-width multiplier:
+     * PolylineMapObject keeps the arrow body tied to the route's current stroke width.
+     */
     private Object maneuverStyle(boolean visible) throws Exception {
-        if (cachedStyleScalePercent == scalePercent
-                && (visible ? visibleManeuverStyle : hiddenManeuverStyle) != null) {
+        if ((visible ? visibleManeuverStyle : hiddenManeuverStyle) != null) {
             return visible ? visibleManeuverStyle : hiddenManeuverStyle;
         }
         Object source = defaultArrowStyle();
-        float scale = scalePercent / 100f;
+        float lengthScale = lengthPercent / 100f;
         Class<?> arrowStyleClass = Class.forName(
                 "com.yandex.mapkit.directions.driving.ArrowManeuverStyle");
         Object arrowStyle = arrowStyleClass.getConstructor(
                         int.class, int.class, float.class, float.class, float.class,
                         boolean.class)
                 .newInstance(
-                        integer(source, "getFillColor", 0xFF000000),
-                        integer(source, "getOutlineColor", 0xFFFFFFFF),
-                        number(source, "getOutlineWidth", 2f) * scale,
-                        number(source, "getLength", 80f) * scale,
-                        number(source, "getTriangleHeight", 16f) * scale,
+                        configuredColor(fillColor,
+                                integer(source, "getFillColor", 0xFF000000)),
+                        configuredColor(outlineColor,
+                                integer(source, "getOutlineColor", 0xFFFFFFFF)),
+                        outlineWidth,
+                        number(source, "getLength", 80f) * lengthScale,
+                        number(source, "getTriangleHeight", 16f) * lengthScale,
                         visible);
         Class<?> styleClass = Class.forName(
                 "com.yandex.mapkit.directions.driving.ManeuverStyle");
         Object result = styleClass.getConstructor(arrowStyleClass).newInstance(arrowStyle);
-        cachedStyleScalePercent = scalePercent;
         if (visible) visibleManeuverStyle = result;
         else hiddenManeuverStyle = result;
         return result;
@@ -304,6 +324,15 @@ final class RouteTurnMapLayer {
             Object value = invoke(target, getter, new Class<?>[0]);
             return value instanceof Number ? ((Number) value).intValue() : fallback;
         } catch (Throwable ignored) {
+            return fallback;
+        }
+    }
+
+    private static int configuredColor(String configured, int fallback) {
+        if (configured == null || configured.isEmpty()) return fallback;
+        try {
+            return Color.parseColor(configured);
+        } catch (IllegalArgumentException invalid) {
             return fallback;
         }
     }

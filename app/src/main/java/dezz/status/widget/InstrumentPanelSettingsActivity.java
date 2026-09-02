@@ -647,9 +647,21 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightScale = slider(content,
                 "Размер светофоров и плашек секунд",
                 map.trafficLightScalePercent, 50, 250, 5, " %");
-        SliderField routeTurnScale = slider(content,
-                "Размер стрелок поворотов на маршруте",
-                map.routeTurnScalePercent, 50, 250, 5, " %");
+        SliderField routeTurnLength = slider(content,
+                "Длина стрелок поворотов на маршруте",
+                map.routeTurnLengthPercent, 50, 250, 5, " %");
+        InheritedColorField routeTurnFillColor = inheritableNavigationColorField(
+                content, "Цвет стрелок поворотов", map.routeTurnFillColor,
+                finalNavigation, preferences, value -> map.routeTurnFillColor = value);
+        InheritedColorField routeTurnOutlineColor = inheritableNavigationColorField(
+                content, "Цвет обводки стрелок", map.routeTurnOutlineColor,
+                finalNavigation, preferences, value -> map.routeTurnOutlineColor = value);
+        SliderField routeTurnOutlineWidth = slider(content,
+                "Толщина обводки стрелок",
+                map.routeTurnOutlineWidth, 0, 20, 0.5, " px");
+        content.addView(text("Ширина стрелки всегда равна толщине линии маршрута. Длина меняет "
+                + "стрелку и наконечник пропорционально, но не меняет её ширину.",
+                12, 0xFFB8C0CC));
         SliderField routeLabelScale = slider(content,
                 "Размер штатных названий улиц",
                 map.routeLabelScalePercent, 50, 250, 5, " %");
@@ -787,7 +799,10 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cameraDirectionScalePercent = cameraDirectionScale.intValue();
                     map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue();
                     map.trafficLightScalePercent = trafficLightScale.intValue();
-                    map.routeTurnScalePercent = routeTurnScale.intValue();
+                    map.routeTurnLengthPercent = routeTurnLength.intValue();
+                    map.routeTurnFillColor = routeTurnFillColor.value;
+                    map.routeTurnOutlineColor = routeTurnOutlineColor.value;
+                    map.routeTurnOutlineWidth = routeTurnOutlineWidth.value();
                     map.routeLabelScalePercent = routeLabelScale.intValue();
                     map.roadEventScalePercent = roadEventScale.intValue();
                     map.destinationScalePercent = destinationScale.intValue();
@@ -1262,6 +1277,43 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         });
     }
 
+    @NonNull private InheritedColorField inheritableNavigationColorField(
+            @NonNull LinearLayout parent,
+            @NonNull String title,
+            @Nullable String initial,
+            @NonNull NavigationIntegrationConfig navigation,
+            @NonNull Preferences preferences,
+            @NonNull InheritedColorSelectionListener setter) {
+        InheritedColorField field = new InheritedColorField(initial);
+        MaterialButton button = new MaterialButton(this);
+        AppleColorPickerDialog.decorateButton(
+                button, title, initial, "Штатный цвет Яндекса");
+        button.setOnClickListener(view -> AppleColorPickerDialog.show(
+                this, title, field.value,
+                AppleColorPickerDialog.Options.opaqueInheritable(),
+                new AppleColorPickerDialog.Listener() {
+                    private void apply(@Nullable String selected) {
+                        field.value = selected;
+                        AppleColorPickerDialog.decorateButton(
+                                button, title, selected, "Штатный цвет Яндекса");
+                    }
+
+                    @Override public void onPreview(@Nullable String selected) {
+                        apply(selected);
+                    }
+
+                    @Override public void onSelected(@Nullable String selected) {
+                        apply(selected);
+                        setter.onSelected(selected);
+                        persistNavigationConfiguration(navigation, preferences);
+                    }
+                }));
+        LinearLayout.LayoutParams params = marginTop(5);
+        params.height = dp(52);
+        parent.addView(button, params);
+        return field;
+    }
+
     private boolean persistNavigationConfiguration(
             @NonNull NavigationIntegrationConfig navigation,
             @NonNull Preferences preferences) {
@@ -1326,8 +1378,18 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         ColorField(@NonNull String value) { this.value = value; }
     }
 
+    private static final class InheritedColorField {
+        @Nullable String value;
+
+        InheritedColorField(@Nullable String value) { this.value = value; }
+    }
+
     private interface ColorSelectionListener {
         void onSelected(@NonNull String selected);
+    }
+
+    private interface InheritedColorSelectionListener {
+        void onSelected(@Nullable String selected);
     }
 
     @NonNull private Button button(@NonNull String title) {

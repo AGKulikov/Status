@@ -2,6 +2,7 @@
 package dezz.status.widget.navigation;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -202,8 +203,14 @@ public final class NavigationIntegrationConfig {
         public int cameraDirectionOpacityPercent = 30;
         /** Scale of Yandex's original signal-and-seconds traffic-light balloon. */
         public int trafficLightScalePercent = 100;
-        /** Scale of arrows painted directly onto upcoming route turns. */
-        public int routeTurnScalePercent = 100;
+        /** Length of arrows painted directly onto upcoming route turns. */
+        public int routeTurnLengthPercent = 100;
+        /** Null preserves the fill colour returned by MapKit's stock maneuver style. */
+        @Nullable public String routeTurnFillColor;
+        /** Null preserves the outline colour returned by MapKit's stock maneuver style. */
+        @Nullable public String routeTurnOutlineColor;
+        /** Outline width is independent from arrow length and route stroke width. */
+        public double routeTurnOutlineWidth = 2d;
         /** Scale of stock Yandex road-label text; 100 preserves the original MapKit size. */
         public int routeLabelScalePercent = 100;
         /** Scale of stock Yandex road-event icons and their captions, excluding cameras. */
@@ -310,7 +317,15 @@ public final class NavigationIntegrationConfig {
                     .put("cameraDirectionScalePercent", cameraDirectionScalePercent)
                     .put("cameraDirectionOpacityPercent", cameraDirectionOpacityPercent)
                     .put("trafficLightScalePercent", trafficLightScalePercent)
-                    .put("routeTurnScalePercent", routeTurnScalePercent)
+                    .put("routeTurnLengthPercent", routeTurnLengthPercent)
+                    // Keep the legacy key during the transition so an older paired Navigator
+                    // still treats the configured value as its closest available equivalent.
+                    .put("routeTurnScalePercent", routeTurnLengthPercent)
+                    .put("routeTurnFillColor", routeTurnFillColor == null
+                            ? JSONObject.NULL : routeTurnFillColor)
+                    .put("routeTurnOutlineColor", routeTurnOutlineColor == null
+                            ? JSONObject.NULL : routeTurnOutlineColor)
+                    .put("routeTurnOutlineWidth", routeTurnOutlineWidth)
                     .put("routeLabelScalePercent", routeLabelScalePercent)
                     .put("roadEventScalePercent", roadEventScalePercent)
                     .put("destinationScalePercent", destinationScalePercent)
@@ -397,8 +412,15 @@ public final class NavigationIntegrationConfig {
                     "cameraDirectionOpacityPercent", result.cameraDirectionOpacityPercent);
             result.trafficLightScalePercent = source.optInt(
                     "trafficLightScalePercent", result.trafficLightScalePercent);
-            result.routeTurnScalePercent = source.optInt(
-                    "routeTurnScalePercent", result.routeTurnScalePercent);
+            result.routeTurnLengthPercent = source.optInt(
+                    "routeTurnLengthPercent", source.optInt(
+                            "routeTurnScalePercent", result.routeTurnLengthPercent));
+            result.routeTurnFillColor = optionalColor(
+                    source, "routeTurnFillColor", result.routeTurnFillColor);
+            result.routeTurnOutlineColor = optionalColor(
+                    source, "routeTurnOutlineColor", result.routeTurnOutlineColor);
+            result.routeTurnOutlineWidth = source.optDouble(
+                    "routeTurnOutlineWidth", result.routeTurnOutlineWidth);
             result.routeLabelScalePercent = source.optInt(
                     "routeLabelScalePercent", result.routeLabelScalePercent);
             result.roadEventScalePercent = source.optInt(
@@ -495,7 +517,10 @@ public final class NavigationIntegrationConfig {
             cameraDirectionScalePercent = clamp(cameraDirectionScalePercent, 25, 300);
             cameraDirectionOpacityPercent = clamp(cameraDirectionOpacityPercent, 0, 100);
             trafficLightScalePercent = clamp(trafficLightScalePercent, 50, 250);
-            routeTurnScalePercent = clamp(routeTurnScalePercent, 50, 250);
+            routeTurnLengthPercent = clamp(routeTurnLengthPercent, 50, 250);
+            routeTurnFillColor = optionalColor(routeTurnFillColor);
+            routeTurnOutlineColor = optionalColor(routeTurnOutlineColor);
+            routeTurnOutlineWidth = clamp(routeTurnOutlineWidth, 0d, 20d, 2d);
             routeLabelScalePercent = clamp(routeLabelScalePercent, 50, 250);
             roadEventScalePercent = clamp(roadEventScalePercent, 50, 250);
             destinationScalePercent = clamp(destinationScalePercent, 50, 250);
@@ -721,6 +746,22 @@ public final class NavigationIntegrationConfig {
         // #RRGGBB output and canonicalise it so every persisted/wire colour remains #AARRGGBB.
         if (value.matches("#[0-9A-F]{6}")) return "#FF" + value.substring(1);
         return value.matches("#[0-9A-F]{8}") ? value : fallback;
+    }
+
+    @Nullable
+    private static String optionalColor(JSONObject source, String key,
+                                        @Nullable String fallback) {
+        if (!source.has(key) || source.isNull(key)) return fallback;
+        String normalized = optionalColor(source.optString(key, ""));
+        return normalized == null ? fallback : normalized;
+    }
+
+    @Nullable
+    private static String optionalColor(@Nullable String raw) {
+        if (raw == null) return null;
+        String value = raw.trim().toUpperCase(Locale.ROOT);
+        if (value.matches("#[0-9A-F]{6}")) return "#FF" + value.substring(1);
+        return value.matches("#[0-9A-F]{8}") ? value : null;
     }
 
     @NonNull

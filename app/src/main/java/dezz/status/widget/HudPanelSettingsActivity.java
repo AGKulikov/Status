@@ -577,9 +577,21 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightScale = slider(form,
                 "Размер светофоров и плашек секунд",
                 profile.trafficLightScalePercent, 50, 250, 5, " %");
-        SliderField routeTurnScale = slider(form,
-                "Размер стрелок поворотов на маршруте",
-                profile.routeTurnScalePercent, 50, 250, 5, " %");
+        SliderField routeTurnLength = slider(form,
+                "Длина стрелок поворотов на маршруте",
+                profile.routeTurnLengthPercent, 50, 250, 5, " %");
+        InheritedColorField routeTurnFillColor = inheritableNavigationColorField(
+                form, "Цвет стрелок поворотов", profile.routeTurnFillColor,
+                navigation, value -> profile.routeTurnFillColor = value);
+        InheritedColorField routeTurnOutlineColor = inheritableNavigationColorField(
+                form, "Цвет обводки стрелок", profile.routeTurnOutlineColor,
+                navigation, value -> profile.routeTurnOutlineColor = value);
+        SliderField routeTurnOutlineWidth = slider(form,
+                "Толщина обводки стрелок",
+                profile.routeTurnOutlineWidth, 0, 20, 0.5, " px");
+        form.addView(text("Ширина стрелки всегда равна толщине линии маршрута. Длина меняет "
+                + "стрелку и наконечник пропорционально, но не меняет её ширину.",
+                12, 0xFF95A0AF), marginTop(4));
         SliderField routeLabelScale = slider(form,
                 "Размер штатных названий улиц",
                 profile.routeLabelScalePercent, 50, 250, 5, " %");
@@ -733,7 +745,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.cameraDirectionOpacityPercent =
                                 cameraDirectionOpacity.intValue();
                         profile.trafficLightScalePercent = trafficLightScale.intValue();
-                        profile.routeTurnScalePercent = routeTurnScale.intValue();
+                        profile.routeTurnLengthPercent = routeTurnLength.intValue();
+                        profile.routeTurnFillColor = routeTurnFillColor.value;
+                        profile.routeTurnOutlineColor = routeTurnOutlineColor.value;
+                        profile.routeTurnOutlineWidth = routeTurnOutlineWidth.value();
                         profile.routeLabelScalePercent = routeLabelScale.intValue();
                         profile.roadEventScalePercent = roadEventScale.intValue();
                         profile.destinationScalePercent = destinationScale.intValue();
@@ -2245,6 +2260,43 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         });
     }
 
+    private InheritedColorField inheritableNavigationColorField(
+            @NonNull LinearLayout parent,
+            @NonNull String title,
+            @Nullable String initial,
+            @NonNull NavigationIntegrationConfig navigation,
+            @NonNull InheritedColorSelectionListener setter) {
+        InheritedColorField field = new InheritedColorField(initial);
+        MaterialButton button = new MaterialButton(this);
+        AppleColorPickerDialog.decorateButton(
+                button, title, initial, "Штатный цвет Яндекса");
+        button.setOnClickListener(view -> AppleColorPickerDialog.show(
+                this, title, field.value,
+                AppleColorPickerDialog.Options.opaqueInheritable(),
+                new AppleColorPickerDialog.Listener() {
+                    private void apply(@Nullable String selected) {
+                        field.value = selected;
+                        AppleColorPickerDialog.decorateButton(
+                                button, title, selected, "Штатный цвет Яндекса");
+                    }
+
+                    @Override public void onPreview(@Nullable String selected) {
+                        apply(selected);
+                    }
+
+                    @Override public void onSelected(@Nullable String selected) {
+                        apply(selected);
+                        setter.onSelected(selected);
+                        persistNavigationConfiguration(navigation);
+                    }
+                }));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
+        params.topMargin = dp(6);
+        parent.addView(button, params);
+        return field;
+    }
+
     private boolean persistNavigationConfiguration(
             @NonNull NavigationIntegrationConfig navigation) {
         try {
@@ -2315,8 +2367,20 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         }
     }
 
+    private static final class InheritedColorField {
+        @Nullable String value;
+
+        InheritedColorField(@Nullable String value) {
+            this.value = value;
+        }
+    }
+
     private interface ColorSelectionListener {
         void onSelected(@NonNull String selected);
+    }
+
+    private interface InheritedColorSelectionListener {
+        void onSelected(@Nullable String selected);
     }
 
     private LinearLayout.LayoutParams fixed(int widthDp) {

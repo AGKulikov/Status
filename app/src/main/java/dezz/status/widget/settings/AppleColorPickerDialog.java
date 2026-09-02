@@ -97,6 +97,12 @@ public final class AppleColorPickerDialog {
             return new Options(false, false, false, false, "Не менять");
         }
 
+        /** Opaque colour plus an explicit return to the source component's own colour. */
+        @NonNull
+        public static Options opaqueInheritable() {
+            return new Options(false, false, true, false, "Штатный цвет Яндекса");
+        }
+
         @NonNull
         public static Options noTint() {
             return new Options(true, true, false, true, "Не менять");
@@ -136,6 +142,14 @@ public final class AppleColorPickerDialog {
         button.setIconTint(null);
         button.setIconSize(dp(button.getContext(), 28));
         button.setIconPadding(dp(button.getContext(), 12));
+    }
+
+    /** Same visual sample with a context-specific label for an inherited/null colour. */
+    public static void decorateButton(@NonNull MaterialButton button, @NonNull String title,
+                                      @Nullable String value,
+                                      @NonNull String inheritDisplayLabel) {
+        decorateButton(button, title, value);
+        if (value == null) button.setText(title + "\n" + inheritDisplayLabel);
     }
 
     private static final class Controller {

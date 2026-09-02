@@ -384,7 +384,10 @@ final class HudMapRenderer {
                 profile.focusXPercent <= 55,
                 profile.effectiveLanePriority());
         routeTurnMapLayer.apply(profile.showRouteTurns,
-                profile.routeTurnScalePercent,
+                profile.routeTurnLengthPercent,
+                profile.routeTurnFillColor,
+                profile.routeTurnOutlineColor,
+                profile.routeTurnOutlineWidth,
                 profile.effectiveRouteTurnPriority());
         try {
             applyMaximumFps();

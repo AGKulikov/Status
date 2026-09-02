@@ -4,6 +4,7 @@ package dezz.status.widget.navigation;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -36,7 +37,10 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.cameraDirectionScalePercent = 180;
         config.hudMap.cameraDirectionOpacityPercent = 45;
         config.hudMap.trafficLightScalePercent = 95;
-        config.hudMap.routeTurnScalePercent = 115;
+        config.hudMap.routeTurnLengthPercent = 115;
+        config.hudMap.routeTurnFillColor = "#123456";
+        config.hudMap.routeTurnOutlineColor = "#FFABCDEF";
+        config.hudMap.routeTurnOutlineWidth = 3.5d;
         config.hudMap.routeLabelScalePercent = 125;
         config.hudMap.roadEventScalePercent = 80;
         config.hudMap.destinationScalePercent = 165;
@@ -82,6 +86,10 @@ public final class NavigationHudV2ContractTest {
         config.clusterMap.trafficUnknownColor = "#FFB1B2B3";
         config.clusterMap.roadColor = "#FF223344";
         config.clusterMap.laneGuidanceScalePercent = 85;
+        config.clusterMap.routeTurnLengthPercent = 175;
+        config.clusterMap.routeTurnFillColor = "#FF654321";
+        config.clusterMap.routeTurnOutlineColor = "#FF102030";
+        config.clusterMap.routeTurnOutlineWidth = 6d;
         config.clusterMap.routeWidthPercent = 75;
         config.clusterMap.roadWidthPercent = 125;
         config.clusterMap.setRoadEventMode("RECONSTRUCTION",
@@ -118,7 +126,10 @@ public final class NavigationHudV2ContractTest {
         assertEquals(180, restored.hudMap.cameraDirectionScalePercent);
         assertEquals(45, restored.hudMap.cameraDirectionOpacityPercent);
         assertEquals(95, restored.hudMap.trafficLightScalePercent);
-        assertEquals(115, restored.hudMap.routeTurnScalePercent);
+        assertEquals(115, restored.hudMap.routeTurnLengthPercent);
+        assertEquals("#FF123456", restored.hudMap.routeTurnFillColor);
+        assertEquals("#FFABCDEF", restored.hudMap.routeTurnOutlineColor);
+        assertEquals(3.5d, restored.hudMap.routeTurnOutlineWidth, 0d);
         assertEquals(125, restored.hudMap.routeLabelScalePercent);
         assertEquals(80, restored.hudMap.roadEventScalePercent);
         assertEquals(165, restored.hudMap.destinationScalePercent);
@@ -164,6 +175,10 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FFB1B2B3", restored.clusterMap.trafficUnknownColor);
         assertEquals("#FF223344", restored.clusterMap.roadColor);
         assertEquals(85, restored.clusterMap.laneGuidanceScalePercent);
+        assertEquals(175, restored.clusterMap.routeTurnLengthPercent);
+        assertEquals("#FF654321", restored.clusterMap.routeTurnFillColor);
+        assertEquals("#FF102030", restored.clusterMap.routeTurnOutlineColor);
+        assertEquals(6d, restored.clusterMap.routeTurnOutlineWidth, 0d);
         assertEquals(75, restored.clusterMap.routeWidthPercent);
         assertEquals(125, restored.clusterMap.roadWidthPercent);
         assertEquals(NavigationIntegrationConfig.RoadEventMode.ALWAYS,
@@ -184,6 +199,17 @@ public final class NavigationHudV2ContractTest {
 
         assertTrue(restored.hudMap.showLabels);
         assertTrue(restored.clusterMap.showLabels);
+    }
+
+    @Test public void legacyRouteTurnScaleMigratesToLengthWithoutForcingColors() {
+        NavigationIntegrationConfig restored = NavigationIntegrationConfig.fromJson(
+                "{\"hudMap\":{\"routeTurnScalePercent\":135},"
+                        + "\"clusterMap\":{\"routeTurnScalePercent\":85}}");
+
+        assertEquals(135, restored.hudMap.routeTurnLengthPercent);
+        assertEquals(85, restored.clusterMap.routeTurnLengthPercent);
+        assertNull(restored.hudMap.routeTurnFillColor);
+        assertNull(restored.hudMap.routeTurnOutlineColor);
     }
 
     @Test public void opaquePickerColorsAreCanonicalizedBeforePersistence() throws Exception {
@@ -284,7 +310,10 @@ public final class NavigationHudV2ContractTest {
                 "map.cameraDirectionScalePercent = cameraDirectionScale.intValue()",
                 "map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue()",
                 "map.trafficLightScalePercent = trafficLightScale.intValue()",
-                "map.routeTurnScalePercent = routeTurnScale.intValue()",
+                "map.routeTurnLengthPercent = routeTurnLength.intValue()",
+                "map.routeTurnFillColor = routeTurnFillColor.value",
+                "map.routeTurnOutlineColor = routeTurnOutlineColor.value",
+                "map.routeTurnOutlineWidth = routeTurnOutlineWidth.value()",
                 "map.routeLabelScalePercent = routeLabelScale.intValue()",
                 "map.roadEventScalePercent = roadEventScale.intValue()",
                 "map.destinationScalePercent = destinationScale.intValue()",
@@ -337,7 +366,10 @@ public final class NavigationHudV2ContractTest {
         config.hudMap.cameraDirectionLayerPriority = -1;
         config.hudMap.cameraDirectionScalePercent = 999;
         config.hudMap.cameraDirectionOpacityPercent = -1;
-        config.hudMap.routeTurnScalePercent = 0;
+        config.hudMap.routeTurnLengthPercent = 0;
+        config.hudMap.routeTurnFillColor = "not-a-color";
+        config.hudMap.routeTurnOutlineColor = "#123456";
+        config.hudMap.routeTurnOutlineWidth = Double.POSITIVE_INFINITY;
         config.hudMap.laneGuidanceLayerPriority = 101;
 
         config.normalize();
@@ -353,7 +385,10 @@ public final class NavigationHudV2ContractTest {
         assertEquals(0, config.hudMap.cameraDirectionLayerPriority);
         assertEquals(300, config.hudMap.cameraDirectionScalePercent);
         assertEquals(0, config.hudMap.cameraDirectionOpacityPercent);
-        assertEquals(50, config.hudMap.routeTurnScalePercent);
+        assertEquals(50, config.hudMap.routeTurnLengthPercent);
+        assertNull(config.hudMap.routeTurnFillColor);
+        assertEquals("#FF123456", config.hudMap.routeTurnOutlineColor);
+        assertEquals(2d, config.hudMap.routeTurnOutlineWidth, 0d);
         assertEquals(100, config.hudMap.laneGuidanceLayerPriority);
     }
 
@@ -398,6 +433,12 @@ public final class NavigationHudV2ContractTest {
             assertTrue(settings.contains("Ручной порядок слоёв"));
             assertTrue(settings.contains("Яндекс автоматически разводит"));
             assertTrue(settings.contains("field.setEnabled(manualLayerPriorities.isChecked())"));
+            assertTrue(settings.contains("Длина стрелок поворотов на маршруте"));
+            assertTrue(settings.contains("Цвет стрелок поворотов"));
+            assertTrue(settings.contains("Цвет обводки стрелок"));
+            assertTrue(settings.contains("Толщина обводки стрелок"));
+            assertTrue(settings.contains("Ширина стрелки всегда равна толщине линии маршрута"));
+            assertTrue(settings.contains("Options.opaqueInheritable()"));
         }
     }
 
@@ -672,6 +713,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(renderer.contains("profile.effectiveTrafficLightPriority()"));
         assertTrue(renderer.contains("routeTurnMapLayer.update(frame.routeActive"));
         assertTrue(renderer.contains("routeTurnMapLayer.apply(profile.showRouteTurns"));
+        assertTrue(renderer.contains("profile.routeTurnLengthPercent"));
+        assertTrue(renderer.contains("profile.routeTurnFillColor"));
+        assertTrue(renderer.contains("profile.routeTurnOutlineColor"));
+        assertTrue(renderer.contains("profile.routeTurnOutlineWidth"));
         assertTrue(renderer.contains("profile.effectiveRouteTurnPriority()"));
         assertTrue(renderer.contains("cameraDirectionMapLayer.update(frame.routeActive"));
         assertTrue(renderer.contains("profile.effectiveCameraPriority()"));
@@ -739,6 +784,15 @@ public final class NavigationHudV2ContractTest {
         assertTrue(routeTurns.contains("discardExpiredSource();"));
         assertTrue(routeTurns.contains("addArrow"));
         assertTrue(routeTurns.contains("PolylinePosition"));
+        assertTrue(routeTurns.contains("configuredColor(fillColor"));
+        assertTrue(routeTurns.contains("configuredColor(outlineColor"));
+        assertTrue(routeTurns.contains("number(source, \"getLength\", 80f) * lengthScale"));
+        assertTrue(routeTurns.contains(
+                "number(source, \"getTriangleHeight\", 16f) * lengthScale"));
+        assertFalse(routeTurns.contains("outlineWidth * lengthScale"));
+        assertFalse(routeTurns.contains("getOutlineWidth"));
+        assertTrue(routeTurns.contains(
+                "arrow body tied to the route's current stroke width"));
         assertFalse(routeTurns.contains("Canvas"));
         assertFalse(routeTurns.contains("createArrowBitmap"));
         assertTrue(renderer.contains("routeTurnMapLayer.attachRoute"));
