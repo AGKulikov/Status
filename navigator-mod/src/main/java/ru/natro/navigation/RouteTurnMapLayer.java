@@ -2,6 +2,9 @@
 package ru.natro.navigation;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.lang.reflect.Method;
@@ -11,8 +14,10 @@ import java.util.List;
 /** Stock MapKit manoeuvre arrows attached to the exact active-route geometry. */
 final class RouteTurnMapLayer {
     private static final String TAG = "NatroRouteTurns";
+    private static final long FRESH_MS = 2_500L;
     private static final int MAX_FALLBACK_TURNS = 10;
 
+    private final Handler main = new Handler(Looper.getMainLooper());
     private Object routePolyline;
     private Object drivingRoute;
     private Object defaultArrowStyle;
@@ -25,6 +30,27 @@ final class RouteTurnMapLayer {
     private int scalePercent = 100;
     private boolean routeActive;
     private List<NavigatorStatePublisher.RouteTurnFrame> latest = Collections.emptyList();
+    private long latestSampleElapsedMs;
+    private boolean expiryPosted;
+
+    private final Runnable expire = new Runnable() {
+        @Override public void run() {
+            expiryPosted = false;
+            if (latestSampleElapsedMs <= 0L) return;
+            long remaining = FRESH_MS
+                    - (SystemClock.elapsedRealtime() - latestSampleElapsedMs);
+            if (remaining > 0L) {
+                expiryPosted = main.postDelayed(this, remaining);
+                return;
+            }
+            latestSampleElapsedMs = 0L;
+            latest = Collections.emptyList();
+            if (routeActive) {
+                routeActive = false;
+                render();
+            }
+        }
+    };
 
     RouteTurnMapLayer(Context ignoredContext) {
         // All visual assets and geometry come from MapKit. Context remains in the constructor only
@@ -59,16 +85,20 @@ final class RouteTurnMapLayer {
         } catch (Throwable failure) {
             Log.w(TAG, "RouteHelper could not add stock manoeuvres", failure);
         }
+        scheduleExpiryIfNeeded();
         render();
     }
 
     void detachMap() {
+        main.removeCallbacks(expire);
+        expiryPosted = false;
         routePolyline = null;
         drivingRoute = null;
         nativeManeuversAdded = false;
         fallbackArrowsAdded = false;
         routeActive = false;
         latest = Collections.emptyList();
+        latestSampleElapsedMs = 0L;
     }
 
     void apply(boolean nextEnabled, int nextScalePercent, int ignoredLayerPriority) {
@@ -81,15 +111,30 @@ final class RouteTurnMapLayer {
             hiddenManeuverStyle = null;
             cachedStyleScalePercent = -1;
         }
+        if (enabled) scheduleExpiryIfNeeded();
+        else {
+            main.removeCallbacks(expire);
+            expiryPosted = false;
+        }
         if (changed) render();
     }
 
-    void update(boolean nextRouteActive, long ignoredSampleElapsedMs,
+    void update(boolean nextRouteActive, long sampleElapsedMs,
                 List<NavigatorStatePublisher.RouteTurnFrame> frames) {
-        boolean routeStateChanged = routeActive != nextRouteActive;
-        routeActive = nextRouteActive;
-        latest = nextRouteActive && frames != null ? frames : Collections.emptyList();
-        boolean fallbackBecameReady = nextRouteActive && !nativeManeuversAdded
+        long now = SystemClock.elapsedRealtime();
+        boolean fresh = nextRouteActive && sampleElapsedMs > 0L
+                && now >= sampleElapsedMs
+                && now - sampleElapsedMs <= FRESH_MS;
+        boolean routeStateChanged = routeActive != fresh;
+        routeActive = fresh;
+        latest = fresh && frames != null ? frames : Collections.emptyList();
+        latestSampleElapsedMs = fresh ? sampleElapsedMs : 0L;
+        if (fresh) scheduleExpiryIfNeeded();
+        else {
+            main.removeCallbacks(expire);
+            expiryPosted = false;
+        }
+        boolean fallbackBecameReady = fresh && !nativeManeuversAdded
                 && !fallbackArrowsAdded && hasContent(latest);
         // Navigation snapshots arrive up to ten times per second. Reapplying the native style on
         // every sample is both unnecessary and another possible source of a flashing route.
@@ -97,10 +142,22 @@ final class RouteTurnMapLayer {
     }
 
     void clearData() {
+        main.removeCallbacks(expire);
+        expiryPosted = false;
         boolean wasActive = routeActive;
         routeActive = false;
         latest = Collections.emptyList();
+        latestSampleElapsedMs = 0L;
         if (wasActive) render();
+    }
+
+    private void scheduleExpiryIfNeeded() {
+        if (!enabled || routePolyline == null || latestSampleElapsedMs <= 0L || expiryPosted) {
+            return;
+        }
+        long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
+        if (age < 0L || age > FRESH_MS) return;
+        expiryPosted = main.postDelayed(expire, Math.max(1L, FRESH_MS - age));
     }
 
     private void render() {
