@@ -11,6 +11,13 @@
 теперь не выходит в главный looper Навигатора, а переполнение лимита слушателей коннекторов больше
 не бросает `IllegalStateException` в процесс Natro.
 
+Автоматическая проверка исходного commit
+`078591241a580067291c0eff33594212a1ab1dc0` (дерево
+`16c01838204a3371771186bf9b21b2b19d67c93f`) завершилась успешно в CI run 231: пройдены Android
+unit-тесты, сборка Natro, компиляция изолированного Navigator `classes19.dex`, компиляция HUD Speed
+bridge и baseline-verifier self-tests. Задание подписи не запускалось; новая финальная APK-пара не
+выпускалась.
+
 | Проверенный механизм | Состояние текущего дерева | Автоматический барьер |
 |---|---|---|
 | Automotive `NavigationLayer` на независимом `OffscreenMapWindow`, даже с выключенной камерой | Исполняемых ссылок нет; дорожные события использует только standalone `RoadEventsLayer` | Release-verifier отклоняет factory/settings/create и on-route API |
