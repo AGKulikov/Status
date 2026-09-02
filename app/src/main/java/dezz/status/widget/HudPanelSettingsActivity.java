@@ -639,11 +639,13 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch manualLayerPriorities = switchView(
                 "Ручной порядок слоёв", profile.manualLayerPrioritiesEnabled);
         form.addView(manualLayerPriorities, marginTop(4));
-        form.addView(text("Выключено: Яндекс автоматически разводит конфликтующие элементы. "
-                + "Включено: большее значение ползунка располагает слой выше.",
+        form.addView(text("Выключено: порядок как в Навигаторе 30.3.0 — маршрут ниже "
+                + "подписей, курсор ниже подсказок, конечная точка выше. Включено: большее "
+                + "значение располагает слой выше внутри совместимой группы. Стрелки "
+                + "полилинии всегда следуют приоритету маршрута.",
                 12, 0xFF95A0AF), marginTop(4));
         SliderField cameraDirectionLayerPriority = slider(form,
-                "Знаки камер и их направления", profile.cameraDirectionLayerPriority,
+                "Знаки камер и секторы направления", profile.cameraDirectionLayerPriority,
                 0, 100, 1, "");
         SliderField roadEventLayerPriority = slider(form,
                 "Остальные дорожные события", profile.roadEventLayerPriority,
@@ -656,9 +658,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightLayerPriority = slider(form,
                 "Светофоры и секунды", profile.trafficLightLayerPriority,
                 0, 100, 1, "");
-        SliderField routeTurnLayerPriority = slider(form,
-                "Стрелки поворотов на маршруте", profile.routeTurnLayerPriority,
-                0, 100, 1, "");
         SliderField laneGuidanceLayerPriority = slider(form,
                 "Знаки движения по полосам", profile.laneGuidanceLayerPriority,
                 0, 100, 1, "");
@@ -668,7 +667,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
                 destinationLayerPriority, trafficLightLayerPriority,
-                routeTurnLayerPriority,
                 laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
             for (SliderField field : layerPriorityControls) {
@@ -787,8 +785,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                                 destinationLayerPriority.intValue();
                         profile.trafficLightLayerPriority =
                                 trafficLightLayerPriority.intValue();
-                        profile.routeTurnLayerPriority =
-                                routeTurnLayerPriority.intValue();
+                        profile.routeTurnLayerPriority = profile.routeLayerPriority;
                         profile.laneGuidanceLayerPriority =
                                 laneGuidanceLayerPriority.intValue();
                         profile.cursorLayerPriority = cursorLayerPriority.intValue();

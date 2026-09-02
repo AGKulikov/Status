@@ -253,7 +253,7 @@ final class TrafficLightMapLayer {
         Object currentCollection = collection;
         if (currentCollection == null) {
             currentCollection = MapObjectLayerFactory.create(map,
-                    "ru.natro.navigation.traffic_lights",
+                    MapSublayerOrder.TRAFFIC_LIGHTS,
                     MapObjectLayerFactory.EQUAL, zIndex);
             collection = currentCollection;
         }

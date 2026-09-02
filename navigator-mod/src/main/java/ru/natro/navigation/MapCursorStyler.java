@@ -126,7 +126,7 @@ final class MapCursorStyler {
         Object currentCollection = collection;
         if (currentCollection == null) {
             currentCollection = MapObjectLayerFactory.create(currentMap,
-                    "ru.natro.navigation.cursor",
+                    MapSublayerOrder.CURSOR,
                     MapObjectLayerFactory.MAJOR, zIndex);
             collection = currentCollection;
         }

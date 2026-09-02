@@ -399,6 +399,9 @@ public final class CameraSpeedNormalizerHarness {
         layer_factory = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                          / "ru" / "natro" / "navigation"
                          / "MapObjectLayerFactory.java").read_text()
+        layer_order = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                       / "ru" / "natro" / "navigation"
+                       / "MapSublayerOrder.java").read_text()
         turns = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                  / "ru" / "natro" / "navigation" / "RouteTurnMapLayer.java").read_text()
         label_path = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
@@ -490,9 +493,22 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("addMapObjectLayer", layer_factory)
         self.assertIn("setConflictResolutionMode", layer_factory)
         self.assertIn("MapObjectLayerFactory.MAJOR", lanes)
-        self.assertIn("applyManualSublayerOrder", renderer)
+        self.assertIn("applySublayerOrder", renderer)
         self.assertIn("getSublayerManager", renderer)
-        self.assertIn("moveToEnd", renderer)
+        self.assertIn("SublayerFeatureType", layer_order)
+        self.assertIn("new Class<?>[]{String.class, featureClass}", layer_order)
+        self.assertIn("moveAfter", layer_order)
+        self.assertIn("moveBefore", layer_order)
+        self.assertNotIn("moveToEnd", layer_order)
+        self.assertIn("CAMERA_SECTORS", camera)
+        self.assertIn("CAMERA_SIGNS", camera)
+        self.assertIn("sectorCollection", camera)
+        self.assertIn("signCollection", camera)
+        self.assertIn("MapObjectLayerFactory.IGNORE", camera)
+        self.assertIn("MIN_CAMERA_TEXTURE_DIAMETER_PX = 80", camera)
+        self.assertIn("Math.max(displayDiameter, MIN_CAMERA_TEXTURE_DIAMETER_PX)",
+                      camera)
+        self.assertIn("Float.valueOf(textureScale)", camera)
         self.assertIn("routeTurnMapLayer.attachRoute", renderer)
         self.assertIn("createDefaultManeuverStyle", turns)
         self.assertIn("addManeuvers", turns)
@@ -510,6 +526,8 @@ public final class CameraSpeedNormalizerHarness {
         self.assertNotIn("outlineWidth * lengthScale", turns)
         self.assertNotIn("getOutlineWidth", turns)
         self.assertIn("arrow body tied to the route's current stroke width", turns)
+        self.assertNotIn("ignoredLayerPriority", turns)
+        self.assertIn("owning route polyline", turns)
         self.assertIn("Math.max(10, Math.min(250, nextLengthPercent))", turns)
         self.assertIn("Math.max(10, Math.min(250, nextHeadSizePercent))", turns)
         self.assertIn("profile.routeTurnLengthPercent", renderer)

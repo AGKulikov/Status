@@ -88,6 +88,7 @@ final class HudMapRenderer {
     private double latestSpeedKmh = Double.NaN;
     private int appliedMaximumFps = -1;
     private long appliedLayerOrderFingerprint = Long.MIN_VALUE;
+    private long lastLayerOrderApplyElapsedMs;
     private long lastOverlayLayoutElapsedMs;
     private NavigationMapProfile profile = new NavigationMapProfile();
 
@@ -114,8 +115,6 @@ final class HudMapRenderer {
         NavigationMapProfile next = NavigationMapProfile.fromConfiguration(raw, profileSection);
         boolean enabledChanged = profile.enabled != next.enabled;
         boolean cameraModeChanged = !profile.cameraMode.equals(next.cameraMode);
-        boolean automaticOrderRestored = profile.manualLayerPrioritiesEnabled
-                && !next.manualLayerPrioritiesEnabled;
         profile = next;
         if (cameraModeChanged) {
             freeCameraSource = null;
@@ -124,11 +123,6 @@ final class HudMapRenderer {
         if (enabledChanged) {
             if (profile.enabled) startRenderer();
             else stopRenderer(false);
-        } else if (mapWindow != null && automaticOrderRestored) {
-            // Recreating the independent MapWindow is the only exact way to restore every
-            // Yandex-owned sublayer to the order selected by its internal scenario stack.
-            stopRenderer(false);
-            startRenderer();
         } else if (mapWindow != null) {
             applyProfile();
         } else if (profile.enabled) {
@@ -211,7 +205,7 @@ final class HudMapRenderer {
                 frame.laneGuidanceSampleElapsedMs, frame.laneGuidance);
         routeTurnMapLayer.update(frame.routeActive,
                 frame.routeTurnsSampleElapsedMs, frame.routeTurns);
-        applyManualSublayerOrder();
+        applySublayerOrder();
         if (!frame.isValid()) {
             relayoutOverlays(false);
             return;
@@ -242,7 +236,7 @@ final class HudMapRenderer {
     void updateExternalCameras(String raw) {
         cameraDirectionMapLayer.updateExternal(raw);
         relayoutOverlays(false);
-        applyManualSublayerOrder();
+        applySublayerOrder();
     }
 
     private static boolean finite(double value) {
@@ -402,8 +396,7 @@ final class HudMapRenderer {
                 profile.routeTurnHeadSizePercent,
                 profile.routeTurnFillColor,
                 profile.routeTurnOutlineColor,
-                profile.routeTurnOutlineWidth,
-                profile.effectiveRouteTurnPriority());
+                profile.routeTurnOutlineWidth);
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -436,7 +429,7 @@ final class HudMapRenderer {
                     profile.visibilityStyleJson());
             applyCamera(false);
             relayoutOverlays(true);
-            applyManualSublayerOrder();
+            applySublayerOrder();
             if (roadEventScaleChanged) resetRoadEventVisibilityForStyleRefresh();
             applyRoadEventVisibility();
             destinationIconStyle = null;
@@ -634,61 +627,33 @@ final class HudMapRenderer {
     }
 
     /**
-     * Automatic mode leaves MapKit's own sublayer scenario untouched. Manual mode reorders only
-     * the explicitly exposed layers, from the smallest slider value to the largest.
+     * Inserts custom layers into Navigator-compatible feature slots without moving Yandex-owned
+     * substrate or label layers. Rechecking once per second also covers late MapKit sublayers.
      */
-    private void applyManualSublayerOrder() {
+    private void applySublayerOrder() {
         Object currentMap = map;
-        if (currentMap == null || !profile.manualLayerPrioritiesEnabled) {
-            appliedLayerOrderFingerprint = Long.MIN_VALUE;
-            return;
-        }
+        if (currentMap == null) return;
         try {
             Object manager = invoke(currentMap, "getSublayerManager", new Class<?>[0]);
             int count = ((Number) invoke(manager, "size", new Class<?>[0])).intValue();
             long fingerprint = count;
+            fingerprint = fingerprint * 131L
+                    + (profile.manualLayerPrioritiesEnabled ? 1L : 0L);
             fingerprint = fingerprint * 131L + profile.effectiveCameraPriority();
             fingerprint = fingerprint * 131L + profile.effectiveRoadEventPriority();
             fingerprint = fingerprint * 131L + profile.effectiveRoutePriority();
             fingerprint = fingerprint * 131L + profile.effectiveDestinationPriority();
             fingerprint = fingerprint * 131L + profile.effectiveTrafficLightPriority();
-            fingerprint = fingerprint * 131L + profile.effectiveRouteTurnPriority();
             fingerprint = fingerprint * 131L + profile.effectiveLanePriority();
             fingerprint = fingerprint * 131L + profile.effectiveCursorPriority();
-            if (fingerprint == appliedLayerOrderFingerprint) return;
-            Class<?> ids = Class.forName("com.yandex.mapkit.map.LayerIds");
-            String roadEvents = (String) ids.getMethod("getRoadEventsLayerId").invoke(null);
-            String navigationBase = (String) ids
-                    .getMethod("getDrivingNavigationBaseLayerId").invoke(null);
-            ArrayList<LayerOrder> layers = new ArrayList<>();
-            layers.add(new LayerOrder("ru.natro.navigation.cameras",
-                    profile.effectiveCameraPriority()));
-            layers.add(new LayerOrder(roadEvents, profile.effectiveRoadEventPriority()));
-            layers.add(new LayerOrder(navigationBase, profile.effectiveRoadEventPriority()));
-            layers.add(new LayerOrder("ru.natro.navigation.route",
-                    profile.effectiveRoutePriority()));
-            layers.add(new LayerOrder("ru.natro.navigation.destination",
-                    profile.effectiveDestinationPriority()));
-            layers.add(new LayerOrder("ru.natro.navigation.traffic_lights",
-                    profile.effectiveTrafficLightPriority()));
-            layers.add(new LayerOrder("ru.natro.navigation.route_turns",
-                    profile.effectiveRouteTurnPriority()));
-            layers.add(new LayerOrder("ru.natro.navigation.lane_guidance",
-                    profile.effectiveLanePriority()));
-            layers.add(new LayerOrder("ru.natro.navigation.cursor",
-                    profile.effectiveCursorPriority()));
-            layers.sort((left, right) -> Integer.compare(left.priority, right.priority));
-            for (LayerOrder layer : layers) {
-                if (layer.id == null || layer.id.isEmpty()) continue;
-                Object rawIndex = invoke(manager, "findFirstOf",
-                        new Class<?>[]{String.class}, layer.id);
-                if (!(rawIndex instanceof Integer) || ((Integer) rawIndex) < 0) continue;
-                invoke(manager, "moveToEnd", new Class<?>[]{int.class},
-                        ((Integer) rawIndex).intValue());
-            }
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (fingerprint == appliedLayerOrderFingerprint
+                    && now - lastLayerOrderApplyElapsedMs < 1_000L) return;
+            MapSublayerOrder.apply(currentMap, profile);
             appliedLayerOrderFingerprint = fingerprint;
+            lastLayerOrderApplyElapsedMs = now;
         } catch (Throwable failure) {
-            Log.w(TAG, "Manual HUD sublayer order could not be applied", failure);
+            Log.w(TAG, "HUD sublayer order could not be applied", failure);
         }
     }
 
@@ -701,7 +666,7 @@ final class HudMapRenderer {
             Object collection = routeCollection;
             if (collection == null) {
                 collection = MapObjectLayerFactory.create(currentMap,
-                        "ru.natro.navigation.route",
+                        MapSublayerOrder.ROUTE,
                         // MINOR keeps the route from displacing stock substrate labels. MapKit
                         // therefore owns the street-name font, outline, curvature and collision
                         // behaviour instead of Natro painting text placemarks over the map.
@@ -745,7 +710,7 @@ final class HudMapRenderer {
                 Object destinations = destinationCollection;
                 if (destinations == null) {
                     destinations = MapObjectLayerFactory.create(currentMap,
-                            "ru.natro.navigation.destination",
+                            MapSublayerOrder.DESTINATION,
                             MapObjectLayerFactory.EQUAL,
                             NavigationMapProfile.layerZ(
                                     profile.effectiveDestinationPriority()));
@@ -757,7 +722,7 @@ final class HudMapRenderer {
                 }
                 addDestinationMarker(destinations, slice.destinationPoint);
             }
-            applyManualSublayerOrder();
+            applySublayerOrder();
         } catch (Throwable failure) {
             Log.w(TAG, "Active route could not be rendered in the HUD MapWindow", failure);
         }
@@ -990,16 +955,6 @@ final class HudMapRenderer {
         }
     }
 
-    private static final class LayerOrder {
-        final String id;
-        final int priority;
-
-        LayerOrder(String id, int priority) {
-            this.id = id;
-            this.priority = priority;
-        }
-    }
-
     private static Object createOptionalLayer(Object mapKit, Class<?> mapKitClass,
                                               Class<?> mapWindowClass, Object mapWindow,
                                               String methodName) {
@@ -1041,6 +996,7 @@ final class HudMapRenderer {
         mapWindow = null;
         appliedMaximumFps = -1;
         appliedLayerOrderFingerprint = Long.MIN_VALUE;
+        lastLayerOrderApplyElapsedMs = 0L;
         map = null;
         trafficLayer = null;
         roadEventsLayer = null;

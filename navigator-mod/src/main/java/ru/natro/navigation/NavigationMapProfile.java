@@ -68,14 +68,15 @@ final class NavigationMapProfile {
     int roadEventScalePercent = 100;
     int destinationScalePercent = 100;
     boolean manualLayerPrioritiesEnabled;
-    int cameraDirectionLayerPriority = 20;
-    int roadEventLayerPriority = 30;
-    int routeLayerPriority = 40;
-    int destinationLayerPriority = 45;
-    int trafficLightLayerPriority = 50;
-    int routeTurnLayerPriority = 55;
+    int cameraDirectionLayerPriority = 30;
+    int roadEventLayerPriority = 40;
+    int routeLayerPriority = 50;
+    int destinationLayerPriority = 90;
+    int trafficLightLayerPriority = 70;
+    /** Legacy transport key. Native polyline arrows always inherit routeLayerPriority. */
+    int routeTurnLayerPriority = 50;
     int laneGuidanceLayerPriority = 80;
-    int cursorLayerPriority = 90;
+    int cursorLayerPriority = 60;
     boolean showCursor = true;
     boolean roadsOnly;
     String cameraMode = "FOLLOW_ROUTE";
@@ -184,21 +185,32 @@ final class NavigationMapProfile {
             result.manualLayerPrioritiesEnabled = source.optBoolean(
                     "manualLayerPrioritiesEnabled", false);
             result.cameraDirectionLayerPriority = clamp(
-                    source.optInt("cameraDirectionLayerPriority", 20), 0, 100);
+                    source.optInt("cameraDirectionLayerPriority", 30), 0, 100);
             result.roadEventLayerPriority = clamp(
-                    source.optInt("roadEventLayerPriority", 30), 0, 100);
+                    source.optInt("roadEventLayerPriority", 40), 0, 100);
             result.routeLayerPriority = clamp(
-                    source.optInt("routeLayerPriority", 40), 0, 100);
+                    source.optInt("routeLayerPriority", 50), 0, 100);
             result.destinationLayerPriority = clamp(
-                    source.optInt("destinationLayerPriority", 45), 0, 100);
+                    source.optInt("destinationLayerPriority", 90), 0, 100);
             result.trafficLightLayerPriority = clamp(
-                    source.optInt("trafficLightLayerPriority", 50), 0, 100);
+                    source.optInt("trafficLightLayerPriority", 70), 0, 100);
             result.routeTurnLayerPriority = clamp(
-                    source.optInt("routeTurnLayerPriority", 55), 0, 100);
+                    source.optInt("routeTurnLayerPriority", result.routeLayerPriority), 0, 100);
             result.laneGuidanceLayerPriority = clamp(
                     source.optInt("laneGuidanceLayerPriority", 80), 0, 100);
             result.cursorLayerPriority = clamp(
-                    source.optInt("cursorLayerPriority", 90), 0, 100);
+                    source.optInt("cursorLayerPriority", 60), 0, 100);
+            if (hasLegacyDefaultLayerPriorities(result)) {
+                result.cameraDirectionLayerPriority = 30;
+                result.roadEventLayerPriority = 40;
+                result.routeLayerPriority = 50;
+                result.destinationLayerPriority = 90;
+                result.trafficLightLayerPriority = 70;
+                result.laneGuidanceLayerPriority = 80;
+                result.cursorLayerPriority = 60;
+            }
+            // MapKit Arrow belongs to PolylineMapObject and exposes no independent z-index.
+            result.routeTurnLayerPriority = result.routeLayerPriority;
             result.showCursor = source.optBoolean("showCursor", true);
             result.roadsOnly = source.optBoolean("roadsOnly", false);
             result.cameraMode = enumText(source.optString(
@@ -272,27 +284,23 @@ final class NavigationMapProfile {
     }
 
     int effectiveCameraPriority() {
-        return manualLayerPrioritiesEnabled ? cameraDirectionLayerPriority : 20;
+        return manualLayerPrioritiesEnabled ? cameraDirectionLayerPriority : 30;
     }
 
     int effectiveRoadEventPriority() {
-        return manualLayerPrioritiesEnabled ? roadEventLayerPriority : 30;
+        return manualLayerPrioritiesEnabled ? roadEventLayerPriority : 40;
     }
 
     int effectiveRoutePriority() {
-        return manualLayerPrioritiesEnabled ? routeLayerPriority : 40;
+        return manualLayerPrioritiesEnabled ? routeLayerPriority : 50;
     }
 
     int effectiveDestinationPriority() {
-        return manualLayerPrioritiesEnabled ? destinationLayerPriority : 45;
+        return manualLayerPrioritiesEnabled ? destinationLayerPriority : 90;
     }
 
     int effectiveTrafficLightPriority() {
-        return manualLayerPrioritiesEnabled ? trafficLightLayerPriority : 50;
-    }
-
-    int effectiveRouteTurnPriority() {
-        return manualLayerPrioritiesEnabled ? routeTurnLayerPriority : 55;
+        return manualLayerPrioritiesEnabled ? trafficLightLayerPriority : 70;
     }
 
     int effectiveLanePriority() {
@@ -300,7 +308,7 @@ final class NavigationMapProfile {
     }
 
     int effectiveCursorPriority() {
-        return manualLayerPrioritiesEnabled ? cursorLayerPriority : 90;
+        return manualLayerPrioritiesEnabled ? cursorLayerPriority : 60;
     }
 
     String visibilityStyleJson() {
@@ -388,6 +396,18 @@ final class NavigationMapProfile {
     /** One shared numeric range makes the order comparable across separate collections. */
     static float layerZ(int priority) {
         return 50f + clamp(priority, 0, 100);
+    }
+
+    /** Migrates the exact 2.6.8 preset; any user-edited tuple is preserved. */
+    private static boolean hasLegacyDefaultLayerPriorities(NavigationMapProfile value) {
+        return value.cameraDirectionLayerPriority == 20
+                && value.roadEventLayerPriority == 30
+                && value.routeLayerPriority == 40
+                && value.destinationLayerPriority == 45
+                && value.trafficLightLayerPriority == 50
+                && value.routeTurnLayerPriority == 55
+                && value.laneGuidanceLayerPriority == 80
+                && value.cursorLayerPriority == 90;
     }
 
     private static double clamp(double value, double minimum, double maximum,

@@ -213,7 +213,7 @@ final class LaneGuidanceMapLayer {
         Object currentCollection = collection;
         if (currentCollection == null) {
             currentCollection = MapObjectLayerFactory.create(map,
-                    "ru.natro.navigation.lane_guidance",
+                    MapSublayerOrder.LANE_GUIDANCE,
                     MapObjectLayerFactory.MAJOR, zIndex);
             collection = currentCollection;
         }

@@ -108,7 +108,7 @@ final class RouteTurnMapLayer {
 
     void apply(boolean nextEnabled, int nextLengthPercent, int nextHeadSizePercent,
                String nextFillColor, String nextOutlineColor,
-               double nextOutlineWidth, int ignoredLayerPriority) {
+               double nextOutlineWidth) {
         int nextLength = Math.max(10, Math.min(250, nextLengthPercent));
         int nextHeadSize = Math.max(10, Math.min(250, nextHeadSizePercent));
         float safeOutlineWidth = (float) Math.max(0d, Math.min(20d,
@@ -245,7 +245,9 @@ final class RouteTurnMapLayer {
     /**
      * Clones MapKit's stock geometry and explicitly enables it. Length and triangular-head size
      * are independent. There is deliberately no arrow-width multiplier:
-     * PolylineMapObject keeps the arrow body tied to the route's current stroke width.
+     * PolylineMapObject keeps the arrow body tied to the route's current stroke width. Arrow has
+     * no independent z-index in MapKit 30.3.0, so its stacking priority is exactly the priority of
+     * the owning route polyline and is applied by MapSublayerOrder.
      */
     private Object maneuverStyle(boolean visible) throws Exception {
         if ((visible ? visibleManeuverStyle : hiddenManeuverStyle) != null) {

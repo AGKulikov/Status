@@ -223,17 +223,18 @@ public final class NavigationIntegrationConfig {
         public int roadEventScalePercent = 100;
         /** Scale of Natro's final-route-point marker. */
         public int destinationScalePercent = 100;
-        /** Off keeps Yandex-compatible automatic collision order; stored sliders are untouched. */
+        /** Off uses the audited Navigator 30.3.0 feature-aware order. */
         public boolean manualLayerPrioritiesEnabled;
-        /** User-controlled global stacking order; larger values are drawn above smaller ones. */
-        public int cameraDirectionLayerPriority = 20;
-        public int roadEventLayerPriority = 30;
-        public int routeLayerPriority = 40;
-        public int destinationLayerPriority = 45;
-        public int trafficLightLayerPriority = 50;
-        public int routeTurnLayerPriority = 55;
+        /** Larger values are drawn above smaller ones inside a compatible MapKit feature group. */
+        public int cameraDirectionLayerPriority = 30;
+        public int roadEventLayerPriority = 40;
+        public int routeLayerPriority = 50;
+        public int destinationLayerPriority = 90;
+        public int trafficLightLayerPriority = 70;
+        /** Legacy JSON key; native polyline arrows always inherit routeLayerPriority. */
+        public int routeTurnLayerPriority = 50;
         public int laneGuidanceLayerPriority = 80;
-        public int cursorLayerPriority = 90;
+        public int cursorLayerPriority = 60;
         public boolean showLabels = true;
         public boolean showPois = true;
         public boolean showBuildings = true;
@@ -344,7 +345,8 @@ public final class NavigationIntegrationConfig {
                     .put("routeLayerPriority", routeLayerPriority)
                     .put("destinationLayerPriority", destinationLayerPriority)
                     .put("trafficLightLayerPriority", trafficLightLayerPriority)
-                    .put("routeTurnLayerPriority", routeTurnLayerPriority)
+                    // Retain the old key for install-over compatibility with a previous pair.
+                    .put("routeTurnLayerPriority", routeLayerPriority)
                     .put("laneGuidanceLayerPriority", laneGuidanceLayerPriority)
                     .put("cursorLayerPriority", cursorLayerPriority)
                     .put("showLabels", showLabels)
@@ -465,6 +467,15 @@ public final class NavigationIntegrationConfig {
                     "laneGuidanceLayerPriority", result.laneGuidanceLayerPriority);
             result.cursorLayerPriority = source.optInt(
                     "cursorLayerPriority", result.cursorLayerPriority);
+            if (hasLegacyDefaultLayerPriorities(result)) {
+                result.cameraDirectionLayerPriority = 30;
+                result.roadEventLayerPriority = 40;
+                result.routeLayerPriority = 50;
+                result.destinationLayerPriority = 90;
+                result.trafficLightLayerPriority = 70;
+                result.laneGuidanceLayerPriority = 80;
+                result.cursorLayerPriority = 60;
+            }
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
             // Migration from 2.5.7-2.6.4: the removed route-only bitmap layer becomes stock
             // MapKit road labels. Preserve the user's opt-in even if generic labels were off.
@@ -522,6 +533,18 @@ public final class NavigationIntegrationConfig {
             return result;
         }
 
+        /** Migrates only the untouched 2.6.8 preset; user-edited priority tuples stay intact. */
+        private static boolean hasLegacyDefaultLayerPriorities(MapProfile value) {
+            return value.cameraDirectionLayerPriority == 20
+                    && value.roadEventLayerPriority == 30
+                    && value.routeLayerPriority == 40
+                    && value.destinationLayerPriority == 45
+                    && value.trafficLightLayerPriority == 50
+                    && value.routeTurnLayerPriority == 55
+                    && value.laneGuidanceLayerPriority == 80
+                    && value.cursorLayerPriority == 90;
+        }
+
         void normalize() {
             cameraMode = enumText(cameraMode, "FOLLOW_ROUTE",
                     "FOLLOW_ROUTE", "NORTH_UP", "HEADING_UP", "FREE");
@@ -555,6 +578,8 @@ public final class NavigationIntegrationConfig {
             routeTurnLayerPriority = clamp(routeTurnLayerPriority, 0, 100);
             laneGuidanceLayerPriority = clamp(laneGuidanceLayerPriority, 0, 100);
             cursorLayerPriority = clamp(cursorLayerPriority, 0, 100);
+            // Arrow is owned by the route PolylineMapObject in MapKit 30.3.0.
+            routeTurnLayerPriority = routeLayerPriority;
             routeWidthPercent = clamp(routeWidthPercent, 25, 300);
             roadWidthPercent = clamp(roadWidthPercent, 25, 300);
             routeWidth = clamp(routeWidth, 1d, 40d, 8d);

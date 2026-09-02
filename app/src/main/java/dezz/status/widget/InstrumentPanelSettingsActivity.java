@@ -712,11 +712,13 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch manualLayerPriorities = switchView(
                 "Ручной порядок слоёв", map.manualLayerPrioritiesEnabled);
         content.addView(manualLayerPriorities);
-        content.addView(text("Выключено: Яндекс автоматически разводит конфликтующие элементы. "
-                + "Включено: большее значение ползунка располагает слой выше.",
+        content.addView(text("Выключено: порядок как в Навигаторе 30.3.0 — маршрут ниже "
+                + "подписей, курсор ниже подсказок, конечная точка выше. Включено: большее "
+                + "значение располагает слой выше внутри совместимой группы. Стрелки "
+                + "полилинии всегда следуют приоритету маршрута.",
                 12, 0xFFB8C0CC));
         SliderField cameraDirectionLayerPriority = slider(content,
-                "Знаки камер и их направления", map.cameraDirectionLayerPriority,
+                "Знаки камер и секторы направления", map.cameraDirectionLayerPriority,
                 0, 100, 1, "");
         SliderField roadEventLayerPriority = slider(content,
                 "Остальные дорожные события", map.roadEventLayerPriority,
@@ -729,9 +731,6 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightLayerPriority = slider(content,
                 "Светофоры и секунды", map.trafficLightLayerPriority,
                 0, 100, 1, "");
-        SliderField routeTurnLayerPriority = slider(content,
-                "Стрелки поворотов на маршруте", map.routeTurnLayerPriority,
-                0, 100, 1, "");
         SliderField laneGuidanceLayerPriority = slider(content,
                 "Знаки движения по полосам", map.laneGuidanceLayerPriority,
                 0, 100, 1, "");
@@ -741,7 +740,6 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
                 destinationLayerPriority, trafficLightLayerPriority,
-                routeTurnLayerPriority,
                 laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
             for (SliderField field : layerPriorityControls) {
@@ -837,7 +835,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.routeLayerPriority = routeLayerPriority.intValue();
                     map.destinationLayerPriority = destinationLayerPriority.intValue();
                     map.trafficLightLayerPriority = trafficLightLayerPriority.intValue();
-                    map.routeTurnLayerPriority = routeTurnLayerPriority.intValue();
+                    map.routeTurnLayerPriority = map.routeLayerPriority;
                     map.laneGuidanceLayerPriority = laneGuidanceLayerPriority.intValue();
                     map.cursorLayerPriority = cursorLayerPriority.intValue();
                     map.trafficFreeColor = trafficFreeColor.value;

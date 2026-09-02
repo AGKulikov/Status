@@ -45,6 +45,8 @@ final class CameraDirectionMapLayer {
     private static final int DEFAULT_SECTOR_RGB = 0x00168BFF;
     private static final int STANDARD_SIGN_RED = 0xFFF04444;
     private static final int STANDARD_SIGN_TEXT = 0xFF24272C;
+    /** Preserve number and vector-plate detail when a 40dp camera sign is reduced on KX11. */
+    private static final int MIN_CAMERA_TEXTURE_DIAMETER_PX = 80;
 
     private static final String SOURCE_YANDEX = "YANDEX";
     private static final String SOURCE_HUD_SPEED = "HUD_SPEED";
@@ -57,7 +59,9 @@ final class CameraDirectionMapLayer {
     private final ArrayList<CameraSign> cameraSigns = new ArrayList<>();
     private final ArrayList<CameraMarker> visibleScratch = new ArrayList<>(MAX_CAMERAS);
     private Object map;
-    private Object collection;
+    /** Ground polygons and placemark signs must never share one ambiguous MapKit root layer. */
+    private Object sectorCollection;
+    private Object signCollection;
     private boolean yandexEnabled;
     private boolean externalEnabled = true;
     private int scalePercent = 100;
@@ -109,7 +113,8 @@ final class CameraDirectionMapLayer {
         main.removeCallbacks(expire);
         expiryPosted = false;
         clearVisual();
-        collection = null;
+        sectorCollection = null;
+        signCollection = null;
         map = null;
     }
 
@@ -139,7 +144,8 @@ final class CameraDirectionMapLayer {
         directionRgb = nextDirectionRgb;
         directionOpacityPercent = nextDirectionOpacity;
         zIndex = nextZ;
-        MapObjectLayerFactory.setZIndex(collection, nextZ);
+        MapObjectLayerFactory.setZIndex(sectorCollection, nextZ);
+        MapObjectLayerFactory.setZIndex(signCollection, nextZ);
         if (presentationChanged) renderedFingerprint = Long.MIN_VALUE;
         if (!yandexEnabled && !externalEnabled) {
             main.removeCallbacks(expire);
@@ -347,14 +353,23 @@ final class CameraDirectionMapLayer {
         }
         if (renderedFingerprint == latestVisualFingerprint) return;
         try {
-            Object currentCollection = collection;
-            if (currentCollection == null) {
-                currentCollection = MapObjectLayerFactory.create(map,
-                        "ru.natro.navigation.cameras",
+            Object currentSigns = signCollection;
+            if (currentSigns == null) {
+                currentSigns = MapObjectLayerFactory.create(map,
+                        MapSublayerOrder.CAMERA_SIGNS,
                         MapObjectLayerFactory.EQUAL, zIndex);
-                collection = currentCollection;
+                signCollection = currentSigns;
             }
-            invoke(currentCollection, "clear", new Class<?>[0]);
+            Object currentSectors = sectorCollection;
+            if (hasDirections(visibleScratch) && currentSectors == null) {
+                currentSectors = MapObjectLayerFactory.create(map,
+                        MapSublayerOrder.CAMERA_SECTORS,
+                        // Direction polygons are background geometry, not collision candidates.
+                        MapObjectLayerFactory.IGNORE, zIndex);
+                sectorCollection = currentSectors;
+            }
+            if (currentSectors != null) invoke(currentSectors, "clear", new Class<?>[0]);
+            invoke(currentSigns, "clear", new Class<?>[0]);
             placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_CAMERAS);
             iconBitmaps.clear();
             imageProviders.clear();
@@ -363,17 +378,27 @@ final class CameraDirectionMapLayer {
                 // No direction supplied means exactly one sign and no guessed circular plane.
                 for (Double direction : camera.directions) {
                     if (direction != null && Double.isFinite(direction)) {
-                        addSector(currentCollection, camera.latitude, camera.longitude,
+                        addSector(currentSectors, camera.latitude, camera.longitude,
                                 direction.doubleValue());
                     }
                 }
             }
-            for (CameraMarker camera : visibleScratch) addSign(currentCollection, camera);
+            for (CameraMarker camera : visibleScratch) addSign(currentSigns, camera);
             renderedFingerprint = latestVisualFingerprint;
         } catch (Throwable failure) {
             Log.w(TAG, "Camera sign/direction update failed", failure);
             clearVisual();
         }
+    }
+
+    private static boolean hasDirections(List<CameraMarker> cameras) {
+        for (CameraMarker camera : cameras) {
+            if (camera == null) continue;
+            for (Double direction : camera.directions) {
+                if (direction != null && Double.isFinite(direction)) return true;
+            }
+        }
+        return false;
     }
 
     private void addSector(Object target, double latitude, double longitude,
@@ -422,7 +447,14 @@ final class CameraDirectionMapLayer {
         Object point = pointClass.getConstructor(double.class, double.class)
                 .newInstance(camera.latitude, camera.longitude);
         Object placemark = invoke(target, "addPlacemark", new Class<?>[]{pointClass}, point);
-        Bitmap bitmap = createCameraBitmap(camera);
+        int displayDiameter = cameraDisplayDiameter();
+        int textureDiameter = Math.max(displayDiameter, MIN_CAMERA_TEXTURE_DIAMETER_PX);
+        float textureScale = displayDiameter / (float) textureDiameter;
+        Bitmap bitmap = createCameraBitmap(camera, textureDiameter);
+        int displayWidth = Math.max(1,
+                (int) Math.ceil(bitmap.getWidth() * textureScale));
+        int displayHeight = Math.max(1,
+                (int) Math.ceil(bitmap.getHeight() * textureScale));
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
         Object provider = providerClass.getMethod("fromBitmap", Bitmap.class)
                 .invoke(null, bitmap);
@@ -431,10 +463,14 @@ final class CameraDirectionMapLayer {
         Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass, "NO_ROTATION");
         Object style = styleClass.getConstructor().newInstance();
         MapOverlayPlacementCoordinator.Placement placement = reservePlacement(
-                camera, bitmap.getWidth(), bitmap.getHeight());
+                camera, displayWidth, displayHeight);
         invoke(style, "setAnchor", new Class<?>[]{PointF.class},
                 new PointF(placement.anchorX, placement.anchorY));
         invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
+        // MapKit receives an oversampled texture, then reduces it to the configured on-map size.
+        // This retains glyph/vector detail instead of rasterising small speed text at 26-40 px.
+        invoke(style, "setScale", new Class<?>[]{Float.class},
+                Float.valueOf(textureScale));
         invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
         invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
         float sourceOffset = SOURCE_HUD_SPEED.equals(camera.source) ? 0.002f : 0.001f;
@@ -445,7 +481,7 @@ final class CameraDirectionMapLayer {
         iconBitmaps.add(bitmap);
         imageProviders.add(provider);
         cameraSigns.add(new CameraSign(camera, placemark, provider, style,
-                bitmap.getWidth(), bitmap.getHeight(), placement));
+                displayWidth, displayHeight, placement));
     }
 
     private MapOverlayPlacementCoordinator.Placement reservePlacement(
@@ -462,10 +498,13 @@ final class CameraDirectionMapLayer {
      * event also controls lanes/crossroads/stopping, the exact stock 40dp control plate is joined
      * directly to that circle; no additional miniature camera badge is painted.
      */
-    private Bitmap createCameraBitmap(CameraMarker camera) {
+    private int cameraDisplayDiameter() {
         float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
         float scale = scalePercent / 100f;
-        int diameter = Math.max(26, Math.min(180, Math.round(40f * density * scale)));
+        return Math.max(26, Math.min(180, Math.round(40f * density * scale)));
+    }
+
+    private Bitmap createCameraBitmap(CameraMarker camera, int diameter) {
         float padding = Math.max(1f, diameter * .035f);
         String detailDrawableName = detailDrawableName(camera.controlTags);
         if (camera.speedLimit <= 0 && detailDrawableName == null) {
@@ -544,8 +583,12 @@ final class CameraDirectionMapLayer {
 
     private void clearVisual() {
         placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_CAMERAS);
-        if (collection != null) {
-            try { invoke(collection, "clear", new Class<?>[0]); }
+        if (sectorCollection != null) {
+            try { invoke(sectorCollection, "clear", new Class<?>[0]); }
+            catch (Throwable ignored) {}
+        }
+        if (signCollection != null) {
+            try { invoke(signCollection, "clear", new Class<?>[0]); }
             catch (Throwable ignored) {}
         }
         iconBitmaps.clear();
