@@ -733,8 +733,9 @@ public final class NavigationIntegrationConfig {
             // The field remains serialized for old Navigator builds, but an opaque outer plane
             // is invalid for the KX11 floating-window contract.
             backgroundColor = "#00000000";
-            modeButtonPosition = enumText(modeButtonPosition, "TOP_LEFT",
-                    "TOP_LEFT", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_RIGHT");
+            // Kept in JSON for compatibility with already installed Navigator builds. Current
+            // builds place the one bidirectional toggle inside the stock left controls rail.
+            modeButtonPosition = "TOP_LEFT";
             modeButtonSizeDp = clamp(modeButtonSizeDp, 28, 96);
             modeButtonOpacityPercent = clamp(modeButtonOpacityPercent, 20, 100);
         }

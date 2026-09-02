@@ -25,6 +25,7 @@ import android.view.WindowInsets;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -73,7 +74,6 @@ final class FloatingWindowController {
     private FloatingWindowProfile profile = new FloatingWindowProfile();
     private FrameLayout controlLayer;
     private TextView modeButton;
-    private TextView floatingModeButton;
     private TextView closeButton;
     private TextView dragHandle;
     private TextView resizeHandle;
@@ -83,6 +83,11 @@ final class FloatingWindowController {
     private View contentRoot;
     private View mapRoot;
     private View mapWithControls;
+    private View controlsInsetHost;
+    private View controlsEngine;
+    private View topNotificationRoot;
+    private View guidanceControls;
+    private View topNotificationContent;
     private Drawable originalContentBackground;
     private Drawable originalMapRootBackground;
     private Drawable originalMapWithControlsBackground;
@@ -99,9 +104,22 @@ final class FloatingWindowController {
     private final int[] originalContentPadding = new int[4];
     private final int[] originalMapRootPadding = new int[4];
     private final int[] originalMapWithControlsPadding = new int[4];
+    private final int[] originalControlsInsetHostPadding = new int[4];
+    private final int[] originalControlsEnginePadding = new int[4];
+    private final int[] originalTopNotificationPadding = new int[4];
+    private final int[] originalGuidanceControlsPadding = new int[4];
+    private final int[] originalTopNotificationContentPadding = new int[4];
     private boolean originalContentFitsSystemWindows;
     private boolean originalMapRootFitsSystemWindows;
     private boolean originalMapWithControlsFitsSystemWindows;
+    private boolean originalControlsInsetHostFitsSystemWindows;
+    private boolean originalControlsEngineFitsSystemWindows;
+    private boolean originalTopNotificationFitsSystemWindows;
+    private boolean originalGuidanceControlsFitsSystemWindows;
+    private boolean originalTopNotificationContentFitsSystemWindows;
+    private int floatingControlsEngineTop;
+    private int floatingGuidanceControlsTop;
+    private int floatingTopNotificationContentTop;
     private int roundedOutlineWidth = -1;
     private int roundedOutlineHeight = -1;
     private int roundedOutlineRadius = -1;
@@ -131,6 +149,20 @@ final class FloatingWindowController {
                             insets.getSystemWindowInsetRight(),
                             insets.getSystemWindowInsetBottom());
                     return view.onApplyWindowInsets(adjusted);
+                }
+            };
+    private final View.OnLayoutChangeListener floatingTopInsetGuard =
+            new View.OnLayoutChangeListener() {
+                @Override public void onLayoutChange(View view, int left, int top, int right,
+                        int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                    if (!floating) return;
+                    if (view == controlsEngine) {
+                        setTopPadding(view, floatingControlsEngineTop);
+                    } else if (view == guidanceControls) {
+                        setTopPadding(view, floatingGuidanceControlsTop);
+                    } else if (view == topNotificationContent) {
+                        setTopPadding(view, floatingTopNotificationContentTop);
+                    }
                 }
             };
     private final ViewOutlineProvider roundedOutlineProvider = new ViewOutlineProvider() {
@@ -215,16 +247,8 @@ final class FloatingWindowController {
         modeButton = control("◲", "Открыть Навигатор в окне");
         modeButton.setTextSize(32f);
         modeButton.setTypeface(Typeface.DEFAULT_BOLD);
-        modeButton.setOnClickListener(view -> restartInMode(true, null));
+        modeButton.setOnClickListener(view -> restartInMode(!floating, null));
         controlLayer.addView(modeButton);
-
-        // Keep both directions in our top overlay. Every map tap reveals the applicable control;
-        // it then hides again so it never occupies permanent map space.
-        floatingModeButton = control("◱", "Развернуть Навигатор на весь экран");
-        floatingModeButton.setTextSize(32f);
-        floatingModeButton.setTypeface(Typeface.DEFAULT_BOLD);
-        floatingModeButton.setOnClickListener(view -> restartInMode(false, null));
-        controlLayer.addView(floatingModeButton);
         revealModeButton();
         mainHandler.post(modeButtonPoller);
         updateControls();
@@ -239,6 +263,7 @@ final class FloatingWindowController {
             controlLayer.post(() -> {
                 if (destroyed) return;
                 ensureControlLayerAttached();
+                attachModeButtonToStockLeftRail();
                 layoutModeButtons();
                 updateModeButtons();
             });
@@ -343,6 +368,7 @@ final class FloatingWindowController {
             ensureControlLayerAttached();
             if (floating) enforceFloatingWindowContract();
             if (controlLayer != null) controlLayer.bringToFront();
+            attachModeButtonToStockLeftRail();
             updateModeButtons();
             if (destroyed) return;
             long delay = floating ? FLOATING_CONTRACT_CHECK_MS : MODE_BUTTON_STABLE_MS;
@@ -382,6 +408,9 @@ final class FloatingWindowController {
             insetDispatchHost.setOnApplyWindowInsetsListener(null);
             insetDispatchHost = null;
         }
+        removeFloatingTopInsetGuards();
+        detachFromParent(modeButton);
+        modeButton = null;
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
         if (parent != null) parent.removeView(controlLayer);
         controlLayer = null;
@@ -554,6 +583,57 @@ final class FloatingWindowController {
             capturePadding(mapWithControls, originalMapWithControlsPadding);
             originalMapWithControlsFitsSystemWindows = fitsSystemWindows(mapWithControls);
         }
+        if (controlsEngine == null) {
+            int controlsEngineId = activity.getResources().getIdentifier(
+                    "controls_engine_container", "id", activity.getPackageName());
+            controlsEngine = controlsEngineId == 0
+                    ? null : activity.findViewById(controlsEngineId);
+            capturePadding(controlsEngine, originalControlsEnginePadding);
+            originalControlsEngineFitsSystemWindows = fitsSystemWindows(controlsEngine);
+        }
+        if (controlsInsetHost == null && controlsEngine != null
+                && controlsEngine.getParent() instanceof View) {
+            // maps_activity.xml wraps the complete controls engine in PaddingtonView. That
+            // sibling of MapWithControlsView owns Navigator's real safe-area padding, so fixing
+            // only the map cannot move the maneuver card and the right-side controls upward.
+            controlsInsetHost = (View) controlsEngine.getParent();
+            capturePadding(controlsInsetHost, originalControlsInsetHostPadding);
+            originalControlsInsetHostFitsSystemWindows = fitsSystemWindows(controlsInsetHost);
+        }
+        if (topNotificationRoot == null) {
+            int notificationId = activity.getResources().getIdentifier(
+                    "maps_activity_top_notification_container", "id",
+                    activity.getPackageName());
+            topNotificationRoot = notificationId == 0
+                    ? null : activity.findViewById(notificationId);
+            capturePadding(topNotificationRoot, originalTopNotificationPadding);
+            originalTopNotificationFitsSystemWindows = fitsSystemWindows(topNotificationRoot);
+        }
+        if (guidanceControls == null) {
+            int guidanceControlsId = activity.getResources().getIdentifier(
+                    "navi_guidance_controls_touch_container", "id",
+                    activity.getPackageName());
+            guidanceControls = guidanceControlsId == 0
+                    ? null : activity.findViewById(guidanceControlsId);
+            capturePadding(guidanceControls, originalGuidanceControlsPadding);
+            originalGuidanceControlsFitsSystemWindows = fitsSystemWindows(guidanceControls);
+            floatingGuidanceControlsTop = paddingtonBaseTop(guidanceControls);
+        }
+        if (topNotificationContent == null) {
+            int topNotificationContentId = activity.getResources().getIdentifier(
+                    "top_notification_container", "id", activity.getPackageName());
+            topNotificationContent = topNotificationContentId == 0
+                    ? null : activity.findViewById(topNotificationContentId);
+            capturePadding(topNotificationContent, originalTopNotificationContentPadding);
+            originalTopNotificationContentFitsSystemWindows =
+                    fitsSystemWindows(topNotificationContent);
+            floatingTopNotificationContentTop = paddingtonBaseTop(topNotificationContent);
+        }
+        if (controlsEngine != null && floatingControlsEngineTop == 0) {
+            // This is zero in maps_activity.xml. Keep the reflective/fallback lookup here so the
+            // contract remains correct if the stock layout later introduces a base top padding.
+            floatingControlsEngineTop = paddingtonBaseTop(controlsEngine);
+        }
         if (transparentContentBackground == null) {
             transparentContentBackground = new ColorDrawable(Color.TRANSPARENT);
         }
@@ -564,7 +644,9 @@ final class FloatingWindowController {
             transparentMapWithControlsBackground = new ColorDrawable(Color.TRANSPARENT);
         }
         transparentLayersCaptured = contentRoot != null || mapRoot != null
-                || mapWithControls != null;
+                || mapWithControls != null || controlsInsetHost != null
+                || controlsEngine != null || topNotificationRoot != null
+                || guidanceControls != null || topNotificationContent != null;
     }
 
     private void enforceTransparentLayers() {
@@ -580,13 +662,29 @@ final class FloatingWindowController {
         removeFloatingTopInset(contentRoot);
         removeFloatingTopInset(mapRoot);
         removeFloatingTopInset(mapWithControls);
+        removeFloatingTopInset(controlsInsetHost);
+        setTopPadding(controlsEngine, floatingControlsEngineTop);
+        removeFloatingTopInset(topNotificationRoot);
+        setTopPadding(guidanceControls, floatingGuidanceControlsTop);
+        setTopPadding(topNotificationContent, floatingTopNotificationContentTop);
         setFitsSystemWindows(contentRoot, false);
         setFitsSystemWindows(mapRoot, false);
         setFitsSystemWindows(mapWithControls, false);
+        setFitsSystemWindows(controlsInsetHost, false);
+        setFitsSystemWindows(controlsEngine, false);
+        setFitsSystemWindows(topNotificationRoot, false);
+        setFitsSystemWindows(guidanceControls, false);
+        setFitsSystemWindows(topNotificationContent, false);
         requestLayout(contentRoot);
         requestLayout(mapRoot);
         requestLayout(mapWithControls);
-        dispatchFloatingInsetsToMapControls();
+        requestLayout(controlsInsetHost);
+        requestLayout(controlsEngine);
+        requestLayout(topNotificationRoot);
+        requestLayout(guidanceControls);
+        requestLayout(topNotificationContent);
+        installFloatingTopInsetGuards();
+        dispatchFloatingInsetsToNavigatorRoots();
         WindowManager.LayoutParams attributes = window.getAttributes();
         if (attributes.dimAmount != 0f) attributes.dimAmount = 0f;
     }
@@ -601,9 +699,21 @@ final class FloatingWindowController {
         restorePadding(contentRoot, originalContentPadding);
         restorePadding(mapRoot, originalMapRootPadding);
         restorePadding(mapWithControls, originalMapWithControlsPadding);
+        restorePadding(controlsInsetHost, originalControlsInsetHostPadding);
+        restorePadding(controlsEngine, originalControlsEnginePadding);
+        restorePadding(topNotificationRoot, originalTopNotificationPadding);
+        restorePadding(guidanceControls, originalGuidanceControlsPadding);
+        restorePadding(topNotificationContent, originalTopNotificationContentPadding);
         setFitsSystemWindows(contentRoot, originalContentFitsSystemWindows);
         setFitsSystemWindows(mapRoot, originalMapRootFitsSystemWindows);
         setFitsSystemWindows(mapWithControls, originalMapWithControlsFitsSystemWindows);
+        setFitsSystemWindows(controlsInsetHost, originalControlsInsetHostFitsSystemWindows);
+        setFitsSystemWindows(controlsEngine, originalControlsEngineFitsSystemWindows);
+        setFitsSystemWindows(topNotificationRoot, originalTopNotificationFitsSystemWindows);
+        setFitsSystemWindows(guidanceControls, originalGuidanceControlsFitsSystemWindows);
+        setFitsSystemWindows(topNotificationContent,
+                originalTopNotificationContentFitsSystemWindows);
+        removeFloatingTopInsetGuards();
     }
 
     /** Makes only the bounded window ignore the head unit's global status-bar top inset. */
@@ -628,18 +738,40 @@ final class FloatingWindowController {
         }
     }
 
-    /** Sends the zero-top contract directly to the late MapWithControls subtree on Android 9. */
-    private void dispatchFloatingInsetsToMapControls() {
+    /** Sends zero-top insets to both the map and its independent controls subtree on Android 9. */
+    private void dispatchFloatingInsetsToNavigatorRoots() {
         if (!floating || Build.VERSION.SDK_INT < 23) return;
         View decor = window.getDecorView();
         WindowInsets raw = decor == null ? null : decor.getRootWindowInsets();
-        View target = mapWithControls != null ? mapWithControls
-                : mapRoot != null ? mapRoot : contentRoot;
-        if (raw == null || target == null || !target.isAttachedToWindow()) return;
+        if (raw == null) return;
         WindowInsets adjusted = raw.replaceSystemWindowInsets(
                 raw.getSystemWindowInsetLeft(), 0,
                 raw.getSystemWindowInsetRight(), raw.getSystemWindowInsetBottom());
-        target.dispatchApplyWindowInsets(adjusted);
+        dispatchAdjustedInsets(mapWithControls != null ? mapWithControls
+                : mapRoot != null ? mapRoot : contentRoot, adjusted);
+        // PaddingtonView and top-notification are siblings of MapWithControlsView. Dispatching
+        // only to the map leaves the large global status-bar reserve on all upper UI elements.
+        dispatchAdjustedInsets(controlsInsetHost != null
+                ? controlsInsetHost : controlsEngine, adjusted);
+        dispatchAdjustedInsets(topNotificationRoot, adjusted);
+        dispatchAdjustedInsets(guidanceControls != null
+                && guidanceControls.getParent() instanceof View
+                ? (View) guidanceControls.getParent() : guidanceControls, adjusted);
+        dispatchAdjustedInsets(topNotificationContent != null
+                && topNotificationContent.getParent() instanceof View
+                ? (View) topNotificationContent.getParent() : topNotificationContent, adjusted);
+        // PaddingtonView 30.3.0 ignores the callback argument and reads raw root insets again.
+        // Reassert its captured XML padding synchronously after dispatch; the layout guard keeps
+        // the same invariant when Navigator issues a later inset pass of its own.
+        setTopPadding(controlsEngine, floatingControlsEngineTop);
+        setTopPadding(guidanceControls, floatingGuidanceControlsTop);
+        setTopPadding(topNotificationContent, floatingTopNotificationContentTop);
+    }
+
+    private static void dispatchAdjustedInsets(View target, WindowInsets adjusted) {
+        if (target != null && target.isAttachedToWindow()) {
+            target.dispatchApplyWindowInsets(adjusted);
+        }
     }
 
     private static Drawable backgroundOf(View view) {
@@ -661,9 +793,57 @@ final class FloatingWindowController {
     }
 
     private static void removeFloatingTopInset(View view) {
-        if (view != null && view.getPaddingTop() != 0) {
-            view.setPadding(view.getPaddingLeft(), 0,
+        setTopPadding(view, 0);
+    }
+
+    private static void setTopPadding(View view, int top) {
+        if (view != null && view.getPaddingTop() != top) {
+            view.setPadding(view.getPaddingLeft(), top,
                     view.getPaddingRight(), view.getPaddingBottom());
+        }
+    }
+
+    /** Reads PaddingtonView's captured XML padding; fallback subtracts the live root inset. */
+    private static int paddingtonBaseTop(View child) {
+        if (child == null) return 0;
+        Object parent = child.getParent();
+        if (parent != null && parent.getClass().getName().endsWith(".PaddingtonView")) {
+            try {
+                java.lang.reflect.Field baseTop = parent.getClass().getDeclaredField("b");
+                baseTop.setAccessible(true);
+                return Math.max(0, baseTop.getInt(parent));
+            } catch (ReflectiveOperationException | RuntimeException ignored) {}
+        }
+        int top = child.getPaddingTop();
+        if (Build.VERSION.SDK_INT >= 23 && child.isAttachedToWindow()) {
+            WindowInsets insets = child.getRootWindowInsets();
+            if (insets != null) top -= insets.getSystemWindowInsetTop();
+        }
+        return Math.max(0, top);
+    }
+
+    private void installFloatingTopInsetGuards() {
+        installFloatingTopInsetGuard(controlsEngine);
+        installFloatingTopInsetGuard(guidanceControls);
+        installFloatingTopInsetGuard(topNotificationContent);
+    }
+
+    private void installFloatingTopInsetGuard(View view) {
+        if (view == null) return;
+        // remove/add makes this idempotent across the one-second floating contract checks.
+        view.removeOnLayoutChangeListener(floatingTopInsetGuard);
+        view.addOnLayoutChangeListener(floatingTopInsetGuard);
+    }
+
+    private void removeFloatingTopInsetGuards() {
+        if (controlsEngine != null) {
+            controlsEngine.removeOnLayoutChangeListener(floatingTopInsetGuard);
+        }
+        if (guidanceControls != null) {
+            guidanceControls.removeOnLayoutChangeListener(floatingTopInsetGuard);
+        }
+        if (topNotificationContent != null) {
+            topNotificationContent.removeOnLayoutChangeListener(floatingTopInsetGuard);
         }
     }
 
@@ -693,7 +873,8 @@ final class FloatingWindowController {
                 + decor.getWidth() + "x" + decor.getHeight() + "@"
                 + location[0] + "," + location[1] + ", transparent roots="
                 + (contentRoot != null) + "/" + (mapRoot != null) + "/"
-                + (mapWithControls != null) + ", movableMap="
+                + (mapWithControls != null) + "/" + (controlsInsetHost != null)
+                + ", movableMap="
                 + NatroEntryPoint.usesMovableMap(activity) + ", rounded="
                 + decor.getClipToOutline());
     }
@@ -810,27 +991,24 @@ final class FloatingWindowController {
         closeButton.setVisibility(floating && profile.closeButtonVisible
                 ? View.VISIBLE : View.GONE);
 
+        attachModeButtonToStockLeftRail();
         layoutModeButtons();
         updateModeButtons();
     }
 
     private void updateModeButtons() {
-        if (modeButton == null || floatingModeButton == null) return;
+        if (modeButton == null) return;
+        attachModeButtonToStockLeftRail();
         updateModeButtonSize(modeButton);
-        updateModeButtonSize(floatingModeButton);
         float alpha = profile.modeButtonOpacityPercent / 100f;
         modeButton.setAlpha(alpha);
-        floatingModeButton.setAlpha(alpha);
-        modeButton.setText("◲");
-        modeButton.setContentDescription("Открыть Навигатор в окне");
-        floatingModeButton.setText("◱");
-        floatingModeButton.setContentDescription("Развернуть Навигатор на весь экран");
+        modeButton.setText(floating ? "◱" : "◲");
+        modeButton.setContentDescription(floating
+                ? "Развернуть Навигатор на весь экран"
+                : "Открыть Навигатор в окне");
         boolean revealed = SystemClock.elapsedRealtime() <= modeButtonVisibleUntilElapsedMs;
-        modeButton.setVisibility(revealed && !floating
-                && profile.enabled && profile.modeButtonVisible
+        modeButton.setVisibility(revealed && profile.enabled && profile.modeButtonVisible
                 ? View.VISIBLE : View.GONE);
-        floatingModeButton.setVisibility(revealed && floating && profile.enabled
-                && profile.modeButtonVisible ? View.VISIBLE : View.GONE);
     }
 
     private void revealModeButton() {
@@ -843,26 +1021,98 @@ final class FloatingWindowController {
 
     private void layoutModeButtons() {
         layoutModeButton(modeButton);
-        layoutModeButton(floatingModeButton);
     }
 
     private void layoutModeButton(TextView button) {
         if (button == null) return;
-        String position = profile.modeButtonPosition;
-        boolean right = "TOP_RIGHT".equals(position) || "BOTTOM_RIGHT".equals(position);
-        boolean bottom = "BOTTOM_LEFT".equals(position) || "BOTTOM_RIGHT".equals(position);
-        int gravity = (right ? Gravity.END : Gravity.START)
-                | (bottom ? Gravity.BOTTOM : Gravity.TOP);
+        if (button.getParent() instanceof LinearLayout) {
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp));
+            params.topMargin = dp(4);
+            params.gravity = Gravity.CENTER_HORIZONTAL;
+            button.setLayoutParams(params);
+            return;
+        }
+        // Short fallback while Navigator is still inflating the stock rail. The poller reparents
+        // this same button as soon as guidance_open_voice_search becomes available.
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp), gravity);
+                dp(profile.modeButtonSizeDp), dp(profile.modeButtonSizeDp),
+                Gravity.START | Gravity.TOP);
         int margin = dp(8);
         params.leftMargin = margin;
-        params.rightMargin = margin;
-        params.bottomMargin = margin;
-        // TOP_LEFT means the next slot in Navigator's own left control rail, not a control over
-        // the road. The resolved Alice/road-event bottom makes this the third stock-column item.
-        params.topMargin = !right && !bottom ? leftControlColumnNextTop(margin) : margin;
+        params.topMargin = leftControlColumnNextTop(margin);
         button.setLayoutParams(params);
+    }
+
+    /** Makes the toggle a real third child of Navigator's stock left vertical controls rail. */
+    private boolean attachModeButtonToStockLeftRail() {
+        TextView button = modeButton;
+        if (button == null) return false;
+        View voice = viewByName("guidance_open_voice_search");
+        View roadEvent = viewByName("guidance_add_road_event");
+        LinearLayout rail = verticalLinearAncestor(voice != null ? voice : roadEvent);
+        if (rail == null || !rail.isAttachedToWindow()) {
+            FrameLayout fallback = controlLayer;
+            if (fallback != null && button.getParent() != fallback) {
+                detachFromParent(button);
+                fallback.addView(button);
+                layoutModeButton(button);
+            }
+            return false;
+        }
+
+        View anchor = voice != null ? voice : roadEvent;
+        View directAnchor = directChildOf(rail, anchor);
+        int wanted = directAnchor == null
+                ? rail.getChildCount() : rail.indexOfChild(directAnchor) + 1;
+        if (button.getParent() == rail && rail.indexOfChild(button) == wanted) return true;
+        detachFromParent(button);
+        directAnchor = directChildOf(rail, anchor);
+        wanted = directAnchor == null
+                ? rail.getChildCount() : rail.indexOfChild(directAnchor) + 1;
+        try {
+            rail.addView(button, Math.max(0, Math.min(wanted, rail.getChildCount())));
+            layoutModeButton(button);
+            return true;
+        } catch (RuntimeException ignored) {
+            if (controlLayer != null && button.getParent() == null) {
+                controlLayer.addView(button);
+                layoutModeButton(button);
+            }
+            return false;
+        }
+    }
+
+    private View viewByName(String name) {
+        int id = activity.getResources().getIdentifier(name, "id", activity.getPackageName());
+        return id == 0 ? null : activity.findViewById(id);
+    }
+
+    private static LinearLayout verticalLinearAncestor(View view) {
+        View current = view;
+        for (int depth = 0; current != null && depth < 4; depth++) {
+            if (current instanceof LinearLayout
+                    && ((LinearLayout) current).getOrientation() == LinearLayout.VERTICAL) {
+                return (LinearLayout) current;
+            }
+            current = current.getParent() instanceof View ? (View) current.getParent() : null;
+        }
+        return null;
+    }
+
+    private static View directChildOf(ViewGroup parent, View descendant) {
+        View current = descendant;
+        while (current != null && current.getParent() != parent) {
+            current = current.getParent() instanceof View ? (View) current.getParent() : null;
+        }
+        return current;
+    }
+
+    private static void detachFromParent(View view) {
+        if (view != null && view.getParent() instanceof ViewGroup) {
+            try { ((ViewGroup) view.getParent()).removeView(view); }
+            catch (RuntimeException ignored) {}
+        }
     }
 
     private int leftControlColumnNextTop(int fallbackMargin) {

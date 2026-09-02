@@ -196,7 +196,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(restored.mainFloatingWindow.movementLocked);
         assertEquals(38, restored.mainFloatingWindow.cornerRadiusDp);
         assertTrue(restored.mainFloatingWindow.modeButtonVisible);
-        assertEquals("BOTTOM_LEFT", restored.mainFloatingWindow.modeButtonPosition);
+        assertEquals("TOP_LEFT", restored.mainFloatingWindow.modeButtonPosition);
         assertEquals(52, restored.mainFloatingWindow.modeButtonSizeDp);
         assertEquals("#FFABCDEF", restored.mainFloatingWindow.borderColor);
     }
@@ -646,7 +646,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("MotionEvent.ACTION_DOWN"));
         assertTrue(controller.contains("revealModeButton()"));
         assertTrue(controller.contains("controlLayer.addView(modeButton)"));
-        assertTrue(controller.contains("controlLayer.addView(floatingModeButton)"));
+        assertFalse(controller.contains("floatingModeButton"));
+        assertTrue(controller.contains("restartInMode(!floating, null)"));
+        assertTrue(controller.contains("attachModeButtonToStockLeftRail()"));
+        assertTrue(controller.contains("guidance_open_voice_search"));
+        assertTrue(controller.contains("verticalLinearAncestor"));
+        assertTrue(controller.contains("rail.addView(button"));
+        assertTrue(windowProfile.contains("modeButtonPosition = \"TOP_LEFT\""));
         assertTrue(controller.contains("MODE_BUTTON_AUTO_HIDE_MS = 5_000L"));
         assertTrue(controller.contains("MODE_BUTTON_STABLE_MS = 5_000L"));
         assertTrue(controller.contains("replaceSystemWindowInsets("));
@@ -655,9 +661,18 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("restorePadding(contentRoot"));
         assertTrue(controller.contains("requestNavigatorInsets()"));
         assertTrue(controller.contains("ensureControlLayerAttached()"));
-        assertTrue(controller.contains("dispatchFloatingInsetsToMapControls()"));
+        assertTrue(controller.contains("dispatchFloatingInsetsToNavigatorRoots()"));
+        assertTrue(controller.contains("controls_engine_container"));
+        assertTrue(controller.contains("controlsInsetHost = (View) controlsEngine.getParent()"));
+        assertTrue(controller.contains("maps_activity_top_notification_container"));
+        assertTrue(controller.contains("navi_guidance_controls_touch_container"));
+        assertTrue(controller.contains("top_notification_container"));
+        assertTrue(controller.contains("removeFloatingTopInset(controlsInsetHost)"));
+        assertTrue(controller.contains("paddingtonBaseTop"));
+        assertTrue(controller.contains("floatingTopInsetGuard"));
+        assertTrue(controller.contains("setTopPadding(guidanceControls"));
+        assertTrue(controller.contains("dispatchAdjustedInsets(controlsInsetHost != null"));
         assertTrue(controller.contains("guidance_add_road_event"));
-        assertTrue(controller.contains("guidance_refuel_search_map_control"));
         assertFalse(controller.contains("map_controls_menu_button"));
         assertTrue(controller.contains("View host = window.getDecorView()"));
         assertTrue(controller.contains("setFitsSystemWindows(contentRoot, false)"));
@@ -802,13 +817,19 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cameraDirections.contains("camera.speedLimit > 0"));
         assertTrue(cameraDirections.contains("STANDARD_SIGN_RED"));
         assertTrue(cameraDirections.contains("bitmapSize, bitmapSize"));
-        assertTrue(cameraDirections.contains("float badgeSize = diameter * .30f"));
+        assertFalse(cameraDirections.contains("badgeSize"));
+        assertFalse(cameraDirections.contains("badgeCx"));
+        int speedBranchStart = cameraDirections.indexOf("if (camera.speedLimit > 0)");
+        int cameraOnlyBranch = cameraDirections.indexOf("} else {", speedBranchStart);
+        assertTrue(speedBranchStart >= 0 && cameraOnlyBranch > speedBranchStart);
+        assertFalse(cameraDirections.substring(speedBranchStart, cameraOnlyBranch)
+                .contains("drawCameraGlyph"));
         assertTrue(cameraDirections.contains("canvas.drawCircle(cx, cy, radius, paint)"));
         assertFalse(cameraDirections.contains("visibleControlTags"));
         assertFalse(cameraDirections.contains("drawControlGlyph"));
         assertFalse(cameraDirections.contains("Path pin"));
         assertFalse(cameraDirections.contains("canvas.drawText(\"H\""));
-        assertTrue(cameraDirections.contains("One compact stock-like sign"));
+        assertTrue(cameraDirections.contains("One compact sign"));
         assertTrue(laneGuidance.contains("FRESH_MS = 1_500L"));
         assertTrue(laneGuidance.contains("LaneSignBalloonTextureFactory"));
         assertTrue(laneGuidance.contains("LaneSignBalloon"));

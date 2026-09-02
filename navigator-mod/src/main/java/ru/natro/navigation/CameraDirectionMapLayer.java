@@ -402,7 +402,7 @@ final class CameraDirectionMapLayer {
         imageProviders.add(provider);
     }
 
-    /** One compact stock-like sign: speed and camera never become adjacent map markers. */
+    /** One compact sign: a known speed is the complete marker, without a camera badge. */
     private Bitmap createCameraBitmap(CameraMarker camera) {
         float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
         float scale = scalePercent / 100f;
@@ -436,22 +436,9 @@ final class CameraDirectionMapLayer {
             float baseline = cy - (metrics.ascent + metrics.descent) * .5f;
             canvas.drawText(Integer.toString(camera.speedLimit),
                     cx - diameter * .025f, baseline, paint);
-
-            // The small red camera badge overlaps the ring just like the standard Navigator
-            // marker. It stays inside the tight square bitmap, so no invisible card-sized field
-            // can enlarge collisions or cover the road.
-            float badgeSize = diameter * .30f;
-            float badgeCx = cx + diameter * .34f;
-            float badgeCy = cy - diameter * .34f;
-            RectF badge = new RectF(badgeCx - badgeSize * .5f,
-                    badgeCy - badgeSize * .5f, badgeCx + badgeSize * .5f,
-                    badgeCy + badgeSize * .5f);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(STANDARD_SIGN_RED);
-            canvas.drawRoundRect(badge, badgeSize * .24f, badgeSize * .24f, paint);
-            drawCameraGlyph(canvas, paint, badgeCx, badgeCy,
-                    badgeSize * .30f, Color.WHITE, STANDARD_SIGN_RED);
         } else {
+            // A camera glyph remains only when the source did not supply a speed limit; otherwise
+            // the marker would have no visible meaning.
             drawCameraGlyph(canvas, paint, cx, cy,
                     diameter * .18f, STANDARD_SIGN_RED, Color.WHITE);
         }

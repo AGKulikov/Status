@@ -122,12 +122,9 @@ final class FloatingWindowProfile {
         // Kept in the wire schema for compatibility; KX11 requires the outer window plane to be
         // transparent so launcher/status controls remain visible around the resized map.
         backgroundColor = "#00000000";
-        if (!"TOP_LEFT".equals(modeButtonPosition)
-                && !"TOP_RIGHT".equals(modeButtonPosition)
-                && !"BOTTOM_LEFT".equals(modeButtonPosition)
-                && !"BOTTOM_RIGHT".equals(modeButtonPosition)) {
-            modeButtonPosition = "TOP_LEFT";
-        }
+        // Wire compatibility only. The toggle is always a child of Navigator's stock left rail;
+        // do not revive a legacy TOP_RIGHT/BOTTOM_* value saved by an older Natro release.
+        modeButtonPosition = "TOP_LEFT";
     }
 
     private static int clamp(int value, int minimum, int maximum) {
