@@ -300,6 +300,7 @@ def verify_navigator(
         b"Lru/natro/navigation/TrafficLightMapLayer;",
         b"Lru/natro/navigation/CameraDirectionMapLayer;",
         b"Lru/natro/navigation/LaneGuidanceMapLayer;",
+        b"Lru/natro/navigation/MapOverlayPlacementCoordinator;",
         b"Lru/natro/navigation/BackgroundMapLease;",
         b"getTrafficLightsWithSignal",
         b"getActiveSpeedCameras",
@@ -315,6 +316,10 @@ def verify_navigator(
         b"addManeuvers",
         b"applyManeuverStyle",
         b"addArrow",
+        b"routeTurnHeadSizePercent",
+        b"new_pin_alerts_lanecamera_40",
+        b"getBalloonGeometry",
+        b"setLegPlacement",
     ):
         if marker not in classes19:
             raise VerificationError(

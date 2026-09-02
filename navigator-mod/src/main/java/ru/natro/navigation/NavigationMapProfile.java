@@ -58,6 +58,8 @@ final class NavigationMapProfile {
     int cameraDirectionOpacityPercent = 30;
     int trafficLightScalePercent = 100;
     int routeTurnLengthPercent = 100;
+    /** Independent scale of ArrowManeuverStyle.triangleHeight. */
+    int routeTurnHeadSizePercent = 100;
     /** Null keeps the corresponding colour from MapKit's stock maneuver style. */
     String routeTurnFillColor;
     String routeTurnOutlineColor;
@@ -164,9 +166,11 @@ final class NavigationMapProfile {
                     source.optInt("cameraDirectionOpacityPercent", 30), 0, 100);
             result.trafficLightScalePercent = clamp(
                     source.optInt("trafficLightScalePercent", 100), 50, 250);
+            int legacyRouteTurnScale = source.optInt("routeTurnScalePercent", 100);
             result.routeTurnLengthPercent = clamp(source.optInt(
-                    "routeTurnLengthPercent",
-                    source.optInt("routeTurnScalePercent", 100)), 10, 250);
+                    "routeTurnLengthPercent", legacyRouteTurnScale), 10, 250);
+            result.routeTurnHeadSizePercent = clamp(source.optInt(
+                    "routeTurnHeadSizePercent", legacyRouteTurnScale), 10, 250);
             result.routeTurnFillColor = optionalColor(source, "routeTurnFillColor");
             result.routeTurnOutlineColor = optionalColor(source, "routeTurnOutlineColor");
             result.routeTurnOutlineWidth = clamp(source.optDouble(

@@ -2,14 +2,11 @@
 package ru.natro.navigation;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.PointF;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
-import android.view.View;
 
 import java.lang.reflect.Method;
 
@@ -19,13 +16,16 @@ final class LaneGuidanceMapLayer {
     private static final long FRESH_MS = 1_500L;
 
     private final Context context;
+    private final MapOverlayPlacementCoordinator placementCoordinator;
     private final Handler main = new Handler(Looper.getMainLooper());
     private Object map;
     private Object collection;
     private Object placemark;
     private Object iconStyle;
     private Object imageProvider;
-    private Bitmap iconBitmap;
+    private Object balloonTexture;
+    private int iconWidth;
+    private int iconHeight;
     private boolean enabled;
     private boolean nightMode;
     private boolean placeOnRight = true;
@@ -37,6 +37,7 @@ final class LaneGuidanceMapLayer {
     private long latestFingerprint = Long.MIN_VALUE;
     private long renderedFingerprint = Long.MIN_VALUE;
     private boolean expiryPosted;
+    private MapOverlayPlacementCoordinator.Placement placement;
 
     private final Runnable expire = new Runnable() {
         @Override public void run() {
@@ -56,8 +57,14 @@ final class LaneGuidanceMapLayer {
     };
 
     LaneGuidanceMapLayer(Context context) {
+        this(context, new MapOverlayPlacementCoordinator());
+    }
+
+    LaneGuidanceMapLayer(Context context,
+                         MapOverlayPlacementCoordinator placementCoordinator) {
         Context app = context.getApplicationContext();
         this.context = app == null ? context : app;
+        this.placementCoordinator = placementCoordinator;
     }
 
     void attach(Object nextMap) {
@@ -137,6 +144,24 @@ final class LaneGuidanceMapLayer {
         latestSampleElapsedMs = 0L;
         latestFingerprint = Long.MIN_VALUE;
         render();
+    }
+
+    /** Participates in the shared lane/light/camera collision pass after a camera move. */
+    void relayout() {
+        placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_LANES);
+        NavigatorStatePublisher.LaneGuidanceFrame frame = latest;
+        if (!enabled || !latestRouteActive || frame == null || !frame.hasContent()
+                || placemark == null || iconStyle == null || imageProvider == null
+                || balloonTexture == null || iconWidth <= 0 || iconHeight <= 0) return;
+        try {
+            MapOverlayPlacementCoordinator.Placement next = placementCoordinator.reserve(
+                    MapOverlayPlacementCoordinator.OWNER_LANES, frame.id,
+                    frame.latitude, frame.longitude,
+                    iconWidth, iconHeight, placeOnRight);
+            applyPlacement(next);
+        } catch (Throwable failure) {
+            Log.w(TAG, "Lane balloon could not be repositioned", failure);
+        }
     }
 
     private void scheduleExpiryIfNeeded() {
@@ -229,10 +254,22 @@ final class LaneGuidanceMapLayer {
                         + "LaneSignBalloonTextureFactory");
         Object factory = factoryClass.getConstructor(Context.class, colorsClass)
                 .newInstance(context, null);
-        View original = (View) factoryClass
-                .getMethod("createView", balloonClass, boolean.class)
-                .invoke(factory, balloon, nightMode);
-        Bitmap bitmap = drawView(original, scalePercent / 100f);
+        Object texture = factoryClass
+                .getMethod("createTexture", balloonClass, boolean.class, float.class)
+                .invoke(factory, balloon, nightMode, scalePercent / 100f);
+        Object preliminaryAnchor = balloonAnchor("LEFT_CENTER");
+        Object preliminaryGeometry = invoke(texture, "getBalloonGeometry",
+                new Class<?>[]{preliminaryAnchor.getClass()}, preliminaryAnchor);
+        int measuredWidth = Math.max(1, Math.round(((Number) invoke(
+                preliminaryGeometry, "getWidth", new Class<?>[0])).floatValue()));
+        int measuredHeight = Math.max(1, Math.round(((Number) invoke(
+                preliminaryGeometry, "getHeight", new Class<?>[0])).floatValue()));
+
+        placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_LANES);
+        MapOverlayPlacementCoordinator.Placement nextPlacement = placementCoordinator.reserve(
+                MapOverlayPlacementCoordinator.OWNER_LANES, frame.id,
+                frame.latitude, frame.longitude,
+                measuredWidth, measuredHeight, placeOnRight);
 
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
@@ -242,44 +279,92 @@ final class LaneGuidanceMapLayer {
             style = styleClass.getConstructor().newInstance();
             Object rotation = Enum.valueOf(
                     (Class<? extends Enum>) rotationClass, "NO_ROTATION");
-            // The stock Navigator keeps this balloon beside the road. An out-of-bounds anchor
-            // places the complete screen-facing card to one side of the route point instead of
-            // centring it over the lanes and hiding the road ahead.
-            invoke(style, "setAnchor", new Class<?>[]{PointF.class},
-                    new PointF(placeOnRight ? -0.08f : 1.08f, 0.55f));
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
             invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
             iconStyle = style;
         }
-        Object provider = providerClass.getMethod("fromBitmap", Bitmap.class)
-                .invoke(null, bitmap);
+        Object exactAnchor = balloonAnchor(nextPlacement.legName);
+        Object provider = invoke(texture, "create",
+                new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
+        Object geometry = invoke(texture, "getBalloonGeometry",
+                new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
+        PointF imageAnchor = (PointF) invoke(geometry, "getImageAnchor", new Class<?>[0]);
         imageProvider = provider;
-        iconBitmap = bitmap;
+        balloonTexture = texture;
+        iconWidth = Math.max(1, Math.round(((Number) invoke(
+                geometry, "getWidth", new Class<?>[0])).floatValue()));
+        iconHeight = Math.max(1, Math.round(((Number) invoke(
+                geometry, "getHeight", new Class<?>[0])).floatValue()));
+        placement = nextPlacement;
+        invoke(style, "setAnchor", new Class<?>[]{PointF.class},
+                imageAnchor);
         invoke(currentPlacemark, "setIcon",
                 new Class<?>[]{providerClass, styleClass}, provider, style);
     }
 
-    private static Bitmap drawView(View view, float scale) {
-        int unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-        view.measure(unspecified, unspecified);
-        int naturalWidth = Math.max(1, view.getMeasuredWidth());
-        int naturalHeight = Math.max(1, view.getMeasuredHeight());
-        if (naturalWidth > 2_048 || naturalHeight > 2_048) {
-            throw new IllegalArgumentException("Lane view is unbounded");
+    private void applyPlacement(MapOverlayPlacementCoordinator.Placement next)
+            throws Exception {
+        if (next == null) return;
+        Object style = iconStyle;
+        Object provider = imageProvider;
+        Object texture = balloonTexture;
+        Object currentPlacemark = placemark;
+        if (style == null || provider == null || texture == null
+                || currentPlacemark == null) return;
+        if (placement != null && placement.sameSlot(next)) return;
+        placement = next;
+        Object exactAnchor = balloonAnchor(next.legName);
+        provider = invoke(texture, "create",
+                new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
+        Object geometry = invoke(texture, "getBalloonGeometry",
+                new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
+        PointF imageAnchor = (PointF) invoke(geometry, "getImageAnchor", new Class<?>[0]);
+        imageProvider = provider;
+        iconWidth = Math.max(1, Math.round(((Number) invoke(
+                geometry, "getWidth", new Class<?>[0])).floatValue()));
+        iconHeight = Math.max(1, Math.round(((Number) invoke(
+                geometry, "getHeight", new Class<?>[0])).floatValue()));
+        invoke(style, "setAnchor", new Class<?>[]{PointF.class},
+                imageAnchor);
+        Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
+        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+        invoke(currentPlacemark, "setIcon",
+                new Class<?>[]{providerClass, styleClass}, provider, style);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static Object balloonAnchor(String legName) throws Exception {
+        String[] parts = legName.split("_");
+        String vertical;
+        String horizontal;
+        if (parts.length == 2) {
+            if ("LEFT".equals(parts[0]) || "RIGHT".equals(parts[0])) {
+                horizontal = parts[0];
+                vertical = parts[1];
+            } else {
+                vertical = parts[0];
+                horizontal = parts[1];
+            }
+        } else {
+            vertical = "CENTER";
+            horizontal = "LEFT";
         }
-        view.layout(0, 0, naturalWidth, naturalHeight);
-        int width = Math.max(1, Math.round(naturalWidth * scale));
-        int height = Math.max(1, Math.round(naturalHeight * scale));
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        canvas.scale(scale, scale);
-        view.draw(canvas);
-        return bitmap;
+        Class<?> verticalClass = Class.forName(
+                "com.yandex.mapkit.navigation.balloons.VerticalPosition");
+        Class<?> horizontalClass = Class.forName(
+                "com.yandex.mapkit.navigation.balloons.HorizontalPosition");
+        Object verticalValue = Enum.valueOf((Class<? extends Enum>) verticalClass, vertical);
+        Object horizontalValue = Enum.valueOf((Class<? extends Enum>) horizontalClass, horizontal);
+        Class<?> anchorClass = Class.forName(
+                "com.yandex.mapkit.navigation.balloons.BalloonAnchor");
+        return anchorClass.getConstructor(verticalClass, horizontalClass)
+                .newInstance(verticalValue, horizontalValue);
     }
 
     private void clearVisual() {
+        placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_LANES);
         if (collection != null) {
             try { invoke(collection, "clear", new Class<?>[0]); }
             catch (Throwable ignored) {}
@@ -287,7 +372,10 @@ final class LaneGuidanceMapLayer {
         placemark = null;
         iconStyle = null;
         imageProvider = null;
-        iconBitmap = null;
+        balloonTexture = null;
+        iconWidth = 0;
+        iconHeight = 0;
+        placement = null;
         renderedFingerprint = Long.MIN_VALUE;
     }
 

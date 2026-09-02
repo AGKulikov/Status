@@ -29,6 +29,7 @@ final class RouteTurnMapLayer {
     private boolean fallbackArrowsAdded;
     private boolean enabled;
     private int lengthPercent = 100;
+    private int headSizePercent = 100;
     private String fillColor;
     private String outlineColor;
     private float outlineWidth = 2f;
@@ -105,14 +106,16 @@ final class RouteTurnMapLayer {
         latestSampleElapsedMs = 0L;
     }
 
-    void apply(boolean nextEnabled, int nextLengthPercent,
+    void apply(boolean nextEnabled, int nextLengthPercent, int nextHeadSizePercent,
                String nextFillColor, String nextOutlineColor,
                double nextOutlineWidth, int ignoredLayerPriority) {
         int nextLength = Math.max(10, Math.min(250, nextLengthPercent));
+        int nextHeadSize = Math.max(10, Math.min(250, nextHeadSizePercent));
         float safeOutlineWidth = (float) Math.max(0d, Math.min(20d,
                 Double.isNaN(nextOutlineWidth) || Double.isInfinite(nextOutlineWidth)
                         ? 2d : nextOutlineWidth));
         boolean styleChanged = lengthPercent != nextLength
+                || headSizePercent != nextHeadSize
                 || !Objects.equals(fillColor, nextFillColor)
                 || !Objects.equals(outlineColor, nextOutlineColor)
                 || Float.compare(outlineWidth, safeOutlineWidth) != 0;
@@ -120,6 +123,7 @@ final class RouteTurnMapLayer {
         enabled = nextEnabled;
         if (styleChanged) {
             lengthPercent = nextLength;
+            headSizePercent = nextHeadSize;
             fillColor = nextFillColor;
             outlineColor = nextOutlineColor;
             outlineWidth = safeOutlineWidth;
@@ -239,8 +243,8 @@ final class RouteTurnMapLayer {
     }
 
     /**
-     * Clones MapKit's stock geometry and explicitly enables it. Length changes the complete
-     * arrow and its tip proportionally. There is deliberately no arrow-width multiplier:
+     * Clones MapKit's stock geometry and explicitly enables it. Length and triangular-head size
+     * are independent. There is deliberately no arrow-width multiplier:
      * PolylineMapObject keeps the arrow body tied to the route's current stroke width.
      */
     private Object maneuverStyle(boolean visible) throws Exception {
@@ -249,6 +253,13 @@ final class RouteTurnMapLayer {
         }
         Object source = defaultArrowStyle();
         float lengthScale = lengthPercent / 100f;
+        float headScale = headSizePercent / 100f;
+        float length = number(source, "getLength", 80f) * lengthScale;
+        // MapKit requires the head to fit inside the arrow. Keep the user's independent scale,
+        // limiting it only when an extreme short-length/long-head combination is impossible.
+        float triangleHeight = Math.min(
+                number(source, "getTriangleHeight", 16f) * headScale,
+                Math.max(1f, length * .95f));
         Class<?> arrowStyleClass = Class.forName(
                 "com.yandex.mapkit.directions.driving.ArrowManeuverStyle");
         Object arrowStyle = arrowStyleClass.getConstructor(
@@ -260,8 +271,8 @@ final class RouteTurnMapLayer {
                         configuredColor(outlineColor,
                                 integer(source, "getOutlineColor", 0xFFFFFFFF)),
                         outlineWidth,
-                        number(source, "getLength", 80f) * lengthScale,
-                        number(source, "getTriangleHeight", 16f) * lengthScale,
+                        length,
+                        triangleHeight,
                         visible);
         Class<?> styleClass = Class.forName(
                 "com.yandex.mapkit.directions.driving.ManeuverStyle");

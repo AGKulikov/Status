@@ -7,8 +7,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PointF;
-import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -26,8 +26,8 @@ import java.util.List;
  * Unified camera signs and source-backed translucent viewing sectors.
  *
  * <p>Yandex data comes directly from Windshield. HUD Speed data arrives through Natro's pinned
- * bridge. HUD Speed is selected first, so a nearby Yandex copy is removed rather than painted
- * under it. A sector is created only when the source supplied a usable direction.</p>
+ * bridge. Nearby records are merged into one physical marker while their exact control tags and
+ * both viewing directions are retained. A sector is created only when a source supplied it.</p>
  */
 final class CameraDirectionMapLayer {
     private static final String TAG = "NatroCameraLayer";
@@ -36,7 +36,8 @@ final class CameraDirectionMapLayer {
     private static final int MAX_CAMERAS = 32;
     private static final int MAX_EXTERNAL_JSON_CHARS = 96 * 1024;
     private static final double HUD_SPEED_DUPLICATE_DISTANCE_METERS = 65d;
-    private static final double SAME_SOURCE_DUPLICATE_DISTANCE_METERS = 55d;
+    /** Do not collapse two consecutive physical cameras just because their pins are nearby. */
+    private static final double SAME_SOURCE_DUPLICATE_DISTANCE_METERS = 12d;
     private static final double EARTH_RADIUS_METERS = 6_371_000d;
     private static final double BASE_SECTOR_LENGTH_METERS = 105d;
     /** Matches the former 13 degree half-angle at the default 105 metre length. */
@@ -49,9 +50,11 @@ final class CameraDirectionMapLayer {
     private static final String SOURCE_HUD_SPEED = "HUD_SPEED";
 
     private final Context context;
+    private final MapOverlayPlacementCoordinator placementCoordinator;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ArrayList<Bitmap> iconBitmaps = new ArrayList<>();
     private final ArrayList<Object> imageProviders = new ArrayList<>();
+    private final ArrayList<CameraSign> cameraSigns = new ArrayList<>();
     private final ArrayList<CameraMarker> visibleScratch = new ArrayList<>(MAX_CAMERAS);
     private Object map;
     private Object collection;
@@ -83,8 +86,14 @@ final class CameraDirectionMapLayer {
     };
 
     CameraDirectionMapLayer(Context context) {
+        this(context, new MapOverlayPlacementCoordinator());
+    }
+
+    CameraDirectionMapLayer(Context context,
+                            MapOverlayPlacementCoordinator placementCoordinator) {
         Context app = context.getApplicationContext();
         this.context = app == null ? context : app;
+        this.placementCoordinator = placementCoordinator;
     }
 
     void attach(Object nextMap) {
@@ -201,6 +210,29 @@ final class CameraDirectionMapLayer {
         scheduleExpiryIfNeeded();
     }
 
+    /** Reuses textures and changes only anchors when the shared collision pass selects a slot. */
+    void relayout() {
+        placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_CAMERAS);
+        for (CameraSign sign : cameraSigns) {
+            try {
+                MapOverlayPlacementCoordinator.Placement next = reservePlacement(
+                        sign.camera, sign.bitmapWidth, sign.bitmapHeight);
+                if (next.sameSlot(sign.placement)) continue;
+                sign.placement = next;
+                invoke(sign.style, "setAnchor", new Class<?>[]{PointF.class},
+                        new PointF(next.anchorX, next.anchorY));
+                Class<?> providerClass = Class.forName(
+                        "com.yandex.runtime.image.ImageProvider");
+                Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+                invoke(sign.placemark, "setIcon",
+                        new Class<?>[]{providerClass, styleClass},
+                        sign.provider, sign.style);
+            } catch (Throwable failure) {
+                Log.w(TAG, "Camera sign could not be repositioned", failure);
+            }
+        }
+    }
+
     private void scheduleExpiryIfNeeded() {
         if (map == null || expiryPosted || (!yandexEnabled && !externalEnabled)) return;
         long now = SystemClock.elapsedRealtime();
@@ -243,48 +275,57 @@ final class CameraDirectionMapLayer {
         if (map != null && (dataChanged || renderedFingerprint != fingerprint)) render();
     }
 
-    /** HUD Speed is inserted first and therefore wins every positional duplicate. */
+    /** HUD Speed supplies the primary record; Yandex enriches it with exact event tags. */
     private void selectVisible(ArrayList<CameraMarker> target) {
         target.clear();
         if (externalEnabled && latestExternalSampleElapsedMs > 0L) {
             for (ExternalCamera value : latestExternal) {
                 if (value == null || !value.hasMapPosition()) continue;
                 CameraMarker candidate = CameraMarker.fromExternal(value);
-                addOrPreferRicherDuplicate(target, candidate,
+                addOrMergeDuplicate(target, candidate,
                         SAME_SOURCE_DUPLICATE_DISTANCE_METERS);
-                if (target.size() >= MAX_CAMERAS) return;
+                if (target.size() >= MAX_CAMERAS) break;
             }
         }
         if (yandexEnabled && latestRouteActive && latestYandexSampleElapsedMs > 0L) {
             for (NavigatorStatePublisher.CameraDirectionFrame value : latestYandex) {
                 if (value == null || !value.hasMapPosition()) continue;
                 CameraMarker candidate = CameraMarker.fromYandex(value);
-                if (!hasHudSpeedDuplicate(target, candidate)) {
-                    addOrPreferRicherDuplicate(target, candidate,
-                            SAME_SOURCE_DUPLICATE_DISTANCE_METERS);
+                if (!mergeIntoNearbyHudSpeed(target, candidate)) {
+                    if (target.size() < MAX_CAMERAS) {
+                        addOrMergeDuplicate(target, candidate,
+                                SAME_SOURCE_DUPLICATE_DISTANCE_METERS);
+                    }
                 }
-                if (target.size() >= MAX_CAMERAS) return;
             }
         }
     }
 
-    private static boolean hasHudSpeedDuplicate(List<CameraMarker> values,
-                                                CameraMarker candidate) {
-        for (CameraMarker accepted : values) {
+    private static boolean mergeIntoNearbyHudSpeed(ArrayList<CameraMarker> values,
+                                                   CameraMarker candidate) {
+        int nearestIndex = -1;
+        double nearestDistance = Double.MAX_VALUE;
+        for (int index = 0; index < values.size(); index++) {
+            CameraMarker accepted = values.get(index);
             if (!SOURCE_HUD_SPEED.equals(accepted.source)) continue;
-            if (distanceMeters(accepted.latitude, accepted.longitude,
-                    candidate.latitude, candidate.longitude)
-                    <= HUD_SPEED_DUPLICATE_DISTANCE_METERS) {
-                return true;
+            double distance = distanceMeters(accepted.latitude, accepted.longitude,
+                    candidate.latitude, candidate.longitude);
+            if (distance <= HUD_SPEED_DUPLICATE_DISTANCE_METERS
+                    && distance < nearestDistance) {
+                nearestIndex = index;
+                nearestDistance = distance;
             }
         }
-        return false;
+        if (nearestIndex < 0) return false;
+        values.set(nearestIndex,
+                CameraMarker.merge(values.get(nearestIndex), candidate));
+        return true;
     }
 
     /** Collapses repeated source records into one physical camera marker. */
-    private static void addOrPreferRicherDuplicate(ArrayList<CameraMarker> values,
-                                                   CameraMarker candidate,
-                                                   double maximumDistanceMeters) {
+    private static void addOrMergeDuplicate(ArrayList<CameraMarker> values,
+                                            CameraMarker candidate,
+                                            double maximumDistanceMeters) {
         for (int index = 0; index < values.size(); index++) {
             CameraMarker accepted = values.get(index);
             if (!accepted.source.equals(candidate.source)) continue;
@@ -292,9 +333,7 @@ final class CameraDirectionMapLayer {
             boolean duplicatePoint = distanceMeters(accepted.latitude, accepted.longitude,
                     candidate.latitude, candidate.longitude) <= maximumDistanceMeters;
             if (!duplicateId && !duplicatePoint) continue;
-            if (candidate.informationScore() > accepted.informationScore()) {
-                values.set(index, candidate);
-            }
+            values.set(index, CameraMarker.merge(accepted, candidate));
             return;
         }
         values.add(candidate);
@@ -316,8 +355,10 @@ final class CameraDirectionMapLayer {
                 collection = currentCollection;
             }
             invoke(currentCollection, "clear", new Class<?>[0]);
+            placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_CAMERAS);
             iconBitmaps.clear();
             imageProviders.clear();
+            cameraSigns.clear();
             for (CameraMarker camera : visibleScratch) {
                 // No direction supplied means exactly one sign and no guessed circular plane.
                 for (Double direction : camera.directions) {
@@ -389,7 +430,10 @@ final class CameraDirectionMapLayer {
         Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
         Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass, "NO_ROTATION");
         Object style = styleClass.getConstructor().newInstance();
-        invoke(style, "setAnchor", new Class<?>[]{PointF.class}, new PointF(0.5f, 0.96f));
+        MapOverlayPlacementCoordinator.Placement placement = reservePlacement(
+                camera, bitmap.getWidth(), bitmap.getHeight());
+        invoke(style, "setAnchor", new Class<?>[]{PointF.class},
+                new PointF(placement.anchorX, placement.anchorY));
         invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
         invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
         invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
@@ -400,74 +444,113 @@ final class CameraDirectionMapLayer {
         invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
         iconBitmaps.add(bitmap);
         imageProviders.add(provider);
+        cameraSigns.add(new CameraSign(camera, placemark, provider, style,
+                bitmap.getWidth(), bitmap.getHeight(), placement));
     }
 
-    /** One compact sign: a known speed is the complete marker, without a camera badge. */
+    private MapOverlayPlacementCoordinator.Placement reservePlacement(
+            CameraMarker camera, int bitmapWidth, int bitmapHeight) {
+        boolean preferRight = (camera.id.hashCode() & 1) == 0;
+        return placementCoordinator.reserve(
+                MapOverlayPlacementCoordinator.OWNER_CAMERAS, camera.id,
+                camera.latitude, camera.longitude,
+                bitmapWidth, bitmapHeight, preferRight);
+    }
+
+    /**
+     * One compact marker. A speed-only camera is one clean speed circle. When the same physical
+     * event also controls lanes/crossroads/stopping, the exact stock 40dp control plate is joined
+     * directly to that circle; no additional miniature camera badge is painted.
+     */
     private Bitmap createCameraBitmap(CameraMarker camera) {
         float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
         float scale = scalePercent / 100f;
         int diameter = Math.max(26, Math.min(180, Math.round(40f * density * scale)));
         float padding = Math.max(1f, diameter * .035f);
-        int bitmapSize = Math.max(1, (int) Math.ceil(diameter + padding * 2f));
+        String detailDrawableName = detailDrawableName(camera.controlTags);
+        if (camera.speedLimit <= 0 && detailDrawableName == null) {
+            detailDrawableName = "new_pin_alerts_camera_40";
+        }
+        Bitmap detail = detailDrawableName == null
+                ? null : stockDrawableBitmap(detailDrawableName, diameter);
+        boolean showSpeed = camera.speedLimit > 0;
+        int overlap = showSpeed && detail != null
+                ? Math.max(1, Math.round(diameter * .08f)) : 0;
+        int contentWidth = (showSpeed ? diameter : 0)
+                + (detail != null ? diameter : 0) - overlap;
+        if (contentWidth <= 0) contentWidth = diameter;
+        int bitmapWidth = Math.max(1, (int) Math.ceil(contentWidth + padding * 2f));
+        int bitmapHeight = Math.max(1, (int) Math.ceil(diameter + padding * 2f));
         Bitmap bitmap = Bitmap.createBitmap(
-                bitmapSize, bitmapSize, Bitmap.Config.ARGB_8888);
+                bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
-        float cx = bitmapSize * .5f;
-        float cy = bitmapSize * .5f;
+        float cy = bitmapHeight * .5f;
+        float speedCx = padding + (detail == null ? 0f : diameter - overlap)
+                + diameter * .5f;
+        if (detail != null) canvas.drawBitmap(detail, padding, padding, paint);
+        if (!showSpeed) return bitmap;
         float stroke = Math.max(2f, diameter * .085f);
         float radius = diameter * .5f - stroke * .5f;
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.WHITE);
-        canvas.drawCircle(cx, cy, radius, paint);
+        canvas.drawCircle(speedCx, cy, radius, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(stroke);
         paint.setColor(STANDARD_SIGN_RED);
-        canvas.drawCircle(cx, cy, radius, paint);
-
-        if (camera.speedLimit > 0) {
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(STANDARD_SIGN_TEXT);
-            paint.setTypeface(Typeface.DEFAULT_BOLD);
-            paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTextSize(diameter * (camera.speedLimit >= 100 ? .34f : .42f));
-            Paint.FontMetrics metrics = paint.getFontMetrics();
-            float baseline = cy - (metrics.ascent + metrics.descent) * .5f;
-            canvas.drawText(Integer.toString(camera.speedLimit),
-                    cx - diameter * .025f, baseline, paint);
-        } else {
-            // A camera glyph remains only when the source did not supply a speed limit; otherwise
-            // the marker would have no visible meaning.
-            drawCameraGlyph(canvas, paint, cx, cy,
-                    diameter * .18f, STANDARD_SIGN_RED, Color.WHITE);
-        }
+        canvas.drawCircle(speedCx, cy, radius, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(STANDARD_SIGN_TEXT);
+        paint.setTypeface(Typeface.DEFAULT_BOLD);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(diameter * (camera.speedLimit >= 100 ? .34f : .42f));
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        float baseline = cy - (metrics.ascent + metrics.descent) * .5f;
+        canvas.drawText(Integer.toString(camera.speedLimit),
+                speedCx - diameter * .025f, baseline, paint);
         return bitmap;
     }
 
-    private static void drawCameraGlyph(Canvas canvas, Paint paint, float cx, float cy,
-                                        float radius, int color, int lensColor) {
-        float width = radius * 1.72f;
-        float height = radius * 1.02f;
-        RectF body = new RectF(cx - width * .5f, cy - height * .35f,
-                cx + width * .5f, cy + height * .65f);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(color);
-        canvas.drawRoundRect(body, radius * .15f, radius * .15f, paint);
-        RectF hump = new RectF(cx - width * .30f, cy - height * .62f,
-                cx + width * .03f, cy - height * .25f);
-        canvas.drawRoundRect(hump, radius * .08f, radius * .08f, paint);
-        paint.setColor(lensColor);
-        canvas.drawCircle(cx + width * .10f, cy + height * .15f, radius * .27f, paint);
+    private Bitmap stockDrawableBitmap(String name, int size) {
+        try {
+            int resource = context.getResources().getIdentifier(
+                    name, "drawable", context.getPackageName());
+            if (resource == 0) return null;
+            Drawable drawable = context.getDrawable(resource);
+            if (drawable == null) return null;
+            Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            drawable.setBounds(0, 0, size, size);
+            drawable.draw(canvas);
+            return bitmap;
+        } catch (Throwable unavailable) {
+            return null;
+        }
+    }
+
+    private static String detailDrawableName(List<String> tags) {
+        if (tags.contains("LANE_CONTROL") || tags.contains("ROAD_MARKING_CONTROL")) {
+            return "new_pin_alerts_lanecamera_40";
+        }
+        if (tags.contains("CROSS_ROAD_CONTROL") || tags.contains("TRAFFIC_CONTROL")) {
+            return "new_pin_alerts_crossroad_camera_40";
+        }
+        if (tags.contains("NO_STOPPING_CONTROL")) {
+            return "new_pin_alerts_camera_stop_40";
+        }
+        return null;
     }
 
     private void clearVisual() {
+        placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_CAMERAS);
         if (collection != null) {
             try { invoke(collection, "clear", new Class<?>[0]); }
             catch (Throwable ignored) {}
         }
         iconBitmaps.clear();
         imageProviders.clear();
+        cameraSigns.clear();
         renderedFingerprint = Long.MIN_VALUE;
     }
 
@@ -643,8 +726,65 @@ final class CameraDirectionMapLayer {
                     && Double.isFinite(longitude) && longitude >= -180d && longitude <= 180d;
         }
 
-        int informationScore() {
-            return (speedLimit > 0 ? 100 : 0) + controlTags.size() * 10 + directions.size();
+        static CameraMarker merge(CameraMarker primary, CameraMarker extra) {
+            ArrayList<String> tags = new ArrayList<>(8);
+            appendTags(tags, primary.controlTags);
+            appendTags(tags, extra.controlTags);
+            ArrayList<Double> directions = new ArrayList<>(4);
+            appendDirections(directions, primary.directions);
+            appendDirections(directions, extra.directions);
+            int speed = primary.speedLimit > 0 ? primary.speedLimit : extra.speedLimit;
+            return new CameraMarker(primary.source, primary.id,
+                    primary.latitude, primary.longitude, speed,
+                    Collections.unmodifiableList(tags),
+                    Collections.unmodifiableList(directions));
+        }
+
+        private static void appendTags(ArrayList<String> target, List<String> source) {
+            for (String value : source) {
+                if (target.size() >= 8) return;
+                if (value != null && !value.isEmpty() && !target.contains(value)) {
+                    target.add(value);
+                }
+            }
+        }
+
+        private static void appendDirections(ArrayList<Double> target, List<Double> source) {
+            for (Double value : source) {
+                if (value == null || !Double.isFinite(value)) continue;
+                double normalized = normalizedBearing(value.doubleValue());
+                boolean duplicate = false;
+                for (Double accepted : target) {
+                    double delta = Math.abs(accepted.doubleValue() - normalized) % 360d;
+                    if (Math.min(delta, 360d - delta) < 7d) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate && target.size() < 4) target.add(normalized);
+            }
+        }
+    }
+
+    private static final class CameraSign {
+        final CameraMarker camera;
+        final Object placemark;
+        final Object provider;
+        final Object style;
+        final int bitmapWidth;
+        final int bitmapHeight;
+        MapOverlayPlacementCoordinator.Placement placement;
+
+        CameraSign(CameraMarker camera, Object placemark, Object provider, Object style,
+                   int bitmapWidth, int bitmapHeight,
+                   MapOverlayPlacementCoordinator.Placement placement) {
+            this.camera = camera;
+            this.placemark = placemark;
+            this.provider = provider;
+            this.style = style;
+            this.bitmapWidth = bitmapWidth;
+            this.bitmapHeight = bitmapHeight;
+            this.placement = placement;
         }
     }
 }

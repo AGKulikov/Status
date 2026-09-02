@@ -660,6 +660,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField routeTurnLength = slider(content,
                 "Длина стрелок поворотов на маршруте",
                 map.routeTurnLengthPercent, 10, 250, 5, " %");
+        SliderField routeTurnHeadSize = slider(content,
+                "Размер наконечника стрелок поворотов",
+                map.routeTurnHeadSizePercent, 10, 250, 5, " %");
         InheritedColorField routeTurnFillColor = inheritableNavigationColorField(
                 content, "Цвет стрелок поворотов", map.routeTurnFillColor,
                 finalNavigation, preferences, value -> map.routeTurnFillColor = value);
@@ -670,7 +673,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 "Толщина обводки стрелок",
                 map.routeTurnOutlineWidth, 0, 20, 0.5, " px");
         content.addView(text("Ширина стрелки всегда равна толщине линии маршрута. Длина меняет "
-                + "стрелку и наконечник пропорционально, но не меняет её ширину.",
+                + "тело стрелки, а размер треугольного наконечника настраивается отдельно.",
                 12, 0xFFB8C0CC));
         SliderField routeLabelScale = slider(content,
                 "Размер штатных названий улиц",
@@ -812,6 +815,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue();
                     map.trafficLightScalePercent = trafficLightScale.intValue();
                     map.routeTurnLengthPercent = routeTurnLength.intValue();
+                    map.routeTurnHeadSizePercent = routeTurnHeadSize.intValue();
                     map.routeTurnFillColor = routeTurnFillColor.value;
                     map.routeTurnOutlineColor = routeTurnOutlineColor.value;
                     map.routeTurnOutlineWidth = routeTurnOutlineWidth.value();

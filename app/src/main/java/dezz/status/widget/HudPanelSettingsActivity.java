@@ -590,6 +590,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField routeTurnLength = slider(form,
                 "Длина стрелок поворотов на маршруте",
                 profile.routeTurnLengthPercent, 10, 250, 5, " %");
+        SliderField routeTurnHeadSize = slider(form,
+                "Размер наконечника стрелок поворотов",
+                profile.routeTurnHeadSizePercent, 10, 250, 5, " %");
         InheritedColorField routeTurnFillColor = inheritableNavigationColorField(
                 form, "Цвет стрелок поворотов", profile.routeTurnFillColor,
                 navigation, value -> profile.routeTurnFillColor = value);
@@ -600,7 +603,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Толщина обводки стрелок",
                 profile.routeTurnOutlineWidth, 0, 20, 0.5, " px");
         form.addView(text("Ширина стрелки всегда равна толщине линии маршрута. Длина меняет "
-                + "стрелку и наконечник пропорционально, но не меняет её ширину.",
+                + "тело стрелки, а размер треугольного наконечника настраивается отдельно.",
                 12, 0xFF95A0AF), marginTop(4));
         SliderField routeLabelScale = slider(form,
                 "Размер штатных названий улиц",
@@ -759,6 +762,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                                 cameraDirectionOpacity.intValue();
                         profile.trafficLightScalePercent = trafficLightScale.intValue();
                         profile.routeTurnLengthPercent = routeTurnLength.intValue();
+                        profile.routeTurnHeadSizePercent = routeTurnHeadSize.intValue();
                         profile.routeTurnFillColor = routeTurnFillColor.value;
                         profile.routeTurnOutlineColor = routeTurnOutlineColor.value;
                         profile.routeTurnOutlineWidth = routeTurnOutlineWidth.value();

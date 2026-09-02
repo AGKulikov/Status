@@ -390,6 +390,12 @@ public final class CameraSpeedNormalizerHarness {
         lanes = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                  / "ru" / "natro" / "navigation"
                  / "LaneGuidanceMapLayer.java").read_text()
+        traffic_lights = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                          / "ru" / "natro" / "navigation"
+                          / "TrafficLightMapLayer.java").read_text()
+        placement = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                     / "ru" / "natro" / "navigation"
+                     / "MapOverlayPlacementCoordinator.java").read_text()
         layer_factory = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                          / "ru" / "natro" / "navigation"
                          / "MapObjectLayerFactory.java").read_text()
@@ -435,24 +441,48 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("directionDegrees + 90d", camera)
         self.assertIn("opaqueRgb(nextDirectionColor", camera)
         self.assertIn("directionOpacityPercent", camera)
-        self.assertIn("addOrPreferRicherDuplicate", camera)
+        self.assertIn("addOrMergeDuplicate", camera)
+        self.assertIn("mergeIntoNearbyHudSpeed", camera)
+        self.assertIn("CameraMarker.merge", camera)
         self.assertIn("setZIndex", camera)
         self.assertNotIn("setDirection", camera)
         self.assertIn("STANDARD_SIGN_RED", camera)
-        self.assertIn("bitmapSize, bitmapSize", camera)
+        self.assertIn("contentWidth", camera)
+        self.assertIn("diameter - overlap", camera)
+        self.assertIn("new_pin_alerts_lanecamera_40", camera)
+        self.assertIn("new_pin_alerts_crossroad_camera_40", camera)
+        self.assertIn("detailDrawableName(camera.controlTags)", camera)
         self.assertNotIn("badgeSize", camera)
         self.assertNotIn("badgeCx", camera)
-        speed_branch = camera.split("if (camera.speedLimit > 0)", 1)[1].split(
-            "} else {", 1
-        )[0]
-        self.assertNotIn("drawCameraGlyph", speed_branch)
+        self.assertNotIn("drawCameraGlyph", camera)
         self.assertNotIn("visibleControlTags", camera)
         self.assertNotIn("drawControlGlyph", camera)
         self.assertNotIn("Path pin", camera)
         self.assertIn("LaneSignBalloonTextureFactory", lanes)
         self.assertIn("Balloon", lanes)
+        self.assertIn('getMethod("createTexture"', lanes)
+        self.assertIn('"getBalloonGeometry"', lanes)
+        self.assertIn('"getImageAnchor"', lanes)
+        self.assertIn("BalloonAnchor", lanes)
+        self.assertNotIn('getMethod("createView"', lanes)
         self.assertIn("NO_ROTATION", lanes)
         self.assertIn("setGeometry", lanes)
+        self.assertIn("setLegPlacement", traffic_lights)
+        self.assertIn("placement.legName", traffic_lights)
+        self.assertNotIn('Enum.valueOf((Class<? extends Enum>) legClass, "NONE")',
+                         traffic_lights)
+        self.assertIn("compactTrafficLightBitmap(light, placement.legName)",
+                      traffic_lights)
+        self.assertIn("worldToScreen", placement)
+        self.assertIn("overlapArea", placement)
+        for leg_name in ("LEFT_CENTER", "RIGHT_CENTER", "BOTTOM_LEFT",
+                         "BOTTOM_RIGHT", "TOP_LEFT", "TOP_RIGHT",
+                         "BOTTOM_CENTER", "TOP_CENTER"):
+            self.assertIn(leg_name, placement)
+        self.assertIn("overlayPlacement.beginLayout()", renderer)
+        self.assertIn("laneGuidanceMapLayer.relayout()", renderer)
+        self.assertIn("trafficLightMapLayer.relayout()", renderer)
+        self.assertIn("cameraDirectionMapLayer.relayout()", renderer)
         self.assertIn("ImageProvider", cursor)
         self.assertIn("setGeometry", cursor)
         self.assertIn("setDirection", cursor)
@@ -476,12 +506,14 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("configuredColor(fillColor", turns)
         self.assertIn("configuredColor(outlineColor", turns)
         self.assertIn('number(source, "getLength", 80f) * lengthScale', turns)
-        self.assertIn('number(source, "getTriangleHeight", 16f) * lengthScale', turns)
+        self.assertIn('number(source, "getTriangleHeight", 16f) * headScale', turns)
         self.assertNotIn("outlineWidth * lengthScale", turns)
         self.assertNotIn("getOutlineWidth", turns)
         self.assertIn("arrow body tied to the route's current stroke width", turns)
         self.assertIn("Math.max(10, Math.min(250, nextLengthPercent))", turns)
+        self.assertIn("Math.max(10, Math.min(250, nextHeadSizePercent))", turns)
         self.assertIn("profile.routeTurnLengthPercent", renderer)
+        self.assertIn("profile.routeTurnHeadSizePercent", renderer)
         self.assertIn("profile.routeTurnFillColor", renderer)
         self.assertIn("profile.routeTurnOutlineColor", renderer)
         self.assertIn("profile.routeTurnOutlineWidth", renderer)

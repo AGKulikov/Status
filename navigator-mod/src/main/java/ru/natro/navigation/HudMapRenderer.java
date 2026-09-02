@@ -40,6 +40,7 @@ final class HudMapRenderer {
     private final Context context;
     private final FailureReporter reporter;
     private final MapCursorStyler cursorStyler;
+    private final MapOverlayPlacementCoordinator overlayPlacement;
     private final TrafficLightMapLayer trafficLightMapLayer;
     private final CameraDirectionMapLayer cameraDirectionMapLayer;
     private final LaneGuidanceMapLayer laneGuidanceMapLayer;
@@ -87,6 +88,7 @@ final class HudMapRenderer {
     private double latestSpeedKmh = Double.NaN;
     private int appliedMaximumFps = -1;
     private long appliedLayerOrderFingerprint = Long.MIN_VALUE;
+    private long lastOverlayLayoutElapsedMs;
     private NavigationMapProfile profile = new NavigationMapProfile();
 
     HudMapRenderer(Context context, FailureReporter reporter) {
@@ -101,9 +103,10 @@ final class HudMapRenderer {
         this.displayName = displayName;
         this.adaptiveFrameRate = adaptiveFrameRate;
         cursorStyler = new MapCursorStyler(this.context);
-        trafficLightMapLayer = new TrafficLightMapLayer(this.context);
-        cameraDirectionMapLayer = new CameraDirectionMapLayer(this.context);
-        laneGuidanceMapLayer = new LaneGuidanceMapLayer(this.context);
+        overlayPlacement = new MapOverlayPlacementCoordinator();
+        trafficLightMapLayer = new TrafficLightMapLayer(this.context, overlayPlacement);
+        cameraDirectionMapLayer = new CameraDirectionMapLayer(this.context, overlayPlacement);
+        laneGuidanceMapLayer = new LaneGuidanceMapLayer(this.context, overlayPlacement);
         routeTurnMapLayer = new RouteTurnMapLayer(this.context);
     }
 
@@ -209,7 +212,10 @@ final class HudMapRenderer {
         routeTurnMapLayer.update(frame.routeActive,
                 frame.routeTurnsSampleElapsedMs, frame.routeTurns);
         applyManualSublayerOrder();
-        if (!frame.isValid()) return;
+        if (!frame.isValid()) {
+            relayoutOverlays(false);
+            return;
+        }
         try {
             latestSpeedKmh = Math.max(0d, frame.speedKmh);
             cursorStyler.update(frame.latitude, frame.longitude, frame.bearingDegrees);
@@ -225,6 +231,7 @@ final class HudMapRenderer {
             // This MapWindow has one camera owner. Exact tilt/zoom/focus settings therefore work
             // independently without alternating against GuidanceCamera every second.
             applyCamera(false);
+            relayoutOverlays(false);
             updateRouteProgress(frame);
         } catch (Exception invalid) {
             Log.w(TAG, "Guidance frame could not be applied to " + displayName, invalid);
@@ -234,6 +241,7 @@ final class HudMapRenderer {
     /** Live HUD Speed cameras forwarded by the authenticated Natro bridge. */
     void updateExternalCameras(String raw) {
         cameraDirectionMapLayer.updateExternal(raw);
+        relayoutOverlays(false);
         applyManualSublayerOrder();
     }
 
@@ -324,6 +332,7 @@ final class HudMapRenderer {
             Object nextMapWindow = invoke(nextOffscreen, "getMapWindow", new Class<?>[0]);
             mapWindow = nextMapWindow;
             map = invoke(nextMapWindow, "getMap", new Class<?>[0]);
+            overlayPlacement.attach(nextMapWindow, width, height);
             trafficLightMapLayer.attach(map);
             cameraDirectionMapLayer.attach(map);
             laneGuidanceMapLayer.attach(map);
@@ -390,6 +399,7 @@ final class HudMapRenderer {
                 profile.effectiveLanePriority());
         routeTurnMapLayer.apply(profile.showRouteTurns,
                 profile.routeTurnLengthPercent,
+                profile.routeTurnHeadSizePercent,
                 profile.routeTurnFillColor,
                 profile.routeTurnOutlineColor,
                 profile.routeTurnOutlineWidth,
@@ -425,6 +435,7 @@ final class HudMapRenderer {
             applyStyleSlot(currentMap, VISIBILITY_STYLE_ID,
                     profile.visibilityStyleJson());
             applyCamera(false);
+            relayoutOverlays(true);
             applyManualSublayerOrder();
             if (roadEventScaleChanged) resetRoadEventVisibilityForStyleRefresh();
             applyRoadEventVisibility();
@@ -1040,6 +1051,7 @@ final class HudMapRenderer {
         trafficLightMapLayer.detachMap();
         cameraDirectionMapLayer.detachMap();
         laneGuidanceMapLayer.detachMap();
+        overlayPlacement.detach();
         routeTurnMapLayer.detachMap();
         routeCollection = null;
         destinationCollection = null;
@@ -1051,6 +1063,7 @@ final class HudMapRenderer {
         renderedRouteSegmentCount = 0;
         freeCameraSource = null;
         lastAppliedCamera = null;
+        lastOverlayLayoutElapsedMs = 0L;
         if (releaseSurface && currentSurface != null) {
             try { currentSurface.release(); } catch (RuntimeException ignored) {}
             surface = null;
@@ -1058,6 +1071,19 @@ final class HudMapRenderer {
             height = 0;
         }
         if (releaseSurface) generation = -1L;
+    }
+
+    /** Re-evaluates collisions after camera movement without redrawing unchanged textures. */
+    private void relayoutOverlays(boolean force) {
+        if (mapWindow == null) return;
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (!force && now - lastOverlayLayoutElapsedMs < 200L) return;
+        lastOverlayLayoutElapsedMs = now;
+        overlayPlacement.beginLayout();
+        // Large lane cards reserve first, then exact traffic-light balloons and compact cameras.
+        laneGuidanceMapLayer.relayout();
+        trafficLightMapLayer.relayout();
+        cameraDirectionMapLayer.relayout();
     }
 
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,

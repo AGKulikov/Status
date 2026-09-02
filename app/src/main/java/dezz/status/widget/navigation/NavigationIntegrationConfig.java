@@ -209,6 +209,8 @@ public final class NavigationIntegrationConfig {
         public int trafficLightScalePercent = 100;
         /** Length of arrows painted directly onto upcoming route turns. */
         public int routeTurnLengthPercent = 100;
+        /** Size of only the triangular arrow head; independent from total arrow length. */
+        public int routeTurnHeadSizePercent = 100;
         /** Null preserves the fill colour returned by MapKit's stock maneuver style. */
         @Nullable public String routeTurnFillColor;
         /** Null preserves the outline colour returned by MapKit's stock maneuver style. */
@@ -327,6 +329,7 @@ public final class NavigationIntegrationConfig {
                     // Keep the legacy key during the transition so an older paired Navigator
                     // still treats the configured value as its closest available equivalent.
                     .put("routeTurnScalePercent", routeTurnLengthPercent)
+                    .put("routeTurnHeadSizePercent", routeTurnHeadSizePercent)
                     .put("routeTurnFillColor", routeTurnFillColor == null
                             ? JSONObject.NULL : routeTurnFillColor)
                     .put("routeTurnOutlineColor", routeTurnOutlineColor == null
@@ -426,9 +429,12 @@ public final class NavigationIntegrationConfig {
                     "cameraDirectionOpacityPercent", result.cameraDirectionOpacityPercent);
             result.trafficLightScalePercent = source.optInt(
                     "trafficLightScalePercent", result.trafficLightScalePercent);
+            int legacyRouteTurnScale = source.optInt(
+                    "routeTurnScalePercent", result.routeTurnLengthPercent);
             result.routeTurnLengthPercent = source.optInt(
-                    "routeTurnLengthPercent", source.optInt(
-                            "routeTurnScalePercent", result.routeTurnLengthPercent));
+                    "routeTurnLengthPercent", legacyRouteTurnScale);
+            result.routeTurnHeadSizePercent = source.optInt(
+                    "routeTurnHeadSizePercent", legacyRouteTurnScale);
             result.routeTurnFillColor = optionalColor(
                     source, "routeTurnFillColor", result.routeTurnFillColor);
             result.routeTurnOutlineColor = optionalColor(
@@ -534,6 +540,7 @@ public final class NavigationIntegrationConfig {
             cameraDirectionOpacityPercent = clamp(cameraDirectionOpacityPercent, 0, 100);
             trafficLightScalePercent = clamp(trafficLightScalePercent, 50, 250);
             routeTurnLengthPercent = clamp(routeTurnLengthPercent, 10, 250);
+            routeTurnHeadSizePercent = clamp(routeTurnHeadSizePercent, 10, 250);
             routeTurnFillColor = optionalColor(routeTurnFillColor);
             routeTurnOutlineColor = optionalColor(routeTurnOutlineColor);
             routeTurnOutlineWidth = clamp(routeTurnOutlineWidth, 0d, 20d, 2d);
