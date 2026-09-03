@@ -651,7 +651,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("EXTRA_FORCE_FULLSCREEN = \"ddnavforcewinfull\""));
         assertTrue(controller.contains("modeButton.setOnClickListener"));
         assertTrue(controller.contains("Развернуть Навигатор на весь экран"));
-        assertTrue(controller.contains("profile.enabled && profile.modeButtonVisible"));
+        assertTrue(controller.contains("!profile.enabled || !profile.modeButtonVisible"));
         assertTrue(controller.contains("mode != MODE_FULLSCREEN"));
         assertTrue(controller.contains("attributes.type = floatingWindowType()"));
         assertTrue(controller.contains("attributes.format = PixelFormat.TRANSLUCENT"));
@@ -1288,7 +1288,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("SliderField columns = slider"));
         assertTrue(settings.contains("SliderField gap = slider"));
         assertTrue(settings.contains("SliderField marginBottom = slider"));
-        assertTrue(settings.contains("SliderField buttonOpacity = slider"));
+        assertFalse(settings.contains("SliderField buttonOpacity = slider"));
+        assertFalse(windowSettings.contains("SliderField buttonOpacity = slider"));
+        assertFalse(settings.contains("SliderField buttonSize = slider"));
+        assertFalse(windowSettings.contains("SliderField buttonSize = slider"));
         assertFalse(settings.contains("EditText focusX = field"));
         assertFalse(settings.contains("EditText buttonOpacity = field"));
         assertFalse(settings.contains("compactNumber("));
