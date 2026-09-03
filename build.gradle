@@ -212,6 +212,11 @@ int getVersionCode() {
     if (version == '2.7.2') {
         return 208021305
     }
+    // 2.7.3 corrects the post-2.7.2 bounded Guidance coordinate and preserves every published
+    // route traffic light instead of collapsing neighbouring events.
+    if (version == '2.7.3') {
+        return 208021306
+    }
     if (version == '2.3.0') {
         return 208021254
     }

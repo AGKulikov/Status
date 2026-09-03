@@ -20,6 +20,7 @@ final class MapOverlayPlacementCoordinator {
     static final String OWNER_LANES = "lanes";
     static final String OWNER_TRAFFIC_LIGHTS = "traffic_lights";
     static final String OWNER_CAMERAS = "cameras";
+    static final String OWNER_SPEED_BUMPS = "speed_bumps";
     private static final String OWNER_CURSOR = "cursor";
 
     private static final float VIEWPORT_MARGIN_PX = 6f;
@@ -210,6 +211,22 @@ final class MapOverlayPlacementCoordinator {
         occupied.inset(-ITEM_MARGIN_PX, -ITEM_MARGIN_PX);
         reservations.add(new Reservation(owner, key, occupied));
         return new Placement(centered.anchorX, centered.anchorY, centered.legName);
+    }
+
+    /** Reserves a fixed pin footprint while its tail remains on the exact route coordinate. */
+    Placement reserveFixed(String owner, String key, double latitude, double longitude,
+                           int bitmapWidth, int bitmapHeight, float anchorX, float anchorY) {
+        float safeAnchorX = Math.max(0f, Math.min(1f, anchorX));
+        float safeAnchorY = Math.max(0f, Math.min(1f, anchorY));
+        Candidate fixed = new Candidate(safeAnchorX, safeAnchorY, "FIXED");
+        float[] screen = projectOrNull(latitude, longitude);
+        if (screen != null) {
+            RectF occupied = rect(screen[0], screen[1], Math.max(1, bitmapWidth),
+                    Math.max(1, bitmapHeight), fixed);
+            occupied.inset(-ITEM_MARGIN_PX, -ITEM_MARGIN_PX);
+            reservations.add(new Reservation(owner, key, occupied));
+        }
+        return new Placement(fixed.anchorX, fixed.anchorY, fixed.legName);
     }
 
     private float[] projectOrNull(double latitude, double longitude) {

@@ -49,6 +49,8 @@ final class FloatingWindowController {
     private static final int MODE_TOGGLE = 2;
     private static final long MODE_BUTTON_REBIND_MS = 5_000L;
     private static final long FLOATING_CONTRACT_CHECK_MS = 1_000L;
+    /** Exact top margin of both direct upper children in car_guidance_controller-land. */
+    private static final int STOCK_GUIDANCE_TOP_MARGIN_DP = 12;
     private static final String STOCK_RECT_CONTROL_CLASS =
             "ru.yandex.yandexmaps.common.views.controls.MapControlsFrameLayoutRect";
     // Exact 29.4.2 KX11 window lane: 0x20 | 0x200 | 0x40000.
@@ -84,6 +86,8 @@ final class FloatingWindowController {
     private ViewGroup modeButton;
     private ModeToggleIconView modeButtonIcon;
     private boolean modeButtonCreationAttempted;
+    private StockControlRail activeModeButtonRail;
+    private boolean modeButtonStatePreDrawObserverInstalled;
     private TextView closeButton;
     private TextView dragHandle;
     private TextView resizeHandle;
@@ -139,6 +143,12 @@ final class FloatingWindowController {
     private int floatingGuidanceControlsTop;
     private int floatingTopNotificationContentTop;
     private final Map<View, Integer> paddingtonBaseTopByChild = new IdentityHashMap<>();
+    private final Map<View, Integer> originalGuidanceTopMargins = new IdentityHashMap<>();
+    private String lastGuidanceTopGeometry = "";
+    private View pendingGuidanceCorrectionRoot;
+    private int pendingGuidanceCorrectionMapTop = Integer.MIN_VALUE;
+    private int pendingGuidanceCorrectionRootTop = Integer.MIN_VALUE;
+    private int pendingGuidanceCorrectionMargin = Integer.MIN_VALUE;
     private int reportedPaddingtonOverrideCount = -1;
     private final int mapTouchSlopSquared;
     private boolean mapGestureInProgress;
@@ -212,6 +222,7 @@ final class FloatingWindowController {
                         } else if (view == topNotificationContent) {
                             setTopPadding(view, floatingTopNotificationContentTop);
                         }
+                        if (view == guidanceVisualRoot) normalizeGuidanceTopGeometry();
                     } catch (Throwable failure) {
                         reportCallbackFailure("floatingTopInsetGuard", failure);
                     }
@@ -227,9 +238,21 @@ final class FloatingWindowController {
                 setTopPadding(activityControllerRoot, 0);
                 setTopPadding(guidanceControls, 0);
                 setTopPadding(guidanceVisualRoot, 0);
+                normalizeGuidanceTopGeometry();
             }
         } catch (Throwable failure) {
             reportCallbackFailure("floatingTopInsetPreDraw", failure);
+        }
+        return true;
+    };
+    private final ViewTreeObserver.OnPreDrawListener modeButtonStatePreDrawObserver = () -> {
+        try {
+            // The stock row can stay visible while Navigator hides its road-event and voice
+            // children individually. Mirror that exact pair at the final drawing boundary;
+            // the slower poller remains responsible only for replacing a stale rail reference.
+            syncModeButtonWithStockRail();
+        } catch (Throwable failure) {
+            reportCallbackFailure("modeButtonStatePreDraw", failure);
         }
         return true;
     };
@@ -312,6 +335,7 @@ final class FloatingWindowController {
 
         ensureModeButtonCreated();
         holdModeButtonHidden();
+        installModeButtonStatePreDrawObserver();
         mainHandler.post(modeButtonPoller);
         updateControls();
     }
@@ -526,9 +550,12 @@ final class FloatingWindowController {
             insetDispatchHost = null;
         }
         removeFloatingTopInsetPreDrawGuard();
+        removeModeButtonStatePreDrawObserver();
         removeFloatingTopInsetGuards();
+        restoreGuidanceTopMargins();
         clearPaddingtonInsetsOverrides();
         detachFromParent(modeButton);
+        activeModeButtonRail = null;
         modeButton = null;
         modeButtonIcon = null;
         ViewGroup parent = controlLayer == null ? null : (ViewGroup) controlLayer.getParent();
@@ -776,6 +803,7 @@ final class FloatingWindowController {
         if (nextGuidanceVisualRoot != guidanceVisualRoot) {
             if (guidanceVisualRoot != null) {
                 guidanceVisualRoot.removeOnLayoutChangeListener(floatingTopInsetGuard);
+                restoreGuidanceTopMargins();
                 restorePadding(guidanceVisualRoot, originalGuidanceVisualRootPadding);
                 setFitsSystemWindows(guidanceVisualRoot,
                         originalGuidanceVisualRootFitsSystemWindows);
@@ -785,6 +813,7 @@ final class FloatingWindowController {
             originalGuidanceVisualRootFitsSystemWindows =
                     fitsSystemWindows(guidanceVisualRoot);
             if (guidanceVisualRoot != null) {
+                captureGuidanceTopMargins(guidanceVisualRoot);
                 NavigationBridgeClient.reportDiagnostic(
                         "floating Guidance root captured outerTop="
                                 + (activityControllerRoot == null ? -1
@@ -867,6 +896,7 @@ final class FloatingWindowController {
         removeFloatingTopInset(guidanceInsetHost);
         setTopPadding(guidanceControls, floatingGuidanceControlsTop);
         removeFloatingTopInset(guidanceVisualRoot);
+        normalizeGuidanceTopGeometry();
         setTopPadding(topNotificationContent, floatingTopNotificationContentTop);
         setFitsSystemWindows(contentRoot, false);
         setFitsSystemWindows(mapRoot, false);
@@ -899,6 +929,7 @@ final class FloatingWindowController {
 
     private void restoreTransparentLayers() {
         if (!transparentLayersCaptured) return;
+        restoreGuidanceTopMargins();
         if (contentRoot != null) contentRoot.setBackground(originalContentBackground);
         if (mapRoot != null) mapRoot.setBackground(originalMapRootBackground);
         if (mapWithControls != null) {
@@ -983,6 +1014,7 @@ final class FloatingWindowController {
         setTopPadding(activityControllerRoot, 0);
         setTopPadding(guidanceControls, floatingGuidanceControlsTop);
         setTopPadding(guidanceVisualRoot, 0);
+        normalizeGuidanceTopGeometry();
         setTopPadding(topNotificationContent, floatingTopNotificationContentTop);
     }
 
@@ -1087,6 +1119,157 @@ final class FloatingWindowController {
             if (insets != null) top -= insets.getSystemWindowInsetTop();
         }
         return Math.max(0, top);
+    }
+
+    /** Captures the stock margins before the bounded-window geometry owns them. */
+    private void captureGuidanceTopMargins(View root) {
+        if (root == null) return;
+        captureTopMargin(root);
+        int speedId = resourceId("speed_group");
+        int maneuverId = resourceId("contextmaneuverview");
+        View speed = speedId == 0 ? null : root.findViewById(speedId);
+        View maneuver = maneuverId == 0 ? null : root.findViewById(maneuverId);
+        if (speed != null && speed.getParent() == root) captureTopMargin(speed);
+        if (maneuver != null && maneuver.getParent() == root) captureTopMargin(maneuver);
+    }
+
+    private void captureTopMargin(View view) {
+        if (view == null || originalGuidanceTopMargins.containsKey(view)) return;
+        ViewGroup.LayoutParams params = view.getLayoutParams();
+        if (params instanceof ViewGroup.MarginLayoutParams) {
+            originalGuidanceTopMargins.put(
+                    view, ((ViewGroup.MarginLayoutParams) params).topMargin);
+        }
+    }
+
+    private void restoreGuidanceTopMargins() {
+        for (Map.Entry<View, Integer> entry : originalGuidanceTopMargins.entrySet()) {
+            try {
+                setTopMargin(entry.getKey(), entry.getValue());
+            } catch (Throwable failure) {
+                reportCallbackFailure("restoreGuidanceTopMargin", failure);
+            }
+        }
+        originalGuidanceTopMargins.clear();
+        lastGuidanceTopGeometry = "";
+        clearPendingGuidanceCorrection();
+    }
+
+    /**
+     * Aligns the complete car-guidance root to the real map viewport, not a guessed inset owner.
+     *
+     * <p>The root is MATCH_PARENT. A compensating top margin therefore expands its measured
+     * height by the same amount: top-constrained widgets move up while the ETA/bottom constraints
+     * keep the same physical bottom. No child translation or hard-coded KX11 inset is used.</p>
+     */
+    private void normalizeGuidanceTopGeometry() {
+        View root = guidanceVisualRoot;
+        View mapViewport = mapWithControls != null ? mapWithControls
+                : mapRoot != null ? mapRoot : contentRoot;
+        if (!floating || root == null || mapViewport == null
+                || !root.isAttachedToWindow() || !mapViewport.isAttachedToWindow()) return;
+
+        captureGuidanceTopMargins(root);
+        boolean changed = false;
+        int stockMargin = dp(STOCK_GUIDANCE_TOP_MARGIN_DP);
+        int speedId = resourceId("speed_group");
+        int maneuverId = resourceId("contextmaneuverview");
+        View speed = speedId == 0 ? null : root.findViewById(speedId);
+        View maneuver = maneuverId == 0 ? null : root.findViewById(maneuverId);
+        if (speed != null && speed.getParent() == root) {
+            changed |= setTopMargin(speed, stockMargin);
+        }
+        if (maneuver != null && maneuver.getParent() == root) {
+            changed |= setTopMargin(maneuver, stockMargin);
+        }
+
+        ViewGroup.LayoutParams rawParams = root.getLayoutParams();
+        if (!root.hasTransientState() && root.getAlpha() > .99f
+                && rawParams instanceof ViewGroup.MarginLayoutParams
+                && rawParams.height == ViewGroup.LayoutParams.MATCH_PARENT
+                && root.getWidth() > 0 && root.getHeight() > 0
+                && mapViewport.getWidth() > 0 && mapViewport.getHeight() > 0) {
+            int[] mapLocation = new int[2];
+            int[] rootLocation = new int[2];
+            mapViewport.getLocationInWindow(mapLocation);
+            root.getLocationInWindow(rootLocation);
+            int excessTop = rootLocation[1] - mapLocation[1];
+            int maximumCorrection = Math.max(dp(24), mapViewport.getHeight() / 2);
+            if (Math.abs(excessTop) > 1 && Math.abs(excessTop) < maximumCorrection) {
+                ViewGroup.MarginLayoutParams params =
+                        (ViewGroup.MarginLayoutParams) rawParams;
+                // setLayoutParams() schedules a later layout. Do not compound the same correction
+                // from another pre-draw if a vendor parent ignores MarginLayoutParams altogether.
+                // A changed viewport/root coordinate unlocks one further residual correction.
+                boolean sameUnappliedCorrection = pendingGuidanceCorrectionRoot == root
+                        && pendingGuidanceCorrectionMapTop == mapLocation[1]
+                        && pendingGuidanceCorrectionRootTop == rootLocation[1]
+                        && pendingGuidanceCorrectionMargin == params.topMargin;
+                if (!sameUnappliedCorrection) {
+                    int targetMargin = params.topMargin - excessTop;
+                    if (setTopMargin(root, targetMargin)) {
+                        changed = true;
+                        pendingGuidanceCorrectionRoot = root;
+                        pendingGuidanceCorrectionMapTop = mapLocation[1];
+                        pendingGuidanceCorrectionRootTop = rootLocation[1];
+                        pendingGuidanceCorrectionMargin = targetMargin;
+                    }
+                }
+            } else if (Math.abs(excessTop) <= 1) {
+                clearPendingGuidanceCorrection();
+            }
+        }
+        if (changed) root.requestLayout();
+        reportGuidanceTopGeometry(mapViewport, root, maneuver, speed);
+    }
+
+    private void reportGuidanceTopGeometry(View mapViewport, View root,
+                                           View maneuver, View speed) {
+        int mapTop = locationInWindowTop(mapViewport);
+        int rootTop = locationInWindowTop(root);
+        int maneuverTop = locationInWindowTop(maneuver);
+        int speedTop = locationInWindowTop(speed);
+        String geometry = "map=" + mapTop + ", root=" + rootTop
+                + ", rootMargin=" + topMargin(root)
+                + ", rootPadding=" + root.getPaddingTop()
+                + ", rootTranslation=" + Math.round(root.getTranslationY())
+                + ", maneuver=" + maneuverTop + "/" + topMargin(maneuver)
+                + ", speed=" + speedTop + "/" + topMargin(speed);
+        if (!geometry.equals(lastGuidanceTopGeometry)) {
+            lastGuidanceTopGeometry = geometry;
+            NavigationBridgeClient.reportDiagnostic("floating Guidance top geometry " + geometry);
+        }
+    }
+
+    private static int locationInWindowTop(View view) {
+        if (view == null || !view.isAttachedToWindow()) return Integer.MIN_VALUE;
+        int[] location = new int[2];
+        view.getLocationInWindow(location);
+        return location[1];
+    }
+
+    private static int topMargin(View view) {
+        ViewGroup.LayoutParams params = view == null ? null : view.getLayoutParams();
+        return params instanceof ViewGroup.MarginLayoutParams
+                ? ((ViewGroup.MarginLayoutParams) params).topMargin : 0;
+    }
+
+    private static boolean setTopMargin(View view, int top) {
+        if (view == null) return false;
+        ViewGroup.LayoutParams raw = view.getLayoutParams();
+        if (!(raw instanceof ViewGroup.MarginLayoutParams)) return false;
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) raw;
+        if (params.topMargin == top) return false;
+        params.topMargin = top;
+        view.setLayoutParams(params);
+        return true;
+    }
+
+    private void clearPendingGuidanceCorrection() {
+        pendingGuidanceCorrectionRoot = null;
+        pendingGuidanceCorrectionMapTop = Integer.MIN_VALUE;
+        pendingGuidanceCorrectionRootTop = Integer.MIN_VALUE;
+        pendingGuidanceCorrectionMargin = Integer.MIN_VALUE;
     }
 
     private void installFloatingTopInsetGuards() {
@@ -1353,10 +1536,17 @@ final class FloatingWindowController {
      * free-drive/Guidance tree. It must never draw a coordinate-based duplicate on the map.
      */
     private void holdModeButtonHidden() {
+        activeModeButtonRail = null;
         ViewGroup button = modeButton;
         FrameLayout layer = controlLayer;
-        if (button == null || layer == null) return;
+        if (button == null) return;
         button.setVisibility(View.GONE);
+        button.setAlpha(1f);
+        button.setScaleX(1f);
+        button.setScaleY(1f);
+        button.setTranslationX(0f);
+        button.setTranslationY(0f);
+        if (layer == null) return;
         if (button.getParent() == layer) return;
         detachFromParent(button);
         try {
@@ -1398,10 +1588,102 @@ final class FloatingWindowController {
                 return false;
             }
         }
-        // Alpha/scale/translation/visibility are intentionally not animated here: the enclosing
-        // FluidContainer/NaviServiceControlsRow owns the same lifecycle as the two stock buttons.
-        button.setVisibility(View.VISIBLE);
+        activeModeButtonRail = rail;
+        syncModeButtonWithStockRail();
         return true;
+    }
+
+    private void installModeButtonStatePreDrawObserver() {
+        if (modeButtonStatePreDrawObserverInstalled) return;
+        View decor = window.getDecorView();
+        if (decor == null) return;
+        ViewTreeObserver observer = decor.getViewTreeObserver();
+        if (!observer.isAlive()) return;
+        observer.addOnPreDrawListener(modeButtonStatePreDrawObserver);
+        modeButtonStatePreDrawObserverInstalled = true;
+    }
+
+    private void removeModeButtonStatePreDrawObserver() {
+        if (!modeButtonStatePreDrawObserverInstalled) return;
+        View decor = window.getDecorView();
+        ViewTreeObserver observer = decor == null ? null : decor.getViewTreeObserver();
+        if (observer != null && observer.isAlive()) {
+            observer.removeOnPreDrawListener(modeButtonStatePreDrawObserver);
+        }
+        modeButtonStatePreDrawObserverInstalled = false;
+    }
+
+    /**
+     * Mirrors the exact stock pair without searching or changing hierarchy during pre-draw.
+     * Geometry from FluidContainer is already inherited through the shared rail; only properties
+     * owned by the individual road-event/voice controls are copied here.
+     */
+    private void syncModeButtonWithStockRail() {
+        ViewGroup button = modeButton;
+        StockControlRail rail = activeModeButtonRail;
+        if (button == null) return;
+        if (destroyed || !profile.enabled || !profile.modeButtonVisible || rail == null
+                || button.getParent() != rail.container
+                || !rail.container.isAttachedToWindow()
+                || rail.roadEventSlot.getParent() != rail.container
+                || rail.voiceControl.getParent() != rail.container
+                || !isDescendantOf(rail.roadEventControl, rail.roadEventSlot)) {
+            if (button.getVisibility() != View.GONE) button.setVisibility(View.GONE);
+            return;
+        }
+
+        int roadVisibility = visibilityWithinRail(rail.roadEventControl, rail.container);
+        int voiceVisibility = visibilityWithinRail(rail.voiceControl, rail.container);
+        int targetVisibility = combinedControlVisibility(roadVisibility, voiceVisibility);
+        if (targetVisibility == View.VISIBLE && !button.isPressed()) {
+            View source = voiceVisibility == View.VISIBLE
+                    ? rail.voiceControl : rail.roadEventSlot;
+            copyModeButtonMotionState(button, source);
+        }
+        // Copy properties before changing GONE/INVISIBLE to VISIBLE, avoiding a one-frame flash
+        // with stale alpha or scale after Navigator's controls reappear.
+        if (button.getVisibility() != targetVisibility) {
+            button.setVisibility(targetVisibility);
+        }
+    }
+
+    private static int visibilityWithinRail(View view, ViewGroup rail) {
+        if (view == null || rail == null) return View.GONE;
+        boolean invisible = false;
+        Object current = view;
+        while (current instanceof View) {
+            View currentView = (View) current;
+            if (currentView.getVisibility() == View.GONE) return View.GONE;
+            if (currentView.getVisibility() == View.INVISIBLE) invisible = true;
+            if (currentView == rail) return invisible ? View.INVISIBLE : View.VISIBLE;
+            current = currentView.getParent();
+        }
+        return View.GONE;
+    }
+
+    private static int combinedControlVisibility(int first, int second) {
+        if (first == View.VISIBLE || second == View.VISIBLE) return View.VISIBLE;
+        if (first == View.INVISIBLE || second == View.INVISIBLE) return View.INVISIBLE;
+        return View.GONE;
+    }
+
+    private static void copyModeButtonMotionState(View button, View source) {
+        if (button == null || source == null) return;
+        if (Math.abs(button.getAlpha() - source.getAlpha()) > .001f) {
+            button.setAlpha(source.getAlpha());
+        }
+        if (Math.abs(button.getScaleX() - source.getScaleX()) > .001f) {
+            button.setScaleX(source.getScaleX());
+        }
+        if (Math.abs(button.getScaleY() - source.getScaleY()) > .001f) {
+            button.setScaleY(source.getScaleY());
+        }
+        if (Math.abs(button.getTranslationX() - source.getTranslationX()) > .001f) {
+            button.setTranslationX(source.getTranslationX());
+        }
+        if (Math.abs(button.getTranslationY() - source.getTranslationY()) > .001f) {
+            button.setTranslationY(source.getTranslationY());
+        }
     }
 
     private StockControlRail findStockModeButtonRail() {
@@ -1428,9 +1710,12 @@ final class FloatingWindowController {
             LinearLayout candidate = (LinearLayout) root.getParent();
             int voiceIndex = candidate.indexOfChild(root);
             View roadEventSlot = voiceIndex > 0 ? candidate.getChildAt(voiceIndex - 1) : null;
+            View roadEventControl = roadEventSlot == null ? null
+                    : roadEventSlot.getId() == roadEventId ? roadEventSlot
+                    : roadEventSlot.findViewById(roadEventId);
             if (candidate.isAttachedToWindow()
                     && candidate.getOrientation() == LinearLayout.VERTICAL && voiceIndex > 0
-                    && containsViewId(roadEventSlot, roadEventId)
+                    && roadEventControl != null
                     && hasAncestorId(candidate, ownerId, alternateOwnerId)) {
                 int spacing = bottomMargin(roadEventSlot);
                 if (spacing <= 0) spacing = navigatorDimension("control_rect_padding", 4);
@@ -1439,7 +1724,8 @@ final class FloatingWindowController {
                         + (roadEventSlot != null && roadEventSlot.isShown() ? 4 : 0)
                         + (candidate.getWidth() > 0 && candidate.getHeight() > 0 ? 2 : 0)
                         + (modeButton != null && modeButton.getParent() == candidate ? 1 : 0);
-                best = new StockControlRail(candidate, voiceIndex, spacing, score);
+                best = new StockControlRail(candidate, roadEventSlot, roadEventControl, root,
+                        voiceIndex, spacing, score);
             }
         }
         if (root instanceof ViewGroup) {
@@ -1451,12 +1737,6 @@ final class FloatingWindowController {
             }
         }
         return best;
-    }
-
-    private static boolean containsViewId(View root, int id) {
-        if (root == null || id == 0) return false;
-        if (root.getId() == id) return true;
-        return root instanceof ViewGroup && ((ViewGroup) root).findViewById(id) != null;
     }
 
     private static boolean hasAncestorId(View view, int id, int alternateId) {
@@ -1640,12 +1920,19 @@ final class FloatingWindowController {
 
     private static final class StockControlRail {
         final LinearLayout container;
+        final View roadEventSlot;
+        final View roadEventControl;
+        final View voiceControl;
         final int voiceIndex;
         final int spacingPx;
         final int score;
 
-        StockControlRail(LinearLayout container, int voiceIndex, int spacingPx, int score) {
+        StockControlRail(LinearLayout container, View roadEventSlot, View roadEventControl,
+                         View voiceControl, int voiceIndex, int spacingPx, int score) {
             this.container = container;
+            this.roadEventSlot = roadEventSlot;
+            this.roadEventControl = roadEventControl;
+            this.voiceControl = voiceControl;
             this.voiceIndex = voiceIndex;
             this.spacingPx = spacingPx;
             this.score = score;

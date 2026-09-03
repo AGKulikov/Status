@@ -525,6 +525,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showTraffic = switchView("Пробки на остальных дорогах", profile.showTraffic);
         Switch showTrafficLights = switchView(
                 "Светофоры с отсчётом — отдельный слой", profile.showTrafficLights);
+        Switch showSpeedBumps = switchView(
+                "Искусственные неровности на активном маршруте", profile.showSpeedBumps);
         Switch showRouteTurns = switchView(
                 "Стрелки поворотов прямо на линии маршрута", profile.showRouteTurns);
         Switch showLaneGuidance = switchView(
@@ -543,6 +545,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Только дороги — прозрачный фон", profile.roadsOnly);
         for (Switch control : new Switch[]{showRoute, destination,
                 showRouteTraffic, showTraffic, showTrafficLights,
+                showSpeedBumps,
                 showRouteTurns, showLaneGuidance, showHudSpeedCameras,
                 showLabels, showPois, showBuildings,
                 showParks, showWater,
@@ -587,6 +590,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightScale = slider(form,
                 "Размер светофоров и плашек секунд",
                 profile.trafficLightScalePercent, 50, 250, 5, " %");
+        SliderField speedBumpScale = slider(form,
+                "Размер знаков искусственных неровностей",
+                profile.speedBumpScalePercent, 50, 250, 5, " %");
         SliderField routeTurnLength = slider(form,
                 "Длина стрелок поворотов на маршруте",
                 profile.routeTurnLengthPercent, 10, 250, 5, " %");
@@ -652,6 +658,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 0, 100, 1, "");
         SliderField routeLayerPriority = slider(form,
                 "Маршрут", profile.routeLayerPriority, 0, 100, 1, "");
+        SliderField speedBumpLayerPriority = slider(form,
+                "Искусственные неровности", profile.speedBumpLayerPriority,
+                0, 100, 1, "");
         SliderField destinationLayerPriority = slider(form,
                 "Конечная точка маршрута", profile.destinationLayerPriority,
                 0, 100, 1, "");
@@ -666,6 +675,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 0, 100, 1, "");
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
+                speedBumpLayerPriority,
                 destinationLayerPriority, trafficLightLayerPriority,
                 laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
@@ -737,6 +747,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showRouteTraffic = showRouteTraffic.isChecked();
                         profile.showTraffic = showTraffic.isChecked();
                         profile.showTrafficLights = showTrafficLights.isChecked();
+                        profile.showSpeedBumps = showSpeedBumps.isChecked();
                         profile.showRouteTurns = showRouteTurns.isChecked();
                         profile.showLaneGuidance = showLaneGuidance.isChecked();
                         profile.showHudSpeedCameras = showHudSpeedCameras.isChecked();
@@ -759,6 +770,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.cameraDirectionOpacityPercent =
                                 cameraDirectionOpacity.intValue();
                         profile.trafficLightScalePercent = trafficLightScale.intValue();
+                        profile.speedBumpScalePercent = speedBumpScale.intValue();
                         profile.routeTurnLengthPercent = routeTurnLength.intValue();
                         profile.routeTurnHeadSizePercent = routeTurnHeadSize.intValue();
                         profile.routeTurnFillColor = routeTurnFillColor.value;
@@ -781,6 +793,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                                 cameraDirectionLayerPriority.intValue();
                         profile.roadEventLayerPriority = roadEventLayerPriority.intValue();
                         profile.routeLayerPriority = routeLayerPriority.intValue();
+                        profile.speedBumpLayerPriority =
+                                speedBumpLayerPriority.intValue();
                         profile.destinationLayerPriority =
                                 destinationLayerPriority.intValue();
                         profile.trafficLightLayerPriority =

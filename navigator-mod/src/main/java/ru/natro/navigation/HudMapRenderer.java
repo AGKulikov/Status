@@ -43,6 +43,7 @@ final class HudMapRenderer {
     private final MapOverlayPlacementCoordinator overlayPlacement;
     private final TrafficLightMapLayer trafficLightMapLayer;
     private final CameraDirectionMapLayer cameraDirectionMapLayer;
+    private final SpeedBumpMapLayer speedBumpMapLayer;
     private final LaneGuidanceMapLayer laneGuidanceMapLayer;
     private final RouteTurnMapLayer routeTurnMapLayer;
     private final String profileSection;
@@ -108,6 +109,7 @@ final class HudMapRenderer {
         overlayPlacement = new MapOverlayPlacementCoordinator();
         trafficLightMapLayer = new TrafficLightMapLayer(this.context, overlayPlacement);
         cameraDirectionMapLayer = new CameraDirectionMapLayer(this.context, overlayPlacement);
+        speedBumpMapLayer = new SpeedBumpMapLayer(this.context, overlayPlacement);
         laneGuidanceMapLayer = new LaneGuidanceMapLayer(this.context, overlayPlacement);
         routeTurnMapLayer = new RouteTurnMapLayer(this.context);
     }
@@ -186,6 +188,7 @@ final class HudMapRenderer {
                     Double.NaN, Double.NaN, 0);
             trafficLightMapLayer.clearData();
             cameraDirectionMapLayer.clearData();
+            speedBumpMapLayer.clearData();
             laneGuidanceMapLayer.clearData();
             routeTurnMapLayer.clearData();
             applyRoadEventVisibility();
@@ -207,6 +210,9 @@ final class HudMapRenderer {
                 frame.trafficLightsSampleElapsedMs, frame.trafficLights);
         cameraDirectionMapLayer.update(frame.routeActive,
                 frame.cameraDirectionsSampleElapsedMs, frame.cameraDirections);
+        speedBumpMapLayer.updateNavigationState(frame.routeActive,
+                frame.routeProgressValid, frame.routeSegmentIndex,
+                frame.routeSegmentPosition);
         laneGuidanceMapLayer.update(frame.routeActive,
                 frame.laneGuidanceSampleElapsedMs, frame.laneGuidance);
         routeTurnMapLayer.update(frame.routeActive,
@@ -267,6 +273,7 @@ final class HudMapRenderer {
                      RoutePolylineStyler.JamStyle jamStyle) {
         if (routeEpoch < activeRouteEpoch) return;
         overlayPlacement.updateRoute(routeEpoch, drivingRoute);
+        speedBumpMapLayer.updateRoute(routeEpoch, drivingRoute);
         // MapKit may hand out a new Java wrapper for the same DrivingRoute on every Guidance
         // callback. Object identity is therefore not a route identity; routeEpoch is.
         boolean changed = routeEpoch != activeRouteEpoch
@@ -338,6 +345,7 @@ final class HudMapRenderer {
             syncOverlayNavigationState();
             trafficLightMapLayer.attach(map);
             cameraDirectionMapLayer.attach(map);
+            speedBumpMapLayer.attach(map);
             laneGuidanceMapLayer.attach(map);
             cursorStyler.attach(map);
 
@@ -387,6 +395,9 @@ final class HudMapRenderer {
         trafficLightMapLayer.apply(profile.showTrafficLights, night,
                 profile.trafficLightScalePercent,
                 profile.effectiveTrafficLightPriority());
+        speedBumpMapLayer.apply(profile.showSpeedBumps,
+                profile.speedBumpScalePercent,
+                profile.effectiveSpeedBumpPriority());
         cameraDirectionMapLayer.apply(
                 !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL")),
                 profile.showHudSpeedCameras,
@@ -655,6 +666,7 @@ final class HudMapRenderer {
             fingerprint = fingerprint * 131L + profile.effectiveRoadEventPriority();
             fingerprint = fingerprint * 131L + profile.effectiveRoutePriority();
             fingerprint = fingerprint * 131L + profile.effectiveDestinationPriority();
+            fingerprint = fingerprint * 131L + profile.effectiveSpeedBumpPriority();
             fingerprint = fingerprint * 131L + profile.effectiveTrafficLightPriority();
             fingerprint = fingerprint * 131L + profile.effectiveLanePriority();
             fingerprint = fingerprint * 131L + profile.effectiveCursorPriority();
@@ -1023,6 +1035,7 @@ final class HudMapRenderer {
         cursorStyler.detach();
         trafficLightMapLayer.detachMap();
         cameraDirectionMapLayer.detachMap();
+        speedBumpMapLayer.detachMap();
         laneGuidanceMapLayer.detachMap();
         overlayPlacement.detach();
         routeTurnMapLayer.detachMap();
@@ -1056,6 +1069,7 @@ final class HudMapRenderer {
         // Cameras are immovable point objects and reserve first. Movable lane/traffic balloons
         // choose a free side around them; a collision may never push a camera off the route.
         cameraDirectionMapLayer.relayout();
+        speedBumpMapLayer.relayout();
         laneGuidanceMapLayer.relayout();
         trafficLightMapLayer.relayout();
     }

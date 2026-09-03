@@ -32,6 +32,36 @@ HUD_SPEED_MANIFEST_PATCHER = load("patch_hud_speed_bridge_manifest.py")
 
 
 class NavigationModToolsTest(unittest.TestCase):
+    def test_speed_bumps_use_exact_route_positions_without_navigation_layer(self):
+        root = TOOLS.parent
+        navigator = root / "navigator-mod" / "src" / "main" / "java" / "ru" / "natro" / "navigation"
+        layer = (navigator / "SpeedBumpMapLayer.java").read_text()
+        renderer = (navigator / "HudMapRenderer.java").read_text()
+        profile = (navigator / "NavigationMapProfile.java").read_text()
+        order = (navigator / "MapSublayerOrder.java").read_text()
+        config = (root / "app" / "src" / "main" / "java" / "dezz" / "status"
+                  / "widget" / "navigation" / "NavigationIntegrationConfig.java").read_text()
+
+        self.assertIn('invoke(route, "getSpeedBumps"', layer)
+        self.assertIn('"pointByPolylinePosition"', layer)
+        self.assertIn('"mapkit_styling_automotive_route_speed_bump"', layer)
+        self.assertIn("MapObjectLayerFactory.IGNORE", layer)
+        self.assertIn("Float.valueOf(1f)", layer)
+        self.assertIn("scalePercent / 100f", layer)
+        self.assertIn("presentationChanged || visibilityChanged", layer)
+        self.assertIn("isPassed(marker.speedBump)", layer)
+        self.assertIn("placementCoordinator.reserveFixed", layer)
+        self.assertNotIn("getSpeedLimits", layer)
+        self.assertNotIn("createNavigationLayer", layer)
+        self.assertNotIn("NavigationLayerSettings", layer)
+        self.assertIn("speedBumpMapLayer.updateRoute(routeEpoch, drivingRoute)", renderer)
+        self.assertIn("profile.showSpeedBumps", renderer)
+        self.assertIn("effectiveSpeedBumpPriority", profile)
+        self.assertIn("SPEED_BUMPS", order)
+        for key in ("showSpeedBumps", "speedBumpScalePercent",
+                    "speedBumpLayerPriority"):
+            self.assertIn(key, config)
+
     def test_living_requirements_ledger_is_unique_and_mandatory(self):
         root = TOOLS.parent
         ledger = (root / "PROJECT_REQUIREMENTS_RU.md").read_text()
@@ -62,7 +92,11 @@ class NavigationModToolsTest(unittest.TestCase):
 
         javac = shutil.which("javac")
         java = shutil.which("java")
-        if javac is None or java is None:
+        if javac is not None:
+            compiler = [javac]
+        elif java is not None:
+            compiler = [java, "com.sun.tools.javac.Main"]
+        else:
             self.skipTest("JDK is unavailable locally; GitHub CI executes this Java contract")
         harness = """package ru.natro.navigation;
 public final class CameraSpeedNormalizerHarness {
@@ -86,7 +120,7 @@ public final class CameraSpeedNormalizerHarness {
             harness_path = work_path / "CameraSpeedNormalizerHarness.java"
             harness_path.write_text(harness)
             subprocess.run(
-                [javac, "-d", str(work_path), str(source), str(harness_path)],
+                compiler + ["-d", str(work_path), str(source), str(harness_path)],
                 check=True,
             )
             subprocess.run(
@@ -648,22 +682,22 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.7.2}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021305}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.7.3}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021306}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.7.2")', verifier)
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021305")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.7.3")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021306")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
         build = (TOOLS.parent / "build.gradle").read_text()
         workflow = (TOOLS.parent / ".github" / "workflows"
                     / "verify-navigation-hud-v2.yml").read_text()
-        self.assertIn("if (version == '2.7.2')", build)
-        self.assertIn("return 208021305", build)
-        self.assertIn("VERSION_NAME: '2.7.2'", workflow)
-        self.assertIn("VERSION_CODE: '208021305'", workflow)
+        self.assertIn("if (version == '2.7.3')", build)
+        self.assertIn("return 208021306", build)
+        self.assertIn("VERSION_NAME: '2.7.3'", workflow)
+        self.assertIn("VERSION_CODE: '208021306'", workflow)
         self.assertNotIn("2.5.10", build)
         self.assertNotIn("2.5.10", workflow)
 
@@ -721,7 +755,11 @@ public final class MapOverlayPlacementHarness {
         self.assertNotIn("routeAwareRoadEventStyleProvider", renderer)
         self.assertNotIn('properties, "isOnRoute"', renderer)
         self.assertIn("setMaxNumberOfUpcomingTrafficLights", publisher)
-        self.assertIn("MAX_UPCOMING_TRAFFIC_LIGHTS = 8", publisher)
+        self.assertIn("MAX_UPCOMING_TRAFFIC_LIGHTS = 16", publisher)
+        self.assertIn("trafficLightIdentity(", publisher)
+        self.assertIn("routeEpoch", publisher)
+        self.assertNotIn("if (routePosition == null) return result", publisher)
+        self.assertIn("catch (Throwable invalidLight)", publisher)
         self.assertIn("setRoadEventVisible", renderer)
         self.assertIn("getActiveSpeedCameras", publisher)
         self.assertIn("getActiveDirections", publisher)
@@ -844,6 +882,12 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("sectorCollection", camera)
         self.assertIn("signCollection", camera)
         self.assertIn("MapObjectLayerFactory.IGNORE", camera)
+        self.assertIn("MapObjectLayerFactory.IGNORE", traffic_lights)
+        self.assertIn("copyRenderableLights", traffic_lights)
+        self.assertIn("target.add(candidate)", traffic_lights)
+        self.assertNotIn("target.size() >= MAX_LIGHTS", traffic_lights)
+        self.assertNotIn("MIN_SEPARATION_METERS", traffic_lights)
+        self.assertNotIn("selectSeparatedLights", traffic_lights)
         self.assertIn("MIN_CAMERA_TEXTURE_DIAMETER_PX = 80", camera)
         self.assertIn("Math.max(displayDiameter, MIN_CAMERA_TEXTURE_DIAMETER_PX)",
                       camera)
@@ -906,7 +950,14 @@ public final class MapOverlayPlacementHarness {
         self.assertIn('"speed_group"', controller)
         self.assertIn("removeFloatingTopInset(activityControllerRoot)", controller)
         self.assertIn("removeFloatingTopInset(guidanceVisualRoot)", controller)
-        self.assertNotIn("setTranslationY", controller)
+        self.assertIn("STOCK_GUIDANCE_TOP_MARGIN_DP = 12", controller)
+        self.assertIn("normalizeGuidanceTopGeometry()", controller)
+        self.assertIn("mapViewport.getLocationInWindow(mapLocation)", controller)
+        self.assertIn("rawParams.height == ViewGroup.LayoutParams.MATCH_PARENT", controller)
+        self.assertIn("int targetMargin = params.topMargin - excessTop", controller)
+        self.assertIn("sameUnappliedCorrection", controller)
+        self.assertIn("restoreGuidanceTopMargins()", controller)
+        self.assertNotIn("root.setTranslationY", controller)
         self.assertIn('"top_notification_container"', controller)
         self.assertIn("paddingtonBaseTop", controller)
         self.assertIn("floatingTopInsetGuard", controller)
@@ -923,6 +974,22 @@ public final class MapOverlayPlacementHarness {
         self.assertNotIn("resolvedModeButtonTop", controller)
         self.assertNotIn("MODE_BUTTON_AUTO_HIDE_MS", controller)
         self.assertIn("MODE_BUTTON_REBIND_MS = 5_000L", controller)
+        self.assertIn("modeButtonStatePreDrawObserver", controller)
+        self.assertIn("installModeButtonStatePreDrawObserver()", controller)
+        self.assertIn("removeModeButtonStatePreDrawObserver()", controller)
+        self.assertIn("activeModeButtonRail = null", controller)
+        self.assertIn('reportCallbackFailure("modeButtonStatePreDraw"', controller)
+        self.assertIn("syncModeButtonWithStockRail()", controller)
+        self.assertIn("visibilityWithinRail", controller)
+        self.assertIn("combinedControlVisibility", controller)
+        self.assertIn("rail.roadEventControl", controller)
+        self.assertIn("rail.voiceControl", controller)
+        self.assertIn("button.isPressed()", controller)
+        self.assertIn("button.setAlpha(source.getAlpha())", controller)
+        self.assertIn("button.setScaleX(source.getScaleX())", controller)
+        self.assertIn("button.setScaleY(source.getScaleY())", controller)
+        self.assertIn("button.setTranslationX(source.getTranslationX())", controller)
+        self.assertIn("button.setTranslationY(source.getTranslationY())", controller)
         self.assertIn('"navi_service_add_road_event"', controller)
         self.assertIn('"navi_service_open_voice_search"', controller)
         self.assertNotIn("leftControlColumnNextTop", controller)
@@ -935,7 +1002,7 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("root.getParent() instanceof LinearLayout", controller)
         self.assertIn("candidate.isAttachedToWindow()", controller)
         self.assertIn("candidate.getOrientation() == LinearLayout.VERTICAL", controller)
-        self.assertIn("containsViewId(roadEventSlot, roadEventId)", controller)
+        self.assertIn("roadEventControl != null", controller)
         self.assertIn("hasAncestorId(candidate, ownerId, alternateOwnerId)", controller)
         self.assertNotIn("upper.getLocationOnScreen", controller)
         self.assertNotIn("lower.getLocationOnScreen", controller)
@@ -958,6 +1025,13 @@ public final class MapOverlayPlacementHarness {
         self.assertIn('reportCallbackFailure("floatingSurfaceCommitter"', controller)
         self.assertIn('reportCallbackFailure("mapTouchReattach"', controller)
         self.assertIn('reportCallbackFailure("modeButtonPoller"', controller)
+        attach_start = controller.index("private boolean ensureModeButtonAttachedToStockRail()")
+        attach_end = controller.index(
+            "private void installModeButtonStatePreDrawObserver()", attach_start)
+        attach_method = controller[attach_start:attach_end]
+        self.assertNotIn("button.setVisibility(View.VISIBLE)", attach_method)
+        self.assertIn("activeModeButtonRail = rail", attach_method)
+        self.assertIn("syncModeButtonWithStockRail()", attach_method)
         self.assertNotIn("@Override public boolean dispatchTouchEvent", controller)
         self.assertIn("MotionEvent.ACTION_POINTER_DOWN", controller)
         self.assertIn("mapTouchSlopSquared", controller)

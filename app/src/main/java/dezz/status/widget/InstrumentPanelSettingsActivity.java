@@ -590,6 +590,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch traffic = switchView("Пробки на остальных дорогах", map.showTraffic);
         Switch trafficLights = switchView(
                 "Светофоры с отсчётом — отдельный слой", map.showTrafficLights);
+        Switch speedBumps = switchView(
+                "Искусственные неровности на активном маршруте", map.showSpeedBumps);
         Switch routeTurns = switchView(
                 "Стрелки поворотов прямо на линии маршрута", map.showRouteTurns);
         Switch laneGuidance = switchView(
@@ -610,6 +612,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(traffic);
         content.addView(routeTraffic);
         content.addView(trafficLights);
+        content.addView(speedBumps);
         content.addView(routeTurns);
         content.addView(laneGuidance);
         content.addView(hudSpeedCameras);
@@ -657,6 +660,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightScale = slider(content,
                 "Размер светофоров и плашек секунд",
                 map.trafficLightScalePercent, 50, 250, 5, " %");
+        SliderField speedBumpScale = slider(content,
+                "Размер знаков искусственных неровностей",
+                map.speedBumpScalePercent, 50, 250, 5, " %");
         SliderField routeTurnLength = slider(content,
                 "Длина стрелок поворотов на маршруте",
                 map.routeTurnLengthPercent, 10, 250, 5, " %");
@@ -725,6 +731,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 0, 100, 1, "");
         SliderField routeLayerPriority = slider(content,
                 "Маршрут", map.routeLayerPriority, 0, 100, 1, "");
+        SliderField speedBumpLayerPriority = slider(content,
+                "Искусственные неровности", map.speedBumpLayerPriority,
+                0, 100, 1, "");
         SliderField destinationLayerPriority = slider(content,
                 "Конечная точка маршрута", map.destinationLayerPriority,
                 0, 100, 1, "");
@@ -739,6 +748,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 0, 100, 1, "");
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
+                speedBumpLayerPriority,
                 destinationLayerPriority, trafficLightLayerPriority,
                 laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
@@ -793,6 +803,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showTraffic = traffic.isChecked();
                     map.showRouteTraffic = routeTraffic.isChecked();
                     map.showTrafficLights = trafficLights.isChecked();
+                    map.showSpeedBumps = speedBumps.isChecked();
                     map.showRouteTurns = routeTurns.isChecked();
                     map.showLaneGuidance = laneGuidance.isChecked();
                     map.showHudSpeedCameras = hudSpeedCameras.isChecked();
@@ -812,6 +823,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cameraDirectionColor = cameraDirectionColor.value;
                     map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue();
                     map.trafficLightScalePercent = trafficLightScale.intValue();
+                    map.speedBumpScalePercent = speedBumpScale.intValue();
                     map.routeTurnLengthPercent = routeTurnLength.intValue();
                     map.routeTurnHeadSizePercent = routeTurnHeadSize.intValue();
                     map.routeTurnFillColor = routeTurnFillColor.value;
@@ -833,6 +845,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                             cameraDirectionLayerPriority.intValue();
                     map.roadEventLayerPriority = roadEventLayerPriority.intValue();
                     map.routeLayerPriority = routeLayerPriority.intValue();
+                    map.speedBumpLayerPriority = speedBumpLayerPriority.intValue();
                     map.destinationLayerPriority = destinationLayerPriority.intValue();
                     map.trafficLightLayerPriority = trafficLightLayerPriority.intValue();
                     map.routeTurnLayerPriority = map.routeLayerPriority;

@@ -24,17 +24,15 @@ import java.util.List;
 final class TrafficLightMapLayer {
     private static final String TAG = "NatroTrafficLights";
     private static final long FRESH_MS = 3_000L;
-    private static final int MAX_LIGHTS = 12;
-    /** Windshield may expose several lane sections for one physical intersection. */
-    private static final double MIN_SEPARATION_METERS = 30d;
-    private static final double EARTH_RADIUS_METERS = 6_371_000d;
+    /** Capacity only; the renderer never truncates an already published Windshield snapshot. */
+    private static final int EXPECTED_LIGHT_CAPACITY = 16;
 
     private final Context context;
     private final MapOverlayPlacementCoordinator placementCoordinator;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ArrayList<Marker> markers = new ArrayList<>();
     private final ArrayList<NavigatorStatePublisher.TrafficLightFrame> visibleScratch =
-            new ArrayList<>(MAX_LIGHTS);
+            new ArrayList<>(EXPECTED_LIGHT_CAPACITY);
     private Object map;
     private Object collection;
     private boolean enabled;
@@ -195,7 +193,7 @@ final class TrafficLightMapLayer {
             clearVisual();
             return;
         }
-        selectSeparatedLights(latest, visibleScratch);
+        copyRenderableLights(latest, visibleScratch);
         if (visibleScratch.isEmpty()) {
             clearVisual();
             return;
@@ -217,38 +215,18 @@ final class TrafficLightMapLayer {
         }
     }
 
-    private static void selectSeparatedLights(
+    private static void copyRenderableLights(
             List<NavigatorStatePublisher.TrafficLightFrame> source,
             ArrayList<NavigatorStatePublisher.TrafficLightFrame> target) {
         target.clear();
         for (NavigatorStatePublisher.TrafficLightFrame candidate : source) {
             if (candidate == null || !candidate.hasMapPosition()) continue;
-            int overlapIndex = -1;
-            for (int index = 0; index < target.size(); index++) {
-                NavigatorStatePublisher.TrafficLightFrame accepted = target.get(index);
-                if (distanceMeters(candidate.latitude, candidate.longitude,
-                        accepted.latitude, accepted.longitude) < MIN_SEPARATION_METERS) {
-                    overlapIndex = index;
-                    break;
-                }
-            }
-            if (overlapIndex < 0) {
-                target.add(candidate);
-            } else if (prefer(candidate, target.get(overlapIndex))) {
-                target.set(overlapIndex, candidate);
-            }
-            if (target.size() >= MAX_LIGHTS) break;
+            // Windshield identities describe separate valid route signals. Two neighbouring
+            // intersections, or MAIN/ADDITIONAL sections with close coordinates, must not be
+            // collapsed by an arbitrary metre radius. The screen-space coordinator gives every
+            // object its own reservation and may change only its leg, never list cardinality.
+            target.add(candidate);
         }
-    }
-
-    /** Prefer the main section, then the nearest sample, for one physical intersection. */
-    private static boolean prefer(NavigatorStatePublisher.TrafficLightFrame candidate,
-                                  NavigatorStatePublisher.TrafficLightFrame accepted) {
-        boolean candidateMain = "MAIN".equals(candidate.sectionType);
-        boolean acceptedMain = "MAIN".equals(accepted.sectionType);
-        if (candidateMain != acceptedMain) return candidateMain;
-        if (candidate.distanceMeters < 0) return false;
-        return accepted.distanceMeters < 0 || candidate.distanceMeters < accepted.distanceMeters;
     }
 
     private void rebuild(List<NavigatorStatePublisher.TrafficLightFrame> values,
@@ -257,7 +235,7 @@ final class TrafficLightMapLayer {
         if (currentCollection == null) {
             currentCollection = MapObjectLayerFactory.create(map,
                     MapSublayerOrder.TRAFFIC_LIGHTS,
-                    MapObjectLayerFactory.EQUAL, zIndex);
+                    MapObjectLayerFactory.IGNORE, zIndex);
             collection = currentCollection;
         }
         invoke(currentCollection, "clear", new Class<?>[0]);
@@ -764,26 +742,13 @@ final class TrafficLightMapLayer {
         int count = 0;
         for (NavigatorStatePublisher.TrafficLightFrame value : values) {
             if (value == null || !value.hasMapPosition()) continue;
-            if (count++ >= MAX_LIGHTS) break;
+            count++;
             result = mix(result, value.secondsLeft);
             result = mix(result, value.signal.hashCode());
             result = mix(result, value.sectionType.hashCode());
             result = mix(result, value.arrow.hashCode());
         }
         return mix(result, count);
-    }
-
-    private static double distanceMeters(double fromLatitude, double fromLongitude,
-                                         double toLatitude, double toLongitude) {
-        double latitudeDelta = Math.toRadians(toLatitude - fromLatitude);
-        double longitudeDelta = Math.toRadians(toLongitude - fromLongitude);
-        double from = Math.toRadians(fromLatitude);
-        double to = Math.toRadians(toLatitude);
-        double sinLatitude = Math.sin(latitudeDelta / 2d);
-        double sinLongitude = Math.sin(longitudeDelta / 2d);
-        double value = sinLatitude * sinLatitude
-                + Math.cos(from) * Math.cos(to) * sinLongitude * sinLongitude;
-        return 2d * EARTH_RADIUS_METERS * Math.asin(Math.min(1d, Math.sqrt(value)));
     }
 
     private static long mix(long value, long part) {

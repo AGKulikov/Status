@@ -187,6 +187,8 @@ public final class NavigationIntegrationConfig {
         public boolean showTraffic = true;
         /** Fresh Windshield traffic lights, rendered in their own map-object collection. */
         public boolean showTrafficLights = true;
+        /** Artificial unevenness pins read only from the exact active DrivingRoute. */
+        public boolean showSpeedBumps = true;
         /** Original-style direction arrows placed directly on upcoming route turns. */
         public boolean showRouteTurns = true;
         /** Upcoming lane sign anchored to its RoutePosition on the map. */
@@ -207,6 +209,8 @@ public final class NavigationIntegrationConfig {
         public int cameraDirectionOpacityPercent = 30;
         /** Scale of Yandex's original signal-and-seconds traffic-light balloon. */
         public int trafficLightScalePercent = 100;
+        /** Target raster size of the stock vector route-speed-bump pin. */
+        public int speedBumpScalePercent = 100;
         /** Length of arrows painted directly onto upcoming route turns. */
         public int routeTurnLengthPercent = 100;
         /** Size of only the triangular arrow head; independent from total arrow length. */
@@ -231,6 +235,7 @@ public final class NavigationIntegrationConfig {
         public int routeLayerPriority = 50;
         public int destinationLayerPriority = 90;
         public int trafficLightLayerPriority = 70;
+        public int speedBumpLayerPriority = 55;
         /** Legacy JSON key; native polyline arrows always inherit routeLayerPriority. */
         public int routeTurnLayerPriority = 50;
         public int laneGuidanceLayerPriority = 80;
@@ -316,6 +321,7 @@ public final class NavigationIntegrationConfig {
                     .put("showRouteTraffic", showRouteTraffic)
                     .put("showTraffic", showTraffic)
                     .put("showTrafficLights", showTrafficLights)
+                    .put("showSpeedBumps", showSpeedBumps)
                     .put("showRouteTurns", showRouteTurns)
                     .put("showLaneGuidance", showLaneGuidance)
                     .put("showHudSpeedCameras", showHudSpeedCameras)
@@ -326,6 +332,7 @@ public final class NavigationIntegrationConfig {
                     .put("cameraDirectionColor", cameraDirectionColor)
                     .put("cameraDirectionOpacityPercent", cameraDirectionOpacityPercent)
                     .put("trafficLightScalePercent", trafficLightScalePercent)
+                    .put("speedBumpScalePercent", speedBumpScalePercent)
                     .put("routeTurnLengthPercent", routeTurnLengthPercent)
                     // Keep the legacy key during the transition so an older paired Navigator
                     // still treats the configured value as its closest available equivalent.
@@ -345,6 +352,7 @@ public final class NavigationIntegrationConfig {
                     .put("routeLayerPriority", routeLayerPriority)
                     .put("destinationLayerPriority", destinationLayerPriority)
                     .put("trafficLightLayerPriority", trafficLightLayerPriority)
+                    .put("speedBumpLayerPriority", speedBumpLayerPriority)
                     // Retain the old key for install-over compatibility with a previous pair.
                     .put("routeTurnLayerPriority", routeLayerPriority)
                     .put("laneGuidanceLayerPriority", laneGuidanceLayerPriority)
@@ -407,6 +415,8 @@ public final class NavigationIntegrationConfig {
                     "showRouteTraffic", result.showRouteTraffic);
             result.showTrafficLights = source.optBoolean(
                     "showTrafficLights", result.showTrafficLights);
+            result.showSpeedBumps = source.optBoolean(
+                    "showSpeedBumps", result.showSpeedBumps);
             result.showRouteTurns = source.optBoolean(
                     "showRouteTurns", result.showRouteTurns);
             result.showLaneGuidance = source.optBoolean(
@@ -431,6 +441,8 @@ public final class NavigationIntegrationConfig {
                     "cameraDirectionOpacityPercent", result.cameraDirectionOpacityPercent);
             result.trafficLightScalePercent = source.optInt(
                     "trafficLightScalePercent", result.trafficLightScalePercent);
+            result.speedBumpScalePercent = source.optInt(
+                    "speedBumpScalePercent", result.speedBumpScalePercent);
             int legacyRouteTurnScale = source.optInt(
                     "routeTurnScalePercent", result.routeTurnLengthPercent);
             result.routeTurnLengthPercent = source.optInt(
@@ -461,6 +473,8 @@ public final class NavigationIntegrationConfig {
                     "destinationLayerPriority", result.destinationLayerPriority);
             result.trafficLightLayerPriority = source.optInt(
                     "trafficLightLayerPriority", result.trafficLightLayerPriority);
+            result.speedBumpLayerPriority = source.optInt(
+                    "speedBumpLayerPriority", result.speedBumpLayerPriority);
             result.routeTurnLayerPriority = source.optInt(
                     "routeTurnLayerPriority", result.routeTurnLayerPriority);
             result.laneGuidanceLayerPriority = source.optInt(
@@ -562,6 +576,7 @@ public final class NavigationIntegrationConfig {
             cameraDirectionColor = color(cameraDirectionColor, "#FF168BFF");
             cameraDirectionOpacityPercent = clamp(cameraDirectionOpacityPercent, 0, 100);
             trafficLightScalePercent = clamp(trafficLightScalePercent, 50, 250);
+            speedBumpScalePercent = clamp(speedBumpScalePercent, 50, 250);
             routeTurnLengthPercent = clamp(routeTurnLengthPercent, 10, 250);
             routeTurnHeadSizePercent = clamp(routeTurnHeadSizePercent, 10, 250);
             routeTurnFillColor = optionalColor(routeTurnFillColor);
@@ -575,6 +590,7 @@ public final class NavigationIntegrationConfig {
             routeLayerPriority = clamp(routeLayerPriority, 0, 100);
             destinationLayerPriority = clamp(destinationLayerPriority, 0, 100);
             trafficLightLayerPriority = clamp(trafficLightLayerPriority, 0, 100);
+            speedBumpLayerPriority = clamp(speedBumpLayerPriority, 0, 100);
             routeTurnLayerPriority = clamp(routeTurnLayerPriority, 0, 100);
             laneGuidanceLayerPriority = clamp(laneGuidanceLayerPriority, 0, 100);
             cursorLayerPriority = clamp(cursorLayerPriority, 0, 100);

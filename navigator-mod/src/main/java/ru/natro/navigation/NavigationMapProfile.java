@@ -46,6 +46,8 @@ final class NavigationMapProfile {
     boolean showTraffic = true;
     /** Independent custom collection; unrelated to background traffic and route jams. */
     boolean showTrafficLights = true;
+    /** Exact DrivingRoute speed-bump pins; MapKit exposes no map-wide bump source. */
+    boolean showSpeedBumps = true;
     boolean showRouteTurns = true;
     /** Screen-facing sign anchored to the upcoming LaneSign RoutePosition. */
     boolean showLaneGuidance = true;
@@ -57,6 +59,7 @@ final class NavigationMapProfile {
     String cameraDirectionColor = "#FF168BFF";
     int cameraDirectionOpacityPercent = 30;
     int trafficLightScalePercent = 100;
+    int speedBumpScalePercent = 100;
     int routeTurnLengthPercent = 100;
     /** Independent scale of ArrowManeuverStyle.triangleHeight. */
     int routeTurnHeadSizePercent = 100;
@@ -73,6 +76,7 @@ final class NavigationMapProfile {
     int routeLayerPriority = 50;
     int destinationLayerPriority = 90;
     int trafficLightLayerPriority = 70;
+    int speedBumpLayerPriority = 55;
     /** Legacy transport key. Native polyline arrows always inherit routeLayerPriority. */
     int routeTurnLayerPriority = 50;
     int laneGuidanceLayerPriority = 80;
@@ -147,6 +151,7 @@ final class NavigationMapProfile {
             result.showRouteTraffic = source.optBoolean(
                     "showRouteTraffic", result.showTraffic);
             result.showTrafficLights = source.optBoolean("showTrafficLights", true);
+            result.showSpeedBumps = source.optBoolean("showSpeedBumps", true);
             result.showRouteTurns = source.optBoolean("showRouteTurns", true);
             result.showLaneGuidance = source.optBoolean("showLaneGuidance", true);
             result.showHudSpeedCameras = source.optBoolean("showHudSpeedCameras", true);
@@ -167,6 +172,8 @@ final class NavigationMapProfile {
                     source.optInt("cameraDirectionOpacityPercent", 30), 0, 100);
             result.trafficLightScalePercent = clamp(
                     source.optInt("trafficLightScalePercent", 100), 50, 250);
+            result.speedBumpScalePercent = clamp(
+                    source.optInt("speedBumpScalePercent", 100), 50, 250);
             int legacyRouteTurnScale = source.optInt("routeTurnScalePercent", 100);
             result.routeTurnLengthPercent = clamp(source.optInt(
                     "routeTurnLengthPercent", legacyRouteTurnScale), 10, 250);
@@ -194,6 +201,8 @@ final class NavigationMapProfile {
                     source.optInt("destinationLayerPriority", 90), 0, 100);
             result.trafficLightLayerPriority = clamp(
                     source.optInt("trafficLightLayerPriority", 70), 0, 100);
+            result.speedBumpLayerPriority = clamp(
+                    source.optInt("speedBumpLayerPriority", 55), 0, 100);
             result.routeTurnLayerPriority = clamp(
                     source.optInt("routeTurnLayerPriority", result.routeLayerPriority), 0, 100);
             result.laneGuidanceLayerPriority = clamp(
@@ -301,6 +310,10 @@ final class NavigationMapProfile {
 
     int effectiveTrafficLightPriority() {
         return manualLayerPrioritiesEnabled ? trafficLightLayerPriority : 70;
+    }
+
+    int effectiveSpeedBumpPriority() {
+        return manualLayerPrioritiesEnabled ? speedBumpLayerPriority : 55;
     }
 
     int effectiveLanePriority() {

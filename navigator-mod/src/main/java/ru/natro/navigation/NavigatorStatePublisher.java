@@ -352,7 +352,7 @@ final class NavigatorStatePublisher {
     /** Upcoming manoeuvres change slowly; one verified route scan per second is sufficient. */
     private static final long ROUTE_TURN_INTERVAL_MS = 1_000L;
     /** MapKit defaults vary by host; request enough upcoming lights for both independent maps. */
-    private static final int MAX_UPCOMING_TRAFFIC_LIGHTS = 8;
+    private static final int MAX_UPCOMING_TRAFFIC_LIGHTS = 16;
     /** Windshield returns only cameras which are active for the current route direction. */
     private static final int MAX_ACTIVE_SPEED_CAMERAS = 8;
     private static final int MAX_MAP_LANES = 8;
@@ -1268,45 +1268,82 @@ final class NavigatorStatePublisher {
     private List<TrafficLightFrame> readTrafficLights(Object routePosition, Object route)
             throws Exception {
         ArrayList<TrafficLightFrame> result = new ArrayList<>();
-        if (routePosition == null) return result;
+        int sourceIndex = 0;
         for (Object light : invokeList(windshield, "getTrafficLightsWithSignal")) {
             if (result.size() >= MAX_UPCOMING_TRAFFIC_LIGHTS) break;
-            Object position = invoke(light, "getPosition");
-            double rawDistance = distance(routePosition, position);
-            if (!finite(rawDistance) || rawDistance < -5d) continue;
-            int distanceMeters = nonNegativeInt(rawDistance);
-            int secondsLeft = nullableInt(invoke(light, "getSecondsLeft"));
-            String signal = enumName(invoke(light, "getSignal"));
-            // UNKNOWN/empty Windshield shells are not navigation data. Keeping them was the
-            // source of the grey traffic-light placeholder with blank values after a route.
-            if (!validTrafficSignal(signal)) continue;
-            double latitude = Double.NaN;
-            double longitude = Double.NaN;
             try {
-                Object point = position == null ? null : invoke(position, "getPoint");
-                if (point != null) {
-                    latitude = number(invoke(point, "getLatitude"), Double.NaN);
-                    longitude = number(invoke(point, "getLongitude"), Double.NaN);
+                Object position = invoke(light, "getPosition");
+                double rawDistance = routePosition == null
+                        ? Double.NaN : distance(routePosition, position);
+                if (finite(rawDistance) && rawDistance < -5d) continue;
+                int distanceMeters = finite(rawDistance)
+                        ? nonNegativeInt(rawDistance) : -1;
+                int secondsLeft = nullableInt(invoke(light, "getSecondsLeft"));
+                String signal = enumName(invoke(light, "getSignal"));
+                // UNKNOWN/empty Windshield shells are not navigation data. Keeping them was the
+                // source of the grey traffic-light placeholder with blank values after a route.
+                if (!validTrafficSignal(signal)) continue;
+                String sectionType = enumName(invoke(light, "getSectionType"));
+                String arrow = enumName(invoke(light, "getArrow"));
+                double latitude = Double.NaN;
+                double longitude = Double.NaN;
+                try {
+                    Object point = position == null ? null : invoke(position, "getPoint");
+                    if (point != null) {
+                        latitude = number(invoke(point, "getLatitude"), Double.NaN);
+                        longitude = number(invoke(point, "getLongitude"), Double.NaN);
+                    }
+                } catch (Throwable unavailable) {
+                    // The standalone widget can still use a valid signal/countdown. The map layer
+                    // independently filters entries which have no geographic point.
                 }
-            } catch (Throwable unavailable) {
-                // The standalone widget can still use a valid signal/countdown. The map layer
-                // independently filters entries which have no geographic point.
+                RouteProgressSample eventProgress = readEventRouteProgress(route, position);
+                String sourceId = text(invoke(light, "getId"));
+                String id = trafficLightIdentity(sourceId, sourceIndex,
+                        latitude, longitude, eventProgress, sectionType, arrow);
+                result.add(new TrafficLightFrame(id, latitude, longitude,
+                        eventProgress.valid ? eventProgress.segmentIndex : -1,
+                        eventProgress.valid ? eventProgress.segmentPosition : Double.NaN,
+                        distanceMeters, secondsLeft, signal, sectionType, arrow));
+            } catch (Throwable invalidLight) {
+                // One malformed native wrapper must not erase the other valid lights in this
+                // Windshield snapshot or detach the otherwise healthy Guidance session.
+                Log.d(TAG, "Skipping one invalid traffic-light wrapper: "
+                        + invalidLight.getClass().getSimpleName());
+            } finally {
+                sourceIndex++;
             }
-            String id = text(invoke(light, "getId"));
-            if (id.isEmpty() && finite(latitude) && finite(longitude)) {
-                id = "point:" + Math.round(latitude * 100_000d)
-                        + ':' + Math.round(longitude * 100_000d);
-            }
-            if (id.isEmpty()) id = "route-light-" + result.size();
-            RouteProgressSample eventProgress = readEventRouteProgress(route, position);
-            result.add(new TrafficLightFrame(id, latitude, longitude,
-                    eventProgress.valid ? eventProgress.segmentIndex : -1,
-                    eventProgress.valid ? eventProgress.segmentPosition : Double.NaN,
-                    distanceMeters, secondsLeft, signal,
-                    enumName(invoke(light, "getSectionType")),
-                    enumName(invoke(light, "getArrow"))));
         }
         return result;
+    }
+
+    /** Stable per-route key; neighbouring lights are never deduplicated by coordinates. */
+    private String trafficLightIdentity(String sourceId, int sourceIndex,
+                                        double latitude, double longitude,
+                                        RouteProgressSample progress,
+                                        String sectionType, String arrow) {
+        StringBuilder result = new StringBuilder("route-light:")
+                .append(routeEpoch).append(':');
+        if (sourceId != null && !sourceId.isEmpty()) {
+            result.append(sourceId);
+        } else if (progress != null && progress.valid) {
+            result.append("segment-").append(progress.segmentIndex).append('-')
+                    .append(Math.round(progress.segmentPosition * 1_000_000d));
+        } else if (finite(latitude) && finite(longitude)) {
+            result.append("point-").append(Math.round(latitude * 1_000_000d))
+                    .append('-').append(Math.round(longitude * 1_000_000d));
+        } else {
+            result.append("anonymous-").append(sourceIndex);
+        }
+        if (progress != null && progress.valid) {
+            result.append(':').append(progress.segmentIndex).append(':')
+                    .append(Math.round(progress.segmentPosition * 1_000_000d));
+        } else if (finite(latitude) && finite(longitude)) {
+            result.append(':').append(Math.round(latitude * 1_000_000d))
+                    .append(':').append(Math.round(longitude * 1_000_000d));
+        }
+        return result.append(':').append(sectionType == null ? "" : sectionType)
+                .append(':').append(arrow == null ? "" : arrow).toString();
     }
 
     private static boolean validTrafficSignal(String signal) {
