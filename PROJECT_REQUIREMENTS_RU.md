@@ -703,3 +703,18 @@ release-gates, общий сертификат и обновление Natro п�
   до `GATE-020/GATE-026` на KX11. Следующий кандидат имеет новую идентичность Natro 2.7.2 /
   `208021305`; публикация source commit, CI и подпись выполняются только после полного
   автоматического release-прогона.
+- **03.09.2026:** подписанная пара Natro 2.7.2 / Navigator HUD v2 выпущена из source commit
+  `075f4a8ec8b879205e6fb66a65b38b45712b7815`, tree
+  `25a008144d1f3fa540bd05064d14578ce49a7f5c`. GitHub Actions run `240`
+  (`33756426074`) успешно выполнил unit/static tests, сборку Natro, Helper 70, Navigator
+  `classes19.dex`, baseline-verifier и упаковку кандидата; SHA-256 архива кандидата
+  `1be47cc9ce86d6c0717778a8da164c42d8c217cc33d67171f52eedf1d35bdeb0`. Итоговые APK:
+  Natro 2.7.2 / `208021305`, SHA-256
+  `b7b453c8e579cac9278e9154a2d4cb91b2f6090cecae3553f435b7cdb9d099cd`; Navigator 30.3.0 /
+  `739564630`, SHA-256 `bb100ccabd30c2adce252f168625817956666309a3b995401b59869440231917`.
+  Оба APK имеют одного подписанта со стабильным сертификатом `6e9855ae…65c75`; Natro
+  автоматически подтверждён как обновление поверх 2.7.1 с тем же package/certificate и
+  возрастающим versionCode. Boundary gate сохранил 17 223 защищённые записи: изменены только
+  `AndroidManifest.xml`, `classes4.dex`, `classes12.dex`, добавлен `classes19.dex`.
+  Автоматические release-gates пройдены; `GATE-007/009/020/023/024/025/026` остаются открытыми
+  до установки, маршрутных снимков и 30-минутной приёмки на KX11.
