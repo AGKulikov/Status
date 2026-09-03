@@ -785,3 +785,10 @@ release-gates, общий сертификат и обновление Natro п�
   reparent остаются вне pre-draw и вне текущего жеста карты, poller больше не вызывает
   безусловный `VISIBLE`, callback изолирован `Throwable` и удаляется в `destroy()`. Статические
   регрессии обновлены; аппаратные `GATE-024/GATE-025` остаются открытыми.
+- **03.09.2026:** первая удалённая сборка 2.7.3, GitHub Actions run `33790260857` / №243,
+  остановилась на одном устаревшем source-contract assertion в
+  `NavigationHudV2ContractTest`: тест продолжал требовать удалённый helper `containsViewId()` и
+  глобально запрещал `setTranslationY`, хотя новое зеркалирование кнопки обязано копировать
+  translation штатного voice-control. Исполняемый Android-код на этой стадии не был причиной
+  отказа, но последующие DEX/release-gates корректно не запускались. Java-контракт приведён к тем
+  же exact-pair/pre-draw требованиям, что Python-регрессия; требуется новый полный CI run.

@@ -749,7 +749,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("root.getParent() instanceof LinearLayout"));
         assertTrue(controller.contains("candidate.isAttachedToWindow()"));
         assertTrue(controller.contains("candidate.getOrientation() == LinearLayout.VERTICAL"));
-        assertTrue(controller.contains("containsViewId(roadEventSlot, roadEventId)"));
+        assertTrue(controller.contains("roadEventControl != null"));
         assertTrue(controller.contains(
                 "hasAncestorId(candidate, ownerId, alternateOwnerId)"));
         assertFalse(controller.contains("upper.getLocationOnScreen"));
@@ -761,6 +761,30 @@ public final class NavigationHudV2ContractTest {
         assertTrue(windowProfile.contains("modeButtonPosition = \"TOP_LEFT\""));
         assertFalse(controller.contains("MODE_BUTTON_AUTO_HIDE_MS"));
         assertTrue(controller.contains("MODE_BUTTON_REBIND_MS = 5_000L"));
+        assertTrue(controller.contains("modeButtonStatePreDrawObserver"));
+        assertTrue(controller.contains("installModeButtonStatePreDrawObserver()"));
+        assertTrue(controller.contains("removeModeButtonStatePreDrawObserver()"));
+        assertTrue(controller.contains("reportCallbackFailure(\"modeButtonStatePreDraw\""));
+        assertTrue(controller.contains("syncModeButtonWithStockRail()"));
+        assertTrue(controller.contains("visibilityWithinRail"));
+        assertTrue(controller.contains("combinedControlVisibility"));
+        assertTrue(controller.contains("rail.roadEventControl"));
+        assertTrue(controller.contains("rail.voiceControl"));
+        assertTrue(controller.contains("button.isPressed()"));
+        assertTrue(controller.contains("button.setAlpha(source.getAlpha())"));
+        assertTrue(controller.contains("button.setScaleX(source.getScaleX())"));
+        assertTrue(controller.contains("button.setScaleY(source.getScaleY())"));
+        assertTrue(controller.contains("button.setTranslationX(source.getTranslationX())"));
+        assertTrue(controller.contains("button.setTranslationY(source.getTranslationY())"));
+        int attachStart = controller.indexOf(
+                "private boolean ensureModeButtonAttachedToStockRail()");
+        int attachEnd = controller.indexOf(
+                "private void installModeButtonStatePreDrawObserver()", attachStart);
+        assertTrue(attachStart >= 0 && attachEnd > attachStart);
+        String attachMethod = controller.substring(attachStart, attachEnd);
+        assertFalse(attachMethod.contains("button.setVisibility(View.VISIBLE)"));
+        assertTrue(attachMethod.contains("activeModeButtonRail = rail"));
+        assertTrue(attachMethod.contains("syncModeButtonWithStockRail()"));
         assertTrue(controller.contains("replaceSystemWindowInsets("));
         assertTrue(controller.contains("insets.getSystemWindowInsetLeft(),"));
         assertTrue(controller.contains("removeFloatingTopInset(contentRoot)"));
@@ -791,7 +815,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("int targetMargin = params.topMargin - excessTop"));
         assertTrue(controller.contains("sameUnappliedCorrection"));
         assertTrue(controller.contains("restoreGuidanceTopMargins()"));
-        assertFalse(controller.contains("setTranslationY"));
+        assertFalse(controller.contains("root.setTranslationY"));
         assertTrue(controller.contains("top_notification_container"));
         assertTrue(controller.contains("removeFloatingTopInset(controlsInsetHost)"));
         assertTrue(controller.contains("paddingtonBaseTop"));
