@@ -701,7 +701,12 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("restartInMode(!floating, null)"));
         assertTrue(controller.contains("ensureModeButtonInOverlay()"));
         assertTrue(controller.contains("guidance_open_voice_search"));
-        assertTrue(controller.contains("leftControlColumnNextTop"));
+        assertTrue(controller.contains("navi_service_open_voice_search"));
+        assertTrue(controller.contains("lockedModeButtonTopPx"));
+        assertTrue(controller.contains("resolvedModeButtonTop"));
+        assertFalse(controller.contains("leftControlColumnNextTop"));
+        assertFalse(controller.contains("alice_fab_container"));
+        assertFalse(controller.contains("guidance_search_map_control_ghost"));
         assertTrue(controller.contains("layer.addView(button"));
         assertFalse(controller.contains("rail.addView(button"));
         assertTrue(controller.contains("if (controlLayer == null) install()"));
@@ -719,6 +724,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("controlsInsetHost = (View) controlsEngine.getParent()"));
         assertTrue(controller.contains("maps_activity_top_notification_container"));
         assertTrue(controller.contains("navi_guidance_controls_touch_container"));
+        assertTrue(controller.contains("guidanceInsetHost"));
+        assertTrue(controller.contains("nextGuidanceControls != guidanceControls"));
+        assertTrue(controller.contains("neutralizePaddingtonTree(guidanceInsetHost != null"));
         assertTrue(controller.contains("top_notification_container"));
         assertTrue(controller.contains("removeFloatingTopInset(controlsInsetHost)"));
         assertTrue(controller.contains("paddingtonBaseTop"));
@@ -733,6 +741,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("reportCallbackFailure(\"floatingSurfaceCommitter\""));
         assertTrue(controller.contains("reportCallbackFailure(\"mapTouchReattach\""));
         assertTrue(controller.contains("reportCallbackFailure(\"modeButtonPoller\""));
+        assertTrue(controller.contains("reportCallbackFailure(\"modeButtonFirstLayout\""));
         assertTrue(controller.contains("finally {"));
         assertTrue(controller.contains("setTopPadding(guidanceControls"));
         assertTrue(controller.contains("dispatchAdjustedInsets(controlsInsetHost != null"));
@@ -921,11 +930,16 @@ public final class NavigationHudV2ContractTest {
         assertTrue(laneGuidance.contains("placementCoordinator.reserve"));
         assertTrue(overlayPlacement.contains("worldToScreen"));
         assertTrue(overlayPlacement.contains("overlapArea"));
+        assertTrue(overlayPlacement.contains("reserveCentered"));
+        assertTrue(overlayPlacement.contains("new Candidate(.50f, .50f, \"CENTER\")"));
+        assertTrue(cameraDirections.contains("placementCoordinator.reserveCentered"));
         assertTrue(overlayPlacement.contains("BOTTOM_CENTER"));
         assertTrue(renderer.contains("overlayPlacement.beginLayout()"));
         assertTrue(renderer.contains("laneGuidanceMapLayer.relayout()"));
         assertTrue(renderer.contains("trafficLightMapLayer.relayout()"));
         assertTrue(renderer.contains("cameraDirectionMapLayer.relayout()"));
+        assertTrue(renderer.indexOf("cameraDirectionMapLayer.relayout()")
+                < renderer.indexOf("laneGuidanceMapLayer.relayout()"));
         assertTrue(routeTurns.contains("createDefaultManeuverStyle"));
         assertTrue(routeTurns.contains("addManeuvers"));
         assertTrue(routeTurns.contains("applyManeuverStyle"));

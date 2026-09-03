@@ -45,6 +45,8 @@ final class FloatingWindowController {
     private static final long MODE_BUTTON_STABLE_MS = 5_000L;
     private static final long MODE_BUTTON_AUTO_HIDE_MS = 5_000L;
     private static final long FLOATING_CONTRACT_CHECK_MS = 1_000L;
+    /** Deterministic third-slot fallback used only before the stock left pair is laid out. */
+    private static final float MODE_BUTTON_FALLBACK_TOP_FRACTION = .64f;
     // Exact 29.4.2 KX11 window lane: 0x20 | 0x200 | 0x40000.
     private static final int FLOATING_FLAGS =
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
@@ -89,6 +91,7 @@ final class FloatingWindowController {
     private View controlsEngine;
     private View topNotificationRoot;
     private View guidanceControls;
+    private View guidanceInsetHost;
     private View topNotificationContent;
     private Drawable originalContentBackground;
     private Drawable originalMapRootBackground;
@@ -103,6 +106,8 @@ final class FloatingWindowController {
     private boolean geometryLoaded;
     private boolean transparentLayersCaptured;
     private long modeButtonVisibleUntilElapsedMs;
+    /** Locked on the first map tap so repeated taps and Guidance rebuilds cannot move the button. */
+    private int lockedModeButtonTopPx = Integer.MIN_VALUE;
     private final int[] originalContentPadding = new int[4];
     private final int[] originalMapRootPadding = new int[4];
     private final int[] originalMapWithControlsPadding = new int[4];
@@ -110,6 +115,7 @@ final class FloatingWindowController {
     private final int[] originalControlsEnginePadding = new int[4];
     private final int[] originalTopNotificationPadding = new int[4];
     private final int[] originalGuidanceControlsPadding = new int[4];
+    private final int[] originalGuidanceInsetHostPadding = new int[4];
     private final int[] originalTopNotificationContentPadding = new int[4];
     private boolean originalContentFitsSystemWindows;
     private boolean originalMapRootFitsSystemWindows;
@@ -118,6 +124,7 @@ final class FloatingWindowController {
     private boolean originalControlsEngineFitsSystemWindows;
     private boolean originalTopNotificationFitsSystemWindows;
     private boolean originalGuidanceControlsFitsSystemWindows;
+    private boolean originalGuidanceInsetHostFitsSystemWindows;
     private boolean originalTopNotificationContentFitsSystemWindows;
     private int floatingControlsEngineTop;
     private int floatingGuidanceControlsTop;
@@ -261,7 +268,7 @@ final class FloatingWindowController {
         controlLayer = new FrameLayout(activity) {
             @Override public boolean dispatchTouchEvent(MotionEvent event) {
                 if (event != null && event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                    revealModeButton();
+                    revealModeButtonAtFixedSlot();
                 }
                 // Returning super's result lets an unhandled event continue to Navigator below.
                 return super.dispatchTouchEvent(event);
@@ -292,7 +299,6 @@ final class FloatingWindowController {
         modeButton.setTypeface(Typeface.DEFAULT_BOLD);
         modeButton.setOnClickListener(view -> restartInMode(!floating, null));
         controlLayer.addView(modeButton);
-        revealModeButton();
         mainHandler.post(modeButtonPoller);
         updateControls();
     }
@@ -305,7 +311,7 @@ final class FloatingWindowController {
         // touch hook is a safe second admission point because it runs before Yandex consumes DOWN.
         if (controlLayer == null) install();
         ensureControlLayerAttached();
-        revealModeButton();
+        revealModeButtonAtFixedSlot();
         if (controlLayer != null) {
             controlLayer.post(() -> {
                 try {
@@ -674,14 +680,24 @@ final class FloatingWindowController {
             capturePadding(topNotificationRoot, originalTopNotificationPadding);
             originalTopNotificationFitsSystemWindows = fitsSystemWindows(topNotificationRoot);
         }
-        if (guidanceControls == null) {
-            int guidanceControlsId = activity.getResources().getIdentifier(
-                    "navi_guidance_controls_touch_container", "id",
-                    activity.getPackageName());
-            guidanceControls = guidanceControlsId == 0
-                    ? null : activity.findViewById(guidanceControlsId);
+        // The active-route controller is added late and can be replaced without recreating the
+        // Activity. Re-resolve it on every bounded-window pass instead of retaining a detached
+        // free-drive or previous-Guidance subtree.
+        View nextGuidanceControls = viewByName("navi_guidance_controls_touch_container");
+        View nextGuidanceInsetHost = nextGuidanceControls != null
+                && nextGuidanceControls.getParent() instanceof View
+                ? (View) nextGuidanceControls.getParent() : null;
+        if (nextGuidanceControls != guidanceControls
+                || nextGuidanceInsetHost != guidanceInsetHost) {
+            if (guidanceControls != null) {
+                guidanceControls.removeOnLayoutChangeListener(floatingTopInsetGuard);
+            }
+            guidanceControls = nextGuidanceControls;
+            guidanceInsetHost = nextGuidanceInsetHost;
             capturePadding(guidanceControls, originalGuidanceControlsPadding);
+            capturePadding(guidanceInsetHost, originalGuidanceInsetHostPadding);
             originalGuidanceControlsFitsSystemWindows = fitsSystemWindows(guidanceControls);
+            originalGuidanceInsetHostFitsSystemWindows = fitsSystemWindows(guidanceInsetHost);
             floatingGuidanceControlsTop = paddingtonBaseTop(guidanceControls);
         }
         if (topNotificationContent == null) {
@@ -711,7 +727,8 @@ final class FloatingWindowController {
         transparentLayersCaptured = contentRoot != null || mapRoot != null
                 || mapWithControls != null || controlsInsetHost != null
                 || controlsEngine != null || topNotificationRoot != null
-                || guidanceControls != null || topNotificationContent != null;
+                || guidanceInsetHost != null || guidanceControls != null
+                || topNotificationContent != null;
     }
 
     private void enforceTransparentLayers() {
@@ -727,6 +744,8 @@ final class FloatingWindowController {
         int paddingtonCount = neutralizePaddingtonTree(controlsInsetHost != null
                 ? controlsInsetHost : controlsEngine);
         paddingtonCount += neutralizePaddingtonTree(topNotificationRoot);
+        paddingtonCount += neutralizePaddingtonTree(guidanceInsetHost != null
+                ? guidanceInsetHost : guidanceControls);
         if (paddingtonCount != reportedPaddingtonOverrideCount) {
             reportedPaddingtonOverrideCount = paddingtonCount;
             NavigationBridgeClient.reportDiagnostic(
@@ -738,6 +757,7 @@ final class FloatingWindowController {
         removeFloatingTopInset(controlsInsetHost);
         setTopPadding(controlsEngine, floatingControlsEngineTop);
         removeFloatingTopInset(topNotificationRoot);
+        removeFloatingTopInset(guidanceInsetHost);
         setTopPadding(guidanceControls, floatingGuidanceControlsTop);
         setTopPadding(topNotificationContent, floatingTopNotificationContentTop);
         setFitsSystemWindows(contentRoot, false);
@@ -746,6 +766,7 @@ final class FloatingWindowController {
         setFitsSystemWindows(controlsInsetHost, false);
         setFitsSystemWindows(controlsEngine, false);
         setFitsSystemWindows(topNotificationRoot, false);
+        setFitsSystemWindows(guidanceInsetHost, false);
         setFitsSystemWindows(guidanceControls, false);
         setFitsSystemWindows(topNotificationContent, false);
         requestLayout(contentRoot);
@@ -754,6 +775,7 @@ final class FloatingWindowController {
         requestLayout(controlsInsetHost);
         requestLayout(controlsEngine);
         requestLayout(topNotificationRoot);
+        requestLayout(guidanceInsetHost);
         requestLayout(guidanceControls);
         requestLayout(topNotificationContent);
         installFloatingTopInsetGuards();
@@ -775,6 +797,7 @@ final class FloatingWindowController {
         restorePadding(controlsInsetHost, originalControlsInsetHostPadding);
         restorePadding(controlsEngine, originalControlsEnginePadding);
         restorePadding(topNotificationRoot, originalTopNotificationPadding);
+        restorePadding(guidanceInsetHost, originalGuidanceInsetHostPadding);
         restorePadding(guidanceControls, originalGuidanceControlsPadding);
         restorePadding(topNotificationContent, originalTopNotificationContentPadding);
         setFitsSystemWindows(contentRoot, originalContentFitsSystemWindows);
@@ -783,6 +806,7 @@ final class FloatingWindowController {
         setFitsSystemWindows(controlsInsetHost, originalControlsInsetHostFitsSystemWindows);
         setFitsSystemWindows(controlsEngine, originalControlsEngineFitsSystemWindows);
         setFitsSystemWindows(topNotificationRoot, originalTopNotificationFitsSystemWindows);
+        setFitsSystemWindows(guidanceInsetHost, originalGuidanceInsetHostFitsSystemWindows);
         setFitsSystemWindows(guidanceControls, originalGuidanceControlsFitsSystemWindows);
         setFitsSystemWindows(topNotificationContent,
                 originalTopNotificationContentFitsSystemWindows);
@@ -827,9 +851,8 @@ final class FloatingWindowController {
         dispatchAdjustedInsets(controlsInsetHost != null
                 ? controlsInsetHost : controlsEngine, adjusted);
         dispatchAdjustedInsets(topNotificationRoot, adjusted);
-        dispatchAdjustedInsets(guidanceControls != null
-                && guidanceControls.getParent() instanceof View
-                ? (View) guidanceControls.getParent() : guidanceControls, adjusted);
+        dispatchAdjustedInsets(guidanceInsetHost != null
+                ? guidanceInsetHost : guidanceControls, adjusted);
         dispatchAdjustedInsets(topNotificationContent != null
                 && topNotificationContent.getParent() instanceof View
                 ? (View) topNotificationContent.getParent() : topNotificationContent, adjusted);
@@ -1138,6 +1161,33 @@ final class FloatingWindowController {
         updateModeButtons();
     }
 
+    /** Resolves the exact left control pair once, then keeps one stable screen slot per Activity. */
+    private void revealModeButtonAtFixedSlot() {
+        FrameLayout layer = controlLayer;
+        if (layer != null && layer.getHeight() <= 0) {
+            // A first MapActivity touch can be the event that installs our overlay. Wait one layout
+            // pass instead of permanently locking the old 116dp emergency fallback.
+            layer.post(() -> {
+                try {
+                    if (destroyed) return;
+                    if (lockedModeButtonTopPx == Integer.MIN_VALUE) {
+                        lockedModeButtonTopPx = resolvedModeButtonTop(dp(8));
+                    }
+                    layoutModeButtons();
+                    revealModeButton();
+                } catch (Throwable failure) {
+                    reportCallbackFailure("modeButtonFirstLayout", failure);
+                }
+            });
+            return;
+        }
+        if (lockedModeButtonTopPx == Integer.MIN_VALUE) {
+            lockedModeButtonTopPx = resolvedModeButtonTop(dp(8));
+        }
+        layoutModeButtons();
+        revealModeButton();
+    }
+
     private void layoutModeButtons() {
         layoutModeButton(modeButton);
     }
@@ -1152,7 +1202,9 @@ final class FloatingWindowController {
                 Gravity.START | Gravity.TOP);
         int margin = dp(8);
         params.leftMargin = margin;
-        params.topMargin = leftControlColumnNextTop(margin);
+        params.topMargin = lockedModeButtonTopPx == Integer.MIN_VALUE
+                ? resolvedModeButtonTop(margin)
+                : clampModeButtonTop(lockedModeButtonTopPx, margin);
         button.setLayoutParams(params);
     }
 
@@ -1188,31 +1240,51 @@ final class FloatingWindowController {
         }
     }
 
-    private int leftControlColumnNextTop(int fallbackMargin) {
+    /**
+     * Uses only the two stock controls that define the requested left column. Unrelated Alice,
+     * maneuver and ghost views deliberately cannot influence the result. The caller locks this
+     * value before revealing the button, so later FluidContainer passes cannot make it jump.
+     */
+    private int resolvedModeButtonTop(int fallbackMargin) {
         FrameLayout layer = controlLayer;
         if (layer == null || layer.getHeight() <= 0) return dp(116);
         int[] layerLocation = new int[2];
         layer.getLocationOnScreen(layerLocation);
-        int bottom = -1;
-        String[] anchors = new String[]{
-                "guidance_open_voice_search", "alice_fab_container", "alice_fab",
-                "guidance_add_road_event", "guidance_refuel_search_map_control",
-                "guidance_search_map_control_ghost"
-        };
-        for (String name : anchors) {
-            int id = activity.getResources().getIdentifier(
-                    name, "id", activity.getPackageName());
-            View anchor = id == 0 ? null : activity.findViewById(id);
-            if (anchor == null || anchor.getVisibility() != View.VISIBLE
-                    || anchor.getWidth() <= 0 || anchor.getHeight() <= 0) continue;
-            int[] location = new int[2];
-            anchor.getLocationOnScreen(location);
-            int localLeft = location[0] - layerLocation[0];
-            if (localLeft > Math.max(dp(160), layer.getWidth() / 4)) continue;
-            bottom = Math.max(bottom,
-                    location[1] - layerLocation[1] + anchor.getHeight());
+        int bottom = exactLeftControlPairBottom(layer, layerLocation,
+                "guidance_add_road_event", "guidance_open_voice_search");
+        if (bottom < 0) {
+            bottom = exactLeftControlPairBottom(layer, layerLocation,
+                    "navi_service_add_road_event", "navi_service_open_voice_search");
         }
-        int top = bottom >= 0 ? bottom + dp(8) : dp(116);
+        int top = bottom >= 0 ? bottom + dp(8)
+                : Math.round(layer.getHeight() * MODE_BUTTON_FALLBACK_TOP_FRACTION);
+        return clampModeButtonTop(top, fallbackMargin);
+    }
+
+    private int exactLeftControlPairBottom(FrameLayout layer, int[] layerLocation,
+                                           String upperName, String lowerName) {
+        View upper = viewByName(upperName);
+        View lower = viewByName(lowerName);
+        if (!isVisibleControl(upper) || !isVisibleControl(lower)) return -1;
+        int[] upperLocation = new int[2];
+        int[] lowerLocation = new int[2];
+        upper.getLocationOnScreen(upperLocation);
+        lower.getLocationOnScreen(lowerLocation);
+        int leftLimit = Math.max(dp(160), layer.getWidth() / 4);
+        if (upperLocation[0] - layerLocation[0] > leftLimit
+                || lowerLocation[0] - layerLocation[0] > leftLimit) return -1;
+        return Math.max(upperLocation[1] - layerLocation[1] + upper.getHeight(),
+                lowerLocation[1] - layerLocation[1] + lower.getHeight());
+    }
+
+    private static boolean isVisibleControl(View view) {
+        return view != null && view.isShown() && view.getVisibility() == View.VISIBLE
+                && view.getWidth() > 0 && view.getHeight() > 0;
+    }
+
+    private int clampModeButtonTop(int top, int fallbackMargin) {
+        FrameLayout layer = controlLayer;
+        if (layer == null || layer.getHeight() <= 0) return Math.max(fallbackMargin, top);
         int maximum = Math.max(fallbackMargin,
                 layer.getHeight() - dp(profile.modeButtonSizeDp) - fallbackMargin);
         return Math.max(fallbackMargin, Math.min(maximum, top));

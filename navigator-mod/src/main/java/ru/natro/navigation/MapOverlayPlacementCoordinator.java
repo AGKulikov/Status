@@ -12,9 +12,10 @@ import java.util.List;
  *
  * <p>MapKit collision modes can hide a conflicting placemark, but child collections cannot ask
  * one another to move the complete card to another side of its geographical point. This small
- * screen-space pass keeps lane guidance, traffic-light balloons and unified camera signs in one
- * reservation set. The selected {@link Placement#legName} is also the stock Yandex balloon leg
- * that points back to the exact map coordinate.</p>
+ * screen-space pass keeps lane guidance and traffic-light balloons clear of one another and of
+ * fixed camera signs. Camera signs reserve their centred footprint but never move away from the
+ * exact map coordinate. The selected {@link Placement#legName} is also the stock Yandex balloon
+ * leg that points back to that coordinate.</p>
  */
 final class MapOverlayPlacementCoordinator {
     static final String OWNER_LANES = "lanes";
@@ -79,6 +80,19 @@ final class MapOverlayPlacementCoordinator {
         occupied.inset(-ITEM_MARGIN_PX, -ITEM_MARGIN_PX);
         reservations.add(new Reservation(owner, key, occupied));
         return new Placement(best.anchorX, best.anchorY, best.legName);
+    }
+
+    /** Reserves an immovable placemark whose visual centre must remain on its map coordinate. */
+    Placement reserveCentered(String owner, String key, double latitude, double longitude,
+                              int bitmapWidth, int bitmapHeight) {
+        float[] screen = project(latitude, longitude);
+        int safeWidth = Math.max(1, bitmapWidth);
+        int safeHeight = Math.max(1, bitmapHeight);
+        Candidate centered = new Candidate(.50f, .50f, "CENTER");
+        RectF occupied = rect(screen[0], screen[1], safeWidth, safeHeight, centered);
+        occupied.inset(-ITEM_MARGIN_PX, -ITEM_MARGIN_PX);
+        reservations.add(new Reservation(owner, key, occupied));
+        return new Placement(centered.anchorX, centered.anchorY, centered.legName);
     }
 
     private float[] project(double latitude, double longitude) {

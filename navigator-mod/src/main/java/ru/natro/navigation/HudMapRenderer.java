@@ -1036,10 +1036,11 @@ final class HudMapRenderer {
         if (!force && now - lastOverlayLayoutElapsedMs < 200L) return;
         lastOverlayLayoutElapsedMs = now;
         overlayPlacement.beginLayout();
-        // Large lane cards reserve first, then exact traffic-light balloons and compact cameras.
+        // Cameras are immovable point objects and reserve first. Movable lane/traffic balloons
+        // choose a free side around them; a collision may never push a camera off the route.
+        cameraDirectionMapLayer.relayout();
         laneGuidanceMapLayer.relayout();
         trafficLightMapLayer.relayout();
-        cameraDirectionMapLayer.relayout();
     }
 
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,

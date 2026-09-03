@@ -216,7 +216,7 @@ final class CameraDirectionMapLayer {
         scheduleExpiryIfNeeded();
     }
 
-    /** Reuses textures and changes only anchors when the shared collision pass selects a slot. */
+    /** Keeps every camera centred while refreshing its fixed collision reservation. */
     void relayout() {
         placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_CAMERAS);
         for (CameraSign sign : cameraSigns) {
@@ -234,7 +234,7 @@ final class CameraDirectionMapLayer {
                         new Class<?>[]{providerClass, styleClass},
                         sign.provider, sign.style);
             } catch (Throwable failure) {
-                Log.w(TAG, "Camera sign could not be repositioned", failure);
+                Log.w(TAG, "Camera sign reservation could not be refreshed", failure);
             }
         }
     }
@@ -486,11 +486,13 @@ final class CameraDirectionMapLayer {
 
     private MapOverlayPlacementCoordinator.Placement reservePlacement(
             CameraMarker camera, int bitmapWidth, int bitmapHeight) {
-        boolean preferRight = (camera.id.hashCode() & 1) == 0;
-        return placementCoordinator.reserve(
+        // A camera is a point object, not a balloon. Its sector apex and the visual centre of both
+        // a speed-only and a composite sign must share the exact source coordinate on the route.
+        // Other movable balloons still receive this centred footprint as a collision reservation.
+        return placementCoordinator.reserveCentered(
                 MapOverlayPlacementCoordinator.OWNER_CAMERAS, camera.id,
                 camera.latitude, camera.longitude,
-                bitmapWidth, bitmapHeight, preferRight);
+                bitmapWidth, bitmapHeight);
     }
 
     /**
