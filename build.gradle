@@ -197,6 +197,11 @@ int getVersionCode() {
     if (version == '2.6.9') {
         return 208021302
     }
+    // The first release after the already-published 2.6.9 rolls to 2.7.0. Reusing 208021302
+    // would make the post-audit Natro safety fix indistinguishable from the installed build.
+    if (version == '2.7.0') {
+        return 208021303
+    }
     if (version == '2.3.0') {
         return 208021254
     }
