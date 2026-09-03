@@ -9,6 +9,9 @@ import android.os.SystemClock;
 import android.util.Log;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /** The stock Yandex lane balloon, anchored to its upcoming RoutePosition. */
 final class LaneGuidanceMapLayer {
@@ -24,6 +27,8 @@ final class LaneGuidanceMapLayer {
     private Object iconStyle;
     private Object imageProvider;
     private Object balloonTexture;
+    private List<MapOverlayPlacementCoordinator.Footprint> placementFootprints =
+            Collections.emptyList();
     private int iconWidth;
     private int iconHeight;
     private boolean enabled;
@@ -157,7 +162,9 @@ final class LaneGuidanceMapLayer {
             MapOverlayPlacementCoordinator.Placement next = placementCoordinator.reserve(
                     MapOverlayPlacementCoordinator.OWNER_LANES, frame.id,
                     frame.latitude, frame.longitude,
-                    iconWidth, iconHeight, placeOnRight);
+                    iconWidth, iconHeight, placeOnRight,
+                    frame.routeSegmentIndex, frame.routeSegmentPosition, placement,
+                    placementFootprints);
             applyPlacement(next);
         } catch (Throwable failure) {
             Log.w(TAG, "Lane balloon could not be repositioned", failure);
@@ -257,19 +264,21 @@ final class LaneGuidanceMapLayer {
         Object texture = factoryClass
                 .getMethod("createTexture", balloonClass, boolean.class, float.class)
                 .invoke(factory, balloon, nightMode, scalePercent / 100f);
-        Object preliminaryAnchor = balloonAnchor("LEFT_CENTER");
-        Object preliminaryGeometry = invoke(texture, "getBalloonGeometry",
-                new Class<?>[]{preliminaryAnchor.getClass()}, preliminaryAnchor);
-        int measuredWidth = Math.max(1, Math.round(((Number) invoke(
-                preliminaryGeometry, "getWidth", new Class<?>[0])).floatValue()));
-        int measuredHeight = Math.max(1, Math.round(((Number) invoke(
-                preliminaryGeometry, "getHeight", new Class<?>[0])).floatValue()));
+        List<MapOverlayPlacementCoordinator.Footprint> footprints =
+                measureBalloonFootprints(texture);
+        int measuredWidth = 1;
+        int measuredHeight = 1;
+        for (MapOverlayPlacementCoordinator.Footprint footprint : footprints) {
+            measuredWidth = Math.max(measuredWidth, footprint.width);
+            measuredHeight = Math.max(measuredHeight, footprint.height);
+        }
 
         placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_LANES);
         MapOverlayPlacementCoordinator.Placement nextPlacement = placementCoordinator.reserve(
                 MapOverlayPlacementCoordinator.OWNER_LANES, frame.id,
                 frame.latitude, frame.longitude,
-                measuredWidth, measuredHeight, placeOnRight);
+                measuredWidth, measuredHeight, placeOnRight,
+                frame.routeSegmentIndex, frame.routeSegmentPosition, placement, footprints);
 
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
@@ -293,6 +302,7 @@ final class LaneGuidanceMapLayer {
         PointF imageAnchor = (PointF) invoke(geometry, "getImageAnchor", new Class<?>[0]);
         imageProvider = provider;
         balloonTexture = texture;
+        placementFootprints = footprints;
         iconWidth = Math.max(1, Math.round(((Number) invoke(
                 geometry, "getWidth", new Class<?>[0])).floatValue()));
         iconHeight = Math.max(1, Math.round(((Number) invoke(
@@ -314,7 +324,6 @@ final class LaneGuidanceMapLayer {
         if (style == null || provider == null || texture == null
                 || currentPlacemark == null) return;
         if (placement != null && placement.sameSlot(next)) return;
-        placement = next;
         Object exactAnchor = balloonAnchor(next.legName);
         provider = invoke(texture, "create",
                 new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
@@ -332,6 +341,27 @@ final class LaneGuidanceMapLayer {
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
         invoke(currentPlacemark, "setIcon",
                 new Class<?>[]{providerClass, styleClass}, provider, style);
+        placement = next;
+    }
+
+    /** Measures all eight real stock bitmaps and anchors before choosing a side. */
+    private static List<MapOverlayPlacementCoordinator.Footprint> measureBalloonFootprints(
+            Object texture) throws Exception {
+        ArrayList<MapOverlayPlacementCoordinator.Footprint> result = new ArrayList<>(8);
+        for (String legName : MapOverlayPlacementCoordinator.placementLegNames()) {
+            Object anchor = balloonAnchor(legName);
+            Object geometry = invoke(texture, "getBalloonGeometry",
+                    new Class<?>[]{anchor.getClass()}, anchor);
+            int width = Math.max(1, Math.round(((Number) invoke(
+                    geometry, "getWidth", new Class<?>[0])).floatValue()));
+            int height = Math.max(1, Math.round(((Number) invoke(
+                    geometry, "getHeight", new Class<?>[0])).floatValue()));
+            PointF imageAnchor = (PointF) invoke(
+                    geometry, "getImageAnchor", new Class<?>[0]);
+            result.add(new MapOverlayPlacementCoordinator.Footprint(
+                    legName, width, height, imageAnchor.x, imageAnchor.y));
+        }
+        return Collections.unmodifiableList(result);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -373,6 +403,7 @@ final class LaneGuidanceMapLayer {
         iconStyle = null;
         imageProvider = null;
         balloonTexture = null;
+        placementFootprints = Collections.emptyList();
         iconWidth = 0;
         iconHeight = 0;
         placement = null;
@@ -385,6 +416,8 @@ final class LaneGuidanceMapLayer {
         result = mix(result, frame.id.hashCode());
         result = mix(result, Math.round(frame.latitude * 1_000_000d));
         result = mix(result, Math.round(frame.longitude * 1_000_000d));
+        result = mix(result, frame.routeSegmentIndex);
+        result = mix(result, Double.doubleToLongBits(frame.routeSegmentPosition));
         for (NavigatorStatePublisher.LaneFrame lane : frame.lanes) {
             result = mix(result, lane.kind.hashCode());
             result = mix(result, lane.highlightedDirection.hashCode());

@@ -21,8 +21,10 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
 import android.view.Window;
 import android.view.WindowManager;
@@ -138,6 +140,12 @@ final class FloatingWindowController {
     private int floatingTopNotificationContentTop;
     private final Map<View, Integer> paddingtonBaseTopByChild = new IdentityHashMap<>();
     private int reportedPaddingtonOverrideCount = -1;
+    private final int mapTouchSlopSquared;
+    private boolean mapGestureInProgress;
+    private boolean mapTapCandidate;
+    private float mapTouchDownX;
+    private float mapTouchDownY;
+    private boolean floatingPreDrawGuardInstalled;
     private int roundedOutlineWidth = -1;
     private int roundedOutlineHeight = -1;
     private int roundedOutlineRadius = -1;
@@ -209,6 +217,22 @@ final class FloatingWindowController {
                     }
                 }
             };
+    private final ViewTreeObserver.OnPreDrawListener floatingTopInsetPreDrawGuard = () -> {
+        try {
+            if (floating) {
+                // PaddingtonView.onAttachedToWindow writes the raw root inset directly and does
+                // not invoke its child listener. Reassert the four common zero-base roots at the
+                // final UI boundary as well, so a late attach/inset pass cannot reach the screen.
+                setTopPadding(controlsEngine, 0);
+                setTopPadding(activityControllerRoot, 0);
+                setTopPadding(guidanceControls, 0);
+                setTopPadding(guidanceVisualRoot, 0);
+            }
+        } catch (Throwable failure) {
+            reportCallbackFailure("floatingTopInsetPreDraw", failure);
+        }
+        return true;
+    };
     private final ViewOutlineProvider roundedOutlineProvider = new ViewOutlineProvider() {
         @Override public void getOutline(View view, Outline outline) {
             int radius = Math.max(0, Math.round(profile.cornerRadiusDp
@@ -254,25 +278,18 @@ final class FloatingWindowController {
         originalNavigationBarColor = window.getNavigationBarColor();
         originalOutlineProvider = decor.getOutlineProvider();
         originalClipToOutline = decor.getClipToOutline();
+        int touchSlop = ViewConfiguration.get(activity).getScaledTouchSlop();
+        mapTouchSlopSquared = touchSlop * touchSlop;
     }
 
     void install() {
         if (destroyed || controlLayer != null) return;
         ViewGroup host = findControlHost();
         if (host == null) return;
-        controlLayer = new FrameLayout(activity) {
-            @Override public boolean dispatchTouchEvent(MotionEvent event) {
-                if (event != null && event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                    try {
-                        ensureModeButtonAttachedToStockRail();
-                    } catch (Throwable failure) {
-                        reportCallbackFailure("controlLayerModeButtonReattach", failure);
-                    }
-                }
-                // Returning super's result lets an unhandled event continue to Navigator below.
-                return super.dispatchTouchEvent(event);
-            }
-        };
+        // This full-size layer owns only the three visible Natro controls below. Keeping the
+        // layer itself non-clickable makes every other point fall through to Navigator without a
+        // side effect before MapActivity.dispatchTouchEvent has completed.
+        controlLayer = new FrameLayout(activity);
         controlLayer.setClipChildren(false);
         controlLayer.setClipToPadding(false);
         controlLayer.setClickable(false);
@@ -299,25 +316,59 @@ final class FloatingWindowController {
         updateControls();
     }
 
-    /** Global MapActivity touch hook: late MapKit views cannot hide or bypass this reveal path. */
+    /**
+     * Observes the complete stock gesture but never mutates Navigator's hierarchy inside it.
+     * Rebinding after ACTION_DOWN used to run before MapActivity's own dispatcher and broke its
+     * tap-to-toggle state machine. Only a completed, unmoved single-pointer tap schedules work,
+     * and Handler.post guarantees that work runs after the current stock dispatch returns.
+     */
     void onMapTouch(MotionEvent event) {
-        if (destroyed || event == null || event.getActionMasked() != MotionEvent.ACTION_DOWN) return;
-        // MapActivity may finish onResumeFragments before Conductor installs android.R.id.content.
-        // A failed first install used to leave this Activity without controls forever. The global
-        // touch hook is a safe second admission point because it runs before Yandex consumes DOWN.
-        if (controlLayer == null) install();
-        ensureControlLayerAttached();
-        ensureModeButtonAttachedToStockRail();
-        if (controlLayer != null) {
-            controlLayer.post(() -> {
-                try {
-                    if (destroyed) return;
-                    ensureControlLayerAttached();
-                    updateModeButtons();
-                } catch (Throwable failure) {
-                    reportCallbackFailure("mapTouchReattach", failure);
+        if (destroyed || event == null) return;
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                mapGestureInProgress = true;
+                mapTapCandidate = event.getPointerCount() == 1;
+                mapTouchDownX = event.getX();
+                mapTouchDownY = event.getY();
+                return;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                mapTapCandidate = false;
+                return;
+            case MotionEvent.ACTION_MOVE:
+                if (mapTapCandidate) {
+                    float deltaX = event.getX() - mapTouchDownX;
+                    float deltaY = event.getY() - mapTouchDownY;
+                    if (deltaX * deltaX + deltaY * deltaY > mapTouchSlopSquared) {
+                        mapTapCandidate = false;
+                    }
                 }
-            });
+                return;
+            case MotionEvent.ACTION_CANCEL:
+                mapGestureInProgress = false;
+                mapTapCandidate = false;
+                return;
+            case MotionEvent.ACTION_UP:
+                boolean completedTap = mapGestureInProgress && mapTapCandidate
+                        && event.getPointerCount() == 1;
+                mapGestureInProgress = false;
+                mapTapCandidate = false;
+                if (!completedTap) return;
+                mainHandler.post(() -> {
+                    try {
+                        if (destroyed || activity.isFinishing()) return;
+                        // MapActivity may finish onResumeFragments before Conductor installs
+                        // android.R.id.content. A completed stock tap is the safe second admission
+                        // point because Navigator has already consumed the whole gesture.
+                        if (controlLayer == null) install();
+                        ensureControlLayerAttached();
+                        updateModeButtons();
+                    } catch (Throwable failure) {
+                        reportCallbackFailure("mapTouchReattach", failure);
+                    }
+                });
+                return;
+            default:
+                return;
         }
     }
 
@@ -418,10 +469,14 @@ final class FloatingWindowController {
         @Override public void run() {
             if (destroyed) return;
             try {
-                ensureControlLayerAttached();
-                if (floating) enforceFloatingWindowContract();
-                if (controlLayer != null) controlLayer.bringToFront();
-                updateModeButtons();
+                // Never reparent either the Natro layer or the stock-rail child while Android is
+                // dispatching one gesture. The next poll is at most one second away in a window.
+                if (!mapGestureInProgress) {
+                    ensureControlLayerAttached();
+                    if (floating) enforceFloatingWindowContract();
+                    if (controlLayer != null) controlLayer.bringToFront();
+                    updateModeButtons();
+                }
             } catch (Throwable failure) {
                 reportCallbackFailure("modeButtonPoller", failure);
             } finally {
@@ -470,6 +525,7 @@ final class FloatingWindowController {
             insetDispatchHost.setOnApplyWindowInsetsListener(null);
             insetDispatchHost = null;
         }
+        removeFloatingTopInsetPreDrawGuard();
         removeFloatingTopInsetGuards();
         clearPaddingtonInsetsOverrides();
         detachFromParent(modeButton);
@@ -563,6 +619,7 @@ final class FloatingWindowController {
         window.setStatusBarColor(originalStatusBarColor);
         window.setNavigationBarColor(originalNavigationBarColor);
         restoreTransparentLayers();
+        removeFloatingTopInsetPreDrawGuard();
         requestNavigatorInsets();
         updateControls();
     }
@@ -663,6 +720,9 @@ final class FloatingWindowController {
                     ? null : activity.findViewById(controlsEngineId);
             capturePadding(controlsEngine, originalControlsEnginePadding);
             originalControlsEngineFitsSystemWindows = fitsSystemWindows(controlsEngine);
+            // maps_activity.xml gives this exact PaddingtonView child zero base top padding.
+            // Do not infer it from a live value that may already include the KX11 root inset.
+            if (controlsEngine != null) paddingtonBaseTopByChild.put(controlsEngine, 0);
         }
         if (controlsInsetHost == null && controlsEngine != null
                 && controlsEngine.getParent() instanceof View) {
@@ -700,7 +760,13 @@ final class FloatingWindowController {
             capturePadding(guidanceInsetHost, originalGuidanceInsetHostPadding);
             originalGuidanceControlsFitsSystemWindows = fitsSystemWindows(guidanceControls);
             originalGuidanceInsetHostFitsSystemWindows = fitsSystemWindows(guidanceInsetHost);
-            floatingGuidanceControlsTop = paddingtonBaseTop(guidanceControls);
+            // navi_guidance_integration_controller.xml also declares an exact zero base padding.
+            // Reflection/fallback against a live child is too late on KX11: the stock
+            // PaddingtonView may already have written the global status-bar height into it.
+            floatingGuidanceControlsTop = 0;
+            if (guidanceControls != null) {
+                paddingtonBaseTopByChild.put(guidanceControls, 0);
+            }
         }
         // CarGuidanceController is attached after the integration container and its stock root has
         // no id. Resolve the one parent that contains both upper Guidance widgets. On KX11 this
@@ -775,9 +841,17 @@ final class FloatingWindowController {
         // The Conductor host owns every late free-drive/Guidance controller. Scanning it avoids
         // retaining a stale subtree and catches PaddingtonView instances created after route
         // transitions. Keep the named Guidance fallback for early layouts without that host.
-        paddingtonCount += neutralizePaddingtonTree(activityControllerRoot != null
-                ? activityControllerRoot
-                : guidanceInsetHost != null ? guidanceInsetHost : guidanceControls);
+        paddingtonCount += neutralizePaddingtonTree(activityControllerRoot);
+        View exactGuidanceInsetRoot = guidanceInsetHost != null
+                ? guidanceInsetHost : guidanceControls;
+        // The KX11 Guidance router is not guaranteed to be a descendant of the generic
+        // activity_container_controller returned by this Activity. Always own the specifically
+        // resolved route PaddingtonView when it is outside that tree; a one-time padding write is
+        // otherwise undone by its next stock inset callback.
+        if (exactGuidanceInsetRoot != null && (activityControllerRoot == null
+                || !isDescendantOf(exactGuidanceInsetRoot, activityControllerRoot))) {
+            paddingtonCount += neutralizePaddingtonTree(exactGuidanceInsetRoot);
+        }
         if (paddingtonCount != reportedPaddingtonOverrideCount) {
             reportedPaddingtonOverrideCount = paddingtonCount;
             NavigationBridgeClient.reportDiagnostic(
@@ -817,6 +891,7 @@ final class FloatingWindowController {
         requestLayout(guidanceVisualRoot);
         requestLayout(topNotificationContent);
         installFloatingTopInsetGuards();
+        installFloatingTopInsetPreDrawGuard();
         dispatchFloatingInsetsToNavigatorRoots();
         WindowManager.LayoutParams attributes = window.getAttributes();
         if (attributes.dimAmount != 0f) attributes.dimAmount = 0f;
@@ -922,7 +997,11 @@ final class FloatingWindowController {
                 View child = group.getChildAt(0);
                 Integer baseTop = paddingtonBaseTopByChild.get(child);
                 if (baseTop == null) {
-                    baseTop = paddingtonBaseTop(child);
+                    // Both named full-screen map-control children have zero XML top padding.
+                    // Prefer that structural fact over a live padding value already polluted by
+                    // the vendor root inset. Other PaddingtonView children retain their own base.
+                    baseTop = child == controlsEngine || child == guidanceControls
+                            ? 0 : paddingtonBaseTop(child);
                     paddingtonBaseTopByChild.put(child, baseTop);
                 }
                 // ViewCompat uses the platform listener on API 28. Setting ours directly replaces
@@ -1041,6 +1120,26 @@ final class FloatingWindowController {
         if (topNotificationContent != null) {
             topNotificationContent.removeOnLayoutChangeListener(floatingTopInsetGuard);
         }
+    }
+
+    private void installFloatingTopInsetPreDrawGuard() {
+        if (floatingPreDrawGuardInstalled) return;
+        View decor = window.getDecorView();
+        if (decor == null) return;
+        ViewTreeObserver observer = decor.getViewTreeObserver();
+        if (!observer.isAlive()) return;
+        observer.addOnPreDrawListener(floatingTopInsetPreDrawGuard);
+        floatingPreDrawGuardInstalled = true;
+    }
+
+    private void removeFloatingTopInsetPreDrawGuard() {
+        if (!floatingPreDrawGuardInstalled) return;
+        View decor = window.getDecorView();
+        ViewTreeObserver observer = decor == null ? null : decor.getViewTreeObserver();
+        if (observer != null && observer.isAlive()) {
+            observer.removeOnPreDrawListener(floatingTopInsetPreDrawGuard);
+        }
+        floatingPreDrawGuardInstalled = false;
     }
 
     private static void restorePadding(View view, int[] source) {
@@ -1200,6 +1299,7 @@ final class FloatingWindowController {
             holdModeButtonHidden();
             return;
         }
+        if (mapGestureInProgress) return;
         ensureModeButtonAttachedToStockRail();
     }
 
@@ -1396,19 +1496,69 @@ final class FloatingWindowController {
 
     private View viewByName(String name) {
         int id = activity.getResources().getIdentifier(name, "id", activity.getPackageName());
-        return id == 0 ? null : activity.findViewById(id);
+        return id == 0 ? null : bestLiveViewById(window.getDecorView(), id, null, Integer.MIN_VALUE);
+    }
+
+    /** Chooses the visible topmost controller when Conductor temporarily retains duplicate ids. */
+    private static View bestLiveViewById(View root, int id, View best, int bestScore) {
+        if (root == null) return best;
+        if (root.getId() == id) {
+            int score = (root.isAttachedToWindow() ? 16 : 0)
+                    + (root.isShown() ? 16 : 0)
+                    + (root.getWidth() > 0 && root.getHeight() > 0 ? 8 : 0)
+                    + (root.getAlpha() > 0.01f ? 4 : 0)
+                    + (root.getVisibility() == View.VISIBLE ? 2 : 0);
+            // Children are visited in drawing order, so an equal later candidate is topmost.
+            if (score >= bestScore) {
+                best = root;
+                bestScore = score;
+            }
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                View candidate = bestLiveViewById(group.getChildAt(index), id, best, bestScore);
+                if (candidate != best) {
+                    best = candidate;
+                    bestScore = liveViewScore(candidate);
+                }
+            }
+        }
+        return best;
+    }
+
+    private static int liveViewScore(View view) {
+        if (view == null) return Integer.MIN_VALUE;
+        return (view.isAttachedToWindow() ? 16 : 0)
+                + (view.isShown() ? 16 : 0)
+                + (view.getWidth() > 0 && view.getHeight() > 0 ? 8 : 0)
+                + (view.getAlpha() > 0.01f ? 4 : 0)
+                + (view.getVisibility() == View.VISIBLE ? 2 : 0);
     }
 
     /** Finds the id-less CarGuidance root without confusing it with free-drive speed controls. */
     private View activeGuidanceVisualRoot() {
-        View maneuver = viewByName("contextmaneuverview");
-        if (maneuver == null || !maneuver.isAttachedToWindow()
-                || !(maneuver.getParent() instanceof ViewGroup)) return null;
-        ViewGroup candidate = (ViewGroup) maneuver.getParent();
+        int maneuverId = resourceId("contextmaneuverview");
         int speedGroupId = activity.getResources().getIdentifier(
                 "speed_group", "id", activity.getPackageName());
-        if (speedGroupId == 0 || candidate.findViewById(speedGroupId) == null) return null;
-        return guidanceControls == null || isDescendantOf(candidate, guidanceControls)
+        if (maneuverId == 0 || speedGroupId == 0) return null;
+
+        // speed_group remains visible even when ContextManeuverView is legitimately GONE between
+        // instructions, so it is the reliable primary key among retained Conductor trees.
+        View speedGroup = viewByName("speed_group");
+        ViewGroup candidate = speedGroup != null && speedGroup.isAttachedToWindow()
+                && speedGroup.getParent() instanceof ViewGroup
+                ? (ViewGroup) speedGroup.getParent() : null;
+        if (candidate != null && candidate.findViewById(maneuverId) != null) return candidate;
+
+        View maneuver = viewByName("contextmaneuverview");
+        candidate = maneuver != null && maneuver.isAttachedToWindow()
+                && maneuver.getParent() instanceof ViewGroup
+                ? (ViewGroup) maneuver.getParent() : null;
+        // The pair is the exact car_guidance_controller.xml signature. Do not require this late
+        // child router to be below the separately resolved side-controls tree: regional Conductor
+        // hosts may mount those siblings while retaining the same stock guidance layout.
+        return candidate != null && candidate.findViewById(speedGroupId) != null
                 ? candidate : null;
     }
 

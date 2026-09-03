@@ -294,6 +294,15 @@ public final class InstrumentPanelContractTest {
         assertTrue(launcher.contains("DIM_WAKE_TO_TASK_RESET_MS = 200L"));
         assertTrue(launcher.contains("finishStalePanelTask"));
         assertTrue(launcher.contains("prepareInstrumentPanelLaunch"));
+        assertTrue(launcher.contains("ensureClusterEndpointStarted(app)"));
+        assertTrue(launcher.contains("MAX_NAVIGATOR_READY_RETRIES = 60"));
+        assertTrue(launcher.contains("NAVIGATOR_READY_RETRY_MS = 500L"));
+        assertTrue(launcher.contains("onExternalLaunchPrepared("));
+        assertTrue(launcher.contains("waiting for Navigator DIM launcher"));
+        assertTrue(launcher.contains(
+                "Navigator external launcher unavailable after bounded readiness wait"));
+        assertTrue(launcher.indexOf("ensureClusterEndpointStarted(app)")
+                < launcher.indexOf("LAUNCH_PENDING.compareAndSet(false, true)"));
         assertTrue(launcher.contains("FORCE_STOP_COMMAND"));
         assertTrue(launcher.contains("PrivilegedShell.get(app)"));
         assertTrue(endpoint.contains("CAP_EXTERNAL_INSTRUMENT_LAUNCHER"));

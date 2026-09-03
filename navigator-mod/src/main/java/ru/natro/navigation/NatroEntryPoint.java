@@ -48,10 +48,9 @@ public final class NatroEntryPoint {
         }
     }
 
-    /** Called by MapActivity.dispatchTouchEvent before Navigator consumes the map gesture. */
+    /** Called by MapActivity.dispatchTouchEvent before Navigator consumes each gesture event. */
     public static void onMapTouch(Activity activity, MotionEvent event) {
         if (activity == null || event == null || activity.isFinishing()) return;
-        if (event.getActionMasked() != MotionEvent.ACTION_DOWN) return;
         try {
             controllerFor(activity).onMapTouch(event);
         } catch (Throwable failure) {

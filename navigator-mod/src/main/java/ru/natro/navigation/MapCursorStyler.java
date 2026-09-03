@@ -156,8 +156,10 @@ final class MapCursorStyler {
             invoke(style, "setAnchor", new Class<?>[]{PointF.class},
                     new PointF(0.5f, 0.5f));
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
+            // The vector path is rasterised at the requested physical size below. A second
+            // IconStyle scale would shrink that final bitmap and blur its outline on KX11.
             invoke(style, "setScale", new Class<?>[]{Float.class},
-                    Float.valueOf(scalePercent / 100f));
+                    Float.valueOf(1f));
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
             invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
@@ -176,8 +178,10 @@ final class MapCursorStyler {
     }
 
     private Bitmap createCursorBitmap() {
-        float density = context.getResources().getDisplayMetrics().density;
-        int size = Math.max(32, Math.round(48f * density));
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        float requestedScale = scalePercent / 100f;
+        int baseSize = Math.max(32, Math.round(48f * density));
+        int size = Math.max(8, Math.round(baseSize * requestedScale));
         Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         float width = bitmap.getWidth();
@@ -194,7 +198,7 @@ final class MapCursorStyler {
         outline.setStyle(Paint.Style.STROKE);
         outline.setStrokeJoin(Paint.Join.ROUND);
         outline.setStrokeCap(Paint.Cap.ROUND);
-        outline.setStrokeWidth(Math.max(2f, 2.5f * density));
+        outline.setStrokeWidth(Math.max(1f, 2.5f * density * requestedScale));
         canvas.drawPath(path, outline);
 
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);

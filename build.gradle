@@ -207,6 +207,11 @@ int getVersionCode() {
     if (version == '2.7.1') {
         return 208021304
     }
+    // 2.7.2 contains the post-2.7.1 KX11 feedback fixes: cold DIM startup, the bounded-window
+    // Guidance/touch contract, route-aware balloon placement and explicit traffic-light legs.
+    if (version == '2.7.2') {
+        return 208021305
+    }
     if (version == '2.3.0') {
         return 208021254
     }

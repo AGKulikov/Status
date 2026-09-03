@@ -81,6 +81,7 @@ final class HudMapRenderer {
     private int renderedRouteSegmentCount;
     private NavigatorStatePublisher.CameraState initialCamera;
     private NavigatorStatePublisher.CameraState navigationCamera;
+    private NavigatorStatePublisher.NavigationFrame latestNavigationFrame;
     /** Frozen source position for FREE mode; profile tilt/zoom may still change around it. */
     private NavigatorStatePublisher.CameraState freeCameraSource;
     private AppliedCamera lastAppliedCamera;
@@ -180,6 +181,9 @@ final class HudMapRenderer {
     void updateNavigationRuntime(Object nextNavigation) {
         if (nextNavigation == null) {
             routeGuidanceActive = false;
+            latestNavigationFrame = null;
+            overlayPlacement.updateNavigationState(false, false, 0, Double.NaN,
+                    Double.NaN, Double.NaN, 0);
             trafficLightMapLayer.clearData();
             cameraDirectionMapLayer.clearData();
             laneGuidanceMapLayer.clearData();
@@ -192,6 +196,8 @@ final class HudMapRenderer {
     /** Canonical navigation location, independent from every visual operation on the main map. */
     void updateNavigationState(NavigatorStatePublisher.NavigationFrame frame) {
         if (frame == null) return;
+        latestNavigationFrame = frame;
+        syncOverlayNavigationState();
         boolean routeVisibilityChanged = routeGuidanceActive != frame.routeActive;
         routeGuidanceActive = frame.routeActive;
         if (routeVisibilityChanged) {
@@ -260,6 +266,7 @@ final class HudMapRenderer {
     void updateRoute(long routeEpoch, Object drivingRoute, long jamFingerprint,
                      RoutePolylineStyler.JamStyle jamStyle) {
         if (routeEpoch < activeRouteEpoch) return;
+        overlayPlacement.updateRoute(routeEpoch, drivingRoute);
         // MapKit may hand out a new Java wrapper for the same DrivingRoute on every Guidance
         // callback. Object identity is therefore not a route identity; routeEpoch is.
         boolean changed = routeEpoch != activeRouteEpoch
@@ -327,6 +334,8 @@ final class HudMapRenderer {
             mapWindow = nextMapWindow;
             map = invoke(nextMapWindow, "getMap", new Class<?>[0]);
             overlayPlacement.attach(nextMapWindow, width, height);
+            overlayPlacement.updateRoute(activeRouteEpoch, activeRoute);
+            syncOverlayNavigationState();
             trafficLightMapLayer.attach(map);
             cameraDirectionMapLayer.attach(map);
             laneGuidanceMapLayer.attach(map);
@@ -410,6 +419,7 @@ final class HudMapRenderer {
             cursorStyler.apply(profile.showCursor, profile.cursorScalePercent,
                     profile.cursorColor, profile.cursorOutlineColor,
                     profile.effectiveCursorPriority());
+            syncOverlayNavigationState();
             invoke(currentMap, "setNightModeEnabled", new Class<?>[]{boolean.class}, night);
             invoke(currentMap, "setModelsEnabled", new Class<?>[]{boolean.class},
                     profile.showModels && !profile.roadsOnly);
@@ -433,6 +443,8 @@ final class HudMapRenderer {
             if (roadEventScaleChanged) resetRoadEventVisibilityForStyleRefresh();
             applyRoadEventVisibility();
             destinationIconStyle = null;
+            destinationImageProvider = null;
+            destinationIconBitmap = null;
             rebuildRoute();
         } catch (Throwable failure) {
             Log.w(TAG, "Some HUD MapProfile fields could not be applied", failure);
@@ -746,8 +758,10 @@ final class HudMapRenderer {
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
+            // createDestinationBitmap() already renders the vector path at its requested physical
+            // size. Keep MapKit at 1:1 so a small endpoint never comes from bitmap downscaling.
             invoke(style, "setScale", new Class<?>[]{Float.class},
-                    Float.valueOf(profile.destinationScalePercent / 100f));
+                    Float.valueOf(1f));
             invoke(style, "setZIndex", new Class<?>[]{Float.class},
                     Float.valueOf(NavigationMapProfile.layerZ(
                             profile.effectiveDestinationPriority())));
@@ -770,9 +784,12 @@ final class HudMapRenderer {
 
     /** Compact neutral endpoint pin, readable on both day and night map styles. */
     private Bitmap createDestinationBitmap() {
-        float density = context.getResources().getDisplayMetrics().density;
-        int width = Math.max(40, Math.round(48f * density));
-        int height = Math.max(50, Math.round(58f * density));
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        float requestedScale = profile.destinationScalePercent / 100f;
+        int width = Math.max(8,
+                Math.round(Math.max(40, Math.round(48f * density)) * requestedScale));
+        int height = Math.max(10,
+                Math.round(Math.max(50, Math.round(58f * density)) * requestedScale));
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         float unit = width / 48f;
@@ -1041,6 +1058,23 @@ final class HudMapRenderer {
         cameraDirectionMapLayer.relayout();
         laneGuidanceMapLayer.relayout();
         trafficLightMapLayer.relayout();
+    }
+
+    /** Keeps cursor protection in the same physical pixel space as MapCursorStyler. */
+    private void syncOverlayNavigationState() {
+        NavigatorStatePublisher.NavigationFrame frame = latestNavigationFrame;
+        if (frame == null) {
+            overlayPlacement.updateNavigationState(false, false, 0, Double.NaN,
+                    Double.NaN, Double.NaN, 0);
+            return;
+        }
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        int textureSize = Math.max(32, Math.round(48f * density));
+        int displaySize = profile.showCursor
+                ? Math.max(1, Math.round(textureSize * profile.cursorScalePercent / 100f)) : 0;
+        overlayPlacement.updateNavigationState(frame.routeActive, frame.routeProgressValid,
+                frame.routeSegmentIndex, frame.routeSegmentPosition,
+                frame.latitude, frame.longitude, displaySize);
     }
 
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,

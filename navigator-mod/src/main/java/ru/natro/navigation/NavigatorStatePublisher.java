@@ -205,6 +205,8 @@ final class NavigatorStatePublisher {
         final String id;
         final double latitude;
         final double longitude;
+        final int routeSegmentIndex;
+        final double routeSegmentPosition;
         final int distanceMeters;
         final int secondsLeft;
         final String signal;
@@ -212,11 +214,14 @@ final class NavigatorStatePublisher {
         final String arrow;
 
         TrafficLightFrame(String id, double latitude, double longitude,
+                          int routeSegmentIndex, double routeSegmentPosition,
                           int distanceMeters, int secondsLeft, String signal,
                           String sectionType, String arrow) {
             this.id = id == null ? "" : id;
             this.latitude = latitude;
             this.longitude = longitude;
+            this.routeSegmentIndex = routeSegmentIndex;
+            this.routeSegmentPosition = routeSegmentPosition;
             this.distanceMeters = Math.max(-1, distanceMeters);
             this.secondsLeft = Math.max(-1, secondsLeft);
             this.signal = signal == null ? "" : signal;
@@ -288,18 +293,23 @@ final class NavigatorStatePublisher {
         final double longitude;
         final int distanceMeters;
         final float bearingDegrees;
+        final int routeSegmentIndex;
+        final double routeSegmentPosition;
         /** Original MapKit object retained in-process for the stock Yandex renderer. */
         final Object laneSign;
         final List<LaneFrame> lanes;
 
         LaneGuidanceFrame(String id, double latitude, double longitude,
                           int distanceMeters, float bearingDegrees,
+                          int routeSegmentIndex, double routeSegmentPosition,
                           Object laneSign, List<LaneFrame> lanes) {
             this.id = id == null ? "" : id;
             this.latitude = latitude;
             this.longitude = longitude;
             this.distanceMeters = Math.max(-1, distanceMeters);
             this.bearingDegrees = normalizeBearing(bearingDegrees);
+            this.routeSegmentIndex = routeSegmentIndex;
+            this.routeSegmentPosition = routeSegmentPosition;
             this.laneSign = laneSign;
             this.lanes = lanes == null ? Collections.emptyList() : lanes;
         }
@@ -644,7 +654,7 @@ final class NavigatorStatePublisher {
                     activeRouteTurnsSampleElapsedMs = 0L;
                     lastRouteTurnsReadElapsedMs = elapsedNow;
                 } else {
-                    activeLaneState = readLanes(inputs.routePosition,
+                    activeLaneState = readLanes(inputs.routePosition, activeRoute,
                             inputs.frame.bearingDegrees);
                     activeLaneSampleElapsedMs = elapsedNow;
                     boolean routeTurnsDue = routeChanged || forceRoute
@@ -669,7 +679,7 @@ final class NavigatorStatePublisher {
                     lastTrafficLightsReadElapsedMs = elapsedNow;
                 } else if (trafficSampleDue) {
                     activeTrafficLights = Collections.unmodifiableList(
-                            readTrafficLights(inputs.routePosition));
+                            readTrafficLights(inputs.routePosition, activeRoute));
                     activeTrafficLightsSampleElapsedMs = elapsedNow;
                     activeCameraDirections = Collections.unmodifiableList(
                             readActiveSpeedCameras(activeRoute,
@@ -930,6 +940,38 @@ final class NavigatorStatePublisher {
         }
     }
 
+    /** Exact active-route segment for a Windshield balloon; geographic nearest is only fallback. */
+    private RouteProgressSample readEventRouteProgress(Object route, Object eventPosition) {
+        if (route == null || eventPosition == null) return RouteProgressSample.INVALID;
+        try {
+            Object polylinePosition = null;
+            try {
+                String routeId = String.valueOf(invoke(route, "getRouteId"));
+                polylinePosition = invoke(eventPosition, "positionOnRoute",
+                        new Class<?>[]{String.class}, routeId);
+            } catch (Throwable unavailable) {
+                // Route wrappers can briefly change while the Windshield list is still valid.
+            }
+            Object point = null;
+            try {
+                point = invoke(eventPosition, "getPoint");
+            } catch (Throwable unavailable) {
+                // Exact positionOnRoute above is sufficient when the point wrapper is unavailable.
+            }
+            if (polylinePosition == null && point != null) {
+                polylinePosition = closestPositionOnRoute(route, point);
+            }
+            if (polylinePosition == null) return RouteProgressSample.INVALID;
+            int segmentIndex = ((Number) invoke(
+                    polylinePosition, "getSegmentIndex")).intValue();
+            double segmentPosition = ((Number) invoke(
+                    polylinePosition, "getSegmentPosition")).doubleValue();
+            return new RouteProgressSample(true, segmentIndex, segmentPosition, point);
+        } catch (Throwable unavailable) {
+            return RouteProgressSample.INVALID;
+        }
+    }
+
     /** Cached native PolylineIndex fallback for the rare positionOnRoute transition gap. */
     private Object closestPositionOnRoute(Object route, Object currentPoint) throws Exception {
         Object index = activeRoutePolylineIndex;
@@ -1151,7 +1193,8 @@ final class NavigatorStatePublisher {
         return fallback;
     }
 
-    private LaneState readLanes(Object routePosition, double fallbackBearingDegrees)
+    private LaneState readLanes(Object routePosition, Object route,
+                                double fallbackBearingDegrees)
             throws Exception {
         JSONArray result = new JSONArray();
         if (routePosition == null) return new LaneState(result, -1, null);
@@ -1201,8 +1244,12 @@ final class NavigatorStatePublisher {
                 ? "lane-sign:" + Math.round(latitude * 100_000d)
                         + ':' + Math.round(longitude * 100_000d)
                 : "";
+        RouteProgressSample eventProgress = readEventRouteProgress(route, position);
         LaneGuidanceFrame frame = new LaneGuidanceFrame(id, latitude, longitude,
-                distanceMeters, bearing, sign, Collections.unmodifiableList(mapLanes));
+                distanceMeters, bearing,
+                eventProgress.valid ? eventProgress.segmentIndex : -1,
+                eventProgress.valid ? eventProgress.segmentPosition : Double.NaN,
+                sign, Collections.unmodifiableList(mapLanes));
         return new LaneState(result, distanceMeters, frame.hasContent() ? frame : null);
     }
 
@@ -1218,7 +1265,8 @@ final class NavigatorStatePublisher {
         }
     }
 
-    private List<TrafficLightFrame> readTrafficLights(Object routePosition) throws Exception {
+    private List<TrafficLightFrame> readTrafficLights(Object routePosition, Object route)
+            throws Exception {
         ArrayList<TrafficLightFrame> result = new ArrayList<>();
         if (routePosition == null) return result;
         for (Object light : invokeList(windshield, "getTrafficLightsWithSignal")) {
@@ -1250,7 +1298,10 @@ final class NavigatorStatePublisher {
                         + ':' + Math.round(longitude * 100_000d);
             }
             if (id.isEmpty()) id = "route-light-" + result.size();
+            RouteProgressSample eventProgress = readEventRouteProgress(route, position);
             result.add(new TrafficLightFrame(id, latitude, longitude,
+                    eventProgress.valid ? eventProgress.segmentIndex : -1,
+                    eventProgress.valid ? eventProgress.segmentPosition : Double.NaN,
                     distanceMeters, secondsLeft, signal,
                     enumName(invoke(light, "getSectionType")),
                     enumName(invoke(light, "getArrow"))));

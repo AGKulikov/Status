@@ -693,8 +693,15 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("if (!windowContractChanged)"));
         assertTrue(windowProfile.contains("sameWindowContract(FloatingWindowProfile other)"));
         assertTrue(windowProfile.contains("backgroundColor = \"#00000000\""));
-        assertTrue(controller.contains("dispatchTouchEvent(MotionEvent event)"));
+        assertFalse(controller.contains("@Override public boolean dispatchTouchEvent"));
         assertTrue(controller.contains("MotionEvent.ACTION_DOWN"));
+        assertTrue(controller.contains("MotionEvent.ACTION_POINTER_DOWN"));
+        assertTrue(controller.contains("MotionEvent.ACTION_MOVE"));
+        assertTrue(controller.contains("MotionEvent.ACTION_UP"));
+        assertTrue(controller.contains("mapTouchSlopSquared"));
+        assertTrue(controller.contains("mainHandler.post(() ->"));
+        assertFalse(entry.contains(
+                "event.getActionMasked() != MotionEvent.ACTION_DOWN"));
         assertTrue(controller.contains("ensureModeButtonAttachedToStockRail()"));
         assertFalse(controller.contains("floatingModeButton"));
         assertTrue(controller.contains("restartInMode(!floating, null)"));
@@ -744,7 +751,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("navi_guidance_controls_touch_container"));
         assertTrue(controller.contains("guidanceInsetHost"));
         assertTrue(controller.contains("nextGuidanceControls != guidanceControls"));
-        assertTrue(controller.contains("neutralizePaddingtonTree(activityControllerRoot != null"));
+        assertTrue(controller.contains("neutralizePaddingtonTree(activityControllerRoot)"));
+        assertTrue(controller.contains("neutralizePaddingtonTree(exactGuidanceInsetRoot)"));
+        assertTrue(controller.contains("paddingtonBaseTopByChild.put(guidanceControls, 0)"));
         assertTrue(controller.contains("activeGuidanceVisualRoot"));
         assertTrue(controller.contains("contextmaneuverview"));
         assertTrue(controller.contains("speed_group"));
@@ -755,16 +764,21 @@ public final class NavigationHudV2ContractTest {
         assertTrue(controller.contains("removeFloatingTopInset(controlsInsetHost)"));
         assertTrue(controller.contains("paddingtonBaseTop"));
         assertTrue(controller.contains("floatingTopInsetGuard"));
+        assertTrue(controller.contains("floatingTopInsetPreDrawGuard"));
+        assertTrue(controller.contains("installFloatingTopInsetPreDrawGuard()"));
+        assertTrue(controller.contains("bestLiveViewById"));
         assertTrue(controller.contains("neutralizePaddingtonTree"));
         assertTrue(controller.contains("floatingPaddingtonInsetsListener"));
         assertTrue(controller.contains("child.setOnApplyWindowInsetsListener"));
         assertTrue(controller.contains("reportCallbackFailure(\"modeAwareInsets\""));
         assertTrue(controller.contains("reportCallbackFailure(\"paddingtonInsets\""));
         assertTrue(controller.contains("reportCallbackFailure(\"floatingTopInsetGuard\""));
+        assertTrue(controller.contains(
+                "reportCallbackFailure(\"floatingTopInsetPreDraw\""));
         assertTrue(controller.contains("reportCallbackFailure(\"createStockModeButton\""));
         assertTrue(controller.contains("reportCallbackFailure(\"attachStockModeButton\""));
         assertTrue(controller.contains("reportCallbackFailure(\"parkModeButton\""));
-        assertTrue(controller.contains(
+        assertFalse(controller.contains(
                 "reportCallbackFailure(\"controlLayerModeButtonReattach\""));
         assertTrue(controller.contains("reportCallbackFailure(\"modeButtonClick\""));
         assertTrue(controller.contains("reportCallbackFailure(\"floatingSurfaceCommitter\""));
@@ -893,12 +907,30 @@ public final class NavigationHudV2ContractTest {
         assertTrue(trafficLights.contains("TrafficLightViewImpl"));
         assertTrue(trafficLights.contains("applyCompactFallbackViews"));
         assertTrue(trafficLights.contains("compactTrafficLightBitmap"));
+        assertTrue(trafficLights.contains("useCompositeIcon"));
+        assertTrue(trafficLights.contains("traffic-light-connector"));
+        assertTrue(trafficLights.contains("traffic-light-body"));
+        assertTrue(trafficLights.contains("ConnectorTexture.OVERSAMPLE"));
+        assertTrue(trafficLights.contains("Float.valueOf(zIndex - .01f)"));
+        assertEquals(trafficLights.indexOf("MapObjectLayerFactory.create(map"),
+                trafficLights.lastIndexOf("MapObjectLayerFactory.create(map"));
+        assertTrue(trafficLights.contains("traffic_light_leg_size"));
+        assertTrue(trafficLights.contains("traffic_light_bg_primary"));
+        assertTrue(trafficLights.contains("new PointF(offsetX / width, offsetY / height)"));
+        for (String legName : new String[]{"LEFT_CENTER", "RIGHT_CENTER", "BOTTOM_LEFT",
+                "BOTTOM_RIGHT", "TOP_LEFT", "TOP_RIGHT", "BOTTOM_CENTER", "TOP_CENTER"}) {
+            assertTrue(trafficLights.contains("\"" + legName + "\".equals(legName)"));
+        }
         assertTrue(trafficLights.contains("setSignal"));
         assertTrue(trafficLights.contains("setTime"));
         assertTrue(trafficLights.contains("createTexture"));
         assertTrue(trafficLights.contains("getAnchor"));
         assertTrue(trafficLights.contains("setLegPlacement"));
         assertTrue(trafficLights.contains("placement.legName"));
+        assertTrue(trafficLights.contains("scalePercent / 100f"));
+        assertTrue(trafficLights.contains(
+                "float safeScale = Math.max(.01f, textureScale)"));
+        assertTrue(trafficLights.contains("floatValue() * safeScale"));
         assertFalse(trafficLights.contains(
                 "Enum.valueOf((Class<? extends Enum>) legClass, \"NONE\")"));
         assertTrue(trafficLights.contains(
@@ -910,6 +942,14 @@ public final class NavigationHudV2ContractTest {
         assertFalse(mainMap.contains("TrafficLightMapLayer"));
         assertFalse(mainMap.contains("CameraDirectionMapLayer"));
         assertFalse(mainMap.contains("LaneGuidanceMapLayer"));
+        assertTrue(cursor.contains(
+                "int size = Math.max(8, Math.round(baseSize * requestedScale))"));
+        assertTrue(cursor.contains("Float.valueOf(1f)"));
+        assertFalse(cursor.contains("Float.valueOf(scalePercent / 100f)"));
+        assertTrue(renderer.contains("createDestinationBitmap() already renders"));
+        assertTrue(renderer.contains("profile.destinationScalePercent / 100f"));
+        assertTrue(renderer.contains("destinationImageProvider = null"));
+        assertTrue(renderer.contains("destinationIconBitmap = null"));
         assertTrue(cameraDirections.contains("YANDEX_FRESH_MS = 3_000L"));
         assertTrue(cameraDirections.contains("SOURCE_HUD_SPEED"));
         assertTrue(cameraDirections.contains("mergeIntoNearbyHudSpeed"));
@@ -958,11 +998,20 @@ public final class NavigationHudV2ContractTest {
         assertTrue(laneGuidance.contains("placementCoordinator.reserve"));
         assertTrue(overlayPlacement.contains("worldToScreen"));
         assertTrue(overlayPlacement.contains("overlapArea"));
+        assertTrue(overlayPlacement.contains("ROUTE_APPROACH_SEGMENTS"));
+        assertTrue(overlayPlacement.contains("ROUTE_FORWARD_WEIGHT"));
+        assertTrue(overlayPlacement.contains("ROUTE_TURN_BONUS"));
+        assertTrue(overlayPlacement.contains("routeOcclusion"));
+        assertTrue(overlayPlacement.contains("projectedBend"));
+        assertTrue(overlayPlacement.contains("clippedSegmentLength"));
+        assertTrue(overlayPlacement.contains("SLOT_CHANGE_PENALTY"));
         assertTrue(overlayPlacement.contains("reserveCentered"));
         assertTrue(overlayPlacement.contains("new Candidate(.50f, .50f, \"CENTER\")"));
         assertTrue(cameraDirections.contains("placementCoordinator.reserveCentered"));
         assertTrue(overlayPlacement.contains("BOTTOM_CENTER"));
         assertTrue(renderer.contains("overlayPlacement.beginLayout()"));
+        assertTrue(renderer.contains("overlayPlacement.updateRoute(routeEpoch, drivingRoute)"));
+        assertTrue(renderer.contains("frame.routeSegmentPosition"));
         assertTrue(renderer.contains("laneGuidanceMapLayer.relayout()"));
         assertTrue(renderer.contains("trafficLightMapLayer.relayout()"));
         assertTrue(renderer.contains("cameraDirectionMapLayer.relayout()"));
@@ -1096,7 +1145,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("MAX_UPCOMING_TRAFFIC_LIGHTS = 8"));
         assertTrue(publisher.contains("activeRoute == null"));
         assertTrue(publisher.contains("Collections.unmodifiableList("));
-        assertTrue(publisher.contains("readTrafficLights(inputs.routePosition)"));
+        assertTrue(publisher.contains(
+                "readTrafficLights(inputs.routePosition, activeRoute)"));
+        assertTrue(publisher.contains("readEventRouteProgress(route, position)"));
+        assertTrue(publisher.contains("eventProgress.segmentIndex"));
+        assertTrue(publisher.contains("eventProgress.segmentPosition"));
         assertTrue(publisher.contains("TRAFFIC_LIGHT_INTERVAL_MS = 500L"));
         assertTrue(publisher.contains("validTrafficSignal"));
         assertTrue(publisher.contains("\"latitude\""));

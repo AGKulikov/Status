@@ -33,6 +33,9 @@ public final class InstrumentDisplayLauncher {
     private static final int DIM_STOCK_MODE = 1;
     private static final int MAX_DISPLAY_RETRIES = 10;
     private static final long DISPLAY_RETRY_MS = 1_500L;
+    /** Lets the Navigator process finish its post-update bind before choosing direct fallback. */
+    private static final int MAX_NAVIGATOR_READY_RETRIES = 60;
+    private static final long NAVIGATOR_READY_RETRY_MS = 500L;
     private static final long DIM_MODE_TO_WAKE_MS = 100L;
     private static final long DIM_WAKE_TO_TASK_RESET_MS = 200L;
     private static final long TASK_RESET_TO_LAUNCH_MS = 50L;
@@ -63,6 +66,9 @@ public final class InstrumentDisplayLauncher {
     public static void launch(@NonNull Context context) {
         Context app = applicationContext(context);
         if (!new InstrumentPanelStore(app).isEnabled()) return;
+        // Settings used to supply this start implicitly. Make the lifecycle launch create the
+        // endpoint before asking Navigator to own the DIM Activity hand-off.
+        NavigationHudEndpointService.ensureClusterEndpointStarted(app);
         if (InstrumentPanelActivity.isActive()) {
             InstrumentPanelActivity.requestReload();
             return;
@@ -190,27 +196,66 @@ public final class InstrumentDisplayLauncher {
                 return;
             }
             NavigationHudEndpointService.prepareInstrumentPanelLaunch(
-                    config.displayId, launchToken, EXTERNAL_LAUNCH_DELAY_MS, prepared -> {
-                        if (!prepared) {
-                            DiagnosticJournal.warn("instrument-panel",
-                                    "Navigator external launcher unavailable; using direct fallback");
-                            postTaskReset(app, 0L);
-                            return;
-                        }
-                        DiagnosticJournal.info("instrument-panel",
-                                "resetting Natro package after Navigator accepted DIM launch");
-                        shell.runCommand(FORCE_STOP_COMMAND, (output, error) -> {
-                            // On success Android terminates this process before the callback. If a
-                            // firmware keeps it alive, Navigator still owns the already-armed start.
-                            if (error != null) {
-                                Log.w(TAG, "Natro package reset failed after external handoff: "
-                                        + error);
-                                DiagnosticJournal.warn("instrument-panel",
-                                        "package reset failed after external handoff: " + error);
-                            }
-                        });
-                    });
+                    config.displayId, launchToken, EXTERNAL_LAUNCH_DELAY_MS,
+                    prepared -> onExternalLaunchPrepared(
+                            app, shell, config.displayId, launchToken, 0, prepared));
         });
+    }
+
+    /**
+     * The package-replaced/boot receiver often runs before patched Navigator has authenticated its
+     * Binder client. A false result at that instant means "not ready yet", not that direct launch
+     * is the correct ECARX path. Keep one launch token and retry within the same idempotent pending
+     * launch; Settings reconciliation then observes LAUNCH_PENDING instead of becoming a second
+     * magic startup pulse.
+     */
+    private static void onExternalLaunchPrepared(
+            @NonNull Context app,
+            @NonNull PrivilegedShell shell,
+            int displayId,
+            @NonNull String launchToken,
+            int readyAttempt,
+            boolean prepared) {
+        if (prepared) {
+            DiagnosticJournal.info("instrument-panel",
+                    "resetting Natro package after Navigator accepted DIM launch");
+            shell.runCommand(FORCE_STOP_COMMAND, (output, error) -> {
+                // On success Android terminates this process before the callback. If a firmware
+                // keeps it alive, Navigator still owns the already-armed start.
+                if (error != null) {
+                    Log.w(TAG, "Natro package reset failed after external handoff: " + error);
+                    DiagnosticJournal.warn("instrument-panel",
+                            "package reset failed after external handoff: " + error);
+                }
+            });
+            return;
+        }
+        if (!new InstrumentPanelStore(app).isEnabled()) {
+            LAUNCH_PENDING.set(false);
+            return;
+        }
+        if (InstrumentPanelActivity.isActive()) {
+            LAUNCH_PENDING.set(false);
+            InstrumentPanelActivity.requestReload();
+            return;
+        }
+        if (readyAttempt < MAX_NAVIGATOR_READY_RETRIES) {
+            if (readyAttempt == 0 || (readyAttempt + 1) % 10 == 0) {
+                DiagnosticJournal.info("instrument-panel",
+                        "waiting for Navigator DIM launcher, attempt=" + (readyAttempt + 1));
+            }
+            int nextAttempt = readyAttempt + 1;
+            MAIN.postAtTime(() -> NavigationHudEndpointService.prepareInstrumentPanelLaunch(
+                            displayId, launchToken, EXTERNAL_LAUNCH_DELAY_MS,
+                            nextPrepared -> onExternalLaunchPrepared(app, shell, displayId,
+                                    launchToken, nextAttempt, nextPrepared)),
+                    app, SystemClock.uptimeMillis() + NAVIGATOR_READY_RETRY_MS);
+            return;
+        }
+        DiagnosticJournal.warn("instrument-panel",
+                "Navigator external launcher unavailable after bounded readiness wait; "
+                        + "using direct fallback");
+        postTaskReset(app, 0L);
     }
 
     /**

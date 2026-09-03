@@ -121,6 +121,295 @@ public final class CameraSpeedNormalizerHarness {
                 MANIFEST_PATCHER.MAP_ACTIVITY_THEME_OFFSET,
             ) = original
 
+    def test_route_aware_overlay_placement_geometry(self):
+        source = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                  / "ru" / "natro" / "navigation"
+                  / "MapOverlayPlacementCoordinator.java")
+        javac = shutil.which("javac")
+        java = shutil.which("java")
+        if javac is not None:
+            compiler = [javac]
+        elif java is not None:
+            # The local runtime contains jdk.compiler even when its launcher is omitted.
+            compiler = [java, "com.sun.tools.javac.Main"]
+        else:
+            self.skipTest("JDK is unavailable locally; GitHub CI executes this Java contract")
+
+        rect_stub = """package android.graphics;
+public final class RectF {
+    public float left, top, right, bottom;
+    public RectF(float left, float top, float right, float bottom) {
+        this.left = left; this.top = top; this.right = right; this.bottom = bottom;
+    }
+    public RectF(RectF other) {
+        this(other.left, other.top, other.right, other.bottom);
+    }
+    public void inset(float dx, float dy) {
+        left += dx; right -= dx; top += dy; bottom -= dy;
+    }
+}
+"""
+        point_stub = """package com.yandex.mapkit.geometry;
+public final class Point {
+    private final double latitude;
+    private final double longitude;
+    public Point(double latitude, double longitude) {
+        this.latitude = latitude; this.longitude = longitude;
+    }
+    public double getLatitude() { return latitude; }
+    public double getLongitude() { return longitude; }
+}
+"""
+        reflection_stub = """package ru.natro.navigation;
+import java.lang.reflect.Method;
+final class ReflectMethods {
+    static Method publicMethod(Class<?> owner, String name, Class<?>[] parameters)
+            throws NoSuchMethodException {
+        return owner.getMethod(name, parameters);
+    }
+}
+"""
+        harness = """package ru.natro.navigation;
+import android.graphics.RectF;
+import com.yandex.mapkit.geometry.Point;
+import java.util.Arrays;
+import java.util.List;
+
+public final class MapOverlayPlacementHarness {
+    public static final class ScreenPoint {
+        private final float x, y;
+        ScreenPoint(float x, float y) { this.x = x; this.y = y; }
+        public float getX() { return x; }
+        public float getY() { return y; }
+    }
+    public static final class Window {
+        private final double angle;
+        Window(double angle) { this.angle = Math.toRadians(angle); }
+        public ScreenPoint worldToScreen(Point point) {
+            double x = point.getLongitude();
+            double y = -point.getLatitude();
+            double rotatedX = x * Math.cos(angle) - y * Math.sin(angle);
+            double rotatedY = x * Math.sin(angle) + y * Math.cos(angle);
+            return new ScreenPoint((float) (110d + rotatedX),
+                    (float) (110d + rotatedY));
+        }
+    }
+    public static final class RoutePoint {
+        private final double latitude, longitude;
+        RoutePoint(double latitude, double longitude) {
+            this.latitude = latitude; this.longitude = longitude;
+        }
+        public double getLatitude() { return latitude; }
+        public double getLongitude() { return longitude; }
+    }
+    public static final class Geometry {
+        private final List<RoutePoint> points;
+        Geometry(RoutePoint... points) { this.points = Arrays.asList(points); }
+        public List<RoutePoint> getPoints() { return points; }
+    }
+    public static final class Route {
+        private final Geometry geometry;
+        Route(RoutePoint... points) { geometry = new Geometry(points); }
+        public Geometry getGeometry() { return geometry; }
+    }
+
+    private static void expect(boolean value, String message) {
+        if (!value) throw new AssertionError(message);
+    }
+    private static RectF bounds(float x, float y, int width, int height,
+                                MapOverlayPlacementCoordinator.Placement placement) {
+        float left = x - placement.anchorX * width;
+        float top = y - placement.anchorY * height;
+        return new RectF(left, top, left + width, top + height);
+    }
+    private static void expectRouteClear(Window window, RectF card, RoutePoint... points) {
+        double hidden = 0d;
+        for (int index = 0; index < points.length - 1; index++) {
+            ScreenPoint from = window.worldToScreen(
+                    new Point(points[index].getLatitude(), points[index].getLongitude()));
+            ScreenPoint to = window.worldToScreen(new Point(
+                    points[index + 1].getLatitude(), points[index + 1].getLongitude()));
+            hidden += MapOverlayPlacementCoordinator.clippedSegmentLength(card,
+                    from.getX(), from.getY(), to.getX(), to.getY());
+        }
+        expect(hidden < .01d, "selected card hides " + hidden + " route pixels");
+    }
+    private static List<MapOverlayPlacementCoordinator.Footprint> stockFootprints(
+            int width, int height) {
+        return Arrays.asList(
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "LEFT_CENTER", width, height, 0f, .5f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "RIGHT_CENTER", width, height, 1f, .5f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "BOTTOM_LEFT", width, height, .22f, 1f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "BOTTOM_RIGHT", width, height, .78f, 1f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "TOP_LEFT", width, height, .22f, 0f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "TOP_RIGHT", width, height, .78f, 0f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "BOTTOM_CENTER", width, height, .5f, 1f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "TOP_CENTER", width, height, .5f, 0f));
+    }
+    private static void exerciseTurn(double angle, boolean right) {
+        Window window = new Window(angle);
+        double exitLongitude = right ? 60d : -60d;
+        RoutePoint[] points = {
+                new RoutePoint(-60d, 0d), new RoutePoint(0d, 0d),
+                new RoutePoint(0d, exitLongitude),
+                new RoutePoint(0d, right ? 78d : -78d)
+        };
+        MapOverlayPlacementCoordinator coordinator =
+                new MapOverlayPlacementCoordinator();
+        coordinator.attach(window, 220, 220);
+        coordinator.updateRoute(1L, new Route(points));
+        coordinator.updateNavigationState(true, true, 0, .25d,
+                -45d, 0d, 18);
+        ScreenPoint source = window.worldToScreen(new Point(0d, 0d));
+        for (int percent : new int[]{50, 75, 100}) {
+            int width = Math.round(52f * percent / 100f);
+            int height = Math.round(32f * percent / 100f);
+            coordinator.beginLayout();
+            MapOverlayPlacementCoordinator.Placement placement = coordinator.reserve(
+                    MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS, "turn",
+                    0d, 0d, width, height, true, 1, 0d, null,
+                    stockFootprints(width, height));
+            RectF card = bounds(source.getX(), source.getY(), width, height, placement);
+            // The stock leg itself meets the approach exactly at the source point. The safety
+            // invariant is that the card body does not cover the road the driver must follow.
+            expectRouteClear(window, card, points[1], points[2], points[3]);
+
+            coordinator.beginLayout();
+            MapOverlayPlacementCoordinator.Placement stable = coordinator.reserve(
+                    MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS, "turn",
+                    0d, 0d, width, height, true, 1, 0d, placement,
+                    stockFootprints(width, height));
+            expect(placement.sameSlot(stable),
+                    "stable route changed slot without a conflict");
+        }
+    }
+    private static void exerciseSShape(double angle) {
+        Window window = new Window(angle);
+        RoutePoint[] points = {
+                new RoutePoint(-65d, 0d), new RoutePoint(-30d, 0d),
+                new RoutePoint(-8d, 24d), new RoutePoint(14d, -8d),
+                new RoutePoint(52d, 0d)
+        };
+        MapOverlayPlacementCoordinator coordinator =
+                new MapOverlayPlacementCoordinator();
+        coordinator.attach(window, 220, 220);
+        coordinator.updateRoute(2L, new Route(points));
+        coordinator.updateNavigationState(true, true, 0, .4d,
+                -50d, 0d, 18);
+        ScreenPoint source = window.worldToScreen(new Point(-8d, 24d));
+        for (int percent : new int[]{50, 75, 100}) {
+            int width = Math.round(48f * percent / 100f);
+            int height = Math.round(30f * percent / 100f);
+            coordinator.beginLayout();
+            MapOverlayPlacementCoordinator.Placement placement = coordinator.reserve(
+                    MapOverlayPlacementCoordinator.OWNER_LANES, "s-shape",
+                    -8d, 24d, width, height, false, 2, 0d, null,
+                    stockFootprints(width, height));
+            expectRouteClear(window,
+                    bounds(source.getX(), source.getY(), width, height, placement),
+                    points[2], points[3], points[4]);
+        }
+    }
+    private static void exerciseViewport() {
+        Window window = new Window(0d);
+        MapOverlayPlacementCoordinator coordinator =
+                new MapOverlayPlacementCoordinator();
+        coordinator.attach(window, 220, 220);
+        coordinator.updateNavigationState(false, false, 0, Double.NaN,
+                Double.NaN, Double.NaN, 0);
+        coordinator.beginLayout();
+        MapOverlayPlacementCoordinator.Placement placement = coordinator.reserve(
+                MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS, "edge",
+                85d, -90d, 48, 30, true);
+        ScreenPoint source = window.worldToScreen(new Point(85d, -90d));
+        RectF card = bounds(source.getX(), source.getY(), 48, 30, placement);
+        expect(card.left >= 6f && card.top >= 6f
+                        && card.right <= 214f && card.bottom <= 214f,
+                "edge placement escaped viewport");
+    }
+    private static void exerciseExactFootprints() {
+        Window window = new Window(0d);
+        MapOverlayPlacementCoordinator coordinator =
+                new MapOverlayPlacementCoordinator();
+        coordinator.attach(window, 220, 220);
+        coordinator.updateNavigationState(false, false, 0, Double.NaN,
+                Double.NaN, Double.NaN, 0);
+        List<MapOverlayPlacementCoordinator.Footprint> footprints = Arrays.asList(
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "LEFT_CENTER", 70, 30, 0f, .5f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "RIGHT_CENTER", 40, 30, 1f, .5f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "BOTTOM_LEFT", 70, 50, .2f, 1f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "BOTTOM_RIGHT", 40, 50, .8f, 1f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "TOP_LEFT", 70, 50, .2f, 0f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "TOP_RIGHT", 40, 50, .8f, 0f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "BOTTOM_CENTER", 55, 50, .5f, 1f),
+                new MapOverlayPlacementCoordinator.Footprint(
+                        "TOP_CENTER", 55, 50, .5f, 0f));
+        coordinator.beginLayout();
+        MapOverlayPlacementCoordinator.Placement placement = coordinator.reserve(
+                MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS, "exact-edge",
+                0d, 90d, 180, 180, true, -1, Double.NaN, null, footprints);
+        expect("RIGHT_CENTER".equals(placement.legName),
+                "exact stock footprint was not used at viewport edge");
+        expect(Math.abs(placement.anchorX - 1f) < .0001f
+                        && Math.abs(placement.anchorY - .5f) < .0001f,
+                "returned anchor is not the exact stock anchor");
+    }
+    public static void main(String[] args) {
+        RectF clip = new RectF(0f, 0f, 10f, 10f);
+        expect(Math.abs(MapOverlayPlacementCoordinator.clippedSegmentLength(
+                clip, -5f, 5f, 15f, 5f) - 10d) < .0001d, "horizontal clip");
+        expect(MapOverlayPlacementCoordinator.clippedSegmentLength(
+                clip, -5f, -5f, -1f, -1f) == 0d, "outside clip");
+        for (double angle : new double[]{0d, 45d, 90d, 180d, 270d}) {
+            exerciseTurn(angle, true);
+            exerciseTurn(angle, false);
+            exerciseSShape(angle);
+        }
+        exerciseViewport();
+        exerciseExactFootprints();
+    }
+}
+"""
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            rect_path = root / "android" / "graphics" / "RectF.java"
+            point_path = root / "com" / "yandex" / "mapkit" / "geometry" / "Point.java"
+            reflection_path = (root / "ru" / "natro" / "navigation"
+                               / "ReflectMethods.java")
+            harness_path = (root / "ru" / "natro" / "navigation"
+                            / "MapOverlayPlacementHarness.java")
+            for path in (rect_path, point_path, reflection_path, harness_path):
+                path.parent.mkdir(parents=True, exist_ok=True)
+            rect_path.write_text(rect_stub)
+            point_path.write_text(point_stub)
+            reflection_path.write_text(reflection_stub)
+            harness_path.write_text(harness)
+            subprocess.run(
+                [*compiler, "-d", str(root), str(rect_path), str(point_path),
+                 str(reflection_path), str(source), str(harness_path)],
+                check=True,
+            )
+            subprocess.run(
+                [java, "-cp", str(root),
+                 "ru.natro.navigation.MapOverlayPlacementHarness"],
+                check=True,
+            )
+
     def test_map_activity_patch_has_six_reviewed_hooks(self):
         source = """.class public final Lru/yandex/yandexmaps/app/MapActivity;
 .super Landroidx/appcompat/app/s;
@@ -359,22 +648,22 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.7.1}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021304}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.7.2}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021305}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.7.1")', verifier)
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021304")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.7.2")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021305")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
         build = (TOOLS.parent / "build.gradle").read_text()
         workflow = (TOOLS.parent / ".github" / "workflows"
                     / "verify-navigation-hud-v2.yml").read_text()
-        self.assertIn("if (version == '2.7.1')", build)
-        self.assertIn("return 208021304", build)
-        self.assertIn("VERSION_NAME: '2.7.1'", workflow)
-        self.assertIn("VERSION_CODE: '208021304'", workflow)
+        self.assertIn("if (version == '2.7.2')", build)
+        self.assertIn("return 208021305", build)
+        self.assertIn("VERSION_NAME: '2.7.2'", workflow)
+        self.assertIn("VERSION_CODE: '208021305'", workflow)
         self.assertNotIn("2.5.10", build)
         self.assertNotIn("2.5.10", workflow)
 
@@ -477,12 +766,42 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("setGeometry", lanes)
         self.assertIn("setLegPlacement", traffic_lights)
         self.assertIn("placement.legName", traffic_lights)
+        self.assertIn('getMethod("getSize", legClass)', traffic_lights)
+        self.assertIn("measureStockFootprints", traffic_lights)
+        self.assertIn("scalePercent / 100f", traffic_lights)
+        self.assertIn("float safeScale = Math.max(.01f, textureScale)",
+                      traffic_lights)
+        self.assertIn("floatValue() * safeScale", traffic_lights)
+        self.assertIn("measureBalloonFootprints", lanes)
+        self.assertIn("placementLegNames", placement)
+        self.assertIn("List<Footprint> footprints", placement)
+        self.assertIn("useCompositeIcon", traffic_lights)
+        self.assertIn('"traffic-light-connector"', traffic_lights)
+        self.assertIn('"traffic-light-body"', traffic_lights)
+        self.assertIn("ConnectorTexture.OVERSAMPLE", traffic_lights)
+        self.assertIn("Float.valueOf(zIndex - .01f)", traffic_lights)
+        self.assertEqual(traffic_lights.count("MapObjectLayerFactory.create(map"), 1)
+        self.assertIn('"traffic_light_leg_size"', traffic_lights)
+        self.assertIn('"traffic_light_bg_primary"', traffic_lights)
+        self.assertNotIn('invoke(composite, "removeAll"', traffic_lights)
+        self.assertIn("new PointF(offsetX / width, offsetY / height)", traffic_lights)
+        for leg_name in ("LEFT_CENTER", "RIGHT_CENTER", "BOTTOM_LEFT",
+                         "BOTTOM_RIGHT", "TOP_LEFT", "TOP_RIGHT",
+                         "BOTTOM_CENTER", "TOP_CENTER"):
+            self.assertIn(f'"{leg_name}".equals(legName)', traffic_lights)
         self.assertNotIn('Enum.valueOf((Class<? extends Enum>) legClass, "NONE")',
                          traffic_lights)
         self.assertIn("compactTrafficLightBitmap(light, placement.legName)",
                       traffic_lights)
         self.assertIn("worldToScreen", placement)
         self.assertIn("overlapArea", placement)
+        self.assertIn("ROUTE_APPROACH_SEGMENTS", placement)
+        self.assertIn("ROUTE_FORWARD_WEIGHT", placement)
+        self.assertIn("ROUTE_TURN_BONUS", placement)
+        self.assertIn("routeOcclusion", placement)
+        self.assertIn("projectedBend", placement)
+        self.assertIn("clippedSegmentLength", placement)
+        self.assertIn("SLOT_CHANGE_PENALTY", placement)
         self.assertIn("reserveCentered", placement)
         self.assertIn('new Candidate(.50f, .50f, "CENTER")', placement)
         self.assertIn("placementCoordinator.reserveCentered", camera)
@@ -491,6 +810,8 @@ public final class CameraSpeedNormalizerHarness {
                          "BOTTOM_CENTER", "TOP_CENTER"):
             self.assertIn(leg_name, placement)
         self.assertIn("overlayPlacement.beginLayout()", renderer)
+        self.assertIn("overlayPlacement.updateRoute(routeEpoch, drivingRoute)", renderer)
+        self.assertIn("frame.routeSegmentPosition", renderer)
         self.assertIn("laneGuidanceMapLayer.relayout()", renderer)
         self.assertIn("trafficLightMapLayer.relayout()", renderer)
         self.assertIn("cameraDirectionMapLayer.relayout()", renderer)
@@ -499,6 +820,14 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn("ImageProvider", cursor)
         self.assertIn("setGeometry", cursor)
         self.assertIn("setDirection", cursor)
+        self.assertIn("int size = Math.max(8, Math.round(baseSize * requestedScale))",
+                      cursor)
+        self.assertIn("Float.valueOf(1f)", cursor)
+        self.assertNotIn("Float.valueOf(scalePercent / 100f)", cursor)
+        self.assertIn("createDestinationBitmap() already renders", renderer)
+        self.assertIn("profile.destinationScalePercent / 100f", renderer)
+        self.assertIn("destinationImageProvider = null", renderer)
+        self.assertIn("destinationIconBitmap = null", renderer)
         self.assertNotIn("UserLocationObjectListener", cursor)
         self.assertIn("addMapObjectLayer", layer_factory)
         self.assertIn("setConflictResolutionMode", layer_factory)
@@ -569,7 +898,9 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn('"navi_guidance_controls_touch_container"', controller)
         self.assertIn("guidanceInsetHost", controller)
         self.assertIn("nextGuidanceControls != guidanceControls", controller)
-        self.assertIn("neutralizePaddingtonTree(activityControllerRoot != null", controller)
+        self.assertIn("neutralizePaddingtonTree(activityControllerRoot)", controller)
+        self.assertIn("neutralizePaddingtonTree(exactGuidanceInsetRoot)", controller)
+        self.assertIn("paddingtonBaseTopByChild.put(guidanceControls, 0)", controller)
         self.assertIn("activeGuidanceVisualRoot", controller)
         self.assertIn('"contextmaneuverview"', controller)
         self.assertIn('"speed_group"', controller)
@@ -579,6 +910,9 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn('"top_notification_container"', controller)
         self.assertIn("paddingtonBaseTop", controller)
         self.assertIn("floatingTopInsetGuard", controller)
+        self.assertIn("floatingTopInsetPreDrawGuard", controller)
+        self.assertIn("installFloatingTopInsetPreDrawGuard()", controller)
+        self.assertIn("bestLiveViewById", controller)
         self.assertIn("ensureModeButtonAttachedToStockRail", controller)
         self.assertIn("findStockModeButtonRail", controller)
         self.assertIn("STOCK_RECT_CONTROL_CLASS", controller)
@@ -615,14 +949,20 @@ public final class CameraSpeedNormalizerHarness {
         self.assertIn('reportCallbackFailure("modeAwareInsets"', controller)
         self.assertIn('reportCallbackFailure("paddingtonInsets"', controller)
         self.assertIn('reportCallbackFailure("floatingTopInsetGuard"', controller)
+        self.assertIn('reportCallbackFailure("floatingTopInsetPreDraw"', controller)
         self.assertIn('reportCallbackFailure("createStockModeButton"', controller)
         self.assertIn('reportCallbackFailure("attachStockModeButton"', controller)
         self.assertIn('reportCallbackFailure("parkModeButton"', controller)
-        self.assertIn('reportCallbackFailure("controlLayerModeButtonReattach"', controller)
+        self.assertNotIn('reportCallbackFailure("controlLayerModeButtonReattach"', controller)
         self.assertIn('reportCallbackFailure("modeButtonClick"', controller)
         self.assertIn('reportCallbackFailure("floatingSurfaceCommitter"', controller)
         self.assertIn('reportCallbackFailure("mapTouchReattach"', controller)
         self.assertIn('reportCallbackFailure("modeButtonPoller"', controller)
+        self.assertNotIn("@Override public boolean dispatchTouchEvent", controller)
+        self.assertIn("MotionEvent.ACTION_POINTER_DOWN", controller)
+        self.assertIn("mapTouchSlopSquared", controller)
+        self.assertNotIn(
+            "event.getActionMasked() != MotionEvent.ACTION_DOWN", entry)
         self.assertIn("finally {", controller)
         self.assertIn("restartInMode(!floating, null)", controller)
         self.assertNotIn("floatingModeButton", controller)
