@@ -766,7 +766,8 @@ public final class NavigationIntegrationConfig {
             // is invalid for the KX11 floating-window contract.
             backgroundColor = "#00000000";
             // Kept in JSON for compatibility with already installed Navigator builds. Current
-            // builds place the one bidirectional toggle inside the stock left controls rail.
+            // builds place the one bidirectional toggle inside the stock left controls rail;
+            // that rail owns its position, final size and opacity.
             modeButtonPosition = "TOP_LEFT";
             modeButtonSizeDp = clamp(modeButtonSizeDp, 28, 96);
             modeButtonOpacityPercent = clamp(modeButtonOpacityPercent, 20, 100);

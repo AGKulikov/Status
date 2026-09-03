@@ -52,9 +52,6 @@ final class FloatingWindowProfile {
                 && dragHandleVisible == other.dragHandleVisible
                 && resizeHandleVisible == other.resizeHandleVisible
                 && modeButtonVisible == other.modeButtonVisible
-                && modeButtonPosition.equals(other.modeButtonPosition)
-                && modeButtonSizeDp == other.modeButtonSizeDp
-                && modeButtonOpacityPercent == other.modeButtonOpacityPercent
                 && closeButtonVisible == other.closeButtonVisible;
     }
 
@@ -122,9 +119,9 @@ final class FloatingWindowProfile {
         // Kept in the wire schema for compatibility; KX11 requires the outer window plane to be
         // transparent so launcher/status controls remain visible around the resized map.
         backgroundColor = "#00000000";
-        // Wire compatibility only. The toggle is always owned by Natro's stable overlay and is
-        // visually aligned with Navigator's left rail; do not revive a legacy TOP_RIGHT/BOTTOM_*
-        // value saved by an older Natro release.
+        // Wire compatibility only. Current builds insert the toggle into Navigator's stock left
+        // rail, whose shell owns position, size, opacity and appearance. Do not revive legacy
+        // TOP_RIGHT/BOTTOM_* coordinates or apply the old overlay geometry fields.
         modeButtonPosition = "TOP_LEFT";
     }
 

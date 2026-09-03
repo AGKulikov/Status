@@ -984,12 +984,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         }
         form.addView(text("Кнопка режима находится слева под штатными кнопками дорожного "
                 + "события и голосового помощника. Она появляется по касанию карты и "
-                + "скрывается вместе с ними в оконном и полноэкранном режимах.",
+                + "скрывается вместе с ними в оконном и полноэкранном режимах. Размер, фон "
+                + "и прозрачность наследуются от штатного блока Навигатора.",
                 12, 0xFFB8C0CC), marginTop(8));
-        SliderField buttonSize = slider(form, "Размер кнопки",
-                window.modeButtonSizeDp, 28, 96, 1, " dp");
-        SliderField buttonOpacity = slider(form, "Непрозрачность кнопки",
-                window.modeButtonOpacityPercent, 20, 100, 1, " %");
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Основная карта и окно Навигатора")
@@ -1031,8 +1028,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         window.dragHandleVisible = dragHandleVisible.isChecked();
                         window.resizeHandleVisible = resizeHandleVisible.isChecked();
                         window.closeButtonVisible = closeButtonVisible.isChecked();
-                        window.modeButtonSizeDp = buttonSize.intValue();
-                        window.modeButtonOpacityPercent = buttonOpacity.intValue();
 
                         navigation.normalize();
                         String encodedNavigation = navigation.toJson().toString();

@@ -202,6 +202,11 @@ int getVersionCode() {
     if (version == '2.7.0') {
         return 208021303
     }
+    // 2.7.1 contains the post-2.7.0 Navigator window-container corrections. It must remain an
+    // in-place Natro update, so its monotonically increasing versionCode is exactly +1.
+    if (version == '2.7.1') {
+        return 208021304
+    }
     if (version == '2.3.0') {
         return 208021254
     }

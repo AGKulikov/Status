@@ -50,8 +50,6 @@ public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
     private SliderField opacity;
     private SliderField borderWidth;
     private SliderField shadowRadius;
-    private SliderField buttonSize;
-    private SliderField buttonOpacity;
     private String borderColor;
     private String shadowColor;
 
@@ -136,11 +134,8 @@ public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
         page.addView(closeButtonVisible, topMargin(5));
         page.addView(hint("Кнопка режима находится слева под штатными кнопками дорожного "
                 + "события и голосового помощника. Она появляется по касанию карты и "
-                + "скрывается вместе с ними в обоих режимах."), topMargin(6));
-        buttonSize = slider(page, "Размер кнопки", window.modeButtonSizeDp,
-                28, 96, " dp");
-        buttonOpacity = slider(page, "Непрозрачность кнопки",
-                window.modeButtonOpacityPercent, 20, 100, " %");
+                + "скрывается вместе с ними в обоих режимах. Размер, фон и прозрачность "
+                + "берутся у штатного блока Навигатора."), topMargin(6));
 
         MaterialButton save = new MaterialButton(this);
         save.setAllCaps(false);
@@ -184,8 +179,6 @@ public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
         window.dragHandleVisible = dragHandleVisible.isChecked();
         window.resizeHandleVisible = resizeHandleVisible.isChecked();
         window.closeButtonVisible = closeButtonVisible.isChecked();
-        window.modeButtonSizeDp = buttonSize.value();
-        window.modeButtonOpacityPercent = buttonOpacity.value();
         navigation.normalize();
         try {
             String encoded = navigation.toJson().toString();
