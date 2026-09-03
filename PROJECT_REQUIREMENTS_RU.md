@@ -792,3 +792,22 @@ release-gates, общий сертификат и обновление Natro п�
   translation штатного voice-control. Исполняемый Android-код на этой стадии не был причиной
   отказа, но последующие DEX/release-gates корректно не запускались. Java-контракт приведён к тем
   же exact-pair/pre-draw требованиям, что Python-регрессия; требуется новый полный CI run.
+- **03.09.2026:** подписанная пара Natro 2.7.3 / Navigator HUD v2 выпущена только из
+  опубликованного source commit `dfc6c050d04d1d4e173fd718256a0591bed03fdb`, tree
+  `ebf7867adabbee298d451cfa6f2611cd6a19ec27`. Push GitHub Actions run №244
+  (`33790723679`) полностью прошёл Android unit/static tests, сборку Natro, Helper 70,
+  изолированную компиляцию Navigator `classes19.dex`, HUD Speed bridge, baseline-verifier и
+  упаковку кандидата; SHA-256 точного CI-архива
+  `0954d62eafc3c73c106bb772d461a8ccc5d6969853d6530af81c02d26e9bb554`. Итоговые APK:
+  Natro 2.7.3 / `208021306`, SHA-256
+  `1cd32b39bfc21f42c534ff472cd5b053240f177c49dbe3062c024e8c6a74307c`; Navigator 30.3.0 /
+  `739564630`, SHA-256 `20f86afd12349b407054117c913400c56ca3419e4ab11ff151e832896df4fad7`.
+  Оба APK имеют одного подписанта со стабильным сертификатом
+  `6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75`; Natro подтверждён как
+  обновление поверх 2.7.2: package/certificate совпадают, `versionCode` повышен с `208021305` до
+  `208021306`. Проверены внутренние суммы, zipalign, схемы подписи (Natro v2+v3, Navigator v3) и
+  точное совпадение упакованного `classes19.dex` с CI-кандидатом. Boundary gate сохранил 17 223
+  защищённые записи Navigator: изменены только `AndroidManifest.xml`, `classes4.dex`,
+  `classes12.dex`, добавлен `classes19.dex`. Автоматические и статические release-gates пройдены;
+  `GATE-007/009/020/023/024/025/026/027/028/030` остаются открытыми до установки, маршрутных
+  кадров и 30-минутной приёмки на KX11.
