@@ -1,0 +1,468 @@
+{
+  "version": "1.0-public",
+  "date": "2026-09-04",
+  "source_bundle_sha256": "8a12666cd1bd41565740faa14fd52bc4767a4d81178a7bc17986c8a059ef918b",
+  "policy": "PROJECT_REQUIREMENTS_RU.md REL-008",
+  "excluded_files": [
+    {
+      "path": "controls/sdk_impl/Hvac.disasm.txt",
+      "bytes": 231285,
+      "sha256": "ef85d5914e5afae04f7cb48b35491e957bb5689064c596475883679ff721fb56",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "controls/sdk_impl/Hvac.java",
+      "bytes": 89387,
+      "sha256": "b31c210f25cc045350968c9a6adc2254e4e442c2939fc00ffe3c369f6c150090",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "controls/sdk_impl/PAS.disasm.txt",
+      "bytes": 96549,
+      "sha256": "dff476cbe569d4c3371acebc6e8f6c17e9348bb61e029c336353e0be8d034910",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "controls/sdk_impl/PAS.java",
+      "bytes": 45325,
+      "sha256": "0ae2e82df9e47a14b6f6b2255d00c1cafbc63827f79b7d0e52a9f647c6c76a4c",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "cruise/_ZN10IPCLModule10spi_handleEv.disasm.txt",
+      "bytes": 22078,
+      "sha256": "55bd4b01748939f5a824464873fecbc2ec66deceb4094300a391516c8d6a5633",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "cruise/_ZN10IPCLModule11packPayloadEv.disasm.txt",
+      "bytes": 9920,
+      "sha256": "43dc265e31bca9eff10801045c569d953920f2e1cbe78c2795121e3230e4ff62",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "cruise/_ZN10IPCLModule12parsePayloadEv.disasm.txt",
+      "bytes": 9092,
+      "sha256": "17bda95d95b95abd901d80b38d79ace529566f9ef0b4a529eb965ff4c9689d96",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "cruise/convert_cb.disasm.txt",
+      "bytes": 70315,
+      "sha256": "86bd5d124ad140adcce50a3632e2ad0a68ccdcf74d659459955bc508edda9245",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "cruise/convert_out.disasm.txt",
+      "bytes": 190263,
+      "sha256": "fc8d79e7a803e3224a6ddf846b63015b1d9a1f17776c7f04483f425171823db9",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "cruise/init_transport_conf.disasm.txt",
+      "bytes": 3523,
+      "sha256": "9e83c99dc226ad7bcadb1abbd2ed84c8f62a173f1883d9151cd85b6598b998dc",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "cruise/queueTxMsg.disasm.txt",
+      "bytes": 16821,
+      "sha256": "1c2f8c0e638b6a570d31f87cd39722050a594fef744f21c19994fb9d6cdf6e75",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/AbsCarFunction.disasm.txt",
+      "bytes": 115959,
+      "sha256": "b6eb0edf46460e823a87ee87b6154d714599617e41557534d5a62523873ba3b8",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/AbsCarFunction.java.txt",
+      "bytes": 45547,
+      "sha256": "01cc7f06ebc19fc2f35de2178f823b0c7afdcd14a1288709b196001fce09083e",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Bcm.annotated.java.txt",
+      "bytes": 65697,
+      "sha256": "730dac47e19a535f6e9606edf7fcd523331f5502fbc2389dd562d8c23d3d2c15",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Bcm.disasm.txt",
+      "bytes": 139378,
+      "sha256": "ac4b3b0ca9deddf80237babed922e151fa7bf65a3301239277e5a51916ec0e01",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Bcm.java.txt",
+      "bytes": 49471,
+      "sha256": "2cfb8dcfe2038404ad783bed8752dd268bfc9b6963b1aa0039cc8d3d9ad36c3d",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/CB_command_routes.disasm.txt",
+      "bytes": 379276,
+      "sha256": "50e6dd9d16b050224bcfff102e179344cfdfda3e555f32aa10fa8f0ceb2ead8c",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/DriveMode.annotated.java.txt",
+      "bytes": 32906,
+      "sha256": "6c8f28c15d9eb33476b1be8cbac53f8093cd65ecd07fc7f022de10790b0c6a50",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/DriveMode.disasm.txt",
+      "bytes": 78920,
+      "sha256": "c2b5d385085846e6096a32134b6a5f2fcc11dc56438b825935cc7a1df78a013b",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/DriveMode.java.txt",
+      "bytes": 26301,
+      "sha256": "d6d7472f2133ebb48a81fb8e48d005d3a1ac032809ad69d1239c38813771ba4f",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/FunctionStatus.java.txt",
+      "bytes": 1928,
+      "sha256": "d0814673eab50461f041323e449ee35bd927b8f136e96614088aae97d05ca619",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Lamp.annotated.java.txt",
+      "bytes": 13508,
+      "sha256": "4f41d53754f0c6a2e64a716e922c4be5e35d558e8985a146fd3f4612fdb2dfbe",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Lamp.disasm.txt",
+      "bytes": 31910,
+      "sha256": "37f45cccfcb37c2cbdd890163dd00026e725a7c56031f136ca0646c17b6f78c8",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Lamp.java.txt",
+      "bytes": 10590,
+      "sha256": "c2e78ea43163282f45b0bae14cd1320483425ce4d3cbe6f313781ec950c50a7b",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Safety.annotated.java.txt",
+      "bytes": 18579,
+      "sha256": "bbf5d92befd5eef9cd7b304b8510d69fec3fce5f24dceffad9594c513a7bf157",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Safety.disasm.txt",
+      "bytes": 30810,
+      "sha256": "2abc449237ec004e35ee7518c8a9cf8a81536affccabb91aff1b85f82b20c13f",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Safety.java.txt",
+      "bytes": 12557,
+      "sha256": "9c109ccb2faeb64b32a30ee22df97be49caf76c7e7407da18f0ce0a6c7932936",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Seat.annotated.java.txt",
+      "bytes": 51393,
+      "sha256": "15811ffbf1ac836f15e2ebb8601a131c054384a4e13835ae390a5eeb4cf0a030",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Seat.disasm.txt",
+      "bytes": 113400,
+      "sha256": "015520b2ce3e9f82a3b79c1f87fe28c28ef9bc69fd4f34343c9c7192307cbffb",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Seat.java.txt",
+      "bytes": 40318,
+      "sha256": "6dc1ebd85442e85976690963dc7b64e1366b0cf09f792dbde46f5ee3c5c55b33",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/SignalUtils.disasm.txt",
+      "bytes": 4397,
+      "sha256": "5a9474645e18ae2a3e1817854a75062e69c4e15faaa0afe9db58ec93e2d463f1",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/SignalUtils.java.txt",
+      "bytes": 4249,
+      "sha256": "2ba2e2c6421c408e62c27bcc155cda5ba05de102655abb2992b84541a6f79c21",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Vehicle.annotated.java.txt",
+      "bytes": 74009,
+      "sha256": "cada0c718afc4a35b03bb37f091f41e40ea9998bb6ba5eec215196ffbcbc36fe",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Vehicle.disasm.txt",
+      "bytes": 160146,
+      "sha256": "d08adb63d089f8c75fdfdf05c1cb5abd8be38c4db41b34ee027595f9124defae",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/Vehicle.java.txt",
+      "bytes": 59130,
+      "sha256": "2a83abba4e0add4544b51175b195d5e64d34a462893facf796bca115335cdc54",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$AbsTask.disasm.txt",
+      "bytes": 12629,
+      "sha256": "d8748c1d6bfcfb8802ee1794b19c5c2501e2e79e6398841609d3c80a6dbee2a4",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$AbsTask.java.txt",
+      "bytes": 4714,
+      "sha256": "c70a5977538fbe7412e029844adff0f0fdb4e7ac0787e342495fae6e9625f07c",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$AssociatedStatus.disasm.txt",
+      "bytes": 4413,
+      "sha256": "bbce0bd33e34353cd69d326fd71207da9ab38283dbfe62556ab368d2812155ad",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$CustomStatus.disasm.txt",
+      "bytes": 4532,
+      "sha256": "3f5131267d4abbee5bb40426ed1a0ca8a6f4cae49f0968c3af180d586760db5d",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$CustomValueTask.disasm.txt",
+      "bytes": 5598,
+      "sha256": "d0f3f4d51fd7aece7cb1267c1af6afa345899ac27ebf02555c83bfb96f6f00cd",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$Data.disasm.txt",
+      "bytes": 6542,
+      "sha256": "4765d5a4b53ee15995bd77aac84a7a4c56401cde72cf022218afd49de38a3fc8",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$MultiSignalTask.disasm.txt",
+      "bytes": 10851,
+      "sha256": "df6503fa7816881990be0a3745f05a65530dfd7c3fd2a1ca209cf1deb1853eea",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$SinglePATask.disasm.txt",
+      "bytes": 7573,
+      "sha256": "25fe310edd7ebfa345a543c0387d5f3edb78adba6ef1f211a35d148074f60438",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$SinglePATask.java.txt",
+      "bytes": 3788,
+      "sha256": "3f3a09f1e3dbac6e14f5bd0dbf85aafbbefdf0f476f682c5599d2e831dec28d6",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$SingleSignalTask.disasm.txt",
+      "bytes": 7962,
+      "sha256": "1f892c5ceb1b2cbfd69328d8e92ba63b612d67f5bdf26e08e5f384c0965e6760",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$SingleSignalTask.java.txt",
+      "bytes": 3887,
+      "sha256": "3a844522a914d7c72f3e766d92860bf8c6b71744da40c458f9e1cd44db6db2b1",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$ZoneTask.disasm.txt",
+      "bytes": 24991,
+      "sha256": "474826b876d3f30a8505d74c1937592e9b7c1e36ae9542c5e7827238f6b78dd5",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction$ZoneTask.java.txt",
+      "bytes": 9955,
+      "sha256": "b50c76dc531ff7225def5862a2f0d649a34e6e2540f2f4566521a85d7c3dcb11",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction.disasm.txt",
+      "bytes": 15893,
+      "sha256": "22db3163f92f3c3671a165076a4bb450b3dc2c5ff5f91a3032a9c54951d9d9e5",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleFunction.java.txt",
+      "bytes": 6724,
+      "sha256": "a9114c3ed304d10cfdefff9239d29487ff9338f51c5de5181cb858a61cb35529",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleType.disasm.txt",
+      "bytes": 26850,
+      "sha256": "1178891a62de17f3157ceeccaf6d9474a6a551206f2ef0a430c309bdf2a47ac7",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/mapping/VehicleType.java.txt",
+      "bytes": 17113,
+      "sha256": "a19b2be8abe6ff6771e33de7c37fcd48146bac69d37f23035a994ac08ce79c5f",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/_ZN20vehiclePAPropertyMap9insertMapEv.asm.txt",
+      "bytes": 1843360,
+      "sha256": "eab5c71fd8e79d4e927f1f6881f75de08891bde9abd30a71d5561d9787020827",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/_ZN24vehicleSignalPropertyMap9insertMapEv.asm.txt",
+      "bytes": 5323984,
+      "sha256": "b2b844178f81854d4ddbac40e34f30b855111902157a6c6fa928f22aa96db5f9",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/_ZN7android8hardware10automotive7vehicle4V2_04impl29EcarxVehicleHalImplementation16initStaticConfigEv.asm.txt",
+      "bytes": 2205,
+      "sha256": "ea795e0364037cfd1b28a889ae57e26db077e1e5e50bbeed562a96d7998099f2",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/_ZN7android8hardware10automotive7vehicle4V2_04impl29EcarxVehicleHalImplementation3setERKNS3_16VehiclePropValueE.asm.txt",
+      "bytes": 4307,
+      "sha256": "64accf8550010d53ff9087f9f57c1d4727b19b73d73d5f4acdb9a2ae06268c94",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/_ZN7android8hardware10automotive7vehicle4V2_04impl29EcarxVehicleHalImplementation8onCreateEv.asm.txt",
+      "bytes": 7341,
+      "sha256": "c2a74fc73eb5c94c49a71caea1d8020280e2ba41f57edd117e0f28fe420738e1",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/_ZN7android8hardware10automotive7vehicle4V2_04impl29EcarxVehicleHalImplementationC2ERNSt3__15mutexEPNS3_20VehiclePropertyStoreE.asm.txt",
+      "bytes": 2451,
+      "sha256": "7dfa20665fcd417e07dc1fd324ba9f3be3903220ed9dec415d8d971de828af21",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/_ZN7android8hardware10automotive7vehicle4V2_04impl29EcarxVehicleHalManagerWrapperC2EPNS3_17VehicleHalManagerEPNS4_29EcarxVehicleHalImplementationE.asm.txt",
+      "bytes": 35,
+      "sha256": "dc9853cd083ae248bc55c73b18c5f297a72ef3cdd74780cd751aeccd02c000f0",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/_ZNK7android8hardware10automotive7vehicle4V2_017VehicleHalManager19checkReadPermissionERKNS3_17VehiclePropConfigE.asm.txt",
+      "bytes": 342,
+      "sha256": "c5cdb0c76ddeaaf312fcab6a71dc67beba340c667b4bf1ca1efaa8981167d44b",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/_ZNK7android8hardware10automotive7vehicle4V2_017VehicleHalManager20checkWritePermissionERKNS3_17VehiclePropConfigE.asm.txt",
+      "bytes": 342,
+      "sha256": "eef4fcdebab81187c942094242c56a7b75718ac6bf4e9545ab6a3f9d6948096d",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/global_initializer.asm.txt",
+      "bytes": 1186,
+      "sha256": "ec5b502da201b5293397f01f97db553f8f3106be695640aef878b8de69581fa9",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/vendor.ecarx.xma.automotive.vehicle_1.0-impl-lib.so.symbols.txt",
+      "bytes": 55024,
+      "sha256": "b6ff37fd614f840904e9127fc846c0de58be96df1802c0bab58a251314f2740b",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/vendor.ecarx.xma.automotive.vehicle_1.0-modules.so.symbols.txt",
+      "bytes": 94391,
+      "sha256": "f1b84d7a5ef7f62575ecc05939e9a238c7de1131417b7849e07db6f277eaee46",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/vendor.ecarx.xma.automotive.vehicle_vehicle-hal-tool.so.symbols.txt",
+      "bytes": 713007,
+      "sha256": "d505b5b7193dbdf3dc5045b70a85d349dc6a83303ac3431822c58dd3c85e89a2",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/native/vhal_v1_0_net_impl-lib.so.symbols.txt",
+      "bytes": 701135,
+      "sha256": "d2e1a55583dec6947af820e9c5f3dd0a505d012e2b66e00ace7363992188a0cb",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/service_evidence/BidirectionalSparseIntArray.disasm.txt",
+      "bytes": 2553,
+      "sha256": "dc71fae3d3e03229a1d7e138499d6978deb08301afa2a7e361eceee226f79653",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/service_evidence/CarPropertyUtils.disasm.txt",
+      "bytes": 20281,
+      "sha256": "d465ea86bdb4cdbbde05c43ede6919c5e442bfa2be80982d7874fd54142e4a9a",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/service_evidence/CarSignalService.disasm.txt",
+      "bytes": 42481,
+      "sha256": "ec60ffba6ddb9f32f1802dc176274d5d58a4f894c00cbb43a7d996d75c21c1b5",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/service_evidence/ECarXCarService.disasm.txt",
+      "bytes": 15211,
+      "sha256": "cce437f10f42a9cf6eb00510524aa27ade9f8ce6596068999031d73c5b1df477",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/service_evidence/IECarXCarImpl.disasm.txt",
+      "bytes": 17796,
+      "sha256": "09c706fa67159e3a214c9bde20fd642382bcf3715bac6581a0218c4e164ed047",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/service_evidence/ManagerToHalPropIdMap.disasm.txt",
+      "bytes": 1634,
+      "sha256": "8ff8264413cd9103d5aba6ae4e1b765571e990df8548109adef30f04d8888e3e",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/service_evidence/Manifest$permission.disasm.txt",
+      "bytes": 92,
+      "sha256": "3d9f0d85a8706270604015cfabc097a64381535d765ec80d130548274b9bdb4e",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/service_evidence/PropertyIdTransformation.disasm.txt",
+      "bytes": 184424,
+      "sha256": "31136cb09d4515f5bccc11d5001457b0e6b2cf8c5b04da01f7c7ed35f5be2ebf",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    },
+    {
+      "path": "firmware/service_evidence/SignalHalService.disasm.txt",
+      "bytes": 27705,
+      "sha256": "1403c7ce57675d147d79ca0ded68debdfc4ed41ab2041c0f37a7985481ac39b5",
+      "reason": "REL-008: full third-party decompilation/disassembly or native symbol inventory"
+    }
+  ],
+  "modified_json": [
+    "controls/camera_route.json",
+    "firmware/mapping/function_routes.json",
+    "firmware/method_evidence.json"
+  ],
+  "removed_json_keys": [
+    "bytecode",
+    "evidence_excerpt"
+  ],
+  "interpretation": "A public analytical edition, not a complete copy of the private evidence bundle."
+}

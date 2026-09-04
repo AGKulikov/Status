@@ -1,0 +1,180 @@
+{
+  "version": "1.0",
+  "date": "2026-09-04",
+  "note": "This is a research queue, not scheduled or automatically executed work.",
+  "questions": [
+    {
+      "id": "CRUISE_WRITE",
+      "priority": "P1",
+      "function": "Программные MAIN/SET/RES/+/− и лимитер",
+      "status": "OPEN",
+      "known": "6 read properties не кодируются исходящим VHAL; ASDM status2↔3 наблюдается",
+      "missing_evidence": "Конкретный поддержанный command route и получатель ECU/MCU",
+      "next_step": "Связать VP .1 с полученными образами и production обработчиком кнопок; не повторять set READ свойств",
+      "sources": [
+        "cruise/report.md",
+        "cruise/vhal_switch_audit.json"
+      ]
+    },
+    {
+      "id": "LIMITER_VALUE",
+      "priority": "P1",
+      "function": "Режим и заданная скорость лимитера",
+      "status": "OPEN",
+      "known": "AdjSpdLimnSts/CrsCtrlrSts в сохранённых журналах invalid/-1",
+      "missing_evidence": "Сигнал режима и числовая шкала скорости из правильного домена",
+      "next_step": "Найти сообщение, коррелирующее с независимым визуальным изменением; исходящие кадры не воспроизводить",
+      "sources": [
+        "cruise/report.md"
+      ]
+    },
+    {
+      "id": "VP_IDENTITY",
+      "priority": "P1",
+      "function": "Кто владеет 198.18.34.1",
+      "status": "OPEN",
+      "known": "UDP peer .1:50500 и QNX startup .2 подтверждены",
+      "missing_evidence": "Привязка IP/MAC к домену, образу и процессу",
+      "next_step": "Разобрать уже выгруженные VM/network конфиги и регистрацию endpoint",
+      "sources": [
+        "cruise/report.md"
+      ]
+    },
+    {
+      "id": "RUNTIME_SDK",
+      "priority": "P1",
+      "function": "Какой SDK реально загружает приложение",
+      "status": "OPEN",
+      "known": "758 CB/PA ID различаются между копиями SDK; exact static mapping извлечён",
+      "missing_evidence": "Runtime class origin для конкретного приложения/класса",
+      "next_step": "Фиксировать loader/source/version и runtime constants существующим Research Agent; не выбирать ID по одному имени",
+      "sources": [
+        "firmware/conflicts.json",
+        "firmware/sdk_to_hal.json"
+      ]
+    },
+    {
+      "id": "CAMERA_STATE",
+      "priority": "P1",
+      "function": "Видимость 360 и переходы внешней AVM",
+      "status": "PARTLY_RESOLVED",
+      "known": "config154=3 в логах; внешняя ветвь использует импульс; raw29021=1…5 означает active в SDK, Natro учитывает 3",
+      "missing_evidence": "Визуальный смысл 1, 2, 4, 5 и полный жизненный цикл callback",
+      "next_step": "Сопоставить PAC watcher, 29021, 29043 и 28995 с видимостью и конфигурацией; считать 3 только частным подтверждённым случаем",
+      "sources": [
+        "controls/camera_route.json",
+        "controls/report.md"
+      ]
+    },
+    {
+      "id": "PAS_PAUSE",
+      "priority": "P1",
+      "function": "Пауза и возобновление уведомлений",
+      "status": "PARTLY_RESOLVED",
+      "known": "Сигналы PAS, 360 и видимость разделены; реальные переходы сохранены",
+      "missing_evidence": "Сброс устаревших значений при Binder/зажигании и полное восстановление",
+      "next_step": "Проверить жизненный цикл политики по timestamp; подтвердить начало и конец физического отображения окна",
+      "sources": [
+        "controls/report.md",
+        "observations/camera_gear_transitions.json"
+      ]
+    },
+    {
+      "id": "CLUSTER_WINGS",
+      "priority": "P1",
+      "function": "Владелец крыльев и штатной машинки",
+      "status": "OPEN",
+      "known": "Тест I испорчен восстановлением до ручной метки; K3 даёт 1920×1080",
+      "missing_evidence": "Синхронная привязка к владельцу surface и физическим пикселям",
+      "next_step": "Повторить один изолированный вариант с меткой до восстановления и отдельным наблюдением DIM/HUD",
+      "sources": [
+        "display/report.md"
+      ]
+    },
+    {
+      "id": "HUD_PROFILE",
+      "priority": "P1",
+      "function": "Режимы HUD, PEN и маски содержимого",
+      "status": "OPEN",
+      "known": "CB accepted и echo при invalid feedback; отдельный HUD PA остаётся IntellDrv",
+      "missing_evidence": "Валидный active profile/PEN и независимый физический эффект",
+      "next_step": "Сначала установить причину invalid PA и неизвестного профиля; не подставлять 15 и не повторять перебор enum",
+      "sources": [
+        "display/report.md"
+      ]
+    },
+    {
+      "id": "MEDIA_LATENCY",
+      "priority": "P1",
+      "function": "Полная задержка кнопок руля",
+      "status": "PARTLY_RESOLVED",
+      "known": "Три остановки main thread дольше 8 секунд; timestamp начинается внутри callback",
+      "missing_evidence": "Нажатие → callback → dispatch → player → audio на общей временной шкале",
+      "next_step": "Исправить блокировки UI отдельной задачей; добавить eventTime, downTime и время callback; не считать текущую метрику полной задержкой",
+      "sources": [
+        "display/report.md"
+      ]
+    },
+    {
+      "id": "SHADE_OWNER",
+      "priority": "P1",
+      "function": "Штатная шторка и жест открытия",
+      "status": "OPEN",
+      "known": "Штатный package и существующая панель Natro найдены",
+      "missing_evidence": "Конкретный component/gesture owner и надёжное восстановление",
+      "next_step": "Изучить component и IPC перед адресным изменением; не отключать SystemUI целиком",
+      "sources": [
+        "controls/report.md"
+      ]
+    },
+    {
+      "id": "WINDOW_SEAT",
+      "priority": "P2",
+      "function": "Остановка окон и движения сидений",
+      "status": "PARTLY_RESOLVED",
+      "known": "Window raw 1…26 соответствует 0…100% с шагом 4; у сидений есть направление и stop; разобраны 110 Adapt routes",
+      "missing_evidence": "Таймаут и stop при потере фокуса/Binder; runtime support комплектации",
+      "next_step": "Подтвердить цикл в штатном клиенте и физический feedback; не приписывать единицы миллиметров команде направления",
+      "sources": [
+        "firmware/mapping/report.md"
+      ]
+    },
+    {
+      "id": "TELEMETRY_SCALE",
+      "priority": "P2",
+      "function": "Единицы и свежесть телеметрии",
+      "status": "PARTLY_RESOLVED",
+      "known": "SDK getter может читать кэш; 55 ID менялись в журналах; извлечены 2355 статических SignalId",
+      "missing_evidence": "Шкалы, качество и timestamps для нужных метрик",
+      "next_step": "Выбирать точный typed decoder и callback; не трактовать initialValue как измерение",
+      "sources": [
+        "firmware/report.md",
+        "observations/observed_signals.json"
+      ]
+    },
+    {
+      "id": "BODY_SUPPORT",
+      "priority": "P2",
+      "function": "Оснащение: подсветка, задние сиденья, ароматизация",
+      "status": "OPEN",
+      "known": "Публичные и PA вызовы извлечены",
+      "missing_evidence": "Поддержка каждой зоны и enum на комплектации пользователя",
+      "next_step": "Запрашивать support и allowed values, затем независимый feedback; наличие enum не доказывает наличие оборудования",
+      "sources": [
+        "controls/report.md"
+      ]
+    },
+    {
+      "id": "CAN_OWNERSHIP",
+      "priority": "P2",
+      "function": "Роль MPC5746/CAN и другие SPI-каналы",
+      "status": "OPEN",
+      "known": "ELF PowerPC получен; SPI4 bridge имеет 89 полей; reset_stats изменял старую статистику",
+      "missing_evidence": "Связь образа с работающей прошивкой и исполнительным доменом",
+      "next_step": "Продолжить офлайн-анализ ownership/config; исключить чтение reset_stats; не выполнять прошивку и перебор команд",
+      "sources": [
+        "cruise/report.md"
+      ]
+    }
+  ]
+}
