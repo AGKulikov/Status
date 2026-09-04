@@ -192,7 +192,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     permissions:
-      contents: read
+      actions: read
+      contents: write
     env:
       VERSION_NAME: '2.7.6'
       VERSION_CODE: '208021309'
@@ -269,6 +270,109 @@ jobs:
               > SHA256SUMS.txt
             sha256sum -c SHA256SUMS.txt
           )
+      - name: Receive exact encrypted signing bundle when Actions secrets are unavailable
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HANDOFF_BRANCH: 'agent/natro-2.7.6-navigation-hud-signing'
+          SIGNING_BUNDLE_SHA256: '4fb34ee8aed62dad3896d7aa6240d4066ec9b6ef3da5459bca9d7d1c4c3b7fc0'
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          CONFIGURED=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || CONFIGURED=$((CONFIGURED + 1))
+          done
+          case "$CONFIGURED" in
+            3)
+              echo 'Complete GitHub Actions signing secrets are configured'
+              exit 0
+              ;;
+            0) ;;
+            *)
+              echo 'Signing credentials must be supplied completely or omitted completely' >&2
+              exit 1
+              ;;
+          esac
+          unset KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS
+          umask 077
+          TRANSPORT="$RUNNER_TEMP/natro-2.7.6-signing-transport"
+          SIGNING="$RUNNER_TEMP/natro-2.7.6-signing-material"
+          mkdir -p "$TRANSPORT/chunks" "$SIGNING"
+          PRIVATE="$TRANSPORT/private.pem"
+          PUBLIC="$TRANSPORT/public.pem"
+          ENCRYPTED="$TRANSPORT/signing-bundle.enc"
+          ARCHIVE="$TRANSPORT/signing-bundle.tar.gz"
+          PREFIX="natro276-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PUBLIC_PATH="release-handoff/${PREFIX}.pub"
+          ENCRYPTED_PATH="release-handoff/${PREFIX}.enc"
+
+          cleanup_transport() {
+            find "$TRANSPORT/chunks" -type f -exec shred -u -- {} + \
+              2>/dev/null || true
+            shred -u -- "$PRIVATE" "$PUBLIC" "$ENCRYPTED" "$ARCHIVE" \
+              "$TRANSPORT/encrypted.json" 2>/dev/null || true
+          }
+          trap cleanup_transport EXIT
+
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
+            -out "$PRIVATE" 2>/dev/null
+          openssl pkey -in "$PRIVATE" -pubout -out "$PUBLIC"
+          PUBLIC_CONTENT=$(base64 -w0 "$PUBLIC")
+          gh api --method PUT \
+            "repos/${GITHUB_REPOSITORY}/contents/${PUBLIC_PATH}" \
+            -f message="ci: publish ephemeral Natro 2.7.6 transport key [skip ci]" \
+            -f content="$PUBLIC_CONTENT" \
+            -f branch="$HANDOFF_BRANCH" >/dev/null
+          echo "::notice title=Natro 2.7.6 encrypted handoff::Waiting for ${ENCRYPTED_PATH}"
+
+          for _ in $(seq 1 180); do
+            if gh api \
+                "repos/${GITHUB_REPOSITORY}/contents/${ENCRYPTED_PATH}?ref=${HANDOFF_BRANCH}" \
+                > "$TRANSPORT/encrypted.json" 2>/dev/null; then
+              jq -r '.content' "$TRANSPORT/encrypted.json" \
+                | tr -d '\n' | base64 --decode > "$ENCRYPTED"
+              break
+            fi
+            sleep 5
+          done
+          test -s "$ENCRYPTED" || {
+            echo 'Timed out waiting for the encrypted signing handoff' >&2
+            exit 1
+          }
+          test $(( $(stat -c '%s' "$ENCRYPTED") % 512 )) -eq 0
+          split -b 512 -d -a 3 "$ENCRYPTED" "$TRANSPORT/chunks/chunk-"
+          : > "$ARCHIVE"
+          for chunk in "$TRANSPORT"/chunks/chunk-*; do
+            openssl pkeyutl -decrypt -inkey "$PRIVATE" \
+              -pkeyopt rsa_padding_mode:oaep \
+              -pkeyopt rsa_oaep_md:sha256 \
+              -pkeyopt rsa_mgf1_md:sha256 \
+              -in "$chunk" >> "$ARCHIVE"
+          done
+          test "$(sha256sum "$ARCHIVE" | awk '{print $1}')" \
+            = "$SIGNING_BUNDLE_SHA256"
+          tar -tzf "$ARCHIVE" | awk \
+            'BEGIN { ok=1 } /^\// || /(^|\/)\.\.($|\/)/ { ok=0 } END { exit ok ? 0 : 1 }'
+          tar -xzf "$ARCHIVE" -C "$SIGNING" \
+            --no-same-owner --no-same-permissions
+          chmod 600 "$SIGNING"/*
+          test -s "$SIGNING/status-widget-ha-update.jks"
+          test -s "$SIGNING/status-widget-ha-update.pass"
+          IFS= read -r BUNDLE_PASSWORD \
+            < "$SIGNING/status-widget-ha-update.pass"
+          test -n "$BUNDLE_PASSWORD"
+          export BUNDLE_PASSWORD
+          BUNDLE_CERT=$(keytool -J-Duser.language=en -J-Duser.country=US \
+            -list -v -keystore "$SIGNING/status-widget-ha-update.jks" \
+            -alias status-widget-ha -storepass:env BUNDLE_PASSWORD \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          unset BUNDLE_PASSWORD
+          test "$BUNDLE_CERT" = "$EXPECTED_CERT_SHA256"
+          touch "$SIGNING/verified.ready"
       - name: Materialize and verify stable update key
         shell: bash
         env:
@@ -278,12 +382,36 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          test -n "$KEYSTORE_BASE64"
+          KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
+          PASSWORD_FILE="$RUNNER_TEMP/stable-update.pass"
+          ALIAS_FILE="$RUNNER_TEMP/stable-update.alias"
+          SIGNING="$RUNNER_TEMP/natro-2.7.6-signing-material"
+          CONFIGURED=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || CONFIGURED=$((CONFIGURED + 1))
+          done
+          case "$CONFIGURED" in
+            3)
+              printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+              printf '%s\n' "$KEY_PASSWORD" > "$PASSWORD_FILE"
+              printf '%s\n' "$KEY_ALIAS" > "$ALIAS_FILE"
+              ;;
+            0)
+              test -f "$SIGNING/verified.ready"
+              mv "$SIGNING/status-widget-ha-update.jks" "$KEYSTORE"
+              mv "$SIGNING/status-widget-ha-update.pass" "$PASSWORD_FILE"
+              printf '%s\n' 'status-widget-ha' > "$ALIAS_FILE"
+              ;;
+            *)
+              echo 'Signing credentials must be supplied completely or by encrypted handoff' >&2
+              exit 1
+              ;;
+          esac
+          chmod 600 "$KEYSTORE" "$PASSWORD_FILE" "$ALIAS_FILE"
+          IFS= read -r KEY_PASSWORD < "$PASSWORD_FILE"
+          IFS= read -r KEY_ALIAS < "$ALIAS_FILE"
           test -n "$KEY_PASSWORD"
           test -n "$KEY_ALIAS"
-          KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
-          chmod 600 "$KEYSTORE"
           export KEY_PASSWORD
           certificate=$(keytool -J-Duser.language=en -J-Duser.country=US \
             -list -v -keystore "$KEYSTORE" -alias "$KEY_ALIAS" \
@@ -296,11 +424,13 @@ jobs:
         env:
           BASELINE_URL: ${{ inputs.baseline_url }}
           GH_TOKEN: ${{ github.token }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           set -euo pipefail
           BASELINE="$RUNNER_TEMP/YN_30.3.0_T2_.apk"
+          IFS= read -r KEY_PASSWORD < "$RUNNER_TEMP/stable-update.pass"
+          IFS= read -r KEY_ALIAS < "$RUNNER_TEMP/stable-update.alias"
+          test -n "$KEY_PASSWORD"
+          test -n "$KEY_ALIAS"
           if test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'; then
             test -n "$BASELINE_URL"
             echo "::add-mask::$BASELINE_URL"
@@ -365,24 +495,26 @@ jobs:
             "$EXPECTED_HUD_SPEED_BASELINE_SHA256"
       - name: Sign and fully verify Natro and Navigator
         shell: bash
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           set -euo pipefail
           CANDIDATE="$RUNNER_TEMP/candidate"
           KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
+          PASSWORD_FILE="$RUNNER_TEMP/stable-update.pass"
+          ALIAS_FILE="$RUNNER_TEMP/stable-update.alias"
           BASELINE="$RUNNER_TEMP/YN_30.3.0_T2_.apk"
           HUD_SPEED_BASELINE="$RUNNER_TEMP/HUD_Speed_v76_L_v13_FineControls.apk"
           OUTPUT="$RUNNER_TEMP/signed-pair"
           cleanup() {
-            shred -u -- "$KEYSTORE" "$BASELINE" "$HUD_SPEED_BASELINE" \
-              2>/dev/null || true
+            shred -u -- "$KEYSTORE" "$PASSWORD_FILE" "$ALIAS_FILE" \
+              "$BASELINE" "$HUD_SPEED_BASELINE" 2>/dev/null || true
           }
           trap cleanup EXIT HUP INT TERM
           test -s "$KEYSTORE"
           test -s "$BASELINE"
+          IFS= read -r KEY_PASSWORD < "$PASSWORD_FILE"
+          IFS= read -r KEY_ALIAS < "$ALIAS_FILE"
+          test -n "$KEY_PASSWORD"
+          test -n "$KEY_ALIAS"
           export KEY_PASSWORD
           KEYSTORE_FILE="$KEYSTORE" \
             KEY_PASSWORD="$KEY_PASSWORD" \
