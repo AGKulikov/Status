@@ -604,7 +604,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch routeTraffic = switchView("Пробки на линии маршрута", map.showRouteTraffic);
         Switch traffic = switchView("Пробки на остальных дорогах", map.showTraffic);
         Switch trafficLights = switchView(
-                "Живые светофоры: сигнал и отсчёт", map.showTrafficLights);
+                "Светофоры с отсчётом — отдельный слой", map.showTrafficLights);
         Switch routeTrafficLights = switchView(
                 "Обычные светофоры активного маршрута",
                 map.showRouteTrafficLights);

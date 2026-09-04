@@ -524,7 +524,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Пробки на линии маршрута", profile.showRouteTraffic);
         Switch showTraffic = switchView("Пробки на остальных дорогах", profile.showTraffic);
         Switch showTrafficLights = switchView(
-                "Живые светофоры: сигнал и отсчёт", profile.showTrafficLights);
+                "Светофоры с отсчётом — отдельный слой", profile.showTrafficLights);
         Switch showRouteTrafficLights = switchView(
                 "Обычные светофоры активного маршрута",
                 profile.showRouteTrafficLights);
