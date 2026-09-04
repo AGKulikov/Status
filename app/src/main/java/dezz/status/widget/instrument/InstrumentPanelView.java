@@ -191,6 +191,18 @@ public final class InstrumentPanelView extends FrameLayout
     private void publishLeaseIfReady(boolean replace) {
         if (mapTexture == null || (!replace && leasePublished)
                 || !attached || mapView.getVisibility() != VISIBLE || !clusterMapEnabled) return;
+        // Android 9 on KX11 can make TextureView.isAvailable() true without delivering the first
+        // SurfaceTextureListener callback after a cold multi-display launch. The old retry loop
+        // only checked mapSurface and therefore retried a permanently null value until some
+        // unrelated window transition happened to deliver another callback. Recover the owned
+        // Surface directly from TextureView on every admission attempt.
+        if ((mapSurface == null || !mapSurface.isValid()) && mapTexture.isAvailable()) {
+            SurfaceTexture texture = mapTexture.getSurfaceTexture();
+            if (texture != null) {
+                releaseOwnedSurface();
+                mapSurface = new Surface(texture);
+            }
+        }
         // ECARX can expose the DIM TextureView before it reports the secondary window as visible.
         // We intentionally keep an existing lease through later visibility changes, so admission
         // must follow the real attached Surface instead of the unreliable initial visibility bit.

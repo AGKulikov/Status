@@ -4710,7 +4710,10 @@ public final class LauncherActivity extends AppCompatActivity {
                     if (direct != null) {
                         long now = System.currentTimeMillis();
                         boolean fresh = direct.isFreshAt(now, DIRECT_NAVIGATION_FRESH_MS);
-                        state = NavigationDataRepository.fromDirectSnapshot(direct, fresh);
+                        Bitmap maneuverArtwork = NavigationBridgeStateStore
+                                .maneuverArtworkFor(direct);
+                        state = NavigationDataRepository.fromDirectSnapshot(
+                                direct, fresh, maneuverArtwork);
                         if (fresh) {
                             // Never extend a future-skewed producer timestamp beyond one local
                             // freshness window. The single delayed wake below replaces polling.

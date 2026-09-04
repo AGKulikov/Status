@@ -28,6 +28,7 @@ import androidx.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import dezz.status.widget.launcher.LauncherGlobalElementTag;
 import dezz.status.widget.launcher.LauncherIconResolver;
@@ -36,9 +37,10 @@ import dezz.status.widget.launcher.LauncherLayoutStore;
 /**
  * Responsive grid of user-defined Yandex routes.
  *
- * <p>The panel owns no configuration state: {@link #reloadConfig()} always rebuilds it from the
- * store. Settings screens may enable {@link #setPreviewMode(boolean)} to render the exact same
- * tiles without accidentally starting navigation.</p>
+ * <p>The panel owns no configuration state: {@link #reloadConfig()} reads the store and rebuilds
+ * only when the normalized route list actually changed. Settings screens may enable
+ * {@link #setPreviewMode(boolean)} to render the exact same tiles without accidentally starting
+ * navigation.</p>
  */
 public final class FavoriteRoutesPanelView extends FrameLayout {
     private static final int DEFAULT_COLUMNS = 2;
@@ -50,6 +52,7 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
     @NonNull private List<FavoriteRouteConfig> routes = Collections.emptyList();
     private int columns;
     private boolean previewMode;
+    private boolean hierarchyBuilt;
 
     public FavoriteRoutesPanelView(@NonNull Context context,
                                    @NonNull FavoriteRoutesConfigStore store) {
@@ -70,7 +73,9 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
     /** Reloads the ordered route list and all tile appearance values from persistent storage. */
     public void reloadConfig() {
         List<FavoriteRouteConfig> loaded = store.load();
-        routes = loaded == null ? Collections.emptyList() : loaded;
+        loaded = loaded == null ? Collections.emptyList() : loaded;
+        if (hierarchyBuilt && sameRoutes(routes, loaded)) return;
+        routes = loaded;
         rebuild();
     }
 
@@ -120,6 +125,7 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
 
     private void rebuild() {
         removeAllViews();
+        hierarchyBuilt = true;
 
         GridLayout grid = new GridLayout(getContext());
         grid.setColumnCount(columns);
@@ -205,10 +211,14 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
         label.setMaxLines(2);
         label.setEllipsize(TextUtils.TruncateAt.END);
         label.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+        int labelMinHeight = Math.max(1, Math.round(
+                route.labelSizeSp * getResources().getDisplayMetrics().scaledDensity * 1.35f));
+        label.setMinHeight(labelMinHeight);
         LinearLayout.LayoutParams labelLayout = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         labelLayout.topMargin = dp(6);
         tile.addView(label, labelLayout);
+        tile.setMinimumHeight(padding * 2 + iconSize + labelLayout.topMargin + labelMinHeight);
 
         if (previewMode) {
             tile.setClickable(false);
@@ -221,6 +231,31 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
             tile.setOnClickListener(view -> YandexRouteLauncher.launch(getContext(), route));
         }
         return tile;
+    }
+
+    private static boolean sameRoutes(@NonNull List<FavoriteRouteConfig> left,
+                                      @NonNull List<FavoriteRouteConfig> right) {
+        if (left.size() != right.size()) return false;
+        for (int index = 0; index < left.size(); index++) {
+            FavoriteRouteConfig a = left.get(index);
+            FavoriteRouteConfig b = right.get(index);
+            if (a == b) continue;
+            if (a == null || b == null
+                    || !Objects.equals(a.id, b.id)
+                    || !Objects.equals(a.title, b.title)
+                    || !Objects.equals(a.address, b.address)
+                    || !Objects.equals(a.coordinates, b.coordinates)
+                    || a.product != b.product
+                    || a.floating != b.floating
+                    || !Objects.equals(a.icon, b.icon)
+                    || a.enabled != b.enabled
+                    || a.iconSizePx != b.iconSizePx
+                    || a.labelSizeSp != b.labelSizeSp
+                    || !Objects.equals(a.backgroundColor, b.backgroundColor)
+                    || !Objects.equals(a.textColor, b.textColor)
+                    || !Objects.equals(a.iconColor, b.iconColor)) return false;
+        }
+        return true;
     }
 
     @NonNull

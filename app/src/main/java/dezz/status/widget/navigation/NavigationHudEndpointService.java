@@ -4,6 +4,7 @@ package dezz.status.widget.navigation;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -30,7 +31,8 @@ import dezz.status.widget.launcher.NavigationDataRepository;
  *
  * <p>The endpoint accepts versioned snapshots/route geometry, sends the independent map profiles
  * and leases Natro's real HUD and instrument-cluster Surfaces to Navigator. Each Surface is
- * producer-owned: no screenshot, ImageReader or per-frame bitmap crosses this bridge.</p>
+ * producer-owned: no screenshot, ImageReader or per-frame bitmap crosses this bridge. A bounded
+ * stock maneuver artwork sample is accepted only when its maneuver identity changes.</p>
  */
 public final class NavigationHudEndpointService extends Service {
     private static final String TAG = "NavigationHudEndpoint";
@@ -42,6 +44,8 @@ public final class NavigationHudEndpointService extends Service {
     private static final long OPTIONAL_HUD_SPEED_BOOTSTRAP_MS = 135_000L;
     /** Coalesces live editor drags so MapKit rebuilds only for the settled viewport. */
     private static final long SURFACE_RESIZE_SETTLE_MS = 80L;
+    private static final int MAX_CLUSTER_SURFACE_RECOVERY_ATTEMPTS = 6;
+    private static final long CLUSTER_SURFACE_RECOVERY_BASE_MS = 250L;
     static final int MAX_CONFIGURATION_CHARS = 384 * 1024;
     @NonNull private static final Object SURFACE_LOCK = new Object();
     @Nullable private static volatile NavigationHudEndpointService instance;
@@ -54,7 +58,9 @@ public final class NavigationHudEndpointService extends Service {
                     | NavigationBridgeContract.CAP_NATRO_NAVIGATION_STATE_SINK
                     | NavigationBridgeContract.CAP_NATRO_HUD_SURFACE_PROVIDER
                     | NavigationBridgeContract.CAP_NATRO_CLUSTER_SURFACE_PROVIDER
-                    | NavigationBridgeContract.CAP_NATRO_EXTERNAL_CAMERA_SOURCE;
+                    | NavigationBridgeContract.CAP_NATRO_EXTERNAL_CAMERA_SOURCE
+                    | NavigationBridgeContract.CAP_NATRO_WINDOW_COMMAND_SOURCE
+                    | NavigationBridgeContract.CAP_NATRO_MANEUVER_ARTWORK_SINK;
 
     @NonNull private final Handler handler = new Handler(Looper.getMainLooper(), this::onMessage);
     @NonNull private final Messenger endpoint = new Messenger(handler);
@@ -70,6 +76,7 @@ public final class NavigationHudEndpointService extends Service {
     private boolean routeGeometryDrainPosted;
     private int optionalHudSpeedBootstrapStartId;
     private int clusterEndpointStartId;
+    private int clusterSurfaceRecoveryAttempts;
     @NonNull private final Runnable snapshotDrain = this::drainLatestSnapshot;
     @NonNull private final Runnable routeGeometryDrain = this::drainLatestRouteGeometry;
     @NonNull private final Runnable sendLatestHudSurface = this::sendPublishedSurface;
@@ -160,6 +167,32 @@ public final class NavigationHudEndpointService extends Service {
         });
     }
 
+    /** Reasserts the window contract after a route URI has been delivered to MapActivity. */
+    public static void requestMainWindowMode(int requestedMode) {
+        NavigationHudEndpointService current = instance;
+        if (current == null) return;
+        int mode = requestedMode == NavigationBridgeContract.WINDOW_MODE_FULLSCREEN
+                ? NavigationBridgeContract.WINDOW_MODE_FULLSCREEN
+                : requestedMode == NavigationBridgeContract.WINDOW_MODE_FLOATING
+                ? NavigationBridgeContract.WINDOW_MODE_FLOATING
+                : NavigationBridgeContract.WINDOW_MODE_TOGGLE;
+        current.handler.post(() -> {
+            Client connected = current.client;
+            if (connected == null || (connected.capabilities
+                    & NavigationBridgeContract.CAP_MAIN_FLOATING_WINDOW) == 0L) return;
+            Bundle data = new Bundle();
+            data.putString(NavigationBridgeContract.KEY_SESSION_ID, connected.sessionId);
+            data.putInt(NavigationBridgeContract.KEY_WINDOW_MODE, mode);
+            data.putString(NavigationBridgeContract.KEY_WINDOW_COMMAND_SOURCE,
+                    "favorite-route");
+            if (send(connected.messenger,
+                    NavigationBridgeContract.MSG_SET_MAIN_WINDOW_MODE, data)) {
+                DiagnosticJournal.info("navigator-window",
+                        "floating mode reasserted after favorite route hand-off");
+            }
+        });
+    }
+
     /** Called by the HUD TextureView in this same Natro process. Ownership stays with it. */
     public static long publishHudSurface(@NonNull Surface surface,
                                          int width, int height, int dpi) {
@@ -229,6 +262,7 @@ public final class NavigationHudEndpointService extends Service {
         }
         NavigationHudEndpointService current = instance;
         if (current != null) {
+            current.handler.post(() -> current.resetClusterSurfaceRecovery(next.generation));
             current.handler.removeCallbacks(current.sendLatestClusterSurface);
             current.handler.postDelayed(current.sendLatestClusterSurface,
                     resizedExistingSurface ? SURFACE_RESIZE_SETTLE_MS : 0L);
@@ -420,6 +454,9 @@ public final class NavigationHudEndpointService extends Service {
                     enqueueRouteGeometry(current, message.getData().getString(
                             NavigationBridgeContract.KEY_ROUTE_GEOMETRY_JSON, ""));
                     break;
+                case NavigationBridgeContract.MSG_MANEUVER_ARTWORK:
+                    acceptManeuverArtwork(current, message.getData());
+                    break;
                 case NavigationBridgeContract.MSG_HUD_SURFACE_LOST:
                     String surfaceLoss = "Navigator reported HUD surface loss, generation="
                             + message.getData().getLong(
@@ -430,14 +467,16 @@ public final class NavigationHudEndpointService extends Service {
                     DiagnosticJournal.warn("hud-map", surfaceLoss);
                     break;
                 case NavigationBridgeContract.MSG_CLUSTER_SURFACE_LOST:
+                    long failedClusterGeneration = message.getData().getLong(
+                            NavigationBridgeContract.KEY_SURFACE_GENERATION, -1L);
                     String clusterSurfaceLoss =
                             "Navigator reported instrument-cluster surface loss, generation="
-                                    + message.getData().getLong(
-                                    NavigationBridgeContract.KEY_SURFACE_GENERATION, -1L)
+                                    + failedClusterGeneration
                                     + ", detail=" + message.getData().getString(
                                     NavigationBridgeContract.KEY_ERROR_DETAIL, "");
                     Log.i(TAG, clusterSurfaceLoss);
                     DiagnosticJournal.warn("cluster-map", clusterSurfaceLoss);
+                    recoverClusterSurface(failedClusterGeneration);
                     break;
                 case NavigationBridgeContract.MSG_HEARTBEAT:
                     replyCapabilities(current.messenger);
@@ -456,6 +495,24 @@ public final class NavigationHudEndpointService extends Service {
             replyError(current.messenger, "INVALID_PAYLOAD", failure.getMessage());
         }
         return true;
+    }
+
+    private void acceptManeuverArtwork(@NonNull Client current, @NonNull Bundle data) {
+        data.setClassLoader(Bitmap.class.getClassLoader());
+        Bitmap artwork;
+        try {
+            artwork = data.getParcelable(NavigationBridgeContract.KEY_MANEUVER_ARTWORK);
+        } catch (RuntimeException invalidParcel) {
+            artwork = null;
+        }
+        long sequence = data.getLong(NavigationBridgeContract.KEY_SEQUENCE, -1L);
+        String identity = data.getString(
+                NavigationBridgeContract.KEY_MANEUVER_IDENTITY, "");
+        if (artwork == null || !NavigationBridgeStateStore.publishManeuverArtwork(
+                current.sessionId, sequence, identity, artwork)) {
+            replyError(current.messenger, "INVALID_MANEUVER_ARTWORK",
+                    "Artwork must be bounded and match the current maneuver frame");
+        }
     }
 
     private static void rejectUntrustedUid(int sendingUid) {
@@ -494,6 +551,9 @@ public final class NavigationHudEndpointService extends Service {
                 remote,
                 death);
         NavigationBridgeStateStore.beginSession(session);
+        // A newly authenticated Navigator process gets its own bounded cold-attach budget. A
+        // previous dead MapKit session must not leave the live producer permanently exhausted.
+        clusterSurfaceRecoveryAttempts = 0;
         replyCapabilities(reply);
         sendConfiguration(reply, session);
         requestNavigationState(client);
@@ -669,6 +729,44 @@ public final class NavigationHudEndpointService extends Service {
             lease = publishedClusterSurface;
         }
         if (lease != null) sendClusterSurface(lease);
+    }
+
+    /**
+     * MapKit can reject the first cold attach while its process is still restoring. Because the
+     * producer Surface remains valid, reissue the same lease under a newer generation instead of
+     * waiting for an unrelated TextureView lifecycle event. A bound prevents a broken regional
+     * MapKit implementation from creating an endless Binder/rebuild loop.
+     */
+    private void recoverClusterSurface(long failedGeneration) {
+        if (failedGeneration < 0L
+                || clusterSurfaceRecoveryAttempts >= MAX_CLUSTER_SURFACE_RECOVERY_ATTEMPTS) {
+            return;
+        }
+        final SurfaceLease recovered;
+        synchronized (SURFACE_LOCK) {
+            SurfaceLease current = publishedClusterSurface;
+            if (current == null || current.generation != failedGeneration
+                    || !current.surface.isValid()) return;
+            recovered = new SurfaceLease(current.surface, current.width, current.height,
+                    current.dpi, ++nextSurfaceGeneration);
+            publishedClusterSurface = recovered;
+        }
+        int attempt = ++clusterSurfaceRecoveryAttempts;
+        long delay = Math.min(4_000L,
+                CLUSTER_SURFACE_RECOVERY_BASE_MS << Math.min(4, attempt - 1));
+        handler.removeCallbacks(sendLatestClusterSurface);
+        handler.postDelayed(sendLatestClusterSurface, delay);
+        DiagnosticJournal.info("cluster-map",
+                "reissuing cold cluster surface after MapKit loss; attempt=" + attempt
+                        + ", generation=" + recovered.generation + ", delayMs=" + delay);
+    }
+
+    private void resetClusterSurfaceRecovery(long ownerGeneration) {
+        synchronized (SURFACE_LOCK) {
+            if (publishedClusterSurface == null
+                    || publishedClusterSurface.generation != ownerGeneration) return;
+        }
+        clusterSurfaceRecoveryAttempts = 0;
     }
 
     private void requestNavigationState(@NonNull Client current) {

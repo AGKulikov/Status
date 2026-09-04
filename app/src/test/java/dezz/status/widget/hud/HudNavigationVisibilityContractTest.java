@@ -111,6 +111,29 @@ public final class HudNavigationVisibilityContractTest {
         assertTrue(state.contains("parseDirectionSigns"));
     }
 
+    @Test public void routeSummaryIsASeparateAutoHidingHudWidget() throws Exception {
+        Path root = projectRoot();
+        String types = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudElementType.java"));
+        String element = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudElementConfig.java"));
+        String canvas = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudCanvasView.java"));
+        String state = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/hud/HudNavigationState.java"));
+        String settings = read(root.resolve(
+                "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
+
+        assertTrue(types.contains("NAV_ROUTE_SUMMARY(\"Сводка маршрута · как в Навигаторе\""));
+        assertTrue(element.contains("case NAV_ROUTE_SUMMARY:"));
+        assertTrue(element.contains("hideWhenInactive\", true"));
+        assertTrue(canvas.contains("drawRouteSummary(canvas"));
+        assertTrue(canvas.contains("without the stock card's side/bottom buttons"));
+        assertTrue(state.contains("case NAV_ROUTE_SUMMARY:"));
+        assertTrue(state.contains("hasText(distance) && hasText(duration)"));
+        assertTrue(settings.contains("Кнопки Навигатора не переносятся"));
+    }
+
     private static Path projectRoot() {
         return Files.isRegularFile(Paths.get("app", "src", "main", "AndroidManifest.xml"))
                 ? Paths.get("") : Paths.get("..");

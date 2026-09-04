@@ -383,7 +383,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 infoRows[row] = spinner;
                 content.addView(spinner);
             }
-        } else if (element.type == InstrumentElementType.NAVIGATION_INFO) {
+        } else if (element.type == InstrumentElementType.NAVIGATION_INFO
+                || element.type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
             showFace = switchView("Фон блока",
                     element.options.optBoolean("showFace", true));
             showDistance = switchView("Оставшееся расстояние",
@@ -462,7 +463,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     if (showUnit != null) setOption(element, "showUnit", showUnit.isChecked());
                     if (showProgress != null) {
                         setOption(element,
-                                element.type == InstrumentElementType.NAVIGATION_INFO
+                                (element.type == InstrumentElementType.NAVIGATION_INFO
+                                        || element.type
+                                        == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY)
                                         ? "showRouteProgress" : "showProgress",
                                 showProgress.isChecked());
                     }
@@ -1059,46 +1062,53 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         }
 
         void addViews() {
-            parent.addView(section("Исходный знак Навигатора"), marginTop(12));
-            showIcon = switchView("Показывать исходный знак слева",
-                    source.options.optBoolean("showManeuverIcon", true));
-            reserveIconSpace = switchView("Сохранять место, пока знак ещё не пришёл",
-                    source.options.optBoolean("reserveManeuverIconSpace", true));
-            parent.addView(showIcon);
-            parent.addView(reserveIconSpace);
-            number("maneuverIconAreaPercent", "Ширина области знака",
-                    15, 5, 40, 1, " %");
-            number("maneuverIconScalePercent", "Размер исходного знака",
-                    100, 25, 250, 5, " %");
-            number("maneuverIconGapPx", "Расстояние от знака до данных",
-                    10, 0, 100, 1, " px");
-            color("maneuverIconBackgroundColor", "Фон области знака",
-                    "#FF2B2E35");
-            number("maneuverIconBackgroundOpacityPercent", "Непрозрачность фона знака",
-                    100, 0, 100, 1, " %");
-            number("maneuverIconCornerRadiusPx", "Скругление фона знака",
-                    12, 0, 100, 1, " px");
+            boolean routeSummary = source.type
+                    == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY;
+            if (!routeSummary) {
+                parent.addView(section("Исходный знак Навигатора"), marginTop(12));
+                showIcon = switchView("Показывать исходный знак слева",
+                        source.options.optBoolean("showManeuverIcon", true));
+                reserveIconSpace = switchView("Сохранять место, пока знак ещё не пришёл",
+                        source.options.optBoolean("reserveManeuverIconSpace", true));
+                parent.addView(showIcon);
+                parent.addView(reserveIconSpace);
+                number("maneuverIconAreaPercent", "Ширина области знака",
+                        15, 5, 40, 1, " %");
+                number("maneuverIconScalePercent", "Размер исходного знака",
+                        100, 25, 250, 5, " %");
+                number("maneuverIconGapPx", "Расстояние от знака до данных",
+                        10, 0, 100, 1, " px");
+                color("maneuverIconBackgroundColor", "Фон области знака",
+                        "#FF2B2E35");
+                number("maneuverIconBackgroundOpacityPercent", "Непрозрачность фона знака",
+                        100, 0, 100, 1, " %");
+                number("maneuverIconCornerRadiusPx", "Скругление фона знака",
+                        12, 0, 100, 1, " px");
 
-            parent.addView(section("Данные ближайшего манёвра"), marginTop(12));
-            showManeuverDetails = switchView(
-                    "Показывать указатели и дополнительную строку",
-                    source.options.optBoolean("showManeuverDetails", true));
-            parent.addView(showManeuverDetails);
-            number("maneuverDetailsHeightPercent", "Высота области",
-                    42, 20, 65, 1, " %");
-            number("maneuverDetailsGapPx", "Отступ до данных маршрута",
-                    4, 0, 100, 1, " px");
-            number("maneuverDetailRowGapPx", "Отступ дополнительной строки",
-                    2, 0, 100, 1, " px");
-            number("maneuverDetailTextSizeSp", "Размер основного текста",
-                    18, 8, 120, 1, " sp");
-            number("maneuverAuxiliaryTextSizeSp", "Размер дополнительного текста",
-                    14, 8, 120, 1, " sp");
-            color("maneuverDetailTextColor", "Цвет текста", "#FFFFFFFF");
-            color("maneuverAuxiliaryColor", "Цвет дополнительной строки", "#E60B4DB5");
+                parent.addView(section("Данные ближайшего манёвра"), marginTop(12));
+                showManeuverDetails = switchView(
+                        "Показывать указатели и дополнительную строку",
+                        source.options.optBoolean("showManeuverDetails", true));
+                parent.addView(showManeuverDetails);
+                number("maneuverDetailsHeightPercent", "Высота области",
+                        42, 20, 65, 1, " %");
+                number("maneuverDetailsGapPx", "Отступ до данных маршрута",
+                        4, 0, 100, 1, " px");
+                number("maneuverDetailRowGapPx", "Отступ дополнительной строки",
+                        2, 0, 100, 1, " px");
+                number("maneuverDetailTextSizeSp", "Размер основного текста",
+                        18, 8, 120, 1, " sp");
+                number("maneuverAuxiliaryTextSizeSp", "Размер дополнительного текста",
+                        14, 8, 120, 1, " sp");
+                color("maneuverDetailTextColor", "Цвет текста", "#FFFFFFFF");
+                color("maneuverAuxiliaryColor", "Цвет дополнительной строки", "#E60B4DB5");
 
-            parent.addView(section("Отступы знака"), marginTop(12));
-            padding("maneuverIconPadding", 5, 5, 5, 5, 160);
+                parent.addView(section("Отступы знака"), marginTop(12));
+                padding("maneuverIconPadding", 5, 5, 5, 5, 160);
+            } else {
+                parent.addView(text("Отдельная сводка как в Навигаторе — без боковых "
+                        + "и нижних кнопок.", 12, 0xFFB8C0CC), marginTop(6));
+            }
 
             parent.addView(section("Шрифты данных"), marginTop(12));
             number("distanceTextSizeSp", "Оставшееся расстояние",
@@ -1121,6 +1131,15 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     7, 0, 60, 1, " px");
             number("progressMarkerScalePercent", "Размер маркера на прогресс-баре",
                     100, 25, 250, 5, " %");
+            if (routeSummary) {
+                color("freeColor", "Свободно", "#FF72E300");
+                color("lightColor", "Небольшая пробка", "#FFFFCC00");
+                color("hardColor", "Затруднение", "#FFFF3B30");
+                color("veryHardColor", "Тяжёлая пробка", "#FFB00020");
+                color("blockedColor", "Перекрыто", "#FF7A1FA2");
+                color("unknownColor", "Нет данных", "#FF8E8E93");
+                color("markerColor", "Маркер положения", "#FFFFC400");
+            }
 
             parent.addView(section("Карточка и внутренние отступы"), marginTop(12));
             color("faceColor", "Цвет карточки", "#FF15171B");
@@ -1158,9 +1177,15 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         }
 
         void apply(@NonNull InstrumentElementConfig target) {
-            setOption(target, "showManeuverIcon", showIcon.isChecked());
-            setOption(target, "reserveManeuverIconSpace", reserveIconSpace.isChecked());
-            setOption(target, "showManeuverDetails", showManeuverDetails.isChecked());
+            if (showIcon != null) {
+                setOption(target, "showManeuverIcon", showIcon.isChecked());
+            }
+            if (reserveIconSpace != null) {
+                setOption(target, "reserveManeuverIconSpace", reserveIconSpace.isChecked());
+            }
+            if (showManeuverDetails != null) {
+                setOption(target, "showManeuverDetails", showManeuverDetails.isChecked());
+            }
             for (Map.Entry<String, SliderField> entry : numbers.entrySet()) {
                 setOption(target, entry.getKey(), entry.getValue().intValue());
             }

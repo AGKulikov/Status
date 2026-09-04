@@ -27,6 +27,19 @@ public final class FavoriteRoutesAppearanceContractTest {
         assertTrue(panel.contains("new LinearLayout.LayoutParams(iconSize, iconSize)"));
         assertTrue(panel.contains("icon.setMaxWidth(iconSize)"));
         assertTrue(panel.contains("icon.setScaleType(ImageView.ScaleType.FIT_CENTER)"));
+        assertTrue(panel.contains("label.setMinHeight(labelMinHeight)"));
+        assertTrue(panel.contains("tile.setMinimumHeight(padding * 2 + iconSize"));
+    }
+
+    @Test
+    public void unchangedSnapshotsKeepTheExistingFavoriteHierarchy() throws IOException {
+        String panel = source("dezz/status/widget/launcher/routes/FavoriteRoutesPanelView.java");
+        String proxy = source("dezz/status/widget/launcher/LauncherGlobalElementProxyView.java");
+
+        assertTrue(panel.contains("hierarchyBuilt && sameRoutes(routes, loaded)"));
+        assertTrue(panel.contains("private static boolean sameRoutes("));
+        assertTrue(panel.contains("hierarchyBuilt = true"));
+        assertTrue(proxy.contains("if (styledSource == current) return;"));
     }
 
     private static String source(String relative) throws IOException {

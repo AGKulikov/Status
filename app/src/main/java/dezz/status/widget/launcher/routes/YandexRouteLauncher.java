@@ -15,10 +15,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import dezz.status.widget.launcher.YandexWindowLauncher;
+import dezz.status.widget.navigation.NavigationBridgeContract;
+import dezz.status.widget.navigation.NavigationHudEndpointService;
 
 /** Opens a saved destination through the same ECARX window entry point as the HOME shortcut. */
 public final class YandexRouteLauncher {
     private static final long ROUTE_AFTER_WINDOW_DELAY_MS = 650L;
+    private static final long ROUTE_WINDOW_REASSERT_DELAY_MS = 220L;
+    private static final long ROUTE_WINDOW_VERIFY_DELAY_MS = 900L;
 
     private YandexRouteLauncher() {}
 
@@ -62,7 +66,15 @@ public final class YandexRouteLauncher {
                     context, route.product, deepLink, alternateDeepLink, true)) {
                 Toast.makeText(context, "Не удалось передать маршрут в Яндекс",
                         Toast.LENGTH_LONG).show();
+                return;
             }
+            Handler handler = new Handler(Looper.getMainLooper());
+            handler.postDelayed(() -> NavigationHudEndpointService.requestMainWindowMode(
+                            NavigationBridgeContract.WINDOW_MODE_FLOATING),
+                    ROUTE_WINDOW_REASSERT_DELAY_MS);
+            handler.postDelayed(() -> NavigationHudEndpointService.requestMainWindowMode(
+                            NavigationBridgeContract.WINDOW_MODE_FLOATING),
+                    ROUTE_WINDOW_VERIFY_DELAY_MS);
         }, ROUTE_AFTER_WINDOW_DELAY_MS);
         return true;
     }

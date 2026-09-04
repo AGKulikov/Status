@@ -123,18 +123,27 @@ public final class YandexWindowLauncher {
                                          @NonNull Product product,
                                          @NonNull Uri deepLink,
                                          boolean windowed) {
+        // Route ACTION_VIEW must target the same MapActivity that owns the floating task.
+        // Package-only resolution can select a full-screen routing trampoline on 30.x.
+        Target direct = product == Product.MAPS
+                ? new Target(MAPS_PACKAGE, "ru.yandex.yandexmaps.app.MapActivity")
+                : new Target(NAVIGATOR_PACKAGE, "ru.yandex.yandexmaps.app.MapActivity");
+        if (startYandexSurface(context,
+                deepLinkIntent(deepLink, direct.packageName, direct.className, windowed),
+                windowed)) return true;
         for (String packageName : packageCandidates(product)) {
-            Intent intent = deepLinkIntent(deepLink, packageName, windowed);
+            Intent intent = deepLinkIntent(deepLink, packageName, null, windowed);
             if (startYandexSurface(context, intent, windowed)) return true;
         }
         // Regional builds can register the proprietary scheme under another package name.
         return startYandexSurface(context,
-                deepLinkIntent(deepLink, null, windowed), windowed);
+                deepLinkIntent(deepLink, null, null, windowed), windowed);
     }
 
     @NonNull
     private static Intent deepLinkIntent(@NonNull Uri deepLink,
                                          @Nullable String packageName,
+                                         @Nullable String className,
                                          boolean windowed) {
         Intent intent = new Intent(Intent.ACTION_VIEW, deepLink)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
@@ -142,7 +151,11 @@ public final class YandexWindowLauncher {
                         | Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra("ddnavwin", windowed);
         if (!windowed) intent.putExtra("ddnavforcewinfull", true);
-        if (packageName != null) intent.setPackage(packageName);
+        if (packageName != null && className != null) {
+            intent.setComponent(new ComponentName(packageName, className));
+        } else if (packageName != null) {
+            intent.setPackage(packageName);
+        }
         return intent;
     }
 

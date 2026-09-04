@@ -340,6 +340,9 @@ public final class HudCanvasView extends View {
             case NAV_COMBINED:
                 drawCombinedNavigation(canvas, item, bounds, textColor, unitColor, scale);
                 return;
+            case NAV_ROUTE_SUMMARY:
+                drawRouteSummary(canvas, item, bounds, textColor, scale);
+                return;
             default:
                 drawText(canvas, item, data.textFor(item), bounds, textColor, scale);
         }
@@ -425,9 +428,9 @@ public final class HudCanvasView extends View {
             drawBitmap(canvas, nav.maneuverImage, bounds);
             return;
         }
-        // Direct snapshots carry the public semantic Action in the same atomic frame as text and
-        // distance. Only an explicitly image-only legacy element may leave the vector slot empty.
-        if (!editor && item.options.optBoolean("sourceImageOnly", false)) return;
+        // A guessed Canvas arrow can have different exit/lane geometry than Navigator. Live
+        // surfaces therefore render only Navigator's identity-keyed stock artwork.
+        if (!editor) return;
         String hint = nav == null ? "" : (nav.maneuverTitle + " " + nav.maneuverText)
                 .toLowerCase(Locale.ROOT);
         HudNavigationVisuals.Maneuver visual = HudNavigationVisuals.maneuver(
@@ -763,6 +766,7 @@ public final class HudCanvasView extends View {
         HudNavigationState nav = data.navigation();
         String distance = nav == null ? (editor ? "350 м" : "") : nav.turnDistance;
         String roadCandidate = nav == null ? (editor ? "М2" : "")
+                : nav.direct ? nav.maneuverNextRoad
                 : firstCardText(nav.maneuverNextRoad, nav.maneuverSubtext, nav.street);
         List<HudNavigationState.DirectionSignItem> directionSigns = nav == null
                 ? Collections.emptyList() : nav.maneuverDirectionSigns;
@@ -771,7 +775,7 @@ public final class HudCanvasView extends View {
                 && looksLikeRoadReference(roadCandidate)
                 ? roadCandidate : "";
         String direction = nav == null ? (editor ? "Тула" : "")
-                : firstCardText(nav.maneuverTitle, nav.maneuverText,
+                : nav.direct ? "" : firstCardText(nav.maneuverTitle, nav.maneuverText,
                         roadCandidate, nav.destination);
         boolean showDirection = item.options.optBoolean("showDirection", true);
         if (!showDirection) direction = "";
@@ -888,7 +892,7 @@ public final class HudCanvasView extends View {
                     color, badgeSize, Layout.Alignment.ALIGN_CENTER, false,
                     Math.max(600, item.fontWeight));
             detailLeft = badge.right + Math.max(3f, 5f * scale);
-        } else if (showDirection && !roadCandidate.isEmpty()
+        } else if ((nav == null || !nav.direct) && showDirection && !roadCandidate.isEmpty()
                 && !sameCardText(roadCandidate, direction)) {
             direction = direction.isEmpty() ? roadCandidate : roadCandidate + " · " + direction;
         }
@@ -923,6 +927,114 @@ public final class HudCanvasView extends View {
             if (sameCardText(value.text, text)) return true;
         }
         return false;
+    }
+
+    /** Standalone Navigator-like route summary without the stock card's side/bottom buttons. */
+    private void drawRouteSummary(Canvas canvas, HudElementConfig item, RectF bounds,
+                                  int textColor, float scale) {
+        int card = optionColor(item, "cardColor", 0xF21B1F24);
+        int opacity = clamp(item.options.optInt("cardOpacityPercent", 100), 0, 100);
+        int cardAlpha = Math.round(Color.alpha(card) * opacity / 100f
+                * item.brightness / 100f);
+        float radius = Math.max(0f, Math.min(
+                item.options.optInt("cardCornerRadiusPx", 18) * scale,
+                Math.min(bounds.width(), bounds.height()) * .5f));
+        if (item.options.optBoolean("showCardBackground", true)) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(card, cardAlpha));
+            canvas.drawRoundRect(bounds, radius, radius, paint);
+            float borderWidth = Math.max(0f,
+                    item.options.optInt("cardBorderWidthPx", 0) * scale);
+            if (borderWidth > 0f) {
+                int border = optionColor(item, "cardBorderColor", 0x00000000);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(borderWidth);
+                paint.setColor(withAlpha(border, Math.round(
+                        Color.alpha(border) * item.brightness / 100f)));
+                canvas.drawRoundRect(inset(bounds, borderWidth * .5f), radius, radius, paint);
+                paint.setStyle(Paint.Style.FILL);
+            }
+        }
+
+        RectF content = insetSides(bounds,
+                item.options.optInt("paddingLeftPx", 14) * scale,
+                item.options.optInt("paddingTopPx", 9) * scale,
+                item.options.optInt("paddingRightPx", 14) * scale,
+                item.options.optInt("paddingBottomPx", 9) * scale);
+        if (content.isEmpty()) return;
+        HudNavigationState nav = data.navigation();
+        String distance = nav == null ? (editor ? "12 км" : "") : nav.distance;
+        String arrival = nav == null ? (editor ? "20:29" : "") : nav.arrival;
+        String duration = nav == null ? (editor ? "12 мин" : "") : nav.duration;
+        if (!editor && (distance.isEmpty() || arrival.isEmpty() || duration.isEmpty())) return;
+
+        float barHeight = Math.min(content.height() * .28f, Math.max(2f,
+                item.options.optInt("progressBarHeightPx", 8) * scale));
+        float barGap = Math.max(0f,
+                item.options.optInt("progressBarTopGapPx", 7) * scale);
+        RectF metrics = new RectF(content.left, content.top, content.right,
+                Math.max(content.top, content.bottom - barHeight - barGap));
+        RectF bar = new RectF(content.left, content.bottom - barHeight,
+                content.right, content.bottom);
+        float column = metrics.width() / 3f;
+        float textSize = Math.max(8f, Math.min(
+                item.options.optInt("metricsFontSizeSp", 25) * scale,
+                metrics.height() * .72f));
+        drawStyledText(canvas, distance,
+                new RectF(metrics.left, metrics.top, metrics.left + column, metrics.bottom),
+                textColor, textSize, Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
+        drawStyledText(canvas, arrival,
+                new RectF(metrics.left + column, metrics.top,
+                        metrics.left + column * 2f, metrics.bottom),
+                textColor, textSize, Layout.Alignment.ALIGN_CENTER, false, item.fontWeight);
+        drawStyledText(canvas, duration,
+                new RectF(metrics.left + column * 2f, metrics.top, metrics.right, metrics.bottom),
+                textColor, textSize, Layout.Alignment.ALIGN_OPPOSITE, false, item.fontWeight);
+
+        float barRadius = bar.height() * .5f;
+        int completed = optionColor(item, "completedColor", 0xFF858A93);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(withAlpha(completed, Math.round(
+                Color.alpha(completed) * item.brightness / 100f)));
+        canvas.drawRoundRect(bar, barRadius, barRadius, paint);
+        double progressValue = nav == null ? .45d : nav.tripProgress;
+        if (!Double.isFinite(progressValue)) progressValue = 0d;
+        progressValue = Math.max(0d, Math.min(.98d, progressValue));
+        float markerX = bar.left + bar.width() * (float) progressValue;
+        RectF remaining = new RectF(markerX, bar.top, bar.right, bar.bottom);
+        List<HudNavigationState.TrafficRun> runs = nav == null
+                ? Collections.emptyList() : nav.trafficRuns;
+        int clip = canvas.save();
+        canvas.clipRect(remaining);
+        if (runs.isEmpty()) {
+            paint.setColor(jamColor(item, "FREE"));
+            canvas.drawRoundRect(remaining, barRadius, barRadius, paint);
+        } else {
+            int maximum = runs.get(runs.size() - 1).to;
+            for (HudNavigationState.TrafficRun run : runs) {
+                if (maximum <= 0) break;
+                RectF part = new RectF(
+                        bar.left + bar.width() * run.from / maximum,
+                        remaining.top,
+                        bar.left + bar.width() * run.to / maximum,
+                        remaining.bottom);
+                paint.setColor(jamColor(item, run.type));
+                canvas.drawRect(part, paint);
+            }
+        }
+        canvas.restoreToCount(clip);
+
+        int marker = optionColor(item, "markerColor", 0xFFFFC400);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(withAlpha(marker, Math.round(
+                Color.alpha(marker) * item.brightness / 100f)));
+        float markerHalf = Math.max(bar.height() * .9f, 4f * scale);
+        path.reset();
+        path.moveTo(markerX + markerHalf, bar.centerY());
+        path.lineTo(markerX - markerHalf * .7f, bar.centerY() - markerHalf);
+        path.lineTo(markerX - markerHalf * .7f, bar.centerY() + markerHalf);
+        path.close();
+        canvas.drawPath(path, paint);
     }
 
     @NonNull

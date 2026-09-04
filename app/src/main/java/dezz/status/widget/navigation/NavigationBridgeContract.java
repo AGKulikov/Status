@@ -7,8 +7,9 @@ package dezz.status.widget.navigation;
  * <p>Navigator initiates an explicit bind to the Natro-owned endpoint. Natro validates the
  * Binder/Messenger sending UID, exact package and signing certificate on every inbound message.
  * Navigator therefore needs no exported component and no manifest edit. The contract transports
- * navigation state and a producer-owned render surface; it never transports screenshots or
- * per-frame bitmaps.</p>
+ * navigation state and a producer-owned render surface. The only bitmap payload is one bounded
+ * stock maneuver artwork sample when the visible maneuver changes; screenshots and per-frame
+ * bitmaps are never transported.</p>
  */
 public final class NavigationBridgeContract {
     public static final int PROTOCOL_VERSION = 2;
@@ -51,6 +52,8 @@ public final class NavigationBridgeContract {
     public static final int MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH = 18;
     /** Natro forwards a bounded live camera frame from the separately authenticated HUD Speed. */
     public static final int MSG_EXTERNAL_CAMERAS = 19;
+    /** Exact, bounded stock maneuver artwork keyed to one snapshot sequence and identity. */
+    public static final int MSG_MANEUVER_ARTWORK = 20;
 
     public static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     public static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -68,6 +71,7 @@ public final class NavigationBridgeContract {
     public static final long CAP_CLUSTER_DIRECT_SURFACE = 1L << 11;
     public static final long CAP_EXTERNAL_INSTRUMENT_LAUNCHER = 1L << 12;
     public static final long CAP_EXTERNAL_CAMERA_OVERLAY = 1L << 13;
+    public static final long CAP_MANEUVER_ARTWORK = 1L << 14;
     public static final long CAP_NATRO_CONFIGURATION_HOST = 1L << 32;
     public static final long CAP_NATRO_NAVIGATION_STATE_SINK = 1L << 33;
     /** Advertise only after Natro can lease a real Surface rather than a bitmap bridge. */
@@ -75,6 +79,7 @@ public final class NavigationBridgeContract {
     public static final long CAP_NATRO_WINDOW_COMMAND_SOURCE = 1L << 35;
     public static final long CAP_NATRO_CLUSTER_SURFACE_PROVIDER = 1L << 36;
     public static final long CAP_NATRO_EXTERNAL_CAMERA_SOURCE = 1L << 37;
+    public static final long CAP_NATRO_MANEUVER_ARTWORK_SINK = 1L << 38;
 
     public static final int WINDOW_MODE_FULLSCREEN = 0;
     public static final int WINDOW_MODE_FLOATING = 1;
@@ -102,6 +107,9 @@ public final class NavigationBridgeContract {
     public static final String KEY_INSTRUMENT_DISPLAY_ID = "instrument_display_id";
     public static final String KEY_INSTRUMENT_LAUNCH_DELAY_MS = "instrument_launch_delay_ms";
     public static final String KEY_INSTRUMENT_LAUNCH_TOKEN = "instrument_launch_token";
+    public static final String KEY_MANEUVER_IDENTITY = "maneuver_identity";
+    public static final String KEY_MANEUVER_ARTWORK = "maneuver_artwork";
+    public static final String KEY_SEQUENCE = "sequence";
 
     private NavigationBridgeContract() {}
 }

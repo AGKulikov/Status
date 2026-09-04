@@ -781,7 +781,7 @@ public final class NavigationDataRepository {
      */
     @NonNull
     public static Snapshot fromDirectSnapshot(@NonNull NavigationSnapshotV2 source) {
-        return fromDirectSnapshot(source, true);
+        return fromDirectSnapshot(source, true, null);
     }
 
     /** Empty authoritative state used between bridge authentication and its first frame. */
@@ -799,6 +799,14 @@ public final class NavigationDataRepository {
     @NonNull
     public static Snapshot fromDirectSnapshot(@NonNull NavigationSnapshotV2 source,
                                               boolean sourceFresh) {
+        return fromDirectSnapshot(source, sourceFresh, null);
+    }
+
+    /** Direct snapshot with stock maneuver artwork already identity-joined by the bridge store. */
+    @NonNull
+    public static Snapshot fromDirectSnapshot(@NonNull NavigationSnapshotV2 source,
+                                              boolean sourceFresh,
+                                              @Nullable Bitmap maneuverArtwork) {
         boolean routeActive = sourceFresh && source.routeActive;
         List<TrafficLight> lights = routeActive
                 ? directTrafficLights(source) : Collections.emptyList();
@@ -811,8 +819,8 @@ public final class NavigationDataRepository {
                 routeActive ? directDuration(source.remainingDurationSeconds) : "",
                 routeActive ? directDistance(source.remainingDistanceMeters) : "",
                 PACKAGE_YANDEX_NAVIGATOR,
-                routeActive ? source.maneuverTitle : "",
-                routeActive ? source.maneuverTitle : "",
+                routeActive ? source.maneuverNextRoad : "",
+                routeActive ? source.maneuverNextRoad : "",
                 sourceFresh && source.speedLimitKmh > 0
                         ? Integer.toString(source.speedLimitKmh) : "",
                 first == null ? "" : first.color,
@@ -822,13 +830,15 @@ public final class NavigationDataRepository {
                 routeActive ? source.maneuverSubtext : "",
                 sourceFresh ? source.street : "",
                 routeActive ? source.destination : "",
-                routeActive ? directDistance(source.maneuverDistanceMeters) : "",
+                routeActive && !source.maneuverDisplayDistance.trim().isEmpty()
+                        ? source.maneuverDisplayDistance
+                        : routeActive ? directDistance(source.maneuverDistanceMeters) : "",
                 "", "", lights, lanes, laneDistance,
                 routeActive ? source.laneDistanceMeters : Double.NaN,
                 Double.NaN, Double.NaN, routeActive,
                 Collections.emptyList(), lanes, "", "", laneDistance,
                 routeActive ? "true" : "", laneAvailable, routeActive,
-                null, null, null, null);
+                routeActive ? maneuverArtwork : null, null, null, null);
     }
 
     @NonNull

@@ -220,7 +220,7 @@ public final class HudNavigationState {
         return fromBridge(source, geometry, previous, null);
     }
 
-    /** Direct route values. The legacy MConfig bitmap argument is ignored because it has no key. */
+    /** Direct route values with artwork keyed to this snapshot's maneuver identity. */
     @NonNull
     public static HudNavigationState fromBridge(@NonNull NavigationSnapshotV2 source,
             @Nullable NavigationRouteGeometryV2 geometry,
@@ -268,7 +268,9 @@ public final class HudNavigationState {
                 routeActive ? source.maneuverAuxiliaryManeuverType : "",
                 routeActive ? formatDistance(source.maneuverAuxiliaryDistanceMeters) : "",
                 source.street, routeActive ? source.destination : "",
-                routeActive ? formatDistance(source.maneuverDistanceMeters) : "",
+                routeActive && !source.maneuverDisplayDistance.trim().isEmpty()
+                        ? source.maneuverDisplayDistance
+                        : routeActive ? formatDistance(source.maneuverDistanceMeters) : "",
                 routeActive ? formatDistance(source.remainingDistanceMeters) : "",
                 routeActive ? formatDuration(source.remainingDurationSeconds) : "",
                 routeActive ? formatDuration(source.trafficJamDurationSeconds) : "",
@@ -284,9 +286,7 @@ public final class HudNavigationState {
                 first == null ? "" : first.color, first == null ? "" : first.countdown,
                 first == null ? "" : first.arrow,
                 routeActive && !lights.isEmpty(), lights, runs, progress,
-                // An unkeyed MConfig bitmap can belong to the previous route instruction.
-                // Direct mode therefore renders the semantic action from this exact snapshot.
-                null,
+                routeActive ? sourceManeuverImage : null,
                 null, null, null, source.lanesJson, source.trafficLightsJson,
                 source.maneuverDirectionSignsJson,
                 routeActive ? geometry : null);
@@ -403,9 +403,9 @@ public final class HudNavigationState {
     public boolean hasDataFor(@NonNull HudElementType type) {
         switch (type) {
             case NAV_MANEUVER_ARROW:
-                return routeActive && (maneuverImage != null
-                        || meaningfulManeuverType(maneuverType)
-                        || (!direct && (hasText(maneuverTitle) || hasText(maneuverText))));
+                return routeActive && (direct ? maneuverImage != null
+                        : maneuverImage != null || meaningfulManeuverType(maneuverType)
+                        || hasText(maneuverTitle) || hasText(maneuverText));
             case NAV_MANEUVER_TITLE:
                 return routeActive && (hasText(maneuverTitle) || hasText(maneuverText));
             case NAV_MANEUVER_SUBTEXT:
@@ -430,10 +430,14 @@ public final class HudNavigationState {
             case NAV_LANE_DISTANCE:
                 return routeActive && laneAvailable && hasText(laneDistance);
             case NAV_COMBINED:
-                return routeActive && (maneuverImage != null
-                        || meaningfulManeuverType(maneuverType)
+                return routeActive && (direct
+                        ? maneuverImage != null && hasText(turnDistance)
+                        : maneuverImage != null || meaningfulManeuverType(maneuverType)
                         || hasText(maneuverTitle) || hasText(maneuverText)
                         || hasText(turnDistance));
+            case NAV_ROUTE_SUMMARY:
+                return routeActive && hasText(distance) && hasText(duration)
+                        && hasText(arrival);
             case NAV_TRIP_PROGRESS:
                 return routeActive && (Double.isFinite(tripProgress)
                         || hasText(distance) || hasText(duration) || hasText(arrival));

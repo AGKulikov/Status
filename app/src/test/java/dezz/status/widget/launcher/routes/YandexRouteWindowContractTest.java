@@ -26,6 +26,10 @@ public final class YandexRouteWindowContractTest {
         assertTrue(source.contains("windowProduct(route.product), false"));
         assertTrue(source.contains("postDelayed"));
         assertTrue(source.contains("alternateDeepLink, true)"));
+        assertTrue(source.contains("ROUTE_WINDOW_REASSERT_DELAY_MS = 220L"));
+        assertTrue(source.contains("ROUTE_WINDOW_VERIFY_DELAY_MS = 900L"));
+        assertTrue(occurrences(source,
+                "NavigationHudEndpointService.requestMainWindowMode(") == 2);
     }
 
     @Test
@@ -42,6 +46,9 @@ public final class YandexRouteWindowContractTest {
         assertTrue(occurrences(launcher, "public static boolean launchDeepLink(") == 1);
         assertTrue(launcher.contains("@NonNull Uri deepLink,"));
         assertTrue(launcher.contains("boolean windowed)"));
+        assertTrue(launcher.contains(
+                "new Target(NAVIGATOR_PACKAGE, \"ru.yandex.yandexmaps.app.MapActivity\")"));
+        assertTrue(launcher.contains("intent.setComponent(new ComponentName(packageName, className))"));
         assertTrue(launcher.contains(".putExtra(\"ddnavwin\", windowed)"));
         assertTrue(launcher.contains(
                 "if (!windowed) intent.putExtra(\"ddnavforcewinfull\", true)"));

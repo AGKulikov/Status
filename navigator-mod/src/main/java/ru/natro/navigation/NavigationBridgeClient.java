@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -51,6 +52,7 @@ final class NavigationBridgeClient {
     private static final int MSG_CLUSTER_SURFACE_LOST = 17;
     private static final int MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH = 18;
     private static final int MSG_EXTERNAL_CAMERAS = 19;
+    private static final int MSG_MANEUVER_ARTWORK = 20;
 
     private static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     private static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -64,6 +66,7 @@ final class NavigationBridgeClient {
     private static final long CAP_CLUSTER_DIRECT_SURFACE = 1L << 11;
     private static final long CAP_EXTERNAL_INSTRUMENT_LAUNCHER = 1L << 12;
     private static final long CAP_EXTERNAL_CAMERA_OVERLAY = 1L << 13;
+    private static final long CAP_MANEUVER_ARTWORK = 1L << 14;
 
     private static final String KEY_PROTOCOL_VERSION = "protocol_version";
     private static final String KEY_SESSION_ID = "session_id";
@@ -83,6 +86,9 @@ final class NavigationBridgeClient {
     private static final String KEY_INSTRUMENT_LAUNCH_DELAY_MS =
             "instrument_launch_delay_ms";
     private static final String KEY_INSTRUMENT_LAUNCH_TOKEN = "instrument_launch_token";
+    private static final String KEY_MANEUVER_IDENTITY = "maneuver_identity";
+    private static final String KEY_MANEUVER_ARTWORK = "maneuver_artwork";
+    private static final String KEY_SEQUENCE = "sequence";
     private static final String INSTRUMENT_ACTIVITY =
             "dezz.status.widget.instrument.InstrumentPanelActivity";
 
@@ -231,6 +237,11 @@ final class NavigationBridgeClient {
             @Override public void onDiagnostic(String detail) {
                 sendDiagnostic(detail);
             }
+
+            @Override public void onManeuverArtwork(long sequence, String maneuverIdentity,
+                                                     Bitmap artwork) {
+                sendManeuverArtwork(sequence, maneuverIdentity, artwork);
+            }
         });
     }
 
@@ -340,7 +351,8 @@ final class NavigationBridgeClient {
                         | CAP_CLUSTER_INDEPENDENT_MAP_WINDOW
                         | CAP_CLUSTER_DIRECT_SURFACE
                         | CAP_EXTERNAL_INSTRUMENT_LAUNCHER
-                        | CAP_EXTERNAL_CAMERA_OVERLAY);
+                        | CAP_EXTERNAL_CAMERA_OVERLAY
+                        | CAP_MANEUVER_ARTWORK);
         Message hello = Message.obtain(null, MSG_HELLO);
         hello.replyTo = callbacks;
         hello.setData(data);
@@ -476,6 +488,25 @@ final class NavigationBridgeClient {
         data.putString(KEY_SESSION_ID, sessionId);
         data.putString(key, value);
         Message state = Message.obtain(null, what);
+        state.replyTo = callbacks;
+        state.setData(data);
+        try {
+            current.send(state);
+        } catch (RemoteException failure) {
+            disconnectAndRetry();
+        }
+    }
+
+    private void sendManeuverArtwork(long sequence, String maneuverIdentity, Bitmap artwork) {
+        Messenger current = remote;
+        if (current == null || sequence <= 0L || maneuverIdentity == null
+                || maneuverIdentity.isEmpty() || artwork == null || artwork.isRecycled()) return;
+        Bundle data = new Bundle();
+        data.putString(KEY_SESSION_ID, sessionId);
+        data.putLong(KEY_SEQUENCE, sequence);
+        data.putString(KEY_MANEUVER_IDENTITY, maneuverIdentity);
+        data.putParcelable(KEY_MANEUVER_ARTWORK, artwork);
+        Message state = Message.obtain(null, MSG_MANEUVER_ARTWORK);
         state.replyTo = callbacks;
         state.setData(data);
         try {

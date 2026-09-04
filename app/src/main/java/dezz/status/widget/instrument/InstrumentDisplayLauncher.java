@@ -52,7 +52,42 @@ public final class InstrumentDisplayLauncher {
         Context app = applicationContext(context);
         InstrumentPanelStore store = new InstrumentPanelStore(app);
         if (store.isEnabled() && store.isAutostart()) {
-            launch(app);
+            launchCold(app);
+        }
+    }
+
+    /**
+     * A lifecycle restore starts from a cold/empty instrument task, so the Settings-only
+     * force-stop hand-off has nothing useful to reset. Starting the panel directly also avoids
+     * Android 9 background-activity throttling of Navigator's delayed launch after Natro has
+     * force-stopped itself; the independent Surface can then wait safely for Navigator's bridge.
+     */
+    private static void launchCold(@NonNull Context app) {
+        if (!new InstrumentPanelStore(app).isEnabled()) return;
+        NavigationHudEndpointService.ensureClusterEndpointStarted(app);
+        if (InstrumentPanelActivity.isActive()) {
+            InstrumentPanelActivity.requestReload();
+            return;
+        }
+        if (!LAUNCH_PENDING.compareAndSet(false, true)) return;
+        try {
+            DIM_LANE.execute(() -> {
+                try {
+                    switchDimMode(app, DIM_NAVIGATION_MODE);
+                    SystemClock.sleep(DIM_MODE_TO_WAKE_MS);
+                    sendDimWake(app);
+                    DiagnosticJournal.info("instrument-panel",
+                            "cold lifecycle restore uses direct DIM launch");
+                    postStart(app, 0, DIM_WAKE_TO_TASK_RESET_MS);
+                } catch (RuntimeException failure) {
+                    LAUNCH_PENDING.set(false);
+                    Log.w(TAG, "Cold DIM launch sequence failed", failure);
+                    postStart(app, 0, 0L);
+                }
+            });
+        } catch (RejectedExecutionException saturated) {
+            LAUNCH_PENDING.set(false);
+            Log.w(TAG, "Cold DIM launch queue is full", saturated);
         }
     }
 

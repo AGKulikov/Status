@@ -120,7 +120,7 @@ public final class LauncherGlobalElementProxyView extends View {
     /** Drops style/gesture ownership when a rebuilt panel reuses the same stable element ID. */
     public void onSourceRebound() {
         View current = sourceView();
-        if (styledSource == null || styledSource == current) return;
+        if (styledSource == current) return;
         cancelForwardedGesture();
         restoreOriginalStyles();
         marqueeStates.clear();

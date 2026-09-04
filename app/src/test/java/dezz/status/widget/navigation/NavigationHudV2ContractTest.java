@@ -1453,6 +1453,35 @@ public final class NavigationHudV2ContractTest {
         assertTrue(canvas.contains("Paint.SUBPIXEL_TEXT_FLAG"));
     }
 
+    @Test public void exactVisibleManeuverArtworkIsIdentityKeyedAndNeverGuessed()
+            throws Exception {
+        Path root = sourceRoot();
+        String contract = read(root.resolve("navigation/NavigationBridgeContract.java"));
+        String endpoint = read(root.resolve("navigation/NavigationHudEndpointService.java"));
+        String store = read(root.resolve("navigation/NavigationBridgeStateStore.java"));
+        String runtime = read(root.resolve("hud/HudRuntimeData.java"));
+        String canvas = read(root.resolve("hud/HudCanvasView.java"));
+        String cluster = read(root.resolve("instrument/InstrumentClusterView.java"));
+        String publisher = read(navigatorModRoot().resolve("NavigatorStatePublisher.java"));
+        String client = read(navigatorModRoot().resolve("NavigationBridgeClient.java"));
+
+        assertTrue(contract.contains("MSG_MANEUVER_ARTWORK = 20"));
+        assertTrue(contract.contains("KEY_MANEUVER_ARTWORK"));
+        assertTrue(endpoint.contains("acceptManeuverArtwork(current, message.getData())"));
+        assertTrue(store.contains("publishManeuverArtwork("));
+        assertTrue(store.contains("identity.equals(current.maneuverIdentity)"));
+        assertTrue(store.contains("maneuverArtworkFor("));
+        assertTrue(runtime.contains("NavigationBridgeStateStore.maneuverArtworkFor(direct)"));
+        assertTrue(publisher.contains("image_maneuverballoon_maneuver"));
+        assertTrue(publisher.contains("distanceMatches(displayDistance, expectedDistanceMeters)"));
+        assertTrue(publisher.contains("captureStockManeuverArtwork(imageView)"));
+        assertTrue(client.contains("sendManeuverArtwork(sequence, maneuverIdentity, artwork)"));
+        assertTrue(canvas.contains("if (!editor) return;"));
+        assertFalse(cluster.contains("semanticIconAvailable"));
+        assertFalse(cluster.contains(
+                "drawSemanticManeuver(canvas, navigation.maneuverType"));
+    }
+
     @Test public void sharpnessAuditHasNoRepeatedNavigationBitmapResize() throws Exception {
         Path project = projectRoot();
         Path navigator = navigatorModRoot();

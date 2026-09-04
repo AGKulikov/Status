@@ -338,9 +338,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         NavigationRouteGeometryV2 geometry = NavigationBridgeStateStore.routeGeometry();
         navigationGeometry = accepted != null && geometry != null
                 && geometry.routeEpoch == accepted.routeEpoch ? geometry : null;
-        // MConfig's bitmap cache has no route/maneuver identity and can outlive the instruction
-        // which produced it. Never attach that old image to a newer direct snapshot.
-        navigationManeuverImage = null;
+        // Artwork is joined only by the bridge store after matching this exact maneuver identity.
+        navigationManeuverImage = accepted == null
+                ? null : NavigationBridgeStateStore.maneuverArtworkFor(accepted);
         if (accepted != null) {
             long delay = accepted.sourceTimestampMs + NAVIGATION_FRESH_MS - now;
             postDelayed(navigationExpiry, Math.max(1L, delay));
@@ -457,6 +457,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                                    @NonNull InstrumentElementConfig element,
                                    @NonNull RectF bounds) {
         if (element.type == InstrumentElementType.NAVIGATION_INFO
+                || element.type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY
                 || element.type == InstrumentElementType.TRAFFIC_JAM) return;
         InstrumentStyleFamily style = element.style;
         int alpha = Math.round(255f * element.opacityPercent / 100f);
@@ -682,6 +683,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 drawInfoBlock(canvas, runtime, bounds);
                 break;
             case NAVIGATION_INFO:
+                drawNavigationInfo(canvas, runtime, bounds, navigationSnapshot);
+                break;
+            case NAVIGATION_ROUTE_SUMMARY:
                 drawNavigationInfo(canvas, runtime, bounds, navigationSnapshot);
                 break;
             case TRAFFIC_JAM:
@@ -1030,6 +1034,10 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         if (navigation == null) return;
         runtime.updateNavigation(navigation, navigationGeometry);
         InstrumentElementConfig element = runtime.config;
+        if (element.type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY
+                && (runtime.navigationRemainingDistance.isEmpty()
+                || runtime.navigationArrival.isEmpty()
+                || runtime.navigationDuration.isEmpty())) return;
         int alpha = Math.round(255f * element.opacityPercent / 100f);
         if (option(element, "showFace", true)) {
             int faceColor = navigationColor(element.options.optString(
@@ -1071,10 +1079,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         boolean showIcon = option(element, "showManeuverIcon", true);
         boolean sourceIconAvailable = navigationManeuverImage != null
                 && !navigationManeuverImage.isRecycled();
-        boolean semanticIconAvailable = hasManeuverAction(navigation.maneuverType);
         boolean reserveIcon = option(element, "reserveManeuverIconSpace", true);
         RectF metricsArea = new RectF(content);
-        if (showIcon && (sourceIconAvailable || semanticIconAvailable || reserveIcon)) {
+        if (showIcon && (sourceIconAvailable || reserveIcon)) {
             float iconWidth = content.width() * Math.max(5, Math.min(40,
                     element.options.optInt("maneuverIconAreaPercent", 15))) / 100f;
             RectF iconArea = new RectF(content.left, content.top,
@@ -1100,17 +1107,6 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                         element.options.optInt("maneuverIconScalePercent", 100))) / 100f;
                 iconTarget = scaleAroundCenter(iconTarget, iconScale, iconArea);
                 drawSourceBitmap(canvas, navigationManeuverImage, iconTarget, alpha);
-            } else if (semanticIconAvailable) {
-                RectF iconTarget = insetSides(iconArea,
-                        element.options.optInt("maneuverIconPaddingLeftPx", 5),
-                        element.options.optInt("maneuverIconPaddingTopPx", 5),
-                        element.options.optInt("maneuverIconPaddingRightPx", 5),
-                        element.options.optInt("maneuverIconPaddingBottomPx", 5));
-                int iconColor = navigationColor(element.options.optString(
-                        "maneuverIconColor", "#FFFFFFFF"), Color.WHITE);
-                drawSemanticManeuver(canvas, navigation.maneuverType, iconTarget,
-                        withAlpha(iconColor, Math.round(Color.alpha(iconColor)
-                                * alpha / 255f)));
             }
             metricsArea.left = Math.min(metricsArea.right,
                     iconArea.right + Math.max(0,
@@ -1505,7 +1501,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         routeBarRect.set(bounds);
         float radius = Math.min(routeBarRect.height() * .5f, Math.max(0f,
                 element.options.optInt("progressBarCornerRadiusPx", 7)));
-        int unknownColor = trafficColor("UNKNOWN", navigationProfile);
+        int unknownColor = routeTrafficColor("UNKNOWN", navigationProfile, element);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(withAlpha(unknownColor, Math.min(alpha, 185)));
         canvas.drawRoundRect(routeBarRect, radius, radius, paint);
@@ -1521,7 +1517,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 float from = Math.max(0f, Math.min(1f, run.fromMeters / maximumMeters));
                 float to = Math.max(from, Math.min(1f, run.toMeters / maximumMeters));
                 if (to <= from) continue;
-                paint.setColor(withAlpha(trafficColor(run.type, navigationProfile), alpha));
+                paint.setColor(withAlpha(routeTrafficColor(
+                        run.type, navigationProfile, element), alpha));
                 canvas.drawRect(routeBarRect.left + routeBarRect.width() * from,
                         routeBarRect.top,
                         routeBarRect.left + routeBarRect.width() * to,
@@ -1566,8 +1563,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         paint.setColor(withAlpha(0xFF111318, alpha));
         canvas.drawPath(routeProgressPath, paint);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(withAlpha(navigationColor(navigationProfile.cursorColor,
-                0xFFFFC400), alpha));
+        paint.setColor(withAlpha(navigationColor(element.options.optString(
+                "markerColor", navigationProfile.cursorColor), 0xFFFFC400), alpha));
         canvas.drawPath(routeProgressPath, paint);
         paint.setStrokeJoin(Paint.Join.MITER);
     }
@@ -2022,6 +2019,20 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         return navigationColor(profile.trafficUnknownColor, 0xFF8A9099);
     }
 
+    private static int routeTrafficColor(
+            @NonNull String type,
+            @NonNull NavigationIntegrationConfig.MapProfile profile,
+            @NonNull InstrumentElementConfig element) {
+        String key = "UNKNOWN".equals(type) ? "unknownColor"
+                : "FREE".equals(type) ? "freeColor"
+                : "LIGHT".equals(type) ? "lightColor"
+                : "HARD".equals(type) ? "hardColor"
+                : "VERY_HARD".equals(type) ? "veryHardColor"
+                : "BLOCKED".equals(type) ? "blockedColor" : "unknownColor";
+        int fallback = trafficColor(type, profile);
+        return navigationColor(element.options.optString(key, ""), fallback);
+    }
+
     private static int navigationColor(@Nullable String raw, int fallback) {
         if (raw == null || raw.trim().isEmpty()) return fallback;
         try {
@@ -2135,10 +2146,10 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 navigationRemainingDistance = distanceText(value.remainingDistanceMeters);
                 navigationArrival = arrivalText(value.arrivalEpochMs);
                 navigationDuration = durationText(value.remainingDurationSeconds);
-                navigationTurnDistance = distanceText(value.maneuverDistanceMeters);
-                navigationCardText = firstNavigationCardText(value.maneuverNextRoad,
-                        value.maneuverSubtext, value.maneuverTitle, value.street,
-                        value.destination);
+                navigationTurnDistance = value.maneuverDisplayDistance.trim().isEmpty()
+                        ? distanceText(value.maneuverDistanceMeters)
+                        : value.maneuverDisplayDistance;
+                navigationCardText = value.maneuverNextRoad;
                 navigationDirectionSigns = parseManeuverDirectionSigns(
                         value.maneuverDirectionSignsJson);
                 navigationAuxiliaryText = value.maneuverAuxiliaryText;

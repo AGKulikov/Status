@@ -29,6 +29,9 @@ public final class InstrumentElementConfig {
         width = type.defaultWidth;
         height = type.defaultHeight;
         if (type == InstrumentElementType.TRAFFIC_JAM) applyTrafficJamDefaults();
+        if (type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
+            applyRouteSummaryDefaults();
+        }
     }
 
     @NonNull
@@ -60,7 +63,13 @@ public final class InstrumentElementConfig {
         responseMillis = clamp(responseMillis, 0, 500);
         opacityPercent = clamp(opacityPercent, 10, 100);
         if (options == null || options.toString().length() > 32_768) options = new JSONObject();
-        if (type == InstrumentElementType.NAVIGATION_INFO) normalizeNavigationInfoOptions();
+        if (type == InstrumentElementType.NAVIGATION_INFO
+                || type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
+            normalizeNavigationInfoOptions();
+        }
+        if (type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
+            normalizeRouteSummaryOptions();
+        }
         if (type == InstrumentElementType.TRAFFIC_JAM) normalizeTrafficJamOptions();
     }
 
@@ -78,6 +87,46 @@ public final class InstrumentElementConfig {
             options.put("contentPaddingBottomPx", 5);
             options.put("textSizeSp", 30);
             options.put("textColor", "#FFFFFFFF");
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void applyRouteSummaryDefaults() {
+        try {
+            options.put("showFace", true);
+            options.put("showDistance", true);
+            options.put("showEta", true);
+            options.put("showDuration", true);
+            options.put("showRouteProgress", true);
+            options.put("showManeuverIcon", false);
+            options.put("reserveManeuverIconSpace", false);
+            options.put("showManeuverDetails", false);
+            options.put("contentPaddingLeftPx", 14);
+            options.put("contentPaddingTopPx", 9);
+            options.put("contentPaddingRightPx", 14);
+            options.put("contentPaddingBottomPx", 9);
+            options.put("metricGapPx", 10);
+            options.put("distanceTextSizeSp", 25);
+            options.put("arrivalTextSizeSp", 25);
+            options.put("durationTextSizeSp", 25);
+            options.put("metricsVerticalPercent", 46);
+            options.put("progressBarHeightPx", 8);
+            options.put("progressBarTopGapPx", 7);
+            options.put("progressBarCornerRadiusPx", 4);
+            options.put("progressMarkerScalePercent", 100);
+            options.put("faceColor", "#F21B1F24");
+            options.put("faceOpacityPercent", 100);
+            options.put("faceCornerRadiusPx", 18);
+            options.put("faceBorderColor", "#00000000");
+            options.put("faceBorderWidthPx", 0);
+            options.put("freeColor", "#FF72E300");
+            options.put("lightColor", "#FFFFCC00");
+            options.put("hardColor", "#FFFF3B30");
+            options.put("veryHardColor", "#FFB00020");
+            options.put("blockedColor", "#FF7A1FA2");
+            options.put("unknownColor", "#FF8E8E93");
+            options.put("markerColor", "#FFFFC400");
         } catch (JSONException impossible) {
             throw new IllegalStateException(impossible);
         }
@@ -158,6 +207,29 @@ public final class InstrumentElementConfig {
                     options.optInt("faceCornerRadiusPx", 18), 0, 160));
             options.put("faceBorderWidthPx", clamp(
                     options.optInt("faceBorderWidthPx", 0), 0, 24));
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void normalizeRouteSummaryOptions() {
+        try {
+            options.put("showManeuverIcon", false);
+            options.put("reserveManeuverIconSpace", false);
+            options.put("showManeuverDetails", false);
+            String[][] colors = new String[][]{
+                    {"freeColor", "#FF72E300"},
+                    {"lightColor", "#FFFFCC00"},
+                    {"hardColor", "#FFFF3B30"},
+                    {"veryHardColor", "#FFB00020"},
+                    {"blockedColor", "#FF7A1FA2"},
+                    {"unknownColor", "#FF8E8E93"},
+                    {"markerColor", "#FFFFC400"}
+            };
+            for (String[] color : colors) {
+                String value = options.optString(color[0], color[1]).trim();
+                options.put(color[0], value.length() <= 32 ? value : color[1]);
+            }
         } catch (JSONException impossible) {
             throw new IllegalStateException(impossible);
         }

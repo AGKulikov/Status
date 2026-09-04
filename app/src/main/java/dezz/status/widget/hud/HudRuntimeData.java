@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -404,13 +405,11 @@ public final class HudRuntimeData {
                 return navigation == null ? "—" : emptyDash(navigation.laneDistance);
             case NAV_COMBINED:
                 if (navigation == null) return "Маршрут не активен";
-                String direction = firstNonEmpty(navigation.maneuverTitle,
-                        navigation.maneuverText,
-                        firstNonEmpty(navigation.maneuverSubtext, navigation.street, ""));
-                String road = firstNonEmpty(navigation.maneuverSubtext,
-                        navigation.street, "");
-                if (road.equals(direction)) road = "";
-                return join(navigation.turnDistance, join(road, direction, " · "), "\n");
+                return join(navigation.turnDistance, navigation.maneuverNextRoad, "\n");
+            case NAV_ROUTE_SUMMARY:
+                if (navigation == null) return "—";
+                return join(navigation.distance,
+                        join(navigation.arrival, navigation.duration, " · "), " · ");
             case NAV_TRIP_PROGRESS:
                 if (navigation == null) return "—";
                 String mode = item.options.optString("progressMode", "COMBINED");
@@ -451,7 +450,8 @@ public final class HudRuntimeData {
     }
 
     public double numericValue(@NonNull HudElementConfig item) {
-        if (item.type == HudElementType.NAV_TRIP_PROGRESS && navigation != null) {
+        if ((item.type == HudElementType.NAV_TRIP_PROGRESS
+                || item.type == HudElementType.NAV_ROUTE_SUMMARY) && navigation != null) {
             return navigation.tripProgress;
         }
         if (item.type == HudElementType.NAV_SPEED && navigation != null
@@ -762,6 +762,8 @@ public final class HudRuntimeData {
                 || !NavigationBridgeStateStore.sessionId().isEmpty();
         NavigationRouteGeometryV2 directRoute = direct == null
                 ? null : NavigationBridgeStateStore.routeGeometry();
+        Bitmap directManeuverArtwork = direct == null
+                ? null : NavigationBridgeStateStore.maneuverArtworkFor(direct);
         HudNavigationState previous = navigation;
         try {
             worker.execute(() -> {
@@ -769,7 +771,8 @@ public final class HudRuntimeData {
                 boolean directFresh = direct != null && direct.isFreshAt(
                         System.currentTimeMillis(), DIRECT_NAVIGATION_FRESH_MS);
                 if (directFresh) {
-                    resolved = HudNavigationState.fromBridge(direct, directRoute, previous);
+                    resolved = HudNavigationState.fromBridge(
+                            direct, directRoute, previous, directManeuverArtwork);
                 } else if (!directSource) {
                     NavigationDataRepository.Snapshot legacy = null;
                     try { legacy = NavigationDataRepository.read(context); }

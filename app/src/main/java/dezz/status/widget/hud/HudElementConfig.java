@@ -160,6 +160,31 @@ public final class HudElementConfig {
                     options.put("roadBadgePaddingHorizontalPx", 5);
                     options.put("roadBadgePaddingVerticalPx", 2);
                     break;
+                case NAV_ROUTE_SUMMARY:
+                    options.put("hideWhenInactive", true);
+                    options.put("hideWhenEmpty", true);
+                    options.put("showCardBackground", true);
+                    options.put("cardColor", "#F21B1F24");
+                    options.put("cardOpacityPercent", 100);
+                    options.put("cardCornerRadiusPx", 18);
+                    options.put("cardBorderColor", "#00000000");
+                    options.put("cardBorderWidthPx", 0);
+                    options.put("paddingLeftPx", 14);
+                    options.put("paddingTopPx", 9);
+                    options.put("paddingRightPx", 14);
+                    options.put("paddingBottomPx", 9);
+                    options.put("metricsFontSizeSp", 25);
+                    options.put("progressBarHeightPx", 8);
+                    options.put("progressBarTopGapPx", 7);
+                    options.put("freeColor", "#FF72E300");
+                    options.put("lightColor", "#FFFFCC00");
+                    options.put("hardColor", "#FFFF3B30");
+                    options.put("veryHardColor", "#FFB00020");
+                    options.put("blockedColor", "#FF7A1FA2");
+                    options.put("unknownColor", "#FF8E8E93");
+                    options.put("completedColor", "#FF858A93");
+                    options.put("markerColor", "#FFFFC400");
+                    break;
                 case NAV_LANES:
                     options.put("laneDistancePosition", "BOTTOM");
                     options.put("laneThresholdMeters", 700);
@@ -323,6 +348,9 @@ public final class HudElementConfig {
         if (type == HudElementType.NAV_COMBINED) {
             normalizeCombinedNavigationOptions();
         }
+        if (type == HudElementType.NAV_ROUTE_SUMMARY) {
+            normalizeRouteSummaryOptions();
+        }
         if (type == HudElementType.NAV_TRAFFIC_JAM) {
             normalizeTrafficJamOptions();
         }
@@ -409,6 +437,48 @@ public final class HudElementConfig {
             options.put("cardBorderColor", bounded(
                     options.optString("cardBorderColor", "#00000000"),
                     32, "#00000000"));
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void normalizeRouteSummaryOptions() {
+        try {
+            options.put("hideWhenInactive", true);
+            options.put("hideWhenEmpty", true);
+            options.put("cardOpacityPercent", clamp(
+                    options.optInt("cardOpacityPercent", 100), 0, 100));
+            options.put("cardCornerRadiusPx", clamp(
+                    options.optInt("cardCornerRadiusPx", 18), 0, 160));
+            options.put("cardBorderWidthPx", clamp(
+                    options.optInt("cardBorderWidthPx", 0), 0, 24));
+            for (String key : new String[]{"paddingLeftPx", "paddingTopPx",
+                    "paddingRightPx", "paddingBottomPx"}) {
+                int fallback = key.endsWith("LeftPx") || key.endsWith("RightPx") ? 14 : 9;
+                options.put(key, clamp(options.optInt(key, fallback), 0, 160));
+            }
+            options.put("metricsFontSizeSp", clamp(
+                    options.optInt("metricsFontSizeSp", 25), 8, 120));
+            options.put("progressBarHeightPx", clamp(
+                    options.optInt("progressBarHeightPx", 8), 2, 48));
+            options.put("progressBarTopGapPx", clamp(
+                    options.optInt("progressBarTopGapPx", 7), 0, 80));
+            String[][] colors = new String[][]{
+                    {"cardColor", "#F21B1F24"},
+                    {"cardBorderColor", "#00000000"},
+                    {"freeColor", "#FF72E300"},
+                    {"lightColor", "#FFFFCC00"},
+                    {"hardColor", "#FFFF3B30"},
+                    {"veryHardColor", "#FFB00020"},
+                    {"blockedColor", "#FF7A1FA2"},
+                    {"unknownColor", "#FF8E8E93"},
+                    {"completedColor", "#FF858A93"},
+                    {"markerColor", "#FFFFC400"}
+            };
+            for (String[] color : colors) {
+                options.put(color[0], bounded(
+                        options.optString(color[0], color[1]), 32, color[1]));
+            }
         } catch (JSONException impossible) {
             throw new IllegalStateException(impossible);
         }

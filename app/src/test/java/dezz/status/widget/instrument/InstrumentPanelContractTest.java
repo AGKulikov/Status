@@ -170,6 +170,8 @@ public final class InstrumentPanelContractTest {
                 + "NavigationHudEndpointService.java"));
         String renderer = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
                 + "InstrumentClusterView.java"));
+        String launcher = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentDisplayLauncher.java"));
 
         assertTrue(repository.contains("ownerMetrics"));
         assertTrue(repository.contains("reconcileSubscriptionLocked"));
@@ -195,10 +197,24 @@ public final class InstrumentPanelContractTest {
         assertTrue(panel.contains("scheduleColdLeaseRetry()"));
         assertTrue(panel.contains("COLD_LEASE_FAST_RETRY_MS = 150L"));
         assertTrue(panel.contains("COLD_LEASE_SLOW_RETRY_MS = 1_000L"));
+        assertTrue(panel.contains("mapTexture.isAvailable()"));
+        assertTrue(panel.contains("mapTexture.getSurfaceTexture()"));
+        assertTrue(panel.contains("mapSurface = new Surface(texture)"));
         assertFalse(panel.contains("|| !attached || !windowVisible"));
         assertTrue(activity.contains("ensureClusterEndpointStarted(this)"));
         assertTrue(endpoint.contains("ACTION_KEEP_CLUSTER_ENDPOINT"));
         assertTrue(endpoint.contains("stopClusterEndpointIfIdle()"));
+        assertTrue(endpoint.contains("recoverClusterSurface(failedClusterGeneration)"));
+        assertTrue(endpoint.contains("MAX_CLUSTER_SURFACE_RECOVERY_ATTEMPTS = 6"));
+        assertTrue(endpoint.contains("++nextSurfaceGeneration"));
+        assertTrue(endpoint.contains("resetClusterSurfaceRecovery(next.generation)"));
+        assertTrue(launcher.contains("launchCold(app);"));
+        String coldLaunch = launcher.substring(
+                launcher.indexOf("private static void launchCold"),
+                launcher.indexOf("public static void apply"));
+        assertTrue(coldLaunch.contains("postStart(app, 0, DIM_WAKE_TO_TASK_RESET_MS)"));
+        assertFalse(coldLaunch.contains("postExternalLaunch"));
+        assertFalse(coldLaunch.contains("FORCE_STOP_COMMAND"));
         assertFalse(panel.contains("Bitmap.createBitmap"));
         assertTrue(renderer.contains("staticLayerDirty"));
         assertTrue(renderer.contains("Choreographer.FrameCallback"));
@@ -206,6 +222,29 @@ public final class InstrumentPanelContractTest {
                 "telemetry.acquire(telemetryListener, config.telemetryMetricIds())"));
         assertTrue(renderer.contains("if (animating) scheduleFrame()"));
         assertTrue(renderer.contains("telemetryWakePosted.compareAndSet(false, true)"));
+    }
+
+    @Test public void stockLikeRouteSummaryIsAnIndependentClusterModule() throws Exception {
+        Path root = projectRoot();
+        String type = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentElementType.java"));
+        String config = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentElementConfig.java"));
+        String renderer = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentClusterView.java"));
+        String settings = read(root.resolve("app/src/main/java/dezz/status/widget/"
+                + "InstrumentPanelSettingsActivity.java"));
+
+        assertTrue(type.contains("NAVIGATION_ROUTE_SUMMARY(\"Сводка маршрута · как в Навигаторе\""));
+        assertTrue(type.contains("this == NAVIGATION_ROUTE_SUMMARY"));
+        assertTrue(config.contains("applyRouteSummaryDefaults()"));
+        assertTrue(config.contains("showManeuverIcon\", false"));
+        assertTrue(config.contains("showManeuverDetails\", false"));
+        assertTrue(renderer.contains("case NAVIGATION_ROUTE_SUMMARY:"));
+        assertTrue(renderer.contains("runtime.navigationRemainingDistance.isEmpty()"));
+        assertTrue(renderer.contains("routeTrafficColor("));
+        assertTrue(settings.contains("Отдельная сводка как в Навигаторе"));
+        assertTrue(settings.contains("без боковых и нижних кнопок"));
     }
 
     @Test public void editorExposesPresetsModulesAndIndependentGradient() throws Exception {

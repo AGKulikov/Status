@@ -2,6 +2,9 @@
 package ru.natro.navigation;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -9,6 +12,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.json.JSONArray;
@@ -49,6 +53,9 @@ final class NavigatorStatePublisher {
                                long routeEpoch, long jamFingerprint,
                                RoutePolylineStyler.JamStyle jamStyle,
                                NavigationFrame navigationFrame);
+
+        /** Exact visible stock artwork; emitted only when its keyed maneuver changes. */
+        void onManeuverArtwork(long sequence, String maneuverIdentity, Bitmap artwork);
 
         void onDiagnostic(String detail);
     }
@@ -429,6 +436,17 @@ final class NavigatorStatePublisher {
     private String lastPrimaryMapFailure = "";
     private String lastGuidanceFailure = "";
     private String lastRouteDiagnostic = "";
+    private boolean forceManeuverArtwork;
+    private long builtManeuverArtworkSequence;
+    private String builtManeuverArtworkIdentity = "";
+    private Bitmap builtManeuverArtwork;
+    private int builtManeuverArtworkSignature;
+    private String lastSentManeuverArtworkIdentity = "";
+    private int lastSentManeuverArtworkSignature;
+    private String cachedManeuverArtworkIdentity = "";
+    private String cachedManeuverArtworkDistance = "";
+    private int cachedManeuverArtworkSignature;
+    private Bitmap cachedManeuverArtwork;
 
     NavigatorStatePublisher(Sink sink) {
         this.sink = sink;
@@ -445,7 +463,10 @@ final class NavigatorStatePublisher {
     }
 
     void requestSnapshot() {
-        runOnMain(() -> publishState(false, false, true));
+        runOnMain(() -> {
+            forceManeuverArtwork = true;
+            publishState(false, false, true);
+        });
     }
 
     void requestRoute() {
@@ -707,6 +728,7 @@ final class NavigatorStatePublisher {
             String route = routeChanged || forceRoute ? buildRoutePayload().toString() : null;
             sink.onNavigationState(snapshot, route, activeRoute, routeEpoch,
                     activeJamFingerprint, activeJamStyle, navigationFrame);
+            if (snapshotDue) dispatchManeuverArtwork();
             lastStateDispatchElapsedMs = elapsedNow;
         } catch (Throwable failure) {
             Log.w(TAG, "Could not publish Navigator state", failure);
@@ -1033,9 +1055,14 @@ final class NavigatorStatePublisher {
         int speedLimit = speedLimitValue == null ? 0 : nonNegativeInt(
                 number(invoke(speedLimitValue, "getValue"), 0d) * 3.6d);
 
+        long snapshotSequence = ++sequence;
+        builtManeuverArtworkSequence = snapshotSequence;
+        builtManeuverArtworkIdentity = manoeuvre.identity;
+        builtManeuverArtwork = manoeuvre.artwork;
+        builtManeuverArtworkSignature = manoeuvre.artworkSignature;
         JSONObject result = new JSONObject()
                 .put("schema", 1)
-                .put("sequence", ++sequence)
+                .put("sequence", snapshotSequence)
                 .put("routeEpoch", routeEpoch)
                 .put("sourceTimestampMs", now)
                 .put("routeActive", routeActive)
@@ -1050,6 +1077,7 @@ final class NavigatorStatePublisher {
                 .put("maneuverAuxiliaryManeuverType", manoeuvre.auxiliary.maneuverType)
                 .put("maneuverAuxiliaryDistanceMeters",
                         manoeuvre.auxiliary.distanceMeters)
+                .put("maneuverDisplayDistance", manoeuvre.displayDistance)
                 .put("street", text(invoke(currentGuidance, "getRoadName")))
                 .put("destination", routeActive ? destinationForRoute(route) : "")
                 .put("maneuverDistanceMeters", manoeuvre.distanceMeters)
@@ -1072,6 +1100,25 @@ final class NavigatorStatePublisher {
             result.put("speedKmh", Math.min(400d, frame.speedKmh));
         }
         return result;
+    }
+
+    private void dispatchManeuverArtwork() {
+        boolean forced = forceManeuverArtwork;
+        forceManeuverArtwork = false;
+        Bitmap artwork = builtManeuverArtwork;
+        String identity = builtManeuverArtworkIdentity;
+        if (artwork == null || artwork.isRecycled() || identity.isEmpty()) {
+            if (identity.isEmpty()) {
+                lastSentManeuverArtworkIdentity = "";
+                lastSentManeuverArtworkSignature = 0;
+            }
+            return;
+        }
+        if (!forced && identity.equals(lastSentManeuverArtworkIdentity)
+                && builtManeuverArtworkSignature == lastSentManeuverArtworkSignature) return;
+        sink.onManeuverArtwork(builtManeuverArtworkSequence, identity, artwork);
+        lastSentManeuverArtworkIdentity = identity;
+        lastSentManeuverArtworkSignature = builtManeuverArtworkSignature;
     }
 
     /**
@@ -1168,15 +1215,11 @@ final class NavigatorStatePublisher {
         String title = description.isEmpty() ? toponym : description;
         String subtext = title.equals(toponym) ? "" : toponym;
         int distance = nonNegativeInt(distance(routePosition, position));
-        StockManeuverCard stockCard = readStockManeuverCard();
-        String nextRoad = stockCard.nextRoad.isEmpty() ? toponym : stockCard.nextRoad;
-        JSONArray directionSigns = stockCard.directionSigns.length() == 0
-                ? readDirectionSignItems(position) : stockCard.directionSigns;
-        ManeuverAuxiliary auxiliary = stockCard.auxiliary == ManeuverAuxiliary.EMPTY
-                ? readManeuverAuxiliary(annotation, routePosition, upcomingManoeuvres, upcoming)
-                : stockCard.auxiliary;
-        return new Manoeuvre(manoeuvreIdentity(type, position), type, title, subtext,
-                nextRoad, directionSigns, auxiliary, distance);
+        String identity = manoeuvreIdentity(type, position);
+        StockManeuverCard stockCard = readStockManeuverCard(distance, identity);
+        return new Manoeuvre(identity, type, title, subtext,
+                stockCard.nextRoad, stockCard.directionSigns, stockCard.auxiliary, distance,
+                stockCard.displayDistance, stockCard.artwork, stockCard.artworkSignature);
     }
 
     /**
@@ -1184,33 +1227,38 @@ final class NavigatorStatePublisher {
      * Unlike a proximity guess, these values have already passed Navigator's own presenter rules,
      * including whether a road sign or the attached auxiliary row is actually selected.
      */
-    private StockManeuverCard readStockManeuverCard() {
+    private StockManeuverCard readStockManeuverCard(int expectedDistanceMeters,
+                                                    String maneuverIdentity) {
         Activity activity = activityReference.get();
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
             return StockManeuverCard.EMPTY;
         }
         try {
-            String nextRoad = visibleText(activity, "text_nextstreet");
+            View card = viewByName(activity, "contextmaneuverview");
+            if (!visibleThroughParents(card)) return StockManeuverCard.EMPTY;
+            String nextRoad = visibleText(card, activity, "text_nextstreet");
             JSONArray signs = new JSONArray();
-            View signView = viewByName(activity, "roadsign_container");
+            View signView = viewByName(card, activity, "roadsign_container");
             if (visibleThroughParents(signView)) {
                 Object raw = invoke(signView, "getItems");
                 if (raw instanceof List<?>) encodeDirectionSignItems((List<?>) raw, signs);
             }
 
             ManeuverAuxiliary auxiliary = ManeuverAuxiliary.EMPTY;
-            View underBalloon = viewByName(activity, "under_balloon");
+            View underBalloon = viewByName(card, activity, "under_balloon");
             if (visibleThroughParents(underBalloon)) {
-                String exitNumber = visibleText(activity, "exit_number_text");
+                String exitNumber = visibleText(card, activity, "exit_number_text");
                 if (!exitNumber.isEmpty()) {
                     auxiliary = new ManeuverAuxiliary(
                             "EXIT_NUMBER", exitNumber, "", -1);
                 } else {
-                    View nextGroup = viewByName(activity,
+                    View nextGroup = viewByName(card, activity,
                             "under_balloon_next_maneuver_group");
                     if (visibleThroughParents(nextGroup)) {
-                        String value = visibleText(activity, "next_maneuver_distance_value");
-                        String unit = visibleText(activity, "next_maneuver_distance_unit");
+                        String value = visibleText(card, activity,
+                                "next_maneuver_distance_value");
+                        String unit = visibleText(card, activity,
+                                "next_maneuver_distance_unit");
                         String label = (value + (value.isEmpty() || unit.isEmpty() ? "" : " ")
                                 + unit).trim();
                         if (!label.isEmpty()) {
@@ -1220,11 +1268,97 @@ final class NavigatorStatePublisher {
                     }
                 }
             }
+            String distanceValue = visibleText(card, activity,
+                    "text_maneuverballoon_distance");
+            String distanceUnit = visibleText(card, activity,
+                    "text_maneuverballoon_metrics");
+            String displayDistance = joinDistanceLabel(distanceValue, distanceUnit);
+            Bitmap artwork = null;
+            int artworkSignature = 0;
+            View image = viewByName(card, activity, "image_maneuverballoon_maneuver");
+            if (image instanceof ImageView && visibleThroughParents(image)
+                    && distanceMatches(displayDistance, expectedDistanceMeters)) {
+                ImageView imageView = (ImageView) image;
+                artworkSignature = artworkSignature(imageView);
+                if (maneuverIdentity.equals(cachedManeuverArtworkIdentity)
+                        && displayDistance.equals(cachedManeuverArtworkDistance)
+                        && artworkSignature == cachedManeuverArtworkSignature
+                        && cachedManeuverArtwork != null
+                        && !cachedManeuverArtwork.isRecycled()) {
+                    artwork = cachedManeuverArtwork;
+                } else {
+                    artwork = captureStockManeuverArtwork(imageView);
+                    if (artwork != null) {
+                        cachedManeuverArtworkIdentity = maneuverIdentity;
+                        cachedManeuverArtworkDistance = displayDistance;
+                        cachedManeuverArtworkSignature = artworkSignature;
+                        cachedManeuverArtwork = artwork;
+                    }
+                }
+            }
             if (nextRoad.isEmpty() && signs.length() == 0
-                    && auxiliary == ManeuverAuxiliary.EMPTY) return StockManeuverCard.EMPTY;
-            return new StockManeuverCard(nextRoad, signs, auxiliary);
+                    && auxiliary == ManeuverAuxiliary.EMPTY && artwork == null) {
+                return StockManeuverCard.EMPTY;
+            }
+            return new StockManeuverCard(nextRoad, signs, auxiliary,
+                    artwork == null ? "" : displayDistance, artwork, artworkSignature);
         } catch (Throwable unavailable) {
             return StockManeuverCard.EMPTY;
+        }
+    }
+
+    private static String joinDistanceLabel(String value, String unit) {
+        String left = value == null ? "" : value.trim();
+        String right = unit == null ? "" : unit.trim();
+        if (left.isEmpty() || right.isEmpty()) return (left + right).trim();
+        return left + ' ' + right;
+    }
+
+    private static boolean distanceMatches(String label, int expectedMeters) {
+        if (label == null || label.isEmpty() || expectedMeters < 0) return false;
+        String normalized = label.replace('\u00a0', ' ').trim().toLowerCase(Locale.ROOT);
+        StringBuilder number = new StringBuilder();
+        for (int index = 0; index < normalized.length(); index++) {
+            char value = normalized.charAt(index);
+            if ((value >= '0' && value <= '9') || value == '.' || value == ',') {
+                number.append(value == ',' ? '.' : value);
+            }
+        }
+        if (number.length() == 0) return false;
+        try {
+            double displayed = Double.parseDouble(number.toString());
+            if (normalized.contains("км") || normalized.contains("km")) displayed *= 1_000d;
+            double tolerance = Math.max(60d, expectedMeters * .2d);
+            return Math.abs(displayed - expectedMeters) <= tolerance;
+        } catch (NumberFormatException invalid) {
+            return false;
+        }
+    }
+
+    private static int artworkSignature(ImageView image) {
+        Drawable drawable = image.getDrawable();
+        Object stable = drawable == null ? null : drawable.getConstantState();
+        int result = 17;
+        result = 31 * result + System.identityHashCode(stable == null ? drawable : stable);
+        result = 31 * result + (drawable == null ? 0 : drawable.getLevel());
+        result = 31 * result + image.getWidth();
+        result = 31 * result + image.getHeight();
+        int[] state = image.getDrawableState();
+        if (state != null) for (int value : state) result = 31 * result + value;
+        return result;
+    }
+
+    private static Bitmap captureStockManeuverArtwork(ImageView image) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        if (width <= 0 || height <= 0 || width > 256 || height > 256
+                || (long) width * height > 65_536L) return null;
+        try {
+            Bitmap result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            image.draw(new Canvas(result));
+            return result;
+        } catch (RuntimeException unavailable) {
+            return null;
         }
     }
 
@@ -1232,6 +1366,13 @@ final class NavigatorStatePublisher {
         int id = activity.getResources().getIdentifier(
                 name, "id", activity.getPackageName());
         return id == 0 ? null : visibleViewById(activity, id);
+    }
+
+    private static View viewByName(View root, Activity activity, String name) {
+        int id = activity.getResources().getIdentifier(name, "id", activity.getPackageName());
+        if (id == 0 || root == null) return null;
+        View result = root.findViewById(id);
+        return visibleThroughParents(result) ? result : null;
     }
 
     /** Chooses the actually displayed instance when portrait/landscape balloons share an id. */
@@ -1257,6 +1398,12 @@ final class NavigatorStatePublisher {
 
     private static String visibleText(Activity activity, String name) {
         View value = viewByName(activity, name);
+        return value instanceof TextView && visibleThroughParents(value)
+                ? String.valueOf(((TextView) value).getText()).trim() : "";
+    }
+
+    private static String visibleText(View root, Activity activity, String name) {
+        View value = viewByName(root, activity, name);
         return value instanceof TextView && visibleThroughParents(value)
                 ? String.valueOf(((TextView) value).getText()).trim() : "";
     }
@@ -2224,7 +2371,7 @@ final class NavigatorStatePublisher {
 
     private static final class Manoeuvre {
         static final Manoeuvre EMPTY = new Manoeuvre("", "", "", "", "",
-                new JSONArray(), ManeuverAuxiliary.EMPTY, -1);
+                new JSONArray(), ManeuverAuxiliary.EMPTY, -1, "", null, 0);
         final String identity;
         final String type;
         final String title;
@@ -2233,9 +2380,13 @@ final class NavigatorStatePublisher {
         final JSONArray directionSigns;
         final ManeuverAuxiliary auxiliary;
         final int distanceMeters;
+        final String displayDistance;
+        final Bitmap artwork;
+        final int artworkSignature;
 
         Manoeuvre(String identity, String type, String title, String subtext, String nextRoad,
-                  JSONArray directionSigns, ManeuverAuxiliary auxiliary, int distanceMeters) {
+                  JSONArray directionSigns, ManeuverAuxiliary auxiliary, int distanceMeters,
+                  String displayDistance, Bitmap artwork, int artworkSignature) {
             this.identity = identity;
             this.type = type;
             this.title = title;
@@ -2244,6 +2395,9 @@ final class NavigatorStatePublisher {
             this.directionSigns = directionSigns;
             this.auxiliary = auxiliary;
             this.distanceMeters = distanceMeters;
+            this.displayDistance = displayDistance;
+            this.artwork = artwork;
+            this.artworkSignature = artworkSignature;
         }
     }
 
@@ -2264,16 +2418,23 @@ final class NavigatorStatePublisher {
 
     private static final class StockManeuverCard {
         static final StockManeuverCard EMPTY = new StockManeuverCard(
-                "", new JSONArray(), ManeuverAuxiliary.EMPTY);
+                "", new JSONArray(), ManeuverAuxiliary.EMPTY, "", null, 0);
         final String nextRoad;
         final JSONArray directionSigns;
         final ManeuverAuxiliary auxiliary;
+        final String displayDistance;
+        final Bitmap artwork;
+        final int artworkSignature;
 
         StockManeuverCard(String nextRoad, JSONArray directionSigns,
-                          ManeuverAuxiliary auxiliary) {
+                          ManeuverAuxiliary auxiliary, String displayDistance,
+                          Bitmap artwork, int artworkSignature) {
             this.nextRoad = nextRoad;
             this.directionSigns = directionSigns;
             this.auxiliary = auxiliary;
+            this.displayDistance = displayDistance;
+            this.artwork = artwork;
+            this.artworkSignature = artworkSignature;
         }
     }
 

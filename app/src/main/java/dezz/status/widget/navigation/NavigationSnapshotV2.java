@@ -29,6 +29,8 @@ public final class NavigationSnapshotV2 {
     @NonNull public final String maneuverAuxiliaryText;
     @NonNull public final String maneuverAuxiliaryManeuverType;
     public final int maneuverAuxiliaryDistanceMeters;
+    /** Exact distance label currently shown beside Navigator's stock maneuver artwork. */
+    @NonNull public final String maneuverDisplayDistance;
     @NonNull public final String street;
     @NonNull public final String destination;
     public final int maneuverDistanceMeters;
@@ -99,7 +101,7 @@ public final class NavigationSnapshotV2 {
                 destination, maneuverDistanceMeters, routeTotalDistanceMeters,
                 remainingDistanceMeters, remainingDurationSeconds, trafficJamDurationSeconds,
                 trafficJamDistanceMeters, arrivalEpochMs, speedLimitKmh, laneDistanceMeters,
-                lanesJson, trafficLightsJson, "", "", "[]", "", "", "", -1);
+                lanesJson, trafficLightsJson, "", "", "[]", "", "", "", -1, "");
     }
 
     public NavigationSnapshotV2(long sequence, long routeEpoch, long sourceTimestampMs,
@@ -116,6 +118,30 @@ public final class NavigationSnapshotV2 {
             @NonNull String maneuverAuxiliaryType, @NonNull String maneuverAuxiliaryText,
             @NonNull String maneuverAuxiliaryManeuverType,
             int maneuverAuxiliaryDistanceMeters) {
+        this(sequence, routeEpoch, sourceTimestampMs, routeActive, latitude, longitude,
+                bearingDegrees, speedKmh, maneuverType, maneuverTitle, maneuverSubtext, street,
+                destination, maneuverDistanceMeters, routeTotalDistanceMeters,
+                remainingDistanceMeters, remainingDurationSeconds, trafficJamDurationSeconds,
+                trafficJamDistanceMeters, arrivalEpochMs, speedLimitKmh, laneDistanceMeters,
+                lanesJson, trafficLightsJson, maneuverIdentity, maneuverNextRoad,
+                maneuverDirectionSignsJson, maneuverAuxiliaryType, maneuverAuxiliaryText,
+                maneuverAuxiliaryManeuverType, maneuverAuxiliaryDistanceMeters, "");
+    }
+
+    public NavigationSnapshotV2(long sequence, long routeEpoch, long sourceTimestampMs,
+            boolean routeActive, double latitude, double longitude, double bearingDegrees,
+            double speedKmh, @NonNull String maneuverType, @NonNull String maneuverTitle,
+            @NonNull String maneuverSubtext, @NonNull String street,
+            @NonNull String destination, int maneuverDistanceMeters,
+            int routeTotalDistanceMeters, int remainingDistanceMeters,
+            int remainingDurationSeconds, int trafficJamDurationSeconds,
+            int trafficJamDistanceMeters, long arrivalEpochMs, int speedLimitKmh,
+            int laneDistanceMeters, @NonNull String lanesJson,
+            @NonNull String trafficLightsJson, @NonNull String maneuverIdentity,
+            @NonNull String maneuverNextRoad, @NonNull String maneuverDirectionSignsJson,
+            @NonNull String maneuverAuxiliaryType, @NonNull String maneuverAuxiliaryText,
+            @NonNull String maneuverAuxiliaryManeuverType,
+            int maneuverAuxiliaryDistanceMeters, @NonNull String maneuverDisplayDistance) {
         this.sequence = Math.max(0L, sequence);
         this.routeEpoch = Math.max(0L, routeEpoch);
         this.sourceTimestampMs = Math.max(0L, sourceTimestampMs);
@@ -134,6 +160,7 @@ public final class NavigationSnapshotV2 {
         this.maneuverAuxiliaryText = bounded(maneuverAuxiliaryText, 4_096);
         this.maneuverAuxiliaryManeuverType = bounded(maneuverAuxiliaryManeuverType, 96);
         this.maneuverAuxiliaryDistanceMeters = nonNegative(maneuverAuxiliaryDistanceMeters);
+        this.maneuverDisplayDistance = bounded(maneuverDisplayDistance, 96);
         this.street = bounded(street, 4_096);
         this.destination = bounded(destination, 4_096);
         this.maneuverDistanceMeters = nonNegative(maneuverDistanceMeters);
@@ -167,6 +194,7 @@ public final class NavigationSnapshotV2 {
                 .put("maneuverAuxiliaryText", maneuverAuxiliaryText)
                 .put("maneuverAuxiliaryManeuverType", maneuverAuxiliaryManeuverType)
                 .put("maneuverAuxiliaryDistanceMeters", maneuverAuxiliaryDistanceMeters)
+                .put("maneuverDisplayDistance", maneuverDisplayDistance)
                 .put("street", street)
                 .put("destination", destination)
                 .put("maneuverDistanceMeters", maneuverDistanceMeters)
@@ -230,7 +258,8 @@ public final class NavigationSnapshotV2 {
                     source.optString("maneuverAuxiliaryType", ""),
                     source.optString("maneuverAuxiliaryText", ""),
                     source.optString("maneuverAuxiliaryManeuverType", ""),
-                    source.optInt("maneuverAuxiliaryDistanceMeters", -1));
+                    source.optInt("maneuverAuxiliaryDistanceMeters", -1),
+                    source.optString("maneuverDisplayDistance", ""));
         } catch (JSONException error) {
             throw new IllegalArgumentException("Invalid navigation snapshot", error);
         }

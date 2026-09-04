@@ -225,6 +225,11 @@ int getVersionCode() {
     if (version == '2.7.5') {
         return 208021308
     }
+    // 2.7.6 contains the post-2.7.5 HUD/DIM navigation-card, launcher-window and cold cluster-map
+    // corrections. It remains an in-place update and therefore advances the code by exactly one.
+    if (version == '2.7.6') {
+        return 208021309
+    }
     if (version == '2.3.0') {
         return 208021254
     }

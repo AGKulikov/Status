@@ -1316,6 +1316,50 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 form.addView(section("Внутренние отступы"), marginTop(12));
                 addCombinedPaddingControls(form, controls, item, "padding", 5, 160);
                 break;
+            case NAV_ROUTE_SUMMARY:
+                form.addView(text("Отдельная сводка маршрута: расстояние, время прибытия, "
+                        + "остаток времени и линия пробок. Кнопки Навигатора не переносятся.",
+                        12, 0xFF95A0AF), marginTop(5));
+                visualSwitch(form, controls, "bool:showCardBackground",
+                        "Фон карточки",
+                        item.options.optBoolean("showCardBackground", true));
+                visualColor(form, controls, item, "cardColor",
+                        "Цвет карточки ARGB", "#F21B1F24");
+                controls.put("int:cardOpacityPercent", slider(form,
+                        "Непрозрачность карточки",
+                        item.options.optInt("cardOpacityPercent", 100),
+                        0, 100, 1, " %"));
+                controls.put("int:cardCornerRadiusPx", slider(form,
+                        "Скругление карточки",
+                        item.options.optInt("cardCornerRadiusPx", 18),
+                        0, 160, 1, " px"));
+                visualColor(form, controls, item, "cardBorderColor",
+                        "Цвет рамки ARGB", "#00000000");
+                controls.put("int:cardBorderWidthPx", slider(form,
+                        "Толщина рамки",
+                        item.options.optInt("cardBorderWidthPx", 0),
+                        0, 24, 1, " px"));
+                controls.put("int:metricsFontSizeSp", slider(form,
+                        "Размер показателей",
+                        item.options.optInt("metricsFontSizeSp", 25),
+                        8, 120, 1, " sp"));
+                controls.put("int:progressBarHeightPx", slider(form,
+                        "Толщина линии пробок",
+                        item.options.optInt("progressBarHeightPx", 8),
+                        2, 48, 1, " px"));
+                controls.put("int:progressBarTopGapPx", slider(form,
+                        "Отступ перед линией пробок",
+                        item.options.optInt("progressBarTopGapPx", 7),
+                        0, 80, 1, " px"));
+                form.addView(section("Внутренние отступы"), marginTop(12));
+                addCombinedPaddingControls(form, controls, item, "padding", 9, 160);
+                form.addView(section("Цвета линии маршрута"), marginTop(12));
+                addTrafficPaletteOptions(form, controls, item);
+                visualColor(form, controls, item, "completedColor",
+                        "Пройденная часть ARGB", "#FF858A93");
+                visualColor(form, controls, item, "markerColor",
+                        "Маркер положения ARGB", "#FFFFC400");
+                break;
             case NAV_TRIP_PROGRESS:
                 visualSpinner(form, controls, "string:progressMode", "Данные прогресса",
                         new String[]{"COMBINED", "DISTANCE", "TIME", "ARRIVAL"},
