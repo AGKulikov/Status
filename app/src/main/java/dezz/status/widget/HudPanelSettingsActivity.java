@@ -590,6 +590,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightScale = slider(form,
                 "Размер светофоров и плашек секунд",
                 profile.trafficLightScalePercent, 50, 250, 5, " %");
+        InheritedColorField trafficLightCardColor = inheritableNavigationColorField(
+                form, "Цвет плашки и хвостика светофора",
+                profile.trafficLightCardColor, navigation,
+                value -> profile.trafficLightCardColor = value);
         SliderField speedBumpScale = slider(form,
                 "Размер знаков искусственных неровностей",
                 profile.speedBumpScalePercent, 50, 250, 5, " %");
@@ -770,6 +774,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.cameraDirectionOpacityPercent =
                                 cameraDirectionOpacity.intValue();
                         profile.trafficLightScalePercent = trafficLightScale.intValue();
+                        profile.trafficLightCardColor = trafficLightCardColor.value;
                         profile.speedBumpScalePercent = speedBumpScale.intValue();
                         profile.routeTurnLengthPercent = routeTurnLength.intValue();
                         profile.routeTurnHeadSizePercent = routeTurnHeadSize.intValue();
@@ -1270,6 +1275,29 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         "Зелёный сигнал ARGB", "#FF34C759");
                 visualColor(form, controls, item, "unknownColor",
                         "Нет данных ARGB", "#FF6B7280");
+                break;
+            case NAV_TRAFFIC_JAM:
+                visualSwitch(form, controls, "bool:showCardBackground",
+                        "Фон плашки",
+                        item.options.optBoolean("showCardBackground", true));
+                visualColor(form, controls, item, "cardColor",
+                        "Цвет плашки ARGB", "#F21B1F24");
+                controls.put("int:cardOpacityPercent", slider(form,
+                        "Непрозрачность плашки",
+                        item.options.optInt("cardOpacityPercent", 100),
+                        0, 100, 1, " %"));
+                controls.put("int:cardCornerRadiusPx", slider(form,
+                        "Скругление плашки",
+                        item.options.optInt("cardCornerRadiusPx", 16),
+                        0, 160, 1, " px"));
+                visualColor(form, controls, item, "cardBorderColor",
+                        "Цвет рамки ARGB", "#00000000");
+                controls.put("int:cardBorderWidthPx", slider(form,
+                        "Толщина рамки",
+                        item.options.optInt("cardBorderWidthPx", 0),
+                        0, 24, 1, " px"));
+                form.addView(section("Внутренние отступы"), marginTop(12));
+                addCombinedPaddingControls(form, controls, item, "padding", 5, 160);
                 break;
             case NAV_TRIP_PROGRESS:
                 visualSpinner(form, controls, "string:progressMode", "Данные прогресса",

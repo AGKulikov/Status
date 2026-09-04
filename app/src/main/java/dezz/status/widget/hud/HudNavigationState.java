@@ -94,6 +94,9 @@ public final class HudNavigationState {
     @NonNull public final String turnDistance;
     @NonNull public final String distance;
     @NonNull public final String duration;
+    @NonNull public final String trafficJamDuration;
+    @NonNull public final String trafficJamDistance;
+    public final boolean trafficJamAvailable;
     @NonNull public final String arrival;
     @NonNull public final String speedLimit;
     public final double speedKmh;
@@ -120,7 +123,9 @@ public final class HudNavigationState {
     private HudNavigationState(boolean direct, boolean routeActive, String maneuverType,
             String maneuverTitle, String maneuverText, String maneuverSubtext, String street,
             String destination, String turnDistance, String distance, String duration,
-            String arrival, String speedLimit, double speedKmh, String lanes,
+            String trafficJamDuration, String trafficJamDistance,
+            boolean trafficJamAvailable, String arrival, String speedLimit,
+            double speedKmh, String lanes,
             String laneDistance, double laneDistanceMeters, boolean laneAvailable,
             List<Lane> laneItems, String trafficColor, String trafficCountdown,
             String trafficArrow, boolean trafficAvailable, List<TrafficLight> trafficLights,
@@ -139,6 +144,9 @@ public final class HudNavigationState {
         this.turnDistance = turnDistance;
         this.distance = distance;
         this.duration = duration;
+        this.trafficJamDuration = trafficJamDuration;
+        this.trafficJamDistance = trafficJamDistance;
+        this.trafficJamAvailable = trafficJamAvailable;
         this.arrival = arrival;
         this.speedLimit = speedLimit;
         this.speedKmh = speedKmh;
@@ -215,6 +223,10 @@ public final class HudNavigationState {
                 routeActive ? formatDistance(source.maneuverDistanceMeters) : "",
                 routeActive ? formatDistance(source.remainingDistanceMeters) : "",
                 routeActive ? formatDuration(source.remainingDurationSeconds) : "",
+                routeActive ? formatDuration(source.trafficJamDurationSeconds) : "",
+                routeActive ? formatDistance(source.trafficJamDistanceMeters) : "",
+                routeActive && source.trafficJamDurationSeconds >= 0
+                        && source.trafficJamDistanceMeters >= 0,
                 routeActive ? formatArrival(source.arrivalEpochMs) : "",
                 source.speedLimitKmh > 0 ? Integer.toString(source.speedLimitKmh) : "",
                 source.speedKmh, "", routeActive
@@ -256,6 +268,7 @@ public final class HudNavigationState {
                 routeActive ? source.turnDistance : "",
                 routeActive ? source.distance : "",
                 routeActive ? source.duration : "",
+                "", "", false,
                 routeActive ? source.arrival : "",
                 routeActive ? source.speedLimit : "", Double.NaN,
                 routeActive ? source.lanes : "",
@@ -360,6 +373,9 @@ public final class HudNavigationState {
                 return routeActive && trafficAvailable
                         && (!trafficLights.isEmpty() || !normalizedTrafficSignal(
                         trafficColor).isEmpty());
+            case NAV_TRAFFIC_JAM:
+                return routeActive && trafficJamAvailable
+                        && hasText(trafficJamDuration) && hasText(trafficJamDistance);
             case NAV_JAM_PROGRESS:
                 return routeActive && (!trafficRuns.isEmpty() || jamImage != null);
             case NAV_ROUTE_GRAPHIC:

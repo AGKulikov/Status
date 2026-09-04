@@ -108,4 +108,27 @@ public final class HudNavigationStateTest {
         assertTrue(snapshot.isFreshAt(5_000, 3_000));
         assertFalse(snapshot.isFreshAt(4_999, 3_000));
     }
+
+    @Test public void nullableTrafficJamForecastDrivesOnlyItsOwnModule() {
+        NavigationSnapshotV2 present = new NavigationSnapshotV2(
+                13, 6, 4_000, true, 55.75, 37.61, 30, 40,
+                "STRAIGHT", "Прямо", "", "", "", 100,
+                9_000, 6_000, 1_200, 600, 1_200,
+                5_000_000, 60, -1, "[]", "[]");
+        HudNavigationState available = HudNavigationState.fromBridge(present, null);
+
+        assertTrue(available.trafficJamAvailable);
+        assertEquals("10 мин", available.trafficJamDuration);
+        assertEquals("1.2 км", available.trafficJamDistance);
+        assertTrue(available.hasDataFor(HudElementType.NAV_TRAFFIC_JAM));
+
+        NavigationSnapshotV2 absent = new NavigationSnapshotV2(
+                14, 6, 4_100, true, 55.75, 37.61, 30, 40,
+                "STRAIGHT", "Прямо", "", "", "", 100,
+                9_000, 6_000, 1_200, 5_000_000, 60, -1, "[]", "[]");
+        HudNavigationState hidden = HudNavigationState.fromBridge(absent, null);
+
+        assertFalse(hidden.trafficJamAvailable);
+        assertFalse(hidden.hasDataFor(HudElementType.NAV_TRAFFIC_JAM));
+    }
 }

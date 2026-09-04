@@ -45,6 +45,7 @@ public enum HudElementType {
     NAV_TRIP_PROGRESS("Прогресс поездки", "Навигация", "", 16, 2),
     NAV_SPEED_LIMIT("Ограничение скорости", "Навигация", "ISensor.speed", 6, 6),
     NAV_TRAFFIC_LIGHTS("Светофоры", "Навигация", "", 9, 10),
+    NAV_TRAFFIC_JAM("Пробка впереди", "Навигация", "", 18, 3),
     NAV_JAM_PROGRESS("Пробки / прогресс", "Навигация", "", 16, 2),
     NAV_ROUTE_GRAPHIC("Графика маршрута", "Навигация", "", 16, 4),
 

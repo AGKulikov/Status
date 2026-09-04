@@ -289,6 +289,8 @@ final class LaneGuidanceMapLayer {
             Object rotation = Enum.valueOf(
                     (Class<? extends Enum>) rotationClass, "NO_ROTATION");
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, rotation);
+            // LaneSignBalloonTextureFactory already rendered the selected physical scale.
+            invoke(style, "setScale", new Class<?>[]{Float.class}, Float.valueOf(1f));
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
             invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));

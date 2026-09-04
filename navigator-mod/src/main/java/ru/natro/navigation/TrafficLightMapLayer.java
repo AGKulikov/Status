@@ -15,6 +15,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,6 +39,8 @@ final class TrafficLightMapLayer {
     private boolean enabled;
     private boolean nightMode;
     private int scalePercent = 100;
+    /** Empty preserves stock colours; configured ARGB recolours stock body/leg or the fallback. */
+    private String cardColor = "";
     private float zIndex = NavigationMapProfile.layerZ(50);
     private boolean latestRouteActive;
     private List<NavigatorStatePublisher.TrafficLightFrame> latest =
@@ -94,16 +97,18 @@ final class TrafficLightMapLayer {
     }
 
     void apply(boolean nextEnabled, boolean nextNightMode, int nextScalePercent,
-               int layerPriority) {
+               String nextCardColor, int layerPriority) {
         int nextScale = Math.max(50, Math.min(250, nextScalePercent));
+        String normalizedCardColor = normalizedCardColor(nextCardColor);
         float nextZ = NavigationMapProfile.layerZ(layerPriority);
         boolean presentationChanged = nightMode != nextNightMode || scalePercent != nextScale
-                || zIndex != nextZ;
+                || !cardColor.equals(normalizedCardColor) || zIndex != nextZ;
         boolean enabledChanged = enabled != nextEnabled;
         if (!presentationChanged && !enabledChanged) return;
         enabled = nextEnabled;
         nightMode = nextNightMode;
         scalePercent = nextScale;
+        cardColor = normalizedCardColor;
         zIndex = nextZ;
         MapObjectLayerFactory.setZIndex(collection, nextZ);
         if (presentationChanged) renderedVisualFingerprint = Long.MIN_VALUE;
@@ -302,6 +307,12 @@ final class TrafficLightMapLayer {
                     "ADDITIONAL".equals(light.sectionType));
             viewClass.getMethod("setAccent", accentClass).invoke(view, primary);
             viewClass.getMethod("setIsNightMode", boolean.class).invoke(view, nightMode);
+            if (!cardColor.isEmpty()) {
+                // 30.3.0 exposes no public colour setter, but its exact reviewed implementation
+                // owns two fill Paints and BalloonTextureImpl's leg colour. Updating those keeps
+                // the stock signal gradients, direction arrow, countdown typography and shape.
+                applyConfiguredCardColor(view, viewClass, resolvedCardColor());
+            }
             List<MapOverlayPlacementCoordinator.Footprint> footprints =
                     measureStockFootprints(view, viewClass, legClass,
                             scalePercent / 100f);
@@ -319,11 +330,13 @@ final class TrafficLightMapLayer {
             invoke(style, "setAnchor", new Class<?>[]{PointF.class},
                     new PointF(anchorX, anchorY));
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
+            // TrafficLightViewImpl(Context, scale) already created the final physical texture.
+            invoke(style, "setScale", new Class<?>[]{Float.class}, Float.valueOf(1f));
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
             invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
             applyCompositeIcon(marker, provider, style, placement.legName,
-                    stockTrafficLightLegColor());
+                    cardColor.isEmpty() ? stockTrafficLightLegColor() : resolvedCardColor());
             invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
             marker.view = view;
             marker.imageProvider = provider;
@@ -362,11 +375,13 @@ final class TrafficLightMapLayer {
             invoke(style, "setAnchor", new Class<?>[]{PointF.class},
                     texture.anchor);
             invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
+            // The compact vector/text card is rasterised directly at the selected physical size.
+            invoke(style, "setScale", new Class<?>[]{Float.class}, Float.valueOf(1f));
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
             invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
             applyCompositeIcon(marker, provider, style, placement.legName,
-                    nightMode ? 0xFF171A20 : 0xFF2B2E34);
+                    resolvedCardColor());
             invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
             marker.view = bitmap;
             marker.imageProvider = provider;
@@ -395,8 +410,8 @@ final class TrafficLightMapLayer {
                 "NO_ROTATION");
         invoke(connectorStyle, "setAnchor", new Class<?>[]{PointF.class}, connector.anchor);
         invoke(connectorStyle, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
-        invoke(connectorStyle, "setScale", new Class<?>[]{Float.class},
-                Float.valueOf(1f / ConnectorTexture.OVERSAMPLE));
+        // The vector connector is rasterised at its final physical size for this profile.
+        invoke(connectorStyle, "setScale", new Class<?>[]{Float.class}, Float.valueOf(1f));
         invoke(connectorStyle, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
         invoke(connectorStyle, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
         invoke(connectorStyle, "setZIndex", new Class<?>[]{Float.class},
@@ -415,18 +430,17 @@ final class TrafficLightMapLayer {
         marker.connectorStyle = connectorStyle;
     }
 
-    /** Re-rasterises simple vector geometry at 2x for the selected physical card size. */
+    /** Re-rasterises simple vector geometry directly for the selected physical card size. */
     private ConnectorTexture trafficLightConnector(String legName, int connectorColor) {
         float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
         float scale = scalePercent / 100f;
-        float oversample = ConnectorTexture.OVERSAMPLE;
         // Navigator 30.3.0 uses traffic_light_leg_size=34dp for a corner leg. Match that
         // reach so this guaranteed part covers the complete stock connector, not only its tip.
         float stockLegLength = navigatorDimension(
                 "traffic_light_leg_size", 34f * density);
-        float length = Math.max(14f, stockLegLength * scale) * oversample;
-        float halfWidth = Math.max(3f, 6f * density * scale) * oversample;
-        float padding = Math.max(2f, density) * oversample;
+        float length = Math.max(14f, stockLegLength * scale);
+        float halfWidth = Math.max(3f, 6f * density * scale);
+        float padding = Math.max(2f, density);
         float[] direction = connectorDirection(legName);
         float dx = direction[0];
         float dy = direction[1];
@@ -460,12 +474,14 @@ final class TrafficLightMapLayer {
         fill.setStyle(Paint.Style.FILL);
         fill.setColor(connectorColor);
         canvas.drawPath(path, fill);
-        Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
-        outline.setStyle(Paint.Style.STROKE);
-        outline.setStrokeJoin(Paint.Join.ROUND);
-        outline.setStrokeWidth(Math.max(1f, density * oversample * .65f));
-        outline.setColor(nightMode ? 0x667D8490 : 0x55383C44);
-        canvas.drawPath(path, outline);
+        if (cardColor.isEmpty()) {
+            Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
+            outline.setStyle(Paint.Style.STROKE);
+            outline.setStrokeJoin(Paint.Join.ROUND);
+            outline.setStrokeWidth(Math.max(1f, density * .65f));
+            outline.setColor(nightMode ? 0x667D8490 : 0x55383C44);
+            canvas.drawPath(path, outline);
+        }
         return new ConnectorTexture(bitmap,
                 new PointF(offsetX / width, offsetY / height));
     }
@@ -480,6 +496,64 @@ final class TrafficLightMapLayer {
             // Exact 30.3.0 resource exists; regional fallback keeps rendering if it moves.
         }
         return nightMode ? 0xFF1A1A1A : 0xFF292C3D;
+    }
+
+    /** Exact 30.3.0 stock-view recolour; any regional drift falls back to our Canvas renderer. */
+    private static void applyConfiguredCardColor(
+            Object view, Class<?> viewClass, int color) throws Exception {
+        int changedPaints = 0;
+        Object active = privateField(view, viewClass, "backgroundPaint");
+        if (active instanceof Paint) {
+            ((Paint) active).setColor(color);
+            changedPaints++;
+        }
+        for (String name : new String[]{"backgroundPaintPrimary$delegate",
+                "backgroundPaintSecondary$delegate"}) {
+            Object lazyPaint = privateField(view, viewClass, name);
+            Object value = invoke(lazyPaint, "getValue", new Class<?>[0]);
+            if (value instanceof Paint) {
+                ((Paint) value).setColor(color);
+                changedPaints++;
+            }
+        }
+        if (changedPaints == 0) {
+            throw new IllegalStateException("No traffic-light background Paint");
+        }
+        Object texture = privateField(view, viewClass, "texture");
+        invoke(texture, "setLegColor", new Class<?>[]{int.class}, color);
+        Field dirty = viewClass.getDeclaredField("isDirty");
+        dirty.setAccessible(true);
+        dirty.setBoolean(view, true);
+    }
+
+    private static Object privateField(Object target, Class<?> owner, String name)
+            throws Exception {
+        Field field = owner.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
+    private int resolvedCardColor() {
+        if (!cardColor.isEmpty()) {
+            try {
+                return Color.parseColor(cardColor);
+            } catch (IllegalArgumentException ignored) {
+                // Configuration is validated twice, but fail back to the reviewed stock colour.
+            }
+        }
+        return nightMode ? 0xFF171A20 : 0xFF2B2E34;
+    }
+
+    private static String normalizedCardColor(String raw) {
+        String value = raw == null ? "" : raw.trim().toUpperCase(java.util.Locale.ROOT);
+        if (value.isEmpty()) return "";
+        if (value.matches("#[0-9A-F]{6}")) value = "#FF" + value.substring(1);
+        try {
+            Color.parseColor(value);
+            return value;
+        } catch (IllegalArgumentException invalid) {
+            return "";
+        }
     }
 
     private float navigatorDimension(String name, float fallback) {
@@ -623,7 +697,7 @@ final class TrafficLightMapLayer {
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(nightMode ? 0xE8171A20 : 0xE82B2E34);
+        paint.setColor(resolvedCardColor());
         android.graphics.Path leg = new android.graphics.Path();
         PointF anchor;
         if (leftTail) {
@@ -663,13 +737,11 @@ final class TrafficLightMapLayer {
         float radius = unit * .36f;
         float centerX = unit * .50f;
         float centerY = unit * .50f;
-        if (countdown) {
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(nightMode ? 0xE8171A20 : 0xE82B2E34);
-            RectF pill = new RectF(unit * .34f, unit * .13f,
-                    cardWidth - unit * .06f, unit * .87f);
-            canvas.drawRoundRect(pill, unit * .30f, unit * .30f, paint);
-        }
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(resolvedCardColor());
+        RectF pill = new RectF(unit * .06f, unit * .13f,
+                cardWidth - unit * .06f, unit * .87f);
+        canvas.drawRoundRect(pill, unit * .30f, unit * .30f, paint);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(signalColor(light.signal));
         canvas.drawCircle(centerX, centerY, radius, paint);
@@ -788,7 +860,6 @@ final class TrafficLightMapLayer {
     }
 
     private static final class ConnectorTexture {
-        static final float OVERSAMPLE = 2f;
         final Bitmap bitmap;
         final PointF anchor;
 

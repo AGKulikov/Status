@@ -59,6 +59,7 @@ public final class InstrumentPanelContractTest {
         assertTrue(InstrumentElementType.DIGITAL_SPEEDOMETER.isDigitalGauge());
         assertTrue(InstrumentElementType.AVERAGE_CONSUMPTION.isDigitalGauge());
         assertFalse(InstrumentElementType.GEAR.isDigitalGauge());
+        assertTrue(InstrumentElementType.TRAFFIC_JAM.usesNavigationState());
 
         config.backgroundBottomColor = "not-a-color";
         config.normalize();
@@ -233,6 +234,33 @@ public final class InstrumentPanelContractTest {
         assertTrue(renderer.contains("config.blackZonePercent"));
         assertTrue(renderer.contains("NavigationBridgeStateStore.addListener"));
         assertTrue(renderer.contains("if (navigation == null) return"));
+    }
+
+    @Test public void trafficJamIsASeparateAutoHidingCanvasModule() throws Exception {
+        InstrumentElementConfig value = new InstrumentElementConfig(
+                "traffic_jam", InstrumentElementType.TRAFFIC_JAM,
+                InstrumentStyleFamily.SLATE_HORIZON);
+        value.options.put("faceColor", "#FF123456");
+        value.options.put("textSizeSp", 41);
+        value.normalize(48, 18);
+        InstrumentElementConfig restored = InstrumentElementConfig.fromJson(
+                value.toJson(), 48, 18);
+
+        assertEquals(InstrumentElementType.TRAFFIC_JAM, restored.type);
+        assertEquals("#FF123456", restored.options.optString("faceColor"));
+        assertEquals(41, restored.options.optInt("textSizeSp"));
+
+        Path root = projectRoot();
+        String renderer = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentClusterView.java"));
+        String settings = read(root.resolve("app/src/main/java/dezz/status/widget/"
+                + "InstrumentPanelSettingsActivity.java"));
+        assertTrue(renderer.contains("drawTrafficJamForecast"));
+        assertTrue(renderer.contains("navigation.trafficJamDurationSeconds >= 0"));
+        assertTrue(renderer.contains("if (!available && !editorMode) return"));
+        assertTrue(renderer.contains("Paint.SUBPIXEL_TEXT_FLAG"));
+        assertTrue(settings.contains("TrafficJamControls"));
+        assertTrue(settings.contains("прогноз текущей пробки"));
     }
 
     @Test public void routeSummaryUsesTheOriginalSignAndHasPerElementLayoutControls()

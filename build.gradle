@@ -217,6 +217,11 @@ int getVersionCode() {
     if (version == '2.7.3') {
         return 208021306
     }
+    // 2.7.4 adds the independent traffic-jam forecast module, configurable traffic-light
+    // balloon color and the reduced-scale rendering sharpness corrections.
+    if (version == '2.7.4') {
+        return 208021307
+    }
     if (version == '2.3.0') {
         return 208021254
     }

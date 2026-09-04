@@ -28,6 +28,7 @@ public final class InstrumentElementConfig {
         this.style = style;
         width = type.defaultWidth;
         height = type.defaultHeight;
+        if (type == InstrumentElementType.TRAFFIC_JAM) applyTrafficJamDefaults();
     }
 
     @NonNull
@@ -60,6 +61,46 @@ public final class InstrumentElementConfig {
         opacityPercent = clamp(opacityPercent, 10, 100);
         if (options == null || options.toString().length() > 32_768) options = new JSONObject();
         if (type == InstrumentElementType.NAVIGATION_INFO) normalizeNavigationInfoOptions();
+        if (type == InstrumentElementType.TRAFFIC_JAM) normalizeTrafficJamOptions();
+    }
+
+    private void applyTrafficJamDefaults() {
+        try {
+            options.put("showFace", true);
+            options.put("faceColor", "#F21B1F24");
+            options.put("faceOpacityPercent", 100);
+            options.put("faceCornerRadiusPx", 16);
+            options.put("faceBorderColor", "#00000000");
+            options.put("faceBorderWidthPx", 0);
+            options.put("contentPaddingLeftPx", 12);
+            options.put("contentPaddingTopPx", 5);
+            options.put("contentPaddingRightPx", 12);
+            options.put("contentPaddingBottomPx", 5);
+            options.put("textSizeSp", 30);
+            options.put("textColor", "#FFFFFFFF");
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void normalizeTrafficJamOptions() {
+        try {
+            options.put("faceOpacityPercent", clamp(
+                    options.optInt("faceOpacityPercent", 100), 0, 100));
+            options.put("faceCornerRadiusPx", clamp(
+                    options.optInt("faceCornerRadiusPx", 16), 0, 160));
+            options.put("faceBorderWidthPx", clamp(
+                    options.optInt("faceBorderWidthPx", 0), 0, 24));
+            options.put("textSizeSp", clamp(options.optInt("textSizeSp", 30), 8, 120));
+            for (String key : new String[]{"contentPaddingLeftPx", "contentPaddingTopPx",
+                    "contentPaddingRightPx", "contentPaddingBottomPx"}) {
+                options.put(key, clamp(options.optInt(key,
+                        key.endsWith("LeftPx") || key.endsWith("RightPx") ? 12 : 5),
+                        0, 160));
+            }
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     private void normalizeNavigationInfoOptions() {

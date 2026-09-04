@@ -24,10 +24,10 @@ import java.util.Map;
 /**
  * Bounded, device-protected storage for graphics supplied by navigation broadcasts.
  *
- * <p>Broadcast parcelables are deliberately copied and down-sampled before they reach the HOME
- * view. This prevents a malformed or accidentally full-resolution image from retaining a large
- * Binder-backed bitmap in the launcher process. Files are used instead of SharedPreferences so
- * the scalar route state remains small and crash-safe.</p>
+ * <p>Broadcast parcelables are deliberately copied before they reach the HOME view. Oversized
+ * parcelable bitmaps are rejected instead of being resized into an intermediate raster which a
+ * HUD element would scale a second time. Encoded images are bounded during their one decode.
+ * Files are used instead of SharedPreferences so scalar route state remains small and crash-safe.</p>
  */
 final class NavigationGraphicStore {
     static final String MANEUVER = "maneuver";
@@ -259,17 +259,12 @@ final class NavigationGraphicStore {
             return null;
         }
         if (width <= 0 || height <= 0) return null;
-        double scale = Math.min(1d, Math.min(MAX_DIMENSION / (double) width,
-                MAX_DIMENSION / (double) height));
-        if ((long) width * height > MAX_PIXELS) {
-            scale = Math.min(scale, Math.sqrt(MAX_PIXELS / ((double) width * height)));
-        }
-        int targetWidth = Math.max(1, (int) Math.round(width * scale));
-        int targetHeight = Math.max(1, (int) Math.round(height * scale));
+        // This path receives an already rasterised Parcelable. Resizing it here and again in the
+        // independently sized HUD/cluster frame creates the exact bitmap->bitmap chain audited in
+        // MAP-046. Fail closed; Navigator's real maneuver/lane graphics are far below this cap.
+        if (width > MAX_DIMENSION || height > MAX_DIMENSION
+                || (long) width * height > MAX_PIXELS) return null;
         try {
-            if (targetWidth != width || targetHeight != height) {
-                return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true);
-            }
             Bitmap.Config config = source.getConfig();
             if (config == null || config == Bitmap.Config.HARDWARE) config = Bitmap.Config.ARGB_8888;
             return source.copy(config, false);

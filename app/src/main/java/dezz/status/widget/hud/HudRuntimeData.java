@@ -424,6 +424,10 @@ public final class HudRuntimeData {
             case NAV_TRAFFIC_LIGHTS:
                 if (navigation == null) return "—";
                 return join(navigation.trafficColor, navigation.trafficCountdown, " ");
+            case NAV_TRAFFIC_JAM:
+                if (navigation == null || !navigation.trafficJamAvailable) return "";
+                return "Пробка на " + navigation.trafficJamDuration
+                        + " (" + navigation.trafficJamDistance + ")";
             case NAV_SPEED:
                 if (navigation != null && Double.isFinite(navigation.speedKmh)) {
                     return applyFormat(item.textFormat, navigation.speedKmh,

@@ -28,6 +28,9 @@ public final class NavigationSnapshotV2 {
     public final int routeTotalDistanceMeters;
     public final int remainingDistanceMeters;
     public final int remainingDurationSeconds;
+    /** Nullable Guidance.leftInTrafficJam() encoded as -1/-1 when Navigator hides its card. */
+    public final int trafficJamDurationSeconds;
+    public final int trafficJamDistanceMeters;
     public final long arrivalEpochMs;
     public final int speedLimitKmh;
     public final int laneDistanceMeters;
@@ -54,8 +57,8 @@ public final class NavigationSnapshotV2 {
         this(sequence, routeEpoch, sourceTimestampMs, routeActive, latitude, longitude,
                 bearingDegrees, speedKmh, maneuverType, maneuverTitle, maneuverSubtext, street,
                 destination, maneuverDistanceMeters, -1, remainingDistanceMeters,
-                remainingDurationSeconds, arrivalEpochMs, speedLimitKmh, -1, lanesJson,
-                trafficLightsJson);
+                remainingDurationSeconds, -1, -1, arrivalEpochMs, speedLimitKmh, -1,
+                lanesJson, trafficLightsJson);
     }
 
     public NavigationSnapshotV2(long sequence, long routeEpoch, long sourceTimestampMs,
@@ -65,6 +68,23 @@ public final class NavigationSnapshotV2 {
             @NonNull String destination, int maneuverDistanceMeters,
             int routeTotalDistanceMeters, int remainingDistanceMeters,
             int remainingDurationSeconds, long arrivalEpochMs, int speedLimitKmh,
+            int laneDistanceMeters, @NonNull String lanesJson,
+            @NonNull String trafficLightsJson) {
+        this(sequence, routeEpoch, sourceTimestampMs, routeActive, latitude, longitude,
+                bearingDegrees, speedKmh, maneuverType, maneuverTitle, maneuverSubtext, street,
+                destination, maneuverDistanceMeters, routeTotalDistanceMeters,
+                remainingDistanceMeters, remainingDurationSeconds, -1, -1, arrivalEpochMs,
+                speedLimitKmh, laneDistanceMeters, lanesJson, trafficLightsJson);
+    }
+
+    public NavigationSnapshotV2(long sequence, long routeEpoch, long sourceTimestampMs,
+            boolean routeActive, double latitude, double longitude, double bearingDegrees,
+            double speedKmh, @NonNull String maneuverType, @NonNull String maneuverTitle,
+            @NonNull String maneuverSubtext, @NonNull String street,
+            @NonNull String destination, int maneuverDistanceMeters,
+            int routeTotalDistanceMeters, int remainingDistanceMeters,
+            int remainingDurationSeconds, int trafficJamDurationSeconds,
+            int trafficJamDistanceMeters, long arrivalEpochMs, int speedLimitKmh,
             int laneDistanceMeters, @NonNull String lanesJson,
             @NonNull String trafficLightsJson) {
         this.sequence = Math.max(0L, sequence);
@@ -84,6 +104,8 @@ public final class NavigationSnapshotV2 {
         this.routeTotalDistanceMeters = nonNegative(routeTotalDistanceMeters);
         this.remainingDistanceMeters = nonNegative(remainingDistanceMeters);
         this.remainingDurationSeconds = nonNegative(remainingDurationSeconds);
+        this.trafficJamDurationSeconds = nonNegative(trafficJamDurationSeconds);
+        this.trafficJamDistanceMeters = nonNegative(trafficJamDistanceMeters);
         this.arrivalEpochMs = Math.max(0L, arrivalEpochMs);
         this.speedLimitKmh = Math.max(0, Math.min(300, speedLimitKmh));
         this.laneDistanceMeters = nonNegative(laneDistanceMeters);
@@ -108,6 +130,8 @@ public final class NavigationSnapshotV2 {
                 .put("routeTotalDistanceMeters", routeTotalDistanceMeters)
                 .put("remainingDistanceMeters", remainingDistanceMeters)
                 .put("remainingDurationSeconds", remainingDurationSeconds)
+                .put("trafficJamDurationSeconds", trafficJamDurationSeconds)
+                .put("trafficJamDistanceMeters", trafficJamDistanceMeters)
                 .put("arrivalEpochMs", arrivalEpochMs)
                 .put("speedLimitKmh", speedLimitKmh)
                 .put("laneDistanceMeters", laneDistanceMeters)
@@ -150,6 +174,8 @@ public final class NavigationSnapshotV2 {
                     source.optInt("routeTotalDistanceMeters", -1),
                     source.optInt("remainingDistanceMeters", -1),
                     source.optInt("remainingDurationSeconds", -1),
+                    source.optInt("trafficJamDurationSeconds", -1),
+                    source.optInt("trafficJamDistanceMeters", -1),
                     source.optLong("arrivalEpochMs", 0L),
                     source.optInt("speedLimitKmh", 0),
                     source.optInt("laneDistanceMeters", -1),

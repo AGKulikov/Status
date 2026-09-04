@@ -59,6 +59,8 @@ final class NavigationMapProfile {
     String cameraDirectionColor = "#FF168BFF";
     int cameraDirectionOpacityPercent = 30;
     int trafficLightScalePercent = 100;
+    /** Empty keeps TrafficLightViewImpl's stock colours; otherwise body and tail are recoloured. */
+    String trafficLightCardColor = "";
     int speedBumpScalePercent = 100;
     int routeTurnLengthPercent = 100;
     /** Independent scale of ArrowManeuverStyle.triangleHeight. */
@@ -172,6 +174,10 @@ final class NavigationMapProfile {
                     source.optInt("cameraDirectionOpacityPercent", 30), 0, 100);
             result.trafficLightScalePercent = clamp(
                     source.optInt("trafficLightScalePercent", 100), 50, 250);
+            String configuredTrafficLightCardColor = optionalColor(
+                    source, "trafficLightCardColor");
+            result.trafficLightCardColor = configuredTrafficLightCardColor == null
+                    ? "" : configuredTrafficLightCardColor;
             result.speedBumpScalePercent = clamp(
                     source.optInt("speedBumpScalePercent", 100), 50, 250);
             int legacyRouteTurnScale = source.optInt("routeTurnScalePercent", 100);

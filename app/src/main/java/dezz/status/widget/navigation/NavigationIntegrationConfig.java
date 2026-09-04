@@ -209,6 +209,8 @@ public final class NavigationIntegrationConfig {
         public int cameraDirectionOpacityPercent = 30;
         /** Scale of Yandex's original signal-and-seconds traffic-light balloon. */
         public int trafficLightScalePercent = 100;
+        /** Null preserves Navigator's stock day/night card; a value recolours body and tail. */
+        @Nullable public String trafficLightCardColor;
         /** Target raster size of the stock vector route-speed-bump pin. */
         public int speedBumpScalePercent = 100;
         /** Length of arrows painted directly onto upcoming route turns. */
@@ -332,6 +334,8 @@ public final class NavigationIntegrationConfig {
                     .put("cameraDirectionColor", cameraDirectionColor)
                     .put("cameraDirectionOpacityPercent", cameraDirectionOpacityPercent)
                     .put("trafficLightScalePercent", trafficLightScalePercent)
+                    .put("trafficLightCardColor", trafficLightCardColor == null
+                            ? JSONObject.NULL : trafficLightCardColor)
                     .put("speedBumpScalePercent", speedBumpScalePercent)
                     .put("routeTurnLengthPercent", routeTurnLengthPercent)
                     // Keep the legacy key during the transition so an older paired Navigator
@@ -441,6 +445,8 @@ public final class NavigationIntegrationConfig {
                     "cameraDirectionOpacityPercent", result.cameraDirectionOpacityPercent);
             result.trafficLightScalePercent = source.optInt(
                     "trafficLightScalePercent", result.trafficLightScalePercent);
+            result.trafficLightCardColor = optionalColor(
+                    source, "trafficLightCardColor", result.trafficLightCardColor);
             result.speedBumpScalePercent = source.optInt(
                     "speedBumpScalePercent", result.speedBumpScalePercent);
             int legacyRouteTurnScale = source.optInt(
@@ -576,6 +582,7 @@ public final class NavigationIntegrationConfig {
             cameraDirectionColor = color(cameraDirectionColor, "#FF168BFF");
             cameraDirectionOpacityPercent = clamp(cameraDirectionOpacityPercent, 0, 100);
             trafficLightScalePercent = clamp(trafficLightScalePercent, 50, 250);
+            trafficLightCardColor = optionalColor(trafficLightCardColor);
             speedBumpScalePercent = clamp(speedBumpScalePercent, 50, 250);
             routeTurnLengthPercent = clamp(routeTurnLengthPercent, 10, 250);
             routeTurnHeadSizePercent = clamp(routeTurnHeadSizePercent, 10, 250);

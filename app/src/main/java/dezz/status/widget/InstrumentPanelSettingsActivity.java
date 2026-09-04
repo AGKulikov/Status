@@ -334,6 +334,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         final Switch showEta;
         final Switch showDuration;
         final NavigationInfoControls navigationInfoControls;
+        final TrafficJamControls trafficJamControls =
+                element.type == InstrumentElementType.TRAFFIC_JAM
+                        ? new TrafficJamControls(content, element) : null;
         final Spinner[] infoRows = new Spinner[3];
         if (element.type.isAnalogGauge()) {
             showFace = switchView("Фон шкалы",
@@ -400,6 +403,15 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             content.addView(showDuration);
             content.addView(showProgress);
             navigationInfoControls.addViews();
+        } else if (element.type == InstrumentElementType.TRAFFIC_JAM) {
+            showFace = switchView("Фон плашки",
+                    element.options.optBoolean("showFace", true));
+            showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
+            showProgress = showStreet = showArrival = null;
+            showDistance = showEta = showDuration = null;
+            navigationInfoControls = null;
+            content.addView(showFace, marginTop(10));
+            trafficJamControls.addViews();
         } else if (isDigitalValueElement(element.type)) {
             showFace = switchView("Фон элемента",
                     element.options.optBoolean("showFace", true));
@@ -471,6 +483,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     }
                     if (navigationInfoControls != null) {
                         navigationInfoControls.apply(element);
+                    }
+                    if (trafficJamControls != null) {
+                        trafficJamControls.apply(element);
                     }
                     InstrumentInfoMetric[] metrics = InstrumentInfoMetric.values();
                     for (int row = 0; row < infoRows.length; row++) {
@@ -660,6 +675,10 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField trafficLightScale = slider(content,
                 "Размер светофоров и плашек секунд",
                 map.trafficLightScalePercent, 50, 250, 5, " %");
+        InheritedColorField trafficLightCardColor = inheritableNavigationColorField(
+                content, "Цвет плашки и хвостика светофора",
+                map.trafficLightCardColor, finalNavigation, preferences,
+                value -> map.trafficLightCardColor = value);
         SliderField speedBumpScale = slider(content,
                 "Размер знаков искусственных неровностей",
                 map.speedBumpScalePercent, 50, 250, 5, " %");
@@ -823,6 +842,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cameraDirectionColor = cameraDirectionColor.value;
                     map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue();
                     map.trafficLightScalePercent = trafficLightScale.intValue();
+                    map.trafficLightCardColor = trafficLightCardColor.value;
                     map.speedBumpScalePercent = speedBumpScale.intValue();
                     map.routeTurnLengthPercent = routeTurnLength.intValue();
                     map.routeTurnHeadSizePercent = routeTurnHeadSize.intValue();
@@ -1105,6 +1125,67 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         void apply(@NonNull InstrumentElementConfig target) {
             setOption(target, "showManeuverIcon", showIcon.isChecked());
             setOption(target, "reserveManeuverIconSpace", reserveIconSpace.isChecked());
+            for (Map.Entry<String, SliderField> entry : numbers.entrySet()) {
+                setOption(target, entry.getKey(), entry.getValue().intValue());
+            }
+            for (Map.Entry<String, ColorField> entry : colors.entrySet()) {
+                setOption(target, entry.getKey(), entry.getValue().value);
+            }
+        }
+    }
+
+    /** Fine-grained editor for the independently positioned traffic-jam forecast card. */
+    private final class TrafficJamControls {
+        @NonNull private final LinearLayout parent;
+        @NonNull private final InstrumentElementConfig source;
+        @NonNull private final Map<String, SliderField> numbers = new LinkedHashMap<>();
+        @NonNull private final Map<String, ColorField> colors = new LinkedHashMap<>();
+
+        TrafficJamControls(@NonNull LinearLayout parent,
+                           @NonNull InstrumentElementConfig source) {
+            this.parent = parent;
+            this.source = source;
+        }
+
+        void addViews() {
+            parent.addView(text("Модуль показывается только пока Яндекс Навигатор передаёт "
+                    + "прогноз текущей пробки; без данных вся плашка скрывается.",
+                    12, 0xFFB8C0CC), marginTop(6));
+            parent.addView(section("Текст"), marginTop(12));
+            color("textColor", "Цвет текста", "#FFFFFFFF");
+            number("textSizeSp", "Размер текста", 30, 8, 120, 1, " sp");
+
+            parent.addView(section("Плашка"), marginTop(12));
+            color("faceColor", "Цвет плашки", "#F21B1F24");
+            number("faceOpacityPercent", "Непрозрачность плашки",
+                    100, 0, 100, 1, " %");
+            number("faceCornerRadiusPx", "Скругление плашки",
+                    16, 0, 160, 1, " px");
+            color("faceBorderColor", "Цвет рамки", "#00000000");
+            number("faceBorderWidthPx", "Толщина рамки",
+                    0, 0, 24, 1, " px");
+
+            parent.addView(section("Внутренние отступы"), marginTop(12));
+            number("contentPaddingLeftPx", "Слева", 12, 0, 160, 1, " px");
+            number("contentPaddingTopPx", "Сверху", 5, 0, 160, 1, " px");
+            number("contentPaddingRightPx", "Справа", 12, 0, 160, 1, " px");
+            number("contentPaddingBottomPx", "Снизу", 5, 0, 160, 1, " px");
+        }
+
+        private void number(@NonNull String key, @NonNull String title, int fallback,
+                            int minimum, int maximum, int step,
+                            @NonNull String suffix) {
+            numbers.put(key, slider(parent, title, source.options.optInt(key, fallback),
+                    minimum, maximum, step, suffix));
+        }
+
+        private void color(@NonNull String key, @NonNull String title,
+                           @NonNull String fallback) {
+            colors.put(key, colorField(parent, title,
+                    source.options.optString(key, fallback)));
+        }
+
+        void apply(@NonNull InstrumentElementConfig target) {
             for (Map.Entry<String, SliderField> entry : numbers.entrySet()) {
                 setOption(target, entry.getKey(), entry.getValue().intValue());
             }

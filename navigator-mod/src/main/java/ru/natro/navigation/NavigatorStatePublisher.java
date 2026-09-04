@@ -694,7 +694,8 @@ final class NavigatorStatePublisher {
                     activeLaneState.mapFrame, activeLaneSampleElapsedMs)
                     .withRouteTurns(activeRouteTurns, activeRouteTurnsSampleElapsedMs);
             String snapshot = snapshotDue
-                    ? buildSnapshot(currentGuidance, activeRoute, inputs,
+                    ? buildSnapshot(currentGuidance, currentNaviKitGuidance,
+                            activeRoute, inputs,
                             activeTrafficLights, activeLaneState).toString() : null;
             if (snapshotDue) lastSnapshotDispatchElapsedMs = elapsedNow;
             String route = routeChanged || forceRoute ? buildRoutePayload().toString() : null;
@@ -995,7 +996,8 @@ final class NavigatorStatePublisher {
                 currentPoint, priority, 1.0d);
     }
 
-    private JSONObject buildSnapshot(Object currentGuidance, Object route,
+    private JSONObject buildSnapshot(Object currentGuidance, Object currentNaviKitGuidance,
+                                     Object route,
                                      SnapshotInputs inputs,
                                      List<TrafficLightFrame> trafficLights,
                                      LaneState lanes)
@@ -1012,6 +1014,8 @@ final class NavigatorStatePublisher {
         int routeTotalDistance = routeActive ? activeRouteTotalDistanceMeters : -1;
         long arrival = remainingDuration < 0 ? 0L
                 : now + Math.min(31_536_000, remainingDuration) * 1_000L;
+        TrafficJamForecast trafficJam = readTrafficJamForecast(
+                currentNaviKitGuidance, routeActive);
 
         Manoeuvre manoeuvre = routeActive && routePosition != null
                 ? readManoeuvre(routePosition) : Manoeuvre.EMPTY;
@@ -1038,6 +1042,8 @@ final class NavigatorStatePublisher {
                 .put("routeTotalDistanceMeters", routeTotalDistance)
                 .put("remainingDistanceMeters", remainingDistance)
                 .put("remainingDurationSeconds", remainingDuration)
+                .put("trafficJamDurationSeconds", trafficJam.durationSeconds)
+                .put("trafficJamDistanceMeters", trafficJam.distanceMeters)
                 .put("arrivalEpochMs", arrival)
                 .put("speedLimitKmh", Math.min(300, speedLimit))
                 .put("laneDistanceMeters", lanes.distanceMeters)
@@ -1052,6 +1058,29 @@ final class NavigatorStatePublisher {
             result.put("speedKmh", Math.min(400d, frame.speedKmh));
         }
         return result;
+    }
+
+    /**
+     * Reads the same nullable value that owns Navigator's "Пробка на …" card. Failure of this
+     * optional API must hide only that module and must never detach the complete Guidance stream.
+     */
+    private static TrafficJamForecast readTrafficJamForecast(
+            Object currentNaviKitGuidance, boolean routeActive) {
+        if (!routeActive || currentNaviKitGuidance == null) return TrafficJamForecast.EMPTY;
+        try {
+            Object forecast = invoke(currentNaviKitGuidance, "leftInTrafficJam");
+            if (forecast == null) return TrafficJamForecast.EMPTY;
+            double durationMillis = number(invoke(forecast, "getDuration"), -1d);
+            int durationSeconds = !finite(durationMillis) || durationMillis < 0d ? -1
+                    : (int) Math.min(Integer.MAX_VALUE,
+                    Math.round(durationMillis) / 1_000L);
+            int distanceMeters = nonNegativeInt(number(invoke(forecast, "getMeters"), -1d));
+            return durationSeconds < 0 || distanceMeters < 0
+                    ? TrafficJamForecast.EMPTY
+                    : new TrafficJamForecast(durationSeconds, distanceMeters);
+        } catch (Throwable unavailable) {
+            return TrafficJamForecast.EMPTY;
+        }
     }
 
     private String destinationForRoute(Object route) {
@@ -1890,6 +1919,17 @@ final class NavigatorStatePublisher {
             this.type = type;
             this.title = title;
             this.subtext = subtext;
+            this.distanceMeters = distanceMeters;
+        }
+    }
+
+    private static final class TrafficJamForecast {
+        static final TrafficJamForecast EMPTY = new TrafficJamForecast(-1, -1);
+        final int durationSeconds;
+        final int distanceMeters;
+
+        TrafficJamForecast(int durationSeconds, int distanceMeters) {
+            this.durationSeconds = durationSeconds;
             this.distanceMeters = distanceMeters;
         }
     }

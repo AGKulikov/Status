@@ -185,6 +185,22 @@ public final class HudElementConfig {
                     options.put("greenColor", "#FF34C759");
                     options.put("unknownColor", "#FF6B7280");
                     break;
+                case NAV_TRAFFIC_JAM:
+                    // This is a standalone Canvas card. It appears only while Navigator exposes
+                    // the nullable JamForecast and never becomes part of NAV_MAP.
+                    options.put("hideWhenInactive", true);
+                    options.put("hideWhenEmpty", true);
+                    options.put("showCardBackground", true);
+                    options.put("cardColor", "#F21B1F24");
+                    options.put("cardOpacityPercent", 100);
+                    options.put("cardCornerRadiusPx", 16);
+                    options.put("cardBorderColor", "#00000000");
+                    options.put("cardBorderWidthPx", 0);
+                    options.put("paddingLeftPx", 12);
+                    options.put("paddingTopPx", 5);
+                    options.put("paddingRightPx", 12);
+                    options.put("paddingBottomPx", 5);
+                    break;
                 case NAV_TRIP_PROGRESS:
                     options.put("progressMode", "COMBINED");
                     options.put("orientation", "HORIZONTAL");
@@ -307,6 +323,9 @@ public final class HudElementConfig {
         if (type == HudElementType.NAV_COMBINED) {
             normalizeCombinedNavigationOptions();
         }
+        if (type == HudElementType.NAV_TRAFFIC_JAM) {
+            normalizeTrafficJamOptions();
+        }
         if (type == HudElementType.HORIZONTAL_GROUP) {
             HudHorizontalGroup.normalizeOptions(this);
         }
@@ -361,6 +380,32 @@ public final class HudElementConfig {
                     options.optString("cardColor", "#FF0758E8"), 32, "#FF0758E8"));
             options.put("roadBadgeColor", bounded(
                     options.optString("roadBadgeColor", "#FF16A34A"), 32, "#FF16A34A"));
+            options.put("cardBorderColor", bounded(
+                    options.optString("cardBorderColor", "#00000000"),
+                    32, "#00000000"));
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void normalizeTrafficJamOptions() {
+        try {
+            options.put("hideWhenInactive", true);
+            options.put("hideWhenEmpty", true);
+            options.put("cardOpacityPercent", clamp(
+                    options.optInt("cardOpacityPercent", 100), 0, 100));
+            options.put("cardCornerRadiusPx", clamp(
+                    options.optInt("cardCornerRadiusPx", 16), 0, 160));
+            options.put("cardBorderWidthPx", clamp(
+                    options.optInt("cardBorderWidthPx", 0), 0, 24));
+            for (String key : new String[]{"paddingLeftPx", "paddingTopPx",
+                    "paddingRightPx", "paddingBottomPx"}) {
+                options.put(key, clamp(options.optInt(key,
+                        key.endsWith("LeftPx") || key.endsWith("RightPx") ? 12 : 5),
+                        0, 160));
+            }
+            options.put("cardColor", bounded(
+                    options.optString("cardColor", "#F21B1F24"), 32, "#F21B1F24"));
             options.put("cardBorderColor", bounded(
                     options.optString("cardBorderColor", "#00000000"),
                     32, "#00000000"));

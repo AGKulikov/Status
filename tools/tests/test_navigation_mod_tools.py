@@ -682,22 +682,22 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.7.3}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021306}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.7.4}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021307}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.7.3")', verifier)
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021306")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.7.4")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021307")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
         build = (TOOLS.parent / "build.gradle").read_text()
         workflow = (TOOLS.parent / ".github" / "workflows"
                     / "verify-navigation-hud-v2.yml").read_text()
-        self.assertIn("if (version == '2.7.3')", build)
-        self.assertIn("return 208021306", build)
-        self.assertIn("VERSION_NAME: '2.7.3'", workflow)
-        self.assertIn("VERSION_CODE: '208021306'", workflow)
+        self.assertIn("if (version == '2.7.4')", build)
+        self.assertIn("return 208021307", build)
+        self.assertIn("VERSION_NAME: '2.7.4'", workflow)
+        self.assertIn("VERSION_CODE: '208021307'", workflow)
         self.assertNotIn("2.5.10", build)
         self.assertNotIn("2.5.10", workflow)
 
@@ -740,6 +740,34 @@ public final class MapOverlayPlacementHarness {
         controller = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                       / "ru" / "natro" / "navigation"
                       / "FloatingWindowController.java").read_text()
+        graphics = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                    / "status" / "widget" / "launcher"
+                    / "NavigationGraphicStore.java").read_text()
+        sharpness_audit = (TOOLS.parent / "docs"
+                           / "NAVIGATION_SHARPNESS_AUDIT_RU.md").read_text()
+        integration_config = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                              / "status" / "widget" / "navigation"
+                              / "NavigationIntegrationConfig.java").read_text()
+        hud_settings = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                        / "status" / "widget"
+                        / "HudPanelSettingsActivity.java").read_text()
+        cluster_settings = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                            / "status" / "widget"
+                            / "InstrumentPanelSettingsActivity.java").read_text()
+        hud_types = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                     / "status" / "widget" / "hud" / "HudElementType.java").read_text()
+        hud_state = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                     / "status" / "widget" / "hud" / "HudNavigationState.java").read_text()
+        hud_runtime = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                       / "status" / "widget" / "hud" / "HudRuntimeData.java").read_text()
+        hud_canvas = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                      / "status" / "widget" / "hud" / "HudCanvasView.java").read_text()
+        instrument_types = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                            / "status" / "widget" / "instrument"
+                            / "InstrumentElementType.java").read_text()
+        instrument_canvas = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                             / "status" / "widget" / "instrument"
+                             / "InstrumentClusterView.java").read_text()
 
         self.assertNotIn("NavigationLayerFactory", renderer)
         self.assertNotIn("NavigationLayerSettings", renderer)
@@ -802,6 +830,7 @@ public final class MapOverlayPlacementHarness {
         self.assertNotIn('getMethod("createView"', lanes)
         self.assertIn("NO_ROTATION", lanes)
         self.assertIn("setGeometry", lanes)
+        self.assertIn('invoke(style, "setScale"', lanes)
         self.assertIn("setLegPlacement", traffic_lights)
         self.assertIn("placement.legName", traffic_lights)
         self.assertIn('getMethod("getSize", legClass)', traffic_lights)
@@ -816,7 +845,19 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("useCompositeIcon", traffic_lights)
         self.assertIn('"traffic-light-connector"', traffic_lights)
         self.assertIn('"traffic-light-body"', traffic_lights)
-        self.assertIn("ConnectorTexture.OVERSAMPLE", traffic_lights)
+        self.assertNotIn("ConnectorTexture.OVERSAMPLE", traffic_lights)
+        self.assertIn('invoke(connectorStyle, "setScale"', traffic_lights)
+        self.assertIn("normalizedCardColor", traffic_lights)
+        self.assertIn("resolvedCardColor", traffic_lights)
+        self.assertIn("applyConfiguredCardColor", traffic_lights)
+        self.assertIn("backgroundPaintPrimary$delegate", traffic_lights)
+        self.assertIn("setLegColor", traffic_lights)
+        self.assertIn("if (cardColor.isEmpty())", traffic_lights)
+        self.assertIn("profile.trafficLightCardColor", renderer)
+        self.assertIn("trafficLightCardColor", integration_config)
+        for settings in (hud_settings, cluster_settings):
+            self.assertIn("Цвет плашки и хвостика светофора", settings)
+            self.assertIn("trafficLightCardColor.value", settings)
         self.assertIn("Float.valueOf(zIndex - .01f)", traffic_lights)
         self.assertEqual(traffic_lights.count("MapObjectLayerFactory.create(map"), 1)
         self.assertIn('"traffic_light_leg_size"', traffic_lights)
@@ -848,6 +889,22 @@ public final class MapOverlayPlacementHarness {
                          "BOTTOM_CENTER", "TOP_CENTER"):
             self.assertIn(leg_name, placement)
         self.assertIn("overlayPlacement.beginLayout()", renderer)
+        self.assertIn('invoke(currentNaviKitGuidance, "leftInTrafficJam")', publisher)
+        self.assertIn('"trafficJamDurationSeconds"', publisher)
+        self.assertIn('"trafficJamDistanceMeters"', publisher)
+        self.assertIn("NAV_TRAFFIC_JAM", hud_types)
+        self.assertIn("case NAV_TRAFFIC_JAM", hud_state)
+        self.assertIn('return "Пробка на " + navigation.trafficJamDuration',
+                      hud_runtime)
+        self.assertIn("drawTrafficJamForecast", hud_canvas)
+        self.assertIn("TRAFFIC_JAM", instrument_types)
+        self.assertIn("drawTrafficJamForecast", instrument_canvas)
+        self.assertIn("if (!available && !editorMode) return", instrument_canvas)
+        self.assertNotIn("Bitmap.createScaledBitmap", traffic_lights)
+        self.assertNotIn("Bitmap.createScaledBitmap", lanes)
+        self.assertNotIn("Bitmap.createScaledBitmap", graphics)
+        self.assertIn("parcelable bitmaps are rejected", graphics)
+        self.assertIn("GATE-032", sharpness_audit)
         self.assertIn("overlayPlacement.updateRoute(routeEpoch, drivingRoute)", renderer)
         self.assertIn("frame.routeSegmentPosition", renderer)
         self.assertIn("laneGuidanceMapLayer.relayout()", renderer)

@@ -49,7 +49,8 @@ public final class HudCanvasView extends View {
 
     private static final float HANDLE_SIZE = 34f;
     @NonNull private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    @NonNull private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    @NonNull private final TextPaint textPaint = new TextPaint(
+            Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
     @NonNull private final Paint.FontMetrics textFontMetrics = new Paint.FontMetrics();
     @NonNull private final Path path = new Path();
     @NonNull private HudPanelConfig config;
@@ -203,7 +204,9 @@ public final class HudCanvasView extends View {
                 && !data.navigationElementAvailable(item)) {
             return false;
         }
-        if (item.options.optBoolean("hideWhenInactive", false)) {
+        // The editor must keep semantic modules selectable even when their live source is
+        // currently absent; their draw methods provide explicit design-time placeholders.
+        if (!editor && item.options.optBoolean("hideWhenInactive", false)) {
             if (isNavigation(item.type)) {
                 HudNavigationState nav = data.navigation();
                 if (nav == null || (!nav.routeActive && !nav.laneAvailable
@@ -212,7 +215,7 @@ public final class HudCanvasView extends View {
                 return false;
             }
         }
-        if (item.options.optBoolean("hideWhenEmpty", false)) {
+        if (!editor && item.options.optBoolean("hideWhenEmpty", false)) {
             String value = data.textFor(item).trim();
             if (value.isEmpty() || "—".equals(value)
                     || "Маршрут не активен".equals(value)) {
@@ -309,6 +312,9 @@ public final class HudCanvasView extends View {
                 return;
             case NAV_TRAFFIC_LIGHTS:
                 drawTrafficLights(canvas, item, bounds, textColor, scale);
+                return;
+            case NAV_TRAFFIC_JAM:
+                drawTrafficJamForecast(canvas, item, bounds, textColor, scale);
                 return;
             case NAV_TRIP_PROGRESS:
                 drawProgress(canvas, item, bounds, textColor, scale);
@@ -708,6 +714,45 @@ public final class HudCanvasView extends View {
         if (!textContent.isEmpty()) {
             drawManeuverCardText(canvas, item, textContent, color, unitColor, scale);
         }
+    }
+
+    /** Vector/text-only standalone forecast card; resizing never samples an intermediate bitmap. */
+    private void drawTrafficJamForecast(Canvas canvas, HudElementConfig item, RectF bounds,
+                                        int textColor, float scale) {
+        if (item.options.optBoolean("showCardBackground", true)) {
+            int card = optionColor(item, "cardColor", 0xF21B1F24);
+            int opacity = clamp(item.options.optInt("cardOpacityPercent", 100), 0, 100);
+            int alpha = Math.round(Color.alpha(card) * opacity / 100f
+                    * item.brightness / 100f);
+            float radius = Math.max(0f, Math.min(
+                    item.options.optInt("cardCornerRadiusPx", 16) * scale,
+                    Math.min(bounds.width(), bounds.height()) * .5f));
+            paint.clearShadowLayer();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(card, alpha));
+            canvas.drawRoundRect(bounds, radius, radius, paint);
+            float borderWidth = Math.max(0f,
+                    item.options.optInt("cardBorderWidthPx", 0) * scale);
+            if (borderWidth > 0f) {
+                int border = optionColor(item, "cardBorderColor", 0x00000000);
+                RectF borderBounds = inset(bounds, borderWidth * .5f);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(borderWidth);
+                paint.setColor(withAlpha(border, Math.round(
+                        Color.alpha(border) * item.brightness / 100f)));
+                canvas.drawRoundRect(borderBounds, radius, radius, paint);
+                paint.setStyle(Paint.Style.FILL);
+            }
+        }
+        RectF content = insetSides(bounds,
+                item.options.optInt("paddingLeftPx", 12) * scale,
+                item.options.optInt("paddingTopPx", 5) * scale,
+                item.options.optInt("paddingRightPx", 12) * scale,
+                item.options.optInt("paddingBottomPx", 5) * scale);
+        if (content.isEmpty()) return;
+        String value = data.textFor(item);
+        if (editor && value.trim().isEmpty()) value = "Пробка на 10 мин (1,2 км)";
+        drawText(canvas, item, value, content, textColor, scale);
     }
 
     /** Draws Navigator's information card without coupling it to the native map Surface. */

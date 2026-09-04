@@ -62,7 +62,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @NonNull private final InstrumentTelemetryRepository telemetry;
     @NonNull private final InstrumentTelemetryRepository.Frame frame =
             new InstrumentTelemetryRepository.Frame();
-    @NonNull private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+    @NonNull private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG
+            | Paint.DITHER_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
     @NonNull private final Paint clearPaint = new Paint();
     @NonNull private final RectF rect = new RectF();
     @NonNull private final RectF gaugeArc = new RectF();
@@ -454,7 +455,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     private void drawStaticElement(@NonNull Canvas canvas,
                                    @NonNull InstrumentElementConfig element,
                                    @NonNull RectF bounds) {
-        if (element.type == InstrumentElementType.NAVIGATION_INFO) return;
+        if (element.type == InstrumentElementType.NAVIGATION_INFO
+                || element.type == InstrumentElementType.TRAFFIC_JAM) return;
         InstrumentStyleFamily style = element.style;
         int alpha = Math.round(255f * element.opacityPercent / 100f);
         if (element.type.isAnalogGauge()) {
@@ -680,6 +682,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 break;
             case NAVIGATION_INFO:
                 drawNavigationInfo(canvas, runtime, bounds, navigationSnapshot);
+                break;
+            case TRAFFIC_JAM:
+                drawTrafficJamForecast(canvas, runtime, bounds, navigationSnapshot);
                 break;
             default:
                 break;
@@ -1171,6 +1176,72 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 centerY - (metrics.ascent + metrics.descent) * .5f, paint);
     }
 
+    /** Independent forecast card. Canvas re-renders vectors and glyphs for every live frame. */
+    private void drawTrafficJamForecast(@NonNull Canvas canvas,
+                                        @NonNull RuntimeElement runtime,
+                                        @NonNull RectF bounds,
+                                        @Nullable NavigationSnapshotV2 navigation) {
+        boolean available = navigation != null
+                && navigation.trafficJamDurationSeconds >= 0
+                && navigation.trafficJamDistanceMeters >= 0;
+        if (!available && !editorMode) return;
+        InstrumentElementConfig element = runtime.config;
+        int alpha = Math.round(255f * element.opacityPercent / 100f);
+        if (option(element, "showFace", true)) {
+            int faceColor = navigationColor(element.options.optString(
+                    "faceColor", "#F21B1F24"), 0xF21B1F24);
+            int faceOpacity = Math.max(0, Math.min(100,
+                    element.options.optInt("faceOpacityPercent", 100)));
+            float corner = Math.min(Math.min(bounds.width(), bounds.height()) * .5f,
+                    Math.max(0f, element.options.optInt("faceCornerRadiusPx", 16)));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(faceColor, Math.round(
+                    Color.alpha(faceColor) * faceOpacity / 100f * alpha / 255f)));
+            canvas.drawRoundRect(bounds, corner, corner, paint);
+            float borderWidth = Math.max(0f,
+                    element.options.optInt("faceBorderWidthPx", 0));
+            if (borderWidth > 0f) {
+                int borderColor = navigationColor(element.options.optString(
+                        "faceBorderColor", "#00000000"), 0x00000000);
+                RectF border = new RectF(bounds);
+                border.inset(borderWidth * .5f, borderWidth * .5f);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(borderWidth);
+                paint.setColor(withAlpha(borderColor, Math.round(
+                        Color.alpha(borderColor) * alpha / 255f)));
+                canvas.drawRoundRect(border, corner, corner, paint);
+            }
+        }
+        RectF content = insetSides(bounds,
+                element.options.optInt("contentPaddingLeftPx", 12),
+                element.options.optInt("contentPaddingTopPx", 5),
+                element.options.optInt("contentPaddingRightPx", 12),
+                element.options.optInt("contentPaddingBottomPx", 5));
+        if (content.isEmpty()) return;
+        String value = available
+                ? "Пробка на " + durationText(navigation.trafficJamDurationSeconds)
+                + " (" + distanceText(navigation.trafficJamDistanceMeters) + ")"
+                : "Пробка на 10 мин (1,2 км)";
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTypeface(digitalTypeface(element.style, true));
+        float requested = Math.max(8f, element.options.optInt("textSizeSp", 30)
+                * getResources().getDisplayMetrics().scaledDensity);
+        paint.setTextSize(Math.min(requested, Math.max(8f, content.height() * .82f)));
+        float measured = paint.measureText(value);
+        if (measured > content.width() && measured > 0f) {
+            paint.setTextSize(Math.max(8f,
+                    paint.getTextSize() * content.width() / measured));
+        }
+        int textColor = navigationColor(element.options.optString(
+                "textColor", "#FFFFFFFF"), Color.WHITE);
+        paint.setColor(withAlpha(textColor, Math.round(
+                Color.alpha(textColor) * alpha / 255f)));
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        canvas.drawText(value, content.centerX(),
+                content.centerY() - (metrics.ascent + metrics.descent) * .5f, paint);
+    }
+
     private void drawNavigationRouteProgress(@NonNull Canvas canvas,
                                              @NonNull RuntimeElement runtime,
                                              @NonNull RectF bounds, int alpha,
@@ -1593,8 +1664,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     private static String distanceText(int meters) {
         if (meters < 0) return "";
         if (meters < 1_000) return meters + " м";
-        int tenths = Math.round(meters / 100f);
-        return tenths < 100 ? (tenths / 10) + "." + (tenths % 10) + " км"
+        return meters < 10_000
+                ? String.format(Locale.getDefault(), "%.1f км", meters / 1_000d)
                 : Math.round(meters / 1_000f) + " км";
     }
 

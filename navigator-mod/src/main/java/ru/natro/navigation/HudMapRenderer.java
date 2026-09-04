@@ -393,7 +393,7 @@ final class HudMapRenderer {
                 && scaledRoadEventStyleProvider.setScales(
                 profile.roadEventScalePercent, profile.cameraScalePercent);
         trafficLightMapLayer.apply(profile.showTrafficLights, night,
-                profile.trafficLightScalePercent,
+                profile.trafficLightScalePercent, profile.trafficLightCardColor,
                 profile.effectiveTrafficLightPriority());
         speedBumpMapLayer.apply(profile.showSpeedBumps,
                 profile.speedBumpScalePercent,
