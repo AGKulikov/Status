@@ -230,6 +230,10 @@ int getVersionCode() {
     if (version == '2.7.6') {
         return 208021309
     }
+    // Parking graphics own the notification hold; sensor operating status does not.
+    if (version == '2.7.7') {
+        return 208021310
+    }
     if (version == '2.3.0') {
         return 208021254
     }
