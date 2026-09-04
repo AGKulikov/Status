@@ -11,6 +11,7 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 
 import java.util.List;
+import java.util.Map;
 
 import dezz.status.widget.launcher.LauncherShortcutStore;
 
@@ -38,7 +39,9 @@ final class DimMenuOverlayWindow {
         }
         WindowManager manager = displayContext.getSystemService(WindowManager.class);
         if (manager == null) throw new IllegalStateException("DIM WindowManager unavailable");
-        DimMenuPanelView view = new DimMenuPanelView(displayContext, config, items);
+        // mNavi inflates the overlay with the application resources and only obtains the window
+        // manager from the display context. Mirroring that detail keeps dp/sp metrics identical.
+        DimMenuPanelView view = new DimMenuPanelView(context, config, items);
         view.setSelectedIndex(selection);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 config.width, config.height,
@@ -69,6 +72,10 @@ final class DimMenuOverlayWindow {
 
     void setSelectedIndex(int index) {
         if (attached) view.setSelectedIndex(index);
+    }
+
+    void setStatuses(@NonNull Map<String, String> statuses) {
+        if (attached) view.setStatuses(statuses);
     }
 
     void dismiss() {

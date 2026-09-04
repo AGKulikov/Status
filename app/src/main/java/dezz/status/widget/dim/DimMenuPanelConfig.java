@@ -8,7 +8,7 @@ import org.json.JSONObject;
 
 /** Versioned geometry and appearance of the steering-wheel DIM menu. */
 public final class DimMenuPanelConfig {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     public static final int STOCK_NAVIGATION_TAB = 2;
 
     public int displayId = 2;
@@ -18,22 +18,23 @@ public final class DimMenuPanelConfig {
     public int height = 284;
     @NonNull public String title = "Natro";
     public int visibleRows = 4;
-    public int rowHeightPx = 50;
-    public int contentPaddingPx = 12;
-    public int rowGapPx = 4;
-    public int cornerRadiusPx = 20;
-    public int borderWidthPx = 2;
-    public int titleTextSizeSp = 21;
-    public int rowTextSizeSp = 22;
-    public int iconSizePx = 32;
-    public int panelOpacityPercent = 92;
-    @NonNull public String backgroundColor = "#FF11151B";
-    @NonNull public String selectedColor = "#FF1478FF";
+    public int rowHeightPx = 48;
+    public int contentPaddingPx = 0;
+    public int rowGapPx = 0;
+    public int cornerRadiusPx = 0;
+    public int borderWidthPx = 0;
+    public int titleTextSizeSp = 14;
+    public int rowTextSizeSp = 24;
+    public int iconSizePx = 28;
+    public int panelOpacityPercent = 100;
+    @NonNull public String backgroundColor = "#00FFFFFF";
+    @NonNull public String selectedColor = "#FF197BC5";
     @NonNull public String textColor = "#FFFFFFFF";
-    @NonNull public String mutedTextColor = "#FFADB7C8";
-    @NonNull public String borderColor = "#665E718A";
+    @NonNull public String mutedTextColor = "#FF6C7984";
+    @NonNull public String borderColor = "#00000000";
+    public boolean mnaviStyle = true;
     public boolean showTitle = true;
-    public boolean showIcons = true;
+    public boolean showIcons = false;
     public boolean showText = true;
     public boolean wrapSelection = true;
     public boolean invertScroll = false;
@@ -49,7 +50,8 @@ public final class DimMenuPanelConfig {
         if (raw == null || raw.trim().isEmpty()) return value;
         try {
             JSONObject json = new JSONObject(raw);
-            if (json.optInt("version", 0) > SCHEMA_VERSION) return value;
+            int version = json.optInt("version", 0);
+            if (version > SCHEMA_VERSION) return value;
             value.displayId = json.optInt("displayId", value.displayId);
             value.x = json.optInt("x", value.x);
             value.y = json.optInt("y", value.y);
@@ -74,6 +76,7 @@ public final class DimMenuPanelConfig {
             value.mutedTextColor = json.optString(
                     "mutedTextColor", value.mutedTextColor);
             value.borderColor = json.optString("borderColor", value.borderColor);
+            value.mnaviStyle = json.optBoolean("mnaviStyle", value.mnaviStyle);
             value.showTitle = json.optBoolean("showTitle", value.showTitle);
             value.showIcons = json.optBoolean("showIcons", value.showIcons);
             value.showText = json.optBoolean("showText", value.showText);
@@ -88,6 +91,7 @@ public final class DimMenuPanelConfig {
                     "hideForControlCenter", value.hideForControlCenter);
             value.hideWhenDisplayOff = json.optBoolean(
                     "hideWhenDisplayOff", value.hideWhenDisplayOff);
+            if (version < 2) value.applyMnaviAppearanceDefaults();
         } catch (JSONException ignored) {
             return new DimMenuPanelConfig();
         }
@@ -120,6 +124,7 @@ public final class DimMenuPanelConfig {
                     .put("textColor", textColor)
                     .put("mutedTextColor", mutedTextColor)
                     .put("borderColor", borderColor)
+                    .put("mnaviStyle", mnaviStyle)
                     .put("showTitle", showTitle)
                     .put("showIcons", showIcons)
                     .put("showText", showText)
@@ -153,11 +158,31 @@ public final class DimMenuPanelConfig {
         rowTextSizeSp = clamp(rowTextSizeSp, 10, 52);
         iconSizePx = clamp(iconSizePx, 16, 96);
         panelOpacityPercent = clamp(panelOpacityPercent, 10, 100);
-        backgroundColor = color(backgroundColor, "#FF11151B");
-        selectedColor = color(selectedColor, "#FF1478FF");
+        backgroundColor = color(backgroundColor, "#00FFFFFF");
+        selectedColor = color(selectedColor, "#FF197BC5");
         textColor = color(textColor, "#FFFFFFFF");
-        mutedTextColor = color(mutedTextColor, "#FFADB7C8");
-        borderColor = color(borderColor, "#665E718A");
+        mutedTextColor = color(mutedTextColor, "#FF6C7984");
+        borderColor = color(borderColor, "#00000000");
+    }
+
+    /** Migrates the former Natro card into the list geometry measured from mNavi 2.0. */
+    private void applyMnaviAppearanceDefaults() {
+        rowHeightPx = 48;
+        contentPaddingPx = 0;
+        rowGapPx = 0;
+        cornerRadiusPx = 0;
+        borderWidthPx = 0;
+        titleTextSizeSp = 14;
+        rowTextSizeSp = 24;
+        iconSizePx = 28;
+        panelOpacityPercent = 100;
+        backgroundColor = "#00FFFFFF";
+        selectedColor = "#FF197BC5";
+        textColor = "#FFFFFFFF";
+        mutedTextColor = "#FF6C7984";
+        borderColor = "#00000000";
+        mnaviStyle = true;
+        showIcons = false;
     }
 
     @NonNull

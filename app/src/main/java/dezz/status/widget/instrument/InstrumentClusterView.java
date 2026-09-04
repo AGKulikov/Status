@@ -129,7 +129,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @Nullable private InstrumentElementConfig dragging;
     @Nullable private NavigationSnapshotV2 navigationSnapshot;
     @Nullable private NavigationRouteGeometryV2 navigationGeometry;
-    /** Untouched maneuver graphic from Yandex/MConfig; never synthesized in this view. */
+    /** Reserved only for keyed source art; direct snapshots intentionally leave it null. */
     @Nullable private Bitmap navigationManeuverImage;
     private boolean resizing;
     private float touchStartX;
@@ -338,8 +338,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         NavigationRouteGeometryV2 geometry = NavigationBridgeStateStore.routeGeometry();
         navigationGeometry = accepted != null && geometry != null
                 && geometry.routeEpoch == accepted.routeEpoch ? geometry : null;
-        navigationManeuverImage = accepted == null ? null
-                : NavigationDataRepository.readFreshManeuverImage(getContext());
+        // MConfig's bitmap cache has no route/maneuver identity and can outlive the instruction
+        // which produced it. Never attach that old image to a newer direct snapshot.
+        navigationManeuverImage = null;
         if (accepted != null) {
             long delay = accepted.sourceTimestampMs + NAVIGATION_FRESH_MS - now;
             postDelayed(navigationExpiry, Math.max(1L, delay));
@@ -1070,9 +1071,10 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         boolean showIcon = option(element, "showManeuverIcon", true);
         boolean sourceIconAvailable = navigationManeuverImage != null
                 && !navigationManeuverImage.isRecycled();
+        boolean semanticIconAvailable = hasManeuverAction(navigation.maneuverType);
         boolean reserveIcon = option(element, "reserveManeuverIconSpace", true);
         RectF metricsArea = new RectF(content);
-        if (showIcon && (sourceIconAvailable || reserveIcon)) {
+        if (showIcon && (sourceIconAvailable || semanticIconAvailable || reserveIcon)) {
             float iconWidth = content.width() * Math.max(5, Math.min(40,
                     element.options.optInt("maneuverIconAreaPercent", 15))) / 100f;
             RectF iconArea = new RectF(content.left, content.top,
@@ -1098,6 +1100,17 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                         element.options.optInt("maneuverIconScalePercent", 100))) / 100f;
                 iconTarget = scaleAroundCenter(iconTarget, iconScale, iconArea);
                 drawSourceBitmap(canvas, navigationManeuverImage, iconTarget, alpha);
+            } else if (semanticIconAvailable) {
+                RectF iconTarget = insetSides(iconArea,
+                        element.options.optInt("maneuverIconPaddingLeftPx", 5),
+                        element.options.optInt("maneuverIconPaddingTopPx", 5),
+                        element.options.optInt("maneuverIconPaddingRightPx", 5),
+                        element.options.optInt("maneuverIconPaddingBottomPx", 5));
+                int iconColor = navigationColor(element.options.optString(
+                        "maneuverIconColor", "#FFFFFFFF"), Color.WHITE);
+                drawSemanticManeuver(canvas, navigation.maneuverType, iconTarget,
+                        withAlpha(iconColor, Math.round(Color.alpha(iconColor)
+                                * alpha / 255f)));
             }
             metricsArea.left = Math.min(metricsArea.right,
                     iconArea.right + Math.max(0,
@@ -1105,6 +1118,18 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         }
 
         RectF valuesArea = new RectF(metricsArea);
+        if (option(element, "showManeuverDetails", true)
+                && runtime.hasNavigationManeuverDetails() && !metricsArea.isEmpty()) {
+            float detailsFraction = Math.max(20, Math.min(65,
+                    element.options.optInt("maneuverDetailsHeightPercent", 42))) / 100f;
+            float detailsHeight = Math.min(metricsArea.height() * .65f,
+                    Math.max(18f, metricsArea.height() * detailsFraction));
+            RectF detailsArea = new RectF(metricsArea.left, metricsArea.top,
+                    metricsArea.right, metricsArea.top + detailsHeight);
+            drawNavigationManeuverDetails(canvas, runtime, detailsArea, element, alpha);
+            valuesArea.top = Math.min(valuesArea.bottom, detailsArea.bottom + Math.max(0f,
+                    element.options.optInt("maneuverDetailsGapPx", 4)));
+        }
         if (showProgress) {
             float barHeight = Math.max(2f, Math.min(metricsArea.height(),
                     element.options.optInt("progressBarHeightPx", 14)));
@@ -1153,6 +1178,236 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         if (showProgress) {
             drawNavigationRouteProgress(canvas, runtime, routeBarRect, alpha, element);
         }
+    }
+
+    /**
+     * Stock ManeuverView content is structured: colored direction signs and the auxiliary row are
+     * not ordinary street text. Draw each region directly at its final size so a resized cluster
+     * element stays sharp and an absent region collapses without leaving an empty placeholder.
+     */
+    private void drawNavigationManeuverDetails(@NonNull Canvas canvas,
+                                                @NonNull RuntimeElement runtime,
+                                                @NonNull RectF bounds,
+                                                @NonNull InstrumentElementConfig element,
+                                                int alpha) {
+        if (bounds.isEmpty()) return;
+        RectF primary = new RectF(bounds);
+        RectF auxiliary = null;
+        if (!runtime.navigationAuxiliaryText.isEmpty()) {
+            float auxiliaryHeight = Math.min(bounds.height() * .40f,
+                    Math.max(12f, bounds.height() * .30f));
+            auxiliary = new RectF(bounds.left,
+                    Math.max(bounds.top, bounds.bottom - auxiliaryHeight),
+                    bounds.right, bounds.bottom);
+            primary.bottom = Math.max(primary.top, auxiliary.top - Math.max(1f,
+                    element.options.optInt("maneuverDetailRowGapPx", 2)));
+        }
+
+        float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
+        float requested = Math.max(8f, element.options.optInt(
+                "maneuverDetailTextSizeSp", 18) * scaledDensity);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTypeface(digitalTypeface(element.style, true));
+        paint.setTextSize(Math.min(requested, Math.max(7f, primary.height() * .68f)));
+        int primaryColor = navigationColor(element.options.optString(
+                "maneuverDetailTextColor", "#FFFFFFFF"), Color.WHITE);
+
+        float cursor = primary.left;
+        if (!runtime.navigationTurnDistance.isEmpty()) {
+            float distancePadding = Math.max(3f, primary.height() * .12f);
+            float distanceWidth = Math.min(primary.width() * .34f,
+                    paint.measureText(runtime.navigationTurnDistance) + distancePadding * 2f);
+            RectF distanceBounds = new RectF(cursor, primary.top,
+                    Math.min(primary.right, cursor + distanceWidth), primary.bottom);
+            drawNavigationTextFit(canvas, runtime.navigationTurnDistance, distanceBounds,
+                    primaryColor, alpha, Paint.Align.LEFT, element.style, true,
+                    element.options.optInt("maneuverDetailTextSizeSp", 18));
+            cursor = Math.min(primary.right, distanceBounds.right + distancePadding);
+        }
+
+        float badgeGap = Math.max(2f, primary.height() * .08f);
+        for (ManeuverDirectionSign sign : runtime.navigationDirectionSigns) {
+            if (cursor >= primary.right) break;
+            float horizontalPadding = Math.max(3f, primary.height() * .13f);
+            float available = primary.right - cursor;
+            float badgeWidth = Math.min(available,
+                    paint.measureText(sign.text) + horizontalPadding * 2f);
+            if (badgeWidth <= horizontalPadding * 2f) break;
+            float verticalInset = Math.max(0f, primary.height() * .08f);
+            RectF badge = new RectF(cursor, primary.top + verticalInset,
+                    cursor + badgeWidth, primary.bottom - verticalInset);
+            int background = navigationColor(sign.backgroundColor, 0xFF1478FF);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(background, Math.round(
+                    Color.alpha(background) * alpha / 255f)));
+            float radius = Math.max(2f, Math.min(badge.height() * .22f, 6f));
+            canvas.drawRoundRect(badge, radius, radius, paint);
+            int foreground = navigationColor(sign.textColor, Color.WHITE);
+            drawNavigationTextFit(canvas, sign.text,
+                    insetSides(badge, horizontalPadding, 0f, horizontalPadding, 0f),
+                    foreground, alpha, Paint.Align.CENTER, element.style, true,
+                    element.options.optInt("maneuverDetailTextSizeSp", 18));
+            cursor = Math.min(primary.right, badge.right + badgeGap);
+        }
+
+        String detail = runtime.navigationCardText;
+        if (!detail.isEmpty() && !runtime.directionSignsContain(detail)
+                && cursor < primary.right) {
+            drawNavigationTextFit(canvas, detail,
+                    new RectF(cursor, primary.top, primary.right, primary.bottom),
+                    primaryColor, alpha, Paint.Align.LEFT, element.style, false,
+                    element.options.optInt("maneuverDetailTextSizeSp", 18));
+        }
+
+        if (auxiliary != null && !auxiliary.isEmpty()) {
+            int auxiliaryColor = navigationColor(element.options.optString(
+                    "maneuverAuxiliaryColor", "#E60B4DB5"), 0xE60B4DB5);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(auxiliaryColor, Math.round(
+                    Color.alpha(auxiliaryColor) * alpha / 255f)));
+            float radius = Math.max(2f, Math.min(auxiliary.height() * .28f, 7f));
+            canvas.drawRoundRect(auxiliary, radius, radius, paint);
+            drawNavigationTextFit(canvas, runtime.navigationAuxiliaryText,
+                    insetSides(auxiliary, Math.max(3f, auxiliary.height() * .18f), 0f,
+                            Math.max(3f, auxiliary.height() * .18f), 0f),
+                    primaryColor, alpha, Paint.Align.LEFT, element.style, true,
+                    element.options.optInt("maneuverAuxiliaryTextSizeSp", 14));
+        }
+    }
+
+    private void drawNavigationTextFit(@NonNull Canvas canvas, @NonNull String value,
+                                       @NonNull RectF bounds, int color, int alpha,
+                                       @NonNull Paint.Align align,
+                                       @NonNull InstrumentStyleFamily style, boolean bold,
+                                       int requestedTextSizeSp) {
+        if (value.isEmpty() || bounds.isEmpty()) return;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTypeface(digitalTypeface(style, bold));
+        paint.setTextAlign(align);
+        float requested = Math.max(7f, requestedTextSizeSp
+                * getResources().getDisplayMetrics().scaledDensity);
+        paint.setTextSize(Math.min(requested, Math.max(7f, bounds.height() * .72f)));
+        float measured = paint.measureText(value);
+        if (measured > bounds.width() && measured > 0f) {
+            paint.setTextSize(Math.max(7f, paint.getTextSize() * bounds.width() / measured));
+        }
+        paint.setColor(withAlpha(color, Math.round(Color.alpha(color) * alpha / 255f)));
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        float x = align == Paint.Align.CENTER ? bounds.centerX()
+                : align == Paint.Align.RIGHT ? bounds.right : bounds.left;
+        int saved = canvas.save();
+        canvas.clipRect(bounds);
+        canvas.drawText(value, x,
+                bounds.centerY() - (metrics.ascent + metrics.descent) * .5f, paint);
+        canvas.restoreToCount(saved);
+    }
+
+    private static boolean hasManeuverAction(@Nullable String raw) {
+        String value = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        return !value.isEmpty() && !"UNKNOWN".equals(value) && !"NONE".equals(value);
+    }
+
+    /** Vector comes from the same atomic semantic action as the text, never from legacy cache. */
+    private void drawSemanticManeuver(@NonNull Canvas canvas, @NonNull String raw,
+                                      @NonNull RectF bounds, int color) {
+        String value = raw.trim().toUpperCase(Locale.ROOT);
+        int direction = value.contains("LEFT") ? -1 : value.contains("RIGHT") ? 1 : 0;
+        float stroke = Math.max(3f, Math.min(bounds.width(), bounds.height()) * .105f);
+        float cx = bounds.centerX();
+        float top = bounds.top + bounds.height() * .12f;
+        float bottom = bounds.bottom - bounds.height() * .10f;
+        float half = bounds.width() * .32f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(color);
+        routeProgressPath.reset();
+        if ("FINISH".equals(value)) {
+            paint.setStyle(Paint.Style.FILL);
+            float square = Math.min(bounds.width(), bounds.height()) * .18f;
+            for (int row = 0; row < 3; row++) {
+                for (int column = 0; column < 3; column++) {
+                    if ((row + column) % 2 == 0) {
+                        canvas.drawRect(cx - square * 1.5f + column * square,
+                                top + row * square,
+                                cx - square * .5f + column * square,
+                                top + (row + 1) * square, paint);
+                    }
+                }
+            }
+            canvas.drawLine(cx - square * 1.5f, top, cx - square * 1.5f, bottom, paint);
+            return;
+        }
+        if (value.contains("UTURN")) {
+            routeProgressPath.moveTo(cx, bottom);
+            routeProgressPath.lineTo(cx, bounds.centerY());
+            routeProgressPath.cubicTo(cx, top, cx + direction * half, top,
+                    cx + direction * half, bounds.centerY());
+            canvas.drawPath(routeProgressPath, paint);
+            drawManeuverArrowHead(canvas, cx + direction * half, bounds.centerY(),
+                    0f, 1f, stroke, color);
+            return;
+        }
+        if (value.contains("ROUNDABOUT")) {
+            float radius = Math.min(bounds.width(), bounds.height()) * .25f;
+            rect.set(cx - radius, bounds.centerY() - radius,
+                    cx + radius, bounds.centerY() + radius);
+            canvas.drawArc(rect, 85f, direction < 0 ? -285f : 285f, false, paint);
+            float endX = cx + (direction < 0 ? -radius : radius);
+            drawManeuverArrowHead(canvas, endX, bounds.centerY(),
+                    direction < 0 ? -1f : 1f, 0f, stroke, color);
+            return;
+        }
+        if (value.contains("FORK")) {
+            canvas.drawLine(cx, bottom, cx, bounds.centerY(), paint);
+            float endX = cx + (direction == 0 ? half : direction * half);
+            canvas.drawLine(cx, bounds.centerY(), endX, top, paint);
+            drawManeuverArrowHead(canvas, endX, top,
+                    direction == 0 ? 1f : direction, -1f, stroke, color);
+            return;
+        }
+        if (direction == 0) {
+            canvas.drawLine(cx, bottom, cx, top, paint);
+            drawManeuverArrowHead(canvas, cx, top, 0f, -1f, stroke, color);
+            return;
+        }
+        float turnY = bounds.top + bounds.height() * (value.contains("SLIGHT") ? .48f : .55f);
+        routeProgressPath.moveTo(cx, bottom);
+        routeProgressPath.lineTo(cx, turnY);
+        float endX = cx + direction * half;
+        if (value.contains("SLIGHT")) {
+            routeProgressPath.lineTo(endX, top);
+            canvas.drawPath(routeProgressPath, paint);
+            drawManeuverArrowHead(canvas, endX, top, direction, -1f, stroke, color);
+        } else {
+            routeProgressPath.lineTo(endX, turnY);
+            canvas.drawPath(routeProgressPath, paint);
+            drawManeuverArrowHead(canvas, endX, turnY, direction, 0f, stroke, color);
+        }
+    }
+
+    private void drawManeuverArrowHead(@NonNull Canvas canvas, float x, float y,
+                                       float dx, float dy, float stroke, int color) {
+        float length = stroke * 2.1f;
+        float magnitude = (float) Math.sqrt(dx * dx + dy * dy);
+        if (magnitude <= 0f) return;
+        dx /= magnitude;
+        dy /= magnitude;
+        float px = -dy;
+        float py = dx;
+        routeProgressPath.reset();
+        routeProgressPath.moveTo(x, y);
+        routeProgressPath.lineTo(x - dx * length + px * length * .55f,
+                y - dy * length + py * length * .55f);
+        routeProgressPath.moveTo(x, y);
+        routeProgressPath.lineTo(x - dx * length - px * length * .55f,
+                y - dy * length - py * length * .55f);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(color);
+        canvas.drawPath(routeProgressPath, paint);
     }
 
     private void drawNavigationMetric(@NonNull Canvas canvas, @NonNull String raw,
@@ -1713,6 +1968,40 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 : Collections.unmodifiableList(result);
     }
 
+    @NonNull
+    private static List<ManeuverDirectionSign> parseManeuverDirectionSigns(
+            @NonNull String raw) {
+        if (raw.isEmpty()) return Collections.emptyList();
+        ArrayList<ManeuverDirectionSign> result = new ArrayList<>();
+        try {
+            JSONArray values = new JSONArray(raw);
+            for (int index = 0; index < Math.min(8, values.length()); index++) {
+                JSONObject value = values.optJSONObject(index);
+                if (value == null) continue;
+                String text = value.optString("text", "").trim();
+                if (text.isEmpty()) continue;
+                result.add(new ManeuverDirectionSign(text,
+                        value.optString("bgColor", "#FF1478FF"),
+                        value.optString("textColor", "#FFFFFFFF")));
+            }
+        } catch (Exception ignored) {
+            return Collections.emptyList();
+        }
+        return result.isEmpty() ? Collections.emptyList()
+                : Collections.unmodifiableList(result);
+    }
+
+    @NonNull
+    private static String firstNavigationCardText(@Nullable String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty() && !"—".equals(value.trim())) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
     private static int trafficColor(@NonNull String type,
                                     @NonNull NavigationIntegrationConfig.MapProfile profile) {
         if ("FREE".equals(type)) {
@@ -1759,6 +2048,19 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         }
     }
 
+    private static final class ManeuverDirectionSign {
+        @NonNull final String text;
+        @NonNull final String backgroundColor;
+        @NonNull final String textColor;
+
+        ManeuverDirectionSign(@NonNull String text, @NonNull String backgroundColor,
+                              @NonNull String textColor) {
+            this.text = text;
+            this.backgroundColor = backgroundColor;
+            this.textColor = textColor;
+        }
+    }
+
     private static final class RuntimeElement {
         @NonNull final InstrumentElementConfig config;
         @NonNull final InstrumentInfoMetric[] infoMetrics = new InstrumentInfoMetric[3];
@@ -1782,6 +2084,11 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         @NonNull String navigationRemainingDistance = "";
         @NonNull String navigationArrival = "";
         @NonNull String navigationDuration = "";
+        @NonNull String navigationTurnDistance = "";
+        @NonNull String navigationCardText = "";
+        @NonNull String navigationAuxiliaryText = "";
+        @NonNull List<ManeuverDirectionSign> navigationDirectionSigns =
+                Collections.emptyList();
         @NonNull List<RouteTrafficRun> navigationTrafficRuns = Collections.emptyList();
         int navigationTotalDistanceMeters = -1;
         int trafficTotalMeters;
@@ -1828,6 +2135,21 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 navigationRemainingDistance = distanceText(value.remainingDistanceMeters);
                 navigationArrival = arrivalText(value.arrivalEpochMs);
                 navigationDuration = durationText(value.remainingDurationSeconds);
+                navigationTurnDistance = distanceText(value.maneuverDistanceMeters);
+                navigationCardText = firstNavigationCardText(value.maneuverNextRoad,
+                        value.maneuverSubtext, value.maneuverTitle, value.street,
+                        value.destination);
+                navigationDirectionSigns = parseManeuverDirectionSigns(
+                        value.maneuverDirectionSignsJson);
+                navigationAuxiliaryText = value.maneuverAuxiliaryText;
+                if ("NEXT_MANEUVER".equals(value.maneuverAuxiliaryType)
+                        && value.maneuverAuxiliaryDistanceMeters >= 0) {
+                    String auxiliaryDistance = distanceText(
+                            value.maneuverAuxiliaryDistanceMeters);
+                    navigationAuxiliaryText = navigationAuxiliaryText.isEmpty()
+                            ? auxiliaryDistance
+                            : navigationAuxiliaryText + " · " + auxiliaryDistance;
+                }
                 navigationTotalDistanceMeters = value.routeTotalDistanceMeters;
                 if (value.routeTotalDistanceMeters > 0
                         && value.remainingDistanceMeters >= 0) {
@@ -1847,6 +2169,19 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             navigationTrafficRuns = parseRouteTrafficRuns(trafficJson);
             trafficTotalMeters = navigationTrafficRuns.isEmpty() ? 0
                     : navigationTrafficRuns.get(navigationTrafficRuns.size() - 1).toMeters;
+        }
+
+        boolean hasNavigationManeuverDetails() {
+            return !navigationTurnDistance.isEmpty() || !navigationCardText.isEmpty()
+                    || !navigationDirectionSigns.isEmpty()
+                    || !navigationAuxiliaryText.isEmpty();
+        }
+
+        boolean directionSignsContain(@NonNull String value) {
+            for (ManeuverDirectionSign sign : navigationDirectionSigns) {
+                if (sign.text.equalsIgnoreCase(value)) return true;
+            }
+            return false;
         }
 
         @NonNull String integerText(float value) {

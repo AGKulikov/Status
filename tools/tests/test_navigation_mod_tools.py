@@ -682,22 +682,22 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.7.4}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021307}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.7.5}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021308}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.7.4")', verifier)
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021307")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.7.5")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021308")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
         build = (TOOLS.parent / "build.gradle").read_text()
         workflow = (TOOLS.parent / ".github" / "workflows"
                     / "verify-navigation-hud-v2.yml").read_text()
-        self.assertIn("if (version == '2.7.4')", build)
-        self.assertIn("return 208021307", build)
-        self.assertIn("VERSION_NAME: '2.7.4'", workflow)
-        self.assertIn("VERSION_CODE: '208021307'", workflow)
+        self.assertIn("if (version == '2.7.5')", build)
+        self.assertIn("return 208021308", build)
+        self.assertIn("VERSION_NAME: '2.7.5'", workflow)
+        self.assertIn("VERSION_CODE: '208021308'", workflow)
         self.assertNotIn("2.5.10", build)
         self.assertNotIn("2.5.10", workflow)
 
@@ -882,8 +882,11 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("clippedSegmentLength", placement)
         self.assertIn("SLOT_CHANGE_PENALTY", placement)
         self.assertIn("reserveCentered", placement)
+        self.assertIn("isPointInsideViewport", placement)
         self.assertIn('new Candidate(.50f, .50f, "CENTER")', placement)
         self.assertIn("placementCoordinator.reserveCentered", camera)
+        self.assertIn("applyAtomicVisibility", camera)
+        self.assertIn("sign.sectors.add(addSector", camera)
         for leg_name in ("LEFT_CENTER", "RIGHT_CENTER", "BOTTOM_LEFT",
                          "BOTTOM_RIGHT", "TOP_LEFT", "TOP_RIGHT",
                          "BOTTOM_CENTER", "TOP_CENTER"):

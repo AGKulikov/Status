@@ -769,13 +769,7 @@ public final class HudRuntimeData {
                 boolean directFresh = direct != null && direct.isFreshAt(
                         System.currentTimeMillis(), DIRECT_NAVIGATION_FRESH_MS);
                 if (directFresh) {
-                    android.graphics.Bitmap sourceManeuverImage = null;
-                    try {
-                        sourceManeuverImage = NavigationDataRepository
-                                .readFreshManeuverImage(context);
-                    } catch (RuntimeException ignored) {}
-                    resolved = HudNavigationState.fromBridge(
-                            direct, directRoute, previous, sourceManeuverImage);
+                    resolved = HudNavigationState.fromBridge(direct, directRoute, previous);
                 } else if (!directSource) {
                     NavigationDataRepository.Snapshot legacy = null;
                     try { legacy = NavigationDataRepository.read(context); }

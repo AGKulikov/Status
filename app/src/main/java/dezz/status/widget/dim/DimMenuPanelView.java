@@ -5,6 +5,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.text.TextPaint;
@@ -14,15 +15,22 @@ import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 
 /** Touch-free stock-like menu rendered in the lower DIM navigation area. */
 public final class DimMenuPanelView extends View {
+    private static final int MNAVI_BACKGROUND = 0x00FFFFFF;
+    private static final int MNAVI_SELECTED = 0xFF197BC5;
+    private static final int MNAVI_SELECTED_TEXT = 0xFFFFFFFF;
+    private static final int MNAVI_MUTED_TEXT = 0xFF6C7984;
     @NonNull private DimMenuPanelConfig config;
     @NonNull private List<LauncherShortcutStore.Shortcut> items = new ArrayList<>();
+    @NonNull private Map<String, String> statuses = new HashMap<>();
     private int selectedIndex;
     @NonNull private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     @NonNull private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -58,16 +66,29 @@ public final class DimMenuPanelView extends View {
         invalidate();
     }
 
+    void setStatuses(@NonNull Map<String, String> source) {
+        statuses = new HashMap<>(source);
+        invalidate();
+    }
+
     @Override protected void onDraw(@NonNull Canvas canvas) {
         super.onDraw(canvas);
         float width = getWidth();
         float height = getHeight();
-        rect.set(1f, 1f, width - 1f, height - 1f);
+        if (config.mnaviStyle) {
+            // The reference overlay is transparent and lets the stock DIM card show through.
+            // SRC is deliberate: it also clears the previously selected row on invalidation.
+            canvas.drawColor(MNAVI_BACKGROUND, PorterDuff.Mode.SRC);
+        }
+        float outerInset = 1f;
+        rect.set(outerInset, outerInset, width - outerInset, height - outerInset);
         fill.setStyle(Paint.Style.FILL);
-        fill.setColor(withOpacity(parse(config.backgroundColor, 0xFF11151B),
-                config.panelOpacityPercent));
-        canvas.drawRoundRect(rect, config.cornerRadiusPx, config.cornerRadiusPx, fill);
-        if (config.borderWidthPx > 0) {
+        if (!config.mnaviStyle) {
+            fill.setColor(withOpacity(parse(config.backgroundColor, 0xFF11151B),
+                    config.panelOpacityPercent));
+            canvas.drawRoundRect(rect, config.cornerRadiusPx, config.cornerRadiusPx, fill);
+        }
+        if (!config.mnaviStyle && config.borderWidthPx > 0) {
             float inset = config.borderWidthPx / 2f;
             rect.set(inset, inset, width - inset, height - inset);
             stroke.setStyle(Paint.Style.STROKE);
@@ -76,31 +97,44 @@ public final class DimMenuPanelView extends View {
             canvas.drawRoundRect(rect, config.cornerRadiusPx, config.cornerRadiusPx, stroke);
         }
 
-        float left = config.contentPaddingPx;
-        float right = width - config.contentPaddingPx;
-        float top = config.contentPaddingPx;
-        if (config.showTitle) {
-            text.setColor(parse(config.textColor, Color.WHITE));
-            text.setTextSize(sp(config.titleTextSizeSp));
+        float contentPadding = config.mnaviStyle ? 0f : config.contentPaddingPx;
+        float rowGap = config.mnaviStyle ? 0f : config.rowGapPx;
+        float rowHeight = config.mnaviStyle ? mnaviRowHeight() : config.rowHeightPx;
+        float left = contentPadding;
+        float right = width - contentPadding;
+        float top = contentPadding;
+        if (config.mnaviStyle || config.showTitle) {
+            text.setColor(config.mnaviStyle ? MNAVI_MUTED_TEXT
+                    : parse(config.textColor, Color.WHITE));
+            text.setTextSize(sp(config.mnaviStyle ? 14 : config.titleTextSizeSp));
             text.setFakeBoldText(true);
             Paint.FontMetrics metrics = text.getFontMetrics();
-            float baseline = top - metrics.top;
-            canvas.drawText(ellipsize(config.title, text,
-                    Math.max(0f, right - left - dp(70))), left, baseline, text);
-            if (!items.isEmpty()) {
+            float titlePadding = config.mnaviStyle ? dp(2) : 0f;
+            float baseline = top + titlePadding - metrics.top;
+            String visibleTitle = ellipsize(config.title, text,
+                    Math.max(0f, right - left - (config.mnaviStyle ? 0f : dp(70))));
+            float titleLeft = config.mnaviStyle
+                    ? left + Math.max(0f, (right - left - text.measureText(visibleTitle)) / 2f)
+                    : left;
+            canvas.drawText(visibleTitle, titleLeft, baseline, text);
+            if (!config.mnaviStyle && !items.isEmpty()) {
                 String position = (selectedIndex + 1) + " / " + items.size();
                 text.setFakeBoldText(false);
                 text.setTextSize(sp(Math.max(11, config.titleTextSizeSp - 5)));
                 text.setColor(parse(config.mutedTextColor, 0xFFADB7C8));
                 canvas.drawText(position, right - text.measureText(position), baseline, text);
             }
-            top = baseline - metrics.bottom + dp(8);
+            // mNavi's header is a wrap-content TextView with 2dp padding on every side and the
+            // list container starts immediately below it. Paint.bottom is below the baseline.
+            top = baseline + metrics.bottom + dp(config.mnaviStyle ? 2 : 8);
         }
 
         if (items.isEmpty()) {
             text.setFakeBoldText(false);
-            text.setTextSize(sp(Math.max(12, config.rowTextSizeSp - 4)));
-            text.setColor(parse(config.mutedTextColor, 0xFFADB7C8));
+            text.setTextSize(sp(config.mnaviStyle ? 20
+                    : Math.max(12, config.rowTextSizeSp - 4)));
+            text.setColor(config.mnaviStyle ? MNAVI_MUTED_TEXT
+                    : parse(config.mutedTextColor, 0xFFADB7C8));
             String empty = "Добавьте действия в настройках";
             Paint.FontMetrics metrics = text.getFontMetrics();
             float baseline = (top + height) / 2f - (metrics.ascent + metrics.descent) / 2f;
@@ -108,26 +142,27 @@ public final class DimMenuPanelView extends View {
             return;
         }
 
-        int possibleRows = Math.max(1, (int) ((height - top - config.contentPaddingPx
-                + config.rowGapPx) / (config.rowHeightPx + config.rowGapPx)));
+        int possibleRows = Math.max(1, (int) ((height - top - contentPadding
+                + rowGap) / (rowHeight + rowGap)));
         int visible = Math.max(1, Math.min(items.size(),
                 Math.min(config.visibleRows, possibleRows)));
         int first = Math.max(0, Math.min(selectedIndex, items.size() - visible));
         for (int row = 0; row < visible; row++) {
             int index = first + row;
             LauncherShortcutStore.Shortcut item = items.get(index);
-            float rowTop = top + row * (config.rowHeightPx + config.rowGapPx);
-            float rowBottom = Math.min(height - config.contentPaddingPx,
-                    rowTop + config.rowHeightPx);
+            float rowTop = top + row * (rowHeight + rowGap);
+            float rowBottom = Math.min(height - contentPadding, rowTop + rowHeight);
             boolean selected = index == selectedIndex;
             if (selected) {
-                fill.setColor(parse(config.selectedColor, 0xFF1478FF));
+                fill.setColor(config.mnaviStyle ? MNAVI_SELECTED
+                        : parse(config.selectedColor, 0xFF1478FF));
                 rect.set(left, rowTop, right, rowBottom);
-                canvas.drawRoundRect(rect, Math.min(14, config.cornerRadiusPx),
-                        Math.min(14, config.cornerRadiusPx), fill);
+                float selectedRadius = config.mnaviStyle ? dp(6)
+                        : Math.min(14, config.cornerRadiusPx);
+                canvas.drawRoundRect(rect, selectedRadius, selectedRadius, fill);
             }
-            float contentLeft = left + dp(10);
-            if (config.showIcons) {
+            float contentLeft = left + dp(config.mnaviStyle ? 8 : 10);
+            if (!config.mnaviStyle && config.showIcons) {
                 int icon = Math.min(config.iconSizePx,
                         Math.max(16, (int) (rowBottom - rowTop - dp(8))));
                 int iconTop = Math.round(rowTop + (rowBottom - rowTop - icon) / 2f);
@@ -140,16 +175,42 @@ public final class DimMenuPanelView extends View {
                 }
                 contentLeft += icon + dp(12);
             }
-            if (config.showText) {
-                text.setFakeBoldText(selected);
-                text.setTextSize(sp(config.rowTextSizeSp));
-                text.setColor(parse(selected ? config.textColor
-                        : config.mutedTextColor, Color.WHITE));
+            if (config.mnaviStyle || config.showText) {
+                String status = statuses.get(item.id);
+                float statusLeft = right - dp(10);
+                if (status != null && !status.isEmpty()) {
+                    text.setFakeBoldText(false);
+                    text.setTextSize(sp(config.mnaviStyle ? 17
+                            : Math.max(10, config.rowTextSizeSp - 7)));
+                    text.setColor(config.mnaviStyle
+                            ? (selected ? MNAVI_SELECTED_TEXT : MNAVI_MUTED_TEXT)
+                            : parse(selected ? config.textColor
+                                    : config.mutedTextColor, Color.LTGRAY));
+                    String visibleStatus = ellipsize(status, text,
+                            Math.max(0f, (right - contentLeft) * .42f));
+                    float statusWidth = text.measureText(visibleStatus);
+                    statusLeft = right - dp(10) - statusWidth;
+                    Paint.FontMetrics statusMetrics = text.getFontMetrics();
+                    float statusBaseline = rowTop + (rowBottom - rowTop) / 2f
+                            - (statusMetrics.ascent + statusMetrics.descent) / 2f;
+                    canvas.drawText(visibleStatus, statusLeft, statusBaseline, text);
+                    statusLeft -= dp(12);
+                }
+                text.setFakeBoldText(config.mnaviStyle || selected);
+                text.setTextSize(sp(config.mnaviStyle ? 24 : config.rowTextSizeSp));
+                text.setColor(config.mnaviStyle
+                        ? (selected ? MNAVI_SELECTED_TEXT : MNAVI_MUTED_TEXT)
+                        : parse(selected ? config.textColor
+                                : config.mutedTextColor, Color.WHITE));
                 Paint.FontMetrics metrics = text.getFontMetrics();
-                float baseline = rowTop + (rowBottom - rowTop) / 2f
-                        - (metrics.ascent + metrics.descent) / 2f;
+                float baseline = config.mnaviStyle
+                        // Exact overlay_list_item.xml geometry: 8dp TextView padding and the
+                        // default include-font-padding top/bottom metrics.
+                        ? rowTop + dp(8) - metrics.top
+                        : rowTop + (rowBottom - rowTop) / 2f
+                                - (metrics.ascent + metrics.descent) / 2f;
                 canvas.drawText(ellipsize(item.title, text,
-                        Math.max(0f, right - contentLeft - dp(10))),
+                        Math.max(0f, statusLeft - contentLeft)),
                         contentLeft, baseline, text);
             }
         }
@@ -195,5 +256,13 @@ public final class DimMenuPanelView extends View {
 
     private float dp(int value) {
         return value * getResources().getDisplayMetrics().density;
+    }
+
+    /** Height of mNavi's 24sp bold, single-line TextView with 8dp padding on all sides. */
+    private float mnaviRowHeight() {
+        text.setTextSize(sp(24));
+        text.setFakeBoldText(true);
+        Paint.FontMetrics metrics = text.getFontMetrics();
+        return metrics.bottom - metrics.top + dp(16);
     }
 }

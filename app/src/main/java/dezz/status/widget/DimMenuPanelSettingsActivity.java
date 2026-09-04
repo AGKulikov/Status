@@ -154,8 +154,8 @@ public final class DimMenuPanelSettingsActivity extends AppCompatActivity {
                 value -> change(c -> c.invertScroll = value));
         addSwitch(settings, "Скрывать после выполнения", config.closeAfterAction,
                 value -> change(c -> c.closeAfterAction = value));
-        hint(settings, "Полная панель приборов Natro имеет приоритет автоматически. При "
-                + "выключенном зажигании панель также не рисуется.");
+        hint(settings, "Меню открывается поверх панели приборов Natro. При выключенном "
+                + "зажигании оно не рисуется.");
 
         section(settings, "Положение и размеры");
         slider(settings, "Дисплей", 0, 4, config.displayId, "", value ->
@@ -178,6 +178,12 @@ public final class DimMenuPanelSettingsActivity extends AppCompatActivity {
                 change(c -> c.contentPaddingPx = value));
 
         section(settings, "Состав и оформление");
+        addSwitch(settings, "Оформление списка как в mNavi", config.mnaviStyle,
+                value -> change(c -> c.mnaviStyle = value));
+        hint(settings, "В режиме mNavi оформление повторяется точно: прозрачная подложка, серый "
+                + "#6C7984, синее выделение #197BC5, белый текст выбранной строки, "
+                + "заголовок 14 sp, строки 24 sp и скругление выделения 6 dp. "
+                + "Параметры ниже применяются только после отключения этого режима.");
         addSwitch(settings, "Показывать заголовок", config.showTitle,
                 value -> change(c -> c.showTitle = value));
         addSwitch(settings, "Показывать иконки", config.showIcons,

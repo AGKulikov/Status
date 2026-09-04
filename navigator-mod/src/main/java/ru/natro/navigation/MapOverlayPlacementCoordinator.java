@@ -21,6 +21,7 @@ final class MapOverlayPlacementCoordinator {
     static final String OWNER_TRAFFIC_LIGHTS = "traffic_lights";
     static final String OWNER_CAMERAS = "cameras";
     static final String OWNER_SPEED_BUMPS = "speed_bumps";
+    static final String OWNER_ROUTE_TRAFFIC_LIGHTS = "route_traffic_lights";
     private static final String OWNER_CURSOR = "cursor";
 
     private static final float VIEWPORT_MARGIN_PX = 6f;
@@ -227,6 +228,19 @@ final class MapOverlayPlacementCoordinator {
             reservations.add(new Reservation(owner, key, occupied));
         }
         return new Placement(fixed.anchorX, fixed.anchorY, fixed.legName);
+    }
+
+    /**
+     * Returns whether a point-backed visual belongs to the current viewport. Polygons can remain
+     * partly visible after their apex leaves the screen while MapKit culls the placemark at that
+     * apex. Camera signs use this common decision for both objects, preventing an orphan sector.
+     * Projection failures deliberately keep the group visible; source freshness still expires it.
+     */
+    boolean isPointInsideViewport(double latitude, double longitude) {
+        float[] screen = projectOrNull(latitude, longitude);
+        if (screen == null) return true;
+        return screen[0] >= 0f && screen[0] <= viewportWidth
+                && screen[1] >= 0f && screen[1] <= viewportHeight;
     }
 
     private float[] projectOrNull(double latitude, double longitude) {

@@ -20,7 +20,12 @@ public final class HudNavigationStateTest {
                         + "\"directions\":[\"STRAIGHT_AHEAD\",\"RIGHT90\"]}]",
                 "[{\"id\":\"tl-1\",\"signal\":\"GREEN\",\"secondsLeft\":12,"
                         + "\"arrow\":\"RIGHT\",\"distanceMeters\":80,"
-                        + "\"latitude\":55.751,\"longitude\":37.617}]");
+                        + "\"latitude\":55.751,\"longitude\":37.617}]",
+                "maneuver:2:4:500000:RIGHT", "Подольск",
+                "[{\"kind\":\"TOPONYM\",\"text\":\"Подольск\","
+                        + "\"bgColor\":\"#FF0B4DB5\","
+                        + "\"textColor\":\"#FFFFFFFF\"}]",
+                "EXIT_NUMBER", "2-й съезд", "", -1);
         NavigationRouteGeometryV2 route = new NavigationRouteGeometryV2(
                 2, "polyline", "[{\"from\":0,\"to\":3,\"type\":\"FREE\"},"
                         + "{\"from\":3,\"to\":4,\"type\":\"HARD\"}]");
@@ -39,6 +44,12 @@ public final class HudNavigationStateTest {
         assertEquals(80, state.trafficLights.get(0).distanceMeters);
         assertEquals(55.751d, state.trafficLights.get(0).latitude, 0d);
         assertEquals("HARD", state.trafficRuns.get(1).type);
+        assertEquals("maneuver:2:4:500000:RIGHT", state.maneuverIdentity);
+        assertEquals("Подольск", state.maneuverNextRoad);
+        assertEquals("Подольск", state.maneuverDirectionSigns.get(0).text);
+        assertEquals("#FF0B4DB5", state.maneuverDirectionSigns.get(0).backgroundColor);
+        assertEquals("EXIT_NUMBER", state.maneuverAuxiliaryType);
+        assertEquals("2-й съезд", state.maneuverAuxiliaryText);
         assertTrue(state.hasDataFor(HudElementType.NAV_MANEUVER_ARROW));
         assertTrue(state.hasDataFor(HudElementType.NAV_LANES));
         assertTrue(state.hasDataFor(HudElementType.NAV_TRAFFIC_LIGHTS));
@@ -82,6 +93,18 @@ public final class HudNavigationStateTest {
         assertFalse(state.trafficAvailable);
         assertTrue(state.laneItems.isEmpty());
         assertTrue(state.trafficLights.isEmpty());
+    }
+
+    @Test public void directUnknownManeuverCannotShowAnOldTextGuessedArrow() {
+        NavigationSnapshotV2 snapshot = new NavigationSnapshotV2(
+                11, 4, 3_100, true, 55.75, 37.61, 30, 40,
+                "UNKNOWN", "Старое направление", "", "", "", 200,
+                5_000, 4_000, 600, 0, 0, -1, "[]", "[]");
+
+        HudNavigationState state = HudNavigationState.fromBridge(snapshot, null);
+
+        assertFalse(state.hasDataFor(HudElementType.NAV_MANEUVER_ARROW));
+        assertTrue(state.hasDataFor(HudElementType.NAV_COMBINED));
     }
 
     @Test public void redAndYellowIsARealTrafficSignalRatherThanAnEmptyShell() {

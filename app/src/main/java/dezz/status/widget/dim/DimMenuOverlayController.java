@@ -19,17 +19,29 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import dezz.status.widget.LauncherActivity;
 import dezz.status.widget.Permissions;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.WidgetAccessibilityService;
+import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.driver.DriverPanelActionExecutor;
 import dezz.status.widget.driver.DriverPanelService;
-import dezz.status.widget.instrument.InstrumentPanelActivity;
+import dezz.status.widget.integration.ConnectorValue;
+import dezz.status.widget.integration.ConnectorValueRegistry;
+import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.SmartHomeShortcutStateBindingPolicy;
+import dezz.status.widget.launcher.SmartHomeShortcutStatePolicy;
+import dezz.status.widget.scenario.IntentActionRule;
+import dezz.status.widget.scenario.IntentActionRuleStore;
+import dezz.status.widget.sprut.SprutHubController;
 
 /** Owns selection, conflicts and the exact display-2 overlay. */
 final class DimMenuOverlayController implements DisplayManager.DisplayListener,
@@ -59,6 +71,9 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
     @Nullable private final DisplayManager displayManager;
     @NonNull private DimMenuPanelConfig config;
     @NonNull private List<LauncherShortcutStore.Shortcut> actions = new ArrayList<>();
+    @NonNull private final Map<String, ConnectorValue> smartHomeValues = new HashMap<>();
+    @NonNull private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
+    @Nullable private WidgetService smartHomeValueService;
     @Nullable private DimMenuOverlayWindow overlay;
     private boolean started;
     private long suppressedUntil;
@@ -66,6 +81,32 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
     private long nextForegroundFallbackCheck;
     private boolean cachedMnavActive;
     @Nullable private String lastDetail;
+
+    @NonNull private final ConnectorValueRegistry.Listener smartHomeValueListener = changed -> {
+        // Connector registries may reuse the callback collection after returning.
+        List<ConnectorValue> snapshot = new ArrayList<>(changed);
+        main.post(() -> applySmartHomeChanges(snapshot));
+    };
+    @NonNull private final Runnable ensureSmartHomeValueSubscription = new Runnable() {
+        @Override public void run() {
+            if (!started) return;
+            WidgetService current = WidgetService.getInstance();
+            if (current != smartHomeValueService) {
+                if (smartHomeValueService != null) {
+                    smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
+                }
+                smartHomeValueService = current;
+                if (current == null) {
+                    smartHomeValues.clear();
+                    applySmartHomeStatuses();
+                } else {
+                    applySmartHomeValues(
+                            current.addConnectorValueListener(smartHomeValueListener));
+                }
+            }
+            main.postDelayed(this, current == null ? 250L : 2_000L);
+        }
+    };
 
     @NonNull private final Runnable monitor = new Runnable() {
         @Override public void run() {
@@ -101,6 +142,7 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
         }
         vendor.start();
         reload();
+        main.post(ensureSmartHomeValueSubscription);
         main.post(monitor);
     }
 
@@ -108,6 +150,7 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
         config = panelStore.load();
         actionStore.load();
         actions = interactive(actionStore.all());
+        smartHomeRules = loadSmartHomeRules();
         selection.setItemCount(actions.size());
         dismiss();
         attachRetryAfter = 0L;
@@ -118,6 +161,12 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
         if (!started) return;
         started = false;
         main.removeCallbacks(monitor);
+        main.removeCallbacks(ensureSmartHomeValueSubscription);
+        if (smartHomeValueService != null) {
+            smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
+            smartHomeValueService = null;
+        }
+        smartHomeValues.clear();
         vendor.stop();
         if (displayManager != null) {
             try { displayManager.unregisterDisplayListener(this); }
@@ -156,8 +205,7 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
         boolean interactive = display != null && display.getState() != Display.STATE_OFF;
         DimMenuConflictPolicy.Reason reason = DimMenuConflictPolicy.reason(
                 panelStore.isEnabled(), interactive, vendor.isEngineOn(),
-                isMnavActive(), InstrumentPanelActivity.isActive(),
-                vendor.currentTab(), vendor.controlCenterState(), config);
+                isMnavActive(), vendor.currentTab(), vendor.controlCenterState(), config);
         if (SystemClock.uptimeMillis() < suppressedUntil) {
             dismiss();
             report("Действие выполнено · панель временно скрыта");
@@ -174,6 +222,7 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
             return;
         }
         if (overlay != null) {
+            overlay.setStatuses(smartHomeStatusLabels());
             report(runtimeReadyLabel());
             return;
         }
@@ -182,6 +231,7 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
         try {
             overlay = DimMenuOverlayWindow.show(context, display, config,
                     actions, selection.selectedIndex());
+            overlay.setStatuses(smartHomeStatusLabels());
             report(runtimeReadyLabel());
         } catch (RuntimeException failure) {
             attachRetryAfter = now + FAILED_ATTACH_BACKOFF_MS;
@@ -239,7 +289,6 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
             case DISPLAY_OFF: return "Дисплей водителя недоступен";
             case ENGINE_OFF: return "Скрыта: зажигание выключено";
             case MNAVI: return "Скрыта: экраном управляет mNavi";
-            case INSTRUMENT_PANEL: return "Скрыта: открыта полная панель приборов Natro";
             case CONTROL_CENTER: return "Скрыта: открыт штатный звонок или медиаплеер";
             case OTHER_DIM_TAB: return "Ожидает штатную вкладку «Навигация»";
             case NONE:
@@ -257,6 +306,69 @@ final class DimMenuOverlayController implements DisplayManager.DisplayListener,
         DimMenuOverlayWindow current = overlay;
         overlay = null;
         if (current != null) current.dismiss();
+    }
+
+    @NonNull
+    private Map<String, IntentActionRule> loadSmartHomeRules() {
+        Map<String, IntentActionRule> result = new HashMap<>();
+        try {
+            for (IntentActionRule rule : new IntentActionRuleStore(preferences).loadStrict()) {
+                result.put(rule.id, rule);
+            }
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Could not load DIM smart-home shortcuts", failure);
+        }
+        return result;
+    }
+
+    private void applySmartHomeValues(@NonNull Collection<ConnectorValue> values) {
+        smartHomeValues.clear();
+        for (ConnectorValue value : values) {
+            smartHomeValues.put(smartHomeKey(value), value);
+        }
+        applySmartHomeStatuses();
+    }
+
+    private void applySmartHomeChanges(@NonNull Collection<ConnectorValue> values) {
+        for (ConnectorValue value : values) {
+            smartHomeValues.put(smartHomeKey(value), value);
+        }
+        applySmartHomeStatuses();
+    }
+
+    private void applySmartHomeStatuses() {
+        DimMenuOverlayWindow current = overlay;
+        if (current != null) current.setStatuses(smartHomeStatusLabels());
+    }
+
+    @NonNull
+    private Map<String, String> smartHomeStatusLabels() {
+        Map<String, String> result = new HashMap<>();
+        SprutHubController sprut = SprutHubController.active();
+        for (LauncherShortcutStore.Shortcut shortcut : actions) {
+            if (shortcut.kind != LauncherShortcutStore.Kind.RULE || !shortcut.showState) continue;
+            IntentActionRule rule = smartHomeRules.get(shortcut.target);
+            SourceBinding source = SmartHomeShortcutStateBindingPolicy.resolve(shortcut, rule,
+                    sprut == null ? null : sprut.catalog());
+            ConnectorValue value = source == null
+                    ? null : smartHomeValues.get(smartHomeKey(source));
+            SmartHomeShortcutStatePolicy.State state =
+                    SmartHomeShortcutStatePolicy.resolveValue(shortcut, rule, source, value);
+            result.put(shortcut.id, state.present ? state.valueLabel : "Нет данных");
+        }
+        return result;
+    }
+
+    @NonNull
+    private static String smartHomeKey(@NonNull ConnectorValue value) {
+        return value.connectorType.jsonName() + '\u0000' + value.connectorId + '\u0000'
+                + value.resourceId;
+    }
+
+    @NonNull
+    private static String smartHomeKey(@NonNull SourceBinding value) {
+        return value.connectorType.jsonName() + '\u0000' + value.connectorId + '\u0000'
+                + value.resourceId;
     }
 
     @NonNull

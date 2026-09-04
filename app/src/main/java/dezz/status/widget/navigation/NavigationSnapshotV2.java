@@ -22,6 +22,13 @@ public final class NavigationSnapshotV2 {
     @NonNull public final String maneuverType;
     @NonNull public final String maneuverTitle;
     @NonNull public final String maneuverSubtext;
+    @NonNull public final String maneuverIdentity;
+    @NonNull public final String maneuverNextRoad;
+    @NonNull public final String maneuverDirectionSignsJson;
+    @NonNull public final String maneuverAuxiliaryType;
+    @NonNull public final String maneuverAuxiliaryText;
+    @NonNull public final String maneuverAuxiliaryManeuverType;
+    public final int maneuverAuxiliaryDistanceMeters;
     @NonNull public final String street;
     @NonNull public final String destination;
     public final int maneuverDistanceMeters;
@@ -87,6 +94,28 @@ public final class NavigationSnapshotV2 {
             int trafficJamDistanceMeters, long arrivalEpochMs, int speedLimitKmh,
             int laneDistanceMeters, @NonNull String lanesJson,
             @NonNull String trafficLightsJson) {
+        this(sequence, routeEpoch, sourceTimestampMs, routeActive, latitude, longitude,
+                bearingDegrees, speedKmh, maneuverType, maneuverTitle, maneuverSubtext, street,
+                destination, maneuverDistanceMeters, routeTotalDistanceMeters,
+                remainingDistanceMeters, remainingDurationSeconds, trafficJamDurationSeconds,
+                trafficJamDistanceMeters, arrivalEpochMs, speedLimitKmh, laneDistanceMeters,
+                lanesJson, trafficLightsJson, "", "", "[]", "", "", "", -1);
+    }
+
+    public NavigationSnapshotV2(long sequence, long routeEpoch, long sourceTimestampMs,
+            boolean routeActive, double latitude, double longitude, double bearingDegrees,
+            double speedKmh, @NonNull String maneuverType, @NonNull String maneuverTitle,
+            @NonNull String maneuverSubtext, @NonNull String street,
+            @NonNull String destination, int maneuverDistanceMeters,
+            int routeTotalDistanceMeters, int remainingDistanceMeters,
+            int remainingDurationSeconds, int trafficJamDurationSeconds,
+            int trafficJamDistanceMeters, long arrivalEpochMs, int speedLimitKmh,
+            int laneDistanceMeters, @NonNull String lanesJson,
+            @NonNull String trafficLightsJson, @NonNull String maneuverIdentity,
+            @NonNull String maneuverNextRoad, @NonNull String maneuverDirectionSignsJson,
+            @NonNull String maneuverAuxiliaryType, @NonNull String maneuverAuxiliaryText,
+            @NonNull String maneuverAuxiliaryManeuverType,
+            int maneuverAuxiliaryDistanceMeters) {
         this.sequence = Math.max(0L, sequence);
         this.routeEpoch = Math.max(0L, routeEpoch);
         this.sourceTimestampMs = Math.max(0L, sourceTimestampMs);
@@ -98,6 +127,13 @@ public final class NavigationSnapshotV2 {
         this.maneuverType = bounded(maneuverType, 96);
         this.maneuverTitle = bounded(maneuverTitle, 4_096);
         this.maneuverSubtext = bounded(maneuverSubtext, 4_096);
+        this.maneuverIdentity = bounded(maneuverIdentity, 512);
+        this.maneuverNextRoad = bounded(maneuverNextRoad, 4_096);
+        this.maneuverDirectionSignsJson = bounded(maneuverDirectionSignsJson, 32_768);
+        this.maneuverAuxiliaryType = bounded(maneuverAuxiliaryType, 96);
+        this.maneuverAuxiliaryText = bounded(maneuverAuxiliaryText, 4_096);
+        this.maneuverAuxiliaryManeuverType = bounded(maneuverAuxiliaryManeuverType, 96);
+        this.maneuverAuxiliaryDistanceMeters = nonNegative(maneuverAuxiliaryDistanceMeters);
         this.street = bounded(street, 4_096);
         this.destination = bounded(destination, 4_096);
         this.maneuverDistanceMeters = nonNegative(maneuverDistanceMeters);
@@ -124,6 +160,13 @@ public final class NavigationSnapshotV2 {
                 .put("maneuverType", maneuverType)
                 .put("maneuverTitle", maneuverTitle)
                 .put("maneuverSubtext", maneuverSubtext)
+                .put("maneuverIdentity", maneuverIdentity)
+                .put("maneuverNextRoad", maneuverNextRoad)
+                .put("maneuverDirectionSignsJson", maneuverDirectionSignsJson)
+                .put("maneuverAuxiliaryType", maneuverAuxiliaryType)
+                .put("maneuverAuxiliaryText", maneuverAuxiliaryText)
+                .put("maneuverAuxiliaryManeuverType", maneuverAuxiliaryManeuverType)
+                .put("maneuverAuxiliaryDistanceMeters", maneuverAuxiliaryDistanceMeters)
                 .put("street", street)
                 .put("destination", destination)
                 .put("maneuverDistanceMeters", maneuverDistanceMeters)
@@ -180,7 +223,14 @@ public final class NavigationSnapshotV2 {
                     source.optInt("speedLimitKmh", 0),
                     source.optInt("laneDistanceMeters", -1),
                     source.optString("lanesJson", ""),
-                    source.optString("trafficLightsJson", ""));
+                    source.optString("trafficLightsJson", ""),
+                    source.optString("maneuverIdentity", ""),
+                    source.optString("maneuverNextRoad", ""),
+                    source.optString("maneuverDirectionSignsJson", "[]"),
+                    source.optString("maneuverAuxiliaryType", ""),
+                    source.optString("maneuverAuxiliaryText", ""),
+                    source.optString("maneuverAuxiliaryManeuverType", ""),
+                    source.optInt("maneuverAuxiliaryDistanceMeters", -1));
         } catch (JSONException error) {
             throw new IllegalArgumentException("Invalid navigation snapshot", error);
         }

@@ -187,6 +187,8 @@ public final class NavigationIntegrationConfig {
         public boolean showTraffic = true;
         /** Fresh Windshield traffic lights, rendered in their own map-object collection. */
         public boolean showTrafficLights = true;
+        /** Full route traffic-light pins, including records without signal/countdown data. */
+        public boolean showRouteTrafficLights = true;
         /** Artificial unevenness pins read only from the exact active DrivingRoute. */
         public boolean showSpeedBumps = true;
         /** Original-style direction arrows placed directly on upcoming route turns. */
@@ -209,6 +211,8 @@ public final class NavigationIntegrationConfig {
         public int cameraDirectionOpacityPercent = 30;
         /** Scale of Yandex's original signal-and-seconds traffic-light balloon. */
         public int trafficLightScalePercent = 100;
+        /** Scale of Yandex's original ordinary route-traffic-light vector pin. */
+        public int routeTrafficLightScalePercent = 100;
         /** Null preserves Navigator's stock day/night card; a value recolours body and tail. */
         @Nullable public String trafficLightCardColor;
         /** Target raster size of the stock vector route-speed-bump pin. */
@@ -237,6 +241,7 @@ public final class NavigationIntegrationConfig {
         public int routeLayerPriority = 50;
         public int destinationLayerPriority = 90;
         public int trafficLightLayerPriority = 70;
+        public int routeTrafficLightLayerPriority = 68;
         public int speedBumpLayerPriority = 55;
         /** Legacy JSON key; native polyline arrows always inherit routeLayerPriority. */
         public int routeTurnLayerPriority = 50;
@@ -323,6 +328,7 @@ public final class NavigationIntegrationConfig {
                     .put("showRouteTraffic", showRouteTraffic)
                     .put("showTraffic", showTraffic)
                     .put("showTrafficLights", showTrafficLights)
+                    .put("showRouteTrafficLights", showRouteTrafficLights)
                     .put("showSpeedBumps", showSpeedBumps)
                     .put("showRouteTurns", showRouteTurns)
                     .put("showLaneGuidance", showLaneGuidance)
@@ -334,6 +340,7 @@ public final class NavigationIntegrationConfig {
                     .put("cameraDirectionColor", cameraDirectionColor)
                     .put("cameraDirectionOpacityPercent", cameraDirectionOpacityPercent)
                     .put("trafficLightScalePercent", trafficLightScalePercent)
+                    .put("routeTrafficLightScalePercent", routeTrafficLightScalePercent)
                     .put("trafficLightCardColor", trafficLightCardColor == null
                             ? JSONObject.NULL : trafficLightCardColor)
                     .put("speedBumpScalePercent", speedBumpScalePercent)
@@ -356,6 +363,7 @@ public final class NavigationIntegrationConfig {
                     .put("routeLayerPriority", routeLayerPriority)
                     .put("destinationLayerPriority", destinationLayerPriority)
                     .put("trafficLightLayerPriority", trafficLightLayerPriority)
+                    .put("routeTrafficLightLayerPriority", routeTrafficLightLayerPriority)
                     .put("speedBumpLayerPriority", speedBumpLayerPriority)
                     // Retain the old key for install-over compatibility with a previous pair.
                     .put("routeTurnLayerPriority", routeLayerPriority)
@@ -419,6 +427,8 @@ public final class NavigationIntegrationConfig {
                     "showRouteTraffic", result.showRouteTraffic);
             result.showTrafficLights = source.optBoolean(
                     "showTrafficLights", result.showTrafficLights);
+            result.showRouteTrafficLights = source.optBoolean(
+                    "showRouteTrafficLights", result.showRouteTrafficLights);
             result.showSpeedBumps = source.optBoolean(
                     "showSpeedBumps", result.showSpeedBumps);
             result.showRouteTurns = source.optBoolean(
@@ -445,6 +455,8 @@ public final class NavigationIntegrationConfig {
                     "cameraDirectionOpacityPercent", result.cameraDirectionOpacityPercent);
             result.trafficLightScalePercent = source.optInt(
                     "trafficLightScalePercent", result.trafficLightScalePercent);
+            result.routeTrafficLightScalePercent = source.optInt(
+                    "routeTrafficLightScalePercent", result.routeTrafficLightScalePercent);
             result.trafficLightCardColor = optionalColor(
                     source, "trafficLightCardColor", result.trafficLightCardColor);
             result.speedBumpScalePercent = source.optInt(
@@ -479,6 +491,8 @@ public final class NavigationIntegrationConfig {
                     "destinationLayerPriority", result.destinationLayerPriority);
             result.trafficLightLayerPriority = source.optInt(
                     "trafficLightLayerPriority", result.trafficLightLayerPriority);
+            result.routeTrafficLightLayerPriority = source.optInt(
+                    "routeTrafficLightLayerPriority", result.routeTrafficLightLayerPriority);
             result.speedBumpLayerPriority = source.optInt(
                     "speedBumpLayerPriority", result.speedBumpLayerPriority);
             result.routeTurnLayerPriority = source.optInt(
@@ -493,6 +507,7 @@ public final class NavigationIntegrationConfig {
                 result.routeLayerPriority = 50;
                 result.destinationLayerPriority = 90;
                 result.trafficLightLayerPriority = 70;
+                result.routeTrafficLightLayerPriority = 68;
                 result.laneGuidanceLayerPriority = 80;
                 result.cursorLayerPriority = 60;
             }
@@ -582,6 +597,7 @@ public final class NavigationIntegrationConfig {
             cameraDirectionColor = color(cameraDirectionColor, "#FF168BFF");
             cameraDirectionOpacityPercent = clamp(cameraDirectionOpacityPercent, 0, 100);
             trafficLightScalePercent = clamp(trafficLightScalePercent, 50, 250);
+            routeTrafficLightScalePercent = clamp(routeTrafficLightScalePercent, 50, 250);
             trafficLightCardColor = optionalColor(trafficLightCardColor);
             speedBumpScalePercent = clamp(speedBumpScalePercent, 50, 250);
             routeTurnLengthPercent = clamp(routeTurnLengthPercent, 10, 250);
@@ -597,6 +613,7 @@ public final class NavigationIntegrationConfig {
             routeLayerPriority = clamp(routeLayerPriority, 0, 100);
             destinationLayerPriority = clamp(destinationLayerPriority, 0, 100);
             trafficLightLayerPriority = clamp(trafficLightLayerPriority, 0, 100);
+            routeTrafficLightLayerPriority = clamp(routeTrafficLightLayerPriority, 0, 100);
             speedBumpLayerPriority = clamp(speedBumpLayerPriority, 0, 100);
             routeTurnLayerPriority = clamp(routeTurnLayerPriority, 0, 100);
             laneGuidanceLayerPriority = clamp(laneGuidanceLayerPriority, 0, 100);

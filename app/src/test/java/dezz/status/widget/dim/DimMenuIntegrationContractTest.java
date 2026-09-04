@@ -2,6 +2,7 @@
 package dezz.status.widget.dim;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import org.junit.Test;
 
@@ -20,6 +21,8 @@ public final class DimMenuIntegrationContractTest {
                 + "DimMenuOverlayWindow.java"));
         String controller = read(root.resolve("app/src/main/java/dezz/status/widget/dim/"
                 + "DimMenuOverlayController.java"));
+        String panel = read(root.resolve("app/src/main/java/dezz/status/widget/dim/"
+                + "DimMenuPanelView.java"));
 
         assertTrue(vendor.contains("ECARX_KEY_DIMSCROLLUP_EVENT"));
         assertTrue(vendor.contains("ECARX_KEY_DIMSCROLLDOWN_EVENT"));
@@ -30,9 +33,20 @@ public final class DimMenuIntegrationContractTest {
         assertTrue(window.contains("FLAG_NOT_TOUCHABLE"));
         assertTrue(window.contains("TYPE_APPLICATION_OVERLAY"));
         assertTrue(controller.contains("DimMenuConflictPolicy.reason"));
-        assertTrue(controller.contains("InstrumentPanelActivity.isActive()"));
+        assertFalse(controller.contains("InstrumentPanelActivity.isActive()"));
         assertTrue(controller.contains("getForegroundPackageOnDisplay(config.displayId)"));
         assertTrue(controller.contains("UsageEvents.Event.MOVE_TO_FOREGROUND"));
+        assertTrue(controller.contains("addConnectorValueListener(smartHomeValueListener)"));
+        assertTrue(controller.contains("SmartHomeShortcutStatePolicy.resolveValue("));
+        assertTrue(controller.contains("state.present ? state.valueLabel : \"Нет данных\""));
+        assertTrue(panel.contains("statuses.get(item.id)"));
+        assertTrue(panel.contains("statusLeft - contentLeft"));
+        assertTrue(panel.contains("config.mnaviStyle"));
+        assertTrue(panel.contains("dp(6)"));
+        assertTrue(panel.contains("MNAVI_BACKGROUND = 0x00FFFFFF"));
+        assertTrue(panel.contains("PorterDuff.Mode.SRC"));
+        assertTrue(panel.contains("MNAVI_SELECTED = 0xFF197BC5"));
+        assertTrue(panel.contains("MNAVI_MUTED_TEXT = 0xFF6C7984"));
     }
 
     @Test public void settingsAndRuntimeSupportRoutesHomeCallsAndBootRestore() throws Exception {
@@ -51,6 +65,11 @@ public final class DimMenuIntegrationContractTest {
         assertTrue(settings.contains("маршруты, приложения, функции автомобиля, умный дом"));
         assertTrue(settings.contains("Размер заголовка"));
         assertTrue(settings.contains("Внутренний отступ"));
+        assertTrue(settings.contains("Оформление списка как в mNavi"));
+        assertTrue(settings.contains("#6C7984"));
+        assertTrue(settings.contains("#197BC5"));
+        assertTrue(settings.contains("Параметры ниже применяются только после отключения"));
+        assertTrue(settings.contains("Меню открывается поверх панели приборов Natro"));
         assertTrue(launcherStore.contains("Kind { APP, BUILTIN, RULE, PHONE"));
         assertTrue(executor.contains("Intent.ACTION_CALL : Intent.ACTION_DIAL"));
         assertTrue(launcher.contains("shortcut.kind == LauncherShortcutStore.Kind.PHONE"));

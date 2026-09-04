@@ -524,7 +524,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Пробки на линии маршрута", profile.showRouteTraffic);
         Switch showTraffic = switchView("Пробки на остальных дорогах", profile.showTraffic);
         Switch showTrafficLights = switchView(
-                "Светофоры с отсчётом — отдельный слой", profile.showTrafficLights);
+                "Живые светофоры: сигнал и отсчёт", profile.showTrafficLights);
+        Switch showRouteTrafficLights = switchView(
+                "Обычные светофоры активного маршрута",
+                profile.showRouteTrafficLights);
         Switch showSpeedBumps = switchView(
                 "Искусственные неровности на активном маршруте", profile.showSpeedBumps);
         Switch showRouteTurns = switchView(
@@ -545,6 +548,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Только дороги — прозрачный фон", profile.roadsOnly);
         for (Switch control : new Switch[]{showRoute, destination,
                 showRouteTraffic, showTraffic, showTrafficLights,
+                showRouteTrafficLights,
                 showSpeedBumps,
                 showRouteTurns, showLaneGuidance, showHudSpeedCameras,
                 showLabels, showPois, showBuildings,
@@ -588,8 +592,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 + "длина и положение вершины при этом не меняются.",
                 12, 0xFF95A0AF), marginTop(4));
         SliderField trafficLightScale = slider(form,
-                "Размер светофоров и плашек секунд",
+                "Размер живых светофоров и плашек секунд",
                 profile.trafficLightScalePercent, 50, 250, 5, " %");
+        SliderField routeTrafficLightScale = slider(form,
+                "Размер обычных светофоров маршрута",
+                profile.routeTrafficLightScalePercent, 50, 250, 5, " %");
         InheritedColorField trafficLightCardColor = inheritableNavigationColorField(
                 form, "Цвет плашки и хвостика светофора",
                 profile.trafficLightCardColor, navigation,
@@ -669,8 +676,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Конечная точка маршрута", profile.destinationLayerPriority,
                 0, 100, 1, "");
         SliderField trafficLightLayerPriority = slider(form,
-                "Светофоры и секунды", profile.trafficLightLayerPriority,
+                "Живые светофоры и секунды", profile.trafficLightLayerPriority,
                 0, 100, 1, "");
+        SliderField routeTrafficLightLayerPriority = slider(form,
+                "Обычные светофоры маршрута",
+                profile.routeTrafficLightLayerPriority, 0, 100, 1, "");
         SliderField laneGuidanceLayerPriority = slider(form,
                 "Знаки движения по полосам", profile.laneGuidanceLayerPriority,
                 0, 100, 1, "");
@@ -680,7 +690,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
                 speedBumpLayerPriority,
-                destinationLayerPriority, trafficLightLayerPriority,
+                destinationLayerPriority, routeTrafficLightLayerPriority,
+                trafficLightLayerPriority,
                 laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
             for (SliderField field : layerPriorityControls) {
@@ -751,6 +762,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showRouteTraffic = showRouteTraffic.isChecked();
                         profile.showTraffic = showTraffic.isChecked();
                         profile.showTrafficLights = showTrafficLights.isChecked();
+                        profile.showRouteTrafficLights =
+                                showRouteTrafficLights.isChecked();
                         profile.showSpeedBumps = showSpeedBumps.isChecked();
                         profile.showRouteTurns = showRouteTurns.isChecked();
                         profile.showLaneGuidance = showLaneGuidance.isChecked();
@@ -774,6 +787,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.cameraDirectionOpacityPercent =
                                 cameraDirectionOpacity.intValue();
                         profile.trafficLightScalePercent = trafficLightScale.intValue();
+                        profile.routeTrafficLightScalePercent =
+                                routeTrafficLightScale.intValue();
                         profile.trafficLightCardColor = trafficLightCardColor.value;
                         profile.speedBumpScalePercent = speedBumpScale.intValue();
                         profile.routeTurnLengthPercent = routeTurnLength.intValue();
@@ -804,6 +819,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                                 destinationLayerPriority.intValue();
                         profile.trafficLightLayerPriority =
                                 trafficLightLayerPriority.intValue();
+                        profile.routeTrafficLightLayerPriority =
+                                routeTrafficLightLayerPriority.intValue();
                         profile.routeTurnLayerPriority = profile.routeLayerPriority;
                         profile.laneGuidanceLayerPriority =
                                 laneGuidanceLayerPriority.intValue();

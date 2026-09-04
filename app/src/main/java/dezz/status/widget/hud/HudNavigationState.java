@@ -83,12 +83,34 @@ public final class HudNavigationState {
         }
     }
 
+    /** One native DirectionSignItem kept separate from ordinary road/destination text. */
+    public static final class DirectionSignItem {
+        @NonNull public final String kind;
+        @NonNull public final String text;
+        @NonNull public final String backgroundColor;
+        @NonNull public final String textColor;
+
+        DirectionSignItem(String kind, String text, String backgroundColor, String textColor) {
+            this.kind = kind;
+            this.text = text;
+            this.backgroundColor = backgroundColor;
+            this.textColor = textColor;
+        }
+    }
+
     public final boolean direct;
     public final boolean routeActive;
     @NonNull public final String maneuverType;
     @NonNull public final String maneuverTitle;
     @NonNull public final String maneuverText;
     @NonNull public final String maneuverSubtext;
+    @NonNull public final String maneuverIdentity;
+    @NonNull public final String maneuverNextRoad;
+    @NonNull public final List<DirectionSignItem> maneuverDirectionSigns;
+    @NonNull public final String maneuverAuxiliaryType;
+    @NonNull public final String maneuverAuxiliaryText;
+    @NonNull public final String maneuverAuxiliaryManeuverType;
+    @NonNull public final String maneuverAuxiliaryDistance;
     @NonNull public final String street;
     @NonNull public final String destination;
     @NonNull public final String turnDistance;
@@ -118,10 +140,15 @@ public final class HudNavigationState {
     @Nullable public final Bitmap rainbowImage;
     @NonNull private final String bridgeLanesJson;
     @NonNull private final String bridgeLightsJson;
+    @NonNull private final String bridgeDirectionSignsJson;
     @Nullable private final NavigationRouteGeometryV2 bridgeGeometry;
 
     private HudNavigationState(boolean direct, boolean routeActive, String maneuverType,
-            String maneuverTitle, String maneuverText, String maneuverSubtext, String street,
+            String maneuverTitle, String maneuverText, String maneuverSubtext,
+            String maneuverIdentity, String maneuverNextRoad,
+            List<DirectionSignItem> maneuverDirectionSigns, String maneuverAuxiliaryType,
+            String maneuverAuxiliaryText, String maneuverAuxiliaryManeuverType,
+            String maneuverAuxiliaryDistance, String street,
             String destination, String turnDistance, String distance, String duration,
             String trafficJamDuration, String trafficJamDistance,
             boolean trafficJamAvailable, String arrival, String speedLimit,
@@ -131,7 +158,7 @@ public final class HudNavigationState {
             String trafficArrow, boolean trafficAvailable, List<TrafficLight> trafficLights,
             List<TrafficRun> trafficRuns, double tripProgress, Bitmap maneuverImage,
             Bitmap lanesImage, Bitmap jamImage, Bitmap rainbowImage,
-            String bridgeLanesJson, String bridgeLightsJson,
+            String bridgeLanesJson, String bridgeLightsJson, String bridgeDirectionSignsJson,
             NavigationRouteGeometryV2 bridgeGeometry) {
         this.direct = direct;
         this.routeActive = routeActive;
@@ -139,6 +166,13 @@ public final class HudNavigationState {
         this.maneuverTitle = maneuverTitle;
         this.maneuverText = maneuverText;
         this.maneuverSubtext = maneuverSubtext;
+        this.maneuverIdentity = maneuverIdentity;
+        this.maneuverNextRoad = maneuverNextRoad;
+        this.maneuverDirectionSigns = Collections.unmodifiableList(maneuverDirectionSigns);
+        this.maneuverAuxiliaryType = maneuverAuxiliaryType;
+        this.maneuverAuxiliaryText = maneuverAuxiliaryText;
+        this.maneuverAuxiliaryManeuverType = maneuverAuxiliaryManeuverType;
+        this.maneuverAuxiliaryDistance = maneuverAuxiliaryDistance;
         this.street = street;
         this.destination = destination;
         this.turnDistance = turnDistance;
@@ -168,6 +202,7 @@ public final class HudNavigationState {
         this.rainbowImage = rainbowImage;
         this.bridgeLanesJson = bridgeLanesJson;
         this.bridgeLightsJson = bridgeLightsJson;
+        this.bridgeDirectionSignsJson = bridgeDirectionSignsJson;
         this.bridgeGeometry = bridgeGeometry;
     }
 
@@ -185,7 +220,7 @@ public final class HudNavigationState {
         return fromBridge(source, geometry, previous, null);
     }
 
-    /** Direct route values plus the untouched maneuver bitmap supplied by Yandex/MConfig. */
+    /** Direct route values. The legacy MConfig bitmap argument is ignored because it has no key. */
     @NonNull
     public static HudNavigationState fromBridge(@NonNull NavigationSnapshotV2 source,
             @Nullable NavigationRouteGeometryV2 geometry,
@@ -206,6 +241,12 @@ public final class HudNavigationState {
                 ? previous.trafficRuns
                 : routeActive ? parseRuns(geometry == null
                 ? "" : geometry.trafficSegmentsJson) : Collections.emptyList();
+        List<DirectionSignItem> directionSigns = previousDirect
+                && previous.routeActive && routeActive
+                && source.maneuverDirectionSignsJson.equals(previous.bridgeDirectionSignsJson)
+                ? previous.maneuverDirectionSigns : routeActive
+                ? parseDirectionSigns(source.maneuverDirectionSignsJson)
+                : Collections.emptyList();
         double progress = Double.NaN;
         if (routeActive && source.routeTotalDistanceMeters > 0
                 && source.remainingDistanceMeters >= 0) {
@@ -219,6 +260,13 @@ public final class HudNavigationState {
                 routeActive ? source.maneuverTitle : "",
                 routeActive ? source.maneuverTitle : "",
                 routeActive ? source.maneuverSubtext : "",
+                routeActive ? source.maneuverIdentity : "",
+                routeActive ? source.maneuverNextRoad : "",
+                directionSigns,
+                routeActive ? source.maneuverAuxiliaryType : "",
+                routeActive ? source.maneuverAuxiliaryText : "",
+                routeActive ? source.maneuverAuxiliaryManeuverType : "",
+                routeActive ? formatDistance(source.maneuverAuxiliaryDistanceMeters) : "",
                 source.street, routeActive ? source.destination : "",
                 routeActive ? formatDistance(source.maneuverDistanceMeters) : "",
                 routeActive ? formatDistance(source.remainingDistanceMeters) : "",
@@ -236,8 +284,11 @@ public final class HudNavigationState {
                 first == null ? "" : first.color, first == null ? "" : first.countdown,
                 first == null ? "" : first.arrow,
                 routeActive && !lights.isEmpty(), lights, runs, progress,
-                routeActive ? sourceManeuverImage : null,
+                // An unkeyed MConfig bitmap can belong to the previous route instruction.
+                // Direct mode therefore renders the semantic action from this exact snapshot.
+                null,
                 null, null, null, source.lanesJson, source.trafficLightsJson,
+                source.maneuverDirectionSignsJson,
                 routeActive ? geometry : null);
     }
 
@@ -264,6 +315,7 @@ public final class HudNavigationState {
                 routeActive ? source.maneuverTitle : "",
                 routeActive ? source.maneuverText : "",
                 routeActive ? source.maneuverSubtext : "",
+                "", "", Collections.emptyList(), "", "", "", "",
                 source.street, routeActive ? source.destination : "",
                 routeActive ? source.turnDistance : "",
                 routeActive ? source.distance : "",
@@ -282,7 +334,25 @@ public final class HudNavigationState {
                 routeActive ? source.lanesImage : null,
                 routeActive ? source.jamImage : null,
                 routeActive ? source.rainbowImage : null,
-                "", "", null);
+                "", "", "", null);
+    }
+
+    @NonNull private static List<DirectionSignItem> parseDirectionSigns(String raw) {
+        ArrayList<DirectionSignItem> result = new ArrayList<>();
+        try {
+            JSONArray values = new JSONArray(raw);
+            for (int index = 0; index < Math.min(8, values.length()); index++) {
+                JSONObject value = values.optJSONObject(index);
+                if (value == null) continue;
+                String label = value.optString("text", "").trim();
+                if (label.isEmpty()) continue;
+                result.add(new DirectionSignItem(
+                        value.optString("kind", ""), label,
+                        value.optString("bgColor", "#FF1478FF"),
+                        value.optString("textColor", "#FFFFFFFF")));
+            }
+        } catch (Exception ignored) {}
+        return result;
     }
 
     @NonNull private static List<Lane> parseLanes(String raw) {
@@ -335,7 +405,7 @@ public final class HudNavigationState {
             case NAV_MANEUVER_ARROW:
                 return routeActive && (maneuverImage != null
                         || meaningfulManeuverType(maneuverType)
-                        || hasText(maneuverTitle) || hasText(maneuverText));
+                        || (!direct && (hasText(maneuverTitle) || hasText(maneuverText))));
             case NAV_MANEUVER_TITLE:
                 return routeActive && (hasText(maneuverTitle) || hasText(maneuverText));
             case NAV_MANEUVER_SUBTEXT:

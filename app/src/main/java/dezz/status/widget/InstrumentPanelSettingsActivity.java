@@ -604,7 +604,10 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch routeTraffic = switchView("Пробки на линии маршрута", map.showRouteTraffic);
         Switch traffic = switchView("Пробки на остальных дорогах", map.showTraffic);
         Switch trafficLights = switchView(
-                "Светофоры с отсчётом — отдельный слой", map.showTrafficLights);
+                "Живые светофоры: сигнал и отсчёт", map.showTrafficLights);
+        Switch routeTrafficLights = switchView(
+                "Обычные светофоры активного маршрута",
+                map.showRouteTrafficLights);
         Switch speedBumps = switchView(
                 "Искусственные неровности на активном маршруте", map.showSpeedBumps);
         Switch routeTurns = switchView(
@@ -627,6 +630,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(traffic);
         content.addView(routeTraffic);
         content.addView(trafficLights);
+        content.addView(routeTrafficLights);
         content.addView(speedBumps);
         content.addView(routeTurns);
         content.addView(laneGuidance);
@@ -673,8 +677,11 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 + "длина и положение вершины при этом не меняются.",
                 12, 0xFFB8C0CC));
         SliderField trafficLightScale = slider(content,
-                "Размер светофоров и плашек секунд",
+                "Размер живых светофоров и плашек секунд",
                 map.trafficLightScalePercent, 50, 250, 5, " %");
+        SliderField routeTrafficLightScale = slider(content,
+                "Размер обычных светофоров маршрута",
+                map.routeTrafficLightScalePercent, 50, 250, 5, " %");
         InheritedColorField trafficLightCardColor = inheritableNavigationColorField(
                 content, "Цвет плашки и хвостика светофора",
                 map.trafficLightCardColor, finalNavigation, preferences,
@@ -757,8 +764,11 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 "Конечная точка маршрута", map.destinationLayerPriority,
                 0, 100, 1, "");
         SliderField trafficLightLayerPriority = slider(content,
-                "Светофоры и секунды", map.trafficLightLayerPriority,
+                "Живые светофоры и секунды", map.trafficLightLayerPriority,
                 0, 100, 1, "");
+        SliderField routeTrafficLightLayerPriority = slider(content,
+                "Обычные светофоры маршрута",
+                map.routeTrafficLightLayerPriority, 0, 100, 1, "");
         SliderField laneGuidanceLayerPriority = slider(content,
                 "Знаки движения по полосам", map.laneGuidanceLayerPriority,
                 0, 100, 1, "");
@@ -768,7 +778,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField[] layerPriorityControls = new SliderField[]{
                 cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
                 speedBumpLayerPriority,
-                destinationLayerPriority, trafficLightLayerPriority,
+                destinationLayerPriority, routeTrafficLightLayerPriority,
+                trafficLightLayerPriority,
                 laneGuidanceLayerPriority, cursorLayerPriority};
         Runnable updateLayerPriorityControls = () -> {
             for (SliderField field : layerPriorityControls) {
@@ -822,6 +833,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showTraffic = traffic.isChecked();
                     map.showRouteTraffic = routeTraffic.isChecked();
                     map.showTrafficLights = trafficLights.isChecked();
+                    map.showRouteTrafficLights = routeTrafficLights.isChecked();
                     map.showSpeedBumps = speedBumps.isChecked();
                     map.showRouteTurns = routeTurns.isChecked();
                     map.showLaneGuidance = laneGuidance.isChecked();
@@ -842,6 +854,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cameraDirectionColor = cameraDirectionColor.value;
                     map.cameraDirectionOpacityPercent = cameraDirectionOpacity.intValue();
                     map.trafficLightScalePercent = trafficLightScale.intValue();
+                    map.routeTrafficLightScalePercent =
+                            routeTrafficLightScale.intValue();
                     map.trafficLightCardColor = trafficLightCardColor.value;
                     map.speedBumpScalePercent = speedBumpScale.intValue();
                     map.routeTurnLengthPercent = routeTurnLength.intValue();
@@ -868,6 +882,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.speedBumpLayerPriority = speedBumpLayerPriority.intValue();
                     map.destinationLayerPriority = destinationLayerPriority.intValue();
                     map.trafficLightLayerPriority = trafficLightLayerPriority.intValue();
+                    map.routeTrafficLightLayerPriority =
+                            routeTrafficLightLayerPriority.intValue();
                     map.routeTurnLayerPriority = map.routeLayerPriority;
                     map.laneGuidanceLayerPriority = laneGuidanceLayerPriority.intValue();
                     map.cursorLayerPriority = cursorLayerPriority.intValue();
@@ -1034,6 +1050,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         @NonNull private final Map<String, ColorField> colors = new LinkedHashMap<>();
         private Switch showIcon;
         private Switch reserveIconSpace;
+        private Switch showManeuverDetails;
 
         NavigationInfoControls(@NonNull LinearLayout parent,
                                @NonNull InstrumentElementConfig source) {
@@ -1061,6 +1078,24 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     100, 0, 100, 1, " %");
             number("maneuverIconCornerRadiusPx", "Скругление фона знака",
                     12, 0, 100, 1, " px");
+
+            parent.addView(section("Данные ближайшего манёвра"), marginTop(12));
+            showManeuverDetails = switchView(
+                    "Показывать указатели и дополнительную строку",
+                    source.options.optBoolean("showManeuverDetails", true));
+            parent.addView(showManeuverDetails);
+            number("maneuverDetailsHeightPercent", "Высота области",
+                    42, 20, 65, 1, " %");
+            number("maneuverDetailsGapPx", "Отступ до данных маршрута",
+                    4, 0, 100, 1, " px");
+            number("maneuverDetailRowGapPx", "Отступ дополнительной строки",
+                    2, 0, 100, 1, " px");
+            number("maneuverDetailTextSizeSp", "Размер основного текста",
+                    18, 8, 120, 1, " sp");
+            number("maneuverAuxiliaryTextSizeSp", "Размер дополнительного текста",
+                    14, 8, 120, 1, " sp");
+            color("maneuverDetailTextColor", "Цвет текста", "#FFFFFFFF");
+            color("maneuverAuxiliaryColor", "Цвет дополнительной строки", "#E60B4DB5");
 
             parent.addView(section("Отступы знака"), marginTop(12));
             padding("maneuverIconPadding", 5, 5, 5, 5, 160);
@@ -1125,6 +1160,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         void apply(@NonNull InstrumentElementConfig target) {
             setOption(target, "showManeuverIcon", showIcon.isChecked());
             setOption(target, "reserveManeuverIconSpace", reserveIconSpace.isChecked());
+            setOption(target, "showManeuverDetails", showManeuverDetails.isChecked());
             for (Map.Entry<String, SliderField> entry : numbers.entrySet()) {
                 setOption(target, entry.getKey(), entry.getValue().intValue());
             }

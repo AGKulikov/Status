@@ -125,6 +125,16 @@ public final class InstrumentElementConfig {
                     options.optInt("maneuverIconBackgroundOpacityPercent", 100), 0, 100));
             options.put("maneuverIconCornerRadiusPx", clamp(
                     options.optInt("maneuverIconCornerRadiusPx", 12), 0, 100));
+            options.put("maneuverDetailsHeightPercent", clamp(
+                    options.optInt("maneuverDetailsHeightPercent", 42), 20, 65));
+            options.put("maneuverDetailsGapPx", clamp(
+                    options.optInt("maneuverDetailsGapPx", 4), 0, 100));
+            options.put("maneuverDetailRowGapPx", clamp(
+                    options.optInt("maneuverDetailRowGapPx", 2), 0, 100));
+            options.put("maneuverDetailTextSizeSp", clamp(
+                    options.optInt("maneuverDetailTextSizeSp", 18), 8, 120));
+            options.put("maneuverAuxiliaryTextSizeSp", clamp(
+                    options.optInt("maneuverAuxiliaryTextSizeSp", 14), 8, 120));
             options.put("metricGapPx", clamp(options.optInt("metricGapPx", 10), 0, 100));
             options.put("distanceTextSizeSp", clamp(
                     options.optInt("distanceTextSizeSp", 25), 8, 120));

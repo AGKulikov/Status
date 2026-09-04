@@ -10,35 +10,39 @@ public final class DimMenuConflictPolicyTest {
 
     @Test public void stockSafetySurfacesAlwaysWin() {
         assertEquals(DimMenuConflictPolicy.Reason.CONTROL_CENTER,
-                reason(true, true, false, false, 2, 1));
-        assertEquals(DimMenuConflictPolicy.Reason.INSTRUMENT_PANEL,
-                reason(true, true, false, true, 2, 0));
+                reason(true, true, false, 2, 1));
         assertEquals(DimMenuConflictPolicy.Reason.MNAVI,
-                reason(true, true, true, false, 2, 0));
+                reason(true, true, true, 2, 0));
+    }
+
+    @Test public void instrumentPanelDoesNotSuppressDriverMenu() {
+        // The full Natro instrument activity is deliberately absent from the conflict inputs:
+        // the touch-free TYPE_APPLICATION_OVERLAY menu must remain above it.
+        assertEquals(DimMenuConflictPolicy.Reason.NONE,
+                reason(true, true, false, 2, 0));
     }
 
     @Test public void menuAppearsOnlyOnNavigationTabByDefault() {
         assertEquals(DimMenuConflictPolicy.Reason.OTHER_DIM_TAB,
-                reason(true, true, false, false, 3, 0));
+                reason(true, true, false, 3, 0));
         assertEquals(DimMenuConflictPolicy.Reason.NONE,
-                reason(true, true, false, false, 2, 0));
+                reason(true, true, false, 2, 0));
         assertEquals(DimMenuConflictPolicy.Reason.NONE,
-                reason(true, true, false, false, -1, 0));
+                reason(true, true, false, -1, 0));
     }
 
     @Test public void engineAndDisplayStateHideWithoutStoppingTheService() {
         assertEquals(DimMenuConflictPolicy.Reason.ENGINE_OFF,
                 DimMenuConflictPolicy.reason(true, true, false,
-                        false, false, 2, 0, config));
+                        false, 2, 0, config));
         assertEquals(DimMenuConflictPolicy.Reason.DISPLAY_OFF,
                 DimMenuConflictPolicy.reason(true, false, true,
-                        false, false, 2, 0, config));
+                        false, 2, 0, config));
     }
 
     private DimMenuConflictPolicy.Reason reason(boolean enabled, boolean display,
-                                                boolean mnav, boolean instrument,
-                                                int tab, int center) {
+                                                boolean mnav, int tab, int center) {
         return DimMenuConflictPolicy.reason(enabled, display, true, mnav,
-                instrument, tab, center, config);
+                tab, center, config);
     }
 }

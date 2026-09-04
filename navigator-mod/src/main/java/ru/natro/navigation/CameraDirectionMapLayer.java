@@ -223,18 +223,22 @@ final class CameraDirectionMapLayer {
             try {
                 MapOverlayPlacementCoordinator.Placement next = reservePlacement(
                         sign.camera, sign.bitmapWidth, sign.bitmapHeight);
-                if (next.sameSlot(sign.placement)) continue;
-                sign.placement = next;
-                invoke(sign.style, "setAnchor", new Class<?>[]{PointF.class},
-                        new PointF(next.anchorX, next.anchorY));
-                Class<?> providerClass = Class.forName(
-                        "com.yandex.runtime.image.ImageProvider");
-                Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
-                invoke(sign.placemark, "setIcon",
-                        new Class<?>[]{providerClass, styleClass},
-                        sign.provider, sign.style);
+                if (!next.sameSlot(sign.placement)) {
+                    sign.placement = next;
+                    invoke(sign.style, "setAnchor", new Class<?>[]{PointF.class},
+                            new PointF(next.anchorX, next.anchorY));
+                    Class<?> providerClass = Class.forName(
+                            "com.yandex.runtime.image.ImageProvider");
+                    Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+                    invoke(sign.placemark, "setIcon",
+                            new Class<?>[]{providerClass, styleClass},
+                            sign.provider, sign.style);
+                }
+                applyAtomicVisibility(sign);
             } catch (Throwable failure) {
                 Log.w(TAG, "Camera sign reservation could not be refreshed", failure);
+                // A failed relayout must not leave only the polygon half of the camera visual.
+                setAtomicVisibility(sign, false);
             }
         }
     }
@@ -357,7 +361,11 @@ final class CameraDirectionMapLayer {
             if (currentSigns == null) {
                 currentSigns = MapObjectLayerFactory.create(map,
                         MapSublayerOrder.CAMERA_SIGNS,
-                        MapObjectLayerFactory.EQUAL, zIndex);
+                        // A direction sector cannot participate in placemark collision. Letting
+                        // MapKit suppress only the sign (EQUAL) created an orphan triangle. Natro
+                        // already reserves the exact sign footprint, so the atomic group uses
+                        // IGNORE and either renders both members or neither one.
+                        MapObjectLayerFactory.IGNORE, zIndex);
                 signCollection = currentSigns;
             }
             Object currentSectors = sectorCollection;
@@ -375,15 +383,18 @@ final class CameraDirectionMapLayer {
             imageProviders.clear();
             cameraSigns.clear();
             for (CameraMarker camera : visibleScratch) {
+                // Create the sign first. A failed sign aborts and clears the entire generation,
+                // therefore no sector from that identity can survive on its own.
+                CameraSign sign = addSign(currentSigns, camera);
                 // No direction supplied means exactly one sign and no guessed circular plane.
                 for (Double direction : camera.directions) {
                     if (direction != null && Double.isFinite(direction)) {
-                        addSector(currentSectors, camera.latitude, camera.longitude,
-                                direction.doubleValue());
+                        sign.sectors.add(addSector(currentSectors, camera.latitude,
+                                camera.longitude, direction.doubleValue()));
                     }
                 }
+                applyAtomicVisibility(sign);
             }
-            for (CameraMarker camera : visibleScratch) addSign(currentSigns, camera);
             renderedFingerprint = latestVisualFingerprint;
         } catch (Throwable failure) {
             Log.w(TAG, "Camera sign/direction update failed", failure);
@@ -401,8 +412,8 @@ final class CameraDirectionMapLayer {
         return false;
     }
 
-    private void addSector(Object target, double latitude, double longitude,
-                           double directionDegrees) throws Exception {
+    private Object addSector(Object target, double latitude, double longitude,
+                             double directionDegrees) throws Exception {
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         ArrayList<Object> points = new ArrayList<>(4);
         points.add(pointClass.getConstructor(double.class, double.class)
@@ -439,10 +450,11 @@ final class CameraDirectionMapLayer {
         invoke(mapObject, "setGeodesic", new Class<?>[]{boolean.class}, false);
         invoke(mapObject, "setZIndex", new Class<?>[]{float.class}, zIndex);
         invoke(mapObject, "setVisible", new Class<?>[]{boolean.class}, true);
+        return mapObject;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void addSign(Object target, CameraMarker camera) throws Exception {
+    private CameraSign addSign(Object target, CameraMarker camera) throws Exception {
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         Object point = pointClass.getConstructor(double.class, double.class)
                 .newInstance(camera.latitude, camera.longitude);
@@ -480,8 +492,26 @@ final class CameraDirectionMapLayer {
         invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
         iconBitmaps.add(bitmap);
         imageProviders.add(provider);
-        cameraSigns.add(new CameraSign(camera, placemark, provider, style,
-                displayWidth, displayHeight, placement));
+        CameraSign sign = new CameraSign(camera, placemark, provider, style,
+                displayWidth, displayHeight, placement);
+        cameraSigns.add(sign);
+        return sign;
+    }
+
+    /** One source point owns one placemark and every supplied viewing sector. */
+    private void applyAtomicVisibility(CameraSign sign) throws Exception {
+        setAtomicVisibility(sign, placementCoordinator.isPointInsideViewport(
+                sign.camera.latitude, sign.camera.longitude));
+    }
+
+    private static void setAtomicVisibility(CameraSign sign, boolean visible) {
+        try {
+            invoke(sign.placemark, "setVisible", new Class<?>[]{boolean.class}, visible);
+        } catch (Throwable ignored) {}
+        for (Object sector : sign.sectors) {
+            try { invoke(sector, "setVisible", new Class<?>[]{boolean.class}, visible); }
+            catch (Throwable ignored) {}
+        }
     }
 
     private MapOverlayPlacementCoordinator.Placement reservePlacement(
@@ -818,6 +848,7 @@ final class CameraDirectionMapLayer {
         final Object style;
         final int bitmapWidth;
         final int bitmapHeight;
+        final ArrayList<Object> sectors = new ArrayList<>(2);
         MapOverlayPlacementCoordinator.Placement placement;
 
         CameraSign(CameraMarker camera, Object placemark, Object provider, Object style,

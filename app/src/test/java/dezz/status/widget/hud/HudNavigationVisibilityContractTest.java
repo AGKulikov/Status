@@ -52,6 +52,8 @@ public final class HudNavigationVisibilityContractTest {
 
         assertTrue(hudSettings.contains("profile.showTrafficLights"));
         assertTrue(clusterSettings.contains("map.showTrafficLights"));
+        assertTrue(hudSettings.contains("profile.showRouteTrafficLights"));
+        assertTrue(clusterSettings.contains("map.showRouteTrafficLights"));
         assertTrue(hudSettings.contains("profile.showLaneGuidance"));
         assertTrue(clusterSettings.contains("map.showLaneGuidance"));
         assertTrue(hudSettings.contains("profile.showDestination"));
@@ -63,6 +65,8 @@ public final class HudNavigationVisibilityContractTest {
         assertTrue(hudSettings.contains("Подсказки по полосам — слой на маршруте"));
         assertTrue(clusterSettings.contains("Подсказки по полосам — слой на маршруте"));
         assertTrue(config.contains(".put(\"showTrafficLights\", showTrafficLights)"));
+        assertTrue(config.contains(
+                ".put(\"showRouteTrafficLights\", showRouteTrafficLights)"));
         assertTrue(config.contains(".put(\"showLaneGuidance\", showLaneGuidance)"));
         assertTrue(config.contains(".put(\"showDestination\", showDestination)"));
         assertFalse(mainMap.contains("showTrafficLights"));
@@ -91,7 +95,9 @@ public final class HudNavigationVisibilityContractTest {
         assertTrue(element.contains("arrowPaddingLeftPx"));
         assertTrue(canvas.contains("drawManeuverCardText"));
         assertTrue(canvas.contains("nav.maneuverImage"));
-        assertTrue(canvas.contains("boolean exactSource = item.type == HudElementType.NAV_COMBINED"));
+        assertTrue(canvas.contains("nav.maneuverDirectionSigns"));
+        assertTrue(canvas.contains("nav.maneuverAuxiliaryText"));
+        assertTrue(canvas.contains("if (!editor && nav != null && nav.direct) return"));
         assertTrue(canvas.contains("sourceImageOnly"));
         assertTrue(canvas.contains("nav.turnDistance"));
         assertTrue(canvas.contains("nav.maneuverSubtext"));
@@ -100,7 +106,9 @@ public final class HudNavigationVisibilityContractTest {
         assertTrue(runtime.contains("navigation.turnDistance"));
         assertTrue(state.contains("case NAV_COMBINED:"));
         assertTrue(state.contains("return routeActive && (maneuverImage != null"));
-        assertTrue(runtime.contains("readFreshManeuverImage(context)"));
+        assertFalse(runtime.contains("readFreshManeuverImage(context)"));
+        assertTrue(state.contains("source.maneuverIdentity"));
+        assertTrue(state.contains("parseDirectionSigns"));
     }
 
     private static Path projectRoot() {

@@ -420,21 +420,23 @@ public final class HudCanvasView extends View {
 
     private void drawManeuver(Canvas canvas, HudElementConfig item, RectF bounds, int color) {
         HudNavigationState nav = data.navigation();
-        boolean exactSource = item.type == HudElementType.NAV_COMBINED;
-        if ((exactSource || item.options.optBoolean("preferSourceImage", true))
+        if (item.options.optBoolean("preferSourceImage", true)
                 && nav != null && nav.maneuverImage != null) {
             drawBitmap(canvas, nav.maneuverImage, bounds);
             return;
         }
-        // Combined cards default to the exact source graphic. A guessed vector can describe the
-        // wrong fork or exit, so live mode leaves the slot empty until Yandex supplies a bitmap.
-        // The editor keeps a placeholder so its geometry remains configurable.
-        if (!editor && (exactSource || item.options.optBoolean("sourceImageOnly", false))) return;
+        // Direct snapshots carry the public semantic Action in the same atomic frame as text and
+        // distance. Only an explicitly image-only legacy element may leave the vector slot empty.
+        if (!editor && item.options.optBoolean("sourceImageOnly", false)) return;
         String hint = nav == null ? "" : (nav.maneuverTitle + " " + nav.maneuverText)
                 .toLowerCase(Locale.ROOT);
         HudNavigationVisuals.Maneuver visual = HudNavigationVisuals.maneuver(
                 nav == null ? "" : nav.maneuverType);
         if (visual.shape == HudNavigationVisuals.ManeuverShape.UNKNOWN) {
+            // A live direct frame without a public semantic Action is intentionally blank. Text
+            // matching used to resurrect an old/wrong direction from a coincidentally similar
+            // road label. It remains only as an editor/legacy compatibility preview.
+            if (!editor && nav != null && nav.direct) return;
             int direction = hint.contains("направ") || hint.contains("right") ? 1
                     : hint.contains("налев") || hint.contains("left") ? -1 : 0;
             visual = new HudNavigationVisuals.Maneuver(
@@ -761,9 +763,12 @@ public final class HudCanvasView extends View {
         HudNavigationState nav = data.navigation();
         String distance = nav == null ? (editor ? "350 м" : "") : nav.turnDistance;
         String roadCandidate = nav == null ? (editor ? "М2" : "")
-                : firstCardText(nav.maneuverSubtext, nav.street);
+                : firstCardText(nav.maneuverNextRoad, nav.maneuverSubtext, nav.street);
+        List<HudNavigationState.DirectionSignItem> directionSigns = nav == null
+                ? Collections.emptyList() : nav.maneuverDirectionSigns;
         boolean showRoadBadge = item.options.optBoolean("showRoadBadge", true);
-        String roadBadge = showRoadBadge && looksLikeRoadReference(roadCandidate)
+        String roadBadge = directionSigns.isEmpty() && showRoadBadge
+                && looksLikeRoadReference(roadCandidate)
                 ? roadCandidate : "";
         String direction = nav == null ? (editor ? "Тула" : "")
                 : firstCardText(nav.maneuverTitle, nav.maneuverText,
@@ -772,14 +777,36 @@ public final class HudCanvasView extends View {
         if (!showDirection) direction = "";
         if (sameCardText(direction, roadBadge)) direction = "";
 
-        float distanceHeight = bounds.height() * clamp(
+        String auxiliary = nav == null ? (editor ? "2-й съезд" : "")
+                : nav.maneuverAuxiliaryText;
+        if (nav != null && "NEXT_MANEUVER".equals(nav.maneuverAuxiliaryType)
+                && !nav.maneuverAuxiliaryDistance.isEmpty()) {
+            auxiliary = auxiliary.isEmpty() ? nav.maneuverAuxiliaryDistance
+                    : auxiliary + " · " + nav.maneuverAuxiliaryDistance;
+        }
+        RectF primaryBounds = new RectF(bounds);
+        RectF auxiliaryBounds = null;
+        if (!auxiliary.isEmpty()) {
+            float auxiliaryHeight = Math.max(16f * scale, bounds.height() * .24f);
+            auxiliaryHeight = Math.min(bounds.height() * .38f, auxiliaryHeight);
+            float gap = Math.max(1f, item.options.optInt("textRowGapPx", 2) * scale);
+            auxiliaryBounds = new RectF(bounds.left,
+                    Math.max(bounds.top, bounds.bottom - auxiliaryHeight),
+                    bounds.right, bounds.bottom);
+            primaryBounds.bottom = Math.max(primaryBounds.top,
+                    auxiliaryBounds.top - gap);
+        }
+
+        float distanceHeight = primaryBounds.height() * clamp(
                 item.options.optInt("distanceAreaPercent", 56), 20, 80) / 100f;
         float rowGap = Math.max(0f, item.options.optInt("textRowGapPx", 2) * scale);
-        RectF distanceBounds = new RectF(bounds.left, bounds.top,
-                bounds.right, Math.max(bounds.top, bounds.top + distanceHeight - rowGap * .5f));
-        RectF detailBounds = new RectF(bounds.left,
-                Math.min(bounds.bottom, bounds.top + distanceHeight + rowGap * .5f),
-                bounds.right, bounds.bottom);
+        RectF distanceBounds = new RectF(primaryBounds.left, primaryBounds.top,
+                primaryBounds.right, Math.max(primaryBounds.top,
+                primaryBounds.top + distanceHeight - rowGap * .5f));
+        RectF detailBounds = new RectF(primaryBounds.left,
+                Math.min(primaryBounds.bottom,
+                        primaryBounds.top + distanceHeight + rowGap * .5f),
+                primaryBounds.right, primaryBounds.bottom);
         float distanceSize = Math.max(8f, Math.min(
                 item.options.optInt("distanceFontSizeSp", item.fontSizeSp) * scale,
                 distanceBounds.height() * .72f));
@@ -795,7 +822,46 @@ public final class HudCanvasView extends View {
                 Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
 
         float detailLeft = detailBounds.left;
-        if (!roadBadge.isEmpty()) {
+        if (!directionSigns.isEmpty()) {
+            float badgeGap = Math.max(3f, 5f * scale);
+            for (HudNavigationState.DirectionSignItem sign : directionSigns) {
+                if (detailLeft >= detailBounds.right) break;
+                textPaint.setTextSize(badgeSize);
+                textPaint.setTypeface(typeface(Math.max(600, item.fontWeight)));
+                float horizontalPadding = Math.max(2f, 5f * scale);
+                float maximum = Math.max(0f, detailBounds.right - detailLeft);
+                float badgeWidth = Math.min(maximum,
+                        textPaint.measureText(sign.text) + horizontalPadding * 2f);
+                if (badgeWidth < horizontalPadding * 2f + 1f) break;
+                float badgeHalfHeight = Math.min(detailBounds.height() * .5f,
+                        badgeSize * .62f + Math.max(1f, 2f * scale));
+                RectF badge = new RectF(detailLeft,
+                        detailBounds.centerY() - badgeHalfHeight,
+                        detailLeft + badgeWidth,
+                        detailBounds.centerY() + badgeHalfHeight);
+                int badgeColor = parseColor(sign.backgroundColor, null, 0xFF1478FF);
+                int badgeTextColor = parseColor(sign.textColor, null, Color.WHITE);
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(withAlpha(badgeColor, Math.round(
+                        Color.alpha(badgeColor) * Color.alpha(color) / 255f)));
+                canvas.drawRoundRect(badge, Math.max(2f, 3f * scale),
+                        Math.max(2f, 3f * scale), paint);
+                drawStyledText(canvas, sign.text,
+                        insetSides(badge, horizontalPadding, 0f, horizontalPadding, 0f),
+                        withAlpha(badgeTextColor, Color.alpha(color)), badgeSize,
+                        Layout.Alignment.ALIGN_CENTER, false,
+                        Math.max(600, item.fontWeight));
+                detailLeft = badge.right + badgeGap;
+            }
+            if (!roadCandidate.isEmpty() && !containsDirectionSign(directionSigns, roadCandidate)
+                    && detailLeft < detailBounds.right) {
+                drawStyledText(canvas, roadCandidate,
+                        new RectF(detailLeft, detailBounds.top, detailBounds.right,
+                                detailBounds.bottom), unitColor, directionSize,
+                        Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
+                detailLeft = detailBounds.right;
+            }
+        } else if (!roadBadge.isEmpty()) {
             textPaint.setTextSize(badgeSize);
             textPaint.setTypeface(typeface(Math.max(600, item.fontWeight)));
             float horizontalPadding = Math.max(0f,
@@ -832,6 +898,31 @@ public final class HudCanvasView extends View {
                             detailBounds.bottom), unitColor, directionSize,
                     Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
         }
+        if (auxiliaryBounds != null) {
+            int auxiliaryColor = optionColor(item, "auxiliaryColor", 0xE60B4DB5);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(auxiliaryColor, Math.round(
+                    Color.alpha(auxiliaryColor) * Color.alpha(color) / 255f)));
+            float radius = Math.max(2f, Math.min(auxiliaryBounds.height() * .28f, 7f * scale));
+            canvas.drawRoundRect(auxiliaryBounds, radius, radius, paint);
+            float auxiliarySize = Math.max(8f, Math.min(
+                    item.options.optInt("auxiliaryFontSizeSp",
+                            Math.max(8, Math.round(item.fontSizeSp * .46f))) * scale,
+                    auxiliaryBounds.height() * .62f));
+            drawStyledText(canvas, auxiliary,
+                    insetSides(auxiliaryBounds, Math.max(3f, 6f * scale), 0f,
+                            Math.max(3f, 6f * scale), 0f),
+                    color, auxiliarySize, Layout.Alignment.ALIGN_NORMAL, false,
+                    Math.max(600, item.fontWeight));
+        }
+    }
+
+    private static boolean containsDirectionSign(
+            List<HudNavigationState.DirectionSignItem> values, String text) {
+        for (HudNavigationState.DirectionSignItem value : values) {
+            if (sameCardText(value.text, text)) return true;
+        }
+        return false;
     }
 
     @NonNull

@@ -244,6 +244,14 @@ public enum InstrumentPanelPreset {
         option(result, "maneuverIconBackgroundColor", "#FF2B2E35");
         option(result, "maneuverIconBackgroundOpacityPercent", 100);
         option(result, "maneuverIconCornerRadiusPx", 12);
+        option(result, "showManeuverDetails", true);
+        option(result, "maneuverDetailsHeightPercent", 42);
+        option(result, "maneuverDetailsGapPx", 4);
+        option(result, "maneuverDetailRowGapPx", 2);
+        option(result, "maneuverDetailTextSizeSp", 18);
+        option(result, "maneuverAuxiliaryTextSizeSp", 14);
+        option(result, "maneuverDetailTextColor", "#FFFFFFFF");
+        option(result, "maneuverAuxiliaryColor", "#E60B4DB5");
         option(result, "metricGapPx", 10);
         option(result, "distanceTextSizeSp", 25);
         option(result, "arrivalTextSizeSp", 25);

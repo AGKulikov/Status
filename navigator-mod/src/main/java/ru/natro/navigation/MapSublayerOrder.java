@@ -22,6 +22,7 @@ final class MapSublayerOrder {
     static final String ROUTE = "ru.natro.navigation.route";
     static final String DESTINATION = "ru.natro.navigation.destination";
     static final String SPEED_BUMPS = "ru.natro.navigation.speed_bumps";
+    static final String ROUTE_TRAFFIC_LIGHTS = "ru.natro.navigation.route_traffic_lights";
     static final String TRAFFIC_LIGHTS = "ru.natro.navigation.traffic_lights";
     static final String LANE_GUIDANCE = "ru.natro.navigation.lane_guidance";
     static final String CURSOR = "ru.natro.navigation.cursor";
@@ -115,9 +116,14 @@ final class MapSublayerOrder {
                 ref(STOCK_ROUTE_PINS, PLACEMARKS),
                 ref(CAMERA_SIGNS, PLACEMARKS),
                 events);
-        placeAfter(manager, ref(SPEED_BUMPS, PLACEMARKS), routePinsAnchor);
+        ArrayList<LayerRef> routePinsFeatures = new ArrayList<>();
+        routePinsFeatures.add(ref(SPEED_BUMPS, PLACEMARKS));
+        routePinsFeatures.add(ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS));
+        LayerRef lastRoutePin = placeSequence(manager, routePinsFeatures,
+                routePinsAnchor, null);
 
         LayerRef cursorAnchor = firstExisting(manager,
+                lastRoutePin, ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS),
                 ref(SPEED_BUMPS, PLACEMARKS), routePinsAnchor);
         placeAfter(manager, ref(CURSOR, PLACEMARKS), cursorAnchor);
 
@@ -149,14 +155,16 @@ final class MapSublayerOrder {
                 profile.effectiveCameraPriority(), 0));
         custom.add(new LayerRef(SPEED_BUMPS, PLACEMARKS,
                 profile.effectiveSpeedBumpPriority(), 1));
+        custom.add(new LayerRef(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS,
+                profile.effectiveRouteTrafficLightPriority(), 2));
         custom.add(new LayerRef(CURSOR, PLACEMARKS,
-                profile.effectiveCursorPriority(), 2));
+                profile.effectiveCursorPriority(), 3));
         custom.add(new LayerRef(TRAFFIC_LIGHTS, PLACEMARKS,
-                profile.effectiveTrafficLightPriority(), 3));
+                profile.effectiveTrafficLightPriority(), 4));
         custom.add(new LayerRef(LANE_GUIDANCE, PLACEMARKS,
-                profile.effectiveLanePriority(), 4));
+                profile.effectiveLanePriority(), 5));
         custom.add(new LayerRef(DESTINATION, PLACEMARKS,
-                profile.effectiveDestinationPriority(), 5));
+                profile.effectiveDestinationPriority(), 6));
         sort(custom);
 
         LayerRef base = firstExisting(manager,

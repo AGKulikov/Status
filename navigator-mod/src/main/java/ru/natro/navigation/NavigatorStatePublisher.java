@@ -6,6 +6,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.widget.TextView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,6 +35,8 @@ import java.util.Locale;
  * sources for route progress and HUD data.</p>
  */
 final class NavigatorStatePublisher {
+    /** Navigator 30.3.0 does not select its traffic-jam StatusPanel below four minutes. */
+    private static final long STOCK_TRAFFIC_JAM_MIN_DURATION_MS = 240_000L;
     interface Sink {
         void onPrimaryMap(Object mapWindow, Object map);
 
@@ -1033,9 +1039,17 @@ final class NavigatorStatePublisher {
                 .put("routeEpoch", routeEpoch)
                 .put("sourceTimestampMs", now)
                 .put("routeActive", routeActive)
+                .put("maneuverIdentity", manoeuvre.identity)
                 .put("maneuverType", manoeuvre.type)
                 .put("maneuverTitle", manoeuvre.title)
                 .put("maneuverSubtext", manoeuvre.subtext)
+                .put("maneuverNextRoad", manoeuvre.nextRoad)
+                .put("maneuverDirectionSignsJson", manoeuvre.directionSigns.toString())
+                .put("maneuverAuxiliaryType", manoeuvre.auxiliary.type)
+                .put("maneuverAuxiliaryText", manoeuvre.auxiliary.text)
+                .put("maneuverAuxiliaryManeuverType", manoeuvre.auxiliary.maneuverType)
+                .put("maneuverAuxiliaryDistanceMeters",
+                        manoeuvre.auxiliary.distanceMeters)
                 .put("street", text(invoke(currentGuidance, "getRoadName")))
                 .put("destination", routeActive ? destinationForRoute(route) : "")
                 .put("maneuverDistanceMeters", manoeuvre.distanceMeters)
@@ -1064,13 +1078,22 @@ final class NavigatorStatePublisher {
      * Reads the same nullable value that owns Navigator's "Пробка на …" card. Failure of this
      * optional API must hide only that module and must never detach the complete Guidance stream.
      */
-    private static TrafficJamForecast readTrafficJamForecast(
+    private TrafficJamForecast readTrafficJamForecast(
             Object currentNaviKitGuidance, boolean routeActive) {
         if (!routeActive || currentNaviKitGuidance == null) return TrafficJamForecast.EMPTY;
         try {
             Object forecast = invoke(currentNaviKitGuidance, "leftInTrafficJam");
             if (forecast == null) return TrafficJamForecast.EMPTY;
             double durationMillis = number(invoke(forecast, "getDuration"), -1d);
+            // leftInTrafficJam() is a forecast source, not the StatusPanel visibility contract.
+            // Navigator keeps returning a residual forecast after its own jam card has already
+            // disappeared. Fail closed unless the exact stock StatusPanel currently owns visible
+            // jam text; this also rejects priority messages which replace that text in-place.
+            if (!finite(durationMillis)
+                    || durationMillis < STOCK_TRAFFIC_JAM_MIN_DURATION_MS
+                    || !isStockTrafficJamPanelVisible()) {
+                return TrafficJamForecast.EMPTY;
+            }
             int durationSeconds = !finite(durationMillis) || durationMillis < 0d ? -1
                     : (int) Math.min(Integer.MAX_VALUE,
                     Math.round(durationMillis) / 1_000L);
@@ -1083,6 +1106,48 @@ final class NavigatorStatePublisher {
         }
     }
 
+    /** Structural visibility survives a background MapWindow while still following its presenter. */
+    private boolean isStockTrafficJamPanelVisible() {
+        Activity activity = activityReference.get();
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return false;
+        try {
+            int panelId = activity.getResources().getIdentifier(
+                    "text_statuspanel", "id", activity.getPackageName());
+            int textId = activity.getResources().getIdentifier(
+                    "status_panel_text", "id", activity.getPackageName());
+            if (panelId == 0 || textId == 0) return false;
+            View panel = visibleViewById(activity, panelId);
+            View textView = panel == null ? null : panel.findViewById(textId);
+            if (!(textView instanceof TextView)
+                    || !visibleThroughParents(panel)
+                    || !visibleThroughParents(textView)) return false;
+            String value = String.valueOf(((TextView) textView).getText())
+                    .trim().toLowerCase(Locale.ROOT);
+            // Russian is the target locale; the English forms keep the adapter fail-safe for a
+            // temporarily changed system language without accepting arbitrary status messages.
+            return value.contains("пробк") || value.contains("traffic jam")
+                    || value.startsWith("jam ") || value.equals("jam");
+        } catch (Throwable unavailable) {
+            return false;
+        }
+    }
+
+    private static boolean visibleThroughParents(View value) {
+        // isShown() additionally rejects a stopped/hidden Navigator window. Plain VISIBLE flags
+        // can stay set in its detached hierarchy and previously kept the HUD jam card alive.
+        if (value == null || !value.isShown()) return false;
+        View current = value;
+        for (int depth = 0; depth < 64; depth++) {
+            if (current.getVisibility() != View.VISIBLE || current.getAlpha() <= .01f) {
+                return false;
+            }
+            ViewParent parent = current.getParent();
+            if (!(parent instanceof View)) return parent != null;
+            current = (View) parent;
+        }
+        return false;
+    }
+
     private String destinationForRoute(Object route) {
         if (cachedDestinationEpoch == routeEpoch) return cachedDestination;
         cachedDestination = readDestination(route);
@@ -1091,8 +1156,8 @@ final class NavigatorStatePublisher {
     }
 
     private Manoeuvre readManoeuvre(Object routePosition) throws Exception {
-        Object upcoming = nearest(invokeList(windshield, "getManoeuvres"),
-                routePosition, "getPosition");
+        List<?> upcomingManoeuvres = invokeList(windshield, "getManoeuvres");
+        Object upcoming = nearest(upcomingManoeuvres, routePosition, "getPosition");
         if (upcoming == null) return Manoeuvre.EMPTY;
         Object position = invoke(upcoming, "getPosition");
         Object annotation = invoke(upcoming, "getAnnotation");
@@ -1103,7 +1168,256 @@ final class NavigatorStatePublisher {
         String title = description.isEmpty() ? toponym : description;
         String subtext = title.equals(toponym) ? "" : toponym;
         int distance = nonNegativeInt(distance(routePosition, position));
-        return new Manoeuvre(type, title, subtext, distance);
+        StockManeuverCard stockCard = readStockManeuverCard();
+        String nextRoad = stockCard.nextRoad.isEmpty() ? toponym : stockCard.nextRoad;
+        JSONArray directionSigns = stockCard.directionSigns.length() == 0
+                ? readDirectionSignItems(position) : stockCard.directionSigns;
+        ManeuverAuxiliary auxiliary = stockCard.auxiliary == ManeuverAuxiliary.EMPTY
+                ? readManeuverAuxiliary(annotation, routePosition, upcomingManoeuvres, upcoming)
+                : stockCard.auxiliary;
+        return new Manoeuvre(manoeuvreIdentity(type, position), type, title, subtext,
+                nextRoad, directionSigns, auxiliary, distance);
+    }
+
+    /**
+     * Reads the public content of the exact stock ContextManeuverView currently on screen.
+     * Unlike a proximity guess, these values have already passed Navigator's own presenter rules,
+     * including whether a road sign or the attached auxiliary row is actually selected.
+     */
+    private StockManeuverCard readStockManeuverCard() {
+        Activity activity = activityReference.get();
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            return StockManeuverCard.EMPTY;
+        }
+        try {
+            String nextRoad = visibleText(activity, "text_nextstreet");
+            JSONArray signs = new JSONArray();
+            View signView = viewByName(activity, "roadsign_container");
+            if (visibleThroughParents(signView)) {
+                Object raw = invoke(signView, "getItems");
+                if (raw instanceof List<?>) encodeDirectionSignItems((List<?>) raw, signs);
+            }
+
+            ManeuverAuxiliary auxiliary = ManeuverAuxiliary.EMPTY;
+            View underBalloon = viewByName(activity, "under_balloon");
+            if (visibleThroughParents(underBalloon)) {
+                String exitNumber = visibleText(activity, "exit_number_text");
+                if (!exitNumber.isEmpty()) {
+                    auxiliary = new ManeuverAuxiliary(
+                            "EXIT_NUMBER", exitNumber, "", -1);
+                } else {
+                    View nextGroup = viewByName(activity,
+                            "under_balloon_next_maneuver_group");
+                    if (visibleThroughParents(nextGroup)) {
+                        String value = visibleText(activity, "next_maneuver_distance_value");
+                        String unit = visibleText(activity, "next_maneuver_distance_unit");
+                        String label = (value + (value.isEmpty() || unit.isEmpty() ? "" : " ")
+                                + unit).trim();
+                        if (!label.isEmpty()) {
+                            auxiliary = new ManeuverAuxiliary(
+                                    "NEXT_MANEUVER", label, "", -1);
+                        }
+                    }
+                }
+            }
+            if (nextRoad.isEmpty() && signs.length() == 0
+                    && auxiliary == ManeuverAuxiliary.EMPTY) return StockManeuverCard.EMPTY;
+            return new StockManeuverCard(nextRoad, signs, auxiliary);
+        } catch (Throwable unavailable) {
+            return StockManeuverCard.EMPTY;
+        }
+    }
+
+    private static View viewByName(Activity activity, String name) {
+        int id = activity.getResources().getIdentifier(
+                name, "id", activity.getPackageName());
+        return id == 0 ? null : visibleViewById(activity, id);
+    }
+
+    /** Chooses the actually displayed instance when portrait/landscape balloons share an id. */
+    private static View visibleViewById(Activity activity, int id) {
+        if (activity.getWindow() == null) return null;
+        return visibleDescendant(activity.getWindow().getDecorView(), id);
+    }
+
+    private static View visibleDescendant(View value, int id) {
+        if (value == null || !value.isShown()
+                || value.getVisibility() != View.VISIBLE || value.getAlpha() <= .01f) {
+            return null;
+        }
+        if (value.getId() == id && visibleThroughParents(value)) return value;
+        if (!(value instanceof ViewGroup)) return null;
+        ViewGroup group = (ViewGroup) value;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            View match = visibleDescendant(group.getChildAt(index), id);
+            if (match != null) return match;
+        }
+        return null;
+    }
+
+    private static String visibleText(Activity activity, String name) {
+        View value = viewByName(activity, name);
+        return value instanceof TextView && visibleThroughParents(value)
+                ? String.valueOf(((TextView) value).getText()).trim() : "";
+    }
+
+    private static void encodeDirectionSignItems(List<?> values, JSONArray target)
+            throws JSONException {
+        int emitted = 0;
+        for (Object item : values) {
+            if (emitted >= 8) break;
+            JSONObject encoded = encodeDirectionSignItem(item);
+            if (encoded == null) continue;
+            target.put(encoded);
+            emitted++;
+        }
+    }
+
+    /** One stable key owns action, text and every optional card region for the whole frame. */
+    private String manoeuvreIdentity(String type, Object position) {
+        RouteProgressSample progress = readEventRouteProgress(activeRoute, position);
+        if (progress.valid) {
+            return "maneuver:" + routeEpoch + ':' + progress.segmentIndex + ':'
+                    + Math.round(progress.segmentPosition * 1_000_000d) + ':' + type;
+        }
+        try {
+            Object point = position == null ? null : invoke(position, "getPoint");
+            if (point != null) {
+                double latitude = number(invoke(point, "getLatitude"), Double.NaN);
+                double longitude = number(invoke(point, "getLongitude"), Double.NaN);
+                if (finite(latitude) && finite(longitude)) {
+                    return "maneuver:" + routeEpoch + ':'
+                            + Math.round(latitude * 100_000d) + ':'
+                            + Math.round(longitude * 100_000d) + ':' + type;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return "maneuver:" + routeEpoch + ':' + type;
+    }
+
+    /** Mirrors DirectionSignItem order and its native colors instead of flattening it into road. */
+    private JSONArray readDirectionSignItems(Object manoeuvrePosition) {
+        JSONArray result = new JSONArray();
+        try {
+            Object best = null;
+            double bestDistance = Double.MAX_VALUE;
+            for (Object upcoming : invokeList(windshield, "getDirectionSigns")) {
+                Object position = invoke(upcoming, "getPosition");
+                double candidate = Math.abs(distance(manoeuvrePosition, position));
+                if (finite(candidate) && candidate <= 300d && candidate < bestDistance) {
+                    best = upcoming;
+                    bestDistance = candidate;
+                }
+            }
+            Object sign = best == null ? null : invoke(best, "getDirectionSign");
+            if (sign == null) return result;
+            encodeDirectionSignItems(invokeList(sign, "getItems"), result);
+        } catch (Throwable unavailable) {
+            // Direction signs are optional; the primary maneuver remains valid without them.
+        }
+        return result;
+    }
+
+    private static JSONObject encodeDirectionSignItem(Object item) throws JSONException {
+        if (item == null) return null;
+        Object value = tryInvoke(item, "getRoad");
+        String kind = "ROAD";
+        String label = value == null ? "" : text(tryInvoke(value, "getName"));
+        if (value == null) {
+            value = tryInvoke(item, "getToponym");
+            kind = "TOPONYM";
+            label = value == null ? "" : text(tryInvoke(value, "getText"));
+        }
+        if (value == null) {
+            value = tryInvoke(item, "getExit");
+            kind = "EXIT";
+            label = value == null ? "" : text(tryInvoke(value, "getName"));
+        }
+        if (value == null) {
+            value = tryInvoke(item, "getIcon");
+            kind = "ICON";
+            label = value == null ? "" : enumName(tryInvoke(value, "getImage"));
+        }
+        if (value == null || label.isEmpty()) return null;
+        Object style = tryInvoke(value, "getStyle");
+        return new JSONObject()
+                .put("kind", kind)
+                .put("text", label)
+                .put("bgColor", colorString(tryInvoke(style, "getBgColor"), "#FF1478FF"))
+                .put("textColor", colorString(
+                        tryInvoke(style, "getTextColor"), "#FFFFFFFF"));
+    }
+
+    private ManeuverAuxiliary readManeuverAuxiliary(
+            Object annotation, Object routePosition, List<?> upcomingManoeuvres, Object current) {
+        try {
+            Object metadata = tryInvoke(annotation, "getActionMetadata");
+            Object roundabout = tryInvoke(metadata, "getLeaveRoundaboutMetadata");
+            int number = positiveInt(tryInvoke(roundabout, "getExitNumber"));
+            if (number > 0) {
+                return new ManeuverAuxiliary("EXIT_NUMBER",
+                        russianOrdinal(number, "съезд"), "", -1);
+            }
+            Object exit = tryInvoke(metadata, "getExitMetadata");
+            number = positiveInt(tryInvoke(exit, "getSequentialNumber"));
+            if (number > 0) {
+                return new ManeuverAuxiliary("EXIT_NUMBER",
+                        russianOrdinal(number, "съезд"), "", -1);
+            }
+            Object turn = tryInvoke(metadata, "getTurnMetadata");
+            number = positiveInt(tryInvoke(turn, "getTurnNumber"));
+            if (number > 0) {
+                return new ManeuverAuxiliary("TURN_NUMBER",
+                        russianOrdinal(number, "поворот"), "", -1);
+            }
+            if (!Boolean.TRUE.equals(tryInvoke(annotation, "getInSeriesWithNext"))) {
+                return ManeuverAuxiliary.EMPTY;
+            }
+            Object next = nextManoeuvre(upcomingManoeuvres, routePosition, current);
+            if (next == null) return ManeuverAuxiliary.EMPTY;
+            Object nextPosition = invoke(next, "getPosition");
+            Object nextAnnotation = invoke(next, "getAnnotation");
+            if (nextAnnotation == null) return ManeuverAuxiliary.EMPTY;
+            String nextType = enumName(invoke(nextAnnotation, "getAction"));
+            String description = text(invoke(nextAnnotation, "getDescriptionText"));
+            String toponym = text(invoke(nextAnnotation, "getToponym"));
+            String label = description.isEmpty() ? toponym : description;
+            if (label.isEmpty()) label = "Следующий манёвр";
+            return new ManeuverAuxiliary("NEXT_MANEUVER", label, nextType,
+                    nonNegativeInt(distance(routePosition, nextPosition)));
+        } catch (Throwable unavailable) {
+            return ManeuverAuxiliary.EMPTY;
+        }
+    }
+
+    private static Object nextManoeuvre(List<?> values, Object routePosition, Object current)
+            throws Exception {
+        Object result = null;
+        double resultDistance = Double.MAX_VALUE;
+        double currentDistance = distance(routePosition, invoke(current, "getPosition"));
+        for (Object value : values) {
+            if (value == current) continue;
+            double candidate = distance(routePosition, invoke(value, "getPosition"));
+            if (finite(candidate) && candidate >= Math.max(0d, currentDistance + 1d)
+                    && candidate < resultDistance) {
+                result = value;
+                resultDistance = candidate;
+            }
+        }
+        return result;
+    }
+
+    private static int positiveInt(Object value) {
+        return value instanceof Number ? Math.max(0, ((Number) value).intValue()) : 0;
+    }
+
+    private static String russianOrdinal(int number, String noun) {
+        return number + "-й " + noun;
+    }
+
+    private static String colorString(Object value, String fallback) {
+        return value instanceof Number
+                ? String.format(Locale.ROOT, "#%08X", ((Number) value).intValue()) : fallback;
     }
 
     private static double geoDistanceMeters(double fromLatitude, double fromLongitude,
@@ -1909,17 +2223,57 @@ final class NavigatorStatePublisher {
     }
 
     private static final class Manoeuvre {
-        static final Manoeuvre EMPTY = new Manoeuvre("", "", "", -1);
+        static final Manoeuvre EMPTY = new Manoeuvre("", "", "", "", "",
+                new JSONArray(), ManeuverAuxiliary.EMPTY, -1);
+        final String identity;
         final String type;
         final String title;
         final String subtext;
+        final String nextRoad;
+        final JSONArray directionSigns;
+        final ManeuverAuxiliary auxiliary;
         final int distanceMeters;
 
-        Manoeuvre(String type, String title, String subtext, int distanceMeters) {
+        Manoeuvre(String identity, String type, String title, String subtext, String nextRoad,
+                  JSONArray directionSigns, ManeuverAuxiliary auxiliary, int distanceMeters) {
+            this.identity = identity;
             this.type = type;
             this.title = title;
             this.subtext = subtext;
+            this.nextRoad = nextRoad;
+            this.directionSigns = directionSigns;
+            this.auxiliary = auxiliary;
             this.distanceMeters = distanceMeters;
+        }
+    }
+
+    private static final class ManeuverAuxiliary {
+        static final ManeuverAuxiliary EMPTY = new ManeuverAuxiliary("", "", "", -1);
+        final String type;
+        final String text;
+        final String maneuverType;
+        final int distanceMeters;
+
+        ManeuverAuxiliary(String type, String text, String maneuverType, int distanceMeters) {
+            this.type = type;
+            this.text = text;
+            this.maneuverType = maneuverType;
+            this.distanceMeters = distanceMeters;
+        }
+    }
+
+    private static final class StockManeuverCard {
+        static final StockManeuverCard EMPTY = new StockManeuverCard(
+                "", new JSONArray(), ManeuverAuxiliary.EMPTY);
+        final String nextRoad;
+        final JSONArray directionSigns;
+        final ManeuverAuxiliary auxiliary;
+
+        StockManeuverCard(String nextRoad, JSONArray directionSigns,
+                          ManeuverAuxiliary auxiliary) {
+            this.nextRoad = nextRoad;
+            this.directionSigns = directionSigns;
+            this.auxiliary = auxiliary;
         }
     }
 
@@ -1975,6 +2329,15 @@ final class NavigatorStatePublisher {
 
     private static Object invoke(Object target, String name) throws Exception {
         return invoke(target, name, new Class<?>[0]);
+    }
+
+    private static Object tryInvoke(Object target, String name) {
+        if (target == null) return null;
+        try {
+            return invoke(target, name);
+        } catch (Throwable unavailable) {
+            return null;
+        }
     }
 
     private static Object invoke(Object target, String name, Class<?>[] parameterTypes,

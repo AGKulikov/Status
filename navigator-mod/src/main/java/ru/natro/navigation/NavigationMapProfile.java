@@ -46,6 +46,8 @@ final class NavigationMapProfile {
     boolean showTraffic = true;
     /** Independent custom collection; unrelated to background traffic and route jams. */
     boolean showTrafficLights = true;
+    /** Full DrivingRoute pins, including traffic lights which have no live signal/countdown. */
+    boolean showRouteTrafficLights = true;
     /** Exact DrivingRoute speed-bump pins; MapKit exposes no map-wide bump source. */
     boolean showSpeedBumps = true;
     boolean showRouteTurns = true;
@@ -59,6 +61,7 @@ final class NavigationMapProfile {
     String cameraDirectionColor = "#FF168BFF";
     int cameraDirectionOpacityPercent = 30;
     int trafficLightScalePercent = 100;
+    int routeTrafficLightScalePercent = 100;
     /** Empty keeps TrafficLightViewImpl's stock colours; otherwise body and tail are recoloured. */
     String trafficLightCardColor = "";
     int speedBumpScalePercent = 100;
@@ -78,6 +81,7 @@ final class NavigationMapProfile {
     int routeLayerPriority = 50;
     int destinationLayerPriority = 90;
     int trafficLightLayerPriority = 70;
+    int routeTrafficLightLayerPriority = 68;
     int speedBumpLayerPriority = 55;
     /** Legacy transport key. Native polyline arrows always inherit routeLayerPriority. */
     int routeTurnLayerPriority = 50;
@@ -153,6 +157,8 @@ final class NavigationMapProfile {
             result.showRouteTraffic = source.optBoolean(
                     "showRouteTraffic", result.showTraffic);
             result.showTrafficLights = source.optBoolean("showTrafficLights", true);
+            result.showRouteTrafficLights = source.optBoolean(
+                    "showRouteTrafficLights", true);
             result.showSpeedBumps = source.optBoolean("showSpeedBumps", true);
             result.showRouteTurns = source.optBoolean("showRouteTurns", true);
             result.showLaneGuidance = source.optBoolean("showLaneGuidance", true);
@@ -174,6 +180,8 @@ final class NavigationMapProfile {
                     source.optInt("cameraDirectionOpacityPercent", 30), 0, 100);
             result.trafficLightScalePercent = clamp(
                     source.optInt("trafficLightScalePercent", 100), 50, 250);
+            result.routeTrafficLightScalePercent = clamp(
+                    source.optInt("routeTrafficLightScalePercent", 100), 50, 250);
             String configuredTrafficLightCardColor = optionalColor(
                     source, "trafficLightCardColor");
             result.trafficLightCardColor = configuredTrafficLightCardColor == null
@@ -207,6 +215,8 @@ final class NavigationMapProfile {
                     source.optInt("destinationLayerPriority", 90), 0, 100);
             result.trafficLightLayerPriority = clamp(
                     source.optInt("trafficLightLayerPriority", 70), 0, 100);
+            result.routeTrafficLightLayerPriority = clamp(
+                    source.optInt("routeTrafficLightLayerPriority", 68), 0, 100);
             result.speedBumpLayerPriority = clamp(
                     source.optInt("speedBumpLayerPriority", 55), 0, 100);
             result.routeTurnLayerPriority = clamp(
@@ -221,6 +231,7 @@ final class NavigationMapProfile {
                 result.routeLayerPriority = 50;
                 result.destinationLayerPriority = 90;
                 result.trafficLightLayerPriority = 70;
+                result.routeTrafficLightLayerPriority = 68;
                 result.laneGuidanceLayerPriority = 80;
                 result.cursorLayerPriority = 60;
             }
@@ -316,6 +327,10 @@ final class NavigationMapProfile {
 
     int effectiveTrafficLightPriority() {
         return manualLayerPrioritiesEnabled ? trafficLightLayerPriority : 70;
+    }
+
+    int effectiveRouteTrafficLightPriority() {
+        return manualLayerPrioritiesEnabled ? routeTrafficLightLayerPriority : 68;
     }
 
     int effectiveSpeedBumpPriority() {
