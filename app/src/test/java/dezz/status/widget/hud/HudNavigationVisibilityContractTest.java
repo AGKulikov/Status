@@ -98,14 +98,14 @@ public final class HudNavigationVisibilityContractTest {
         assertTrue(canvas.contains("nav.maneuverDirectionSigns"));
         assertTrue(canvas.contains("nav.maneuverAuxiliaryText"));
         assertTrue(canvas.contains("if (!editor && nav != null && nav.direct) return"));
-        assertTrue(canvas.contains("sourceImageOnly"));
+        assertTrue(canvas.contains("if (!editor) return"));
         assertTrue(canvas.contains("nav.turnDistance"));
         assertTrue(canvas.contains("nav.maneuverSubtext"));
         assertTrue(canvas.contains("nav.street"));
         assertFalse(canvas.contains("NAV_COMBINED MapObject"));
         assertTrue(runtime.contains("navigation.turnDistance"));
         assertTrue(state.contains("case NAV_COMBINED:"));
-        assertTrue(state.contains("return routeActive && (maneuverImage != null"));
+        assertTrue(state.contains("? maneuverImage != null && hasText(turnDistance)"));
         assertFalse(runtime.contains("readFreshManeuverImage(context)"));
         assertTrue(state.contains("source.maneuverIdentity"));
         assertTrue(state.contains("parseDirectionSigns"));

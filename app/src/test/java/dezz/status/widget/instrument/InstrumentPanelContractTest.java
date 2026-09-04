@@ -244,7 +244,8 @@ public final class InstrumentPanelContractTest {
         assertTrue(renderer.contains("runtime.navigationRemainingDistance.isEmpty()"));
         assertTrue(renderer.contains("routeTrafficColor("));
         assertTrue(settings.contains("Отдельная сводка как в Навигаторе"));
-        assertTrue(settings.contains("без боковых и нижних кнопок"));
+        assertTrue(settings.contains("без боковых \""));
+        assertTrue(settings.contains("и нижних кнопок"));
     }
 
     @Test public void editorExposesPresetsModulesAndIndependentGradient() throws Exception {

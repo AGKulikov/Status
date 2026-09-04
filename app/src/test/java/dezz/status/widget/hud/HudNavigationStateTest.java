@@ -11,7 +11,7 @@ import dezz.status.widget.navigation.NavigationRouteGeometryV2;
 import dezz.status.widget.navigation.NavigationSnapshotV2;
 
 public final class HudNavigationStateTest {
-    @Test public void directSnapshotPopulatesEveryIndependentHudChannel() {
+    @Test public void directSnapshotRequiresStockArtworkForTheArrowChannel() {
         NavigationSnapshotV2 snapshot = new NavigationSnapshotV2(
                 9, 2, 1_000, true, 55.75, 37.61, 30, 72,
                 "RIGHT", "Направо", "на улицу", "Тверская", "Дом",
@@ -50,7 +50,7 @@ public final class HudNavigationStateTest {
         assertEquals("#FF0B4DB5", state.maneuverDirectionSigns.get(0).backgroundColor);
         assertEquals("EXIT_NUMBER", state.maneuverAuxiliaryType);
         assertEquals("2-й съезд", state.maneuverAuxiliaryText);
-        assertTrue(state.hasDataFor(HudElementType.NAV_MANEUVER_ARROW));
+        assertFalse(state.hasDataFor(HudElementType.NAV_MANEUVER_ARROW));
         assertTrue(state.hasDataFor(HudElementType.NAV_LANES));
         assertTrue(state.hasDataFor(HudElementType.NAV_TRAFFIC_LIGHTS));
     }
@@ -104,7 +104,7 @@ public final class HudNavigationStateTest {
         HudNavigationState state = HudNavigationState.fromBridge(snapshot, null);
 
         assertFalse(state.hasDataFor(HudElementType.NAV_MANEUVER_ARROW));
-        assertTrue(state.hasDataFor(HudElementType.NAV_COMBINED));
+        assertFalse(state.hasDataFor(HudElementType.NAV_COMBINED));
     }
 
     @Test public void redAndYellowIsARealTrafficSignalRatherThanAnEmptyShell() {
