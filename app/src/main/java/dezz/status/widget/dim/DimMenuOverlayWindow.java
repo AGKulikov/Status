@@ -52,7 +52,8 @@ final class DimMenuOverlayWindow {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                         | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.TOP | Gravity.LEFT;
+        // mNavi uses 0x800033 (START | TOP), not the absolute LEFT variant.
+        params.gravity = Gravity.TOP | Gravity.START;
         params.x = config.x;
         params.y = config.y;
         params.alpha = 1f;

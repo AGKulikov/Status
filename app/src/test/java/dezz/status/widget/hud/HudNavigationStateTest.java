@@ -15,7 +15,7 @@ public final class HudNavigationStateTest {
         NavigationSnapshotV2 snapshot = new NavigationSnapshotV2(
                 9, 2, 1_000, true, 55.75, 37.61, 30, 72,
                 "RIGHT", "Направо", "на улицу", "Тверская", "Дом",
-                250, 10_000, 7_500, 900, 3_600_000, 60, 500,
+                250, 10_000, 7_500, 900, -1, -1, 3_600_000, 60, 500,
                 "[{\"kind\":\"NORMAL\",\"highlightedDirection\":\"RIGHT90\","
                         + "\"directions\":[\"STRAIGHT_AHEAD\",\"RIGHT90\"]}]",
                 "[{\"id\":\"tl-1\",\"signal\":\"GREEN\",\"secondsLeft\":12,"
