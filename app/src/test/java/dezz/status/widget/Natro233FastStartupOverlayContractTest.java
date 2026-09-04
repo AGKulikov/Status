@@ -94,7 +94,7 @@ public final class Natro233FastStartupOverlayContractTest {
         assertTrue(policy.contains("PROPERTY_VISION_IMAGE_MODE = 29043"));
         assertTrue(fallback.contains("onExternalOverlaySignal(propertyId, raw)"));
         assertTrue(widget.contains(
-                "setPhoneExternalOverlayActive(phoneVehicleOverlayActive)"));
+                "boolean active = phoneVehicleOverlayActive || phoneParkingWindowActive"));
         assertFalse(widget.contains("phoneAccessibilityOverlayActive"));
         assertTrue(widget.contains("pausePhoneNotificationForExternalOverlay"));
         assertTrue(widget.contains("resumePhoneNotificationAfterExternalOverlay"));

@@ -70,7 +70,7 @@ public final class Natro234RoadLogRecoveryContractTest {
         assertTrue(hfpEvent.contains("hfpNetworkLiveSeenThisConnection = true"));
     }
 
-    @Test public void parkingDistanceSignalPausesIndependentlyFromCamera() throws Exception {
+    @Test public void parkingDistanceSignalRemainsAvailableForDiagnostics() throws Exception {
         String policy = read("app/src/main/java/dezz/status/widget/car/"
                 + "EcarxExternalOverlayPolicy.java");
         String fallback = read("app/src/geely/java/dezz/status/widget/car/"
@@ -79,8 +79,9 @@ public final class Natro234RoadLogRecoveryContractTest {
                 + "GeelyCarIntegration.java");
 
         assertTrue(policy.contains("PROPERTY_PARKING_DISTANCE_CONTROL_STATUS = 28995"));
-        assertTrue(policy.contains("parkingDistanceStatus == 2"));
-        assertTrue(policy.contains("parkingDistanceStatus == 3"));
+        // NOTIF-009 supersedes the old inference that sensor state means visible graphics.
+        assertFalse(dezz.status.widget.car.EcarxExternalOverlayPolicy.isActive(8, 0, 2));
+        assertFalse(dezz.status.widget.car.EcarxExternalOverlayPolicy.isActive(8, 0, 3));
         assertTrue(fallback.contains(
                 "EcarxExternalOverlayPolicy.PROPERTY_PARKING_DISTANCE_CONTROL_STATUS"));
         assertTrue(integration.contains("externalOverlayParkingRaw"));

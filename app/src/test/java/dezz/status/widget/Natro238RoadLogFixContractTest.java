@@ -73,12 +73,10 @@ public final class Natro238RoadLogFixContractTest {
         assertTrue(journal.contains("merged.addAll(readLines(file))"));
     }
 
-    @Test public void bothRecordedParktronicVisibleStatesOwnThePauseEdge() throws Exception {
-        String policy = read("app/src/main/java/dezz/status/widget/car/"
-                + "EcarxExternalOverlayPolicy.java");
+    @Test public void parkingWindowAndCameraVisibilityOwnThePauseEdgeWithoutDeadlineBypass() throws Exception {
         String widget = read("app/src/main/java/dezz/status/widget/WidgetService.java");
-        assertTrue(policy.contains("parkingDistanceStatus == 2"));
-        assertTrue(policy.contains("parkingDistanceStatus == 3"));
+        assertTrue(widget.contains("boolean active = phoneVehicleOverlayActive || phoneParkingWindowActive"));
+        assertTrue(widget.contains("this::onEcarxParkingWindowStateChanged"));
         assertFalse(widget.contains("phoneExternalOverlayDeadlineBypass"));
         assertTrue(widget.contains("boolean changed = phoneExternalOverlayActive != active"));
         assertTrue(widget.contains("syncPhoneNotificationExternalOverlayPause()"));

@@ -3,15 +3,15 @@ package dezz.status.widget.car;
 
 import androidx.annotation.Nullable;
 
-/** Pure interpretation of the KX11 external display/parking overlay signals. */
+/** Camera display signals. Parking-system status is diagnostic, not proof of a visible window. */
 public final class EcarxExternalOverlayPolicy {
     /** {@code SwtDispOnAndOffStsResp}: 3 while the external panel owns the display. */
     public static final int PROPERTY_DISPLAY_SWITCH_STATUS = 29021;
     /** {@code VisnImgDispModResp}: 1/2 while a vehicle image mode is entering/visible. */
     public static final int PROPERTY_VISION_IMAGE_MODE = 29043;
     /**
-     * {@code PrkgDstCtrlSts}: 2/3 while the KX11 park-distance/360 surface owns the display;
-     * 1 is the recorded closed state.
+     * {@code PrkgDstCtrlSts}: operating status of the parking distance system. Values 2/3 can
+     * outlive its on-screen graphics; retain the subscription for diagnostics only.
      */
     public static final int PROPERTY_PARKING_DISTANCE_CONTROL_STATUS = 28995;
 
@@ -35,17 +35,13 @@ public final class EcarxExternalOverlayPolicy {
     }
 
     /**
-     * Parking distance control is independent from the 360-camera switch. Captures from both
-     * firmware paths use {@code 2} and {@code 3} while either the distance card or 360 image is
-     * visible, and publish {@code 1} only after the vehicle overlay has closed. Do not require the
-     * slower display-switch/vision responses: they can already be back at 8/0 while parktronic is
-     * still visibly covering the launcher.
+     * Only camera display responses can create this hold. The parking UI has its own independently
+     * observed window state, combined with this result by WidgetService. A parked/enabled sensor
+     * system must never keep a notification's paused expiry at Long.MAX_VALUE after its UI closes.
      */
     public static boolean isActive(@Nullable Integer displaySwitchStatus,
                                    @Nullable Integer visionImageMode,
                                    @Nullable Integer parkingDistanceStatus) {
-        if (parkingDistanceStatus != null
-                && (parkingDistanceStatus == 2 || parkingDistanceStatus == 3)) return true;
         if (displaySwitchStatus != null) return displaySwitchStatus == 3;
         return visionImageMode != null
                 && (visionImageMode == 1 || visionImageMode == 2);

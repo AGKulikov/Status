@@ -24,16 +24,18 @@ public final class EcarxExternalOverlayPolicyTest {
         assertTrue(EcarxExternalOverlayPolicy.isActive(null, 2));
     }
 
-    @Test public void parkingDistanceSignalIndependentlyBracketsParktronicOverlay() {
-        assertFalse(EcarxExternalOverlayPolicy.isActive(8, 0, 1));
-        assertTrue(EcarxExternalOverlayPolicy.isActive(8, 0, 2));
-        assertTrue(EcarxExternalOverlayPolicy.isActive(8, 0, 3));
-        assertTrue(EcarxExternalOverlayPolicy.isActive(3, 1, 3));
+    @Test public void enabledParkingSystemCannotHoldNotificationsAfterGraphicsClose() {
+        for (int parking = 0; parking <= 3; parking++) {
+            assertFalse(EcarxExternalOverlayPolicy.isActive(8, 0, parking));
+            assertFalse(EcarxExternalOverlayPolicy.isActive(0, 0, parking));
+            assertFalse(EcarxExternalOverlayPolicy.isActive(null, null, parking));
+        }
     }
 
-    @Test public void parkingDistanceThreeDoesNotNeedCameraSideSignals() {
-        assertTrue(EcarxExternalOverlayPolicy.isActive(8, 0, 3));
-        assertTrue(EcarxExternalOverlayPolicy.isActive(0, 0, 3));
-        assertTrue(EcarxExternalOverlayPolicy.isActive(null, null, 3));
+    @Test public void parkingStatusCannotCancelAnIndependentlyVisibleCamera() {
+        for (Integer parking : new Integer[]{null, 0, 1, 2, 3}) {
+            assertTrue(EcarxExternalOverlayPolicy.isActive(3, 0, parking));
+            assertTrue(EcarxExternalOverlayPolicy.isActive(null, 1, parking));
+        }
     }
 }

@@ -14,6 +14,28 @@ import java.nio.file.Paths;
 /** Regression contract for camera/360/PAS notification pause and ordered recovery. */
 public final class Ha1242VehicleOverlayNotificationPauseContractTest {
     @Test
+    public void parkingConfirmationRequestsFreshEvidenceWithoutAnExpiryRelease() throws Exception {
+        String service = source("WidgetService.java");
+        int from = service.indexOf("private void requestParkingWindowAbsenceConfirmation()");
+        int to = service.indexOf("private void onEcarxParkingWindowStateChanged", from);
+        assertTrue(from >= 0 && to > from);
+        String confirmation = service.substring(from, to);
+        assertTrue(confirmation.contains("refresh(\"parking-absence-confirmation\")"));
+        assertFalse(confirmation.contains("reset("));
+        assertFalse(confirmation.contains("resumePhoneNotification"));
+        assertFalse(confirmation.contains("setPhoneExternalOverlayActive(false)"));
+        assertTrue(service.contains("boolean active = phoneVehicleOverlayActive || phoneParkingWindowActive"));
+        assertTrue(service.contains("SystemShadeService.setVehicleOverlayActive(active)"));
+
+        String observer = source("EcarxNavigatorWindowObserver.java");
+        assertTrue(observer.contains("freshSnapshots.accept(raw)"));
+        assertTrue(observer.contains("generation == parkingObservationGeneration"));
+        assertTrue(observer.contains("scheduleWithFixedDelay"));
+        assertTrue(observer.contains("if (api == null) initializeAndSeed()"));
+        assertTrue(observer.contains("displayBounds(Display.DEFAULT_DISPLAY), Display.DEFAULT_DISPLAY"));
+    }
+
+    @Test
     public void vehicleSafetyOverlayCannotBeBypassedByForegroundMaximumWait() throws Exception {
         String service = source("WidgetService.java");
         assertFalse(service.contains("phoneExternalOverlayDeadlineBypass"));

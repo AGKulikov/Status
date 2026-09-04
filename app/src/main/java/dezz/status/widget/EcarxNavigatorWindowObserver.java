@@ -28,6 +28,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import dezz.status.widget.diagnostics.DiagnosticJournal;
@@ -44,6 +45,10 @@ import dezz.status.widget.diagnostics.DiagnosticJournal;
 final class EcarxNavigatorWindowObserver {
     interface Listener {
         void onStateChanged(@NonNull NavigatorWindowFramePolicy.Result result);
+    }
+
+    interface ParkingListener {
+        void onParkingStateChanged(@NonNull EcarxParkingWindowPolicy.State state);
     }
 
     private static final String COMPONENT = "navigator-window";
@@ -69,6 +74,7 @@ final class EcarxNavigatorWindowObserver {
 
     @NonNull private final Context appContext;
     @NonNull private final Listener listener;
+    @Nullable private final ParkingListener parkingListener;
     @NonNull private final Handler mainHandler = new Handler(Looper.getMainLooper());
     @NonNull private final ScheduledExecutorService worker =
             Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -80,22 +86,34 @@ final class EcarxNavigatorWindowObserver {
     @NonNull private final Set<Integer> yandexUids = new HashSet<>();
     @NonNull private final NavigatorWindowSourcePolicy.AbsenceGate absenceGate =
             new NavigatorWindowSourcePolicy.AbsenceGate();
+    @NonNull private final EcarxParkingWindowPolicy.FreshSnapshots freshSnapshots =
+            new EcarxParkingWindowPolicy.FreshSnapshots();
 
     private volatile boolean stopped;
+    private volatile boolean parkingObservationNeeded;
+    private volatile long parkingObservationGeneration;
+    @Nullable private ScheduledFuture<?> parkingRefreshTask;
     private volatile int targetDisplayId = Display.DEFAULT_DISPLAY;
     @Nullable private VendorApi api;
     @Nullable private Object observerProxy;
     @NonNull private NavigatorWindowFramePolicy.State lastState =
             NavigatorWindowFramePolicy.State.UNKNOWN;
     @NonNull private String lastEvidence = "";
+    @NonNull private String lastParkingEvidence = "";
     private long snapshotGeneration;
     private long confirmationRefreshGeneration;
     private long absenceConfirmationGeneration;
     private long lastFailureLogAt;
 
     EcarxNavigatorWindowObserver(@NonNull Context context, @NonNull Listener listener) {
+        this(context, listener, null);
+    }
+
+    EcarxNavigatorWindowObserver(@NonNull Context context, @NonNull Listener listener,
+                                 @Nullable ParkingListener parkingListener) {
         this.appContext = context.getApplicationContext();
         this.listener = listener;
+        this.parkingListener = parkingListener;
     }
 
     void start(int displayId) {
@@ -114,6 +132,24 @@ final class EcarxNavigatorWindowObserver {
         requestSnapshot(reason, 0L);
     }
 
+    /** Shares the vendor inventory with navigation; no second Binder channel or window-tree scan. */
+    void setParkingObservationNeeded(boolean needed) {
+        synchronized (snapshotLock) {
+            if (stopped || parkingObservationNeeded == needed) return;
+            parkingObservationNeeded = needed;
+            parkingObservationGeneration++;
+            if (parkingRefreshTask != null) parkingRefreshTask.cancel(false);
+            parkingRefreshTask = null;
+            if (!needed || parkingListener == null) return;
+            // Poll even while hidden: a lost OEM callback must not lose the next opening/closing.
+            parkingRefreshTask = worker.scheduleWithFixedDelay(() -> {
+                if (stopped || !parkingObservationNeeded) return;
+                if (api == null) initializeAndSeed();
+                else takeSnapshot("parking-visibility-refresh");
+            }, 0L, 1_000L, TimeUnit.MILLISECONDS);
+        }
+    }
+
     void stop() {
         if (stopped) return;
         stopped = true;
@@ -121,6 +157,9 @@ final class EcarxNavigatorWindowObserver {
             snapshotGeneration++;
             confirmationRefreshGeneration++;
             absenceConfirmationGeneration++;
+            parkingObservationGeneration++;
+            if (parkingRefreshTask != null) parkingRefreshTask.cancel(false);
+            parkingRefreshTask = null;
         }
         try {
             worker.execute(this::unregisterSafely);
@@ -133,6 +172,11 @@ final class EcarxNavigatorWindowObserver {
 
     private void initializeAndSeed() {
         if (stopped) return;
+        // start() and enabling parking observation can both enqueue initialization.
+        if (api != null) {
+            takeSnapshot("reseed");
+            return;
+        }
         try {
             resolveYandexUids();
             api = VendorApi.create(appContext);
@@ -197,22 +241,38 @@ final class EcarxNavigatorWindowObserver {
         VendorApi current = api;
         if (stopped || current == null) return;
         int displayId = targetDisplayId;
+        long parkingGeneration = parkingObservationGeneration;
         try {
             NavigatorWindowFramePolicy.Frame displayBounds = displayBounds(displayId);
             Object raw = current.getWindowList.invoke(current.manager);
-            if (!(raw instanceof Object[])) {
-                if (displayId != targetDisplayId) return;
-                publishResult(reason, new NavigatorWindowFramePolicy.Result(
-                        NavigatorWindowFramePolicy.State.UNKNOWN, null, 0),
-                        displayId, displayBounds);
-                return;
+            // AdaptAPI catches RemoteException and returns the same cached array. A successful
+            // KX11 getWindowList() allocates a new array, including for an empty inventory.
+            // Keep this identity guard across reconnects so a cached VISIBLE/HIDDEN cannot win.
+            if (!freshSnapshots.accept(raw)) {
+                throw new IllegalStateException("ECARX window inventory is missing or cached");
             }
             Object[] windows = (Object[]) raw;
             ArrayList<NavigatorWindowFramePolicy.WindowSample> samples =
                     new ArrayList<>(windows.length);
+            ArrayList<EcarxParkingWindowPolicy.WindowSample> parkingSamples = new ArrayList<>();
             for (Object window : windows) {
                 NavigatorWindowFramePolicy.WindowSample sample = sample(current, window);
                 if (sample != null) samples.add(sample);
+                if (parkingObservationNeeded) {
+                    // A null entry means the inventory was incomplete, not that parking closed.
+                    if (window == null) parkingSamples.add(null);
+                    else {
+                        EcarxParkingWindowPolicy.WindowSample parking = sampleParking(current, window);
+                        if (parking != null) parkingSamples.add(parking);
+                    }
+                }
+            }
+            if (parkingObservationNeeded) {
+                EcarxParkingWindowPolicy.State parkingState = EcarxParkingWindowPolicy.classify(
+                        displayBounds(Display.DEFAULT_DISPLAY), Display.DEFAULT_DISPLAY,
+                        parkingSamples);
+                logParkingEvidence(parkingState, parkingSamples, reason);
+                publishParkingState(parkingState, parkingGeneration);
             }
             NavigatorWindowFramePolicy.Result result = NavigatorWindowFramePolicy.classify(
                     displayBounds, displayId, samples);
@@ -222,8 +282,66 @@ final class EcarxNavigatorWindowObserver {
             publishResult(reason, result, displayId, displayBounds);
         } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
             reportFailure("ECARX window snapshot rejected", failure);
+            // The parking refresh loop reconnects on its next tick. Do not retain a dead proxy.
+            unregisterSafely();
             publishUnknown();
         }
+    }
+
+    @Nullable
+    private EcarxParkingWindowPolicy.WindowSample sampleParking(@NonNull VendorApi current,
+                                                                @NonNull Object window)
+            throws ReflectiveOperationException {
+        String packageName = stringValue(current.getPackage.invoke(window));
+        if (packageName.isEmpty()) {
+            return new EcarxParkingWindowPolicy.WindowSample("", -1, -1, -1, null);
+        }
+        if (!EcarxParkingWindowPolicy.PARKING_PACKAGE.equals(packageName)) return null;
+        int visibility = intValue(current.getVisibility.invoke(window));
+        // Hidden windows need no geometry. Some vendor versions cannot parse their old frame.
+        Object rawFrame = visibility == 0 ? current.getFrame.invoke(window) : null;
+        NavigatorWindowFramePolicy.Frame frame = null;
+        if (rawFrame instanceof Rect) {
+            Rect rect = (Rect) rawFrame;
+            frame = new NavigatorWindowFramePolicy.Frame(rect.left, rect.top, rect.right, rect.bottom);
+        }
+        return new EcarxParkingWindowPolicy.WindowSample(packageName,
+                intValue(current.getDisplayId.invoke(window)), intValue(current.getType.invoke(window)),
+                visibility, frame);
+    }
+
+    private void logParkingEvidence(@NonNull EcarxParkingWindowPolicy.State state,
+                                    @NonNull ArrayList<EcarxParkingWindowPolicy.WindowSample> samples,
+                                    @NonNull String reason) {
+        StringBuilder evidence = new StringBuilder("parking state=").append(state)
+                .append(" display=").append(Display.DEFAULT_DISPLAY);
+        for (EcarxParkingWindowPolicy.WindowSample sample : samples) {
+            if (sample == null || sample.packageName.isEmpty()) {
+                evidence.append(" incomplete-entry");
+            } else {
+                // No titles, tags or unrelated applications are recorded.
+                evidence.append(" window={package=").append(sample.packageName)
+                        .append(" display=").append(sample.displayId)
+                        .append(" type=").append(sample.type)
+                        .append(" visibility=").append(sample.visibility)
+                        .append(" frame=").append(sample.frame).append('}');
+            }
+        }
+        String text = evidence.toString();
+        if (!text.equals(lastParkingEvidence)) {
+            lastParkingEvidence = text;
+            logInfo(text + " reason=" + reason);
+        }
+    }
+
+    private void publishParkingState(@NonNull EcarxParkingWindowPolicy.State state,
+                                     long generation) {
+        if (parkingListener == null || !parkingObservationNeeded) return;
+        mainHandler.post(() -> {
+            if (!stopped && parkingObservationNeeded && generation == parkingObservationGeneration) {
+                parkingListener.onParkingStateChanged(state);
+            }
+        });
     }
 
     @Nullable
@@ -358,6 +476,10 @@ final class EcarxNavigatorWindowObserver {
     }
 
     private void publishUnknown() {
+        if (parkingObservationNeeded) {
+            logParkingEvidence(EcarxParkingWindowPolicy.State.UNKNOWN, new ArrayList<>(), "unavailable");
+        }
+        publishParkingState(EcarxParkingWindowPolicy.State.UNKNOWN, parkingObservationGeneration);
         publishResult("unavailable", new NavigatorWindowFramePolicy.Result(
                 NavigatorWindowFramePolicy.State.UNKNOWN, null, 0),
                 targetDisplayId, null);

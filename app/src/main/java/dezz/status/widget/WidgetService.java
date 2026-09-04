@@ -479,6 +479,11 @@ public class WidgetService extends Service {
     /** Confirmed ECARX 360°-camera / parktronic ownership of the vehicle display. */
     private boolean phoneExternalOverlayActive;
     private boolean phoneVehicleOverlayActive;
+    private boolean phoneParkingWindowActive;
+    private final EcarxParkingWindowPolicy.VisibilityState phoneParkingWindowState =
+            new EcarxParkingWindowPolicy.VisibilityState();
+    private final Runnable phoneParkingWindowAbsenceConfirmation =
+            this::requestParkingWindowAbsenceConfirmation;
     private boolean phoneVehicleOverlayListenerInstalled;
     private final CarIntegration.ExternalOverlayListener phoneVehicleOverlayListener =
             this::onVehicleExternalOverlayChanged;
@@ -1172,7 +1177,7 @@ public class WidgetService extends Service {
         timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
         windowManager = getSystemService(WindowManager.class);
         ecarxNavigatorWindowObserver = new EcarxNavigatorWindowObserver(
-                this, this::onEcarxNavigatorWindowStateChanged);
+                this, this::onEcarxNavigatorWindowStateChanged, this::onEcarxParkingWindowStateChanged);
         ecarxNavigatorWindowObserver.start(android.view.Display.DEFAULT_DISPLAY);
 
         if (prefs.widgetEnabled.get() && overlayRuntimeAvailable) {
@@ -7126,11 +7131,40 @@ public class WidgetService extends Service {
 
     private void onVehicleExternalOverlayChanged(boolean active) {
         mainHandler.post(() -> {
-            if (destroyed) return;
+            if (destroyed || !phoneVehicleOverlayListenerInstalled) return;
             phoneVehicleOverlayActive = active;
-            SystemShadeService.setVehicleOverlayActive(active);
             recomputePhoneExternalOverlayActive();
         });
+    }
+
+    private void requestParkingWindowAbsenceConfirmation() {
+        if (!destroyed && phoneVehicleOverlayListenerInstalled
+                && ecarxNavigatorWindowObserver != null) {
+            ecarxNavigatorWindowObserver.refresh("parking-absence-confirmation");
+        }
+    }
+
+    private void onEcarxParkingWindowStateChanged(@NonNull EcarxParkingWindowPolicy.State state) {
+        if (destroyed || !phoneVehicleOverlayListenerInstalled) return;
+        phoneParkingWindowState.observe(state, SystemClock.elapsedRealtime());
+        mainHandler.removeCallbacks(phoneParkingWindowAbsenceConfirmation);
+        if (phoneParkingWindowState.needsAbsenceConfirmation()) {
+            mainHandler.postDelayed(phoneParkingWindowAbsenceConfirmation,
+                    EcarxParkingWindowPolicy.ABSENCE_CONFIRMATION_MS);
+        }
+        reconcileParkingWindowHold();
+    }
+
+    /** Only a confirmed window transition changes this hold; elapsed time never releases it. */
+    private void reconcileParkingWindowHold() {
+        if (destroyed) return;
+        boolean active = phoneParkingWindowState.isActive();
+        if (phoneParkingWindowActive != active) {
+            phoneParkingWindowActive = active;
+            DiagnosticJournal.info("phone-notification", "parking window hold=" + active
+                    + " source=ecarx-window-inventory cameraHold=" + phoneVehicleOverlayActive);
+            recomputePhoneExternalOverlayActive();
+        }
     }
 
     private void reconcileCarExternalOverlayListener(@NonNull CarIntegration car) {
@@ -7141,15 +7175,22 @@ public class WidgetService extends Service {
         boolean needed = phoneNeeded || shadeNeeded;
         car.setExternalOverlayListener(needed ? phoneVehicleOverlayListener : null);
         phoneVehicleOverlayListenerInstalled = needed;
+        if (ecarxNavigatorWindowObserver != null) {
+            ecarxNavigatorWindowObserver.setParkingObservationNeeded(needed);
+        }
         if (!needed) {
             phoneVehicleOverlayActive = false;
-            SystemShadeService.setVehicleOverlayActive(false);
+            phoneParkingWindowState.reset();
+            phoneParkingWindowActive = false;
+            mainHandler.removeCallbacks(phoneParkingWindowAbsenceConfirmation);
             recomputePhoneExternalOverlayActive();
         }
     }
 
     private void recomputePhoneExternalOverlayActive() {
-        setPhoneExternalOverlayActive(phoneVehicleOverlayActive);
+        boolean active = phoneVehicleOverlayActive || phoneParkingWindowActive;
+        SystemShadeService.setVehicleOverlayActive(active);
+        setPhoneExternalOverlayActive(active);
     }
 
     private void setPhoneExternalOverlayActive(boolean active) {
