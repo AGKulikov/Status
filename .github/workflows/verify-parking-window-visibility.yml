@@ -54,6 +54,7 @@ jobs:
           fi
           cp "$TOOLS/aapt" "$TOOLS/apksigner" "$TOOLS/zipalign" "$OUT/tools/"
           cp "$TOOLS/lib/apksigner.jar" "$OUT/tools/lib/"
+          cp -a "$TOOLS/lib64" "$OUT/tools/"
           chmod 755 "$OUT/tools/"*
           jq -n --arg commit "$GITHUB_SHA" --arg tree "$(git rev-parse HEAD^{tree})" \
             --arg run "$GITHUB_RUN_ID" \

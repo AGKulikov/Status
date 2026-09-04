@@ -76,8 +76,9 @@ def main():
     current, badging = identity(unsigned)
     if current != {k: expected[k] for k in ("package", "versionCode", "versionName")}:
         raise ValueError("APK identity differs from the candidate manifest")
-    if "application-label:'Natro'" not in badging or "sdkVersion:'28'" not in badging:
-        raise ValueError("Unexpected application label or minimum Android version")
+    if ("application-label:'Natro'" not in badging or "sdkVersion:'28'" not in badging
+            or "targetSdkVersion:'28'" not in badging or "application-debuggable" in badging):
+        raise ValueError("Unexpected application label, Android version or debug flag")
     with zipfile.ZipFile(unsigned) as apk:
         if apk.testzip() is not None:
             raise ValueError("Corrupt APK ZIP entry")
@@ -92,8 +93,10 @@ def main():
         raise FileExistsError("Signed release already exists; choose a new output directory")
     aligned = args.output / f"Natro-{args.version}-aligned.apk"
     run(zipalign, "-f", "-P", "16", "4", unsigned, aligned)
+    # The release key uses the keystore password. apksigner reuses it by default;
+    # passing the same one-line file twice would consume a nonexistent second line.
     run(apksigner, "sign", "--ks", args.keystore, "--ks-key-alias", "status-widget-ha",
-        "--ks-pass", f"file:{args.password_file}", "--key-pass", f"file:{args.password_file}",
+        "--ks-pass", f"file:{args.password_file}",
         "--v1-signing-enabled", "true", "--v2-signing-enabled", "true",
         "--v3-signing-enabled", "true", "--out", signed, aligned)
     verified = verify_certificate(signed)
@@ -113,7 +116,10 @@ def main():
               "signerCount": 1, "zipalign16KiB": True,
               "previous": {**previous, "sha256": sha256(args.previous_apk)},
               "installOverMetadataVerified": True, "physicalKx11Verification": "pending",
-              "navigatorChanged": False, "helperChanged": False}
+              "navigatorChanged": False, "helperChanged": False,
+              "signingScriptSha256": sha256(Path(__file__)),
+              "toolSha256": {str(p.relative_to(root / "tools")): sha256(p)
+                              for p in sorted((root / "tools").rglob("*")) if p.is_file()}}
     (args.output / "release-report.json").write_text(json.dumps(report, indent=2) + "\n")
     (args.output / "signature-verification.txt").write_text(
         "New APK (Android 9):\n" + verified + "\nNew APK (v2):\n" + v2
