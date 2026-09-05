@@ -1,0 +1,388 @@
+{
+  "schema_version": 1,
+  "scope": "Bluetooth native and server-side missing static files; not a vehicle command run.",
+  "targets": [
+    {
+      "platform": "Android",
+      "path": "/system/lib64/libbluetooth_jni.so",
+      "priority": "P0",
+      "reason": "Разрешить зарегистрированные JNI-методы AdapterService/GattService и преобразование native status; AdapterApp загружает bluetooth_jni.",
+      "existence_evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "corpus_status": "Checked all158 registered sources/102 outer archives plus all discovered ZIP/TAR nesting; requested file or lib64 ABI absent.",
+      "expected_baseline_sha256": null,
+      "expected_baseline_sha256_reason": "Source binary not captured; no verified hash for this missing file available.",
+      "safe_metadata_commands": [
+        "ls -lZ '/system/lib64/libbluetooth_jni.so'",
+        "sha256sum '/system/lib64/libbluetooth_jni.so'"
+      ],
+      "collect_content": true,
+      "sensitive_data_exclusion": "Only installed system APK/ELF; no application databases, pairing keys, HCI payload, contacts or notifications.",
+      "coverage_evidence": "full_corpus_target_coverage.json",
+      "same_basename_other_abi_hits": []
+    },
+    {
+      "platform": "Android",
+      "path": "/system/lib64/libbluetooth.so",
+      "priority": "P0",
+      "reason": "Восстановить actual native GATT/nFore/HCI backend, обработку reason 0x0028 и 0x0100, связь LeScanEnable и лимитов; доступные Java-тела только передают status.",
+      "existence_evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "corpus_status": "Checked all158 registered sources/102 outer archives plus all discovered ZIP/TAR nesting; requested file or lib64 ABI absent.",
+      "expected_baseline_sha256": null,
+      "expected_baseline_sha256_reason": "Source binary not captured; no verified hash for this missing file available.",
+      "safe_metadata_commands": [
+        "ls -lZ '/system/lib64/libbluetooth.so'",
+        "sha256sum '/system/lib64/libbluetooth.so'"
+      ],
+      "collect_content": true,
+      "sensitive_data_exclusion": "Only installed system APK/ELF; no application databases, pairing keys, HCI payload, contacts or notifications.",
+      "coverage_evidence": "full_corpus_target_coverage.json",
+      "same_basename_other_abi_hits": []
+    },
+    {
+      "platform": "Android",
+      "path": "/system/app/EcarxBluetoothServiceExtension/EcarxBluetoothServiceExtension.apk",
+      "priority": "P0",
+      "reason": "Получить service-side auto/passive-connect и reject арбитрацию ECARX extension; интерфейсные объявления не доказывают правила сервера.",
+      "existence_evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_apks.txt",
+        "member_sha256": "0e62ab906f0e2b8d2579dbbc81a1aedba07397f67dd0447ccb43db2bc262525b"
+      },
+      "corpus_status": "Checked all158 registered sources/102 outer archives plus all discovered ZIP/TAR nesting; requested file or lib64 ABI absent.",
+      "expected_baseline_sha256": null,
+      "expected_baseline_sha256_reason": "Source binary not captured; no verified hash for this missing file available.",
+      "safe_metadata_commands": [
+        "ls -lZ '/system/app/EcarxBluetoothServiceExtension/EcarxBluetoothServiceExtension.apk'",
+        "sha256sum '/system/app/EcarxBluetoothServiceExtension/EcarxBluetoothServiceExtension.apk'"
+      ],
+      "collect_content": true,
+      "sensitive_data_exclusion": "Only installed system APK/ELF; no application databases, pairing keys, HCI payload, contacts or notifications.",
+      "coverage_evidence": "full_corpus_target_coverage.json",
+      "same_basename_other_abi_hits": [],
+      "package": "ecarx.bluetooth.service.extension",
+      "package_identity_evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/packages_full_paths.txt",
+        "member_sha256": "1ba192e0b647aae34968a439664b59fb28628758f84c2940d2702aa38d19f950",
+        "line": 11
+      }
+    },
+    {
+      "platform": "Android",
+      "path": "/system/lib64/libbluetooth-binder.so",
+      "priority": "P1",
+      "reason": "Получить Binder glue ABI действующего arm64 процесса; в архивах имеется только /system/lib/libbluetooth-binder.so (ELF32), не заменяющий этот файл.",
+      "existence_evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "corpus_status": "Checked all158 registered sources/102 outer archives plus all discovered ZIP/TAR nesting; requested file or lib64 ABI absent.",
+      "expected_baseline_sha256": null,
+      "expected_baseline_sha256_reason": "Source binary not captured; no verified hash for this missing file available.",
+      "safe_metadata_commands": [
+        "ls -lZ '/system/lib64/libbluetooth-binder.so'",
+        "sha256sum '/system/lib64/libbluetooth-binder.so'"
+      ],
+      "collect_content": true,
+      "sensitive_data_exclusion": "Only installed system APK/ELF; no application databases, pairing keys, HCI payload, contacts or notifications.",
+      "coverage_evidence": "full_corpus_target_coverage.json",
+      "same_basename_other_abi_hits": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+          "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/lib/libbluetooth-binder.so",
+          "bytes": 41412,
+          "basename": "libbluetooth-binder.so",
+          "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+          "member_sha256": "8a29b5544aea6004ef3f8ca42a8007140112e1d21c650d0937243cb5c5afe764"
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/lib/libbluetooth-binder.so",
+          "bytes": 41412,
+          "basename": "libbluetooth-binder.so",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member_sha256": "8a29b5544aea6004ef3f8ca42a8007140112e1d21c650d0937243cb5c5afe764"
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/lib/libbluetooth-binder.so",
+          "bytes": 41412,
+          "basename": "libbluetooth-binder.so",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member_sha256": "8a29b5544aea6004ef3f8ca42a8007140112e1d21c650d0937243cb5c5afe764"
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/lib/libbluetooth-binder.so",
+          "bytes": 41412,
+          "basename": "libbluetooth-binder.so",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member_sha256": "8a29b5544aea6004ef3f8ca42a8007140112e1d21c650d0937243cb5c5afe764"
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/lib/libbluetooth-binder.so",
+          "bytes": 41412,
+          "basename": "libbluetooth-binder.so",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member_sha256": "8a29b5544aea6004ef3f8ca42a8007140112e1d21c650d0937243cb5c5afe764"
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/lib/libbluetooth-binder.so",
+          "bytes": 41412,
+          "basename": "libbluetooth-binder.so",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member_sha256": "8a29b5544aea6004ef3f8ca42a8007140112e1d21c650d0937243cb5c5afe764"
+        }
+      ]
+    },
+    {
+      "platform": "Android",
+      "path": "/vendor/lib64/libbt-hidlclient.so",
+      "priority": "P1",
+      "reason": "Связать Android native Bluetooth backend с vendor HIDL; установленные discovery пути известны, тела в корпусе не найдены.",
+      "existence_evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "corpus_status": "Checked all158 registered sources/102 outer archives plus all discovered ZIP/TAR nesting; requested file or lib64 ABI absent.",
+      "expected_baseline_sha256": null,
+      "expected_baseline_sha256_reason": "Source binary not captured; no verified hash for this missing file available.",
+      "safe_metadata_commands": [
+        "ls -lZ '/vendor/lib64/libbt-hidlclient.so'",
+        "sha256sum '/vendor/lib64/libbt-hidlclient.so'"
+      ],
+      "collect_content": true,
+      "sensitive_data_exclusion": "Only installed system APK/ELF; no application databases, pairing keys, HCI payload, contacts or notifications.",
+      "coverage_evidence": "full_corpus_target_coverage.json",
+      "same_basename_other_abi_hits": []
+    },
+    {
+      "platform": "Android",
+      "path": "/vendor/lib64/libbt-vendor.so",
+      "priority": "P1",
+      "reason": "Проверить controller/vendor backend и пределы нижнего транспортного уровня при продолжении native цепи.",
+      "existence_evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "corpus_status": "Checked all158 registered sources/102 outer archives plus all discovered ZIP/TAR nesting; requested file or lib64 ABI absent.",
+      "expected_baseline_sha256": null,
+      "expected_baseline_sha256_reason": "Source binary not captured; no verified hash for this missing file available.",
+      "safe_metadata_commands": [
+        "ls -lZ '/vendor/lib64/libbt-vendor.so'",
+        "sha256sum '/vendor/lib64/libbt-vendor.so'"
+      ],
+      "collect_content": true,
+      "sensitive_data_exclusion": "Only installed system APK/ELF; no application databases, pairing keys, HCI payload, contacts or notifications.",
+      "coverage_evidence": "full_corpus_target_coverage.json",
+      "same_basename_other_abi_hits": []
+    },
+    {
+      "platform": "Android",
+      "path": "/vendor/lib64/libbthost_if.so",
+      "priority": "P1",
+      "reason": "Проверить host interface после восстановления основной JNI/native цепи.",
+      "existence_evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "corpus_status": "Checked all158 registered sources/102 outer archives plus all discovered ZIP/TAR nesting; requested file or lib64 ABI absent.",
+      "expected_baseline_sha256": null,
+      "expected_baseline_sha256_reason": "Source binary not captured; no verified hash for this missing file available.",
+      "safe_metadata_commands": [
+        "ls -lZ '/vendor/lib64/libbthost_if.so'",
+        "sha256sum '/vendor/lib64/libbthost_if.so'"
+      ],
+      "collect_content": true,
+      "sensitive_data_exclusion": "Only installed system APK/ELF; no application databases, pairing keys, HCI payload, contacts or notifications.",
+      "coverage_evidence": "full_corpus_target_coverage.json",
+      "same_basename_other_abi_hits": []
+    },
+    {
+      "platform": "Android",
+      "path": "/vendor/lib64/libbtnv.so",
+      "priority": "P2",
+      "reason": "Нативная библиотека controller configuration; читать только ELF, без NVRAM/ключей/содержимого pairing databases.",
+      "existence_evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "corpus_status": "Checked all158 registered sources/102 outer archives plus all discovered ZIP/TAR nesting; requested file or lib64 ABI absent.",
+      "expected_baseline_sha256": null,
+      "expected_baseline_sha256_reason": "Source binary not captured; no verified hash for this missing file available.",
+      "safe_metadata_commands": [
+        "ls -lZ '/vendor/lib64/libbtnv.so'",
+        "sha256sum '/vendor/lib64/libbtnv.so'"
+      ],
+      "collect_content": true,
+      "sensitive_data_exclusion": "Only installed system APK/ELF; no application databases, pairing keys, HCI payload, contacts or notifications.",
+      "coverage_evidence": "full_corpus_target_coverage.json",
+      "same_basename_other_abi_hits": []
+    }
+  ],
+  "qnx_targets": [],
+  "qnx_reason": "No verified QNX Bluetooth component path established by this bounded subtask; do not invent one.",
+  "already_available_do_not_recollect": [
+    "/system/app/Bluetooth/Bluetooth.apk",
+    "/system/framework/ts-dm-foundation-lib.jar",
+    "/system/framework/ts-platform-library.jar",
+    "/system/etc/bluetooth/nForeBluetooth.properties",
+    "/system/lib/libbluetooth-binder.so",
+    {
+      "path": "/system/app/ts-dm-service/ts-dm-service.apk",
+      "sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+      "bytes": 641997,
+      "package": "com.ts.dm.service",
+      "versionCode": 28,
+      "versionName": "4.5.9.0",
+      "source": {
+        "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+        "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+        "bytes": 641997,
+        "basename": "ts-dm-service.apk",
+        "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+        "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1"
+      },
+      "duplicate_source": {
+        "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+        "member": "KX11-Cruise-Trace-20260809-085503/packages/com_ts_dm_service/ts-dm-service.apk",
+        "bytes": 641997,
+        "basename": "ts-dm-service.apk",
+        "archive_sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+        "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1"
+      },
+      "inspection": "Actual service-side DEX connect/disconnect, request dedup, timeouts and projection/HFP arbitration completed",
+      "safe_next_step": "Fresh pm path/package metadata and SHA only; collect binary only if SHA differs from known baseline",
+      "evidence": "dm_service_evidence.json"
+    }
+  ],
+  "runtime_projection_targets": [
+    {
+      "platform": "Android",
+      "target": "installed package identity",
+      "packages": [
+        "com.android.bluetooth",
+        "com.ts.dm.service",
+        "ecarx.bluetooth.service.extension",
+        "ecarx.powersomeip.service",
+        "org.astpepper.hwgps",
+        "ru.natro.statuswidget"
+      ],
+      "safe_readonly_commands": [
+        "pm path <exact-package>",
+        "dumpsys package <exact-package> | exact allowlist(versionName,versionCode,codePath,primaryCpuAbi,userId)",
+        "sha256sum <validated installed APK path>"
+      ],
+      "reason": "August logs do not establish Natro version/current binary identity; version drift cannot be resolved by firmware fingerprint alone.",
+      "collect_content": false,
+      "package_identity_evidence": "package_identity_evidence.json"
+    },
+    {
+      "platform": "Android",
+      "target": "process native library mapping",
+      "safe_readonly_commands": [
+        "pidof com.android.bluetooth",
+        "read /proc/<validated-numeric-pid>/maps and emit only absolute .so path column"
+      ],
+      "reason": "Confirm loaded arm64 JNI/backend path before selecting a missing ABI; maps payload/private memory is unnecessary.",
+      "collect_content": false
+    },
+    {
+      "platform": "Android",
+      "target": "Bluetooth snapshot metadata projection",
+      "safe_readonly_commands": [
+        "dumpsys bluetooth_manager through strict typed allowlist before saving"
+      ],
+      "allow_fields": [
+        "enabled",
+        "adapter state",
+        "time since enabled",
+        "enable caller/reason/time",
+        "crash count",
+        "profile class",
+        "GATT application package",
+        "Registered",
+        "Application ID",
+        "Connections count",
+        "scan started/stopped counts"
+      ],
+      "omit_fields": [
+        "device names",
+        "addresses",
+        "UUID values",
+        "subscriber information",
+        "contacts",
+        "call history",
+        "notification content",
+        "bonded device list",
+        "database/cache bytes"
+      ],
+      "reason": "ClientIf6 can belong to Natro GATT client or Navigator scanner depending on epoch. Snapshot must preserve namespace/role.",
+      "collect_content": false
+    },
+    {
+      "platform": "Android",
+      "target": "power+Bluetooth+Natro temporal event projection",
+      "safe_readonly_commands": [
+        "bounded logcat -d or passive duration capture; keep only whitelisted event type and scalar state/status/reason/clientId/connId/package/time fields before saving"
+      ],
+      "allow_event_names": [
+        "apStatusChange",
+        "ScPwIVIMngrReqState",
+        "enable(ecarx.powersomeip.service)",
+        "adapter state transition",
+        "waitForOnOff timeout",
+        "onClientConnectionState",
+        "clientDisconnect",
+        "close",
+        "unregisterApp",
+        "ANCS owner/phase/recovery reason without payload"
+      ],
+      "reason": "Missing AP/QNX epoch and application internal teardown cause; Bluetooth slices omit both. No collector-induced sleep/reboot/pairing is needed.",
+      "collect_content": false,
+      "blocker": "Exact installed Natro diagnostic tag/path must be established from installed version; do not guess or recursively pull application data."
+    }
+  ],
+  "do_not_collect": [
+    "/data/misc/bluedroid/bt_config.conf",
+    "/data/misc/bluedroid/bt_config.bak",
+    "/data/misc/bluedroid/192.key",
+    "/data/misc/bluedroid/256.key",
+    "/data/data/com.ts.dm.service/databases/*",
+    "/data/user/0/com.ts.dm.service/databases/*",
+    "full btsnoop_hci.log or .last payload",
+    "raw subscriber/contact/call/notification fields from dumpsys or logcat",
+    "GATT cache contents",
+    "controller NVRAM or pairing database values"
+  ],
+  "coverage_correction": {
+    "previous_target_count": 9,
+    "remaining_missing_target_count": 8,
+    "source_registry_count": 158,
+    "reason": "Earlier29-archive inventory omitted two Cruise APK members; ts-dm-service is now found and statically analyzed."
+  }
+}

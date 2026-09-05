@@ -1,0 +1,120 @@
+{
+  "schema": "typed-compact-sdk-validation-v3",
+  "status": "PASS_WITH_RECORDED_ORIGINAL_DEX_SHA1_ANOMALIES",
+  "catalog_checks_pass": true,
+  "checks": {
+    "source_table_unique_and_complete": true,
+    "archive_scan_has_no_errors": true,
+    "all_dex_declaration_scans_have_no_errors": true,
+    "independent_typed_values_pass": true,
+    "typed_validation_hashes_match_published_files": true,
+    "classes_file_integrity": true,
+    "classes_record_count": true,
+    "classes_occurrence_balance": true,
+    "classes_identities_and_string_withholding": true,
+    "fields_file_integrity": true,
+    "fields_record_count": true,
+    "fields_occurrence_balance": true,
+    "fields_identities_and_string_withholding": true,
+    "methods_file_integrity": true,
+    "methods_record_count": true,
+    "methods_occurrence_balance": true,
+    "methods_identities_and_string_withholding": true,
+    "static_writes_file_integrity": true,
+    "static_writes_record_count": true,
+    "family_calls_file_integrity": true,
+    "family_calls_record_count": true,
+    "inheritance_file_integrity": true,
+    "inheritance_record_count": true,
+    "typed_initializer_corrections_file_integrity": true,
+    "typed_initializer_corrections_record_count": true,
+    "value_conflicts_file_integrity": true,
+    "value_conflicts_record_count": true,
+    "classes_private_source_coverage": true,
+    "classes_private_page_hashes": true,
+    "fields_private_source_coverage": true,
+    "fields_private_page_hashes": true,
+    "methods_private_source_coverage": true,
+    "methods_private_page_hashes": true,
+    "raw_dex_counts_and_sha256_adler32_pass": true,
+    "raw_dex_sha1_anomalies_exactly_accounted_for": true,
+    "system_zero_revalidation": true,
+    "frozen_baseline_source_crosswalk_has_no_errors": true,
+    "registered_corpus_scope": true
+  },
+  "public_catalog_counts": {
+    "classes": {
+      "rows": 15928,
+      "variants": 16942,
+      "source_occurrences": 61855,
+      "source_records_by_category": {
+        "android_car": 4430,
+        "build_configuration_declaration": 52,
+        "other_ecarx_application_or_library": 6840,
+        "android_resource_declaration": 594,
+        "ecarx_sdk": 2488,
+        "adaptapi": 16143,
+        "ts_wrapper_or_application": 717,
+        "ecarx_car": 28689,
+        "vendor_ecarx": 1902
+      }
+    },
+    "fields": {
+      "rows": 170965,
+      "variants": 185382,
+      "source_occurrences": 359668,
+      "source_records_by_category": {
+        "android_car": 16678,
+        "build_configuration_declaration": 350,
+        "other_ecarx_application_or_library": 28933,
+        "android_resource_declaration": 124739,
+        "ecarx_sdk": 8214,
+        "adaptapi": 60067,
+        "ts_wrapper_or_application": 2682,
+        "ecarx_car": 104807,
+        "vendor_ecarx": 13198
+      }
+    },
+    "methods": {
+      "rows": 85945,
+      "variants": 99483,
+      "source_occurrences": 267069,
+      "source_records_by_category": {
+        "android_car": 21885,
+        "build_configuration_declaration": 64,
+        "other_ecarx_application_or_library": 48652,
+        "android_resource_declaration": 694,
+        "ecarx_sdk": 15240,
+        "adaptapi": 57670,
+        "ts_wrapper_or_application": 4811,
+        "ecarx_car": 100926,
+        "vendor_ecarx": 17127
+      }
+    },
+    "static_writes": {
+      "rows": 12496
+    },
+    "family_calls": {
+      "rows": 9706
+    },
+    "inheritance": {
+      "rows": 93271
+    },
+    "typed_initializer_corrections": {
+      "rows": 1280
+    },
+    "value_conflicts": {
+      "rows": 6145
+    }
+  },
+  "private_coverage_checked_this_run": true,
+  "raw_dex_sha1_header_signatures_all_valid": false,
+  "original_dex_sha1_mismatch_count": 75,
+  "raw_dex_anomaly_note": "75 source DEX files already have an invalid embedded SHA-1 signature. All 621 exact source SHA-256 identities, Adler-32 checksums and declaration counts match. No source bytes were repaired; the cause of the stored SHA-1 anomalies is not established.",
+  "runtime_class_origin_verified": false,
+  "effective_runtime_values_computed": false,
+  "all_vehicle_systems_understood": false,
+  "firmware_executed": false,
+  "apk_built": false,
+  "vehicle_commands_sent": false
+}

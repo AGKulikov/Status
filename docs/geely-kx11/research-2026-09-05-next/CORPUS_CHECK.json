@@ -1,0 +1,1432 @@
+{
+  "registered_sources": 158,
+  "available_sources": 158,
+  "bytes": 3958579973,
+  "missing": [],
+  "size_mismatches": [],
+  "additional_checksum_sidecar": "KX11-HU-Route-20260810-070911-29994-1234567.zip.sha256",
+  "sources": [
+    {
+      "name": "status-action-session(6).json",
+      "bytes": 2221056,
+      "sha256": "9dadc540d660629c36ef222f0f158a533afeeb738ae6ae5e5952203f56ab4a71",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "MConfig+_v45(4).apk",
+      "bytes": 1263915,
+      "sha256": "f217534230cada7def4c522c5ca4add694eb9c6936a069ad22a1a61d68baf5b6",
+      "category": "reference_application",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(5).json",
+      "bytes": 4411179,
+      "sha256": "665708a5647519a1c8c2b37abf4957499398356ef4e7f78b7f93f6626622efc8",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "MConfig+_v45(3).apk",
+      "bytes": 1263915,
+      "sha256": "f217534230cada7def4c522c5ca4add694eb9c6936a069ad22a1a61d68baf5b6",
+      "category": "reference_application",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(4).json",
+      "bytes": 2444076,
+      "sha256": "c0bc92fdab7b8a98e80a8d60c828d9fc90a75d73c414960b2948ec4685dd82e2",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(3).json",
+      "bytes": 3270347,
+      "sha256": "ffc08cfcfa3982a505560225b3ca2c450e8b171320d22163b911399c45bb1980",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(2).json",
+      "bytes": 2196324,
+      "sha256": "4c0c9e26c7ff33b6dc4fc108b2c6781593035259dc6cf84064d8bc834d554308",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_Mac.zip",
+      "bytes": 7357,
+      "sha256": "cb9cb535a3ea0159c7e6f44dbcec0e4279075279a907a3de37f2b19da4e0af73",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(4).sh",
+      "bytes": 23690,
+      "sha256": "a27c154731f28f0641d7ed8fab238914c4531896c5aca89332554b25c1a9e913",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(3).sh",
+      "bytes": 23690,
+      "sha256": "a27c154731f28f0641d7ed8fab238914c4531896c5aca89332554b25c1a9e913",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(2).sh",
+      "bytes": 23690,
+      "sha256": "a27c154731f28f0641d7ed8fab238914c4531896c5aca89332554b25c1a9e913",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-VP-Firmware-Locator-Evidence-20260815-191452_84144.zip",
+      "bytes": 201007,
+      "sha256": "81f1064f48f252fd90f368862d327e6874a311cf82b9a58844f2560c0824eadd",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-VP-Action-Evidence-20260815-190324_83890.zip",
+      "bytes": 816248,
+      "sha256": "770a60c64e3730f3718ff3783cb8d86ec016f4856751a137678eed7fb66427c6",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-QNX-Gap-Evidence-20260815-185143.zip",
+      "bytes": 915041,
+      "sha256": "fc3ccc07151a6b33de8c51ad3b6d630febff29749e4961c4ba086f608d1ed174",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-VP-QNX-Live-Window-Evidence-20260815-174011.zip",
+      "bytes": 1274123,
+      "sha256": "dda269c6fb96209da39499d825f1688b0805f9206190883598f8e09f7390042c",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-VP-QNX-Live-Window-Evidence-20260815-173650.zip",
+      "bytes": 3898,
+      "sha256": "a66ead04d4de8ed1b70169e082c49d18b895f764eda570884f37c577f760d563",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-VP-QNX-Boot-Window-Evidence-20260815-171623.zip",
+      "bytes": 1249916,
+      "sha256": "7d5544e1dce45a8a2e2c85a428cbe60c80b0fee23145978c32331ccc12326b7d",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Update-Package-Evidence(1).zip",
+      "bytes": 308854,
+      "sha256": "b434c6c25d763de3649e22a57c0e0e1e6bf6e0b7df372b8072b96be3aedaeebc",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Update-Package-Evidence.zip",
+      "bytes": 308854,
+      "sha256": "b434c6c25d763de3649e22a57c0e0e1e6bf6e0b7df372b8072b96be3aedaeebc",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-VP-Firmware-Evidence.zip",
+      "bytes": 336541820,
+      "sha256": "22b2540fc8aeb3c57ba1d43255c0d2fdbbe31fd88eaca4cb72e9ca6cb14828b8",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Raw-Ethernet-Evidence-20260815-135547_77986.zip",
+      "bytes": 16641999,
+      "sha256": "6245b558d3d3c20f062d42aee486ed1aca165342a8503b057c57e32c1eec87e3",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "bytes": 288046319,
+      "sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+      "bytes": 286965379,
+      "sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-BOOT-FAILURE.txt.zip",
+      "bytes": 938293,
+      "sha256": "b7d4557d797feac9ba488408f6dc55aedc0e9f2d73cc79ca103f339bbea89dd4",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+      "bytes": 286662499,
+      "sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-QNX-CAN-Inventory.zip",
+      "bytes": 1031759,
+      "sha256": "42a23161cb9b79aa2a9a532fe3a8f949313c7db7b98949c93457caaac110ea70",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+      "bytes": 286907347,
+      "sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-QNX-Window-Evidence.zip",
+      "bytes": 1016227,
+      "sha256": "b20438bbc2f0a23d3f4e18ccaf89d738aaf61668b2a511d89e8a1cf549c6ffe9",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-QNX-Deep-Evidence.zip",
+      "bytes": 16876539,
+      "sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-QNX-Live-Discovery.zip",
+      "bytes": 1168144,
+      "sha256": "b2742d3106182f8e12fb4dc57a81cc5b5b2081fb73d8b46168d1f95861bf09a8",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+      "bytes": 12634312,
+      "sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(1).sh",
+      "bytes": 23690,
+      "sha256": "a27c154731f28f0641d7ed8fab238914c4531896c5aca89332554b25c1a9e913",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-QNX-IPCP-Evidence 2.zip",
+      "bytes": 291864186,
+      "sha256": "f5e69a2deeadc09f2c3d053437da2d0bd216d4f2088e3f637e01a7f2d6fbb706",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+      "bytes": 12502905,
+      "sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-QNX-IPCP-Collector-v1.0.0.zip",
+      "bytes": 50310,
+      "sha256": "f66aaaa6e4700951e69b8a9b6967c022cb95e47e3e536e202051951733c359fb",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect.sh",
+      "bytes": 23690,
+      "sha256": "a27c154731f28f0641d7ed8fab238914c4531896c5aca89332554b25c1a9e913",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(1).command",
+      "bytes": 23695,
+      "sha256": "d61166714512b2e78b7bae3d44c112b86e213d1a349cf9ac3be6fe7a9bbf666c",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_Bluetooth_Collect.command",
+      "bytes": 23695,
+      "sha256": "d61166714512b2e78b7bae3d44c112b86e213d1a349cf9ac3be6fe7a9bbf666c",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Bluetooth-Collector-macOS-v2.zip",
+      "bytes": 9682,
+      "sha256": "3ee17fdcbebb3432578d2964cb32a0c11238db1237f5dcabb53c598c9a1e0c13",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.6-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "b3f8739aa38446b456079e1f27483c1dc93cd88b3cd172b97c4238150f5f408e",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.6-Update.zip",
+      "bytes": 450268,
+      "sha256": "7fd1847b8eba2aa73fdf8c5547a9bc8617118024851ee4f027089829024adaa9",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.5-Update.zip",
+      "bytes": 449494,
+      "sha256": "dc92204b72d938328db93f53b1f67c0f165c4492857da6da2d86a0ebbdc4fbcf",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.5-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "f0a8bb3ab82fdd7e805f043129de870fac0f3c9a92c739eb828be4ee75ffb3f5",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.4-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "8fb7031c71285e9b735f0ec02df39e67e605d89f21ccc9255b734c4df42a5e5d",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.4-Update.zip",
+      "bytes": 444647,
+      "sha256": "a8dfa0748d7ffd50b8646fa6544a164d1606437a261d9d81ad34af0c70d4f25b",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Bluetooth-Collector-v1.zip",
+      "bytes": 6938,
+      "sha256": "0d98c80053eee518f971661cf6ac7f6741db9dd7313ccd3a9eca7baeebcac820",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.3-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "6aacfe683e2323a517b9344587f92b56bc6923804ff6657d58f91dce725d2cfc",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.3-Update.zip",
+      "bytes": 446548,
+      "sha256": "b27b1d33a990a0f02cdd32b43500656de22729fca9b22c546178ed820cd79162",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.2-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "9bf32891f53cb89dea2cc130d66b1ca8101fe4be54a2853cad1e2aba57c56424",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.2-Update.zip",
+      "bytes": 445914,
+      "sha256": "9b60afe8d7682bd013309cb22d921478214339a171f0ffd1ea671fd11e9fd6d6",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.1-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "e589868e3bc17b773f1be90197bdb7cb4eeee435b2b83671ecae9f265a500dac",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.1-Update.zip",
+      "bytes": 443338,
+      "sha256": "8f155aabb3a207d4a346fc1286a076d5f37267cee7e9594317dd724972385c4e",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.0-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "38326f0fbfecbeae060798d9db7caa49ac202235a09aea85fe6131c8fdc00fb6",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.0-Update.zip",
+      "bytes": 439175,
+      "sha256": "d00a225ed0a7267b52a1bde6270d5cd591f8dfb0eed5acf1c7bd38a499d5c4f5",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.4-Update.zip",
+      "bytes": 384368,
+      "sha256": "10a6308c2f025c6bfb487080a2832b6fb7709ff4ef0bdda28c844872a905ed56",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.4-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "17fd82c2bba17064a74b8b4b66680fcedb3d68a703e3259b8a7d09a4bbf5b8e7",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.3-Update.zip",
+      "bytes": 383857,
+      "sha256": "bed10704bd5f9350d9ef27e717299663e7867131da7a434a395cd308538b3a53",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.3-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "567725424db1a4b8256a027b49fae79c47857f1958736b8cd5bfff38c49f344f",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.2-Update.zip",
+      "bytes": 375773,
+      "sha256": "88c63c638a40877d492479166ed696beff8e78d8405128a3f89e6a256bc4e968",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.2-Update.zip.sha256",
+      "bytes": 149,
+      "sha256": "360cfa0af2724332ffb3a7819c66a7ec08d5de2c3c5f79d5c1d376d7f97af7bf",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.1-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "0a37e62afa704dba6ad62b81e3618fd16d6bec8c02214e1c30cbe144f2310b31",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.1-Update.zip",
+      "bytes": 374265,
+      "sha256": "29a1187401c7a9c6b0e431620febeb4f1a3690a0af7fbfbad0f5e8c1a7af6763",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Agent-Review-20260811-190042-458bb6453ca6d7be.zip",
+      "bytes": 4142129,
+      "sha256": "d690e56dee9613c094b6fbd8d2dc8d9b19d3b6e73e59e4cd2fdef8545caf3209",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.0-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "b4299b03aa50251141939387cd53dd9d1208fe8ea77e33ddee93048800ac20a3",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.0-Update.zip",
+      "bytes": 370720,
+      "sha256": "c513646121097902ca5857c9f36f075a225a3f32f7400fb5282bd966aff021d0",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.3.0-Update.zip",
+      "bytes": 282783,
+      "sha256": "db93502269a8fb5a41dd46b5b9949eff50dddd2b29017c8dd0347e91d574fadd",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.2.0-Update.zip",
+      "bytes": 230133,
+      "sha256": "4a0c3bd9331020c3a89faa474e293e1a1e1c1a396b30568c33cd5efda9ecfa0c",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.2.0-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "41cba2cc09e11e9f5f17356f6b47351c9946426584770de93b0b3fd8d71a8ddc",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.10-Update.zip",
+      "bytes": 190448,
+      "sha256": "713a88101b5e6b2ef7306647992517df8c510cd1858ee20327f2ac17ad4e1a03",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.10-Update.zip.sha256",
+      "bytes": 105,
+      "sha256": "abd009a254b0544a522abd1b6d086eb57cdd22675c7b7c72a0a02c4953318ddc",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "kx11_hu_route_collect(1).sh",
+      "bytes": 23205,
+      "sha256": "ea4a4a6dcab0a16c0cf3dfac2196b6a2ed1ad13793270be9ccac21b5ac7f00db",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.9-Update.zip",
+      "bytes": 6399699,
+      "sha256": "51c514750e70864053e560b2d35386706b80d302bbffa58a544f3394dfe29901",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.9-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "54c1c15f1b8904d5865561cff4d06fc4c4a956626c793b1ed326bbdba512f65e",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.8-Update.zip.sha256",
+      "bytes": 104,
+      "sha256": "3f9f10338af3c8e7381eeae9077c2c404dbeaeeb00b6249a99a98ecae930fb69",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.8-Update.zip",
+      "bytes": 6396713,
+      "sha256": "9070f3282a3282b055b51f08cf29f35fe265b6f5dc3121081e56d6dd9cd2a71a",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Agent-Review-20260811-001810-8e906dcfc821f2f9.zip",
+      "bytes": 2643778,
+      "sha256": "7fd0c6a3f8051568f0bb4a89e9e74328bad8f3421e5b4029e527318f20a4a373",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.7.zip.sha256",
+      "bytes": 97,
+      "sha256": "03612cd8a0a39b8496acc07d8cc77756d49776f19d281c3b64283f14eb1ec391",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.7.zip",
+      "bytes": 6380881,
+      "sha256": "34535fa0fa4cb683a919d2d091ed050acd608e5788fefc0ca00c996602df4b03",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.5.zip",
+      "bytes": 165220,
+      "sha256": "e4fcfd78e24ca132a5258491a532477f4c72a6e6fdf0156a903060eb1ec3f55c",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Agent-Review-20260810-221412-3c0c34ee92bfae61.zip",
+      "bytes": 2497134,
+      "sha256": "b2551f4b511d1cf58f500efd4224b58b109f19c1345e1a8c2c7b03048742750d",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.4.zip",
+      "bytes": 155054,
+      "sha256": "04b5e139a0c10134f7df72dc729b2be15a9ab4c1d0c211241c4535c3d9aba36f",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.3.zip",
+      "bytes": 139908,
+      "sha256": "8215b8922361164fb4f1d8f7b00fa62e08329386d1c028a7127b82d74e3f25cc",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.2.zip",
+      "bytes": 139878,
+      "sha256": "28ec6698263b13b4ed5cd0eed4a0952fea74371944d85e5024f62b253026927b",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.1.zip",
+      "bytes": 139837,
+      "sha256": "1fc9495b3f5421e74b156c2234f8ce7cfc2c991ffdba05804210c3ad84460c43",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.0.zip",
+      "bytes": 135226,
+      "sha256": "bf74194508909806c2865684cc47c7b0a2ea0836f8b1d245277bc43892df9345",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Research-Agent-v1.0.0.zip",
+      "bytes": 84736,
+      "sha256": "04d7a2d7c9c4c04c0ff4ad349753669635f57082d2771e21a103626888335701",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "kx11_qnx_readonly_collect.sh",
+      "bytes": 26583,
+      "sha256": "705baa8198846c0c8f5033ff69210576733517121c03fc1c14b65a82e01779fe",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+      "bytes": 42556311,
+      "sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260810-070156.zip",
+      "bytes": 11577550,
+      "sha256": "af378011351abbd3c3b96bb405dde444d7c90458e75d6e752cdbab11d5416c4f",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip",
+      "bytes": 2514985,
+      "sha256": "e32dcf2f2f8ae9140dd4d595e56190286520e62f036e47272c7b8ed754362fdc",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "kx11_hu_route_collect.sh",
+      "bytes": 23205,
+      "sha256": "ea4a4a6dcab0a16c0cf3dfac2196b6a2ed1ad13793270be9ccac21b5ac7f00db",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip",
+      "bytes": 2548361,
+      "sha256": "6f67719476170e2d19ff6f7de2810374a77c5b4078b9c5993986d76d913bfb33",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260810-003840.zip",
+      "bytes": 31825,
+      "sha256": "dbdcaa87af90c5d39226e16102cd41b9a5ee2aa52850295623f50e083ae331ef",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260810-004256.zip",
+      "bytes": 31495,
+      "sha256": "5cba6de2924434911c300ccf72a2a053c029362e91bd7e2d9a841fc8e1f2bd2a",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-233657-487.zip",
+      "bytes": 50944,
+      "sha256": "e3cd6f90aeb24c6191097325924d6af7d4194530039f0fe13881c6045d9af031",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "kx11_bus_capture.sh",
+      "bytes": 29122,
+      "sha256": "9165eb5363ca516d5dc60f94f4d0640faa6ec885c8fa430ef3f2a8fd616b9ee1",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-165024.zip",
+      "bytes": 30219,
+      "sha256": "321c9561edf77bdb5f2f52fe621ae808aed2d2acf66496e104827cf4cbd6f1d5",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-160754(1).zip",
+      "bytes": 28710,
+      "sha256": "c5f48d9b37504505c2d082461c6af47fce04086ff05d4034238556b720c5370f",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-160754.zip",
+      "bytes": 28710,
+      "sha256": "c5f48d9b37504505c2d082461c6af47fce04086ff05d4034238556b720c5370f",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-152225.zip",
+      "bytes": 11334359,
+      "sha256": "2663dd80589102d9ccd6fe48a97065304ee0a728082421b4d709f6636f0ed868",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-150147.zip",
+      "bytes": 69821607,
+      "sha256": "f1faab66e9ca5b17bc7207ac5b1ddd4bc4d48c145d7ce31f2045b5af4e16b77b",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-150248.zip",
+      "bytes": 6163024,
+      "sha256": "b7232b45706ade81db65d0aa3f4349a2a0ec2105c21ae83ffdb6f981f5094922",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-135239.zip",
+      "bytes": 75163870,
+      "sha256": "4f257e5d1d5cc443d7285b617e80359d12619da707feed85457e86f0e7d9e10c",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-133652.zip",
+      "bytes": 170842,
+      "sha256": "e610d154f98d3be3d4ba5258027c954306e6e6b2a5af6d289fb86294bfd291ec",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-125830(1).zip",
+      "bytes": 35499,
+      "sha256": "f99878e9f78908da4751b8ccbd5559580cdd3f1854150da74f270715fc3ba018",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-125830.zip",
+      "bytes": 35499,
+      "sha256": "f99878e9f78908da4751b8ccbd5559580cdd3f1854150da74f270715fc3ba018",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-123506.zip",
+      "bytes": 974470,
+      "sha256": "091f5e154d1d84067c48cd206daad856286a3794c5d489eabdbe15c980fb300a",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-121015.zip",
+      "bytes": 27009,
+      "sha256": "d72760c8c33e86652eb09c3d2283f12afd7f8585a5a39ba40ea961b8a0fd1e38",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-113750.zip",
+      "bytes": 3800258,
+      "sha256": "bab7a18fa621db6e2a1492014f1bf3c9c3e722fdbf5046016a67e72d79e55962",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-112301.zip",
+      "bytes": 636649,
+      "sha256": "71a2cd56e16a6bd4674b46c5beaf6914f1ffa8a96093faa0997dce607a4b8e01",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-110616.zip",
+      "bytes": 12054827,
+      "sha256": "ab1e4d3db74e28489bd19789574195e37913c250ccbb92a7fb730dbeb1f14a6f",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-101433.zip",
+      "bytes": 1846440,
+      "sha256": "4cf60f5dd0c979616649fe8fc09d0ea739d8deb3414d57c290fefa74e4174f6f",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-093747.zip",
+      "bytes": 2633210,
+      "sha256": "58fe89e812b33780d7eeab05c7b63a90927b4d3e1a090ddbe2f4d37a71880d8f",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-092722.zip",
+      "bytes": 47504,
+      "sha256": "cbfc23a22969c65400ed8ab3f1d57e139971c4dd2adbbbce554970ca1f542691",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-092756.zip",
+      "bytes": 47487,
+      "sha256": "6b7f9bc743067a6adc562e6ccb799816f89897c090325cce1161faabfe37db34",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-092740.zip",
+      "bytes": 47600,
+      "sha256": "dec146d2b13bdfe27391663e433a6576dea9fec69c392b3fa854840ca3acb1e4",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-092642.zip",
+      "bytes": 47614,
+      "sha256": "66cdcd1941227d961271a080c03adb4753d73a0625251afd7cdddd011186a556",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-085503.zip",
+      "bytes": 360218725,
+      "sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(6).txt",
+      "bytes": 6551970,
+      "sha256": "a18a7b22fd31e23b2de8d113f41e26ea5d615ee69e9fbdeeb90ad5eb7d331edb",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-083512.zip",
+      "bytes": 4653590,
+      "sha256": "817509be15b88bd481b5942ca948c58e28e478445f29ef6371ce07a9afff683c",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-001402.zip",
+      "bytes": 324549107,
+      "sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-001443(1).zip",
+      "bytes": 980042,
+      "sha256": "425d64d6229c8cdf07c81f8c80138d751f04cb87cca19a9c25685cb80326db4d",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-001443.zip",
+      "bytes": 980042,
+      "sha256": "425d64d6229c8cdf07c81f8c80138d751f04cb87cca19a9c25685cb80326db4d",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "kx11_cruise_trace.sh",
+      "bytes": 262208,
+      "sha256": "e0a0fbccc1cfd0626653fdb405bb22b8473742a17e4a798ae320d1dad59fcb67",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(5).txt",
+      "bytes": 958226,
+      "sha256": "5298aaabdef2b396115e0926f05abddff21c12673371db8370dfc946f0c6cd40",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(4).txt",
+      "bytes": 1024874,
+      "sha256": "cf7fa0f36c603b100de15b9e583ba61d71d5810b03895490d06e55c8d38d0af1",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(3).txt",
+      "bytes": 1240802,
+      "sha256": "f3965e2d3bf897161e7e0d1f661a69f1d675b2011a33650699dd68a8957365b6",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(2).txt",
+      "bytes": 1211525,
+      "sha256": "daf32c69da7cb7f4a2454679b18fc13f8f5ac638166282b0ea091bb17398bb40",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(1).txt",
+      "bytes": 117689,
+      "sha256": "695a493896ebda0441d404a41125bd9e5a3d9c5095e302acdf9249a09fd14360",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session.txt",
+      "bytes": 170919,
+      "sha256": "e92f2883a5ef274cc201a63d7615e47a87ac567f825fb7a92c6314a3e5fe934f",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session(1).json",
+      "bytes": 502520,
+      "sha256": "ab93daca404cb8696e79e7ab910a6a02ba6e1732fb079ce27d5f4c9e2d6b0f77",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "status-action-session.json",
+      "bytes": 197787,
+      "sha256": "66a96e767e326e4eef9fc2dad5a19836f8bb8dd73d0b387bbbc054fde5bf335c",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "MConfig+_v45(2).apk",
+      "bytes": 1263915,
+      "sha256": "f217534230cada7def4c522c5ca4add694eb9c6936a069ad22a1a61d68baf5b6",
+      "category": "reference_application",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-stock-launcher-phone-20260807-160844.zip",
+      "bytes": 31425693,
+      "sha256": "9a6be424d3d4f01d6c9172c6c943022e8f9872f1e5e8a787bd900717fd261e59",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11-stock-launcher-phone-20260807-1605954.zip",
+      "bytes": 31425696,
+      "sha256": "d396b01f2f5396a2d06decff6acac7ed1dd5abd5a9b39fd4f364955941e1cbd5",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "hudlab-cluster-20260730-224443.txt",
+      "bytes": 513830,
+      "sha256": "586448bf21ed797182a6e5075081921612e451a53f62c793ed59aa2877b9d408",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "hudlab-cluster-20260730-222702.txt",
+      "bytes": 734257,
+      "sha256": "d9a9d201ba32f8fe0bc4668c3c93560e4d9c494b5c593bbdf0625a42bb0f7244",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "Monjaro HUD log(1).txt",
+      "bytes": 9806,
+      "sha256": "16e2a32a96d8efe8d2427267cb7dbfc78262aaa19f13626c430221f68c5b941a",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "hudlab-cluster-20260730-220151.txt",
+      "bytes": 692490,
+      "sha256": "d69c8db9e427cb0d2c536bd599e9bce4c7f6105e4734a352c66418deb9618cc6",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "Monjaro HUD log.txt",
+      "bytes": 20631,
+      "sha256": "f58a18712b68e4f28861c0c508f63d0bca10e9e5c78d60116adbc20f4956834a",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "hudlab-cluster-20260730-213051.txt",
+      "bytes": 610696,
+      "sha256": "4cca9d29a944400a9944a1e694543da0c2966c4d7d6ec60b69e0860990ad765d",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "hudlab-cluster-20260730-191421.txt",
+      "bytes": 382414,
+      "sha256": "c018af82b3457efc92868680bfd68e5394ebb8fe0a4b47c74209ca16e5a17425",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "MConfig+_v45(1).apk",
+      "bytes": 1263915,
+      "sha256": "f217534230cada7def4c522c5ca4add694eb9c6936a069ad22a1a61d68baf5b6",
+      "category": "reference_application",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "hudlab-cluster-20260730-182106.txt",
+      "bytes": 194125,
+      "sha256": "b06020b5a11c0c5efbf7678ea2f20de51e197b8a2c39965ffb79211e23d880e8",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "hudlab-cluster-20260730-180831.txt",
+      "bytes": 192870,
+      "sha256": "c244c15f4625a7d8c2645df6403502ab5f5529a8c98bf88d1a8ee37e0313973b",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "hudlab-cluster-20260730-075353.txt",
+      "bytes": 526168,
+      "sha256": "f3e3f58fa3edf1a7acdb545c1bed80ed1df3242b6a61f69c21a35edde8734587",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "ecarx-hud-system-20260727-010640.zip",
+      "bytes": 300729150,
+      "sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "ecarx-hud-system-20260726-225221.zip",
+      "bytes": 289535031,
+      "sha256": "b129b060112e57fa794b9bb41cb6a898f27997c42d5db8dbea6b2558856e2f32",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "ecarx-hud-system-20260726-172826.zip",
+      "bytes": 286769962,
+      "sha256": "92f9e9687535b0a5f818c2523a20f843b6b12115e18a20d1eb24149a9af8079a",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_4BLE_patch.zip",
+      "bytes": 4826,
+      "sha256": "2389c808bcc46bed67f70ab47d64b1bc2610069bfb2f7a1e9de2dabd8242fd66",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "ecarx-hud-dump.tar",
+      "bytes": 740864,
+      "sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+      "category": "firmware_or_runtime_evidence",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "MConfig+_v45.apk",
+      "bytes": 1263915,
+      "sha256": "f217534230cada7def4c522c5ca4add694eb9c6936a069ad22a1a61d68baf5b6",
+      "category": "reference_application",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "ecarx_hud_dump_mconfig.txt",
+      "bytes": 1893,
+      "sha256": "c1d20ed2f0233f3e85ff44c2c38757bdcf2c6c576398ff9bde23b6302d624bdc",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "outer_archive_inventory_or_text_available",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_BLE_patch.zip",
+      "bytes": 3362,
+      "sha256": "32de7e399e92fd33ad64457719c484cf4a8b86bad082442d307a7c9f03d7212d",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KX11_BLE_Activation_ADB.txt",
+      "bytes": 3573,
+      "sha256": "b486a244f5b16a1487448dc54d8dd847da37d6b594d55f8a59ecbe5ff6fdf12a",
+      "category": "research_tool_or_prior_procedure",
+      "available": true,
+      "prior_depth": "metadata_only",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "MConfig_0.103_src.zip",
+      "bytes": 136705326,
+      "sha256": "7ca75727f64d3a1bdfb28f33965a98285a0f85fc7c0c04fb027703d018da9d8a",
+      "category": "reference_application",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "KNOWN_FINDINGS.txt",
+      "bytes": 23617,
+      "sha256": "5e9ecc447174aeca49f5d7ad8a834d8b9805600541bb51e5198ca22fe05a94d4",
+      "category": "prior_baseline_reference",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    },
+    {
+      "name": "Natro-2.7.6-signed.apk",
+      "bytes": 28212590,
+      "sha256": "34bcf7a40350a7f4cc620cb90a8a7316882d4a954a53e1babc134889d7df625f",
+      "category": "prior_baseline_reference",
+      "available": true,
+      "prior_depth": "prior_analysis_retained",
+      "depth_note": "Materialized and content-hashed. Exact semantic coverage is recorded separately in the four domain reports; acquisition alone does not mean every byte is understood."
+    }
+  ]
+}

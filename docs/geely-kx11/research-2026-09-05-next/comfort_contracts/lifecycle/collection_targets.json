@@ -1,0 +1,211 @@
+{
+  "schema": "comfort_contracts.lifecycle.collection_targets.v1",
+  "date": "2026-09-05",
+  "mode": "OFFLINE_COLLECTION_PLAN_ONLY",
+  "missing_binary_targets": [],
+  "existing_targets": [
+    {
+      "runtime_path": "/system/app/XCSettings2/XCSettings2.apk",
+      "role": "Production seat/roof consumer and callbacks",
+      "binary_in_corpus": true,
+      "corpus_member": "packages/ecarx.settings/base.apk",
+      "binary_sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "collect_binary": false,
+      "reason": "Original member already available and hashed; source presence does not establish loaded class origin.",
+      "path_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "raw_lines": [
+          {
+            "line": 342,
+            "text": "sourceDir=/system/app/XCSettings2/XCSettings2.apk"
+          },
+          {
+            "line": 343,
+            "text": "publicSourceDir=/system/app/XCSettings2/XCSettings2.apk"
+          },
+          {
+            "line": 506,
+            "text": "COPIED /system/app/XCSettings2/XCSettings2.apk -> packages/ecarx.settings/base.apk bytes=305412090"
+          }
+        ]
+      }
+    },
+    {
+      "runtime_path": "/system/app/AdaptApiTestApp/AdaptApiTestApp.apk",
+      "role": "Diagnostic profile consumer and observer",
+      "binary_in_corpus": true,
+      "corpus_member": "packages/ecarx.adaptapi.platform/base.apk",
+      "binary_sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "collect_binary": false,
+      "reason": "Original member already available and hashed; source presence does not establish loaded class origin.",
+      "path_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "raw_lines": [
+          {
+            "line": 230,
+            "text": "sourceDir=/system/app/AdaptApiTestApp/AdaptApiTestApp.apk"
+          },
+          {
+            "line": 231,
+            "text": "publicSourceDir=/system/app/AdaptApiTestApp/AdaptApiTestApp.apk"
+          },
+          {
+            "line": 238,
+            "text": "COPIED /system/app/AdaptApiTestApp/AdaptApiTestApp.apk -> packages/ecarx.adaptapi.platform/base.apk bytes=2339956"
+          }
+        ]
+      }
+    },
+    {
+      "runtime_path": "/system/priv-app/ECarXCarService/ECarXCarService.apk",
+      "role": "Property service backend; binary already available",
+      "binary_in_corpus": true,
+      "corpus_member": "packages/com.ecarx.car/base.apk",
+      "binary_sha256": "1cab337a3c056d6ba2a7a58f12638c2b7137f672a1613a2fb78305602c6683f3",
+      "collect_binary": false,
+      "reason": "Original member already available and hashed; source presence does not establish loaded class origin.",
+      "path_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "raw_lines": [
+          {
+            "line": 285,
+            "text": "sourceDir=/system/priv-app/ECarXCarService/ECarXCarService.apk"
+          },
+          {
+            "line": 286,
+            "text": "publicSourceDir=/system/priv-app/ECarXCarService/ECarXCarService.apk"
+          },
+          {
+            "line": 298,
+            "text": "service=com.ecarx.car.ECarXCarService process=com.ecarx.car exported=true enabled=true permission=null"
+          },
+          {
+            "line": 299,
+            "text": "COPIED /system/priv-app/ECarXCarService/ECarXCarService.apk -> packages/com.ecarx.car/base.apk bytes=6816872"
+          }
+        ]
+      }
+    },
+    {
+      "runtime_path": "/system/framework/ecarx.adaptapi.jar",
+      "role": "Seat/Bcm/UserProfile/CarKey adapter",
+      "binary_in_corpus": true,
+      "corpus_member": "framework/system_framework/ecarx.adaptapi.jar",
+      "binary_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "collect_binary": false,
+      "reason": "Original member already available and hashed; source presence does not establish loaded class origin.",
+      "path_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "raw_lines": [
+          {
+            "line": 585,
+            "text": "COPIED /system/framework/ecarx.adaptapi.jar -> framework/system_framework/ecarx.adaptapi.jar bytes=1135817"
+          }
+        ]
+      }
+    },
+    {
+      "runtime_path": "/system/framework/ecarx.car.jar",
+      "role": "Managers, callback decode, Binder property wrapper",
+      "binary_in_corpus": true,
+      "corpus_member": "framework/system_framework/ecarx.car.jar",
+      "binary_sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "collect_binary": false,
+      "reason": "Original member already available and hashed; source presence does not establish loaded class origin.",
+      "path_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "raw_lines": [
+          {
+            "line": 589,
+            "text": "COPIED /system/framework/ecarx.car.jar -> framework/system_framework/ecarx.car.jar bytes=594600"
+          }
+        ]
+      }
+    },
+    {
+      "runtime_path": "/system/framework/ecarx.gkui.openapi.impl.jar",
+      "role": "Alternative read-only car-key status API",
+      "binary_in_corpus": true,
+      "corpus_member": "framework/system_framework/ecarx.gkui.openapi.impl.jar",
+      "binary_sha256": "389884082b3e313b81efffae3802afd97876bef6318f6d5299ddf8d9e588894b",
+      "collect_binary": false,
+      "reason": "Original member already available and hashed; source presence does not establish loaded class origin.",
+      "path_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "raw_lines": [
+          {
+            "line": 591,
+            "text": "COPIED /system/framework/ecarx.gkui.openapi.impl.jar -> framework/system_framework/ecarx.gkui.openapi.impl.jar bytes=384026"
+          }
+        ]
+      }
+    },
+    {
+      "runtime_path": "/system/app/XSFOpenAPIService/XSFOpenAPIService.apk",
+      "role": "Existing open API service; no digital-key issuance claim",
+      "binary_in_corpus": true,
+      "corpus_member": "packages/com.ecarx.sdk.openapi/base.apk",
+      "binary_sha256": "eab4552733023ca7a323df2b9ae35b036107e3895ad5fd01b7b27540f47ed158",
+      "collect_binary": false,
+      "reason": "Original member already available and hashed; source presence does not establish loaded class origin.",
+      "path_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "raw_lines": [
+          {
+            "line": 131,
+            "text": "sourceDir=/system/app/XSFOpenAPIService/XSFOpenAPIService.apk"
+          },
+          {
+            "line": 132,
+            "text": "publicSourceDir=/system/app/XSFOpenAPIService/XSFOpenAPIService.apk"
+          },
+          {
+            "line": 220,
+            "text": "COPIED /system/app/XSFOpenAPIService/XSFOpenAPIService.apk -> packages/com.ecarx.sdk.openapi/base.apk bytes=3005711"
+          }
+        ]
+      }
+    }
+  ],
+  "unresolved_targets": [
+    {
+      "purpose": "Alternative digital-key issuance or production UserProfile create/apply consumer",
+      "runtime_path": null,
+      "binary_in_corpus": "unknown",
+      "collect_binary": false,
+      "reason": "No exact absent runtime path proved by inspected sources. Identify the actual user-visible package/component before requesting a binary; do not guess paths or collect key/account databases."
+    }
+  ],
+  "runtime_questions": [
+    "Actual class origin for ICarFunction/CarKey/UserProfile implementations",
+    "Callback arrival and ordering including PA33847 followed by PA33888; PA33874 and currentId at completion",
+    "For held movement: independent evidence of STOP on cancel/focus/Binder loss, under separately authorized safe protocol"
+  ],
+  "excluded": [
+    "Key databases or key material",
+    "Whole-device dumps",
+    "Unbounded logcat",
+    "Vehicle writes or deliberate Binder failure commands"
+  ]
+}

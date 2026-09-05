@@ -1,0 +1,93 @@
+{
+  "scope": "offline artifact integrity/privacy and projection validation, not physical KX11 acceptance",
+  "result": "PASS",
+  "errors": [],
+  "runtime_findings": 15,
+  "static_findings": 13,
+  "typed_timeline_events": 401,
+  "log_lines": 248366,
+  "hci_records": 144934,
+  "hci_malformed_records": 0,
+  "archive_checks": [
+    {
+      "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+      "sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+      "matches": true
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+      "sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+      "matches": true
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+      "sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+      "matches": true
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+      "sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+      "matches": true
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+      "sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+      "matches": true
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "matches": true
+    }
+  ],
+  "runtime_evidence_checks": 65,
+  "all_runtime_member_hashes_match": true,
+  "all_runtime_lines_in_bounds": true,
+  "collector_projector_tests": {
+    "tests": 7,
+    "result": "PASS",
+    "files": [
+      "audit-work/repo/tools/geely-macos-collector/lib/bt_projection.py",
+      "audit-work/repo/tools/geely-macos-collector/lib/tests/test_bt_projection.py"
+    ]
+  },
+  "no_build_or_vehicle_operations": true,
+  "private_originals_excluded_from_public_deliverables": true,
+  "remaining_blockers": [
+    "missing native backend and extension binaries",
+    "August installed Natro identity",
+    "Natro client teardown reason",
+    "synchronized AP/QNX power epoch",
+    "DM projection policy execution in the observed disconnect epoch"
+  ],
+  "dm_server_findings": 13,
+  "dm_actual_dex_reference_checks": 55,
+  "source_presence_recheck": {
+    "registry_sources_present_and_hash_verified": 158,
+    "outer_archives": 102,
+    "outer_members": 15306,
+    "nested_containers": 129,
+    "nested_unique_sha256": 67,
+    "nested_members": 1576,
+    "deep_nested_containers": 123,
+    "remaining_unexpanded_discovered_archives": 0,
+    "recovered_previously_missing_apk": "ts-dm-service.apk",
+    "remaining_missing_files_or_abi": 8,
+    "limit": "Exact basename inventory, not semantic coverage of all bytes or absence inside raw firmware partitions."
+  },
+  "public_privacy_pattern_scan": {
+    "files": 22,
+    "raw_mac_or_uuid_matches": 0,
+    "raw_log_or_full_method_body_keys": 0
+  },
+  "collector_regression_tests": {
+    "tests": 44,
+    "result": "PASS",
+    "scope": "37 collector/QNX tests plus 7 BT projection tests; offline mocks only",
+    "includes": [
+      "single-line version metadata spaces/tabs/mixed whitespace",
+      "candidate package absent presence_probe",
+      "required package absent remains package_not_found"
+    ]
+  }
+}

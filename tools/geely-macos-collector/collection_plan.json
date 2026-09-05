@@ -1,0 +1,750 @@
+{
+  "schema_version": 1,
+  "collector_version": "1.0.0",
+  "vehicle_scope": "Geely KX11 / ECARX; compare the current device with the supplied corpus",
+  "date": "2026-09-05",
+  "android_files": [
+    {
+      "id": "COMFORT-XCHVAC",
+      "path": "/system/priv-app/XCHvac/XCHvac.apk",
+      "reason": "TempManager LO/HI selection to setCustomizeFunctionValue and finite/grid guards; production HVAC REQUEST/CONFIRM dialog semantic buttons and lifecycle; fan/seat climate/front-rear consumer availability and callback gates",
+      "evidence": [
+        {
+          "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+          "archive_sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+          "member": "KX11-HU-Route-20260810-070911-29994-1234567/android/all-packages.txt",
+          "sha256": "5e413cbc64b7cc9b72a2daca1b5116d1873f7571b17403c650050e53ebadf6df",
+          "line": 70
+        }
+      ],
+      "max_bytes": 536870912,
+      "conditional": false
+    },
+    {
+      "id": "COMFORT-SETTINGS-ORIGIN",
+      "path": "/system/app/XCSettings2/XCSettings2.apk",
+      "reason": "runtime binding for boolean BREATHE consumer versus RGB function at0x2a010300; loaded class origin for seat CANCEL/STOP branch",
+      "evidence": [
+        {
+          "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+          "archive_sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+          "member": "KX11-HU-Route-20260810-070911-29994-1234567/android/all-packages.txt",
+          "sha256": "5e413cbc64b7cc9b72a2daca1b5116d1873f7571b17403c650050e53ebadf6df",
+          "line": 87
+        }
+      ],
+      "max_bytes": 536870912,
+      "conditional": false,
+      "known_sha256": [
+        "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5"
+      ]
+    },
+    {
+      "id": "ANDROID:/system/lib64/libbluetooth_jni.so",
+      "path": "/system/lib64/libbluetooth_jni.so",
+      "reason": "Разрешить зарегистрированные JNI-методы AdapterService/GattService и преобразование native status; AdapterApp загружает bluetooth_jni.",
+      "evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "max_bytes": 268435456,
+      "conditional": false
+    },
+    {
+      "id": "ANDROID:/system/lib64/libbluetooth.so",
+      "path": "/system/lib64/libbluetooth.so",
+      "reason": "Восстановить actual native GATT/nFore/HCI backend, обработку reason 0x0028 и 0x0100, связь LeScanEnable и лимитов; доступные Java-тела только передают status.",
+      "evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "max_bytes": 268435456,
+      "conditional": false
+    },
+    {
+      "id": "ANDROID:/system/app/EcarxBluetoothServiceExtension/EcarxBluetoothServiceExtension.apk",
+      "path": "/system/app/EcarxBluetoothServiceExtension/EcarxBluetoothServiceExtension.apk",
+      "reason": "Получить service-side auto/passive-connect и reject арбитрацию ECARX extension; интерфейсные объявления не доказывают правила сервера.",
+      "evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_apks.txt",
+        "member_sha256": "0e62ab906f0e2b8d2579dbbc81a1aedba07397f67dd0447ccb43db2bc262525b"
+      },
+      "max_bytes": 268435456,
+      "conditional": false
+    },
+    {
+      "id": "ANDROID:/system/lib64/libbluetooth-binder.so",
+      "path": "/system/lib64/libbluetooth-binder.so",
+      "reason": "Получить Binder glue ABI действующего arm64 процесса; в архивах имеется только /system/lib/libbluetooth-binder.so (ELF32), не заменяющий этот файл.",
+      "evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "max_bytes": 268435456,
+      "conditional": false
+    },
+    {
+      "id": "ANDROID:/vendor/lib64/libbt-hidlclient.so",
+      "path": "/vendor/lib64/libbt-hidlclient.so",
+      "reason": "Связать Android native Bluetooth backend с vendor HIDL; установленные discovery пути известны, тела в корпусе не найдены.",
+      "evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "max_bytes": 268435456,
+      "conditional": false
+    },
+    {
+      "id": "ANDROID:/vendor/lib64/libbt-vendor.so",
+      "path": "/vendor/lib64/libbt-vendor.so",
+      "reason": "Проверить controller/vendor backend и пределы нижнего транспортного уровня при продолжении native цепи.",
+      "evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "max_bytes": 268435456,
+      "conditional": false
+    },
+    {
+      "id": "ANDROID:/vendor/lib64/libbthost_if.so",
+      "path": "/vendor/lib64/libbthost_if.so",
+      "reason": "Проверить host interface после восстановления основной JNI/native цепи.",
+      "evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "max_bytes": 268435456,
+      "conditional": false
+    },
+    {
+      "id": "ANDROID:/vendor/lib64/libbtnv.so",
+      "path": "/vendor/lib64/libbtnv.so",
+      "reason": "Нативная библиотека controller configuration; читать только ELF, без NVRAM/ключей/содержимого pairing databases.",
+      "evidence": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+        "member_sha256": "710547c58cf275266b125137b234c82a14ef6664502f5dc388fffe82ff6df2f1"
+      },
+      "max_bytes": 268435456,
+      "conditional": false
+    },
+    {
+      "id": "SDK-CURRENT-ADAPT",
+      "path": "/system/framework/ecarx.adaptapi.jar",
+      "reason": "Compare currently available system SDK with archived static baseline; skip known identical hash.",
+      "evidence": {
+        "report": "sdk_completeness/report.md",
+        "target_id": "SDK-CURRENT-ADAPT"
+      },
+      "max_bytes": 268435456,
+      "conditional": false,
+      "known_sha256": [
+        "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0"
+      ]
+    },
+    {
+      "id": "SDK-CURRENT-CAR",
+      "path": "/system/framework/ecarx.car.jar",
+      "reason": "Same declaration and method source pairing.",
+      "evidence": {
+        "report": "sdk_completeness/report.md",
+        "target_id": "SDK-CURRENT-CAR"
+      },
+      "max_bytes": 268435456,
+      "conditional": false,
+      "known_sha256": [
+        "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b"
+      ]
+    },
+    {
+      "id": "ANDROID:/ota_download/udisk_manifest.json",
+      "path": "/ota_download/udisk_manifest.json",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "max_bytes": 268435456,
+      "conditional": true
+    },
+    {
+      "id": "ANDROID:/ota_download/update-swp1.tar.gz",
+      "path": "/ota_download/update-swp1.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "max_bytes": 2147483648,
+      "conditional": true
+    },
+    {
+      "id": "ANDROID:/ota_download/update-swl3.tar.gz",
+      "path": "/ota_download/update-swl3.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "max_bytes": 2147483648,
+      "conditional": true
+    },
+    {
+      "id": "ANDROID:/ota_download/update-swl4.tar.gz",
+      "path": "/ota_download/update-swl4.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "max_bytes": 2147483648,
+      "conditional": true
+    },
+    {
+      "id": "ANDROID:/ota_download/update-swlm.tar.gz",
+      "path": "/ota_download/update-swlm.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "max_bytes": 2147483648,
+      "conditional": true
+    },
+    {
+      "id": "ANDROID:/ota_download/update-swl2.tar.gz",
+      "path": "/ota_download/update-swl2.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "max_bytes": 2147483648,
+      "conditional": true
+    },
+    {
+      "id": "ANDROID:/vendor/bin/smartcore_update_client",
+      "path": "/vendor/bin/smartcore_update_client",
+      "reason": "Correlate actual package-copy branch with installed updater.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "max_bytes": 268435456,
+      "conditional": false,
+      "known_sha256": [
+        "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2"
+      ]
+    },
+    {
+      "id": "ANDROID:/system/bin/smartcore_update_client",
+      "path": "/system/bin/smartcore_update_client",
+      "reason": "Existing second updater path; hash-equal copy adds no new semantics.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "max_bytes": 268435456,
+      "conditional": false,
+      "known_sha256": [
+        "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2"
+      ]
+    },
+    {
+      "id": "ANDROID:/vendor/etc/usb_reflash_config.json",
+      "path": "/vendor/etc/usb_reflash_config.json",
+      "reason": "Real config selects ECARX/HIGH/folder/udisk_manifest.json; compare changed variants.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "max_bytes": 268435456,
+      "conditional": false,
+      "known_sha256": [
+        "e2c5497a45848c25a521c00d1db7423721ae15f6de5aed143b574c47e2d79aa0"
+      ]
+    },
+    {
+      "id": "ANDROID:/system/etc/usb_reflash_config.json",
+      "path": "/system/etc/usb_reflash_config.json",
+      "reason": "Exact default config path appears in updater at VA0xea35; existence and alias to vendor config remain unproven.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "max_bytes": 268435456,
+      "conditional": true
+    }
+  ],
+  "packages": [
+    {
+      "name": "ecarx.hvac.app",
+      "reason": "TempManager LO/HI selection to setCustomizeFunctionValue and finite/grid guards; production HVAC REQUEST/CONFIRM dialog semantic buttons and lifecycle; fan/seat climate/front-rear consumer availability and callback gates",
+      "evidence": [
+        [
+          {
+            "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+            "archive_sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+            "member": "KX11-HU-Route-20260810-070911-29994-1234567/android/all-packages.txt",
+            "sha256": "5e413cbc64b7cc9b72a2daca1b5116d1873f7571b17403c650050e53ebadf6df",
+            "line": 70
+          }
+        ]
+      ],
+      "presence_probe": false
+    },
+    {
+      "name": "ecarx.settings",
+      "reason": "runtime binding for boolean BREATHE consumer versus RGB function at0x2a010300; loaded class origin for seat CANCEL/STOP branch",
+      "evidence": [
+        [
+          {
+            "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+            "archive_sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+            "member": "KX11-HU-Route-20260810-070911-29994-1234567/android/all-packages.txt",
+            "sha256": "5e413cbc64b7cc9b72a2daca1b5116d1873f7571b17403c650050e53ebadf6df",
+            "line": 87
+          }
+        ],
+        {
+          "archive": "ecarx-hud-system-20260727-010640.zip",
+          "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+          "member": "report.txt",
+          "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+          "lines": [
+            335
+          ],
+          "literal": "PACKAGE ecarx.settings",
+          "scope": "PackageManager snapshot from July27; current installation must still be checked."
+        }
+      ],
+      "presence_probe": false
+    },
+    {
+      "name": "com.android.bluetooth",
+      "reason": "Current Bluetooth package, embedded SDK and mapped native-code variants",
+      "evidence": [
+        {
+          "report": "bluetooth_runtime/report.md",
+          "basis": "Observed Bluetooth process/package in archived runtime logs"
+        }
+      ],
+      "presence_probe": false
+    },
+    {
+      "name": "ru.natro.statuswidget",
+      "reason": "Current Natro code and package version for the local GATT teardown branch",
+      "evidence": [
+        {
+          "report": "bluetooth_runtime/report.md",
+          "basis": "Observed GATT client6 and package in runtime snapshots"
+        },
+        {
+          "basis": "candidate_package_presence_probe"
+        }
+      ],
+      "presence_probe": false
+    },
+    {
+      "name": "ecarx.bluetooth.service.extension",
+      "reason": "Current ECARX Bluetooth service extension and mapped vendor dependencies",
+      "evidence": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/packages_full_paths.txt",
+          "line": 11
+        }
+      ],
+      "presence_probe": false
+    },
+    {
+      "name": "com.ts.dm.service",
+      "reason": "Compare installed device-management service with the now analyzed archived implementation",
+      "evidence": [
+        {
+          "report": "bluetooth_runtime/dm_service_evidence.json",
+          "sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1"
+        }
+      ],
+      "presence_probe": false
+    },
+    {
+      "name": "com.ecarx.dimmenu",
+      "reason": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "evidence": [
+        {
+          "archive": "ecarx-hud-system-20260727-010640.zip",
+          "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+          "member": "report.txt",
+          "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+          "lines": [
+            62
+          ],
+          "literal": "PACKAGE com.ecarx.dimmenu",
+          "scope": "PackageManager snapshot from July27; current installation must still be checked."
+        }
+      ],
+      "presence_probe": true
+    },
+    {
+      "name": "com.ecarx.settings",
+      "reason": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "evidence": [
+        {
+          "basis": "candidate_package_presence_probe"
+        }
+      ],
+      "presence_probe": true
+    },
+    {
+      "name": "ecarx.adaptapi.platform",
+      "reason": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "evidence": [
+        {
+          "archive": "ecarx-hud-system-20260727-010640.zip",
+          "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+          "member": "report.txt",
+          "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+          "lines": [
+            223
+          ],
+          "literal": "PACKAGE ecarx.adaptapi.platform",
+          "scope": "PackageManager snapshot from July27; current installation must still be checked."
+        }
+      ],
+      "presence_probe": true
+    },
+    {
+      "name": "ecarx.geea.platform.api.signal",
+      "reason": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "evidence": [
+        {
+          "archive": "ecarx-hud-system-20260727-010640.zip",
+          "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+          "member": "report.txt",
+          "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+          "lines": [
+            241
+          ],
+          "literal": "PACKAGE ecarx.geea.platform.api.signal",
+          "scope": "PackageManager snapshot from July27; current installation must still be checked."
+        }
+      ],
+      "presence_probe": true
+    },
+    {
+      "name": "ecarx.geea.platform.api.vf",
+      "reason": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "evidence": [
+        {
+          "archive": "ecarx-hud-system-20260727-010640.zip",
+          "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+          "member": "report.txt",
+          "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+          "lines": [
+            260
+          ],
+          "literal": "PACKAGE ecarx.geea.platform.api.vf",
+          "scope": "PackageManager snapshot from July27; current installation must still be checked."
+        }
+      ],
+      "presence_probe": true
+    },
+    {
+      "name": "com.ecarx.sdk.openapi",
+      "reason": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "evidence": [
+        {
+          "archive": "ecarx-hud-system-20260727-010640.zip",
+          "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+          "member": "report.txt",
+          "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+          "lines": [
+            124
+          ],
+          "literal": "PACKAGE com.ecarx.sdk.openapi",
+          "scope": "PackageManager snapshot from July27; current installation must still be checked."
+        }
+      ],
+      "presence_probe": true
+    },
+    {
+      "name": "ru.monjaro.mconfig",
+      "reason": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "evidence": [
+        {
+          "basis": "candidate_package_presence_probe"
+        }
+      ],
+      "presence_probe": true
+    }
+  ],
+  "qnx_files": [
+    {
+      "id": "QNX:/bin/sc_qnx_vip_proxy",
+      "path": "/bin/sc_qnx_vip_proxy",
+      "reason": "Compare the six finite registered SOME/IP handlers with any changed vehicle variant.",
+      "evidence": [
+        {
+          "archive": "KX11-QNX-CAN-Inventory.zip",
+          "member": "KX11-QNX-CAN-Inventory/qnx/files/bin/sc_qnx_vip_proxy",
+          "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+          "bytes": 335440
+        },
+        {
+          "archive": "KX11-QNX-Deep-Evidence.zip",
+          "member": "KX11-QNX-Deep-Evidence/qnx/files/bin/sc_qnx_vip_proxy",
+          "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+          "bytes": 335440
+        },
+        {
+          "archive": "KX11-QNX-Live-Discovery.zip",
+          "member": "KX11-QNX-Live-Discovery/qnx/files/bin/sc_qnx_vip_proxy",
+          "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+          "bytes": 335440
+        }
+      ],
+      "max_bytes": 268435456,
+      "conditional": false,
+      "known_sha256": [
+        "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55"
+      ]
+    },
+    {
+      "id": "QNX:/bin/can_driver",
+      "path": "/bin/can_driver",
+      "reason": "Compare generic SPI/CAN resource-manager code; do not open the device node.",
+      "evidence": [
+        {
+          "archive": "KX11-QNX-CAN-Inventory.zip",
+          "member": "KX11-QNX-CAN-Inventory/qnx/files/bin/can_driver",
+          "sha256": "d60ba7ab0bb07119cf24425ebc817a6e6bc41ab737944bab0d5dd737cfeeb28d",
+          "bytes": 18360
+        }
+      ],
+      "max_bytes": 268435456,
+      "conditional": false,
+      "known_sha256": [
+        "d60ba7ab0bb07119cf24425ebc817a6e6bc41ab737944bab0d5dd737cfeeb28d"
+      ]
+    },
+    {
+      "id": "QNX:/bin/SwVersionService",
+      "path": "/bin/SwVersionService",
+      "reason": "Correlate QNX software-version provider.",
+      "evidence": [
+        {
+          "archive": "KX11-QNX-Deep-Evidence.zip",
+          "member": "KX11-QNX-Deep-Evidence/qnx/files/bin/SwVersionService",
+          "sha256": "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29",
+          "bytes": 46992
+        },
+        {
+          "archive": "KX11-Update-Package-Evidence(1).zip",
+          "member": "KX11-Update-Package-Evidence/qnx/files/bin/SwVersionService",
+          "sha256": "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29",
+          "bytes": 46992
+        },
+        {
+          "archive": "KX11-Update-Package-Evidence.zip",
+          "member": "KX11-Update-Package-Evidence/qnx/files/bin/SwVersionService",
+          "sha256": "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29",
+          "bytes": 46992
+        }
+      ],
+      "max_bytes": 268435456,
+      "conditional": false,
+      "known_sha256": [
+        "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29"
+      ]
+    },
+    {
+      "id": "QNX:/etc/sw-version-info.txt",
+      "path": "/etc/sw-version-info.txt",
+      "reason": "Record actual ES/ER QNX version with files.",
+      "evidence": [
+        {
+          "archive": "KX11-QNX-Deep-Evidence.zip",
+          "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/sw-version-info.txt",
+          "sha256": "2062fc7816f3978028cf37f3f073d3b68ee6042c81322a459c06d7a93ef8f2e5",
+          "bytes": 121
+        }
+      ],
+      "max_bytes": 268435456,
+      "conditional": false,
+      "known_sha256": [
+        "2062fc7816f3978028cf37f3f073d3b68ee6042c81322a459c06d7a93ef8f2e5"
+      ]
+    },
+    {
+      "id": "QNX:/vm/images_lv/linux-lv.img",
+      "path": "/vm/images_lv/linux-lv.img",
+      "reason": "If changed, decode updated Linux LV initramfs offline for updater and log handler paths.",
+      "evidence": [
+        {
+          "archive": "KX11-VP-Firmware-Evidence.zip",
+          "member": "KX11-VP-Firmware-Evidence/qnx/files/vm/images_lv/linux-lv.img",
+          "sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680",
+          "bytes": 49506320
+        }
+      ],
+      "max_bytes": 536870912,
+      "conditional": false,
+      "known_sha256": [
+        "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+      ]
+    }
+  ],
+  "not_collectable_as_files": [
+    {
+      "target_id": "SDK-RUNTIME-DEFINING-LOADER",
+      "status": "requires an existing in-process runtime diagnostic; no APK build, injection or class initialization requested",
+      "classes": [
+        "com.ecarx.xui.adaptapi.AdaptAPI",
+        "com.ecarx.xui.adaptapi.car.base.CarInfo",
+        "com.ecarx.xui.adaptapi.car.diagnostics.DtcManager",
+        "com.ecarx.xui.adaptapi.car.sensor.Sensor",
+        "ecarx.car.hardware.vehicle.ECarXCarActivesafetyManager"
+      ],
+      "required_evidence": [
+        "application package, version and process identity",
+        "actual Class.getClassLoader result for the already loaded target class",
+        "defining dex/container path and exact digest if available from the existing diagnostic",
+        "classloader parent/delegation context; no constant read that newly initializes classes",
+        "method/field values observed in that exact process remain separate from disk constants"
+      ],
+      "never_substitute": [
+        "disk path alone",
+        "BOOTCLASSPATH alone",
+        "same class name",
+        "process maps alone",
+        "different package embedded SDK"
+      ]
+    },
+    {
+      "domain": "Linux_LV_initramfs_runtime",
+      "path_pattern": "/data/kernellog/vp_*.log",
+      "proven_directory": "/data/kernellog",
+      "proven_prefix": "vp",
+      "evidence": "mcu_log SHA33d91dad416089274af3ec23b4e5b8824b69a5196313b3162c40bdfd65e4fd0b VA400a1c..400a3c passes directory and prefix to logging setup; generated names %s/%s_%d.log. Runtime guest alias into Android/QNX not established.",
+      "missing_fact": "Mounted location of LV /dev/block/vdb within an already-running accessible filesystem. No new mount or LV boot is authorized.",
+      "prohibited_action": "Do not execute mcu_log: callback400c1c performs mkdir and mount."
+    },
+    {
+      "id": "CRUISE-PRODUCTION-HANDLER",
+      "facts": [
+        "Production VP/MCU image corresponding to MCU version20.24.10.23024.41141 and hardware identity of 198.18.34.1:50500.",
+        "Wheel-switch receiving ECU handler and downstream cruise request/counter/checksum/eligibility semantics.",
+        "Meaning/ownership of swlm/swp1 package segments; names alone are insufficient."
+      ],
+      "status": "No verified exact file path; do not substitute device reads or replay."
+    },
+    {
+      "id": "ANCS-APP-DECISION",
+      "status": "The existing generic Bluetooth log projection does not reveal the internal Natro decision/reason/epoch; requires an existing app diagnostic with no notification payload."
+    },
+    {
+      "id": "PHYSICAL-AND-ECU-GATES",
+      "status": "Hardware inventory, physical effects, ECU watchdogs, interlocks and unsupported features cannot be verified by file acquisition alone."
+    }
+  ],
+  "completion_scope": "Finite file-acquisition plan. This does not certify all vehicle functions or close hardware acceptance.",
+  "rules": [
+    "Existing authorized ADB only; no root daemon restart, installation, firmware execution or vehicle command.",
+    "Only exact installed-code paths and reviewed conditional OTA paths. No network scanning or device-node reads.",
+    "Current SHA-256 determines content duplication; matching filenames are insufficient.",
+    "Conditional missing files are evidence of current absence only. Permission/transport/format errors remain errors.",
+    "QNX stat is available after O_RDONLY open; only pre-reviewed ordinary-file locations are included."
+  ],
+  "counts": {
+    "android_files": 22,
+    "qnx_files": 5,
+    "packages": 13,
+    "not_collectable_as_files": 5
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "scope": "Observed package-name/path mapping, August 15 archive; no current installed-byte claim",
+  "identities": [
+    {
+      "package": "ecarx.bluetooth.service.extension",
+      "installed_path_observed": "/system/app/EcarxBluetoothServiceExtension/EcarxBluetoothServiceExtension.apk",
+      "source": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/packages_full_paths.txt",
+        "member_sha256": "1ba192e0b647aae34968a439664b59fb28628758f84c2940d2702aa38d19f950",
+        "line": 11
+      }
+    },
+    {
+      "package": "com.ts.dm.service",
+      "installed_path_observed": "/system/app/ts-dm-service/ts-dm-service.apk",
+      "source": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/packages_full_paths.txt",
+        "member_sha256": "1ba192e0b647aae34968a439664b59fb28628758f84c2940d2702aa38d19f950",
+        "line": 45
+      }
+    },
+    {
+      "package": "ecarx.powersomeip.service",
+      "installed_path_observed": "/system/app/PowerSomeIPService/PowerSomeIPService.apk",
+      "source": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/packages_full_paths.txt",
+        "member_sha256": "1ba192e0b647aae34968a439664b59fb28628758f84c2940d2702aa38d19f950",
+        "line": 66
+      }
+    },
+    {
+      "package": "org.astpepper.hwgps",
+      "installed_path_observed": "/data/app/org.astpepper.hwgps-CfiV8m8-C4x_BQqIDnwkQQ==/base.apk",
+      "source": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/packages_full_paths.txt",
+        "member_sha256": "1ba192e0b647aae34968a439664b59fb28628758f84c2940d2702aa38d19f950",
+        "line": 78
+      }
+    },
+    {
+      "package": "ru.natro.statuswidget",
+      "installed_path_observed": "/data/app/ru.natro.statuswidget-nvnzesSIbXC9aOZYenRccw==/base.apk",
+      "source": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/packages_full_paths.txt",
+        "member_sha256": "1ba192e0b647aae34968a439664b59fb28628758f84c2940d2702aa38d19f950",
+        "line": 101
+      }
+    },
+    {
+      "package": "com.android.bluetooth",
+      "installed_path_observed": "/system/app/Bluetooth/Bluetooth.apk",
+      "source": {
+        "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+        "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+        "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/packages_full_paths.txt",
+        "member_sha256": "1ba192e0b647aae34968a439664b59fb28628758f84c2940d2702aa38d19f950",
+        "line": 134
+      }
+    }
+  ],
+  "version_limit": "Natro August version/SHA is not established by this listing. Fresh metadata must retain timestamps and firmware scope."
+}

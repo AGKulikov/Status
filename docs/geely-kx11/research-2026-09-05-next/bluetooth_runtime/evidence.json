@@ -1,0 +1,1708 @@
+{
+  "scope": "offline original corpus; no execution/build/vehicle operations",
+  "findings": [
+    {
+      "id": "BT01",
+      "namespace": "Android BluetoothManagerService / PowerSomeIP",
+      "evidence_level": "OBSERVED",
+      "claim": "Штатный ecarx.powersomeip.service запрашивает enable; все шесть dumpsys сообщают enabled=true/state=ON и Bluetooth crashed 0 times. Два снимка указывают SYSTEM_BOOT, остальные APPLICATION_REQUEST.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+          "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+          "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "6592a380f915da85bd70828d79af7a4e4713e79adffb66127484be549ffd7f94",
+          "lines": [
+            2,
+            3,
+            9,
+            10,
+            11,
+            12,
+            13
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "52f5f34b2ce667c5c64f0e869b5b0497318a28b16b13be82f1e2d2ae26f07df5",
+          "lines": [
+            2,
+            3,
+            9,
+            10,
+            11,
+            12,
+            13
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "756615e16394415b655111908d04c9ccd9de896e705737be55705e5758c18240",
+          "lines": [
+            2,
+            3,
+            9,
+            10,
+            11,
+            12,
+            13
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "53b2974cd4069aa18a168e0d76d37962a77f5224c3ca3da98aa34eb7a1bd3d03",
+          "lines": [
+            2,
+            3,
+            9,
+            10,
+            11,
+            12,
+            13
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "2e4947745aefe28f7ed9caf4a415f50255fdfc1545d47198e95dfea3df55f7b0",
+          "lines": [
+            2,
+            3,
+            9,
+            10,
+            11,
+            12,
+            13
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "2a6df18ecfbb42fc3057c98a4180710aeac69caea02011ac3919f55a86b34ef8",
+          "lines": [
+            2,
+            3,
+            9,
+            10,
+            11,
+            12,
+            13
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+          "lines": [
+            18
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "4c3a5240662c15e09da0826e7a16199df50ad70bf6b600f74f68c0bf8c72ef15",
+          "lines": [
+            367
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+          "lines": [
+            20
+          ]
+        }
+      ],
+      "limits": "Ноль счётчика crash в отдельных эпохах не исключает иных отказов. RESTARTED не равен crash. Причина sleep/wake и AP status в Bluetooth slice отсутствует."
+    },
+    {
+      "id": "BT02",
+      "namespace": "Android BluetoothManagerService state machine",
+      "evidence_level": "OBSERVED",
+      "claim": "13:24:10.222 waitForOnOff time out, MESSAGE_RESTART_BLUETOOTH_SERVICE и BLE_TURNING_ON→BLE_ON; далее BLE_ON→TURNING_ON. Это реально зарегистрированный сбой ожидания запуска; поздние снимки показывают ON.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+          "lines": [
+            24,
+            25,
+            26,
+            35,
+            37,
+            42
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "2e4947745aefe28f7ed9caf4a415f50255fdfc1545d47198e95dfea3df55f7b0",
+          "lines": [
+            2,
+            3
+          ]
+        }
+      ],
+      "limits": "Срез не содержит полного вызывающего power request или причин задержки; не утверждается падение Bluetooth или физический сон."
+    },
+    {
+      "id": "BT03",
+      "namespace": "Android GATT ContextMap / application IDs",
+      "evidence_level": "OBSERVED",
+      "claim": "В снимках 10:42 и11:45 ID5=org.astpepper.hwgps; ID6=ru.natro.statuswidget. Natro имеет1 GATT connection, GPS также1. В13:29 и13:46 Natro остаётся лишь записью статистики без Registered, Application ID и Connections; GPS зарегистрирован и подключён.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "756615e16394415b655111908d04c9ccd9de896e705737be55705e5758c18240",
+          "lines": [
+            68,
+            72,
+            74,
+            75,
+            77,
+            81,
+            83,
+            84
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "53b2974cd4069aa18a168e0d76d37962a77f5224c3ca3da98aa34eb7a1bd3d03",
+          "lines": [
+            51,
+            55,
+            57,
+            58,
+            60,
+            64,
+            66,
+            67
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "2e4947745aefe28f7ed9caf4a415f50255fdfc1545d47198e95dfea3df55f7b0",
+          "lines": [
+            59,
+            62,
+            67,
+            71,
+            73,
+            74
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "2a6df18ecfbb42fc3057c98a4180710aeac69caea02011ac3919f55a86b34ef8",
+          "lines": [
+            63,
+            66,
+            71,
+            75,
+            77,
+            78
+          ]
+        }
+      ],
+      "limits": "ID действует в соответствующем процессе/эпохе. Один только ID6 из другой эпохи нельзя автоматически считать Natro; в13:29 scanner ID6 принадлежит Navigator."
+    },
+    {
+      "id": "BT04",
+      "namespace": "BluetoothGatt callback status / native GATT reason",
+      "evidence_level": "OBSERVED + ATTRIBUTION",
+      "claim": "Дважды GPS clientIf5 получает status40=0x28, закрывает регистрацию, повторяет connect, отменяет неготовое подключение (connId=null, native reason0x100), затем успешно подключается и завершает services discovery. Восстановление до services:8.182с и8.485с.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+          "lines": [
+            9750,
+            9759,
+            9793,
+            9800,
+            9801,
+            9930,
+            11687,
+            11693,
+            11776,
+            11911
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+          "lines": [
+            4915,
+            4924,
+            4942,
+            4943,
+            5004,
+            6006,
+            6012,
+            6410,
+            6522
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "756615e16394415b655111908d04c9ccd9de896e705737be55705e5758c18240",
+          "lines": [
+            77,
+            81
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "2e4947745aefe28f7ed9caf4a415f50255fdfc1545d47198e95dfea3df55f7b0",
+          "lines": [
+            67,
+            71
+          ]
+        }
+      ],
+      "limits": "Это сбой GPS GATT-клиента, не доказательство ANCS failure. Названная семантика0x28/0x100 в конкретных vendor библиотеках ещё не восстановлена; статический GattService передаёт native status без преобразования."
+    },
+    {
+      "id": "BT05",
+      "namespace": "Android GATT lifecycle / Natro epoch10:39",
+      "evidence_level": "OBSERVED",
+      "claim": "Natro client6 после успешного discovery сам проходит clientDisconnect→close→unregisterApp в10:40:59.494–.500 и10:41:26.347–.348. Примерно через1с native запрашивает HCI disconnect reason0x13; затем link down reason0x16. В10:41:29 происходит новое успешное подключение/discovery и локальная регистрация notification callbacks.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+          "lines": [
+            13275,
+            14176,
+            46501,
+            46508,
+            46509,
+            46513,
+            46604,
+            46622,
+            46683,
+            48195,
+            48556,
+            48558,
+            48559,
+            48563,
+            48611,
+            48625,
+            48678,
+            48806,
+            48895,
+            48897,
+            48977
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "756615e16394415b655111908d04c9ccd9de896e705737be55705e5758c18240",
+          "lines": [
+            68,
+            72,
+            74
+          ]
+        }
+      ],
+      "limits": "Причина решения Natro закрыть GATT отсутствует в срезе. close предшествует native disconnect и не доказывает crash/переключение power. registerForNotification не доказывает remote CCCD success или ANCS-ready."
+    },
+    {
+      "id": "BT06",
+      "namespace": "HFP client vs BLE ACL",
+      "evidence_level": "OBSERVED",
+      "claim": "При разрывах BLE штатный InCallServiceImpl сообщает isHfpConnected=true:10:41:00.516 и10:41:27.400. GATT потеря не означает исчезновение профиля звонка; HFP/A2DP и BLE следует оценивать отдельно.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+          "lines": [
+            46683,
+            48678
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "756615e16394415b655111908d04c9ccd9de896e705737be55705e5758c18240",
+          "lines": [
+            102,
+            111,
+            114,
+            115
+          ]
+        }
+      ],
+      "limits": "isHfpConnected — программное наблюдение штатного клиента; слышимость разговора и физический аудиотракт не проверялись."
+    },
+    {
+      "id": "BT07",
+      "namespace": "Android GATT / Natro recovery",
+      "evidence_level": "OBSERVED",
+      "claim": "11:45:51.969 client6 начинает connect;11:45:52.727 callback status0; MTU185 принят в11:45:52.904; services discovery status0 в11:45:52.930; snapshot показывает Natro registered/1 connection.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "4c3a5240662c15e09da0826e7a16199df50ad70bf6b600f74f68c0bf8c72ef15",
+          "lines": [
+            9773,
+            9782,
+            9883,
+            9910,
+            9971,
+            9973
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "53b2974cd4069aa18a168e0d76d37962a77f5224c3ca3da98aa34eb7a1bd3d03",
+          "lines": [
+            51,
+            55,
+            57,
+            58
+          ]
+        }
+      ],
+      "limits": "Успешные GATT-этапы не заменяют авторизацию ANCS/CCCD/доставку уведомления. Callback данных и личное содержимое не анализировались."
+    },
+    {
+      "id": "BT08",
+      "namespace": "Android BLE scan ownership",
+      "evidence_level": "OBSERVED",
+      "claim": "У Navigator имеются долгие ongoing BLE scan записи. В13:46 один scanner package содержит два ongoing scans (IDs6,7); у Natro активный GATT client отсутствует. В09:00 Natro history включает scans38.486с,60.021с,49.847с,2.204с,2.242с.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "52f5f34b2ce667c5c64f0e869b5b0497318a28b16b13be82f1e2d2ae26f07df5",
+          "lines": [
+            48,
+            49,
+            53,
+            54,
+            55,
+            56,
+            57,
+            59,
+            65,
+            66,
+            67
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "2a6df18ecfbb42fc3057c98a4180710aeac69caea02011ac3919f55a86b34ef8",
+          "lines": [
+            49,
+            50,
+            56,
+            57,
+            58,
+            59,
+            66
+          ]
+        }
+      ],
+      "limits": "Это счётчики и длительности scanner map, не число BLE links и не доказательство конкуренции, радиоистощения или причины задержки ANCS."
+    },
+    {
+      "id": "BT09",
+      "namespace": "Android GATT Binder callback",
+      "evidence_level": "OBSERVED",
+      "claim": "В13:29:12.234 GattService регистрирует DeadObjectException; после этого есть onScanFilterParamsConfigured(clientIf6,status0). Bluetooth crashed0 в снимке не означает отсутствие Binder callback errors.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+          "lines": [
+            82988,
+            82998
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "2e4947745aefe28f7ed9caf4a415f50255fdfc1545d47198e95dfea3df55f7b0",
+          "lines": [
+            13
+          ]
+        }
+      ],
+      "limits": "Срез не содержит stack trace/callback recipient. Нельзя атрибутировать DeadObjectException Natro; scanner6 в ближайшем snapshot принадлежит Navigator."
+    },
+    {
+      "id": "BT10",
+      "namespace": "Android profile role / IBluetoothHeadset",
+      "evidence_level": "OBSERVED",
+      "claim": "В корпусе повторяется ошибка bind android.bluetooth.IBluetoothHeadset; это сервис обычной Headset роли, тогда как автомобильные снимки содержат HeadsetClientService. Нельзя по этой строке объявлять HFP client отключённым.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8f64e420a0443680a25cf6bf15c43a1d3e517a19501ffe89cd209602850b436a",
+          "lines": [
+            3,
+            4
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "52f5f34b2ce667c5c64f0e869b5b0497318a28b16b13be82f1e2d2ae26f07df5",
+          "lines": [
+            117
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+          "member_sha256": "756615e16394415b655111908d04c9ccd9de896e705737be55705e5758c18240",
+          "lines": [
+            111
+          ]
+        }
+      ],
+      "limits": "Полная причина запросов неверной/отсутствующей роли и package caller из среза не установлена."
+    },
+    {
+      "id": "BT11",
+      "namespace": "HCI event0x05 / logcat clock alignment",
+      "evidence_level": "OBSERVED + CROSS_SOURCE_ALIGNMENT",
+      "claim": "HCI Disconnection Complete record4516 offset1026715:10:25:01.599616UTC,handle3,status0,reason40. Logcat13:25:01.600 содержит тот же handle/reason и GPS client5. Сдвиг+3часа согласует два независимых источника до0.384мс.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+          "member_sha256": "0316fd1a333585254ed4b2ef729e6b9908c089ce946c9652baab1139ca99991a",
+          "record": 4516,
+          "byte_offset": 1026715,
+          "timestamp_UTC": "2026-08-15T10:25:01.599616+00:00"
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+          "lines": [
+            4924,
+            4942
+          ]
+        }
+      ],
+      "limits": "Согласование часов является выводом по событию, не заявлением о системной timezone всего корпуса. Callback приложения происходит позже native event; это не физическая кнопочная задержка."
+    },
+    {
+      "id": "BT12",
+      "namespace": "Btsnoop file chronology",
+      "evidence_level": "OBSERVED",
+      "claim": "Три btsnoop_hci.log.last имеют144934 целых records:14авг13:36–13:47UTC,14авг18:10–18:15UTC,15авг10:24–10:45UTC. Имя архива не является временем HCI. Второй файл, собранный15авг09:00, содержит события предыдущего дня.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+          "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+          "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+          "member_sha256": "b04d0bae850741d896d97f65cd1d649b12a7e389f15487a8abf76eeeade5d9aa",
+          "record_range": [
+            1,
+            54362
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+          "member_sha256": "70b34c55c8234ff5e459121b968b50cdac9f3e665a222576f3448e28dbb84a0e",
+          "record_range": [
+            1,
+            25037
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+          "member_sha256": "0316fd1a333585254ed4b2ef729e6b9908c089ce946c9652baab1139ca99991a",
+          "record_range": [
+            1,
+            65535
+          ]
+        }
+      ],
+      "limits": "Разобраны framing и whitelist lifecycle scalar fields; ACL/SCO/security/key/notification payload исключены. Нет claims об ATT error codes или notification content."
+    },
+    {
+      "id": "BT13",
+      "namespace": "bounded log search / negative evidence",
+      "evidence_level": "NEGATIVE",
+      "claim": "В 248366 строках шести Bluetooth slices отсутствуют конкретные AP callback, insufficient-key/invalid-handle тексты, выбранные ANCS phase tags и descriptor-write callbacks (точные шаблоны и нули в log_windows).",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+          "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+          "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "9c2ef5ecbae8c3b9ec633aeb438a465bb914d86abd0962ab5621cc4b78d2819c",
+          "lines": [
+            1,
+            3605
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8f64e420a0443680a25cf6bf15c43a1d3e517a19501ffe89cd209602850b436a",
+          "lines": [
+            1,
+            81687
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+          "lines": [
+            1,
+            51913
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "4c3a5240662c15e09da0826e7a16199df50ad70bf6b600f74f68c0bf8c72ef15",
+          "lines": [
+            1,
+            16820
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+          "lines": [
+            1,
+            83990
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8b588cdd8f0dac3b12658d17a77aa9c98b529f3b8a8c5a005582b172f58fc5a3",
+          "lines": [
+            1,
+            10351
+          ]
+        }
+      ],
+      "limits": "Это отрицательный результат только сохранённого Bluetooth slice; иных буферов и Natro private diagnostic нет. Строки с ANCS в friendly device metadata не являются событиями ANCS."
+    },
+    {
+      "id": "BT14",
+      "namespace": "native GATT cache I/O",
+      "evidence_level": "OBSERVED",
+      "claim": "Missing GATT cache file messages are followed by successful services discovery; missing-cache error alone does not establish corrupted bond.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8f64e420a0443680a25cf6bf15c43a1d3e517a19501ffe89cd209602850b436a",
+          "lines": [
+            29195,
+            29799,
+            43568,
+            44363,
+            49957,
+            50336
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+          "lines": [
+            11765,
+            11911,
+            13259,
+            14176,
+            47943,
+            48195
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "4c3a5240662c15e09da0826e7a16199df50ad70bf6b600f74f68c0bf8c72ef15",
+          "lines": [
+            1825,
+            3741
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+          "lines": [
+            6399,
+            6522
+          ]
+        }
+      ],
+      "limits": "Cache contents and pairing data were not examined; no deletion or repair is justified by these lines."
+    },
+    {
+      "id": "BT15",
+      "namespace": "captured firmware/config identity",
+      "evidence_level": "OBSERVED",
+      "claim": "All six build_fingerprint.txt, current nForeBluetooth.properties, and bt_stack.conf members respectively have identical SHA256.",
+      "sources": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+          "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+          "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+          "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+          "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+          "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/etc/bluetooth/bt_stack.conf",
+          "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+          "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+          "member": "KX11_Bluetooth_Collect_20260814-210122_61118/META/build_fingerprint.txt",
+          "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+          "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/etc/bluetooth/bt_stack.conf",
+          "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/META/build_fingerprint.txt",
+          "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+          "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/etc/bluetooth/bt_stack.conf",
+          "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/META/build_fingerprint.txt",
+          "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+          "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/etc/bluetooth/bt_stack.conf",
+          "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/META/build_fingerprint.txt",
+          "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+          "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/etc/bluetooth/bt_stack.conf",
+          "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/META/build_fingerprint.txt",
+          "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+          "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/bt_stack.conf",
+          "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+          "lines": [
+            1
+          ]
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/META/build_fingerprint.txt",
+          "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+          "lines": [
+            1
+          ]
+        }
+      ],
+      "limits": "Same selected bytes do not prove identical full firmware, unchanged Natro APK or pristine factory configuration."
+    }
+  ],
+  "log_windows": [
+    {
+      "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+      "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+      "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "9c2ef5ecbae8c3b9ec633aeb438a465bb914d86abd0962ab5621cc4b78d2819c",
+      "lines": 3605,
+      "start": "08-14 21:01:24.971",
+      "end": "08-14 21:01:36.673",
+      "typed_event_counts": {
+        "registerForNotification": 2
+      },
+      "negative_searches": {
+        "power_ap_callback": {
+          "matches": 0,
+          "pattern": "apStatusChange|ScPwIVIMngrReqState|bt_pre_state|lastAPStatus|wifi_pre_state"
+        },
+        "insufficient_key_text": {
+          "matches": 0,
+          "pattern": "(?i)encryption key size|insufficient.*key|key.*insufficient"
+        },
+        "invalid_handle_text": {
+          "matches": 0,
+          "pattern": "(?i)handle is invalid|invalid handle|GATT_INVALID_HANDLE"
+        },
+        "Natro_ANCS_phase_tag": {
+          "matches": 0,
+          "pattern": "\\s(?:AncsClient|AncsManager|ANCS|NatroAncs)\\s*:"
+        },
+        "descriptor_write_callback": {
+          "matches": 0,
+          "pattern": "onDescriptorWrite|onCharacteristicWrite"
+        }
+      }
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+      "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+      "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "8f64e420a0443680a25cf6bf15c43a1d3e517a19501ffe89cd209602850b436a",
+      "lines": 81687,
+      "start": "08-15 08:52:12.298",
+      "end": "08-15 09:01:16.346",
+      "typed_event_counts": {
+        "native_link_disconnected": 4,
+        "stock_phone_acl_disconnect": 3,
+        "connect": 3,
+        "registerClient": 3,
+        "onClientRegistered": 6,
+        "clientConnect": 3,
+        "onClientConnectionState": 4,
+        "configureMTU": 6,
+        "onConnectionUpdated": 7,
+        "onConfigureMTU": 6,
+        "discoverServices": 6,
+        "onSearchCompleted": 3,
+        "onSearchComplete": 3,
+        "clientDisconnect": 3,
+        "close": 3,
+        "unregisterApp": 3,
+        "unregisterClient": 3,
+        "native_send_hci_disconnect": 2,
+        "native_gatt_connection_callback": 18
+      },
+      "negative_searches": {
+        "power_ap_callback": {
+          "matches": 0,
+          "pattern": "apStatusChange|ScPwIVIMngrReqState|bt_pre_state|lastAPStatus|wifi_pre_state"
+        },
+        "insufficient_key_text": {
+          "matches": 0,
+          "pattern": "(?i)encryption key size|insufficient.*key|key.*insufficient"
+        },
+        "invalid_handle_text": {
+          "matches": 0,
+          "pattern": "(?i)handle is invalid|invalid handle|GATT_INVALID_HANDLE"
+        },
+        "Natro_ANCS_phase_tag": {
+          "matches": 0,
+          "pattern": "\\s(?:AncsClient|AncsManager|ANCS|NatroAncs)\\s*:"
+        },
+        "descriptor_write_callback": {
+          "matches": 0,
+          "pattern": "onDescriptorWrite|onCharacteristicWrite"
+        }
+      }
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+      "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+      "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+      "lines": 51913,
+      "start": "08-15 10:39:13.047",
+      "end": "08-15 10:42:36.682",
+      "typed_event_counts": {
+        "enable_request": 1,
+        "waitForOnOff_timeout": 1,
+        "adapter_state_change": 4,
+        "connect": 6,
+        "registerClient": 6,
+        "onClientRegistered": 12,
+        "clientConnect": 6,
+        "onClientConnectionState": 7,
+        "onConnectionUpdated": 11,
+        "discoverServices": 10,
+        "onSearchCompleted": 5,
+        "onSearchComplete": 5,
+        "configureMTU": 10,
+        "onConfigureMTU": 10,
+        "requestConnectionPriority": 2,
+        "registerForNotification": 23,
+        "native_gatt_connection_callback": 19,
+        "native_link_disconnected": 3,
+        "close": 4,
+        "unregisterApp": 4,
+        "unregisterClient": 4,
+        "clientDisconnect": 3,
+        "DeadObjectException": 1,
+        "native_send_hci_disconnect": 2,
+        "stock_phone_acl_disconnect": 2
+      },
+      "negative_searches": {
+        "power_ap_callback": {
+          "matches": 0,
+          "pattern": "apStatusChange|ScPwIVIMngrReqState|bt_pre_state|lastAPStatus|wifi_pre_state"
+        },
+        "insufficient_key_text": {
+          "matches": 0,
+          "pattern": "(?i)encryption key size|insufficient.*key|key.*insufficient"
+        },
+        "invalid_handle_text": {
+          "matches": 0,
+          "pattern": "(?i)handle is invalid|invalid handle|GATT_INVALID_HANDLE"
+        },
+        "Natro_ANCS_phase_tag": {
+          "matches": 0,
+          "pattern": "\\s(?:AncsClient|AncsManager|ANCS|NatroAncs)\\s*:"
+        },
+        "descriptor_write_callback": {
+          "matches": 0,
+          "pattern": "onDescriptorWrite|onCharacteristicWrite"
+        }
+      }
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+      "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+      "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "4c3a5240662c15e09da0826e7a16199df50ad70bf6b600f74f68c0bf8c72ef15",
+      "lines": 16820,
+      "start": "08-15 11:45:31.530",
+      "end": "08-15 11:46:55.264",
+      "typed_event_counts": {
+        "adapter_state_change": 3,
+        "enable_request": 1,
+        "connect": 2,
+        "registerClient": 2,
+        "onClientRegistered": 4,
+        "clientConnect": 2,
+        "onClientConnectionState": 2,
+        "discoverServices": 4,
+        "onConnectionUpdated": 2,
+        "onSearchCompleted": 2,
+        "onSearchComplete": 2,
+        "configureMTU": 4,
+        "onConfigureMTU": 4,
+        "requestConnectionPriority": 1,
+        "registerForNotification": 12
+      },
+      "negative_searches": {
+        "power_ap_callback": {
+          "matches": 0,
+          "pattern": "apStatusChange|ScPwIVIMngrReqState|bt_pre_state|lastAPStatus|wifi_pre_state"
+        },
+        "insufficient_key_text": {
+          "matches": 0,
+          "pattern": "(?i)encryption key size|insufficient.*key|key.*insufficient"
+        },
+        "invalid_handle_text": {
+          "matches": 0,
+          "pattern": "(?i)handle is invalid|invalid handle|GATT_INVALID_HANDLE"
+        },
+        "Natro_ANCS_phase_tag": {
+          "matches": 0,
+          "pattern": "\\s(?:AncsClient|AncsManager|ANCS|NatroAncs)\\s*:"
+        },
+        "descriptor_write_callback": {
+          "matches": 0,
+          "pattern": "onDescriptorWrite|onCharacteristicWrite"
+        }
+      }
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+      "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+      "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+      "lines": 83990,
+      "start": "08-15 13:24:07.632",
+      "end": "08-15 13:29:36.723",
+      "typed_event_counts": {
+        "enable_request": 1,
+        "waitForOnOff_timeout": 1,
+        "adapter_state_change": 2,
+        "registerForNotification": 10,
+        "native_gatt_connection_callback": 6,
+        "native_link_disconnected": 1,
+        "onClientConnectionState": 2,
+        "close": 2,
+        "unregisterApp": 2,
+        "unregisterClient": 2,
+        "connect": 2,
+        "registerClient": 2,
+        "onClientRegistered": 4,
+        "clientConnect": 2,
+        "clientDisconnect": 1,
+        "discoverServices": 2,
+        "onConnectionUpdated": 3,
+        "onSearchCompleted": 1,
+        "onSearchComplete": 1,
+        "configureMTU": 2,
+        "onConfigureMTU": 2,
+        "requestConnectionPriority": 1,
+        "DeadObjectException": 1
+      },
+      "negative_searches": {
+        "power_ap_callback": {
+          "matches": 0,
+          "pattern": "apStatusChange|ScPwIVIMngrReqState|bt_pre_state|lastAPStatus|wifi_pre_state"
+        },
+        "insufficient_key_text": {
+          "matches": 0,
+          "pattern": "(?i)encryption key size|insufficient.*key|key.*insufficient"
+        },
+        "invalid_handle_text": {
+          "matches": 0,
+          "pattern": "(?i)handle is invalid|invalid handle|GATT_INVALID_HANDLE"
+        },
+        "Natro_ANCS_phase_tag": {
+          "matches": 0,
+          "pattern": "\\s(?:AncsClient|AncsManager|ANCS|NatroAncs)\\s*:"
+        },
+        "descriptor_write_callback": {
+          "matches": 0,
+          "pattern": "onDescriptorWrite|onCharacteristicWrite"
+        }
+      }
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "8b588cdd8f0dac3b12658d17a77aa9c98b529f3b8a8c5a005582b172f58fc5a3",
+      "lines": 10351,
+      "start": "08-15 13:46:20.264",
+      "end": "08-15 13:46:40.331",
+      "typed_event_counts": {},
+      "negative_searches": {
+        "power_ap_callback": {
+          "matches": 0,
+          "pattern": "apStatusChange|ScPwIVIMngrReqState|bt_pre_state|lastAPStatus|wifi_pre_state"
+        },
+        "insufficient_key_text": {
+          "matches": 0,
+          "pattern": "(?i)encryption key size|insufficient.*key|key.*insufficient"
+        },
+        "invalid_handle_text": {
+          "matches": 0,
+          "pattern": "(?i)handle is invalid|invalid handle|GATT_INVALID_HANDLE"
+        },
+        "Natro_ANCS_phase_tag": {
+          "matches": 0,
+          "pattern": "\\s(?:AncsClient|AncsManager|ANCS|NatroAncs)\\s*:"
+        },
+        "descriptor_write_callback": {
+          "matches": 0,
+          "pattern": "onDescriptorWrite|onCharacteristicWrite"
+        }
+      }
+    }
+  ],
+  "hci_sources": [
+    {
+      "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+      "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+      "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+      "member_sha256": "b04d0bae850741d896d97f65cd1d649b12a7e389f15487a8abf76eeeade5d9aa",
+      "version": 1,
+      "datalink": 1002,
+      "records": 54362,
+      "malformed_records": 0,
+      "record_type_counts": {
+        "1": 158,
+        "4": 32054,
+        "2": 22150
+      },
+      "start_UTC": "2026-08-14T13:36:08.762319+00:00",
+      "end_UTC": "2026-08-14T13:47:45.913671+00:00",
+      "events": [
+        {
+          "record": 99,
+          "record_offset": 5902,
+          "timestamp_UTC": "2026-08-14T13:36:13.947922+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 0,
+          "handle": 3
+        },
+        {
+          "record": 170,
+          "record_offset": 8816,
+          "timestamp_UTC": "2026-08-14T13:36:14.424330+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 3
+        },
+        {
+          "record": 250,
+          "record_offset": 11874,
+          "timestamp_UTC": "2026-08-14T13:36:14.909169+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 3
+        },
+        {
+          "record": 282,
+          "record_offset": 13113,
+          "timestamp_UTC": "2026-08-14T13:36:15.231789+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 3
+        },
+        {
+          "record": 53677,
+          "record_offset": 3467157,
+          "timestamp_UTC": "2026-08-14T13:47:33.121907+00:00",
+          "event": "disconnection_complete",
+          "hci_event": 5,
+          "status": 0,
+          "handle": 3,
+          "reason": 8
+        },
+        {
+          "record": 53729,
+          "record_offset": 3470426,
+          "timestamp_UTC": "2026-08-14T13:47:34.072693+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 54100,
+          "record_offset": 3494466,
+          "timestamp_UTC": "2026-08-14T13:47:38.966315+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 54169,
+          "record_offset": 3498772,
+          "timestamp_UTC": "2026-08-14T13:47:40.084316+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 54325,
+          "record_offset": 3508092,
+          "timestamp_UTC": "2026-08-14T13:47:44.916078+00:00",
+          "event": "disconnect_command",
+          "opcode": 1030,
+          "handle": 2,
+          "reason": 19
+        },
+        {
+          "record": 54327,
+          "record_offset": 3508154,
+          "timestamp_UTC": "2026-08-14T13:47:44.947833+00:00",
+          "event": "disconnection_complete",
+          "hci_event": 5,
+          "status": 0,
+          "handle": 2,
+          "reason": 22
+        }
+      ]
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+      "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+      "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+      "member_sha256": "70b34c55c8234ff5e459121b968b50cdac9f3e665a222576f3448e28dbb84a0e",
+      "version": 1,
+      "datalink": 1002,
+      "records": 25037,
+      "malformed_records": 0,
+      "record_type_counts": {
+        "1": 171,
+        "4": 13217,
+        "2": 11649
+      },
+      "start_UTC": "2026-08-14T18:10:04.019698+00:00",
+      "end_UTC": "2026-08-14T18:15:56.688252+00:00",
+      "events": [
+        {
+          "record": 159,
+          "record_offset": 8375,
+          "timestamp_UTC": "2026-08-14T18:10:07.232550+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 0,
+          "handle": 4
+        },
+        {
+          "record": 274,
+          "record_offset": 13584,
+          "timestamp_UTC": "2026-08-14T18:10:07.712628+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 4
+        },
+        {
+          "record": 399,
+          "record_offset": 18585,
+          "timestamp_UTC": "2026-08-14T18:10:08.172886+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 4
+        },
+        {
+          "record": 430,
+          "record_offset": 19895,
+          "timestamp_UTC": "2026-08-14T18:10:08.478482+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 4
+        },
+        {
+          "record": 973,
+          "record_offset": 194849,
+          "timestamp_UTC": "2026-08-14T18:10:16.485927+00:00",
+          "event": "disconnection_complete",
+          "hci_event": 5,
+          "status": 0,
+          "handle": 4,
+          "reason": 40
+        },
+        {
+          "record": 1370,
+          "record_offset": 470741,
+          "timestamp_UTC": "2026-08-14T18:10:16.689206+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 1717,
+          "record_offset": 490590,
+          "timestamp_UTC": "2026-08-14T18:10:46.693926+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 1725,
+          "record_offset": 491039,
+          "timestamp_UTC": "2026-08-14T18:10:46.884475+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 0,
+          "handle": 5
+        },
+        {
+          "record": 1744,
+          "record_offset": 491768,
+          "timestamp_UTC": "2026-08-14T18:10:47.212951+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 5
+        },
+        {
+          "record": 1820,
+          "record_offset": 494945,
+          "timestamp_UTC": "2026-08-14T18:10:47.643683+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 5
+        },
+        {
+          "record": 1829,
+          "record_offset": 495461,
+          "timestamp_UTC": "2026-08-14T18:10:47.841451+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 5
+        },
+        {
+          "record": 5463,
+          "record_offset": 705102,
+          "timestamp_UTC": "2026-08-14T18:11:22.322804+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 7791,
+          "record_offset": 841657,
+          "timestamp_UTC": "2026-08-14T18:11:53.365508+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 10248,
+          "record_offset": 986249,
+          "timestamp_UTC": "2026-08-14T18:12:25.404146+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 12727,
+          "record_offset": 1130624,
+          "timestamp_UTC": "2026-08-14T18:12:59.417308+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 15643,
+          "record_offset": 1301312,
+          "timestamp_UTC": "2026-08-14T18:13:37.432713+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 17655,
+          "record_offset": 1417868,
+          "timestamp_UTC": "2026-08-14T18:14:10.746085+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 19814,
+          "record_offset": 1545623,
+          "timestamp_UTC": "2026-08-14T18:14:41.335404+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 21776,
+          "record_offset": 1660682,
+          "timestamp_UTC": "2026-08-14T18:15:12.307678+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 23942,
+          "record_offset": 1788819,
+          "timestamp_UTC": "2026-08-14T18:15:44.324928+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 24905,
+          "record_offset": 1845103,
+          "timestamp_UTC": "2026-08-14T18:15:55.704650+00:00",
+          "event": "disconnect_command",
+          "opcode": 1030,
+          "handle": 2,
+          "reason": 19
+        },
+        {
+          "record": 24907,
+          "record_offset": 1845165,
+          "timestamp_UTC": "2026-08-14T18:15:55.705535+00:00",
+          "event": "disconnect_command",
+          "opcode": 1030,
+          "handle": 5,
+          "reason": 19
+        },
+        {
+          "record": 24909,
+          "record_offset": 1845227,
+          "timestamp_UTC": "2026-08-14T18:15:55.707325+00:00",
+          "event": "disconnect_command",
+          "opcode": 1030,
+          "handle": 5,
+          "reason": 19
+        },
+        {
+          "record": 24915,
+          "record_offset": 1845496,
+          "timestamp_UTC": "2026-08-14T18:15:55.719196+00:00",
+          "event": "disconnection_complete",
+          "hci_event": 5,
+          "status": 0,
+          "handle": 5,
+          "reason": 22
+        },
+        {
+          "record": 24916,
+          "record_offset": 1845527,
+          "timestamp_UTC": "2026-08-14T18:15:55.721593+00:00",
+          "event": "disconnection_complete",
+          "hci_event": 5,
+          "status": 0,
+          "handle": 2,
+          "reason": 22
+        }
+      ]
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+      "member_sha256": "0316fd1a333585254ed4b2ef729e6b9908c089ce946c9652baab1139ca99991a",
+      "version": 1,
+      "datalink": 1002,
+      "records": 65535,
+      "malformed_records": 0,
+      "record_type_counts": {
+        "1": 243,
+        "4": 22832,
+        "2": 42460
+      },
+      "start_UTC": "2026-08-15T10:24:07.896950+00:00",
+      "end_UTC": "2026-08-15T10:45:03.322279+00:00",
+      "events": [
+        {
+          "record": 918,
+          "record_offset": 320580,
+          "timestamp_UTC": "2026-08-15T10:24:15.486024+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 0,
+          "handle": 3
+        },
+        {
+          "record": 1020,
+          "record_offset": 381952,
+          "timestamp_UTC": "2026-08-15T10:24:15.988573+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 3
+        },
+        {
+          "record": 1103,
+          "record_offset": 395282,
+          "timestamp_UTC": "2026-08-15T10:24:16.415714+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 3
+        },
+        {
+          "record": 1126,
+          "record_offset": 410218,
+          "timestamp_UTC": "2026-08-15T10:24:16.708888+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 3
+        },
+        {
+          "record": 1477,
+          "record_offset": 476333,
+          "timestamp_UTC": "2026-08-15T10:24:24.942507+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 0,
+          "handle": 4
+        },
+        {
+          "record": 1542,
+          "record_offset": 479341,
+          "timestamp_UTC": "2026-08-15T10:24:29.463148+00:00",
+          "event": "disconnect_command",
+          "opcode": 1030,
+          "handle": 4,
+          "reason": 19
+        },
+        {
+          "record": 1643,
+          "record_offset": 484619,
+          "timestamp_UTC": "2026-08-15T10:24:29.507987+00:00",
+          "event": "disconnection_complete",
+          "hci_event": 5,
+          "status": 0,
+          "handle": 4,
+          "reason": 22
+        },
+        {
+          "record": 4516,
+          "record_offset": 1026715,
+          "timestamp_UTC": "2026-08-15T10:25:01.599616+00:00",
+          "event": "disconnection_complete",
+          "hci_event": 5,
+          "status": 0,
+          "handle": 3,
+          "reason": 40
+        },
+        {
+          "record": 4547,
+          "record_offset": 1042694,
+          "timestamp_UTC": "2026-08-15T10:25:06.805330+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 2,
+          "handle": 0
+        },
+        {
+          "record": 4555,
+          "record_offset": 1043114,
+          "timestamp_UTC": "2026-08-15T10:25:09.244563+00:00",
+          "event": "LE_enhanced_connection_complete",
+          "hci_event": 62,
+          "subevent": 10,
+          "status": 0,
+          "handle": 5
+        },
+        {
+          "record": 4576,
+          "record_offset": 1043912,
+          "timestamp_UTC": "2026-08-15T10:25:09.720401+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 5
+        },
+        {
+          "record": 4640,
+          "record_offset": 1046381,
+          "timestamp_UTC": "2026-08-15T10:25:10.126050+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 5
+        },
+        {
+          "record": 4644,
+          "record_offset": 1046527,
+          "timestamp_UTC": "2026-08-15T10:25:10.484633+00:00",
+          "event": "LE_connection_update_complete",
+          "hci_event": 62,
+          "subevent": 3,
+          "status": 0,
+          "handle": 5
+        },
+        {
+          "record": 6407,
+          "record_offset": 1127932,
+          "timestamp_UTC": "2026-08-15T10:25:27.474382+00:00",
+          "event": "vendor_command_complete_first_return_byte",
+          "opcode": 64855,
+          "first_return_byte": 23
+        }
+      ]
+    }
+  ]
+}

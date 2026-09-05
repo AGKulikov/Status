@@ -1,0 +1,455 @@
+{
+  "source_sha256": "b6feed82f777bfa8773c03b78c1f17038e122f492ef85126c095354a29c16756",
+  "algorithm": "target = jump_table_VA + little_endian_signed32(table + 4*(property-base)); base/range verified from converter instructions",
+  "scope": "11 original/adjacent read properties plus five actual parking/ADAS-setting entries. These are VHAL property IDs, not CAN IDs.",
+  "entries": [
+    {
+      "vhal_property": "0x214070f4",
+      "config_name": "AsyALatIndcr",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 244,
+      "entry_signed32": -717500,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x214070f5",
+      "config_name": "AsyALgtIndcr",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 245,
+      "entry_signed32": -717500,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407160",
+      "config_name": "TiGapSetForLgtCtrl",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 352,
+      "entry_signed32": -717500,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407705",
+      "config_name": "SteerWhlBtnPsd",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 1797,
+      "entry_signed32": -717500,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407a7a",
+      "config_name": "AdjSpdLimnSts",
+      "converter_va": "0x19c808",
+      "table_va": "0x2529d8",
+      "table_property_base": "0x21407a3d",
+      "table_index": 61,
+      "entry_signed32": -727584,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407a83",
+      "config_name": "CrsCtrlrSts",
+      "converter_va": "0x19c808",
+      "table_va": "0x2529d8",
+      "table_property_base": "0x21407a3d",
+      "table_index": 70,
+      "entry_signed32": -727584,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407174",
+      "config_name": "AsyALgtStsAsyALgtSts",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 372,
+      "entry_signed32": -717500,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407175",
+      "config_name": "AsyALgtStsChks",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 373,
+      "entry_signed32": -717500,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407176",
+      "config_name": "AsyALgtStsCntr",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 374,
+      "entry_signed32": -717500,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407118",
+      "config_name": "DrvrAsscSysDisp",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 280,
+      "entry_signed32": -717500,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407119",
+      "config_name": "DrvrAsscSysSts",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 281,
+      "entry_signed32": -717500,
+      "target_va": "0x1a0fb8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a0fb8",
+          "mnemonic": "strh",
+          "operands": "wzr, [x19]"
+        },
+        {
+          "va": "0x1a0fbc",
+          "mnemonic": "b",
+          "operands": "#0x1a3520"
+        },
+        {
+          "va": "0x1a0fc0",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        }
+      ],
+      "classification": "invalid_no_outbound"
+    },
+    {
+      "vhal_property": "0x21407008",
+      "config_name": "DrvrAsscSysBtnPush",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 8,
+      "entry_signed32": -711100,
+      "target_va": "0x1a28b8",
+      "first_three_instructions": [
+        {
+          "va": "0x1a28b8",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        },
+        {
+          "va": "0x1a28bc",
+          "mnemonic": "movk",
+          "operands": "w8, #9, lsl #16"
+        },
+        {
+          "va": "0x1a28c0",
+          "mnemonic": "b",
+          "operands": "#0x1a34d4"
+        }
+      ],
+      "classification": "non_cruise_setting_or_parking_command"
+    },
+    {
+      "vhal_property": "0x21407009",
+      "config_name": "DrvrAsscSysParkMod",
+      "converter_va": "0x19c808",
+      "table_va": "0x250274",
+      "table_property_base": "0x21407000",
+      "table_index": 9,
+      "entry_signed32": -709024,
+      "target_va": "0x1a30d4",
+      "first_three_instructions": [
+        {
+          "va": "0x1a30d4",
+          "mnemonic": "mov",
+          "operands": "w8, #0x1f"
+        },
+        {
+          "va": "0x1a30d8",
+          "mnemonic": "movk",
+          "operands": "w8, #0xa, lsl #16"
+        },
+        {
+          "va": "0x1a30dc",
+          "mnemonic": "b",
+          "operands": "#0x1a34d4"
+        }
+      ],
+      "classification": "non_cruise_setting_or_parking_command"
+    },
+    {
+      "vhal_property": "0x214080d2",
+      "config_name": "CB_SAP_DrvrAsscSysBtnPush",
+      "converter_va": "0x199f5c",
+      "table_va": "0x24f4d8",
+      "table_property_base": "0x21408000",
+      "table_index": 210,
+      "entry_signed32": -734144,
+      "target_va": "0x19c118",
+      "first_three_instructions": [
+        {
+          "va": "0x19c118",
+          "mnemonic": "mov",
+          "operands": "w8, #0x7b"
+        },
+        {
+          "va": "0x19c11c",
+          "mnemonic": "movk",
+          "operands": "w8, #1, lsl #16"
+        },
+        {
+          "va": "0x19c120",
+          "mnemonic": "b",
+          "operands": "#0x19c6e4"
+        }
+      ],
+      "classification": "non_cruise_setting_or_parking_command"
+    },
+    {
+      "vhal_property": "0x21408000",
+      "config_name": "CB_ASY_ACC_and_TSR",
+      "converter_va": "0x199f5c",
+      "table_va": "0x24f4d8",
+      "table_property_base": "0x21408000",
+      "table_index": 0,
+      "entry_signed32": -732824,
+      "target_va": "0x19c640",
+      "first_three_instructions": [
+        {
+          "va": "0x19c640",
+          "mnemonic": "mov",
+          "operands": "w8, #0x6f"
+        },
+        {
+          "va": "0x19c644",
+          "mnemonic": "movk",
+          "operands": "w8, #1, lsl #16"
+        },
+        {
+          "va": "0x19c648",
+          "mnemonic": "b",
+          "operands": "#0x19c6e4"
+        }
+      ],
+      "classification": "non_cruise_setting_or_parking_command"
+    },
+    {
+      "vhal_property": "0x21408001",
+      "config_name": "CB_ASY_HWA",
+      "converter_va": "0x199f5c",
+      "table_va": "0x24f4d8",
+      "table_property_base": "0x21408000",
+      "table_index": 1,
+      "entry_signed32": -736896,
+      "target_va": "0x19b658",
+      "first_three_instructions": [
+        {
+          "va": "0x19b658",
+          "mnemonic": "mov",
+          "operands": "w8, #0x6f"
+        },
+        {
+          "va": "0x19b65c",
+          "mnemonic": "movk",
+          "operands": "w8, #3, lsl #16"
+        },
+        {
+          "va": "0x19b660",
+          "mnemonic": "b",
+          "operands": "#0x19c6e4"
+        }
+      ],
+      "classification": "non_cruise_setting_or_parking_command"
+    }
+  ]
+}

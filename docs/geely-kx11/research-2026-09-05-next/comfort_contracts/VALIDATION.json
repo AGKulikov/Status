@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "offline_only": true,
+  "vehicle_binary_execution": false,
+  "commands_sent_to_vehicle": false,
+  "apk_built": false,
+  "proprietary_source_bodies_in_public_outputs": false,
+  "card_count": 25,
+  "unique_card_ids": 25,
+  "evidence_count": 16,
+  "unresolved_evidence_selections": [],
+  "runtime_observation_count": 1701,
+  "runtime_unique_function_ids": 123,
+  "lo_hi_runtime_sources": 5,
+  "celsius_symbolic_validator_grid": [
+    {
+      "input": "15.0",
+      "sdk_range_validator": false,
+      "index_if_converted": 0,
+      "decoded_index_celsius": 15.0,
+      "grid_aligned": true
+    },
+    {
+      "input": "15.5",
+      "sdk_range_validator": true,
+      "index_if_converted": 1,
+      "decoded_index_celsius": 15.5,
+      "grid_aligned": true
+    },
+    {
+      "input": "16.0",
+      "sdk_range_validator": true,
+      "index_if_converted": 2,
+      "decoded_index_celsius": 16.0,
+      "grid_aligned": true
+    },
+    {
+      "input": "16.2",
+      "sdk_range_validator": true,
+      "index_if_converted": 2,
+      "decoded_index_celsius": 16.0,
+      "grid_aligned": false
+    },
+    {
+      "input": "28.0",
+      "sdk_range_validator": true,
+      "index_if_converted": 26,
+      "decoded_index_celsius": 28.0,
+      "grid_aligned": true
+    },
+    {
+      "input": "28.5",
+      "sdk_range_validator": true,
+      "index_if_converted": 27,
+      "decoded_index_celsius": 28.5,
+      "grid_aligned": true
+    },
+    {
+      "input": "29.0",
+      "sdk_range_validator": false,
+      "index_if_converted": 28,
+      "decoded_index_celsius": 29.0,
+      "grid_aligned": true
+    },
+    {
+      "input": "30.0",
+      "sdk_range_validator": false,
+      "index_if_converted": 30,
+      "decoded_index_celsius": 30.0,
+      "grid_aligned": true
+    },
+    {
+      "input": "nan",
+      "sdk_range_validator": true,
+      "index_if_converted": 0,
+      "decoded_index_celsius": 15.0,
+      "grid_aligned": false
+    },
+    {
+      "input": "inf",
+      "sdk_range_validator": false,
+      "index_if_converted": null,
+      "decoded_index_celsius": null,
+      "grid_aligned": false
+    },
+    {
+      "input": "-inf",
+      "sdk_range_validator": false,
+      "index_if_converted": null,
+      "decoded_index_celsius": null,
+      "grid_aligned": false
+    }
+  ],
+  "physical_validation": "not performed; no function declared physically verified",
+  "full_vehicle_reverse_engineering_complete": false,
+  "inherited_base_ui_read": true,
+  "typed_seat_event_route_read_to_native_boundary": true,
+  "exact_native_library_path_established": false,
+  "physical_stop_verified": false,
+  "public_method_bodies_excluded": true,
+  "evidence_references_resolved": true,
+  "verified_archive_count": 12,
+  "verified_member_or_file_count": 23,
+  "verified_dex_count": 14,
+  "verified_method_source_records": 334,
+  "verified_exact_runtime_lines": 28,
+  "code_offset_convention": "code_item header; instruction address = code_offset + 16 + instruction_offset",
+  "incomplete_download_sources_used": false,
+  "source_member_and_dex_hash_checks": "passed",
+  "lifecycle_evidence_reference": "lifecycle/evidence.json",
+  "lifecycle_method_count": 143,
+  "validation_errors": [],
+  "artifact_sha256": {
+    "report.md": "bf16c0e3cc1c64dcc6eae005d55dd3ef50a556b5659c0a22e6ae2a3143b26f44",
+    "contracts.json": "43bb6efef2b629a9802838bd25ae425428d878715e470cb45d427f17a82708bf",
+    "evidence.json": "d3b8271c4da4b22cd357e136bf3ecb06a5bdf36255cf9cf12bfb9bab66a9db4c",
+    "source_inventory.json": "f350d3fdf3432908c272d1204828b9aab551003f7cc80554c9e6b7e4017098d5",
+    "collection_targets.json": "694d88df0de6fa33af7f71fabf6bce25fb41d5db9da78b0da78880ff2f315813",
+    "lifecycle/report.md": "17ae210857381dfac0b239d7772a27c870c0d77dd61388415809fc6421bd92b9",
+    "lifecycle/evidence.json": "a3610f68f49e3d830a9e143102845b7c61d73356cf508e4536dd5c10cd798570",
+    "lifecycle/collection_targets.json": "f31b2f95d06d954178260be13e2e6bcdfdda87af445867eb44223f5047c1d260"
+  },
+  "lifecycle_and_native_method_hash_records_checked": 146,
+  "lifecycle_and_native_private_hash_errors": [],
+  "public_opcode_body_check": "passed; all 9 allowlisted outputs reviewed; JSON forbidden body keys absent",
+  "finalization_status": "complete_offline_analysis; KX11 physical acceptance open"
+}

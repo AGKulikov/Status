@@ -1,0 +1,3349 @@
+{
+  "schema": "comfort-lifecycle-evidence-v2-metadata-only",
+  "date": "2026-09-05",
+  "evidence_level": "STATIC / IMPLEMENTED, no vehicle execution",
+  "archive_member_count": 181,
+  "sources": [
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "size": 1135817
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "size": 594600
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.gkui.openapi.impl.jar",
+      "sha256": "389884082b3e313b81efffae3802afd97876bef6318f6d5299ddf8d9e588894b",
+      "size": 384026
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ts-carplay-adapter.jar",
+      "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+      "size": 1256310
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/com.ecarx.dimmenu/base.apk",
+      "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+      "size": 7864621
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "size": 2339956
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "size": 305412090
+    }
+  ],
+  "methods": [
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/comfort/KXAdjustSeatFrag$1;",
+      "method": "onFunctionValueChanged",
+      "descriptor": "(I I I)V",
+      "code_offset": 5240088,
+      "code_offset_hex": "0x4ff518",
+      "instruction_count": 8,
+      "normalized_instructions_sha256": "bf05aabf96a8bbab1ea8a8b7fcd9b8440c98a691921fc2e8b8dc75fad9d1c1ad",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/comfort/KXAdjustSeatFrag$1;",
+      "method": "onSupportedFunctionStatusChanged",
+      "descriptor": "(I I Lcom/ecarx/xui/adaptapi/FunctionStatus;)V",
+      "code_offset": 5240140,
+      "code_offset_hex": "0x4ff54c",
+      "instruction_count": 46,
+      "normalized_instructions_sha256": "df7e78301ae60e22cf0f40c188988089ad34941611e7638112e9c98cdf8f6a14",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/comfort/KXAdjustSeatFrag;",
+      "method": "handleClickEvent",
+      "descriptor": "(I Z Z Z)V",
+      "code_offset": 5241076,
+      "code_offset_hex": "0x4ff8f4",
+      "instruction_count": 40,
+      "normalized_instructions_sha256": "5abd7234b845f1d54fdc57befb7389460fb2e4e97e47e58224b3d4557d371fff",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/comfort/KXAdjustSeatFrag;",
+      "method": "intiProxy",
+      "descriptor": "()V",
+      "code_offset": 5241940,
+      "code_offset_hex": "0x4ffc54",
+      "instruction_count": 33,
+      "normalized_instructions_sha256": "e87e7dc701e20709dfc0d3ebd7685a528f3a778be9b880b268d735c7a993ff3b",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/comfort/KXAdjustSeatFrag;",
+      "method": "onDestroyView",
+      "descriptor": "()V",
+      "code_offset": 5242576,
+      "code_offset_hex": "0x4ffed0",
+      "instruction_count": 10,
+      "normalized_instructions_sha256": "117e92fd5d47e2cc73ef98edc813f7ff434fa2ca0ef3d367f247dc53f1ee3e68",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/comfort/KXAdjustSeatFrag;",
+      "method": "onPause",
+      "descriptor": "()V",
+      "code_offset": 5242632,
+      "code_offset_hex": "0x4fff08",
+      "instruction_count": 17,
+      "normalized_instructions_sha256": "f8b7b3f06fc2da8b2b19011a9ad1a7c73e7ea8d69b35a2bebcc04edb65cf61b0",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/comfort/KXAdjustSeatFrag;",
+      "method": "onSeatClick",
+      "descriptor": "(Landroid/view/View; Z)V",
+      "code_offset": 5242816,
+      "code_offset_hex": "0x4fffc0",
+      "instruction_count": 135,
+      "normalized_instructions_sha256": "d96a40c65275dfc6b55c6d984a9538ba1f087b2936ea08782976891902085561",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/comfort/KXAdjustSeatFrag;",
+      "method": "onTouch",
+      "descriptor": "(Landroid/view/View; Landroid/view/MotionEvent;)Z",
+      "code_offset": 5240400,
+      "code_offset_hex": "0x4ff650",
+      "instruction_count": 120,
+      "normalized_instructions_sha256": "887e1dd1c077958f34246c6c8cd14f6515928da07a874663a0d2d3add5aebca4",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.settings/base.apk",
+      "size": 305412090,
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entries": [
+        "classes.dex",
+        "classes2.dex",
+        "classes3.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/KXFunctionFragment;",
+      "method": "handleNavigate",
+      "descriptor": "(I Lecarx/settings/entity/FunctionScheme;)V",
+      "code_offset": 5209700,
+      "code_offset_hex": "0x4f7e64",
+      "instruction_count": 350,
+      "normalized_instructions_sha256": "39c9a98cc83f10ae11613835dde43fad8b83af3f5d0aaf62757f37a0e5b84443"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarProfileManager;",
+      "method": "CB_PSET_ConnectKey",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 974400,
+      "code_offset_hex": "0xede40",
+      "instruction_count": 6,
+      "normalized_instructions_sha256": "faed24ab161915873416441c0d3cb2e9b18fee1356a228b1a2f3ecb3ebb99b6e"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarProfileManager;",
+      "method": "CB_PSET_NewProfile",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 974640,
+      "code_offset_hex": "0xedf30",
+      "instruction_count": 6,
+      "normalized_instructions_sha256": "0b9397e9d77697b47d8e6d047b093505458ab9398d7f274bafaa5eda28fa6167"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarProfileManager;",
+      "method": "CB_PSET_ProfileCloudData",
+      "descriptor": "(Lvendor/ecarx/xma/pa/nano/VendorVehicleHalPAProto$Profileclouddata;)V",
+      "code_offset": 978068,
+      "code_offset_hex": "0xeec94",
+      "instruction_count": 7,
+      "normalized_instructions_sha256": "69fddc0e3bd0aee0b312e0a23e3d331aeed86796e18f4c85f0b7bb834fdd7b59"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+      "method": "CB_BackRestAdjmtRowFirstDrvr",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 984112,
+      "code_offset_hex": "0xf0430",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "aa647544bf641e3e37b027cd78679bc7f3fcd76ecf66a08468bbeffa1cb4f857"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+      "method": "CB_BackRestAdjmtRowFirstPass",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 984172,
+      "code_offset_hex": "0xf046c",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "f036ea70d5879834736cadf4a14c447e014a647d0c449e317cd91e5789e6bc1a"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+      "method": "CB_SeatCushTiltAdjmtRowFirstDrvr",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 985692,
+      "code_offset_hex": "0xf0a5c",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "0650562db5170825bb2b7abbe00910353f514c07161fd6333c13fc4f0d40e76b"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+      "method": "CB_SeatCushTiltAdjmtRowFirstPass",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 985752,
+      "code_offset_hex": "0xf0a98",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "4c1a5605ea3da97ddddf0eb048774d56204dbe5bca5282250262bc2697a32f57"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+      "method": "CB_SeatHeiAdjmtRowFirstDrvr",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 985932,
+      "code_offset_hex": "0xf0b4c",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "f2efb0581000216e209d915b2b75c926de03b6042835473997061a2b63c02ad4"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+      "method": "CB_SeatHeiAdjmtRowFirstPass",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 985992,
+      "code_offset_hex": "0xf0b88",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "609931d08339ad3fb0117456d7caa93ec60e21c6150a073765d9550eec1ed862"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+      "method": "CB_SeatLenAdjmtRowFirstDrvr",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 986052,
+      "code_offset_hex": "0xf0bc4",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "04b03e85af969f8dc2493d360cbdb60e1abbae7532e6de9b726435c71b2368be"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+      "method": "CB_SeatLenAdjmtRowFirstPass",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 986112,
+      "code_offset_hex": "0xf0c00",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "676bd397714a3c5bbb5cb9474902ca43001bd5d1620cb98246a47eb007c252a5"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/CarImpl;",
+      "method": "getCarKeyManager",
+      "descriptor": "()Lcom/ecarx/xui/adaptapi/car/userprofile/ICarKey;",
+      "code_offset": 901668,
+      "code_offset_hex": "0xdc224",
+      "instruction_count": 26,
+      "normalized_instructions_sha256": "369a0e30f376933021331f11c6026c92f7bce0bdfc72ba3e3e0a81500adea631"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/CarImpl;",
+      "method": "getUserProfileManager",
+      "descriptor": "()Lcom/ecarx/xui/adaptapi/car/userprofile/IUserProfile;",
+      "code_offset": 901792,
+      "code_offset_hex": "0xdc2a0",
+      "instruction_count": 26,
+      "normalized_instructions_sha256": "c1c74724acba50e8c6a966d6789458a7a28103fbee53b783dacc8bc1271ff36a"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/CarImpl;",
+      "method": "onECarXCarServiceDeath",
+      "descriptor": "()V",
+      "code_offset": 902200,
+      "code_offset_hex": "0xdc438",
+      "instruction_count": 35,
+      "normalized_instructions_sha256": "3f314d4a4da9c864c36a24e7315ee94953532b6b3813eee41071a0936b2cd63f"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey$1;",
+      "method": "onPA_PSET_Key_Result",
+      "descriptor": "(Lecarx/car/hardware/vehicle/PATypes$PA_PSET_Key_Result;)V",
+      "code_offset": 1027020,
+      "code_offset_hex": "0xfabcc",
+      "instruction_count": 44,
+      "normalized_instructions_sha256": "098f12bfb35bbc0d83e2cde632d91965294180086df4e93b118f3ca9c7ca4ba3"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "cancelDiscovery",
+      "descriptor": "()V",
+      "code_offset": 1027484,
+      "code_offset_hex": "0xfad9c",
+      "instruction_count": 1,
+      "normalized_instructions_sha256": "0a341aa22fa2fc4cedaa5561c5a0ab346ed50b0f80ca11ecff4333b84291a591"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "createDigitalKey",
+      "descriptor": "(I)Z",
+      "code_offset": 1027204,
+      "code_offset_hex": "0xfac84",
+      "instruction_count": 2,
+      "normalized_instructions_sha256": "3a3f51d3c887516cec731ee02c3a134cdd2aa09c87ca29932919be3160290136"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "delAllDigitalKey",
+      "descriptor": "()Z",
+      "code_offset": 1027224,
+      "code_offset_hex": "0xfac98",
+      "instruction_count": 2,
+      "normalized_instructions_sha256": "3a3f51d3c887516cec731ee02c3a134cdd2aa09c87ca29932919be3160290136"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "delDigitalKeyItem",
+      "descriptor": "(I)Z",
+      "code_offset": 1027244,
+      "code_offset_hex": "0xfacac",
+      "instruction_count": 2,
+      "normalized_instructions_sha256": "3a3f51d3c887516cec731ee02c3a134cdd2aa09c87ca29932919be3160290136"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "getDigitalKeys",
+      "descriptor": "()[Lcom/ecarx/xui/adaptapi/car/userprofile/DigitalKeyInfo;",
+      "code_offset": 1027384,
+      "code_offset_hex": "0xfad38",
+      "instruction_count": 3,
+      "normalized_instructions_sha256": "572d8ee3a6cf8366789a98cee6ce3c96397a6d790cbd7b181991c1acb3027745"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "initPAFilter",
+      "descriptor": "()V",
+      "code_offset": 1027504,
+      "code_offset_hex": "0xfadb0",
+      "instruction_count": 5,
+      "normalized_instructions_sha256": "cde4f0e8545d83a42ef9140ca1046a3b19a76bd5429ffa91163f494e88f13048"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "onInitCarSignalManager",
+      "descriptor": "()V",
+      "code_offset": 1027544,
+      "code_offset_hex": "0xfadd8",
+      "instruction_count": 13,
+      "normalized_instructions_sha256": "ebb6447f8d422edd6f81578af7675917eaf13884a4d53181254ba7e67cf9901d"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "readRealKey",
+      "descriptor": "()V",
+      "code_offset": 1027628,
+      "code_offset_hex": "0xfae2c",
+      "instruction_count": 7,
+      "normalized_instructions_sha256": "cb241f3ffd78bb479169dbe342d85453b0aabff300eae8f90c1e28af7ef14650"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "registerDigitalKeyCallback",
+      "descriptor": "(Lcom/ecarx/xui/adaptapi/car/userprofile/ICarKey$IDigitalKeyCallback;)Z",
+      "code_offset": 1027312,
+      "code_offset_hex": "0xfacf0",
+      "instruction_count": 2,
+      "normalized_instructions_sha256": "3a3f51d3c887516cec731ee02c3a134cdd2aa09c87ca29932919be3160290136"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "startDiscovery",
+      "descriptor": "()V",
+      "code_offset": 1027684,
+      "code_offset_hex": "0xfae64",
+      "instruction_count": 4,
+      "normalized_instructions_sha256": "4f67bce997d5b8077540a8737fc2a664fa9fa5410abae8081e5de42e9f68aa4f"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "unbindCarKey",
+      "descriptor": "(I)V",
+      "code_offset": 1027716,
+      "code_offset_hex": "0xfae84",
+      "instruction_count": 7,
+      "normalized_instructions_sha256": "ba0fd038b0831e1a93ea1d53ee8dba9672305d2a1cd8e599b89be50f57533e1c"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "unregisterDigitalKeyCallback",
+      "descriptor": "(Lcom/ecarx/xui/adaptapi/car/userprofile/ICarKey$IDigitalKeyCallback;)Z",
+      "code_offset": 1027364,
+      "code_offset_hex": "0xfad24",
+      "instruction_count": 2,
+      "normalized_instructions_sha256": "3a3f51d3c887516cec731ee02c3a134cdd2aa09c87ca29932919be3160290136"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "lambda$buildFilterChains$4",
+      "descriptor": "(Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile; Lecarx/car/hardware/vehicle/PATypes$PA_PSET_NewProfile;)V",
+      "code_offset": 1036476,
+      "code_offset_hex": "0xfd0bc",
+      "instruction_count": 14,
+      "normalized_instructions_sha256": "cbed1f8cf8dae8560fa235e405ff1e81f75bc71b8d0e882472bd2328a9386482"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "lambda$buildFilterChains$8",
+      "descriptor": "(Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile; Lecarx/car/hardware/vehicle/PATypes$PA_PSET_ProfileDownloadStatus;)V",
+      "code_offset": 1036876,
+      "code_offset_hex": "0xfd24c",
+      "instruction_count": 15,
+      "normalized_instructions_sha256": "7782fbd1cf924bbbe099ede11bc7082ffd4feddeb1b9d4a521fdfdedec859688"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "notAllow",
+      "descriptor": "()Z",
+      "code_offset": 1032036,
+      "code_offset_hex": "0xfbf64",
+      "instruction_count": 17,
+      "normalized_instructions_sha256": "66d0d47afdb528992008a9b10e2e652b8b3053e6f02200c4ea380b0867454c27"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "onUserProfileAddStatus",
+      "descriptor": "(I I)V",
+      "code_offset": 1037164,
+      "code_offset_hex": "0xfd36c",
+      "instruction_count": 17,
+      "normalized_instructions_sha256": "c541f246c5a74a60e36bd9bf5100a7a2d9358af1d91e54f0a1eb0dcf018dff82"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "addUserProfile",
+      "descriptor": "()I",
+      "code_offset": 1033876,
+      "code_offset_hex": "0xfc694",
+      "instruction_count": 20,
+      "normalized_instructions_sha256": "f56345fda7e854117ae1c09151e1df7a269db700cd87f7cb23fb997f4570883b"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "addUserProfileCopyFrom",
+      "descriptor": "(I)I",
+      "code_offset": 1033968,
+      "code_offset_hex": "0xfc6f0",
+      "instruction_count": 25,
+      "normalized_instructions_sha256": "0a64fd1ceb0a3353430fef6372ef8864d7e364b8de08e407d0ac537615d70ad4"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "applyUserProfileData",
+      "descriptor": "(I Lcom/ecarx/xui/adaptapi/car/userprofile/IProfile;)Z",
+      "code_offset": 1030644,
+      "code_offset_hex": "0xfb9f4",
+      "instruction_count": 75,
+      "normalized_instructions_sha256": "338b75fc977c2bbbcedbf6bdb0970f7571688a50b125bb3cdcb543db297d43cf"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "buildFilterChains",
+      "descriptor": "()V",
+      "code_offset": 1035384,
+      "code_offset_hex": "0xfcc78",
+      "instruction_count": 85,
+      "normalized_instructions_sha256": "d79884a3c7898f0ed06811bb0a7dfede15c38c62ccac22d37fd9b7c66b4cc80f"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "getCurrentId",
+      "descriptor": "()I",
+      "code_offset": 1034088,
+      "code_offset_hex": "0xfc768",
+      "instruction_count": 10,
+      "normalized_instructions_sha256": "3f5e1ab6fb151f20515f8f15dd581c941caa1e7a7994fe6061dd7e7be1cb7037"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;",
+      "method": "switchUserProfile",
+      "descriptor": "(I I)Z",
+      "code_offset": 1032692,
+      "code_offset_hex": "0xfc1f4",
+      "instruction_count": 34,
+      "normalized_instructions_sha256": "96e57805e5100ab245c0db044348c3601a62f3af4fc18fc58cd83f9b87b4bf1e"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/vehicle/Seat;",
+      "method": "buildFunctions",
+      "descriptor": "()V",
+      "code_offset": 1121836,
+      "code_offset_hex": "0x111e2c",
+      "instruction_count": 1230,
+      "normalized_instructions_sha256": "b172466d59da7138caaa68669980c03b601448f48affdf0723de590bb4a50047"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "size": 2339956,
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "class": "Lecarx/adaptapi/platform/ProfileFragment;",
+      "method": "lambda$createListViewDialog$28",
+      "descriptor": "(Lecarx/adaptapi/platform/ProfileFragment; Ljava/util/List; Landroid/content/DialogInterface; I)V",
+      "code_offset": 2570064,
+      "code_offset_hex": "0x273750",
+      "instruction_count": 11,
+      "normalized_instructions_sha256": "eb90fcb17d983fa46b42cb751ae946e3eec9176863a8516ea971a480a96f5919"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "size": 2339956,
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "class": "Lecarx/adaptapi/platform/ProfileFragment;",
+      "method": "lambda$onViewCreated$1",
+      "descriptor": "(Lecarx/adaptapi/platform/ProfileFragment; Landroid/view/View;)V",
+      "code_offset": 2570268,
+      "code_offset_hex": "0x27381c",
+      "instruction_count": 6,
+      "normalized_instructions_sha256": "52f95169cc58d24682f24df2b92d58f460738b679c4c8ee5eabe75f479f5ef4d"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "size": 2339956,
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "class": "Lecarx/adaptapi/platform/ProfileFragment;",
+      "method": "lambda$onViewCreated$15",
+      "descriptor": "(Lecarx/adaptapi/platform/ProfileFragment; Ljava/lang/String;)V",
+      "code_offset": 2571292,
+      "code_offset_hex": "0x273c1c",
+      "instruction_count": 16,
+      "normalized_instructions_sha256": "2337a2a80bdda0ccde4916b24853c680217e82c06949adc8b213fdc1df7b84cd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "size": 2339956,
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "class": "Lecarx/adaptapi/platform/ProfileFragment;",
+      "method": "onCreate",
+      "descriptor": "(Landroid/os/Bundle;)V",
+      "code_offset": 2572480,
+      "code_offset_hex": "0x2740c0",
+      "instruction_count": 9,
+      "normalized_instructions_sha256": "db2ceee743fd5d3afb1bcc5cd1903113649c9ad956ee470142447a2bfd568890"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "size": 2339956,
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "class": "Lecarx/adaptapi/platform/ProfileFragment;",
+      "method": "onDestroyView",
+      "descriptor": "()V",
+      "code_offset": 2572556,
+      "code_offset_hex": "0x27410c",
+      "instruction_count": 4,
+      "normalized_instructions_sha256": "f09d86430b5f0cded3578b0763c8dd500158a036f66715476c0e61846980d833"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "size": 2339956,
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "class": "Lecarx/adaptapi/platform/ProfileFragment;",
+      "method": "onUserProfileActionStatus",
+      "descriptor": "(I I I)V",
+      "code_offset": 2572676,
+      "code_offset_hex": "0x274184",
+      "instruction_count": 67,
+      "normalized_instructions_sha256": "a3376221ab75ced9bf133ebb311fee401a9f9cb131e206d70abb6decd1d13acd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "size": 2339956,
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "class": "Lecarx/adaptapi/platform/ProfileFragment;",
+      "method": "onUserProfileAdded",
+      "descriptor": "(I)V",
+      "code_offset": 2572940,
+      "code_offset_hex": "0x27428c",
+      "instruction_count": 15,
+      "normalized_instructions_sha256": "933cb3c85586aeab074ede1dae8ab943762e5a57e9e038c99acb254b00b7636e"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "size": 2339956,
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "class": "Lecarx/adaptapi/platform/ProfileFragment;",
+      "method": "onViewCreated",
+      "descriptor": "(Landroid/view/View; Landroid/os/Bundle;)V",
+      "code_offset": 2573028,
+      "code_offset_hex": "0x2742e4",
+      "instruction_count": 88,
+      "normalized_instructions_sha256": "76ecc94ca2c46b3c8b71b091c5f489656c2d7b5da2aaebf808cb2858daadc2ec"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.settings/base.apk",
+      "size": 305412090,
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entries": [
+        "classes.dex",
+        "classes2.dex",
+        "classes3.dex"
+      ],
+      "dex_counts": [
+        {
+          "dex": "classes.dex",
+          "classes": 7637,
+          "matched_methods": 4063,
+          "sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+        }
+      ],
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/helper/DialogHelper;",
+      "method": "resetUserInfo",
+      "descriptor": "()V",
+      "code_offset": 3951520,
+      "code_offset_hex": "0x3c4ba0",
+      "instruction_count": 25,
+      "normalized_instructions_sha256": "eaea1c533f78dbfc398289e46ad343b2741aa6d27b59d43a36d86033a0c65e4b"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$3;",
+      "method": "onProgressChanged",
+      "descriptor": "(Landroid/widget/SeekBar; I Z)V",
+      "code_offset": 4217776,
+      "code_offset_hex": "0x405bb0",
+      "instruction_count": 1,
+      "normalized_instructions_sha256": "0a341aa22fa2fc4cedaa5561c5a0ab346ed50b0f80ca11ecff4333b84291a591",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$3;",
+      "method": "onStartTrackingTouch",
+      "descriptor": "(Landroid/widget/SeekBar;)V",
+      "code_offset": 4217796,
+      "code_offset_hex": "0x405bc4",
+      "instruction_count": 18,
+      "normalized_instructions_sha256": "920932dd475fc35c31d37bc0d167236f9c3c4c7696d102c6167d86e5c5e92ba5",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$3;",
+      "method": "onStopTrackingTouch",
+      "descriptor": "(Landroid/widget/SeekBar;)V",
+      "code_offset": 4217884,
+      "code_offset_hex": "0x405c1c",
+      "instruction_count": 9,
+      "normalized_instructions_sha256": "dad0d94a6825fd545d886193df54ec760da5a2eca65908df173c9dcbde4e3ec1",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lcom/settings/kanzi/KanziManager;",
+      "method": "sendMessageSunroofControl",
+      "descriptor": "(Lcom/ecarx/kanziproto/vehiclesetting/VehicleBaseSettings$SunroofControl$SunroofControlStatus; Z Z)V",
+      "code_offset": 2547384,
+      "code_offset_hex": "0x26deb8",
+      "instruction_count": 40,
+      "normalized_instructions_sha256": "7ba01f6a8cf556d414429554f1b32485e44d0d4eec68e0a656db1021787914bc",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lcom/settings/kanzi/KanziManager;",
+      "method": "sendMessageSunroofControl",
+      "descriptor": "(Lcom/ecarx/kanziproto/vehiclesetting/VehicleBaseSettings$SunroofControl$SunroofControlStatus; Z Z F F)V",
+      "code_offset": 2547580,
+      "code_offset_hex": "0x26df7c",
+      "instruction_count": 69,
+      "normalized_instructions_sha256": "b9d4c84eaab8239e349ada6b34c77ed9c171942f7c7122c1c6f5fb5ad70ec604",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarProxy;",
+      "method": "getCarKeyManager",
+      "descriptor": "()Lcom/ecarx/xui/adaptapi/car/userprofile/ICarKey;",
+      "code_offset": 4029032,
+      "code_offset_hex": "0x3d7a68",
+      "instruction_count": 7,
+      "normalized_instructions_sha256": "49244be59f14c28d50a78e35373721138ceb9dfcc23ef2fc7ed96be57c87072a",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "getSeatIndex",
+      "descriptor": "(Z)I",
+      "code_offset": 4019680,
+      "code_offset_hex": "0x3d55e0",
+      "instruction_count": 25,
+      "normalized_instructions_sha256": "064a93022504c78abaee028cd4ef6625420745c40c89fa5ed437dfb919fb1ffe",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "seatBackrestAdjust",
+      "descriptor": "(Z Z Z)V",
+      "code_offset": 4022412,
+      "code_offset_hex": "0x3d608c",
+      "instruction_count": 36,
+      "normalized_instructions_sha256": "59922677b05289007271683569d66302bd40083f8f70c8a72aebae7522f3f949",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "seatCushionTiltAdjust",
+      "descriptor": "(Z Z Z)V",
+      "code_offset": 4022588,
+      "code_offset_hex": "0x3d613c",
+      "instruction_count": 36,
+      "normalized_instructions_sha256": "5a793a55a14fcf922c8e14568d23a99e6d96e7d34187ebc9b59f5effeb2bf50e",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "seatHeightAdjust",
+      "descriptor": "(Z Z Z)V",
+      "code_offset": 4022764,
+      "code_offset_hex": "0x3d61ec",
+      "instruction_count": 36,
+      "normalized_instructions_sha256": "b2fb52216d10d54e6852f72b26d82b9ddfd16cfcda19fe6b57e9224e54b0e2b7",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "seatLengthAdjust",
+      "descriptor": "(Z Z Z)V",
+      "code_offset": 4022940,
+      "code_offset_hex": "0x3d629c",
+      "instruction_count": 36,
+      "normalized_instructions_sha256": "31f65fd64fbca91692780c1499b18e81f70d788c1dddcdfb3d516b8ff7c9ed77",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag;",
+      "method": "setFwValueShort",
+      "descriptor": "(I I)V",
+      "code_offset": 4225452,
+      "code_offset_hex": "0x4079ac",
+      "instruction_count": 37,
+      "normalized_instructions_sha256": "b0978dc0e245a8cdc0d5632e92c476fc8aec840c485121986e68122e213079b9",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag;",
+      "method": "transFormProgress",
+      "descriptor": "(I)I",
+      "code_offset": 4224100,
+      "code_offset_hex": "0x407464",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "0727ea19e0988166fa50977ec47db9a4659796a7b5a0c83446ec64c64b0373b2",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag;",
+      "method": "onDestroyView",
+      "descriptor": "()V",
+      "code_offset": 4225212,
+      "code_offset_hex": "0x4078bc",
+      "instruction_count": 9,
+      "normalized_instructions_sha256": "80082f9897bdd6e75f5634f5eb093469a9ac2869714b6dfd8027984fcf46e1db",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag;",
+      "method": "onPause",
+      "descriptor": "()V",
+      "code_offset": 4225268,
+      "code_offset_hex": "0x4078f4",
+      "instruction_count": 17,
+      "normalized_instructions_sha256": "cd87abbd17bee8b77bc4d0d8552997377465bf9955add4941c7b382dfd399f16",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.gkui.openapi.impl.jar",
+      "size": 384026,
+      "sha256": "389884082b3e313b81efffae3802afd97876bef6318f6d5299ddf8d9e588894b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "0d7c79d1f27e69e083688a29c4bcf1e1decb54b69110b55499501e55a03c2c88",
+      "class": "Lcom/ecarx/sdk/vehicle/VehicleAPIImpl;",
+      "method": "getCarKeyStatus",
+      "descriptor": "()I",
+      "code_offset": 528712,
+      "code_offset_hex": "0x81148",
+      "instruction_count": 16,
+      "normalized_instructions_sha256": "5d0aa7b2316fa4203675122dfa11dfe2fdcf366a908a2377c3d6708370a5312f"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.gkui.openapi.impl.jar",
+      "size": 384026,
+      "sha256": "389884082b3e313b81efffae3802afd97876bef6318f6d5299ddf8d9e588894b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "0d7c79d1f27e69e083688a29c4bcf1e1decb54b69110b55499501e55a03c2c88",
+      "class": "Lcom/ecarx/sdk/vehicle/VehicleAPIImpl;",
+      "method": "registerCarKeyStatusListener",
+      "descriptor": "(Lcom/ecarx/sdk/vehicle/car/sensor/ICarKeyStatusListener;)Z",
+      "code_offset": 530872,
+      "code_offset_hex": "0x819b8",
+      "instruction_count": 29,
+      "normalized_instructions_sha256": "2d697bebf1de22a1c028e5ba7fe60a975ebe64a3eb1c98837ed3cc340bb3d92d"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;",
+      "method": "onCarDisconnected",
+      "descriptor": "()V",
+      "code_offset": 701676,
+      "code_offset_hex": "0xab4ec",
+      "instruction_count": 9,
+      "normalized_instructions_sha256": "64bb2081c5ddac4b0c814770f3b236ad462c13f05a4d5d3d7fd1757f42569484",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;",
+      "method": "setProperty",
+      "descriptor": "(Ljava/lang/Class; I I Ljava/lang/Object;)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 700988,
+      "code_offset_hex": "0xab23c",
+      "instruction_count": 23,
+      "normalized_instructions_sha256": "69aff8ee17e46a5724c6ecabb5be82fd3843ed4407580be87b89dba481d927b5",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;",
+      "method": "setbytesProperty",
+      "descriptor": "(I I [B)V",
+      "code_offset": 702036,
+      "code_offset_hex": "0xab654",
+      "instruction_count": 3,
+      "normalized_instructions_sha256": "790ba7ac1d7f0a07a892fe152f6054e3117d3b53fb06194d093718b7e9e35337",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/AbsCarSignal;",
+      "method": "onECarXCarServiceDeath",
+      "descriptor": "()V",
+      "code_offset": 875052,
+      "code_offset_hex": "0xd5a2c",
+      "instruction_count": 1,
+      "normalized_instructions_sha256": "0a341aa22fa2fc4cedaa5561c5a0ab346ed50b0f80ca11ecff4333b84291a591",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/AbsChainCarSignal$EndQueueTask;",
+      "method": "lambda$observerChange$0",
+      "descriptor": "(Lcom/ecarx/xui/adaptapi/AbsChainCarSignal$EndQueueTask; I Ljava/util/function/Consumer;)V",
+      "code_offset": 875632,
+      "code_offset_hex": "0xd5c70",
+      "instruction_count": 11,
+      "normalized_instructions_sha256": "9cb5f5bafdc3a267b7a63225a4f62ff04c7a02a96e64b95cd3903fd667103124",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/AbsChainCarSignal$EndQueueTask;",
+      "method": "run",
+      "descriptor": "()V",
+      "code_offset": 875692,
+      "code_offset_hex": "0xd5cac",
+      "instruction_count": 16,
+      "normalized_instructions_sha256": "486984373b16cb9e564b7715f54bb479690d7b54b3da297ffd82db9a45c1c53d",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/AbsChainCarSignal$EndQueueTask;",
+      "method": "observerChange",
+      "descriptor": "(I Ljava/util/function/Consumer;)Lcom/ecarx/xui/adaptapi/AbsChainCarSignal$EndQueueTask;",
+      "code_offset": 875508,
+      "code_offset_hex": "0xd5bf4",
+      "instruction_count": 9,
+      "normalized_instructions_sha256": "5fe373c9cd1318a4a2556695dad90ce543d9b49efeba428307f16ef90caa8e61",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/AbsChainCarSignal$1;",
+      "method": "onPAChanged",
+      "descriptor": "(Lecarx/car/hardware/ECarXCarPropertyValue;)V",
+      "code_offset": 875196,
+      "code_offset_hex": "0xd5abc",
+      "instruction_count": 71,
+      "normalized_instructions_sha256": "3ebc88aa9980682fa46fc9bfc00bdfba478d3a01c4f03eeb3e452633d5f2bd10",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/AbsChainCarSignal;",
+      "method": "isChange",
+      "descriptor": "(I)Z",
+      "code_offset": 875872,
+      "code_offset_hex": "0xd5d60",
+      "instruction_count": 8,
+      "normalized_instructions_sha256": "2e7e6c1eafd4ad27773c70fea73c2903965463137a5497907707f9f625514669",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/AbsChainCarSignal;",
+      "method": "onInitCarSignalManager",
+      "descriptor": "()V",
+      "code_offset": 877000,
+      "code_offset_hex": "0xd61c8",
+      "instruction_count": 33,
+      "normalized_instructions_sha256": "2480c6a8be7a1a4f9dd3a8c789272f9add9a5ce674490a275997a01a32a4f43a",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/CarPAEventCallback;",
+      "method": "convertData",
+      "descriptor": "(Lecarx/car/hardware/ECarXCarPropertyValue;)V",
+      "code_offset": 883868,
+      "code_offset_hex": "0xd7c9c",
+      "instruction_count": 7237,
+      "normalized_instructions_sha256": "d0d7344b3a8e353a49d43ed9178147f0bbf93a8d62936cb8c8c5f9ff15b8c66a"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/CarPAEventCallback;",
+      "method": "convertPAData",
+      "descriptor": "(Lecarx/car/hardware/ECarXCarPropertyValue;)Ljava/lang/Object;",
+      "code_offset": 854864,
+      "code_offset_hex": "0xd0b50",
+      "instruction_count": 6580,
+      "normalized_instructions_sha256": "451f0ad2911cf687a0713374eaf49b73a5d69fee542779e1334902727df25e7d"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "getClosestKey",
+      "descriptor": "([I I)I",
+      "code_offset": 4016752,
+      "code_offset_hex": "0x3d4a70",
+      "instruction_count": 31,
+      "normalized_instructions_sha256": "953d1870722b4fc81037328bc549f6151842d672dd4e9e3ee2e50bf62d408d9b",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "getSupportSlideValue",
+      "descriptor": "()[I",
+      "code_offset": 4021160,
+      "code_offset_hex": "0x3d5ba8",
+      "instruction_count": 16,
+      "normalized_instructions_sha256": "bb687dcdc5f28b292a5cb5cb6441ebeab1cdecd7aef7ac39bb4cd3733499ac95",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "openCloseSunBlindSkylight",
+      "descriptor": "(I I I)V",
+      "code_offset": 4021664,
+      "code_offset_hex": "0x3d5da0",
+      "instruction_count": 27,
+      "normalized_instructions_sha256": "55bdf96702dcfcfacbd6279e4a17930ee94905b7a1c671ffbbedead1e79eb639",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "openCloseSunBlindSkylightShortClick",
+      "descriptor": "(I I I)V",
+      "code_offset": 4021796,
+      "code_offset_hex": "0x3d5e24",
+      "instruction_count": 28,
+      "normalized_instructions_sha256": "5e904f185731ac34383c3f1faba0717d818949d71ab59c1541994f41e5d806c1",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/proxy/branch/CarFunctionProxy;",
+      "method": "slideControlSunBlindSkylight",
+      "descriptor": "(I I)V",
+      "code_offset": 4027808,
+      "code_offset_hex": "0x3d75a0",
+      "instruction_count": 34,
+      "normalized_instructions_sha256": "5093e0efb30044c65ff89437380d71c64c5cf221198384a13c14df11994d0242",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmisc2Manager;",
+      "method": "CB_CloseSunRoof_Btn",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 1006556,
+      "code_offset_hex": "0xf5bdc",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "81e36be7a955de8a1e3132e891b025decb16d2357cb47eddfe5ebeb03507d5af"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmisc2Manager;",
+      "method": "CB_OpenSunRoof_Btn",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 1006676,
+      "code_offset_hex": "0xf5c54",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "e8981bdf5602829ddfd21bc723a8ea8e023e77bff0cc0fa92e406dee3900f126"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmisc2Manager;",
+      "method": "CB_SunRoofOpenPosnReq",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 1006856,
+      "code_offset_hex": "0xf5d08",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "63e573e5d7ecb045bbec44072229b6ede228dd94126302bdb3955b178fbb4d70"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "size": 594600,
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmisc2Manager;",
+      "method": "CB_SunRoofTiltReq",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 1006916,
+      "code_offset_hex": "0xf5d44",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "f0d20c3db111a59000e9629157a376295316165259d366c15587462d8b7a8dcf"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/vehicle/-$$Lambda$MUbTnZbu4JI5n2hNz6whaAbbkSY;",
+      "method": "apply",
+      "descriptor": "(Ljava/lang/Object;)Ljava/lang/Object;",
+      "code_offset": 1051192,
+      "code_offset_hex": "0x100a38",
+      "instruction_count": 7,
+      "normalized_instructions_sha256": "f07e6b59a202e688d11c6e76c6402e112ad5f04cf5fd956c3a64c66c2b1f6088"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/vehicle/-$$Lambda$eUOecOuBbKpb10ssOdkY0xdgK04;",
+      "method": "apply",
+      "descriptor": "(Ljava/lang/Object;)Ljava/lang/Object;",
+      "code_offset": 1060816,
+      "code_offset_hex": "0x102fd0",
+      "instruction_count": 7,
+      "normalized_instructions_sha256": "932b916178858e01bffd19e858aa22640947c7bd20494ce7c23541d45b8e3124"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/vehicle/Bcm;",
+      "method": "convertToWindowPos",
+      "descriptor": "(I)I",
+      "code_offset": 1085260,
+      "code_offset_hex": "0x108f4c",
+      "instruction_count": 30,
+      "normalized_instructions_sha256": "74e9014d7ddbbe82a08a405fecf10faf0b8dc8baf6c598036641385511b6185e"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/vehicle/Bcm;",
+      "method": "lambda$buildFunctions$10",
+      "descriptor": "(Lcom/ecarx/xui/adaptapi/car/vehicle/Bcm; Ljava/lang/Integer;)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 1084180,
+      "code_offset_hex": "0x108b14",
+      "instruction_count": 33,
+      "normalized_instructions_sha256": "4e735dbbffdad9a0e3a229d238c5f47c3c0f24f3643be9fbf6b724dc86654dda"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/vehicle/Bcm;",
+      "method": "lambda$buildFunctions$11",
+      "descriptor": "(Lcom/ecarx/xui/adaptapi/car/vehicle/Bcm; Ljava/lang/Integer;)Lecarx/car/hardware/annotation/ApiResult;",
+      "code_offset": 1084320,
+      "code_offset_hex": "0x108ba0",
+      "instruction_count": 33,
+      "normalized_instructions_sha256": "8f1179a63a8bfe62e3c9b8b4625c1895ce7f1706c213a71ca08581bbf9d7c317"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "size": 1135817,
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entries": [
+        "classes.dex"
+      ],
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/vehicle/Bcm;",
+      "method": "buildFunctions",
+      "descriptor": "()V",
+      "code_offset": 1086928,
+      "code_offset_hex": "0x1095d0",
+      "instruction_count": 1138,
+      "normalized_instructions_sha256": "140b8835d2b4e939cd43fd0a1c5c473381717340c4e89d2ec1415d620e80981b"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$1;",
+      "method": "run",
+      "descriptor": "()V",
+      "code_offset": 4217560,
+      "code_offset_hex": "0x405ad8",
+      "instruction_count": 16,
+      "normalized_instructions_sha256": "31d411c47e40d989376968a31b491aba907dba54b4eea3329ce4f3dc0e0dca49",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$2;",
+      "method": "run",
+      "descriptor": "()V",
+      "code_offset": 4217668,
+      "code_offset_hex": "0x405b44",
+      "instruction_count": 16,
+      "normalized_instructions_sha256": "de0c083463d67ac97c171ddab7f753fbcb6985703a7ed4ecc454bed886e83a4a",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$4;",
+      "method": "callback",
+      "descriptor": "()V",
+      "code_offset": 4217964,
+      "code_offset_hex": "0x405c6c",
+      "instruction_count": 1,
+      "normalized_instructions_sha256": "0a341aa22fa2fc4cedaa5561c5a0ab346ed50b0f80ca11ecff4333b84291a591",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$4;",
+      "method": "callback",
+      "descriptor": "(I I)V",
+      "code_offset": 4218184,
+      "code_offset_hex": "0x405d48",
+      "instruction_count": 16,
+      "normalized_instructions_sha256": "c1bb400b33a17b756251885fd9296fa2a04ba5fda7ca1bbc056dc8c908229ecb",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$4;",
+      "method": "callback",
+      "descriptor": "(I I I)V",
+      "code_offset": 4218460,
+      "code_offset_hex": "0x405e5c",
+      "instruction_count": 107,
+      "normalized_instructions_sha256": "72966c057b0c0c2cfc2637ec869fd86af4fc1edde0b1e7f0cc2f6a5e2e13391b",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$4;",
+      "method": "callback",
+      "descriptor": "(I I Z)V",
+      "code_offset": 4218272,
+      "code_offset_hex": "0x405da0",
+      "instruction_count": 38,
+      "normalized_instructions_sha256": "bcef728eab6af1de894c4a9eea32332eb3e5364851c54af7c89baaceb3395e05",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag$4;",
+      "method": "callback",
+      "descriptor": "(I Z)V",
+      "code_offset": 4217984,
+      "code_offset_hex": "0x405c80",
+      "instruction_count": 42,
+      "normalized_instructions_sha256": "086d519aa0d7d49742c2f1cfc31379c9e52f5d41198ccd26041cf81eda08a9b6",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag;",
+      "method": "getWindowPos",
+      "descriptor": "(I)I",
+      "code_offset": 4223976,
+      "code_offset_hex": "0x4073e8",
+      "instruction_count": 26,
+      "normalized_instructions_sha256": "c5dad61604780f4d478231934a7fe772e35f6aed12899f10213b7a9b8b6f734f",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/ui/vehicle/WindowFrag;",
+      "method": "init",
+      "descriptor": "()V",
+      "code_offset": 4224400,
+      "code_offset_hex": "0x407590",
+      "instruction_count": 124,
+      "normalized_instructions_sha256": "b7d1c117e36162afcd9218eb2c445653f236d513128b1b48ae546eda49f38c14",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lcom/example/kanziapilibrary/ECarxKanziLib$1;",
+      "method": "run",
+      "descriptor": "()V",
+      "code_offset": 4755172,
+      "code_offset_hex": "0x488ee4",
+      "instruction_count": 10,
+      "normalized_instructions_sha256": "cd7a5da83568321f41b35dea11e26e9538fab4f43dc18dcb7eddbf4d6e0d4d32",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lcom/example/kanziapilibrary/ECarxKanziLib;",
+      "method": "Request",
+      "descriptor": "([B)I",
+      "code_offset": 4756048,
+      "code_offset_hex": "0x489250",
+      "instruction_count": 12,
+      "normalized_instructions_sha256": "a65fd4490785c7c4a74817931856d872987796f81f9a6a72fbbd4ec20745d8a3",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Landroidx/fragment/app/Fragment;",
+      "method": "onDestroy",
+      "descriptor": "()V",
+      "code_offset": 2839832,
+      "code_offset_hex": "0x2b5518",
+      "instruction_count": 3,
+      "normalized_instructions_sha256": "969c694a575be02c2391820143fa32d1d67a87ce9b467c209b4f84924601a94c",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Landroidx/fragment/app/Fragment;",
+      "method": "onDestroyView",
+      "descriptor": "()V",
+      "code_offset": 2839876,
+      "code_offset_hex": "0x2b5544",
+      "instruction_count": 3,
+      "normalized_instructions_sha256": "969c694a575be02c2391820143fa32d1d67a87ce9b467c209b4f84924601a94c",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Landroidx/fragment/app/Fragment;",
+      "method": "onPause",
+      "descriptor": "()V",
+      "code_offset": 2840092,
+      "code_offset_hex": "0x2b561c",
+      "instruction_count": 3,
+      "normalized_instructions_sha256": "969c694a575be02c2391820143fa32d1d67a87ce9b467c209b4f84924601a94c",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Landroidx/fragment/app/Fragment;",
+      "method": "onStop",
+      "descriptor": "()V",
+      "code_offset": 2840264,
+      "code_offset_hex": "0x2b56c8",
+      "instruction_count": 3,
+      "normalized_instructions_sha256": "969c694a575be02c2391820143fa32d1d67a87ce9b467c209b4f84924601a94c",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/BaseFragment;",
+      "method": "onDestroy",
+      "descriptor": "()V",
+      "code_offset": 5179444,
+      "code_offset_hex": "0x4f0834",
+      "instruction_count": 5,
+      "normalized_instructions_sha256": "8b2f78f9ebc50238344992c3e3eb67d286a7786cd5ef38cb56c4c19938867ef1",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/BaseFragment;",
+      "method": "onDestroyView",
+      "descriptor": "()V",
+      "code_offset": 5179484,
+      "code_offset_hex": "0x4f085c",
+      "instruction_count": 5,
+      "normalized_instructions_sha256": "5dce3822434a043ee5ea27019eb0f3c4caff2f510ca4c74bca6d81dd808df9e2",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/BaseCommFragment;",
+      "method": "onDestroy",
+      "descriptor": "()V",
+      "code_offset": 5178236,
+      "code_offset_hex": "0x4f037c",
+      "instruction_count": 4,
+      "normalized_instructions_sha256": "d5dde3b381b6de443fb930b8ec7b8ce6d7b04f7dbaa8e873214b94fdafe4102b",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/BaseCommFragment;",
+      "method": "onDestroyView",
+      "descriptor": "()V",
+      "code_offset": 5178268,
+      "code_offset_hex": "0x4f039c",
+      "instruction_count": 4,
+      "normalized_instructions_sha256": "46058e0d2a332eb667682575a9ff40f910160846a3601d9297b04642d336f371",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lecarx/settings/ui/BaseCommFragment;",
+      "method": "onPause",
+      "descriptor": "()V",
+      "code_offset": 5178300,
+      "code_offset_hex": "0x4f03bc",
+      "instruction_count": 15,
+      "normalized_instructions_sha256": "d6d4e32b76fc88305b210c21570b16c948c403261203445e2ca3fbdb8cfc6cac",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lcom/settings/kanzi/KanziManager$1;",
+      "method": "run",
+      "descriptor": "()V",
+      "code_offset": 2545656,
+      "code_offset_hex": "0x26d7f8",
+      "instruction_count": 5,
+      "normalized_instructions_sha256": "fbb1f79915c25b67553e3f13b221abe2c03fe79301a5bf893da8e2bcf86c5d55",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/helper/VehicleCallbackHelper;",
+      "method": "unregisterFunctionValueWatcher",
+      "descriptor": "()V",
+      "code_offset": 3965024,
+      "code_offset_hex": "0x3c8060",
+      "instruction_count": 19,
+      "normalized_instructions_sha256": "9f93c6f1fe58d6cbba86fc5b19f0d4a01098045392a71a14c0f2a385b5005634",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/rx/RxBus;",
+      "method": "post",
+      "descriptor": "(Ljava/lang/Object;)V",
+      "code_offset": 4111328,
+      "code_offset_hex": "0x3ebbe0",
+      "instruction_count": 5,
+      "normalized_instructions_sha256": "65895be6a185ae74c04d2e8be513cab786217377bbbbfacfd4e2a42a9110ffd7",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/rx/RxBus;",
+      "method": "toFlowable",
+      "descriptor": "(Ljava/lang/Class;)Lio/reactivex/Flowable;",
+      "code_offset": 4111232,
+      "code_offset_hex": "0x3ebb80",
+      "instruction_count": 4,
+      "normalized_instructions_sha256": "1934621b68ea72499e0acd50c927d470c27c63d31b99418d6991d24829da5366",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/rx/RxManager;",
+      "method": "unSubscribe",
+      "descriptor": "()V",
+      "code_offset": 4111436,
+      "code_offset_hex": "0x3ebc4c",
+      "instruction_count": 3,
+      "normalized_instructions_sha256": "5304a5d323ea3fac9ce1a9d9927ad2dae2db16fbcfa6c18fb2a3101be10db154",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lcom/rightware/kanzi/KanziView;",
+      "method": "queueEvent",
+      "descriptor": "(Ljava/lang/Runnable;)I",
+      "code_offset": 2494976,
+      "code_offset_hex": "0x261200",
+      "instruction_count": 8,
+      "normalized_instructions_sha256": "98306f0736e8c8717f68a3756aa9c82e7297aead91e31092ad17cf0d8c07f183",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lcom/settings/kanzi/KanziManager;",
+      "method": "sendMessageWrapper",
+      "descriptor": "(I Lcom/google/protobuf/ByteString;)V",
+      "code_offset": 2548332,
+      "code_offset_hex": "0x26e26c",
+      "instruction_count": 40,
+      "normalized_instructions_sha256": "9c0ac62dcf5711064d465f51d03b6f0f703bdd4a2449e9c78c5e59db79b00c44",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lcom/settings/kanzi/KanziManager;",
+      "method": "sendMessageAdjustment",
+      "descriptor": "(Lcom/ecarx/kanziproto/vehiclesetting/ComfortSettings$SeatAdjustment$SeatAdjMode; Lcom/ecarx/kanziproto/vehiclesetting/ComfortSettings$SeatAdjustment$AdjSeatTypes; Z Z)V",
+      "code_offset": 2547184,
+      "code_offset_hex": "0x26ddf0",
+      "instruction_count": 39,
+      "normalized_instructions_sha256": "7baea42981c8a5182b617729986ecdfc7005140aa290945909476c6ba177bf85",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/BaseActivity;",
+      "method": "onDestroy",
+      "descriptor": "()V",
+      "code_offset": 4138760,
+      "code_offset_hex": "0x3f2708",
+      "instruction_count": 21,
+      "normalized_instructions_sha256": "3524f4e4acb3c4fe286ae7b05e15c306e8f6116af63edd2294169d7ae40ad17a",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/BaseActivity;",
+      "method": "onPause",
+      "descriptor": "()V",
+      "code_offset": 4138864,
+      "code_offset_hex": "0x3f2770",
+      "instruction_count": 21,
+      "normalized_instructions_sha256": "5b07ca46b4168b5b5980a8de801b1331d2026d18fec870d52fba3bf0e5e1c57c",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/BaseActivity;",
+      "method": "onStop",
+      "descriptor": "()V",
+      "code_offset": 4139284,
+      "code_offset_hex": "0x3f2914",
+      "instruction_count": 21,
+      "normalized_instructions_sha256": "c4bcfba82011910b8c23778a3f531bfaf93e2784bb72bb1c2c7c5345a18d66dc",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/BaseActivity;",
+      "method": "onTouchEvent",
+      "descriptor": "(Landroid/view/MotionEvent;)Z",
+      "code_offset": 4138260,
+      "code_offset_hex": "0x3f2514",
+      "instruction_count": 18,
+      "normalized_instructions_sha256": "6b9d8bc1763e97b1b4e494d4146dd78bb670db5d6594cbb78e611e4bab3b5ba0",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/Settings;",
+      "method": "onDestroy",
+      "descriptor": "()V",
+      "code_offset": 4150160,
+      "code_offset_hex": "0x3f5390",
+      "instruction_count": 18,
+      "normalized_instructions_sha256": "3903c6b60e11c13c9fecea163aa6f4d7facf5b236db84f1e1a98a4f71930e1e5",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/Settings;",
+      "method": "onPause",
+      "descriptor": "()V",
+      "code_offset": 4150416,
+      "code_offset_hex": "0x3f5490",
+      "instruction_count": 14,
+      "normalized_instructions_sha256": "f7fd3c92b876d665b7239d9b6de41abc32774fae446f26b9d93fb178201c5e1c",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/Settings;",
+      "method": "onStop",
+      "descriptor": "()V",
+      "code_offset": 4150904,
+      "code_offset_hex": "0x3f5678",
+      "instruction_count": 11,
+      "normalized_instructions_sha256": "8ad991e238bba12691ea979d31ba509d686f02b5054d119ae3d0dfa5e1b55fb8",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/CarSettingActivity;",
+      "method": "registerListener",
+      "descriptor": "()V",
+      "code_offset": 4143092,
+      "code_offset_hex": "0x3f37f4",
+      "instruction_count": 300,
+      "normalized_instructions_sha256": "93407fa0228ee7a4b2be6eb36cc45d2f02406658d90b30e648cc60468968faf4",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/CarSettingActivity;",
+      "method": "lambda$registerListener$4$CarSettingActivity",
+      "descriptor": "(Lecarx/settings/rx/event/SeatAdjustEvent;)V",
+      "code_offset": 4142100,
+      "code_offset_hex": "0x3f3414",
+      "instruction_count": 7,
+      "normalized_instructions_sha256": "8d86932346d5e081c18646392bb54f48871e56a848cf2f3da725e3e729e63ee6",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/CarSettingActivity;",
+      "method": "lambda$registerListener$5$CarSettingActivity",
+      "descriptor": "(Lecarx/settings/rx/event/RightSeatAdjustEvent;)V",
+      "code_offset": 4142144,
+      "code_offset_hex": "0x3f3440",
+      "instruction_count": 2,
+      "normalized_instructions_sha256": "fa50aa47bba453663e734508a914c51c0eeb4f8daad2af4e5724b18ff25a0c06",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/CarSettingActivity;",
+      "method": "onDestroy",
+      "descriptor": "()V",
+      "code_offset": 4142540,
+      "code_offset_hex": "0x3f35cc",
+      "instruction_count": 17,
+      "normalized_instructions_sha256": "50ac3764b0e84ee76539e81308a93629bd6ec92d3989f26dac1635a5a4f7abdd",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/CarSettingActivity;",
+      "method": "onPause",
+      "descriptor": "()V",
+      "code_offset": 4142696,
+      "code_offset_hex": "0x3f3668",
+      "instruction_count": 8,
+      "normalized_instructions_sha256": "708afd132b495da0c48c82a3b49e8d513acc37641321901ba2caf8e8cd58e7e4",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes2.dex",
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "class": "Lecarx/settings/setting/CarSettingActivity;",
+      "method": "onStop",
+      "descriptor": "()V",
+      "code_offset": 4142980,
+      "code_offset_hex": "0x3f3784",
+      "instruction_count": 2,
+      "normalized_instructions_sha256": "ef57a072d6ebdcf828f2f669d7e1acba583f180ea11a6e298449b12549746dda",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes3.dex",
+      "dex_sha256": "281601d7ba9685ca963a305bfd218dd21cfcdc6f15eb4e3fdd25c11aeb2ed1d2",
+      "class": "Lecarx/settings/vr/VrVisionManager;",
+      "method": "cancelVision",
+      "descriptor": "()V",
+      "code_offset": 901092,
+      "code_offset_hex": "0xdbfe4",
+      "instruction_count": 26,
+      "normalized_instructions_sha256": "5a59ecdb15f5a03b679bf454772873527af5d08422a014c1626e1009142bad09",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lcom/example/kanziapilibrary/KanziCommunicationBase;",
+      "method": "SendToKanzi",
+      "descriptor": "([B I)I",
+      "access_flags": "public",
+      "code_offset": 4757124,
+      "code_offset_hex": "0x489684",
+      "instruction_count": 4,
+      "normalized_instructions_sha256": "b34b3888484fcf6b5901b2485123c3c756bab4df1a7477755184a816c5b3a02b",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    }
+  ],
+  "car_key_variant_methods": [
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ts-carplay-adapter.jar",
+      "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "608676008421db51e1b81596d97d2b9ce8350ef0286152301fe2f3f819bb02df",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "cancelDiscovery",
+      "code_offset": 1042508
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ts-carplay-adapter.jar",
+      "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "608676008421db51e1b81596d97d2b9ce8350ef0286152301fe2f3f819bb02df",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "createDigitalKey",
+      "code_offset": 1042228
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "cancelDiscovery",
+      "code_offset": 4523788
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "createDigitalKey",
+      "code_offset": 4523504
+    },
+    {
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "archive_sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/ru_natro_statuswidget/base.apk",
+      "sha256": "c4d7a3976d5e7404d6a4aec89755167ae58f31ba52a5a460bbf03360337444c7",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "30eb3a1083d2bbd17d2c2904b32868e03ba99b7e7d1312f109c000d2f1624b31",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "cancelDiscovery",
+      "code_offset": 3840572
+    },
+    {
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "archive_sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/ru_natro_statuswidget/base.apk",
+      "sha256": "c4d7a3976d5e7404d6a4aec89755167ae58f31ba52a5a460bbf03360337444c7",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "30eb3a1083d2bbd17d2c2904b32868e03ba99b7e7d1312f109c000d2f1624b31",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "createDigitalKey",
+      "code_offset": 3840288
+    },
+    {
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "archive_sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/dezz_status_widget/base.apk",
+      "sha256": "fe63d0f2ba5031f7c22c308c52198471815950f714e8cd1632de4dc6c1d0103e",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "9ac1ee71f2be3dda7d89c46c63cdde4f147863c8206b3f5b7af98e3e13b41b52",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "cancelDiscovery",
+      "code_offset": 4066684
+    },
+    {
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "archive_sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/dezz_status_widget/base.apk",
+      "sha256": "fe63d0f2ba5031f7c22c308c52198471815950f714e8cd1632de4dc6c1d0103e",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "9ac1ee71f2be3dda7d89c46c63cdde4f147863c8206b3f5b7af98e3e13b41b52",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "createDigitalKey",
+      "code_offset": 4066400
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "cancelDiscovery",
+      "code_offset": 1027484
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "createDigitalKey",
+      "code_offset": 1027204
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/com.ecarx.dimmenu/base.apk",
+      "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "08932252974634a3f516cb87ba30a8252fb8e070eb1ff840908df332e64f6f19",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "cancelDiscovery",
+      "code_offset": 3978808
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "packages/com.ecarx.dimmenu/base.apk",
+      "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+      "dex_entry": "classes.dex",
+      "dex_sha256": "08932252974634a3f516cb87ba30a8252fb8e070eb1ff840908df332e64f6f19",
+      "class": "Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;",
+      "method": "createDigitalKey",
+      "code_offset": 3978524
+    }
+  ],
+  "scan_scope": [
+    {
+      "dex_sha256": "608676008421db51e1b81596d97d2b9ce8350ef0286152301fe2f3f819bb02df",
+      "member": "framework/system_framework/ts-carplay-adapter.jar",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 3439,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "62d966a26d7574fcbb78bd6210006c427aff62b038b138ae2c819b051955f7c1",
+      "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ecarx_engineeringmodel/EngineeringModel.apk",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 702
+    },
+    {
+      "dex_sha256": "a4fa512e7ba8097e6de9e9f2d866e3bcf37f4c0a72098211f22ad55503f46a62",
+      "member": "packages/ecarx.powersomeip.service/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 1,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+      "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 279
+    },
+    {
+      "dex_sha256": "11e75aefee91df602130f61007e9d78b1d358714e06ffbf8b6ac0f5734f1bee0",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_core-libart.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 68
+    },
+    {
+      "dex_sha256": "0a21187af60d0f351d3846a540255299899e936e9434a4903613689aa44c091c",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_ext.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 1
+    },
+    {
+      "dex_sha256": "4c622f8ed92668abcda2623ff26e0df1c87838d3531d10ecec936a857884e7a4",
+      "member": "KX11-QNX-IPCP-Evidence 2/android/files/com.android.settings.intelligence/4636ab064567-SettingsIntelligence.apk",
+      "archive": "KX11-QNX-IPCP-Evidence 2.zip",
+      "matched_methods": 573
+    },
+    {
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "member": "packages/ecarx.settings/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 4063,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "7eb55b391b57c8375f051fb1b219c95d5352471a3e65723b0a89a92e4f5f1557",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_framework.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 2256
+    },
+    {
+      "dex_sha256": "3d32aab6996f561fd8e05ee549e11ed09b1f55a0e688e790f977d68fe17fa4f4",
+      "member": "framework/system_framework/ecarx.jar",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 11,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "957897e605aba0fadcdec436f3371bdd66bdc335beb86846f275c469a8e6b82a",
+      "member": "packages/ecarx.geea.platform.api.vf/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 671,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "94597e3c072a6efc9f37dbebe37ad5c37e9691e1a8fb77b3abe15311b6122552",
+      "member": "packages/com.ecarx.sdk.openapi/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 216,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "30eb3a1083d2bbd17d2c2904b32868e03ba99b7e7d1312f109c000d2f1624b31",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/ru_natro_statuswidget/base.apk",
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "matched_methods": 1156
+    },
+    {
+      "dex_sha256": "80cbee34205002c18c68eece06303a2ab2051fcbf372aa36cdd1b263cc9ae01e",
+      "member": "packages/com.ecarx.car/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 1309,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "81bd8b1c1275f7f72ab7f64fac3a02abc14ebee30b731dbe0ca84a003a8d40bb",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/ack48_monjarodev_mhud/base.apk",
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "matched_methods": 823
+    },
+    {
+      "dex_sha256": "962f0e6b6f0b659a8f3580209ab405d12f0fb9b7ad11aed150dfb9bf6c036c2d",
+      "member": "packages/com.ecarx.providers.settings/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 1,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "member": "framework/system_framework/ecarx.car.jar",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 2283,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "b960e2f60368d50005d3e50b1f68981b9cfa46b97ccb38abe2d11046733f4b0a",
+      "member": "packages/com.ecarx.hud/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 75,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "abd2d6de229a651ec30eab9f9e45ff79431edddeef6e18f45d533cd81ecd0c3a",
+      "member": "packages/com.ecarx.dimmenu/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 2552,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "0d3df3cc9de7ae92aa9d9e7da7569bb3d0fca2026524b0e504e07af57775f824",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_framework.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 242
+    },
+    {
+      "dex_sha256": "35f57de7186a60bce1dece16bdc8e597af80f36cf18fa3990224e5099147666e",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_okhttp.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 19
+    },
+    {
+      "dex_sha256": "345f037efd4c17b8f8405fea7e42847d1661cc672a554225d81f638f29d292bd",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_apache-xml.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 10
+    },
+    {
+      "dex_sha256": "84788e434c43608033cfe88521b15be236e7f704654004020f38f51f4f9b1a6b",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_core-oj.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 7
+    },
+    {
+      "dex_sha256": "9ac1ee71f2be3dda7d89c46c63cdde4f147863c8206b3f5b7af98e3e13b41b52",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/dezz_status_widget/base.apk",
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "matched_methods": 1422
+    },
+    {
+      "dex_sha256": "d3498fb1d4a52ce7ebb126336953fef2b600805be8c52c17588ac9cb697e809c",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_framework.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 882
+    },
+    {
+      "dex_sha256": "81902e796e6c8718d48bc101f2f77744a0cb7e8d6276d04d8f9cf2d3c0a22f89",
+      "member": "packages/com.ecarx.car/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 164,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "236271fd7995f4cbbdabb08a1f6faa92121edecb6cc02125ed138fa82ef43544",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_WfdCommon.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 1
+    },
+    {
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 3439,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "a4ca5718eee3b453e460dec9bd9e80b922e6a66caf799245e6c8103691747d7f",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/plus_monjaro/base.apk",
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "matched_methods": 399
+    },
+    {
+      "dex_sha256": "d7fa4b044cad29969dc78c408870d596b5e7366bd5f0e44e86e3c25cbeb9806a",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/ru_natro_statuswidget/base.apk",
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "matched_methods": 3751
+    },
+    {
+      "dex_sha256": "08932252974634a3f516cb87ba30a8252fb8e070eb1ff840908df332e64f6f19",
+      "member": "packages/com.ecarx.dimmenu/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 1353,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "a9acefde5e74a00c22bb203ed2efc3ce68ce415a570851d30364bde397847e81",
+      "member": "KX11-Cruise-Trace-20260809-113750/packages/log_debugtools_ecarx_logmanager/_system_app_DebugLogManager_DebugLogManager.apk",
+      "archive": "KX11-Cruise-Trace-20260809-113750.zip",
+      "matched_methods": 79
+    },
+    {
+      "dex_sha256": "e6992fe6470a413ac504580090bc7060b01bff32660d8736c00bbf1269c540c5",
+      "member": "packages/com.ecarx.sdk.openapi/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 2,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "7d5cfc2fa44eff4d5125461be67373b28ff6f41095f05a0ff5f067e0a254b8e3",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/dezz_status_widget/base.apk",
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "matched_methods": 2105
+    },
+    {
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 416,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "87c9ad57efbad8f08e9a5bb855c9bd4f1b1f7c7fa22cc174fbeada09a8145dd0",
+      "member": "KX11-QNX-IPCP-Evidence 2/android/files/com.android.settings/8a477ed7d6ed-Settings.apk",
+      "archive": "KX11-QNX-IPCP-Evidence 2.zip",
+      "matched_methods": 947
+    },
+    {
+      "dex_sha256": "478c93a300ee6e7c62cccae2408462c9e0d05bb09c834d72ae165cbe175226ca",
+      "member": "packages/com.ecarx.car.multidisplay/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 2,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "212029fcafe9d87fa32b6b45fec012dcdb1cc3c949f57ea064a8db2ab4967ebf",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/debug_monjaro/base.apk",
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "matched_methods": 51
+    },
+    {
+      "dex_sha256": "048ab3eea2457f5320806d9363df836e9f8591ad7032a037c635959bfcaacb48",
+      "member": "framework/system_framework/android.car.jar",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 44,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "c052bc9bb0c1afc232a411c98a3fce409a12533d96af655942d3b0c80119119e",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/SYSTEMSERVERCLASSPATH_services.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 3603
+    },
+    {
+      "dex_sha256": "6b19c7c4cefbe3447609f5a04e700c8fa9f5c64153a3291f5d9982dd52e987bb",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/SYSTEMSERVERCLASSPATH_wifi-service.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 33
+    },
+    {
+      "dex_sha256": "ac266c21bfba8e1a2258e556e3f0120fcf450fdb01944bddc2e44697f086ae96",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_bouncycastle.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 29
+    },
+    {
+      "dex_sha256": "5b581efdb279f9460b28c1bd018ae3a13127cae7dc4271dbdb68f5717a37d4fa",
+      "member": "KX11-QNX-IPCP-Evidence 2/android/files/com.android.providers.settings/e2c3347e33b7-SettingsProvider.apk",
+      "archive": "KX11-QNX-IPCP-Evidence 2.zip",
+      "matched_methods": 9
+    },
+    {
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "member": "packages/ecarx.settings/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 2252,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "1934d917f0398e965f4186767db04bb6c622022a80dc0bcce1bdc2e3ec46ab2f",
+      "member": "KX11-Cruise-Trace-20260809-085503/packages/ru_natro_statuswidget/base.apk",
+      "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+      "matched_methods": 738
+    },
+    {
+      "dex_sha256": "0d7c79d1f27e69e083688a29c4bcf1e1decb54b69110b55499501e55a03c2c88",
+      "member": "framework/system_framework/ecarx.gkui.openapi.impl.jar",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 100,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "eb2f0811d98358e909fc7714da96494604debf01ceba248aa68f436a90e559ac",
+      "member": "packages/ecarx.geea.platform.api.signal/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 380,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "281601d7ba9685ca963a305bfd218dd21cfcdc6f15eb4e3fdd25c11aeb2ed1d2",
+      "member": "packages/ecarx.settings/base.apk",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 854,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "16f510b81833038c9aac7799b4f0b6b48facc9ec67240b11750fa130d01c25dc",
+      "member": "framework/system_framework/ecarx.car.audio.jar",
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "matched_methods": 7,
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+    },
+    {
+      "dex_sha256": "3f2718052e3243e3231a57ac250d3fdd09f7115ad569a4e60ed41bbb832b1dc6",
+      "member": "KX11-Cruise-Trace-20260809-001402/framework/BOOTCLASSPATH_telephony-common.jar",
+      "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+      "matched_methods": 14
+    }
+  ],
+  "limits": [
+    "No physical stop/cancel/focus/Binder-loss test",
+    "Only inspected methods establish negative branch scope; no claim of absence in all ECU/firmware",
+    "Generated Kanzi visual message duration is not established ECU stop timeout",
+    "CarKey digital key stubs do not rule out a different unprovided service",
+    "All callbacks described are static implementation, not new observed runtime events",
+    "The previously untraced Settings base-fragment, base-activity and typed SeatAdjustEvent Java paths are now traced; the bounded negative result is no seat setter on these cleanup paths.",
+    "No claim that the Java no-STOP result proves absent native/ECU watchdog or unsafe continued physical motion.",
+    "Kanzi native handling and platform framework Activity focus dispatch are outside the DEX branch proof; no guessed library path is a collection target."
+  ],
+  "runtime_path_evidence": [
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "report.txt",
+      "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+      "raw_lines": [
+        {
+          "line": 342,
+          "text": "sourceDir=/system/app/XCSettings2/XCSettings2.apk"
+        },
+        {
+          "line": 343,
+          "text": "publicSourceDir=/system/app/XCSettings2/XCSettings2.apk"
+        },
+        {
+          "line": 506,
+          "text": "COPIED /system/app/XCSettings2/XCSettings2.apk -> packages/ecarx.settings/base.apk bytes=305412090"
+        }
+      ]
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "report.txt",
+      "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+      "raw_lines": [
+        {
+          "line": 230,
+          "text": "sourceDir=/system/app/AdaptApiTestApp/AdaptApiTestApp.apk"
+        },
+        {
+          "line": 231,
+          "text": "publicSourceDir=/system/app/AdaptApiTestApp/AdaptApiTestApp.apk"
+        },
+        {
+          "line": 238,
+          "text": "COPIED /system/app/AdaptApiTestApp/AdaptApiTestApp.apk -> packages/ecarx.adaptapi.platform/base.apk bytes=2339956"
+        }
+      ]
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "report.txt",
+      "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+      "raw_lines": [
+        {
+          "line": 285,
+          "text": "sourceDir=/system/priv-app/ECarXCarService/ECarXCarService.apk"
+        },
+        {
+          "line": 286,
+          "text": "publicSourceDir=/system/priv-app/ECarXCarService/ECarXCarService.apk"
+        },
+        {
+          "line": 298,
+          "text": "service=com.ecarx.car.ECarXCarService process=com.ecarx.car exported=true enabled=true permission=null"
+        },
+        {
+          "line": 299,
+          "text": "COPIED /system/priv-app/ECarXCarService/ECarXCarService.apk -> packages/com.ecarx.car/base.apk bytes=6816872"
+        }
+      ]
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "report.txt",
+      "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+      "raw_lines": [
+        {
+          "line": 585,
+          "text": "COPIED /system/framework/ecarx.adaptapi.jar -> framework/system_framework/ecarx.adaptapi.jar bytes=1135817"
+        }
+      ]
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "report.txt",
+      "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+      "raw_lines": [
+        {
+          "line": 589,
+          "text": "COPIED /system/framework/ecarx.car.jar -> framework/system_framework/ecarx.car.jar bytes=594600"
+        }
+      ]
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "report.txt",
+      "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+      "raw_lines": [
+        {
+          "line": 591,
+          "text": "COPIED /system/framework/ecarx.gkui.openapi.impl.jar -> framework/system_framework/ecarx.gkui.openapi.impl.jar bytes=384026"
+        }
+      ]
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "member": "report.txt",
+      "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+      "raw_lines": [
+        {
+          "line": 131,
+          "text": "sourceDir=/system/app/XSFOpenAPIService/XSFOpenAPIService.apk"
+        },
+        {
+          "line": 132,
+          "text": "publicSourceDir=/system/app/XSFOpenAPIService/XSFOpenAPIService.apk"
+        },
+        {
+          "line": 220,
+          "text": "COPIED /system/app/XSFOpenAPIService/XSFOpenAPIService.apk -> packages/com.ecarx.sdk.openapi/base.apk bytes=3005711"
+        }
+      ]
+    }
+  ],
+  "negative_search_scope": {
+    "kind": "filtered_Dex_method_index",
+    "searched_calls": [
+      "createDigitalKey",
+      "startDiscovery",
+      "cancelDiscovery",
+      "readRealKey",
+      "addUserProfile",
+      "applyUserProfileData",
+      "onUserProfileAdded"
+    ],
+    "excluded_from_consumer_search": [
+      "CarKey",
+      "UserProfile",
+      "ICarKey",
+      "IUserProfile",
+      "ProfileFragment"
+    ],
+    "result": "No additional direct-invoke consumers in inspected indexed methods at validation time",
+    "limits": "Index filters namespaces/methods and is not whole-firmware, reflection, native or runtime absence proof."
+  },
+  "validation": {
+    "json_parse": true,
+    "archive_members": 181,
+    "source_member_hashes_verified": true,
+    "method_code_offsets_are_bytes": true,
+    "window_pos_decimal_hex_verified": true,
+    "window_discrete_decimal_hex_verified": true,
+    "missing_runtime_paths_not_invented": true,
+    "artifacts_only_lifecycle_directory": false,
+    "private_instruction_bodies_excluded_from_public": true,
+    "original_method_records_preserved": 109,
+    "inherited_and_event_method_records_added": 34
+  },
+  "offset_convention": {
+    "code_offset": "DEX byte address of code_item header",
+    "excerpts_offset": "Byte offset from insns start",
+    "absolute_instruction_address": "code_offset + 16 + excerpts.offset",
+    "exception_table_units": "DEX code units (16 bits), explicit byte conversion stored for handlers"
+  },
+  "publication_policy": "REL-008: no instruction arrays, opcode excerpts, decompiled source bodies or proprietary binaries. Complete method bodies remain private; re-read pinned DEX to reproduce hashes.",
+  "instruction_hash_convention": "SHA-256 of UTF-8 json.dumps([(op,args),...], ensure_ascii=False) using default Python JSON separators; offsets excluded from hash.",
+  "settings_hierarchy": [
+    [
+      {
+        "class": "Lecarx/settings/ui/comfort/KXAdjustSeatFrag;",
+        "superclass": "Lecarx/settings/ui/BaseCommFragment;",
+        "interfaces": [
+          "Landroid/widget/RadioGroup$OnCheckedChangeListener;",
+          "Landroid/view/View$OnTouchListener;",
+          "Lecarx/settings/vr/VrCallback;",
+          "Landroid/view/View$OnClickListener;"
+        ],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Lecarx/settings/ui/BaseCommFragment;",
+        "superclass": "Lecarx/settings/ui/BaseFragment;",
+        "interfaces": [],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Lecarx/settings/ui/BaseFragment;",
+        "superclass": "Landroidx/fragment/app/Fragment;",
+        "interfaces": [],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Landroidx/fragment/app/Fragment;",
+        "superclass": "Ljava/lang/Object;",
+        "interfaces": [
+          "Landroid/content/ComponentCallbacks;",
+          "Landroid/view/View$OnCreateContextMenuListener;",
+          "Landroidx/lifecycle/LifecycleOwner;",
+          "Landroidx/lifecycle/ViewModelStoreOwner;",
+          "Landroidx/savedstate/SavedStateRegistryOwner;"
+        ],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Ljava/lang/Object;",
+        "not_in_apk": true
+      }
+    ],
+    [
+      {
+        "class": "Lecarx/settings/ui/vehicle/WindowFrag;",
+        "superclass": "Lecarx/settings/ui/BaseCommFragment;",
+        "interfaces": [
+          "Landroid/view/View$OnClickListener;",
+          "Lcom/ecarx/widget/XCSwitchButton$OnCheckedChangeListener;",
+          "Lecarx/settings/vr/VrCallback;"
+        ],
+        "dex_entry": "classes2.dex",
+        "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11"
+      },
+      {
+        "class": "Lecarx/settings/ui/BaseCommFragment;",
+        "superclass": "Lecarx/settings/ui/BaseFragment;",
+        "interfaces": [],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Lecarx/settings/ui/BaseFragment;",
+        "superclass": "Landroidx/fragment/app/Fragment;",
+        "interfaces": [],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Landroidx/fragment/app/Fragment;",
+        "superclass": "Ljava/lang/Object;",
+        "interfaces": [
+          "Landroid/content/ComponentCallbacks;",
+          "Landroid/view/View$OnCreateContextMenuListener;",
+          "Landroidx/lifecycle/LifecycleOwner;",
+          "Landroidx/lifecycle/ViewModelStoreOwner;",
+          "Landroidx/savedstate/SavedStateRegistryOwner;"
+        ],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Ljava/lang/Object;",
+        "not_in_apk": true
+      }
+    ],
+    [
+      {
+        "class": "Lecarx/settings/setting/CarSettingActivity;",
+        "superclass": "Lecarx/settings/setting/Settings;",
+        "interfaces": [
+          "Lcom/settings/kanzi/KanziManager$ChangeRecyleItemListener;",
+          "Lcom/settings/kanzi/KanziManager$TrunkStatusListener;",
+          "Lcom/settings/kanzi/KanziManager$SunroofStatusListener;",
+          "Lcom/settings/kanzi/KanziManager$SunshadeStatusListener;",
+          "Lcom/settings/kanzi/SurfaceInterface;"
+        ],
+        "dex_entry": "classes2.dex",
+        "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11"
+      },
+      {
+        "class": "Lecarx/settings/setting/Settings;",
+        "superclass": "Lecarx/settings/setting/BaseActivity;",
+        "interfaces": [
+          "Landroid/view/View$OnClickListener;",
+          "Landroidx/viewpager/widget/ViewPager$OnPageChangeListener;"
+        ],
+        "dex_entry": "classes2.dex",
+        "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11"
+      },
+      {
+        "class": "Lecarx/settings/setting/BaseActivity;",
+        "superclass": "Landroidx/appcompat/app/AppCompatActivity;",
+        "interfaces": [],
+        "dex_entry": "classes2.dex",
+        "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11"
+      },
+      {
+        "class": "Landroidx/appcompat/app/AppCompatActivity;",
+        "superclass": "Landroidx/fragment/app/FragmentActivity;",
+        "interfaces": [
+          "Landroidx/appcompat/app/AppCompatCallback;",
+          "Landroidx/core/app/TaskStackBuilder$SupportParentable;",
+          "Landroidx/appcompat/app/ActionBarDrawerToggle$DelegateProvider;"
+        ],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Landroidx/fragment/app/FragmentActivity;",
+        "superclass": "Landroidx/activity/ComponentActivity;",
+        "interfaces": [
+          "Landroidx/core/app/ActivityCompat$OnRequestPermissionsResultCallback;",
+          "Landroidx/core/app/ActivityCompat$RequestPermissionsRequestCodeValidator;"
+        ],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Landroidx/activity/ComponentActivity;",
+        "superclass": "Landroidx/core/app/ComponentActivity;",
+        "interfaces": [
+          "Landroidx/lifecycle/LifecycleOwner;",
+          "Landroidx/lifecycle/ViewModelStoreOwner;",
+          "Landroidx/savedstate/SavedStateRegistryOwner;",
+          "Landroidx/activity/OnBackPressedDispatcherOwner;"
+        ],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Landroidx/core/app/ComponentActivity;",
+        "superclass": "Landroid/app/Activity;",
+        "interfaces": [
+          "Landroidx/lifecycle/LifecycleOwner;",
+          "Landroidx/core/view/KeyEventDispatcher$Component;"
+        ],
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+      },
+      {
+        "class": "Landroid/app/Activity;",
+        "not_in_apk": true
+      }
+    ]
+  ],
+  "settings_full_dex_reference_scan": {
+    "apk_sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+    "dex_entries": [
+      "classes.dex",
+      "classes2.dex",
+      "classes3.dex"
+    ],
+    "classes_scanned": 17878,
+    "concrete_method_bodies_scanned_for_reference_candidates": 116258,
+    "seat_and_roof_reference_candidate_count": 12,
+    "scope": "All concrete DEX method bodies searched for SeatAdjustEvent/sendMessageAdjustment/sendMessageSunroofControl references; inherited lifecycle and typed seat subscriber branches then read in full. Search counts are not semantic coverage percentages.",
+    "focus_override_result": "No onWindowFocusChanged/onFocusChange/dispatchTouchEvent override in the APK-defined Settings activity ancestry, or seat/base fragment ancestry. Android framework Activity beyond the APK and native/ECU behavior are outside this negative result."
+  },
+  "seat_cancel_and_cleanup": {
+    "action_up": "KXAdjustSeatFrag.onTouch → handleClickEvent(down=false) → CarFunctionProxy.seat*Adjust → setFunctionValue(function,zone,0). Return value is ignored.",
+    "action_cancel": "Action3 branches directly to return true at instruction offset380 in onTouch code_item0x4ff650. Neither handleClickEvent nor onSeatClick is reached.",
+    "fragment_lifecycle": "BaseCommFragment/BaseFragment/AndroidX Fragment onPause/onDestroyView/onDestroy read in full: super/log/rootView cleanup and VehicleCallbackHelper watcher unregister, no seat setter.",
+    "activity_lifecycle": "CarSettingActivity/Settings/BaseActivity lifecycle read in full: RxManager.dispose, visual surface/context cleanup, VR capability cancellation and super/log. No seat motor setter in these app-defined methods.",
+    "availability_event": "SeatAdjustEvent(false) → typed CarSettingActivity subscriber → KanziManager.sendMessageAdjustment → protobuf cmd3014 with isPressDown=false → ECarxKanziLib.Request → KanziView.queueEvent → KanziCommunication.SendToKanzi.",
+    "kanzi_result": "The Java event route builds and queues a Kanzi message; it does not call CarFunctionProxy, ICarFunction or a CB seat setter. Native effects are not established by this Java analysis.",
+    "kanzi_delay": "When mECarxKanziLib is null, sendMessageWrapper posts a new retry after1000ms; this is a client visual-message retry, not an ECU timeout or a guaranteed motor STOP.",
+    "physical_effect_verified": false
+  },
+  "native_boundary": {
+    "sources": [
+      {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "packages/ecarx.settings/base.apk",
+        "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+        "class": "Lcom/example/kanziapilibrary/KanziCommunicationBase;",
+        "method": "SendToKanzi",
+        "descriptor": "([B I)I",
+        "access_flags": "public",
+        "code_offset": 4757124,
+        "code_offset_hex": "0x489684",
+        "instruction_count": 4,
+        "normalized_instructions_sha256": "b34b3888484fcf6b5901b2485123c3c756bab4df1a7477755184a816c5b3a02b",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+      },
+      {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "packages/ecarx.settings/base.apk",
+        "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+        "dex_entry": "classes.dex",
+        "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+        "class": "Lcom/example/kanziapilibrary/Swig_Template_APPJNI;",
+        "method": "KanziCommunicationBase_SendToKanzi",
+        "descriptor": "(J Lcom/example/kanziapilibrary/KanziCommunicationBase; [B I)I",
+        "access_flags": "public static final native",
+        "code_offset": 0,
+        "code_offset_hex": "0x0",
+        "instruction_count": 0,
+        "normalized_instructions_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+      },
+      {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "packages/ecarx.settings/base.apk",
+        "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+        "dex_entry": "classes2.dex",
+        "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+        "class": "Lcom/rightware/kanzi/KanziNativeLibrary;",
+        "method": "submitTask",
+        "descriptor": "(Ljava/lang/Object;)I",
+        "access_flags": "public static native",
+        "code_offset": 0,
+        "code_offset_hex": "0x0",
+        "instruction_count": 0,
+        "normalized_instructions_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+      }
+    ],
+    "scope": "SendToKanzi is inherited from KanziCommunicationBase and directly invokes the native SWIG method; KanziView submits work through native KanziNativeLibrary.submitTask. Native declarations have code_offset0 because no DEX body exists.",
+    "apk_native_members": [
+      "lib/arm64-v8a/libBugly.so"
+    ],
+    "runtime_library_path": "Not established by the pinned Settings APK or this Java route; current PID maps are needed before naming a native library collection target.",
+    "physical_stop_verified": false
+  }
+}

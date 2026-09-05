@@ -1,0 +1,217 @@
+{
+  "schema": "sdk-public-file-allowlist-v1",
+  "files": [
+    {
+      "path": "RAW_DEX_VALIDATION.json.gz",
+      "size": 30374,
+      "sha256": "a9c24df21df139999c6dcbec0cb5394965992b5e98c0a7370c962e9be97c766a",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "TYPED_INITIALIZERS_VALIDATION.json",
+      "size": 3195,
+      "sha256": "c2a0cc18aae19265152e978725caa6042448e0356de21ca9e8aa91d0fb5a8cd2",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "VALIDATION.json",
+      "size": 4216,
+      "sha256": "2c4c17e040f8e4e1904bbbebcb96f2cebab83c2209ee1446677dc55f0f9d045b",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "additional_family_evidence.json.gz",
+      "size": 10100,
+      "sha256": "5e19100aa12e705c94382ce8ef489f7322dd0723c93f74c467bd2486ede621d0",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "baseline_source_crosswalk.json",
+      "size": 2586,
+      "sha256": "f58cda4e3d75a97b5ab1b88d545c99941686cd5d6c810e11ce7340595ebabbfc",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog/classes.jsonl.gz",
+      "size": 396853,
+      "sha256": "c30cbc63fbe56eb1d045ba15687bc495fb276e16f8a94155f153460132ccef20",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog/family_calls.jsonl.gz",
+      "size": 112088,
+      "sha256": "cbb1531eec81a64808f953ccb3545ecc4c0c8991bcad0185f20ef244390121e2",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog/fields.jsonl.gz",
+      "size": 5983331,
+      "sha256": "7f185ac7451d2004ca10c1b8ee95164876bda84b6a192536ea63e14bd65816d4",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog/inheritance.jsonl.gz",
+      "size": 531589,
+      "sha256": "49c064e327e08ff4fd6bb13d2f42b0417f1effbe6e9e4de7e1cb2f3b394f70f3",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog/methods.jsonl.gz",
+      "size": 1789250,
+      "sha256": "035d72e76dddc922cb2a6f7c6bf14ba770cba0ade02e278b2ebd93ab0009e452",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog/sources.json",
+      "size": 49254,
+      "sha256": "2809bf43197f4e141284c7d95cf1b4bf6fe735b0b47178486a7190adb979eec6",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog/static_writes.jsonl.gz",
+      "size": 313812,
+      "sha256": "a3b144126d9aa920e6c44ce2a2f8fed2b074bd653652b66b70234765440459b7",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog/typed_initializer_corrections.jsonl.gz",
+      "size": 45507,
+      "sha256": "7318e9944ac7fba338ed3a87f3db85761a28219bf83a82a08f0ae92d2032aaf7",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog/value_conflicts.jsonl.gz",
+      "size": 175642,
+      "sha256": "675e0a73a0f349910e92eab1af0d5288e54dee6551429f055e5826a14c7b66f9",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "catalog_manifest.json",
+      "size": 3953,
+      "sha256": "80a21482b6d9bb393cdf238a66fead51f676dd87d4120a9558566f7f0cff10b9",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "collection_targets.json",
+      "size": 9373,
+      "sha256": "9a00a4321c40163d3d9d119ff90343d593434741ada732c0836a5aa0373e8bf2",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "compact_catalog.py",
+      "size": 7552,
+      "sha256": "6d91fb4f23f38fcb37f418665465e98fe4a7f0d1515e097ad048825926be02fe",
+      "role": "authored_tool"
+    },
+    {
+      "path": "corpus_scope.json",
+      "size": 35877,
+      "sha256": "c89d173d68f80f9a3e3cf327b2abe4be67ac140e07ac61e04c3f7dc956bf8184",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "decode_initializers.py",
+      "size": 2927,
+      "sha256": "c1c9a7a7fe12502db982cc9530c54bcb81bab789eb7bea8fd3a8d052ac1aee61",
+      "role": "authored_tool"
+    },
+    {
+      "path": "extract_dex.py",
+      "size": 7398,
+      "sha256": "b07ed5b436fc901659b1f7da8e402db7d9d8409524048349ced3c0d90b6d94e3",
+      "role": "authored_tool"
+    },
+    {
+      "path": "extraction_summary.json.gz",
+      "size": 66139,
+      "sha256": "779cc3c9d625c07959c141ed04c06dc678a81d1af705a6f9ec828e5491c5309f",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "lookup.py",
+      "size": 5722,
+      "sha256": "3f51683c29210f2d61bf300605dd9dd7ab7cb496c8ea622fe9e4e45ceecc7d5a",
+      "role": "authored_tool"
+    },
+    {
+      "path": "package_public.py",
+      "size": 4279,
+      "sha256": "6df9899e90b936cb91bf1cb21abf597c006fc4f8f33d55e65c6eb2141eb1c5e4",
+      "role": "authored_tool"
+    },
+    {
+      "path": "prepare_public_metadata.py",
+      "size": 4682,
+      "sha256": "d99587551f48912d172ebfb7161eed9e36cce3e0c5adfc9a9c17d7a1d9ec3d68",
+      "role": "authored_tool"
+    },
+    {
+      "path": "report.md",
+      "size": 17408,
+      "sha256": "d1a868f7cf00a1abb6bf76bf00b58ca4883e34dedb7e39f620f0b99193f4ac84",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "scan_sources.py",
+      "size": 5221,
+      "sha256": "7b8fd8139b20d154b03f8a0880b1d06e7e129617bdc0f670c44702cec2b1ebb2",
+      "role": "authored_tool"
+    },
+    {
+      "path": "source_inventory.json.gz",
+      "size": 111196,
+      "sha256": "a23fea5c7a433463ac12a81d40ab5fd907374047499506f07c141c43fbe98798",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "summarize.py",
+      "size": 15809,
+      "sha256": "ecc28f480b6d264264846f804643b89d91cf63b0f32b784ac06c7a1178cd5c65",
+      "role": "authored_tool"
+    },
+    {
+      "path": "system_zero_revalidation.json.gz",
+      "size": 4667,
+      "sha256": "ad18d4a5ed4eacb07221bd9ec54e9fc189bfc2d46cb59ccec7d4e06892fcb48e",
+      "role": "extracted_facts_or_authored_report"
+    },
+    {
+      "path": "test_typed_decoder.py",
+      "size": 1255,
+      "sha256": "06c81e972d901c0b9709745747888130c661c796268dd59dd543c04f277aa7b0",
+      "role": "authored_tool"
+    },
+    {
+      "path": "validate_catalog.py",
+      "size": 8185,
+      "sha256": "e9dafbf7c5935f37dea4456a579ccf71178ab200f890fbaf63bd3f85c720f902",
+      "role": "authored_tool"
+    },
+    {
+      "path": "validate_typed_initializers.py",
+      "size": 21809,
+      "sha256": "e06ef0079752139eab3f31a1cae1fd0ab715487f1c89638f0cc7bc230f489366",
+      "role": "authored_tool"
+    },
+    {
+      "path": "verify_raw_dex.py",
+      "size": 3320,
+      "sha256": "682e8307e17d228f99a90d1fe1276c8363d74ef77fb85f4ec769ceebc5c72fad",
+      "role": "authored_tool"
+    }
+  ],
+  "payload_file_count": 33,
+  "total_payload_bytes": 9784569,
+  "manifest_path": "PUBLIC_FILES.json",
+  "copy_rule": "Copy these relative files and this manifest preserving directories. No other files are authorized by this allowlist.",
+  "self_hash": "The manifest intentionally omits its own checksum; commit/tree identity anchors it.",
+  "excluded": [
+    "private/",
+    "original archives, APK/JAR/DEX bytes",
+    "foreign method bodies and disassembly",
+    "resolved arbitrary string initializer content",
+    "uncompressed intermediate inventories and historical page manifests"
+  ],
+  "runtime_class_origin_verified": false,
+  "vehicle_commands_sent": false
+}

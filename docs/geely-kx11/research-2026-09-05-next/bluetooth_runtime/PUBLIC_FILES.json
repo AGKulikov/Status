@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "scope": "REL-008 public allowlist: authored analysis, typed evidence, references and code only",
+  "excluded": [
+    "private/**",
+    "static/private/**",
+    "original APK/JAR/ELF",
+    "full foreign method bodies",
+    "raw HCI/log/device metadata"
+  ],
+  "files": [
+    {
+      "path": "VALIDATION.json",
+      "bytes": 3326,
+      "sha256": "2f3922ce9f833ae5888ead098314c49860dedba323c95fde3d201453865bb79f"
+    },
+    {
+      "path": "build_dm_report.py",
+      "bytes": 13422,
+      "sha256": "ecfb717e5a444804cfe8c641e6e4e7c1ddcdf28d514b639f84121b01dfa3fa61"
+    },
+    {
+      "path": "build_report.py",
+      "bytes": 17139,
+      "sha256": "277f7927f4ed01adbcf0265a45e6680577729f5e0fbc7f65a5b12cf9bfb50184"
+    },
+    {
+      "path": "collection_targets.json",
+      "bytes": 21379,
+      "sha256": "8b19f7deec0037700ea4ca1c9d9e56c1aa306876d27758debd467b081fd7cf38"
+    },
+    {
+      "path": "dm_service_evidence.json",
+      "bytes": 69061,
+      "sha256": "ead19293a6c75b5f7de71d2ae97733c939579959278754a7faa959309df1635f"
+    },
+    {
+      "path": "dm_service_runtime_projection.json",
+      "bytes": 3727,
+      "sha256": "981c6e99e434f8644eaf7b62e0c78e0e57427152f9b497ba77fd18a24edbbefb"
+    },
+    {
+      "path": "evidence.json",
+      "bytes": 69110,
+      "sha256": "08d6dde046e05600b100abca79fe5a59e9fa53fcba73bbaf29537b7e1ddc146a"
+    },
+    {
+      "path": "finalize_presence.py",
+      "bytes": 2716,
+      "sha256": "9d2c44b95602ee4414bde3b6191f56df0170057b92ad5dc292a100f61ef9691d"
+    },
+    {
+      "path": "finalize_public.py",
+      "bytes": 8069,
+      "sha256": "c0c9b501862ce3e36291a3a415b8a5110e87feb6d5bfc6f401604eb6c89cbd7d"
+    },
+    {
+      "path": "finish_nested_names.py",
+      "bytes": 1167,
+      "sha256": "8eee24462016f34ac7058b7df547cf29c5233da1038e2aa90765052f0d9d8d76"
+    },
+    {
+      "path": "full_corpus_target_coverage.json",
+      "bytes": 213761,
+      "sha256": "e60c4f0fd53fbde578a7d7ecd9ecf3e55fe0902f56ea38eba86f1c66383301b5"
+    },
+    {
+      "path": "hci_metadata.py",
+      "bytes": 3237,
+      "sha256": "52d92169d703d16138b3202869493ff5f49e4a0baae6c0c414596937fe6292d4"
+    },
+    {
+      "path": "package_identity_evidence.json",
+      "bytes": 3603,
+      "sha256": "19e771fc66f050241b5f838895c6cc50964adf431ae173f4104f01466ecc9f1b"
+    },
+    {
+      "path": "project_runtime.py",
+      "bytes": 2705,
+      "sha256": "43479390f4280b3aa46a19658d8deddef0636f6fb8f5ec461d708783cc2abf7e"
+    },
+    {
+      "path": "report.md",
+      "bytes": 18343,
+      "sha256": "2d3aa11565e709fa4e71d49b6a88b9b679519ffc06e4b1bbc9ce9d822e316b99"
+    },
+    {
+      "path": "scan_nested_names.py",
+      "bytes": 1716,
+      "sha256": "1cf1b12c293b457fe87afe748299fdb88f09345d59696e160dab68a0a95a50cf"
+    },
+    {
+      "path": "source_inventory.json",
+      "bytes": 162292,
+      "sha256": "daaa59613d3f4719b38ef452ea300be0914e8a125569b7f12d6ff523ddfc2ed4"
+    },
+    {
+      "path": "static/collection_targets.json",
+      "bytes": 17584,
+      "sha256": "a749324e837330e0b027dc6474b5638832dcee3682bc7f9a93311fc50970965e"
+    },
+    {
+      "path": "static/evidence.json",
+      "bytes": 38610,
+      "sha256": "862372ed89c3ac7ec22594a78e56d1c22664d403df291567db853397822055cc"
+    },
+    {
+      "path": "static/report.md",
+      "bytes": 12286,
+      "sha256": "f4381b3be1b8306d3d1bd9d4dd4b51f88886a9a1da08f7e0bb3ae19be01815cc"
+    },
+    {
+      "path": "timeline.json",
+      "bytes": 281589,
+      "sha256": "3a9ec06f88e683e404c17c5d5ca469740071316cfb33394fce3cacd34459a5b1"
+    },
+    {
+      "path": "validate_full_corpus.py",
+      "bytes": 4457,
+      "sha256": "ce2adb30b6bc8fa9fea568e9eef7d973107d8876fa4720662eb49e8c94a93ace"
+    }
+  ],
+  "self_excluded_from_hashes": "PUBLIC_FILES.json"
+}

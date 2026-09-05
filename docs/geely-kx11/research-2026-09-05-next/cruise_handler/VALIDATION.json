@@ -1,0 +1,118 @@
+{
+  "status": "PASS",
+  "runtime_vehicle_validation": "NOT_PERFORMED",
+  "firmware_execution": "NONE",
+  "network_io": "NONE",
+  "checks": [
+    {
+      "check": "source_entries_unique",
+      "pass": true,
+      "detail": 141
+    },
+    {
+      "check": "source_member_totals",
+      "pass": true,
+      "detail": 15345
+    },
+    {
+      "check": "native_eleven_invalid",
+      "pass": true,
+      "detail": "11/11"
+    },
+    {
+      "check": "native_source_hash",
+      "pass": true,
+      "detail": "b6feed82f777bfa8773c03b78c1f17038e122f492ef85126c095354a29c16756"
+    },
+    {
+      "check": "enum_external_refs_zero",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "check": "pcap_no_truncation",
+      "pass": true,
+      "detail": 32
+    },
+    {
+      "check": "lv_path_safety",
+      "pass": true,
+      "detail": 341
+    },
+    {
+      "check": "targets_regular_files_only",
+      "pass": true,
+      "detail": 15
+    },
+    {
+      "check": "known_qnx_paths_have_source_evidence",
+      "pass": true,
+      "detail": "known-source hash skip targets"
+    },
+    {
+      "check": "syntax:unpack_lv.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:build_collection_targets.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:build_report.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:scan_java.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:scan_archives.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:audit_native_tables.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:audit_updater_paths.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:extract_handlers.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:audit_cruise_xrefs.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:audit_pcaps.py",
+      "pass": true,
+      "detail": "py_compile only"
+    },
+    {
+      "check": "syntax:disassemble_native.py",
+      "pass": true,
+      "detail": "py_compile only"
+    }
+  ],
+  "artifact_sha256": {
+    "updater_path_xrefs.json": "de129089bfa704e702e21f6f6aa95f14ab0d945ae1b3f4fee624e1c03ac03b75",
+    "evidence.json": "efc714107e97d14099b5d353379ab4053c93b206479540a12a13a182d77a9a64",
+    "pcap_audit.json": "730b9e1329e60e838be6847f8310e23f7bb4f1e2231de9b604cb655a0b2ddcf2",
+    "source_inventory.json": "d6330951d72d63024daac57ddfb311cbb98ff0e81fb27794653dbac4403d7aa5",
+    "native_tables.json": "f68fac2857b90878b367f366c5f1c78830994c192948613e856443707c2f5c53",
+    "lv_image_inventory.json": "2d683b86bf01ce6ba9b4ad9712a3dabc9909b9e5b469748a2f99c4be5341e3c4",
+    "cruise_dex_xrefs.json": "a2434f284fbfaf932474e54dadbfbb41906615b513f73266f1959eb094fc5e93",
+    "collection_targets.json": "18400668841aecaf5fefd26a9d03a4c0996e603b67ea5aed9c0d58dcd1ebb6f1"
+  }
+}

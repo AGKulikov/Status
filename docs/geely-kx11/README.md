@@ -4,7 +4,10 @@
 [Реестр требований](../../PROJECT_REQUIREMENTS_RU.md) ·
 [Расширенная очередь вопросов](open_questions.json)
 
-Обновление 1.1 от 5 сентября: [матрица 94 областей](research-2026-09-05/COVERAGE_RU.md),
+Продолжение 1.2: [Mac-сборщик недостающих файлов](../../tools/geely-macos-collector/README_RU.md),
+[углублённый разбор](research-2026-09-05-next/README_RU.md), [проверка158 источников](research-2026-09-05-next/CORPUS_CHECK.json).
+
+Историческое обновление 1.1 от 5 сентября: [матрица 94 областей](research-2026-09-05/COVERAGE_RU.md),
 [новые результаты](research-2026-09-05/RESEARCH_LOG_RU.md),
 [план исследования и недостающих данных](research-2026-09-05/DATA_PLAN_RU.md).
 Машиночитаемая [матрица](research-2026-09-05/systems.json) связана с точными источниками;

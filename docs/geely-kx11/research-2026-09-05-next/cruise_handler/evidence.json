@@ -1,0 +1,217 @@
+{
+  "task": "Geely KX11 cruise supported-handler boundary",
+  "date": "2026-09-05",
+  "method": "offline-only archive/DEX/ELF/PCAP/initramfs analysis; source binaries never executed",
+  "counts": {
+    "source_files": 141,
+    "source_bytes": 3958578166,
+    "archive_members": 15345,
+    "member_bytes": 6471473436,
+    "unique_member_hashes": 9678,
+    "unique_elf_hashes": 274,
+    "selected_dex": 42,
+    "dex_methods": 1406737,
+    "external_enum_instruction_refs": 0,
+    "unique_pcaps": 32,
+    "pcap_records": 222353,
+    "mcu_service_datagrams": 300,
+    "asdm_initial_and_changed_samples": 35,
+    "lv_entries": 341,
+    "lv_regular_files": 143
+  },
+  "selected_files": {
+    "ecarx.adaptapi.jar": {
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "bytes": 1135817
+    },
+    "ecarx.car.jar": {
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "bytes": 594600
+    },
+    "XSFInputService.apk": {
+      "sha256": "c4e380408d952298370ce8f9df177e902233c2a24825f15a02c1dbf371fccc14",
+      "bytes": 3204602
+    },
+    "sc_qnx_vip_proxy": {
+      "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+      "bytes": 335440
+    },
+    "can_driver": {
+      "sha256": "d60ba7ab0bb07119cf24425ebc817a6e6bc41ab737944bab0d5dd737cfeeb28d",
+      "bytes": 18360
+    },
+    "cluster_controller": {
+      "sha256": "d9b7573cf3933d5a58f6c6132b1f76902f52ea108dadb91d5b76a59a474273d8",
+      "bytes": 3916064
+    },
+    "vendor_bin_smartcore_update_client": {
+      "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+      "bytes": 136400
+    },
+    "mcu_log": {
+      "sha256": "33d91dad416089274af3ec23b4e5b8824b69a5196313b3162c40bdfd65e4fd0b",
+      "bytes": 405000
+    },
+    "swdl_soc": {
+      "sha256": "618591de6ec1373340b587c67eb6a2059cbd2ff6ceaf686b4e9f3137b59514f8",
+      "bytes": 406048
+    },
+    "swl_update": {
+      "sha256": "f9e492b581b754f95350634c53cfe03d42c63f372bbfd68eab4efee92a1d114f",
+      "bytes": 23261624
+    }
+  },
+  "findings": [
+    {
+      "id": "CH-001",
+      "status": "proven_static_bounded",
+      "statement": "11 original/adjacent cruise/status VHAL properties reach invalid outbound constructor at0x1a0fb8.",
+      "evidence": "native_tables.json",
+      "limit": "Applies to SHA b6feed82…; not a proof about unidentified MCU firmware."
+    },
+    {
+      "id": "CH-002",
+      "status": "proven_static_bounded",
+      "statement": "Two DrvrCrsCtrlFct enum classes exist but external instruction references are absent in the corpus DEX scan. Four speed-function literals occur in labels/support maps or user research code; a live supported cruise handler is not established.",
+      "evidence": "cruise_dex_xrefs.json",
+      "limit": "Does not rule out reflection, arithmetic construction, native caller, encoded tables or another software version."
+    },
+    {
+      "id": "CH-003",
+      "status": "proven_static",
+      "statement": "Stock ECarXCarHardKeyService finite subscription registers27 SDK signals plus conditional33456; does not subscribe30469. XSF KeyPolicy registers37 named actions for media/phone/menu/drive-mode/touch.",
+      "sdk_signal_ids": [
+        30967,
+        30969,
+        30915,
+        30899,
+        30897,
+        30900,
+        30901,
+        30898,
+        30913,
+        30916,
+        30917,
+        30909,
+        30891,
+        30867,
+        30868,
+        30896,
+        30860,
+        30903,
+        30904,
+        30902,
+        30865,
+        30861,
+        30966,
+        30965,
+        30968,
+        30970,
+        31385
+      ],
+      "conditional_sdk_signal_id": 33456,
+      "limit": "Only this Android stock path; steering cruise receiving ECU is not captured."
+    },
+    {
+      "id": "CH-004",
+      "status": "proven_static",
+      "statement": "DrvrAsscSysBtnPush and CB_SAP equivalent have real outbound converter entries, but enum0..12 means APA/PAS/RPA parking buttons, not cruise. ACC/TSR/HWA CB_ASY routes are settings.",
+      "evidence": "native_tables.json",
+      "limit": "No new vehicle-network commands were sent."
+    },
+    {
+      "id": "CH-005",
+      "status": "proven_static_bounded",
+      "statement": "QNX sc_qnx_vip_proxy init registers six explicit callbacks using application vtable+0xc0; no cruise callback in this registration function.",
+      "namespace": "QNX SOME/IP; not the .1 IPCP service namespace",
+      "callbacks": [
+        {
+          "service": "0x00c9",
+          "instance": 1,
+          "method": 1,
+          "callback": "onRecvACK",
+          "callback_va": "0x7490",
+          "registration_call": "0x6728"
+        },
+        {
+          "service": "0x00c9",
+          "instance": 1,
+          "method": 2,
+          "callback": "onRecvRegRvcEvent",
+          "callback_va": "0x5c70",
+          "registration_call": "0x6780"
+        },
+        {
+          "service": "0x0191",
+          "instance": 1,
+          "method": 2,
+          "callback": "onRecvHeartBeat",
+          "callback_va": "0x70a0",
+          "registration_call": "0x67d8"
+        },
+        {
+          "service": "0x00c7",
+          "instance": 1,
+          "method": 6,
+          "callback": "onRecvHealthMenagerHeartBeat",
+          "callback_va": "0x5dc8",
+          "registration_call": "0x6830"
+        },
+        {
+          "service": "0x00c9",
+          "instance": 1,
+          "method": 3,
+          "callback": "onRecvUsbupdateReq",
+          "callback_va": "0x5fb0",
+          "registration_call": "0x6888"
+        },
+        {
+          "service": "0x00c9",
+          "instance": 1,
+          "method": 4,
+          "callback": "onRecvLocalTimeSyncEvent",
+          "callback_va": "0x60d8",
+          "registration_call": "0x68e0"
+        }
+      ]
+    },
+    {
+      "id": "CH-006",
+      "status": "proven_static_bounded",
+      "statement": "QNX can_driver provides generic CAN/SPI devctl, not an identified cruise handler; open callback0x1808 changes global state and close0x182c changes it again.",
+      "evidence": "private/can_driver.1510.asm.txt",
+      "consequence": "Do not collect device nodes even as a read-only file. Copy existing ordinary binaries only."
+    },
+    {
+      "id": "CH-007",
+      "status": "observed_saved_capture",
+      "statement": "Saved PCAPs contain incoming MCU-log service0099/00c8 and incoming ASDM001f/0056 state changes around named MAIN/mode episodes.",
+      "evidence": "pcap_audit.json",
+      "limit": "Cue names/timestamps are not authenticated physical actuation times; captures overlap, so datagram counts are not independent trials. No outgoing cruise command identified."
+    },
+    {
+      "id": "CH-008",
+      "status": "proven_static",
+      "statement": "Raw AArch64 linux-lv.img embeds gzip/newc initramfs at19406128;341 entries extracted safely offline. mcu_log UDP bind setup uses INADDR_ANY:50500 and logging prefix vp under /data/kernellog.",
+      "evidence": "lv_image_inventory.json",
+      "main_va": "0x4009e0",
+      "log_setup_va": "0x400a1c",
+      "socket_bind_setup_va": "0x400a40..0x400a74",
+      "receive_loop_va": "0x400adc..0x400ba4",
+      "mount_callback_va": "0x400c1c",
+      "limit": "LV logger is a receive/log path, not cruise control. Current runtime alias into Android/QNX is unknown. Do not launch it."
+    },
+    {
+      "id": "CH-009",
+      "status": "proven_static_paths_conditional_presence",
+      "statement": "Android smartcore_update_client destination strings and LV usb_update.sh establish6 exact OTA filenames; presence and component ownership are not established. LV swl_update main calls someip_client which addresses update service0x12d instance1.",
+      "evidence": "collection_targets.json",
+      "limit": "No proof that swlm/swp1 means production VP firmware. No update process was run."
+    }
+  ],
+  "unresolved": [
+    "Production VP/MCU image corresponding to MCU version20.24.10.23024.41141 and hardware identity of 198.18.34.1:50500.",
+    "Wheel-switch receiving ECU handler and downstream cruise request/counter/checksum/eligibility semantics.",
+    "Meaning/ownership of swlm/swp1 package segments; names alone are insufficient."
+  ]
+}

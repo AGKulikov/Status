@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "date": "2026-09-05",
   "note": "Рабочая очередь приоритетных вопросов, а не исчерпывающий перечень и не расписание автоматических действий. Подробные неизвестные, аппаратные ограничения, необходимые артефакты и следующие шаги остаются в 94 связанных карточках. Сначала используются уже собранные исходники и архивы; новые наблюдения запрашиваются только для конкретного остаточного пробела.",
   "coverage": {
@@ -39,74 +39,114 @@
       "priority": "P1",
       "function": "Программные MAIN/SET/RES/+/− и лимитер",
       "status": "OPEN",
-      "known": "Шесть READ-свойств не кодируются исходящим VHAL; ASDM status 2↔3 наблюдался. Настройки ACC/HWA не установлены как MAIN/SET/RES; сохранённый канал MCU-журнала не является маршрутом этих команд.",
-      "missing_evidence": "Конкретный поддержанный command route и получатель ECU/MCU",
-      "next_step": "Проверить production consumer кнопок и уже полученный HU-Route, сопоставить с обработчиками peer .1; установить supported route и обратный статус. Исходящие кадры не воспроизводить.",
+      "known": "В 42 выбранных DEX проверены 1406737 методов: внешние ссылки на cruise enum не найдены. 11 проверенных VHAL-статусов имеют invalid outgoing branch; реальные DrvrAsscSysBtnPush относятся к парковке. В QNX proxy шесть callbacks, can_driver — общий transport, не cruise handler.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Через Mac-сборщик проверить сохранённые пакеты OTA и новые варианты известных компонентов; после появления production ECU image разобрать получатель кнопок. Точный путь этого image пока не установлен.",
       "sources": [
         "cruise/report.md",
         "cruise/vhal_switch_audit.json",
         "research-2026-09-05/powertrain_chassis/systems.json",
-        "research-2026-09-05/architecture_domains/systems.json"
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05-next/cruise_handler/report.md"
       ],
       "coverage_ids": [
         "ADAS-CRUISE"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "Шесть READ-свойств не кодируются исходящим VHAL; ASDM status 2↔3 наблюдался. Настройки ACC/HWA не установлены как MAIN/SET/RES; сохранённый канал MCU-журнала не является маршрутом этих команд.",
+          "next_step": "Проверить production consumer кнопок и уже полученный HU-Route, сопоставить с обработчиками peer .1; установить supported route и обратный статус. Исходящие кадры не воспроизводить.",
+          "missing_evidence": "Конкретный поддержанный command route и получатель ECU/MCU"
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "LIMITER_VALUE",
       "priority": "P1",
       "function": "Режим и заданная скорость лимитера",
       "status": "OPEN",
-      "known": "AdjSpdLimnSts/CrsCtrlrSts в прежних журналах invalid/−1. Статически 31354 — READ; настройки предупреждения о скорости и TSR compensation не устанавливают заданную скорость лимитера.",
-      "missing_evidence": "Сигнал режима и числовая шкала скорости из правильного домена",
-      "next_step": "В уже сохранённых callback/PCAP и штатном потребителе найти отдельные mode/set-speed поля; разобрать invalid, единицы и точный decoder. Сопоставление с визуальным значением остаётся отдельным доказательством.",
+      "known": "Четыре speed feature ID имеют только ограниченные прямые ссылки в CarLog/пользовательском consumer/support-map; штатный command handler не найден в исследованной области.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Разобрать новые компоненты OTA, если сборщик их получит. Не переносить setter/readback из статуса лимитера в неизвестный command protocol.",
       "sources": [
         "cruise/report.md",
-        "research-2026-09-05/powertrain_chassis/systems.json"
+        "research-2026-09-05/powertrain_chassis/systems.json",
+        "research-2026-09-05-next/cruise_handler/report.md"
       ],
       "coverage_ids": [
         "ADAS-LIMITER"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "AdjSpdLimnSts/CrsCtrlrSts в прежних журналах invalid/−1. Статически 31354 — READ; настройки предупреждения о скорости и TSR compensation не устанавливают заданную скорость лимитера.",
+          "next_step": "В уже сохранённых callback/PCAP и штатном потребителе найти отдельные mode/set-speed поля; разобрать invalid, единицы и точный decoder. Сопоставление с визуальным значением остаётся отдельным доказательством.",
+          "missing_evidence": "Сигнал режима и числовая шкала скорости из правильного домена"
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "VP_IDENTITY",
       "priority": "P1",
       "function": "Кто владеет 198.18.34.1",
       "status": "OPEN",
-      "known": "В исходном PCAP повторно подтверждены 45 входящих MCU-log пакетов 0099/00c8 от 198.18.34.1:50500 к Android .15:50335. QNX/qconn имеет .2. LA и LV конфигурируют system la с одинаковым виртуальным peer; LV — Failsafe guest. Это не привязывает .1 к физическому MCU или linux-lv.img.",
-      "missing_evidence": "Процесс, сетевой интерфейс и исполняемый образ владельца .1:50500; первоначальный источник MCU-текста за транспортным peer; независимая привязка к установленному оборудованию.",
-      "next_step": "Сопоставить endpoint bind/registration в имеющихся native библиотеках и VM/network config; связать отдельный PA_VP_Version с образом. printApvpVersion читает PA_ErrorReport, поэтому его ярлык VpVersion не использовать как идентификацию.",
+      "known": "Linux LV initramfs распакован: mcu_log — UDP logger с каталогом /data/kernellog, swl_update — клиент обновления. Это не подтверждение аппаратной личности peer .1.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Сопоставить состав найденного OTA с production MCU version; установленного Android/QNX alias к LV /data пока нет.",
       "sources": [
         "research-2026-09-05/architecture_domains/systems.json",
         "research-2026-09-05/architecture_domains/primary_evidence.json",
         "research-2026-09-05/architecture_domains/sdk_architecture_evidence.json",
         "research-2026-09-05/mcu_log_route/report.md",
-        "research-2026-09-05/mcu_log_route/pcap_mcu_summary.json"
+        "research-2026-09-05/mcu_log_route/pcap_mcu_summary.json",
+        "research-2026-09-05-next/cruise_handler/report.md"
       ],
       "coverage_ids": [
         "ARCH-004",
         "ARCH-005",
         "ARCH-016"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "В исходном PCAP повторно подтверждены 45 входящих MCU-log пакетов 0099/00c8 от 198.18.34.1:50500 к Android .15:50335. QNX/qconn имеет .2. LA и LV конфигурируют system la с одинаковым виртуальным peer; LV — Failsafe guest. Это не привязывает .1 к физическому MCU или linux-lv.img.",
+          "next_step": "Сопоставить endpoint bind/registration в имеющихся native библиотеках и VM/network config; связать отдельный PA_VP_Version с образом. printApvpVersion читает PA_ErrorReport, поэтому его ярлык VpVersion не использовать как идентификацию.",
+          "missing_evidence": "Процесс, сетевой интерфейс и исполняемый образ владельца .1:50500; первоначальный источник MCU-текста за транспортным peer; независимая привязка к установленному оборудованию."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "RUNTIME_SDK",
       "priority": "P1",
       "function": "Какой SDK реально загружает приложение",
       "status": "OPEN",
-      "known": "758 CB/PA ID различаются между копиями SDK; exact static mapping извлечён",
-      "missing_evidence": "Runtime class origin для конкретного приложения/класса",
-      "next_step": "Сначала сопоставить имеющиеся classloader paths, packages/framework dependencies и исходные DEX; для каждого клиента записать класс, source SHA и значения. Только отсутствующее runtime происхождение станет точечным запросом.",
+      "known": "Все 621 уникальных DEX прошли структурное извлечение; независимый decoder исправляет signed int и float/double initializer. У 75 исходных DEX внутренняя SHA1 signature не совпадает при корректном Adler32; это отмечено отдельно.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Сборщик сверит текущие APK/JAR hashes и package/maps metadata; defining classloader конкретного класса всё ещё требует существующей диагностики внутри его процесса.",
       "sources": [
         "firmware/conflicts.json",
         "firmware/sdk_to_hal.json",
         "research-2026-09-05/architecture_domains/systems.json",
-        "research-2026-09-05/android_platform/systems.json"
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-09-05-next/sdk_completeness/report.md"
       ],
       "coverage_ids": [
         "ARCH-001",
         "ARCH-021"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "758 CB/PA ID различаются между копиями SDK; exact static mapping извлечён",
+          "next_step": "Сначала сопоставить имеющиеся classloader paths, packages/framework dependencies и исходные DEX; для каждого клиента записать класс, source SHA и значения. Только отсутствующее runtime происхождение станет точечным запросом.",
+          "missing_evidence": "Runtime class origin для конкретного приложения/класса"
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "CAMERA_STATE",
@@ -220,17 +260,27 @@
       "priority": "P2",
       "function": "Остановка окон и движения сидений",
       "status": "PARTLY_RESOLVED",
-      "known": "Окна: raw 1…26 → 0…100% с шагом 4; групповая запись последовательна и не атомарна. Сиденья: направления 1/2, stop 0. В non-EX11 ветви окна обнаружено расхождение регистрации pause и mapper.",
-      "missing_evidence": "Реальный stop при отпускании, потере фокуса/Binder/сне; препятствие и anti-pinch feedback; границы зон, положение и остаточное движение; значение расхождения pause на нужном SDK.",
-      "next_step": "Свести штатный press/release lifecycle, оконный mapper и PA33833…33840; для сидений отделить направления от абсолютных координат и памяти. Установить, кто гарантирует stop при разрыве клиента.",
+      "known": "Штатный seat consumer отправляет STOP0 по UP; ACTION_CANCEL идёт в return true. Roof position slider пишет при отпускании; UI-delay не является доказанным ECU watchdog.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Прочитать итоговый lifecycle-разбор с inherited/RxBus цепью; остаются физический STOP при разрыве клиента, ECU watchdog и anti-pinch, которые файловый сбор сам не проверяет.",
       "sources": [
         "firmware/mapping/report.md",
-        "research-2026-09-05/comfort_systems/systems.json"
+        "research-2026-09-05/comfort_systems/systems.json",
+        "research-2026-09-05-next/comfort_contracts/report.md"
       ],
       "coverage_ids": [
         "COMF-006",
         "COMF-019"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "Окна: raw 1…26 → 0…100% с шагом 4; групповая запись последовательна и не атомарна. Сиденья: направления 1/2, stop 0. В non-EX11 ветви окна обнаружено расхождение регистрации pause и mapper.",
+          "next_step": "Свести штатный press/release lifecycle, оконный mapper и PA33833…33840; для сидений отделить направления от абсолютных координат и памяти. Установить, кто гарантирует stop при разрыве клиента.",
+          "missing_evidence": "Реальный stop при отпускании, потере фокуса/Binder/сне; препятствие и anti-pinch feedback; границы зон, положение и остаточное движение; значение расхождения pause на нужном SDK."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "TELEMETRY_SCALE",
@@ -280,15 +330,16 @@
       "priority": "P2",
       "function": "Роль MPC5746/CAN и другие SPI-каналы",
       "status": "OPEN",
-      "known": "MPC5746 ELF содержит FreeRTOS/CAN/SPI/board-power и reference-board ADP-STARVIP/ALCOR dual-SoC признаки. QNX can_driver указывает SPI9; IPCL SPI4 — отдельный IHU обмен. Два исходных Android-лога передают MCU_Version 20.24.10.23024.41141 через PA_McuLog.",
-      "missing_evidence": "Соответствие reference ELF установленной версии MCU; владельцы SPI4/SPI9 и физических CAN/FlexRay/LIN; путь от transport endpoint к контроллеру и конкретному ECU.",
-      "next_step": "Сравнить version/build metadata образов с сообщаемой MCU-версией, затем call graph driver/IPCL и board configuration. Продолжать по сохранённым байтам; reset_stats не является чтением неизменяемой статистики.",
+      "known": "QNX can_driver open/close меняет глобальное состояние драйвера; обычный бинарный файл можно читать отдельно, открывать /dev/can* для якобы пассивного сбора нельзя.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Изучать только новые обычные бинарные файлы; ECU-владелец и cruise framing остаются неподтверждёнными.",
       "sources": [
         "cruise/report.md",
         "research-2026-09-05/architecture_domains/systems.json",
         "research-2026-09-05/architecture_domains/mpc5746c_structure_evidence.json",
         "research-2026-09-05/architecture_domains/relayed_mcu_logs.json",
-        "research-2026-09-05/mcu_log_route/report.md"
+        "research-2026-09-05/mcu_log_route/report.md",
+        "research-2026-09-05-next/cruise_handler/report.md"
       ],
       "coverage_ids": [
         "ARCH-008",
@@ -296,7 +347,16 @@
         "ARCH-010",
         "ARCH-011",
         "ARCH-024"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "MPC5746 ELF содержит FreeRTOS/CAN/SPI/board-power и reference-board ADP-STARVIP/ALCOR dual-SoC признаки. QNX can_driver указывает SPI9; IPCL SPI4 — отдельный IHU обмен. Два исходных Android-лога передают MCU_Version 20.24.10.23024.41141 через PA_McuLog.",
+          "next_step": "Сравнить version/build metadata образов с сообщаемой MCU-версией, затем call graph driver/IPCL и board configuration. Продолжать по сохранённым байтам; reset_stats не является чтением неизменяемой статистики.",
+          "missing_evidence": "Соответствие reference ELF установленной версии MCU; владельцы SPI4/SPI9 и физических CAN/FlexRay/LIN; путь от transport endpoint к контроллеру и конкретному ECU."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "DOMAIN_BOOT_GRAPH",
@@ -360,18 +420,28 @@
       "priority": "P1",
       "function": "Как работают DoIP/UDS, DTC и диагностические владельцы?",
       "status": "OPEN",
-      "known": "QNX DoIP задаёт один physical target 0xE000 и шесть functional addresses; UDS config содержит иную функциональную группировку. Android имеет dtcnl; getDtcCodeStatus и setDtcCode различны.",
-      "missing_evidence": "Кто отвечает за адрес, где gateway, какая таблица DTC/статусов актуальна, что локально и что пересылается, какие операции имеют побочный эффект.",
-      "next_step": "Проследить существующие DoIP/UDS config и native dispatch до обработчиков, декодировать уже записанные diagnostic logs. Функциональный адрес не считать отдельным ECU.",
+      "known": "В разобранной SDK-копии DtcManager возвращает локальный набор восьми записей; только WPC обновляется по PA33625. DiagnosticMonitor.setMonitorEnable и ряд BtDebug методов — literal false.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Не выдавать этот API за полный reader ECU DTC. Сверить текущую SDK-копию; реальный диагностический owner пока не установлен.",
       "sources": [
         "research-2026-09-05/architecture_domains/systems.json",
-        "research-2026-09-05/android_platform/systems.json"
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-09-05-next/sdk_completeness/report.md"
       ],
       "coverage_ids": [
         "ARCH-013",
         "ARCH-015",
         "PLAT_UPDATE"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "QNX DoIP задаёт один physical target 0xE000 и шесть functional addresses; UDS config содержит иную функциональную группировку. Android имеет dtcnl; getDtcCodeStatus и setDtcCode различны.",
+          "next_step": "Проследить существующие DoIP/UDS config и native dispatch до обработчиков, декодировать уже записанные diagnostic logs. Функциональный адрес не считать отдельным ECU.",
+          "missing_evidence": "Кто отвечает за адрес, где gateway, какая таблица DTC/статусов актуальна, что локально и что пересылается, какие операции имеют побочный эффект."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "VERSION_PROVENANCE",
@@ -396,37 +466,57 @@
       "priority": "P1",
       "function": "Как устроены питание, сон и восстановление связности?",
       "status": "OPEN",
-      "known": "MCU relay показывает последовательности AP/IM/EM/qnx/and/ps_hold. PowerSomeIP управляет mute, Wi-Fi и Bluetooth; QNX request проходит через IPLM.ReleaseResourceGroup к PowerManager.onQNXRequest.",
-      "missing_evidence": "Состояния и разрешённые переходы каждого автомата, причины wake/sleep, сохранение ресурсов, условия heartbeat и фактическое снятие питания; embedded counter не установлен как миллисекунды.",
-      "next_step": "Раскрыть PowerSomeIP handlers и изменённый PowerManager, сопоставить PA_Power_Res и два boot timelines; отделить время источника MCU от Android получения и связи с ANCS/audio сбоями.",
+      "known": "PowerSomeIP повторные enable, timeout/Binder errors наблюдаются, но причинная связь со sleep и конкретным обрывом GATT не доказана.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Сверить новые версии и очищенный runtime snapshot; синхронный AP/QNX power epoch остаётся отдельным отсутствующим наблюдением.",
       "sources": [
         "research-2026-09-05/architecture_domains/systems.json",
         "research-2026-09-05/android_platform/systems.json",
-        "research-2026-09-05/architecture_domains/relayed_mcu_logs.json"
+        "research-2026-09-05/architecture_domains/relayed_mcu_logs.json",
+        "research-2026-09-05-next/bluetooth_runtime/report.md"
       ],
       "coverage_ids": [
         "ARCH-017",
         "ARCH-018",
         "PLAT_POWER"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "MCU relay показывает последовательности AP/IM/EM/qnx/and/ps_hold. PowerSomeIP управляет mute, Wi-Fi и Bluetooth; QNX request проходит через IPLM.ReleaseResourceGroup к PowerManager.onQNXRequest.",
+          "next_step": "Раскрыть PowerSomeIP handlers и изменённый PowerManager, сопоставить PA_Power_Res и два boot timelines; отделить время источника MCU от Android получения и связи с ANCS/audio сбоями.",
+          "missing_evidence": "Состояния и разрешённые переходы каждого автомата, причины wake/sleep, сохранение ресурсов, условия heartbeat и фактическое снятие питания; embedded counter не установлен как миллисекунды."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "UPDATE_RECOVERY",
       "priority": "P1",
       "function": "Как выбираются update targets и выполняется восстановление?",
       "status": "OPEN",
-      "known": "Манифест содержит 23 image entries, не 23 ECU; обнаружена отдельная failsafe ветвь. OTA, USB update и PKI имеют свои сервисы; текст Flash successful в generic скрипте не проверяет exit status updater.",
-      "missing_evidence": "Подписи и совместимость payload, реальные A/B назначения, boot selection, rollback и сценарий прерывания; условия consent/install и восстановления после ошибки.",
-      "next_step": "По существующим metadata/config/code построить update state graph и проверить каждую запись main/backup, включая cmnlib; отделить подготовку, статус и операции записи. Образы не исполнять.",
+      "known": "Android updater содержит точные /ota_download/udisk_manifest.json и пять update-сегментов; LV /swdl относится к другому namespace. Наличие пакетов на текущей ГУ условно.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Запустить Mac-сборщик: только шесть точных Android OTA paths; состав и принадлежность частей определять по новым байтам.",
       "sources": [
         "research-2026-09-05/architecture_domains/systems.json",
         "research-2026-09-05/android_platform/systems.json",
-        "research-2026-09-05/architecture_domains/manifest_summary.json"
+        "research-2026-09-05/architecture_domains/manifest_summary.json",
+        "research-2026-09-05-next/cruise_handler/report.md"
       ],
       "coverage_ids": [
         "ARCH-020",
         "PLAT_UPDATE"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "Манифест содержит 23 image entries, не 23 ECU; обнаружена отдельная failsafe ветвь. OTA, USB update и PKI имеют свои сервисы; текст Flash successful в generic скрипте не проверяет exit status updater.",
+          "next_step": "По существующим metadata/config/code построить update state graph и проверить каждую запись main/backup, включая cmnlib; отделить подготовку, статус и операции записи. Образы не исполнять.",
+          "missing_evidence": "Подписи и совместимость payload, реальные A/B назначения, boot selection, rollback и сценарий прерывания; условия consent/install и восстановления после ошибки."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "ACCESS_POLICY",
@@ -451,19 +541,29 @@
       "priority": "P1",
       "function": "Что именно передаёт MCU-log канал и как восстановить время событий?",
       "status": "OPEN",
-      "known": "IPCP0099/00c8 → VHAL0x217082F3 → SDK33523 → ECarXCarLogService раскрыт по native/DEX и 45 пакетам. 1307 Android-строк двух boot logs содержат версию и 23 software groups; Panic — имя свойства, не признак аварии каждой записи.",
-      "missing_evidence": "Источник текста за peer, накопление/повтор/потери, единицы и epoch внутренних меток, смысл поля payload+4, условия availability/status/format; связь DIAG network-management с реальными шинами.",
-      "next_step": "Свести PCAP и MCU embedded timeline; найти producer и CB_LogServiceStatusAP lifecycle в сохранённых образах. Не считать число строк количеством событий или log group физическим ECU.",
+      "known": "Во всех 32 выбранных уникальных PCAP найдено 300 входящих MCU-log datagrams; LV имеет отдельный mcu_log receive/write handler. Сходство порта не доказывает тождество процессов или файловых систем.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Проверить новые firmware components и доказанный доступный LV filesystem; не запускать logger с mount callback.",
       "sources": [
         "research-2026-09-05/architecture_domains/systems.json",
         "research-2026-09-05/mcu_log_route/report.md",
         "research-2026-09-05/mcu_log_route/evidence.json",
-        "research-2026-09-05/mcu_log_route/pcap_mcu_summary.json"
+        "research-2026-09-05/mcu_log_route/pcap_mcu_summary.json",
+        "research-2026-09-05-next/cruise_handler/report.md"
       ],
       "coverage_ids": [
         "ARCH-023",
         "ARCH-024"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "IPCP0099/00c8 → VHAL0x217082F3 → SDK33523 → ECarXCarLogService раскрыт по native/DEX и 45 пакетам. 1307 Android-строк двух boot logs содержат версию и 23 software groups; Panic — имя свойства, не признак аварии каждой записи.",
+          "next_step": "Свести PCAP и MCU embedded timeline; найти producer и CB_LogServiceStatusAP lifecycle в сохранённых образах. Не считать число строк количеством событий или log group физическим ECU.",
+          "missing_evidence": "Источник текста за peer, накопление/повтор/потери, единицы и epoch внутренних меток, смысл поля payload+4, условия availability/status/format; связь DIAG network-management с реальными шинами."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "ENGINE_FUEL",
@@ -632,33 +732,53 @@
       "priority": "P1",
       "function": "Как работают двери, детские замки и физический/цифровой ключ?",
       "status": "OPEN",
-      "known": "BCM door/lock ветви содержат READ и fixed Active; child-lock CB и PA кодируют 1/2 асимметрично. Ряд digital-key методов — stubs; readRealKey/unbind пишут CB33254, unbind не использует переданный ID.",
-      "missing_evidence": "Реальный immediate lock/unlock route, deadlock/anti-theft и interlocks; зона детского замка; production key owner, PA33853, async подтверждение и побочные эффекты.",
-      "next_step": "Проследить штатные callers и отдельный key service, сравнить CB/PA enum; составить read/write/side-effect контракт каждого метода до выбора действий.",
+      "known": "Digital create/delete/register остаются заглушками в проверенных копиях; physical-discovery CB33254 и PA33853 имеют конкретную карту callback. PA результата нельзя использовать как CB.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Не запрашивать guessed key-service или ключевые БД. Отдельный действующий issuance-service и hardware provisioning пока не установлены.",
       "sources": [
-        "research-2026-09-05/comfort_systems/systems.json"
+        "research-2026-09-05/comfort_systems/systems.json",
+        "research-2026-09-05-next/comfort_contracts/report.md"
       ],
       "coverage_ids": [
         "COMF-001",
         "COMF-002",
         "COMF-003"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "BCM door/lock ветви содержат READ и fixed Active; child-lock CB и PA кодируют 1/2 асимметрично. Ряд digital-key методов — stubs; readRealKey/unbind пишут CB33254, unbind не использует переданный ID.",
+          "next_step": "Проследить штатные callers и отдельный key service, сравнить CB/PA enum; составить read/write/side-effect контракт каждого метода до выбора действий.",
+          "missing_evidence": "Реальный immediate lock/unlock route, deadlock/anti-theft и interlocks; зона детского замка; production key owner, PA33853, async подтверждение и побочные эффекты."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "PROFILE_SCENES",
       "priority": "P1",
       "function": "Как профили и сценарии меняют несколько систем и восстанавливают состояние?",
       "status": "OPEN",
-      "known": "Profile getter/apply привязаны к current profile; add отправляет CB и возвращает−1, apply true не является ack. Семь cabin-сценариев пишут один CB33272, общий OFF0; theater — отдельный CB33271/PA33928.",
-      "missing_evidence": "Асинхронное подтверждение, field ownership seat/mirror/climate, атомарность/rollback, конфликты сценариев и поведение после отказа/сна; shared value не набор независимых флагов.",
-      "next_step": "Связать PA33845/33855 и 33926/33928 со штатными profile/scene consumers, восстановить таблицу изменяемых полей и последовательность возврата.",
+      "known": "Profile apply может вернуть true после поглощённого Binder failure; onAdded вызывается даже при FAILED. Семь scene bool используют общий selector, OFF старой сцены может сбросить новый режим.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Сверить текущую SDK-версию; для физических действий и rollback нужен подтверждённый нижний owner. Автоповтор по return value не обоснован.",
       "sources": [
-        "research-2026-09-05/comfort_systems/systems.json"
+        "research-2026-09-05/comfort_systems/systems.json",
+        "research-2026-09-05-next/comfort_contracts/report.md"
       ],
       "coverage_ids": [
         "COMF-004",
         "COMF-024"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "Profile getter/apply привязаны к current profile; add отправляет CB и возвращает−1, apply true не является ack. Семь cabin-сценариев пишут один CB33272, общий OFF0; theater — отдельный CB33271/PA33928.",
+          "next_step": "Связать PA33845/33855 и 33926/33928 со штатными profile/scene consumers, восстановить таблицу изменяемых полей и последовательность возврата.",
+          "missing_evidence": "Асинхронное подтверждение, field ownership seat/mirror/climate, атомарность/rollback, конфликты сценариев и поведение после отказа/сна; shared value не набор независимых флагов."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "TRUNK_ROOF",
@@ -697,51 +817,81 @@
       "priority": "P2",
       "function": "Как различаются прямое освещение, автоматические режимы и салонные палитры?",
       "status": "OPEN",
-      "known": "Dipped-beam публичная настройка ведёт к AFS33027, не прямому ближнему свету. Individual reading OFF2 отличается от all OFF0. KX11 DEFAULT имеет 72 RGB entries; BREATHE может сначала включить all и затем вернуть FAILED.",
-      "missing_evidence": "Владельцы реальных ламп/зон, яркость и приоритет door/courtesy/scene; enum/palette варианты, persistence и побочные эффекты частичного отказа.",
-      "next_step": "Связать setters, status/availability и штатную палитру нужного carconfig; проверить ветви side effect before error и влияние KING33926==11.",
+      "known": "Production Settings пишет bool0/1 в 0x2a010300, тогда как его SDK регистрирует RGB BREATHE_MODE_COLOR и runtime возвращает65326. Это конфликт consumer/SDK, не доказанный рабочий breathing switch.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Сборщик сверит текущие Settings/JAR/maps. Установить реальную runtime-копию и нижний обработчик до управления этой функцией.",
       "sources": [
-        "research-2026-09-05/comfort_systems/systems.json"
+        "research-2026-09-05/comfort_systems/systems.json",
+        "research-2026-09-05-next/comfort_contracts/report.md"
       ],
       "coverage_ids": [
         "COMF-010",
         "COMF-011",
         "COMF-012"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "Dipped-beam публичная настройка ведёт к AFS33027, не прямому ближнему свету. Individual reading OFF2 отличается от all OFF0. KX11 DEFAULT имеет 72 RGB entries; BREATHE может сначала включить all и затем вернуть FAILED.",
+          "next_step": "Связать setters, status/availability и штатную палитру нужного carconfig; проверить ветви side effect before error и влияние KING33926==11.",
+          "missing_evidence": "Владельцы реальных ламп/зон, яркость и приоритет door/courtesy/scene; enum/palette варианты, persistence и побочные эффекты частичного отказа."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "HVAC_CONTRACT",
       "priority": "P1",
       "function": "Каковы единицы, зоны, режимы вентилятора и ограничения климата?",
       "status": "OPEN",
-      "known": "Температура зависит от C/F: 15.5…28.5°C шаг0.5 или59…85°F шаг1. KX11 manual fan0…9, EX11 0…5; PA AUTO/status и popup/error независимы от requested значения.",
-      "missing_evidence": "LO/HI/invalid, действующая SDK/config ветвь, реальные зоны, направление потока, AUTO против manual, interlocks обогрева/осушения и подтверждение результата.",
-      "next_step": "Проверить getters/setters/support по каждой зоне и PA33460, сопоставить штатный UI formatting; разобрать PA error/availability до расширения диапазонов клиента.",
+      "known": "Пять runtime источников TempManager показывают LO — 16…28°C — HI, min15.5/max28.5/step0.5. Числовые пределы соответствуют крайним LO/HI в штатном UI. SDK range check не обеспечивает finite/grid: 16.2 и NaN проходят прочитанный validator.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Собрать отсутствующий XCHvac.apk (ecarx.hvac.app) и разобрать click conversion, guards и связь requested/confirmed по зонам.",
       "sources": [
-        "research-2026-09-05/comfort_systems/systems.json"
+        "research-2026-09-05/comfort_systems/systems.json",
+        "research-2026-09-05-next/comfort_contracts/report.md"
       ],
       "coverage_ids": [
         "COMF-013",
         "COMF-014",
         "COMF-015"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "Температура зависит от C/F: 15.5…28.5°C шаг0.5 или59…85°F шаг1. KX11 manual fan0…9, EX11 0…5; PA AUTO/status и popup/error независимы от requested значения.",
+          "next_step": "Проверить getters/setters/support по каждой зоне и PA33460, сопоставить штатный UI formatting; разобрать PA error/availability до расширения диапазонов клиента.",
+          "missing_evidence": "LO/HI/invalid, действующая SDK/config ветвь, реальные зоны, направление потока, AUTO против manual, interlocks обогрева/осушения и подтверждение результата."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "HVAC_EVENTS_PREPOST",
       "priority": "P1",
       "function": "Как отличить климатическое предложение от команды и предварительного режима?",
       "status": "OPEN",
-      "known": "REQUEST auto-ion/dehumidify/close-window — входящие события, CONFIRM — ответы с разными raw mappings. Pre/post климат имеют CB32797/32796 и PA; это не доказанный remote engine start. Aroma ON задаёт raw2, не прежнюю интенсивность.",
-      "missing_evidence": "Lifecycle предложения, event correlation и повтор, условия питания pre/post на бензиновом KX11, ограничения воздуха/осушения/картриджей и побочные эффекты ответа.",
-      "next_step": "Найти штатные request consumers и timeout/cancel handling; проследить pre/post power conditions и aroma PA33406/slot ratio. Не применять CONFIRM вне соответствующего события.",
+      "known": "Восстановлены три разные REQUEST/CONFIRM карты ответов; public2 не имеет универсальной семантики. PRE/POST notavailable в сохранённых сеансах не означает отсутствия оборудования.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "XCHvac.apk нужен для текста и lifecycle кнопок предложений, корреляции актуального запроса и ответа.",
       "sources": [
-        "research-2026-09-05/comfort_systems/systems.json"
+        "research-2026-09-05/comfort_systems/systems.json",
+        "research-2026-09-05-next/comfort_contracts/report.md"
       ],
       "coverage_ids": [
         "COMF-016",
         "COMF-017",
         "COMF-018"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "REQUEST auto-ion/dehumidify/close-window — входящие события, CONFIRM — ответы с разными raw mappings. Pre/post климат имеют CB32797/32796 и PA; это не доказанный remote engine start. Aroma ON задаёт raw2, не прежнюю интенсивность.",
+          "next_step": "Найти штатные request consumers и timeout/cancel handling; проследить pre/post power conditions и aroma PA33406/slot ratio. Не применять CONFIRM вне соответствующего события.",
+          "missing_evidence": "Lifecycle предложения, event correlation и повтор, условия питания pre/post на бензиновом KX11, ограничения воздуха/осушения/картриджей и побочные эффекты ответа."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "SEAT_THERMAL_MASSAGE",
@@ -810,34 +960,54 @@
       "priority": "P1",
       "function": "Кто владеет Bluetooth/BLE/ANCS и восстановлением профильных соединений?",
       "status": "OPEN",
-      "known": "Наблюдаются A2DPsink/AVRCP/HFP/PBAP/MAP, ECARX extension и TS-DM/nFore config. MaxAclNum4/MaxDeviceNum2 не измеряют число одновременных ANCS сессий; PowerSomeIP может выключать и восстанавливать BT.",
-      "missing_evidence": "Production owner, per-profile arbitration, GATT subscriptions/reconnect epochs, coexistence CarPlay, реальное BLE ограничение и причина каждого сохранённого сбоя.",
-      "next_step": "Разобрать BluetoothConnectManager/DeviceBluetoothProfileManager в уже найденных JAR/APK и существующие Bluetooth/Natro logs; связать события с PowerSomeIP без содержимого личных уведомлений.",
+      "known": "Разобраны все шесть Bluetooth архивов: reason40/0x28 и затем0x100 относятся к GPS client5; Natro client6 выполняет local disconnect/close/unregister. HFP остаётся подключённым. ts-dm-service найден и server arbitration разобран.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Собрать восемь отсутствующих Bluetooth ELF/APK, metadata текущего Natro и очищенный GATT snapshot. Внутреннее решение Natro требует его существующего diagnostic event без содержимого уведомлений.",
       "sources": [
         "research-2026-09-05/android_platform/systems.json",
-        "research-2026-09-05/continuation/systems.json"
+        "research-2026-09-05/continuation/systems.json",
+        "research-2026-09-05-next/bluetooth_runtime/report.md"
       ],
       "coverage_ids": [
         "PLAT_BLUETOOTH",
         "BASE-ANCS"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "Наблюдаются A2DPsink/AVRCP/HFP/PBAP/MAP, ECARX extension и TS-DM/nFore config. MaxAclNum4/MaxDeviceNum2 не измеряют число одновременных ANCS сессий; PowerSomeIP может выключать и восстанавливать BT.",
+          "next_step": "Разобрать BluetoothConnectManager/DeviceBluetoothProfileManager в уже найденных JAR/APK и существующие Bluetooth/Natro logs; связать события с PowerSomeIP без содержимого личных уведомлений.",
+          "missing_evidence": "Production owner, per-profile arbitration, GATT subscriptions/reconnect epochs, coexistence CarPlay, реальное BLE ограничение и причина каждого сохранённого сбоя."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "PHONE_CARPLAY",
       "priority": "P1",
       "function": "Как телефония и CarPlay делят вызовы, дисплей, Wi-Fi и звук?",
       "status": "OPEN",
-      "known": "DIM receiver XCBTPhone3 статически ведёт к UiCallManager/Telecom; приложение не system UID. CarPlay имеет отдельные services и audio/video/BT/Wi-Fi/location adapters; интерфейс SoftAP не доказывает wireless session.",
-      "missing_evidence": "Extras/permissions и state conditions call/hold/swap/mute, выбор двух телефонов, HFP путь; CarPlay session/focus/coexistence, cleanup при disconnect/suspend и установленный режим проекции.",
-      "next_step": "Продолжить receiver→UiCallManager→Telecom/HFP, затем CarPlay StateManager→focus/SoftAP/BT; использовать существующие записи, не отправлять вызовы и телефонные сообщения.",
+      "known": "TS-DM capability5/6 соответствует HFP/A2DP и использует FoundationManager, дедупликацию запросов, callbacks и таймеры сверки. Это не доказанная ANCS-арбитрация.",
+      "missing_evidence": "Остаточная граница описана в новом отчёте и следующем шаге; ранее закрытые статические звенья не запрашиваются повторно.",
+      "next_step": "Досбор EcarxBluetoothServiceExtension и native backend продолжает неизвестную нижнюю policy-ветвь.",
       "sources": [
         "research-2026-09-05/android_platform/systems.json",
-        "research-2026-09-05/android_platform/phone_call_routes.json"
+        "research-2026-09-05/android_platform/phone_call_routes.json",
+        "research-2026-09-05-next/bluetooth_runtime/report.md"
       ],
       "coverage_ids": [
         "PLAT_PHONE",
         "PLAT_CARPLAY"
-      ]
+      ],
+      "history": [
+        {
+          "version": "1.1",
+          "known": "DIM receiver XCBTPhone3 статически ведёт к UiCallManager/Telecom; приложение не system UID. CarPlay имеет отдельные services и audio/video/BT/Wi-Fi/location adapters; интерфейс SoftAP не доказывает wireless session.",
+          "next_step": "Продолжить receiver→UiCallManager→Telecom/HFP, затем CarPlay StateManager→focus/SoftAP/BT; использовать существующие записи, не отправлять вызовы и телефонные сообщения.",
+          "missing_evidence": "Extras/permissions и state conditions call/hold/swap/mute, выбор двух телефонов, HFP путь; CarPlay session/focus/coexistence, cleanup при disconnect/suspend и установленный режим проекции."
+        }
+      ],
+      "collection_plan": "../../tools/geely-macos-collector/collection_plan.json"
     },
     {
       "id": "GNSS_SOURCES",

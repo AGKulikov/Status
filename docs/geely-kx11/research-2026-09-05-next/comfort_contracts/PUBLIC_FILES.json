@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "scope": "REL-008 public allowlist: authored analysis, source hashes, method metadata and limited runtime evidence only",
+  "excluded": [
+    "private/**",
+    "original APK/JAR/ELF",
+    "full foreign method bodies",
+    "instruction/opcode arrays",
+    "decompiled foreign source",
+    "key/profile/account databases"
+  ],
+  "files": [
+    {
+      "path": "VALIDATION.json",
+      "bytes": 4293,
+      "sha256": "d4c9e91c07a720e04841fc2bf9dfcdeb136b5fa3f3ae22ca01780ea81658b511"
+    },
+    {
+      "path": "collection_targets.json",
+      "bytes": 3010,
+      "sha256": "694d88df0de6fa33af7f71fabf6bce25fb41d5db9da78b0da78880ff2f315813"
+    },
+    {
+      "path": "contracts.json",
+      "bytes": 516095,
+      "sha256": "43bb6efef2b629a9802838bd25ae425428d878715e470cb45d427f17a82708bf"
+    },
+    {
+      "path": "evidence.json",
+      "bytes": 180348,
+      "sha256": "d3b8271c4da4b22cd357e136bf3ecb06a5bdf36255cf9cf12bfb9bab66a9db4c"
+    },
+    {
+      "path": "lifecycle/collection_targets.json",
+      "bytes": 9476,
+      "sha256": "f31b2f95d06d954178260be13e2e6bcdfdda87af445867eb44223f5047c1d260"
+    },
+    {
+      "path": "lifecycle/evidence.json",
+      "bytes": 160924,
+      "sha256": "a3610f68f49e3d830a9e143102845b7c61d73356cf508e4536dd5c10cd798570"
+    },
+    {
+      "path": "lifecycle/report.md",
+      "bytes": 30454,
+      "sha256": "17ae210857381dfac0b239d7772a27c870c0d77dd61388415809fc6421bd92b9"
+    },
+    {
+      "path": "report.md",
+      "bytes": 28900,
+      "sha256": "bf16c0e3cc1c64dcc6eae005d55dd3ef50a556b5659c0a22e6ae2a3143b26f44"
+    },
+    {
+      "path": "source_inventory.json",
+      "bytes": 3449109,
+      "sha256": "f350d3fdf3432908c272d1204828b9aab551003f7cc80554c9e6b7e4017098d5"
+    }
+  ],
+  "self_excluded_from_hashes": "PUBLIC_FILES.json"
+}
