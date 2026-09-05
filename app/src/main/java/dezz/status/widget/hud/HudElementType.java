@@ -9,8 +9,9 @@ import java.util.Locale;
 /**
  * Complete HUD element catalog.
  *
- * <p>The catalog intentionally contains the full set exposed by mHUD 6.1 plus connector-neutral
- * and vehicle values already available in Status Widget. Elements are data-driven, so adding one
+ * <p>The catalog includes counterparts for mHUD 6.1 data and additional connector-neutral
+ * and vehicle values. Composite layouts and behavior differ; see the dated mHUD widget audit.
+ * Elements are data-driven, so adding one
  * to a panel never changes the external-display lifecycle or the editor grid.</p>
  */
 public enum HudElementType {

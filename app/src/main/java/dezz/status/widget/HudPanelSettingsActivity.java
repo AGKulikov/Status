@@ -44,6 +44,7 @@ import dezz.status.widget.hud.HudCanvasView;
 import dezz.status.widget.hud.HudDisplaySelector;
 import dezz.status.widget.hud.HudElementConfig;
 import dezz.status.widget.hud.HudElementType;
+import dezz.status.widget.hud.HudFuelSettings;
 import dezz.status.widget.hud.HudHorizontalGroup;
 import dezz.status.widget.hud.HudPanelConfig;
 import dezz.status.widget.hud.HudPanelStore;
@@ -334,6 +335,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         scroll.addView(form);
 
         EditText title = field(form, "Название", item.title, false);
+        FuelOptionsControls fuelControls = item.type == HudElementType.FUEL_LEVEL
+                || item.type == HudElementType.FUEL_REFILL
+                ? new FuelOptionsControls(form, config.fuelSettingsFor(item)) : null;
         TextView immutableId = text("ID: " + item.id + "\nЦель сценариев: "
                 + item.automationId, 12, 0xFF95A0AF);
         form.addView(immutableId, marginTop(4));
@@ -403,6 +407,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(view -> {
                     try {
+                        // Validate the whole draft before changing any live element or shared fuel state.
+                        HudFuelSettings fuelDraft = fuelControls == null ? null : fuelControls.read();
+                        JSONObject parsedOptions = new JSONObject(value(options).isEmpty()
+                                ? "{}" : value(options));
+                        applyVisualElementOptions(parsedOptions, visualOptions);
                         item.title = value(title);
                         item.automationId = value(automation);
                         item.telemetryMetricId = value(metric);
@@ -431,11 +440,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                                     value(connectorId), resourceId, value(valuePath),
                                     SourceBinding.PRESENTATION_AUTO, item.unit);
                         }
-                        JSONObject parsedOptions = new JSONObject(value(options).isEmpty()
-                                ? "{}" : value(options));
-                        applyVisualElementOptions(parsedOptions, visualOptions);
                         item.options = parsedOptions;
                         item.normalize(config.gridColumns, config.gridRows);
+                        if (fuelDraft != null) config.fuelSettings = fuelDraft;
                         canvas.updateConfig(config);
                         updateSelection(item);
                         persist(false);
@@ -477,6 +484,15 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 item.options.optInt("cornerRadiusPx", 0), 0, 80, 1, " px");
         SliderField opacity = slider(form, "Непрозрачность карты",
                 item.options.optInt("opacityPercent", 100), 20, 100, 1, " %");
+        Switch edgeBlur = switchView("Размыть края карты",
+                item.options.optBoolean("edgeBlurEnabled", false));
+        form.addView(edgeBlur, marginTop(8));
+        SliderField edgeStrength = slider(form, "Степень размытия края",
+                item.options.optInt("edgeBlurStrengthPercent", 100), 0, 100, 1, " %");
+        SliderField edgeSize = slider(form, "Размер зоны размытия",
+                item.options.optInt("edgeBlurSizePx", 24), 0, 300, 1, " px");
+        form.addView(text("Карта плавно становится прозрачной у границ. Центр и отдельные "
+                + "виджеты сохраняют чёткость.", 12, 0xFFB8C0CC), marginTop(4));
 
         form.addView(section("Камера HUD"), marginTop(16));
         Spinner cameraMode = navigationCameraModeSpinner(profile.cameraMode);
@@ -743,6 +759,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.options.put("renderer", HudElementConfig.DIRECT_MAP_RENDERER);
                         item.options.put("cornerRadiusPx", radius.intValue());
                         item.options.put("opacityPercent", opacity.intValue());
+                        item.options.put("edgeBlurEnabled", edgeBlur.isChecked());
+                        item.options.put("edgeBlurStrengthPercent", edgeStrength.intValue());
+                        item.options.put("edgeBlurSizePx", edgeSize.intValue());
                         item.options.put("transparentBackground", roadsOnly.isChecked());
 
                         profile.enabled = rendererEnabled.isChecked();
@@ -1758,6 +1777,123 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         showSafeDialog(dialog);
     }
 
+    /** Same staged controls in a fuel widget and in HUD Options; cancellation never mutates config. */
+    private final class FuelOptionsControls {
+        final HudFuelSettings initial;
+        final EditText yellow, red, capacity;
+        final Switch defaultCapacity, hideAbove, onlyPark;
+        final TextView summary;
+        String manualCapacityText;
+
+        FuelOptionsControls(LinearLayout parent, HudFuelSettings settings) {
+            initial = settings.copy();
+            parent.addView(section("Пороги топлива"), marginTop(16));
+            parent.addView(text("Общие для виджетов «Остаток топлива» и «Долить» на этом HUD.",
+                    12, 0xFFB8C0CC), marginTop(4));
+            LinearLayout row = new LinearLayout(HudPanelSettingsActivity.this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout left = column(), right = column();
+            LinearLayout.LayoutParams leftParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            leftParams.rightMargin = dp(12);
+            row.addView(left, leftParams);
+            row.addView(right, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            parent.addView(row);
+            yellow = litresField(left, "Жёлтый ниже (л)", settings.yellowBelowLitres);
+            red = litresField(left, "Красный ниже (л)", settings.redBelowLitres);
+            manualCapacityText = fuelNumber(settings.customCapacityLitres);
+            capacity = litresField(right, "Общий объём бака (л)", settings.capacityLitres());
+            defaultCapacity = switchView("Объём бака по умолчанию: 64 л", settings.useDefaultCapacity);
+            right.addView(defaultCapacity, marginTop(4));
+            summary = text("", 12, 0xFF9EDDA8);
+            right.addView(summary, marginTop(4));
+            hideAbove = switchView("Скрыть уровень топлива выше порогов", settings.hideAboveThreshold);
+            onlyPark = switchView("Показывать виджет «Долить» только в режиме паркинг",
+                    settings.refillOnlyInPark);
+            parent.addView(hideAbove, marginTop(8));
+            parent.addView(onlyPark, marginTop(4));
+            capacity.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    if (!defaultCapacity.isChecked()) manualCapacityText = s.toString();
+                    updateSummary();
+                }
+                @Override public void afterTextChanged(android.text.Editable value) {}
+            });
+            defaultCapacity.setOnCheckedChangeListener((button, checked) -> {
+                capacity.setEnabled(!checked);
+                capacity.setText(checked ? "64" : manualCapacityText);
+                updateSummary();
+            });
+            capacity.setEnabled(!defaultCapacity.isChecked());
+            updateSummary();
+        }
+
+        void updateSummary() {
+            if (defaultCapacity.isChecked()) {
+                summary.setText("Режим по умолчанию активен. Используется: 64 л");
+            } else {
+                summary.setText("Ручной объём. Используется: " + value(capacity) + " л");
+            }
+        }
+
+        HudFuelSettings read() {
+            HudFuelSettings draft = initial.copy();
+            draft.yellowBelowLitres = fuelDecimal(value(yellow), "Жёлтый порог");
+            draft.redBelowLitres = fuelDecimal(value(red), "Красный порог");
+            draft.useDefaultCapacity = defaultCapacity.isChecked();
+            try {
+                draft.customCapacityLitres = fuelDecimal(manualCapacityText, "Объём бака");
+                if (draft.useDefaultCapacity && draft.customCapacityLitres <= 0d)
+                    draft.customCapacityLitres = initial.customCapacityLitres;
+            } catch (IllegalArgumentException invalid) {
+                if (!draft.useDefaultCapacity) throw invalid;
+                draft.customCapacityLitres = initial.customCapacityLitres;
+            }
+            draft.hideAboveThreshold = hideAbove.isChecked();
+            draft.refillOnlyInPark = onlyPark.isChecked();
+            draft.validate();
+            return draft;
+        }
+
+        boolean changed(HudFuelSettings draft) throws JSONException {
+            return !draft.toJson().toString().equals(initial.toJson().toString());
+        }
+    }
+
+    private EditText litresField(LinearLayout parent, String title, double initial) {
+        EditText input = field(parent, title, fuelNumber(initial), false);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        return input;
+    }
+
+    private static String fuelNumber(double value) {
+        return value == Math.rint(value) ? String.format(Locale.ROOT, "%.0f", value)
+                : Double.toString(value);
+    }
+
+    private static double fuelDecimal(String value, String name) {
+        try {
+            double parsed = Double.parseDouble(value.trim().replace(',', '.'));
+            if (!Double.isFinite(parsed)) throw new NumberFormatException();
+            return parsed;
+        } catch (NumberFormatException invalid) {
+            throw new IllegalArgumentException(name + ": укажите число в литрах");
+        }
+    }
+
+    private HudFuelSettings currentFuelSettings() {
+        if (config.fuelSettings != null) return config.fuelSettings;
+        for (HudElementConfig item : config.elements) {
+            if (item.type == HudElementType.FUEL_LEVEL) return config.fuelSettingsFor(item);
+        }
+        for (HudElementConfig item : config.elements) {
+            if (item.type == HudElementType.FUEL_REFILL) return config.fuelSettingsFor(item);
+        }
+        return new HudFuelSettings();
+    }
+
     private void editGlobalOptions() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
@@ -1790,6 +1926,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 config.navigationDisplayThresholdMeters, 0, 5_000, 100, " м");
         SliderField navDelay = slider(form, "Задержка скрытия навигации",
                 config.navigationHideDelaySeconds, 0, 60, 1, " с");
+        FuelOptionsControls fuelControls = new FuelOptionsControls(form, currentFuelSettings());
         Switch showGrid = switchView("Показывать сетку в редакторе", config.showGrid);
         Switch free = switchView("Свободное перемещение между линиями", config.freeMovement);
         Switch snow = switchView("Снежный режим", config.snowMode);
@@ -1824,6 +1961,15 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(view -> {
+                    HudFuelSettings fuelDraft;
+                    boolean fuelChanged;
+                    try {
+                        fuelDraft = fuelControls.read();
+                        fuelChanged = fuelControls.changed(fuelDraft);
+                    } catch (Exception invalid) {
+                        Toast.makeText(this, invalid.getMessage(), Toast.LENGTH_LONG).show();
+                        return;
+                    }
                     config.gridColumns = columns.intValue();
                     config.gridRows = rows.intValue();
                     config.backgroundMode = "TRANSPARENT";
@@ -1838,6 +1984,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     config.freeMovement = free.isChecked();
                     config.snowMode = snow.isChecked();
                     config.syncElementColors = sync.isChecked();
+                    if (fuelChanged) config.fuelSettings = fuelDraft;
                     preferences.hudPanelAutostart.set(autostart.isChecked());
                     config.normalize();
                     canvas.updateConfig(config);

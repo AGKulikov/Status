@@ -95,11 +95,22 @@ public final class LauncherMediaController {
         @Nullable public final Boolean liked;
         /** Current STREAM_MUSIC volume, from 0 to 100. */
         public final int volumePercent;
+        /** Exact AudioManager steps; -1 means unavailable, never inferred from a percentage. */
+        public final int volumeSteps;
+        public final int volumeMaximum;
 
         Snapshot(@NonNull String title, @NonNull String artist, @NonNull String album,
                  @NonNull String application, @Nullable Bitmap artwork, long durationMs,
                  long positionMs, boolean playing, boolean available, boolean likeAvailable,
                  @Nullable Boolean liked, int volumePercent) {
+            this(title, artist, album, application, artwork, durationMs, positionMs, playing,
+                    available, likeAvailable, liked, volumePercent, -1, -1);
+        }
+
+        Snapshot(@NonNull String title, @NonNull String artist, @NonNull String album,
+                 @NonNull String application, @Nullable Bitmap artwork, long durationMs,
+                 long positionMs, boolean playing, boolean available, boolean likeAvailable,
+                 @Nullable Boolean liked, int volumePercent, int volumeSteps, int volumeMaximum) {
             this.title = title;
             this.artist = artist;
             this.album = album;
@@ -112,11 +123,20 @@ public final class LauncherMediaController {
             this.likeAvailable = likeAvailable;
             this.liked = liked;
             this.volumePercent = Math.max(0, Math.min(100, volumePercent));
+            this.volumeMaximum = volumeMaximum > 0 ? volumeMaximum : -1;
+            this.volumeSteps = volumeSteps >= 0 && this.volumeMaximum > 0
+                    ? Math.min(volumeSteps, this.volumeMaximum) : -1;
         }
 
         static Snapshot empty(int volumePercent) {
             return new Snapshot("Музыка не воспроизводится", "", "", "", null,
                     0L, 0L, false, false, false, null, volumePercent);
+        }
+
+        static Snapshot empty(VolumeState volume) {
+            return new Snapshot("Музыка не воспроизводится", "", "", "", null,
+                    0L, 0L, false, false, false, null,
+                    volume.percent(), volume.steps, volume.maximum);
         }
     }
 
@@ -318,6 +338,11 @@ public final class LauncherMediaController {
         @Override public void onReceive(Context receiverContext, Intent intent) {
             if (!started) return;
             String action = intent == null ? null : intent.getAction();
+            if ("android.media.VOLUME_CHANGED_ACTION".equals(action)) {
+                // Re-read AudioManager; incoming extras are only a wakeup, never trusted values.
+                publish();
+                return;
+            }
             if (MediaBroadcastRepository.ACTION_CACHE_UPDATED.equals(action)) {
                 loadCachedBroadcast();
                 return;
@@ -392,7 +417,7 @@ public final class LauncherMediaController {
         invalidateCacheRead();
         // Clear ImageView references before the owned broadcast bitmap is recycled on the next
         // main-loop turn. A stopped HOME must not pin or attempt to draw media artwork.
-        listener.onMediaChanged(Snapshot.empty(volumePercent()));
+        listener.onMediaChanged(Snapshot.empty(readVolume()));
         replaceBroadcastState(null);
     }
 
@@ -861,6 +886,7 @@ public final class LauncherMediaController {
         filter.addAction(ACTION_MEDIA_UPDATE_DEBUG);
         filter.addAction(ACTION_MEDIA_CLEAR_DEBUG);
         filter.addAction(MediaBroadcastRepository.ACTION_CACHE_UPDATED);
+        filter.addAction("android.media.VOLUME_CHANGED_ACTION");
         try {
             ContextCompat.registerReceiver(context, broadcastReceiver, filter,
                     ContextCompat.RECEIVER_EXPORTED);
@@ -1327,7 +1353,7 @@ public final class LauncherMediaController {
 
     private void publish() {
         expireBroadcastIfNeeded();
-        int volume = volumePercent();
+        VolumeState volume = readVolume();
         MediaState session = sessionState;
         MediaState broadcast = broadcastState;
         if (session == null && broadcast == null) {
@@ -1399,7 +1425,7 @@ public final class LauncherMediaController {
 
     private void publish(@NonNull MediaState content, @Nullable MediaState supplement,
                          @NonNull MediaState playback, @NonNull MediaState artwork,
-                         @NonNull MediaState timeline, int volume) {
+                         @NonNull MediaState timeline, VolumeState volume) {
         String title = preferred(content.title, supplement == null ? "" : supplement.title);
         String artist = preferred(content.artist, supplement == null ? "" : supplement.artist);
         String album = preferred(content.album, supplement == null ? "" : supplement.album);
@@ -1421,7 +1447,8 @@ public final class LauncherMediaController {
         MediaPlaybackHistoryStore.record(context, packageName, playback.playing);
         listener.onMediaChanged(new Snapshot(title.isEmpty() ? "Неизвестный трек" : title,
                 artist, album, application, artworkBitmap, duration, position, playback.playing, true,
-                likeState.available, likeState.active, volume));
+                likeState.available, likeState.active,
+                volume.percent(), volume.steps, volume.maximum));
         scheduleTicker(playback.playing);
     }
 
@@ -1481,15 +1508,20 @@ public final class LauncherMediaController {
         }
     }
 
-    private int volumePercent() {
-        if (audioManager == null) return 0;
+    private static final class VolumeState {
+        final int steps, maximum;
+        VolumeState(int steps, int maximum) { this.steps = steps; this.maximum = maximum; }
+        int percent() { return steps < 0 || maximum <= 0 ? 0 : Math.round(steps * 100f / maximum); }
+    }
+
+    private VolumeState readVolume() {
+        if (audioManager == null) return new VolumeState(-1, -1);
         try {
             int maximum = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-            if (maximum <= 0) return 0;
-            return Math.round(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                    * 100f / maximum);
+            int steps = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            return new VolumeState(steps, maximum);
         } catch (RuntimeException ignored) {
-            return 0;
+            return new VolumeState(-1, -1);
         }
     }
 

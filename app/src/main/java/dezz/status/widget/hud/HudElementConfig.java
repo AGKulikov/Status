@@ -341,6 +341,10 @@ public final class HudElementConfig {
                         options.optInt("opacityPercent", 100), 20, 100));
                 options.put("transparentBackground",
                         options.optBoolean("transparentBackground", false));
+                options.put("edgeBlurEnabled", options.optBoolean("edgeBlurEnabled", false));
+                options.put("edgeBlurStrengthPercent", clamp(
+                        options.optInt("edgeBlurStrengthPercent", 100), 0, 100));
+                options.put("edgeBlurSizePx", clamp(options.optInt("edgeBlurSizePx", 24), 0, 300));
             } catch (JSONException impossible) {
                 throw new IllegalStateException(impossible);
             }

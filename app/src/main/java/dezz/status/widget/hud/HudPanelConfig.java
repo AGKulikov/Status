@@ -54,7 +54,13 @@ public final class HudPanelConfig {
     public int globalFontWeight = 600;
     public int navigationDisplayThresholdMeters = 1_500;
     public int navigationHideDelaySeconds = 8;
+    /** Null only for imported legacy layouts whose per-widget choices have not been unified. */
+    public HudFuelSettings fuelSettings = new HudFuelSettings();
     @NonNull public final List<HudElementConfig> elements = new ArrayList<>();
+
+    @NonNull public HudFuelSettings fuelSettingsFor(HudElementConfig item) {
+        return fuelSettings != null ? fuelSettings : HudFuelSettings.fromLegacy(item.options);
+    }
 
     @NonNull
     public static HudPanelConfig defaults() {
@@ -225,6 +231,7 @@ public final class HudPanelConfig {
         out.put("customFontUri", customFontUri).put("globalFontWeight", globalFontWeight);
         out.put("navigationDisplayThresholdMeters", navigationDisplayThresholdMeters);
         out.put("navigationHideDelaySeconds", navigationHideDelaySeconds);
+        if (fuelSettings != null) out.put("fuelSettings", fuelSettings.toJson());
         JSONArray items = new JSONArray();
         for (HudElementConfig item : elements) items.put(item.toJson());
         out.put("elements", items);
@@ -273,6 +280,9 @@ public final class HudPanelConfig {
                     source.optInt("navigationDisplayThresholdMeters", 1_500);
             out.navigationHideDelaySeconds =
                     source.optInt("navigationHideDelaySeconds", 8);
+            // Additive schema-6 field: never invalidate an existing direct NAV_MAP on update.
+            JSONObject fuel = source.optJSONObject("fuelSettings");
+            out.fuelSettings = fuel == null ? null : HudFuelSettings.fromJson(fuel);
             out.normalize();
             JSONArray items = source.optJSONArray("elements");
             if (items != null) {

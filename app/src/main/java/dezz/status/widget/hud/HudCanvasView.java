@@ -34,6 +34,7 @@ import java.util.Map;
 
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.launcher.HorizontalGroupLayout;
+import dezz.status.widget.launcher.LauncherMediaController;
 
 /**
  * Resolution-independent renderer shared byte-for-byte by the live editor and HUD Presentation.
@@ -53,6 +54,8 @@ public final class HudCanvasView extends View {
             Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
     @NonNull private final Paint.FontMetrics textFontMetrics = new Paint.FontMetrics();
     @NonNull private final Path path = new Path();
+    private final dezz.status.widget.navigation.MapEdgeFade editorMapEdgeFade =
+            new dezz.status.widget.navigation.MapEdgeFade();
     @NonNull private HudPanelConfig config;
     @NonNull private List<HudElementConfig> drawingOrder;
     @Nullable private HudElementConfig directMap;
@@ -197,6 +200,11 @@ public final class HudCanvasView extends View {
 
     private boolean shouldDraw(HudElementConfig item) {
         if (!item.enabled) return false;
+        LauncherMediaController.Snapshot playback = data.media();
+        if (!HudMediaVisibility.visible(item.type, editor,
+                playback != null && playback.available, playback != null && playback.playing,
+                playback != null && playback.artwork != null,
+                playback == null ? 0L : playback.durationMs, data.volumeVisible())) return false;
         AutomationState state = data.automation(item);
         if (state.present && !state.visible) return false;
         if (!editor && isNavigation(item.type)
@@ -238,12 +246,15 @@ public final class HudCanvasView extends View {
                 return false;
             }
         }
-        if (item.type == HudElementType.FUEL_REFILL
-                && item.options.optBoolean("onlyInPark", true) && !data.inPark()) {
+        if (!editor && item.type == HudElementType.FUEL_REFILL
+                && !config.fuelSettingsFor(item).showRefill(data.inPark())) {
             return false;
         }
         double numeric = data.numericValue(item);
-        if (Double.isFinite(numeric) && item.options.optBoolean("hideAboveThreshold", false)) {
+        if (!editor && item.type == HudElementType.FUEL_LEVEL
+                && !config.fuelSettingsFor(item).showLevel(numeric)) return false;
+        if (item.type != HudElementType.FUEL_LEVEL && Double.isFinite(numeric)
+                && item.options.optBoolean("hideAboveThreshold", false)) {
             double threshold = isTirePressure(item.type)
                     ? item.options.optDouble("lowThreshold", 2d)
                     : item.options.optDouble("yellowThreshold", 20d);
@@ -296,10 +307,20 @@ public final class HudCanvasView extends View {
                 // Geometry-only container. A background is always an independent BACKDROP.
                 return;
             case NAV_MAP:
-                if (editor) drawMapPlaceholder(canvas, item, bounds, scale);
+                if (editor) {
+                    int save = editorMapEdgeFade.begin(canvas, bounds,
+                            item.options.optBoolean("edgeBlurEnabled", false),
+                            item.options.optInt("edgeBlurSizePx", 24),
+                            item.options.optInt("edgeBlurStrengthPercent", 100));
+                    drawMapPlaceholder(canvas, item, bounds, scale);
+                    editorMapEdgeFade.finish(canvas, save, bounds);
+                }
                 return;
             case MEDIA_ARTWORK:
                 drawBitmap(canvas, data.media() == null ? null : data.media().artwork, bounds);
+                return;
+            case MEDIA_VOLUME:
+                drawVolume(canvas, item, bounds, textColor, scale);
                 return;
             case NAV_MANEUVER_ARROW:
                 drawManeuver(canvas, item, bounds, textColor);
@@ -733,6 +754,45 @@ public final class HudCanvasView extends View {
         } else if (!textContent.isEmpty()) {
             drawManeuverCardText(canvas, item, textContent, color, unitColor, scale);
         }
+    }
+
+    private void drawVolume(Canvas canvas, HudElementConfig item, RectF bounds, int color, float scale) {
+        int steps = data.media() == null ? -1 : data.media().volumeSteps;
+        if (editor && steps < 0) steps = 12;
+        float side = Math.min(bounds.height(), bounds.width() * .36f);
+        if (side <= 0f) return;
+        RectF icon = new RectF(bounds.left, bounds.centerY() - side * .5f,
+                bounds.left + side, bounds.centerY() + side * .5f);
+        paint.setColor(color);
+        paint.setStyle(Paint.Style.FILL);
+        path.reset();
+        path.moveTo(icon.left + side * .10f, icon.top + side * .37f);
+        path.lineTo(icon.left + side * .28f, icon.top + side * .37f);
+        path.lineTo(icon.left + side * .51f, icon.top + side * .16f);
+        path.lineTo(icon.left + side * .51f, icon.top + side * .84f);
+        path.lineTo(icon.left + side * .28f, icon.top + side * .63f);
+        path.lineTo(icon.left + side * .10f, icon.top + side * .63f);
+        path.close();
+        canvas.drawPath(path, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, side * .06f));
+        if (steps == 0) {
+            canvas.drawLine(icon.left + side * .67f, icon.top + side * .36f,
+                    icon.left + side * .92f, icon.top + side * .64f, paint);
+            canvas.drawLine(icon.left + side * .92f, icon.top + side * .36f,
+                    icon.left + side * .67f, icon.top + side * .64f, paint);
+        } else {
+            canvas.drawArc(new RectF(icon.left + side * .36f, icon.top + side * .29f,
+                    icon.left + side * .78f, icon.top + side * .71f), -55, 110, false, paint);
+            canvas.drawArc(new RectF(icon.left + side * .22f, icon.top + side * .14f,
+                    icon.left + side * .97f, icon.top + side * .86f), -55, 110, false, paint);
+        }
+        paint.setStyle(Paint.Style.FILL);
+        RectF text = new RectF(icon.right + Math.max(2f, 4f * scale), bounds.top,
+                bounds.right, bounds.bottom);
+        if (!text.isEmpty()) drawStyledText(canvas, steps < 0 ? "—" : Integer.toString(steps),
+                text, color, Math.min(item.fontSizeSp * scale, text.height() * .8f),
+                Layout.Alignment.ALIGN_CENTER, false, item.fontWeight);
     }
 
     private static RectF stockCardRect(StockManeuverCardRows.Row row) {
@@ -2130,6 +2190,7 @@ public final class HudCanvasView extends View {
         }
         switch (item.type) {
             case FUEL_LEVEL:
+                return config.fuelSettingsFor(item).levelColor(value, fallback);
             case FUEL_RANGE:
                 double red = item.options.optDouble("redThreshold", 10d);
                 double yellow = item.options.optDouble("yellowThreshold", 20d);

@@ -3,6 +3,7 @@ package dezz.status.widget.hud;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Canvas;
 import android.graphics.Outline;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
@@ -17,6 +18,7 @@ import androidx.annotation.Nullable;
 
 import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
+import dezz.status.widget.navigation.MapEdgeFade;
 
 /**
  * One HUD view tree: a producer-owned map Surface below Natro's independently placed widgets.
@@ -36,6 +38,8 @@ final class HudCompositeView extends FrameLayout
     private int leasedWidth;
     private int leasedHeight;
     @Nullable private HudElementConfig activeMap;
+    private final MapEdgeFade mapEdgeFade = new MapEdgeFade();
+    private final RectF edgeBounds = new RectF();
 
     HudCompositeView(@NonNull Context context,
                      @NonNull HudPanelConfig config,
@@ -77,6 +81,18 @@ final class HudCompositeView extends FrameLayout
         canvas.invalidate();
     }
 
+    @Override protected boolean drawChild(Canvas target, View child, long drawingTime) {
+        if (child != mapTexture || activeMap == null) return super.drawChild(target, child, drawingTime);
+        edgeBounds.set(child.getLeft(), child.getTop(), child.getRight(), child.getBottom());
+        int save = mapEdgeFade.begin(target, edgeBounds,
+                activeMap.options.optBoolean("edgeBlurEnabled", false),
+                activeMap.options.optInt("edgeBlurSizePx", 24),
+                activeMap.options.optInt("edgeBlurStrengthPercent", 100));
+        boolean result = super.drawChild(target, child, drawingTime);
+        mapEdgeFade.finish(target, save, edgeBounds);
+        return result;
+    }
+
     @Override
     protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
         super.onSizeChanged(width, height, oldWidth, oldHeight);
@@ -106,6 +122,7 @@ final class HudCompositeView extends FrameLayout
         int radius = activeMap.options.optInt("cornerRadiusPx", 0);
         mapTexture.setOutlineProvider(new RoundedOutline(radius));
         mapTexture.setClipToOutline(radius > 0);
+        invalidate();
         applyMapGeometry();
     }
 

@@ -4,6 +4,7 @@ package dezz.status.widget.instrument;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.RectF;
 import android.graphics.Paint;
 import android.graphics.SurfaceTexture;
 import android.view.Surface;
@@ -37,6 +38,9 @@ public final class InstrumentPanelView extends FrameLayout
     private boolean windowVisible;
     private boolean leasePublished;
     private boolean clusterMapEnabled = true;
+    private final dezz.status.widget.navigation.MapEdgeFade mapEdgeFade =
+            new dezz.status.widget.navigation.MapEdgeFade();
+    private final RectF edgeBounds = new RectF();
     private int publishedWidth;
     private int publishedHeight;
     private int coldLeaseRetryCount;
@@ -87,6 +91,20 @@ public final class InstrumentPanelView extends FrameLayout
         return instruments;
     }
 
+    @Override protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+        if (child != mapView) return super.drawChild(canvas, child, drawingTime);
+        InstrumentElementConfig map = firstMap();
+        if (map == null) return super.drawChild(canvas, child, drawingTime);
+        edgeBounds.set(child.getLeft(), child.getTop(), child.getRight(), child.getBottom());
+        int save = mapEdgeFade.begin(canvas, edgeBounds,
+                map.options.optBoolean("edgeBlurEnabled", false),
+                map.options.optInt("edgeBlurSizePx", 24),
+                map.options.optInt("edgeBlurStrengthPercent", 100));
+        boolean result = super.drawChild(canvas, child, drawingTime);
+        mapEdgeFade.finish(canvas, save, edgeBounds);
+        return result;
+    }
+
     /** Updates the editor's map locator during a drag without rebuilding telemetry state. */
     public void refreshMapGeometry() {
         InstrumentElementConfig map = firstMap();
@@ -124,6 +142,7 @@ public final class InstrumentPanelView extends FrameLayout
         if (mapTexture != null) mapTexture.setOpaque(!profile.roadsOnly);
         mapView.requestLayout();
         mapView.invalidate();
+        invalidate();
         coldLeaseRetryCount = 0;
         mapView.post(this::publishLeaseIfReady);
     }

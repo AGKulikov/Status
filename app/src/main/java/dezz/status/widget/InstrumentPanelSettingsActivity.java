@@ -337,6 +337,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         final TrafficJamControls trafficJamControls =
                 element.type == InstrumentElementType.TRAFFIC_JAM
                         ? new TrafficJamControls(content, element) : null;
+        final MapEdgeControls mapEdges = element.type == InstrumentElementType.NAV_MAP
+                ? new MapEdgeControls(content, element) : null;
         final Spinner[] infoRows = new Spinner[3];
         if (element.type.isAnalogGauge()) {
             showFace = switchView("Фон шкалы",
@@ -451,6 +453,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     element.enabled = visible.isChecked();
                     element.responseMillis = response.getProgress();
                     element.opacityPercent = opacity.getProgress() + 10;
+                    if (mapEdges != null) mapEdges.apply();
                     if (showFace != null) setOption(element, "showFace", showFace.isChecked());
                     if (showScale != null) setOption(element, "showScale", showScale.isChecked());
                     if (showScaleLabels != null) {
@@ -537,6 +540,37 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         refresh(selected.id, true);
     }
 
+    private final class MapEdgeControls {
+        final InstrumentElementConfig element;
+        final Switch enabled;
+        final SliderField strength, size;
+
+        MapEdgeControls(LinearLayout content, InstrumentElementConfig element) {
+            this.element = element;
+            enabled = switchView("Размыть края карты", element.options.optBoolean("edgeBlurEnabled", false));
+            content.addView(enabled);
+            strength = slider(content, "Степень размытия края",
+                    element.options.optInt("edgeBlurStrengthPercent", 100), 0, 100, 1, " %");
+            size = slider(content, "Размер зоны размытия",
+                    element.options.optInt("edgeBlurSizePx", 24), 0, 300, 1, " px");
+            content.addView(text("Карта плавно становится прозрачной у границ. Центр и отдельные "
+                    + "виджеты сохраняют чёткость.", 12, 0xFFB8C0CC));
+        }
+
+        void apply() {
+            setOption(element, "edgeBlurEnabled", enabled.isChecked());
+            setOption(element, "edgeBlurStrengthPercent", strength.intValue());
+            setOption(element, "edgeBlurSizePx", size.intValue());
+        }
+    }
+
+    private InstrumentElementConfig mapElement() {
+        for (InstrumentElementConfig element : config.elements) {
+            if (element.type == InstrumentElementType.NAV_MAP) return element;
+        }
+        return null;
+    }
+
     private void editMapPerformance() {
         Preferences preferences = new Preferences(this);
         NavigationIntegrationConfig navigation;
@@ -553,6 +587,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = dialogColumn();
         scroll.addView(content);
+        InstrumentElementConfig mapElement = mapElement();
+        MapEdgeControls mapEdges = mapElement == null ? null : new MapEdgeControls(content, mapElement);
 
         content.addView(text("Карта приборной панели полностью независима от основного экрана "
                 + "Навигатора. Все значения ниже применяются только к этой карте.",
@@ -898,6 +934,10 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.trafficUnknownColor = trafficUnknownColor.value;
                     map.trafficGradientLength = trafficGradient.value();
                     if (persistNavigationConfiguration(finalNavigation, preferences)) {
+                        if (mapEdges != null) {
+                            mapEdges.apply();
+                            refresh(mapElement.id, true);
+                        }
                         // Make the projected panel re-read map enable/opacity immediately. When
                         // disabled this revokes its Surface instead of retaining an idle lease.
                         sendBroadcast(new android.content.Intent(

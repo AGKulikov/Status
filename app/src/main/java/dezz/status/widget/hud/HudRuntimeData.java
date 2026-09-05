@@ -79,6 +79,8 @@ public final class HudRuntimeData {
     @NonNull private HudPanelConfig config;
     @Nullable private HudNavigationState navigation;
     @Nullable private LauncherMediaController.Snapshot media;
+    private final HudVolumeVisibility volumeVisibility = new HudVolumeVisibility();
+    private final Runnable volumeExpiry = this::notifyChanged;
     private boolean mediaTimelineVisible;
     @Nullable private WidgetService attachedHost;
     @Nullable private String cachedAppVersion;
@@ -199,6 +201,8 @@ public final class HudRuntimeData {
     public void stop() {
         if (!started) return;
         started = false;
+        main.removeCallbacks(volumeExpiry);
+        volumeVisibility.reset();
         navigationDataNeeded = false;
         main.removeCallbacks(hostProbe);
         main.removeCallbacks(clockTick);
@@ -270,6 +274,8 @@ public final class HudRuntimeData {
             return;
         }
         media = null;
+        main.removeCallbacks(volumeExpiry);
+        volumeVisibility.reset();
         mediaController.stop();
     }
 
@@ -277,6 +283,10 @@ public final class HudRuntimeData {
         if (!started) return;
         LauncherMediaController.Snapshot previous = media;
         media = next;
+        if (volumeVisibility.sample(next.volumeSteps, SystemClock.elapsedRealtime())) {
+            main.removeCallbacks(volumeExpiry);
+            main.postDelayed(volumeExpiry, HudVolumeVisibility.DISPLAY_MS);
+        }
         if (previous == null || mediaSnapshotChanged(previous, next, mediaTimelineVisible)) {
             notifyChanged();
         }
@@ -299,7 +309,9 @@ public final class HudRuntimeData {
                 || before.likeAvailable != after.likeAvailable
                 || (before.liked == null ? after.liked != null
                         : !before.liked.equals(after.liked))
-                || before.volumePercent != after.volumePercent;
+                || before.volumePercent != after.volumePercent
+                || before.volumeSteps != after.volumeSteps
+                || before.volumeMaximum != after.volumeMaximum;
     }
 
     private static boolean isMediaElement(@NonNull HudElementType type) {
@@ -330,6 +342,7 @@ public final class HudRuntimeData {
 
     @Nullable public HudNavigationState navigation() { return navigation; }
     @Nullable public LauncherMediaController.Snapshot media() { return media; }
+    public boolean volumeVisible() { return volumeVisibility.visible(SystemClock.elapsedRealtime()); }
 
     @NonNull
     public AutomationState automation(@NonNull HudElementConfig item) {
@@ -382,7 +395,7 @@ public final class HudRuntimeData {
                 return media == null ? "0:00 / 0:00"
                         : duration(media.positionMs) + " / " + duration(media.durationMs);
             case MEDIA_VOLUME:
-                return media == null ? "—" : media.volumePercent + "%";
+                return media == null || media.volumeSteps < 0 ? "—" : Integer.toString(media.volumeSteps);
             case NAV_MANEUVER_TITLE:
                 return navigation == null ? "Маршрут не активен"
                         : firstNonEmpty(navigation.maneuverTitle, navigation.maneuverText, "Маршрут");
@@ -450,6 +463,12 @@ public final class HudRuntimeData {
     }
 
     public double numericValue(@NonNull HudElementConfig item) {
+        if (item.type == HudElementType.FUEL_REFILL) {
+            CarIntegration.TelemetryValue fuel = telemetry.get("ISensor.fuel_level");
+            double litres = fuel == null || !Double.isFinite(fuel.value) || fuel.value < 0d
+                    ? Double.NaN : fuel.value / 1_000d;
+            return config.fuelSettingsFor(item).refillLitres(litres);
+        }
         if ((item.type == HudElementType.NAV_TRIP_PROGRESS
                 || item.type == HudElementType.NAV_ROUTE_SUMMARY) && navigation != null) {
             return navigation.tripProgress;
@@ -516,18 +535,14 @@ public final class HudRuntimeData {
         String id = metricId(item);
         CarIntegration.TelemetryValue value = telemetry.get(id);
         if (item.type == HudElementType.FUEL_REFILL) {
-            CarIntegration.TelemetryValue fuel = telemetry.get("ISensor.fuel_level");
-            CarIntegration.TelemetryValue capacity = telemetry.get("ICarInfo.fuel_capacity");
-            if (fuel == null) return "—";
-            double litres = fuel.value / 1_000d;
-            double tank = capacity == null
-                    ? item.options.optDouble("tankCapacityLitres", 64d)
-                    : (capacity.value > 500d ? capacity.value / 1_000d : capacity.value);
-            return applyFormat(item.textFormat, Math.max(0d, tank - litres),
+            double refill = numericValue(item);
+            if (!Double.isFinite(refill)) return "—";
+            return applyFormat(item.textFormat, refill,
                     item.unit.isEmpty() ? "л" : item.unit);
         }
         if (value == null) return "—";
         double number = normalizedVehicleValue(item, value.value);
+        if (item.type == HudElementType.FUEL_LEVEL && !Double.isFinite(number)) return "—";
         if (item.type == HudElementType.GEAR) return gear(number, item);
         if (item.type == HudElementType.HIGH_BEAM
                 || item.type == HudElementType.AUTO_HOLD
@@ -545,7 +560,7 @@ public final class HudRuntimeData {
             case NAV_SPEED:
                 return value * 3.72d;
             case FUEL_LEVEL:
-                return value / 1_000d;
+                return Double.isFinite(value) && value >= 0d ? value / 1_000d : Double.NaN;
             case FUEL_CAPACITY:
                 return value > 500d ? value / 1_000d : value;
             case RPM:
@@ -710,8 +725,7 @@ public final class HudRuntimeData {
             if (!id.isEmpty()) ids.add(id);
             if (item.type == HudElementType.FUEL_REFILL) {
                 ids.add("ISensor.fuel_level");
-                ids.add("ICarInfo.fuel_capacity");
-                if (item.options.optBoolean("onlyInPark", true)) ids.add("ISensor.gear");
+                if (config.fuelSettingsFor(item).refillOnlyInPark) ids.add("ISensor.gear");
             }
         }
         carIntegration.subscribeTelemetry(Collections.unmodifiableSet(ids), telemetryListener);
