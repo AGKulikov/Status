@@ -1,0 +1,40 @@
+name: Verify native maneuver command sources (no APK)
+on:
+  push:
+    branches: ['fix/maneuver-commands-20260905']
+    paths: ['app/**', 'navigator-mod/**', 'tools/**', '.github/workflows/verify-maneuver-commands.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install compilation dependencies
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Compile Navigator bridge sources
+        run: bash tools/build_navigation_patch_dex.sh build/navigation-command-check
+      - name: Test Natro sources
+        run: ./gradlew testGeelyDebugUnitTest --no-daemon
+      - name: Verify isolated patch and navigation contracts
+        run: |
+          python3 tools/tests/test_verify_navigation_mod_baseline.py
+          python3 tools/tests/test_navigation_mod_tools.py
+          python3 tools/tests/test_navigation_maneuver_patch.py
+          python3 tools/tests/test_navigation_position_policy.py
+          python3 tools/tests/test_navigation_layer_order.py
+          python3 tools/tests/test_navigation_event_visibility.py
+          python3 tools/tests/test_stock_maneuver_artwork.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: maneuver-command-test-results
+          path: app/build/test-results/testGeelyDebugUnitTest/
+          retention-days: 7

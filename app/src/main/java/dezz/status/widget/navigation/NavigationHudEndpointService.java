@@ -564,9 +564,10 @@ public final class NavigationHudEndpointService extends Service {
         DiagnosticJournal.info("navigation-bridge",
                 "authenticated Navigator session started; capabilities="
                         + Long.toHexString(client.capabilities));
-        if ((client.capabilities & NavigationBridgeContract.CAP_MANEUVER_ARTWORK) == 0L) {
+        if ((client.capabilities & (NavigationBridgeContract.CAP_MANEUVER_ARTWORK
+                | NavigationBridgeContract.CAP_MANEUVER_COMMANDS)) == 0L) {
             DiagnosticJournal.warn("navigation-bridge",
-                    "Navigator has no stock maneuver artwork capability (0x4000); "
+                    "Navigator has no stock maneuver artwork/commands capability; "
                             + "install the compatible Navigator from the Natro release pair");
         }
     }

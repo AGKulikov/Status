@@ -458,8 +458,19 @@ public final class HudCanvasView extends View {
                 Color.WHITE, Math.max(9f, 13f * scale), Layout.Alignment.ALIGN_CENTER);
     }
 
+    private StockManeuverCardRenderer commandCardRenderer;
+
+    private StockManeuverCardRenderer commandCardRenderer() {
+        if (commandCardRenderer == null) commandCardRenderer = new StockManeuverCardRenderer(getContext());
+        return commandCardRenderer;
+    }
+
     private void drawManeuver(Canvas canvas, HudElementConfig item, RectF bounds, int color) {
         HudNavigationState nav = data.navigation();
+        if (nav != null && nav.stockCard.enabled) {
+            commandCardRenderer().drawMain(canvas, nav.stockCard, bounds, Color.alpha(color));
+            return;
+        }
         if (item.options.optBoolean("preferSourceImage", true)
                 && nav != null && nav.maneuverImage != null) {
             drawBitmap(canvas, nav.maneuverImage, bounds);
@@ -682,6 +693,9 @@ public final class HudCanvasView extends View {
 
     private void drawCombinedNavigation(Canvas canvas, HudElementConfig item, RectF bounds,
                                         int color, int unitColor, float scale) {
+        HudNavigationState commandNav = data.navigation();
+        if (commandNav != null && commandNav.stockCard.enabled
+                && !commandCardRenderer().available(commandNav.stockCard)) return;
         if (item.options.optBoolean("showCardBackground", true)) {
             int card = optionColor(item, "cardColor", 0xFF0758E8);
             int opacity = clamp(item.options.optInt("cardOpacityPercent", 94), 0, 100);
@@ -715,6 +729,11 @@ public final class HudCanvasView extends View {
                 item.options.optInt("paddingBottomPx", 8) * scale);
         if (content.isEmpty()) return;
         HudNavigationState nav = data.navigation();
+        if (nav != null && nav.stockCard.enabled) {
+            commandCardRenderer().draw(canvas, nav.stockCard, content, item.options, scale,
+                    item.fontSizeSp, item.fontWeight, color);
+            return;
+        }
         String auxiliary = nav == null ? "" : stockManeuverAuxiliaryText(nav);
         StockManeuverCardRows stockRows = nav != null && nav.direct
                 ? new StockManeuverCardRows(content.left, content.top, content.right, content.bottom,

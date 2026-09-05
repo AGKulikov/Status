@@ -61,20 +61,24 @@ python3 "$SCRIPT_DIR/patch_navigation_manifest_theme.py" "$PATCHED_MANIFEST"
 mkdir -p "$DEX_PROJECT"
 cp "$DECODED/apktool.yml" "$DEX_PROJECT/apktool.yml"
 mv "$DECODED/smali_classes4" "$DEX_PROJECT/smali_classes4"
+mv "$DECODED/smali_classes8" "$DEX_PROJECT/smali_classes8"
 mv "$DECODED/smali_classes12" "$DEX_PROJECT/smali_classes12"
 MAP_ACTIVITY="$DEX_PROJECT/smali_classes4/ru/yandex/yandexmaps/app/MapActivity.smali"
 MAP_VIEW="$DEX_PROJECT/smali_classes12/com/yandex/mapkit/mapview/MapView.smali"
 python3 "$SCRIPT_DIR/patch_navigation_map_activity.py" "$MAP_ACTIVITY"
 python3 "$SCRIPT_DIR/patch_navigation_map_view.py" "$MAP_VIEW"
+MANEUVER_VIEW="$DEX_PROJECT/smali_classes8/ru/yandex/yandexnavi/ui/guidance/maneuver/ContextManeuverView.smali"
+python3 "$SCRIPT_DIR/patch_navigation_maneuver_view.py" "$MANEUVER_VIEW"
 
-# The isolated project has no manifest/resources and contains only the two reviewed DEX lanes.
+# The isolated project has no manifest/resources and contains only the three reviewed DEX lanes.
 # Apktool therefore cannot rebuild any protected APK entry even accidentally.
 XDG_DATA_HOME="$BUILD_ROOT/apktool-data" \
   java -jar "$APKTOOL_JAR" b --no-apk "$DEX_PROJECT"
 CLASSES4_DEX="$DEX_PROJECT/build/apk/classes4.dex"
 CLASSES12_DEX="$DEX_PROJECT/build/apk/classes12.dex"
-if [ ! -f "$CLASSES4_DEX" ] || [ ! -f "$CLASSES12_DEX" ]; then
-  printf 'apktool did not produce both reviewed DEX outputs\n' >&2
+CLASSES8_DEX="$DEX_PROJECT/build/apk/classes8.dex"
+if [ ! -f "$CLASSES4_DEX" ] || [ ! -f "$CLASSES8_DEX" ] || [ ! -f "$CLASSES12_DEX" ]; then
+  printf 'apktool did not produce all three reviewed DEX outputs\n' >&2
   exit 1
 fi
 
@@ -84,6 +88,7 @@ python3 "$SCRIPT_DIR/repack_apk_entries.py" \
   --output "$UNALIGNED" \
   --replace "AndroidManifest.xml=$PATCHED_MANIFEST" \
   --replace "classes4.dex=$CLASSES4_DEX" \
+  --replace "classes8.dex=$CLASSES8_DEX" \
   --replace "classes12.dex=$CLASSES12_DEX" \
   --replace "classes19.dex=$CLASSES19_DEX"
 

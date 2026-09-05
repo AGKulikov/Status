@@ -67,6 +67,7 @@ final class NavigationBridgeClient {
     private static final long CAP_EXTERNAL_INSTRUMENT_LAUNCHER = 1L << 12;
     private static final long CAP_EXTERNAL_CAMERA_OVERLAY = 1L << 13;
     private static final long CAP_MANEUVER_ARTWORK = 1L << 14;
+    private static final long CAP_MANEUVER_COMMANDS = 1L << 15;
 
     private static final String KEY_PROTOCOL_VERSION = "protocol_version";
     private static final String KEY_SESSION_ID = "session_id";
@@ -352,7 +353,7 @@ final class NavigationBridgeClient {
                         | CAP_CLUSTER_DIRECT_SURFACE
                         | CAP_EXTERNAL_INSTRUMENT_LAUNCHER
                         | CAP_EXTERNAL_CAMERA_OVERLAY
-                        | CAP_MANEUVER_ARTWORK);
+                        | CAP_MANEUVER_COMMANDS);
         Message hello = Message.obtain(null, MSG_HELLO);
         hello.replyTo = callbacks;
         hello.setData(data);

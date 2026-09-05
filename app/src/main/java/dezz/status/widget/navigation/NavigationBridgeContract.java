@@ -72,6 +72,7 @@ public final class NavigationBridgeContract {
     public static final long CAP_EXTERNAL_INSTRUMENT_LAUNCHER = 1L << 12;
     public static final long CAP_EXTERNAL_CAMERA_OVERLAY = 1L << 13;
     public static final long CAP_MANEUVER_ARTWORK = 1L << 14;
+    public static final long CAP_MANEUVER_COMMANDS = 1L << 15;
     public static final long CAP_NATRO_CONFIGURATION_HOST = 1L << 32;
     public static final long CAP_NATRO_NAVIGATION_STATE_SINK = 1L << 33;
     /** Advertise only after Natro can lease a real Surface rather than a bitmap bridge. */

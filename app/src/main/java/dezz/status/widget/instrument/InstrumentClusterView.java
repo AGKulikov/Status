@@ -38,6 +38,8 @@ import dezz.status.widget.navigation.NavigationBridgeStateStore;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
 import dezz.status.widget.navigation.NavigationRouteGeometryV2;
 import dezz.status.widget.navigation.NavigationSnapshotV2;
+import dezz.status.widget.navigation.StockManeuverCardState;
+import dezz.status.widget.hud.StockManeuverCardRenderer;
 
 /**
  * One hardware-accelerated Canvas for every non-map instrument. Static artwork is raster-cached;
@@ -105,6 +107,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         navigationSnapshot = null;
         navigationGeometry = null;
         navigationManeuverImage = null;
+        commandCard = StockManeuverCardState.HIDDEN;
         invalidate();
     };
     @NonNull private final Runnable clockWake = () -> {
@@ -131,6 +134,12 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @Nullable private NavigationRouteGeometryV2 navigationGeometry;
     /** Reserved only for keyed source art; direct snapshots intentionally leave it null. */
     @Nullable private Bitmap navigationManeuverImage;
+    private StockManeuverCardState commandCard = StockManeuverCardState.LEGACY;
+    private StockManeuverCardRenderer commandCardRenderer;
+    private StockManeuverCardRenderer commandCardRenderer() {
+        if (commandCardRenderer == null) commandCardRenderer = new StockManeuverCardRenderer(getContext());
+        return commandCardRenderer;
+    }
     private boolean resizing;
     private float touchStartX;
     private float touchStartY;
@@ -317,6 +326,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             navigationSnapshot = null;
             navigationGeometry = null;
             navigationManeuverImage = null;
+        commandCard = StockManeuverCardState.HIDDEN;
             removeCallbacks(navigationWake);
             removeCallbacks(navigationExpiry);
             navigationWakePosted.set(false);
@@ -335,6 +345,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         navigationSnapshot = value != null && value.routeActive
                 && value.isFreshAt(now, NAVIGATION_FRESH_MS) ? value : null;
         NavigationSnapshotV2 accepted = navigationSnapshot;
+        commandCard = accepted == null ? StockManeuverCardState.HIDDEN : StockManeuverCardState.parse(
+                accepted.maneuverCardJson, accepted.routeEpoch, accepted.routeActive);
         NavigationRouteGeometryV2 geometry = NavigationBridgeStateStore.routeGeometry();
         navigationGeometry = accepted != null && geometry != null
                 && geometry.routeEpoch == accepted.routeEpoch ? geometry : null;
@@ -1077,9 +1089,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         if (content.isEmpty()) return;
 
         boolean showIcon = option(element, "showManeuverIcon", true);
-        boolean sourceIconAvailable = navigationManeuverImage != null
+        boolean sourceIconAvailable = !commandCard.enabled && navigationManeuverImage != null
                 && !navigationManeuverImage.isRecycled();
-        boolean reserveIcon = option(element, "reserveManeuverIconSpace", true);
+        boolean reserveIcon = !commandCard.enabled && option(element, "reserveManeuverIconSpace", true);
         RectF metricsArea = new RectF(content);
         if (showIcon && (sourceIconAvailable || reserveIcon)) {
             float iconWidth = content.width() * Math.max(5, Math.min(40,
@@ -1115,7 +1127,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
 
         RectF valuesArea = new RectF(metricsArea);
         if (option(element, "showManeuverDetails", true)
-                && runtime.hasNavigationManeuverDetails() && !metricsArea.isEmpty()) {
+                && (commandCard.enabled ? commandCardRenderer().available(commandCard)
+                    : runtime.hasNavigationManeuverDetails()) && !metricsArea.isEmpty()) {
             float detailsFraction = Math.max(20, Math.min(65,
                     element.options.optInt("maneuverDetailsHeightPercent", 42))) / 100f;
             float detailsHeight = Math.min(metricsArea.height() * .65f,
@@ -1187,6 +1200,15 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                                                 @NonNull InstrumentElementConfig element,
                                                 int alpha) {
         if (bounds.isEmpty()) return;
+        if (commandCard.enabled) {
+            int textColor = navigationColor(element.options.optString(
+                    "maneuverDetailTextColor", "#FFFFFFFF"), Color.WHITE);
+            commandCardRenderer().draw(canvas, commandCard, bounds, element.options,
+                    getResources().getDisplayMetrics().scaledDensity,
+                    element.options.optInt("maneuverDetailTextSizeSp", 18), 600,
+                    withAlpha(textColor, alpha));
+            return;
+        }
         RectF primary = new RectF(bounds);
         RectF auxiliary = null;
         if (!runtime.navigationAuxiliaryText.isEmpty()) {

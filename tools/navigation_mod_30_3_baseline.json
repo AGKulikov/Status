@@ -12,6 +12,7 @@
   "mutable_entries": [
     "AndroidManifest.xml",
     "classes4.dex",
+    "classes8.dex",
     "classes12.dex"
   ],
   "allowed_new_entries": [
@@ -20,6 +21,7 @@
   "release_required_changed_entries": [
     "AndroidManifest.xml",
     "classes4.dex",
+    "classes8.dex",
     "classes12.dex"
   ],
   "release_required_new_entries": [
@@ -28,7 +30,8 @@
   "release_entry_sha256": {
     "AndroidManifest.xml": "1e8d52eadd9f9561bc76cbeb6f22017d537af8b5eff8803e759be0694f8172e3",
     "classes4.dex": "68f78d368c8051dc69cf689a3e4703c0c421740c29ca44af292e72243684216c",
-    "classes12.dex": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23"
+    "classes12.dex": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+    "classes8.dex": "d8212ed318b43e9381e14efcd64d5cfd14d8865607f29c35ca94d8cd8eb0eadc"
   },
   "critical_entries": [
     "resources.arsc",

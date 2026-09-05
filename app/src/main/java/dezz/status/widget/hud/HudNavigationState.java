@@ -19,6 +19,7 @@ import java.util.Locale;
 import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.navigation.NavigationRouteGeometryV2;
 import dezz.status.widget.navigation.NavigationSnapshotV2;
+import dezz.status.widget.navigation.StockManeuverCardState;
 
 /** One renderer-facing model, preferring the direct 30.3.0 stream over notification fallback. */
 public final class HudNavigationState {
@@ -98,6 +99,7 @@ public final class HudNavigationState {
         }
     }
 
+    public final StockManeuverCardState stockCard;
     public final boolean direct;
     public final boolean routeActive;
     @NonNull public final String maneuverType;
@@ -159,7 +161,8 @@ public final class HudNavigationState {
             List<TrafficRun> trafficRuns, double tripProgress, Bitmap maneuverImage,
             Bitmap lanesImage, Bitmap jamImage, Bitmap rainbowImage,
             String bridgeLanesJson, String bridgeLightsJson, String bridgeDirectionSignsJson,
-            NavigationRouteGeometryV2 bridgeGeometry) {
+            NavigationRouteGeometryV2 bridgeGeometry, StockManeuverCardState stockCard) {
+        this.stockCard = stockCard;
         this.direct = direct;
         this.routeActive = routeActive;
         this.maneuverType = maneuverType;
@@ -226,6 +229,8 @@ public final class HudNavigationState {
             @Nullable NavigationRouteGeometryV2 geometry,
             @Nullable HudNavigationState previous,
             @Nullable Bitmap sourceManeuverImage) {
+        StockManeuverCardState stockCard = StockManeuverCardState.parse(
+                source.maneuverCardJson, source.routeEpoch, source.routeActive);
         boolean previousDirect = previous != null && previous.direct;
         boolean routeActive = source.routeActive;
         List<Lane> lanes = previousDirect && previous.routeActive && routeActive
@@ -268,7 +273,8 @@ public final class HudNavigationState {
                 routeActive ? source.maneuverAuxiliaryManeuverType : "",
                 routeActive ? formatDistance(source.maneuverAuxiliaryDistanceMeters) : "",
                 source.street, routeActive ? source.destination : "",
-                routeActive && !source.maneuverDisplayDistance.trim().isEmpty()
+                stockCard.enabled ? stockCard.distance
+                        : routeActive && !source.maneuverDisplayDistance.trim().isEmpty()
                         ? source.maneuverDisplayDistance
                         : routeActive ? formatDistance(source.maneuverDistanceMeters) : "",
                 routeActive ? formatDistance(source.remainingDistanceMeters) : "",
@@ -289,7 +295,7 @@ public final class HudNavigationState {
                 routeActive ? sourceManeuverImage : null,
                 null, null, null, source.lanesJson, source.trafficLightsJson,
                 source.maneuverDirectionSignsJson,
-                routeActive ? geometry : null);
+                routeActive ? geometry : null, stockCard);
     }
 
     @NonNull
@@ -334,7 +340,7 @@ public final class HudNavigationState {
                 routeActive ? source.lanesImage : null,
                 routeActive ? source.jamImage : null,
                 routeActive ? source.rainbowImage : null,
-                "", "", "", null);
+                "", "", "", null, StockManeuverCardState.LEGACY);
     }
 
     @NonNull private static List<DirectionSignItem> parseDirectionSigns(String raw) {
@@ -403,6 +409,7 @@ public final class HudNavigationState {
     public boolean hasDataFor(@NonNull HudElementType type) {
         switch (type) {
             case NAV_MANEUVER_ARROW:
+                if (stockCard.enabled) return routeActive && stockCard.hasMain();
                 return routeActive && (direct ? maneuverImage != null
                         : maneuverImage != null || meaningfulManeuverType(maneuverType)
                         || hasText(maneuverTitle) || hasText(maneuverText));
@@ -415,6 +422,7 @@ public final class HudNavigationState {
             case NAV_DESTINATION:
                 return routeActive && hasText(destination);
             case NAV_TURN_DISTANCE:
+                if (stockCard.enabled) return routeActive && stockCard.visible && !stockCard.distance.isEmpty();
                 return routeActive && hasText(turnDistance)
                         && (meaningfulManeuverType(maneuverType)
                         || hasText(maneuverTitle) || hasText(maneuverText));
@@ -430,6 +438,7 @@ public final class HudNavigationState {
             case NAV_LANE_DISTANCE:
                 return routeActive && laneAvailable && hasText(laneDistance);
             case NAV_COMBINED:
+                if (stockCard.enabled) return routeActive && stockCard.hasMain();
                 return routeActive && (direct
                         ? maneuverImage != null && hasText(turnDistance)
                         : maneuverImage != null || meaningfulManeuverType(maneuverType)

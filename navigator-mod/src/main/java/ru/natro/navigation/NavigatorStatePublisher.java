@@ -440,6 +440,8 @@ final class NavigatorStatePublisher {
     private int lastSentManeuverArtworkSignature;
     private final StockManeuverArtwork maneuverArtwork = new StockManeuverArtwork();
 
+    private final Runnable dispatchManeuverCommands = () -> publishState(false, false, true);
+
     NavigatorStatePublisher(Sink sink) {
         this.sink = sink;
     }
@@ -471,6 +473,10 @@ final class NavigatorStatePublisher {
             detachOnMain();
             activityReference = new WeakReference<>(activity);
         }
+        StockManeuverCommands.listen(() -> {
+            main.removeCallbacks(dispatchManeuverCommands);
+            main.post(dispatchManeuverCommands);
+        });
         resolveRetryMs = MIN_RESOLVE_RETRY_MS;
         resolveBindings();
     }
@@ -824,6 +830,8 @@ final class NavigatorStatePublisher {
         activeRouteKey = nextKey;
         encodedRoute = nextEncoded;
         if (initial || changed) {
+            // Require a fresh native maneuver command after the route transition.
+            StockManeuverCommands.reset(routeEpoch);
             cachedDestinationEpoch = Long.MIN_VALUE;
             cachedDestination = "";
             clearRouteMatchedPosition();
@@ -1061,6 +1069,8 @@ final class NavigatorStatePublisher {
                 .put("maneuverAuxiliaryDistanceMeters",
                         manoeuvre.auxiliary.distanceMeters)
                 .put("maneuverDisplayDistance", manoeuvre.displayDistance)
+                .put("maneuverCardJson", StockManeuverCommands.snapshot(
+                        activityReference.get(), routeEpoch, routeActive))
                 .put("street", text(invoke(currentGuidance, "getRoadName")))
                 .put("destination", routeActive ? destinationForRoute(route) : "")
                 .put("maneuverDistanceMeters", manoeuvre.distanceMeters)
@@ -1199,7 +1209,8 @@ final class NavigatorStatePublisher {
         String subtext = title.equals(toponym) ? "" : toponym;
         int distance = nonNegativeInt(distance(routePosition, position));
         String identity = manoeuvreIdentity(type, position);
-        StockManeuverCard stockCard = readStockManeuverCard(distance, identity);
+        // Native commands own the card. Windshield semantics remain available for other modules.
+        StockManeuverCard stockCard = StockManeuverCard.EMPTY;
         return new Manoeuvre(identity, type, title, subtext,
                 stockCard.nextRoad, stockCard.directionSigns, stockCard.auxiliary, distance,
                 stockCard.displayDistance, stockCard.artwork, stockCard.artworkSignature);
@@ -2164,6 +2175,9 @@ final class NavigatorStatePublisher {
     }
 
     private void detachOnMain() {
+        StockManeuverCommands.listen(null);
+        StockManeuverCommands.reset(routeEpoch);
+        main.removeCallbacks(dispatchManeuverCommands);
         main.removeCallbacks(resolveRetry);
         main.removeCallbacks(dispatchCamera);
         main.removeCallbacks(routeReconcile);
