@@ -246,6 +246,10 @@ int getVersionCode() {
     if (version == '2.8.0') {
         return 208021313
     }
+    // Native ManeuverView commands and original Navigator resources on HUD and cluster.
+    if (version == '2.8.1') {
+        return 208021314
+    }
     if (version == '2.3.0') {
         return 208021254
     }
