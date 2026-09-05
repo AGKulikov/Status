@@ -130,6 +130,7 @@ import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.dim.DimMenuPanelService;
 import dezz.status.widget.hud.HudPresentationService;
+import dezz.status.widget.instrument.InstrumentDisplayLauncher;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.MediaPlaybackHistoryStore;
 import dezz.status.widget.launcher.information.StatusBarInformationCatalog;
@@ -1179,6 +1180,11 @@ public class WidgetService extends Service {
         ecarxNavigatorWindowObserver = new EcarxNavigatorWindowObserver(
                 this, this::onEcarxNavigatorWindowStateChanged, this::onEcarxParkingWindowStateChanged);
         ecarxNavigatorWindowObserver.start(android.view.Display.DEFAULT_DISPLAY);
+
+        // A watchdog/service restart need not pass through BootReceiver or any Activity. Restore
+        // the saved DIM composition as visual work here; its vendor calls use the DIM worker and
+        // the map lease waits independently for Navigator, without waiting for ANCS/connectors.
+        mainHandler.post(this::reconcileAutomaticInstrumentPanel);
 
         if (prefs.widgetEnabled.get() && overlayRuntimeAvailable) {
             createOverlayView();
@@ -3001,6 +3007,7 @@ public class WidgetService extends Service {
                 || automaticLifecycleQuiet
                 || initialIntegrationStartupInProgress || !integrationsStarted) return;
         automaticSurfaceReconcilePending = false;
+        reconcileAutomaticInstrumentPanel();
         if (prefs.driverPanelEnabled.get()) {
             runIntegrationStep("automatic Driver surface reconcile",
                     () -> DriverPanelService.apply(this));
@@ -3023,6 +3030,12 @@ public class WidgetService extends Service {
             });
         }
         schedulePendingAutomationUiRefresh();
+    }
+
+    private void reconcileAutomaticInstrumentPanel() {
+        if (destroyed || prefs == null) return;
+        runIntegrationStep("automatic instrument panel reconcile",
+                () -> InstrumentDisplayLauncher.reconcileAutomatic(this));
     }
 
     /**

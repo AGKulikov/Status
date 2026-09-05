@@ -1,0 +1,79 @@
+{
+  "versionName": "2.7.8",
+  "versionCode": 208021311,
+  "package": "ru.natro.statuswidget",
+  "sourceCommit": "b0c64a5624158887c3f81a6b344f37e0a679c840",
+  "sourceTree": "6a476c61a9bec97fe478a569dab8f40082e2ce1e",
+  "ciRunId": "33964848193",
+  "unsignedSha256": "7e8d3dd172d1e108fa318ec1baaa870e09f43db1a60041e81f4136816d7de8dc",
+  "navigator": {
+    "pairRequired": true,
+    "patchDexSha256": "11474b5f8fd4fe90e7423a7c2393d6bc5e74d24256dc2a519cb3edcd339e91de",
+    "requiredCapability": "0x4000",
+    "baselineSha256": "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f"
+  },
+  "signedApk": "Natro-2.7.8-signed.apk",
+  "signedSha256": "6c189c4c93dcbbe6a8bc17c66a30cbe89dcadde5e3b42efe13fb352bc688895d",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "signerCount": 1,
+  "zipalign16KiB": true,
+  "previous": {
+    "package": "ru.natro.statuswidget",
+    "versionCode": 208021310,
+    "versionName": "2.7.7",
+    "sha256": "feb2a2aa258ad681475507d989d99e9f89bf20271a45edb97da3f1871e5a001e"
+  },
+  "installOverMetadataVerified": true,
+  "physicalKx11Verification": "pending",
+  "navigatorPairRequired": true,
+  "helperChanged": false,
+  "signingScriptSha256": "dba4ed9ec20d735300f0ef3b8104789b3f0891dd3ea8c100fc92ec6fccfddf0f",
+  "toolSha256": {
+    "aapt": "c076aeeee8bd3ce58395a093747202265ab80c6c12e59358f598a30a81fde13b",
+    "apksigner": "b47549e373b895ce6ca620d0c7887e674d9615ffa837a86ac601dcfd04adb0f0",
+    "dexdump": "0944161e1e453ac40a16362ab42f4b1ee5e60eccf503cd87f4a6040c78247d02",
+    "lib/apksigner.jar": "3716d9311e55d2b0918a2fd9d54ba9e406c5f6abeea700b287f11259bc163dec",
+    "lib64/libLLVM_android.so": "f35907663f0069916f86aaafceadc55698f02a8f8cfc21bcd91833f849b2dc09",
+    "lib64/libbcc.so": "f69fd124a305f6d9774e62759e21f6aeea7f12745189d9d4b4ae99977761d83b",
+    "lib64/libbcinfo.so": "ff584620b65dfee59bcb5050c692398cf03fe9326b1e6daf1a92f1f30ac24cc6",
+    "lib64/libc++.so": "96a19cd2154a4423a61f8444e5d3148a608fa3033bc1a22285d19855a950d05a",
+    "lib64/libc++.so.1": "7eb2812ec39ab5c31f2fc9f906f412c713e76e0d07d6a6911108c7f886e24945",
+    "lib64/libclang_android.so": "f18899cc604a3a1a9b836804cdfeb1ff96b25faff2b75f5ff451037a4308660f",
+    "zipalign": "c5f559e946de5a9e7d58792181db20383b228877812136bc469d97ae00a43b0a"
+  },
+  "artifacts": [
+    {
+      "file": "Natro-2.7.8-signed.apk",
+      "bytes": 28339765,
+      "sha256": "6c189c4c93dcbbe6a8bc17c66a30cbe89dcadde5e3b42efe13fb352bc688895d"
+    },
+    {
+      "file": "Navigator-30.3.0-Natro-2.7.8-signed.apk",
+      "bytes": 155125155,
+      "sha256": "19fdba821d64b0613bc05b47ee8fcb0490443966f6cf2c00a038650ddf0620b9"
+    }
+  ],
+  "ciTests": {
+    "testSuites": 357,
+    "tests": 1796,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "navigatorCapabilities": {
+    "method": "ru.natro.navigation.NavigationBridgeClient.sendHello:()V",
+    "requiredMask": "0x4000",
+    "previousCapabilities": "0x3fe7",
+    "candidateCapabilities": "0x7fe7",
+    "previousArtifactSha256": "c80b67865caeece9a9008b0aad62b1262cabb9da0d46765b1f1eeb1c923b3c44",
+    "candidateClasses19Sha256": "11474b5f8fd4fe90e7423a7c2393d6bc5e74d24256dc2a519cb3edcd339e91de",
+    "methodConstantsVerified": true,
+    "physicalRenderingVerified": false
+  },
+  "navigatorInstallOverMetadataVerified": true,
+  "navigatorProtectedEntriesByteIdentical": 17223,
+  "ciUrl": "https://github.com/AGKulikov/Status/actions/runs/33964848193",
+  "ciArtifactSha256": "3be6c649f689e30b8a667d2d166a326eea3e689fe2a42de8c7ceec6920164943"
+}

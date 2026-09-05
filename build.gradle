@@ -234,6 +234,10 @@ int getVersionCode() {
     if (version == '2.7.7') {
         return 208021310
     }
+    // Restore the cluster from its service host and recover a proven registered ANCS owner.
+    if (version == '2.7.8') {
+        return 208021311
+    }
     if (version == '2.3.0') {
         return 208021254
     }

@@ -211,6 +211,8 @@ public final class LauncherActivity extends AppCompatActivity {
     };
     private boolean globalElementRefreshPosted;
     private boolean globalElementsActivated;
+    private boolean globalElementGeometryPending;
+    @Nullable private String lastFavoriteProjectionState;
     private boolean activityStarted;
     private final Runnable globalElementRefresh = () -> {
         globalElementRefreshPosted = false;
@@ -565,6 +567,13 @@ public final class LauncherActivity extends AppCompatActivity {
         root.requestApplyInsets();
         workspace.setDescendantInvalidationListener(
                 this::onWorkspaceDescendantInvalidated);
+        workspace.setLayoutCompleteListener(() -> {
+            if (!activityStarted || !globalElementsActivated) return;
+            // A source skipped before its first measurement needs a frame after layout. Other
+            // traversals only recheck visibility; they do not rebuild an unchanged route list.
+            if (globalElementGeometryPending) syncGlobalElements();
+            requestGlobalElementRefresh();
+        });
         workspace.addOnLayoutChangeListener((view, left, top, right, bottom,
                 oldLeft, oldTop, oldRight, oldBottom) -> {
             if (right <= left || bottom <= top) return;
@@ -582,6 +591,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        lastFavoriteProjectionState = null;
         setIntent(intent);
         if (isHomeInvocation(intent)) homeRootInvocation = true;
         handleStagedOrHomeNavigation(intent);
@@ -990,6 +1000,7 @@ public final class LauncherActivity extends AppCompatActivity {
         pendingLauncherBootstrapState = null;
         pendingLauncherBootstrapFailure = null;
         if (workspace != null) workspace.setDescendantInvalidationListener(null);
+        if (workspace != null) workspace.setLayoutCompleteListener(null);
         navigationUiHandler.removeCallbacksAndMessages(null);
         navigationRefresh.cancel();
         launcherWorker.shutdownNow();
@@ -1720,6 +1731,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void syncGlobalElements() {
         if (!globalElementsActivated || workspace == null) return;
+        globalElementGeometryPending = false;
         LinkedHashMap<String, View> discovered = new LinkedHashMap<>();
         LinkedHashMap<String, LauncherGlobalElementTag> tags = new LinkedHashMap<>();
         for (LauncherElementFrame panel : panels.values()) {
@@ -1743,7 +1755,10 @@ public final class LauncherActivity extends AppCompatActivity {
                 LauncherGlobalElementLayoutStore.Geometry geometry =
                         globalElementLayoutStore.get(id);
                 if (geometry == null) geometry = migrateSourceGeometry(source);
-                if (geometry == null) continue;
+                if (geometry == null) {
+                    globalElementGeometryPending = true;
+                    continue;
+                }
                 LauncherGlobalElementTag tag = tags.get(id);
                 String label = tag == null ? id : tag.label;
                 LauncherGlobalElementLayoutStore.Appearance appearance =
@@ -1853,6 +1868,8 @@ public final class LauncherActivity extends AppCompatActivity {
         if (!globalElementsActivated) return;
         int snap = Math.max(1, preferences.launcherSnapPx.get());
         String sourceEditorPanel = activeContentEditorPanelId();
+        int favoriteFrames = 0;
+        int visibleFavoriteFrames = 0;
         for (Map.Entry<String, LauncherElementFrame> entry
                 : globalElementFrames.entrySet()) {
             LauncherGlobalElementProxyView proxy = globalElementProxies.get(entry.getKey());
@@ -1864,10 +1881,25 @@ public final class LauncherActivity extends AppCompatActivity {
             boolean visible = !sourceEditorOwnsElement && source != null
                     && !appearance.hidden
                     && (editMode || proxy != null && proxy.sourceIsShown());
+            if (entry.getKey().startsWith(LauncherLayoutStore.NAVIGATION + "/favorite_route_")) {
+                favoriteFrames++;
+                if (visible) visibleFavoriteFrames++;
+            }
             entry.getValue().setVisibility(visible ? View.VISIBLE : View.GONE);
             entry.getValue().setEditMode(
                     editMode && !isLauncherWidgetGrouped(entry.getKey()), snap);
             if (proxy != null && visible) proxy.refreshFromSource();
+        }
+        String projection = "configured=" + favoriteRoutesAvailable
+                + " routeActive=" + (lastNavigationSnapshot != null
+                && lastNavigationSnapshot.routeActive)
+                + " panelVisibility=" + (favoriteRoutesPanel == null
+                ? -1 : favoriteRoutesPanel.getVisibility())
+                + " frames=" + favoriteFrames + " visible=" + visibleFavoriteFrames
+                + " geometryPending=" + globalElementGeometryPending;
+        if (!projection.equals(lastFavoriteProjectionState)) {
+            lastFavoriteProjectionState = projection;
+            DiagnosticJournal.debug("launcher-favorites", projection);
         }
     }
 

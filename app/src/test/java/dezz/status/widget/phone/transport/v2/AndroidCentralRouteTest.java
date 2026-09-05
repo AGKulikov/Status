@@ -265,6 +265,79 @@ public final class AndroidCentralRouteTest {
         assertTrue(retained.state.detail.contains("withheld its callback"));
     }
 
+    @Test public void advertisementsCannotStarveProvenRegisteredOwnerRetirement() {
+        AndroidCentralRoute.State state = registeredPresenceWait();
+        long owner = state.activeOwnerId;
+        BleRouteToken scan = state.expected;
+        BleRouteTransition<AndroidCentralRoute.State> advertised =
+                AndroidCentralRoute.systemConnectionAdvertisement(state, scan);
+        assertTrue(advertised.accepted);
+        assertEquals(owner, advertised.state.activeOwnerId);
+        assertTrue(hasEffect(advertised, BleRouteEffect.Type.STOP_SCAN));
+        assertTrue(hasEffect(advertised, BleRouteEffect.Type.REASSERT_SAME_GATT));
+        assertFalse(AndroidCentralRoute.systemConnectionRecoveryElapsed(
+                advertised.state, scan).accepted);
+        assertFalse(AndroidCentralRoute.systemConnectionAdvertisement(
+                advertised.state, scan).accepted);
+
+        BleRouteTransition<AndroidCentralRoute.State> retired =
+                AndroidCentralRoute.registeredSilentConnection(
+                        advertised.state, advertised.state.expected);
+        assertEquals(AndroidCentralRoute.Phase.RETRY_DRAINING, retired.state.phase);
+        assertEquals(1, countEffects(retired, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(retired, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+        assertFalse(AndroidCentralRoute.retryElapsed(
+                retired.state, retired.state.expected, true).accepted);
+
+        state = AndroidCentralRoute.attemptTeardownComplete(
+                retired.state, retired.state.expected).state;
+        BleRouteTransition<AndroidCentralRoute.State> replacement =
+                AndroidCentralRoute.retryElapsed(state, state.expected, true);
+        assertEquals(1, countEffects(replacement, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+        assertNotEquals(owner, replacement.state.activeOwnerId);
+    }
+
+    @Test public void classicPromptCannotStarveProvenRegisteredOwnerRetirement() {
+        AndroidCentralRoute.State state = registeredPresenceWait();
+        BleRouteTransition<AndroidCentralRoute.State> prompted =
+                AndroidCentralRoute.selectedPhonePresent(state);
+        assertEquals(state.activeOwnerId, prompted.state.activeOwnerId);
+        BleRouteTransition<AndroidCentralRoute.State> retired =
+                AndroidCentralRoute.registeredSilentConnection(
+                        prompted.state, prompted.state.expected);
+        assertEquals(AndroidCentralRoute.Phase.RETRY_DRAINING, retired.state.phase);
+        assertTrue(hasEffect(retired, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(retired, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+    }
+
+    @Test public void repeatedAdvertisementsNeverAuthorizeClosingAnUnprovenOwner() {
+        AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 44L));
+        state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
+        long owner = state.activeOwnerId;
+        for (int i = 0; i < 12; i++) {
+            BleRouteTransition<AndroidCentralRoute.State> silence =
+                    AndroidCentralRoute.deadline(state, state.expected);
+            assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION, silence.state.phase);
+            assertFalse(hasEffect(silence, BleRouteEffect.Type.CLOSE_GATT));
+            state = AndroidCentralRoute.systemConnectionAdvertisement(
+                    silence.state, silence.state.expected).state;
+            assertEquals(owner, state.activeOwnerId);
+        }
+    }
+
+    private static AndroidCentralRoute.State registeredPresenceWait() {
+        AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 43L));
+        state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
+        for (int i = 0; i < 2; i++) {
+            state = AndroidCentralRoute.registeredSilentConnection(state, state.expected).state;
+            assertEquals(AndroidCentralRoute.Phase.WAIT_REASSERT, state.phase);
+            state = AndroidCentralRoute.sameOwnerReassertElapsed(state, state.expected).state;
+        }
+        state = AndroidCentralRoute.registeredSilentConnection(state, state.expected).state;
+        assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION, state.phase);
+        return state;
+    }
+
     @Test public void alphabeticSelectedBondCanonicalizesBeforeSingleOwnerAllocation() {
         IphoneTransportStartRequest request = new IphoneTransportStartRequest(
                 new BleRouteEpoch(11L, 2L), " aa:bC:dE:f0:A1:b2 ", HELPER, true, 0L,

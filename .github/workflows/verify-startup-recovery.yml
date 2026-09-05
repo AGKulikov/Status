@@ -1,0 +1,93 @@
+name: Build Natro 2.7.8 startup recovery and compatible Navigator candidate
+
+on:
+  push:
+    branches: ['fix/startup-recovery-20260905']
+    paths:
+      - 'app/**'
+      - 'navigator-mod/**'
+      - 'tools/**'
+      - 'build.gradle'
+      - 'PROJECT_REQUIREMENTS_RU.md'
+      - '.github/workflows/verify-startup-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: '2.7.8'
+      VERSION_CODE: '208021311'
+      ALLOW_UNSIGNED_RELEASE: 'true'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install Android compilation dependencies
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Test and assemble the authorized Natro release
+        run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+      - name: Compile the compatible stock-maneuver Navigator bridge
+        run: bash tools/build_navigation_patch_dex.sh build/navigation-mod-ci
+      - name: Verify isolated Navigator patch tools
+        run: |
+          python3 tools/tests/test_verify_navigation_mod_baseline.py
+          python3 tools/tests/test_navigation_mod_tools.py
+      - name: Fetch pinned Apktool
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/apktool_3.0.3.jar" \
+            https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar
+          echo 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423  '"$RUNNER_TEMP/apktool_3.0.3.jar" | sha256sum -c -
+      - name: Prepare exact offline signing candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          OUT="$RUNNER_TEMP/natro-2.7.8-candidate"
+          mkdir -p "$OUT/tools/lib"
+          mapfile -t APK_FILES < <(find app/build/outputs/apk/geely/release -name '*.apk')
+          test "${#APK_FILES[@]}" = 1
+          cp "${APK_FILES[0]}" "$OUT/Natro-2.7.8-unsigned.apk"
+          "$TOOLS/aapt" dump badging "$OUT/Natro-2.7.8-unsigned.apk" \
+            > "$OUT/badging.txt"
+          grep -F "package: name='ru.natro.statuswidget' versionCode='208021311' versionName='2.7.8'" \
+            "$OUT/badging.txt"
+          if "$TOOLS/apksigner" verify "$OUT/Natro-2.7.8-unsigned.apk" >/dev/null 2>&1; then
+            echo 'Candidate unexpectedly signed' >&2
+            exit 1
+          fi
+          cp "$TOOLS/aapt" "$TOOLS/apksigner" "$TOOLS/zipalign" "$TOOLS/dexdump" "$OUT/tools/"
+          cp "$TOOLS/lib/apksigner.jar" "$OUT/tools/lib/"
+          cp -a "$TOOLS/lib64" "$OUT/tools/"
+          chmod 755 "$OUT/tools/"*
+          cp build/navigation-mod-ci/classes19.dex "$OUT/classes19.dex"
+          cp "$RUNNER_TEMP/apktool_3.0.3.jar" "$OUT/apktool_3.0.3.jar"
+          cp -r app/build/test-results/testGeelyDebugUnitTest "$OUT/test-results"
+          jq -n --arg commit "$GITHUB_SHA" --arg tree "$(git rev-parse HEAD^{tree})" \
+            --arg run "$GITHUB_RUN_ID" \
+            --arg dex "$(sha256sum "$OUT/classes19.dex" | cut -d ' ' -f 1)" \
+            --arg sha "$(sha256sum "$OUT/Natro-2.7.8-unsigned.apk" | cut -d ' ' -f 1)" \
+            '{versionName:"2.7.8", versionCode:208021311, package:"ru.natro.statuswidget",
+              sourceCommit:$commit, sourceTree:$tree, ciRunId:$run, unsignedSha256:$sha,
+              navigator:{pairRequired:true, patchDexSha256:$dex, requiredCapability:"0x4000",
+              baselineSha256:"663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f"}}' \
+            > "$OUT/candidate.json"
+          (cd "$OUT"; find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+      - name: Upload candidate and exact signing tools
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-2.7.8-candidate-${{ github.run_number }}
+          path: ${{ steps.candidate.outputs.path }}/*
+          if-no-files-found: error
+          retention-days: 7

@@ -116,7 +116,8 @@ def main():
               "signerCount": 1, "zipalign16KiB": True,
               "previous": {**previous, "sha256": sha256(args.previous_apk)},
               "installOverMetadataVerified": True, "physicalKx11Verification": "pending",
-              "navigatorChanged": False, "helperChanged": False,
+              "navigatorPairRequired": bool(manifest.get("navigator", {}).get("pairRequired")),
+              "helperChanged": False,
               "signingScriptSha256": sha256(Path(__file__)),
               "toolSha256": {str(p.relative_to(root / "tools")): sha256(p)
                               for p in sorted((root / "tools").rglob("*")) if p.is_file()}}

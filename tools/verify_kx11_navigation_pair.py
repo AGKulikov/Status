@@ -163,6 +163,20 @@ def require_dex_strings(apk: Path, expected: Iterable[bytes]) -> None:
     raise VerificationError(f"{apk.name}: missing DEX window contract strings: {rendered}")
 
 
+def verify_maneuver_artwork(apk: Path) -> None:
+    # Navigator keeps its stock package/version identity across mods. An APK with the right
+    # 30.3.0 name can still predate the artwork IPC required by Natro 2.7.6+ (REL-017).
+    # Check the delivered bridge DEX, not the local source tree or original Navigator resources.
+    bridge = zip_entry(apk, "classes19.dex")
+    for marker in (b"maneuver_artwork", b"sendManeuverArtwork", b"onManeuverArtwork",
+                   b"image_maneuverballoon_maneuver", b"maneuverIdentity"):
+        if marker not in bridge:
+            raise VerificationError(
+                f"{apk.name}: incompatible Navigator; stock maneuver artwork IPC missing "
+                f"from classes19.dex ({marker.decode('ascii')})"
+            )
+
+
 def verify_signer(apksigner: Path, apk: Path, schemes: Iterable[str]) -> str:
     output = run([
         str(apksigner), "verify", "--verbose", "--print-certs",
@@ -294,6 +308,7 @@ def verify_navigator(
     classes4 = zip_entry(apk, "classes4.dex")
     classes12 = zip_entry(apk, "classes12.dex")
     classes19 = zip_entry(apk, "classes19.dex")
+    verify_maneuver_artwork(apk)
     if b"Lru/natro/navigation/NatroEntryPoint;" not in classes4:
         raise VerificationError("Navigator classes4.dex has no Natro lifecycle hook")
     for marker in (
