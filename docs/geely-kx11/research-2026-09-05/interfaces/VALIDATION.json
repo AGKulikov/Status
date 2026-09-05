@@ -1,0 +1,51 @@
+{
+  "schema": "geely-coverage-inventory-validation-v1",
+  "source_scope": "existing exact v1.0 extracted artifacts",
+  "primary_entries": 4440,
+  "api_classes": 70,
+  "methods": 6931,
+  "constant_declarations": 16082,
+  "schema_classes": 188,
+  "resolved_json_pointers": 14907,
+  "payload_schema_links": 173,
+  "native_routes_id_type_access_verified": 3531,
+  "deterministic_rebuild_artifacts": 9,
+  "checks": [
+    "every primary declaration retained once by namespace/class/field",
+    "every group index partitions primary entries exactly",
+    "Android properties separate",
+    "observations joined only in CarSignal namespace",
+    "other namespaces observation status null",
+    "all JSON parse",
+    "Python AST parse",
+    "byte-identical clean rebuild"
+  ],
+  "vehicle_access_performed": false,
+  "artifact_sha256": {
+    "REPORT_RU.md": "a5521724ed80b9800e2cc97dbdf9dbe02fbd31d1ade3d3b9c6ea0f96ee706a3a",
+    "android_standard_ids.json": "35023995efe9b58aa6b74885559a0390505d88b0862051ddf2d595bb221d5b56",
+    "api_groups.json": "b15eeb1920ac947bce58cf7d38cbcfcd77c5d037a2543d8c14cbff26d6675805",
+    "audit_implicit_zero_constants.py": "8f0ef62582df56e25a9a60a00443f57c5b51d9c1c82ddab6a56333bc71daeed6",
+    "build_coverage_inventory.py": "3992b9f10b19a7f27cb066ee93aca5915cda30e47babd6985a07ec1c1db3de28",
+    "class_inventory.json": "366a7c89fb92bfdc74f93efbe8b497e643579bdc33b02985981de41037dbec60",
+    "entry_index.json": "cd2d0823c33072015977b2fef236f29fcc843194a792d25e3d0e8ca736cc9964",
+    "publish_interface_pages.py": "5db5dd77d71a45158a1a41757aa8b046665d89b88b66deef34cd495a1d8ca1ea",
+    "source_index.json": "7990b33938073f7d19d52c41938aad1f7c9f5fdb3c659d61a6df96181e7f4d94",
+    "summary.json": "76bcd7ec1e21cff4fb3b8456fa861cb71fe901b7d66d10c2e050a169c997d53b",
+    "supplemental_route_ids.json": "1f27bc09e3489955b5d85a353aba640d9abc02130b9f2149555eac4355b2d804",
+    "uncovered_families.json": "03dd5e4211e72fa14b4f28ec3e66e53a2647b48bdb6a97fa1158826bb082bf56"
+  },
+  "frozen_baseline_counts_unchanged_after_zero_audit": true,
+  "validation_scope": "Original analysis output validation. artifact_sha256 preserves original hashes; publication layout differences are recorded separately below.",
+  "publication_layout": {
+    "entry_index.json": "Losslessly represented by entries_manifest.json + entries/*.json; source SHA retained above.",
+    "REPORT_RU.md": {
+      "change": "Updated relative paths for publication; numeric findings unchanged.",
+      "published_sha256": "ab121d6792b388c7f8c03bf26903abf5d72b4fd3cfc222fc9dab8cfed1ae503c"
+    },
+    "lookup_interfaces.py": {
+      "change": "Offline lookup applies required semantic errata; original page hashes remain unchanged.",
+      "published_sha256": "41f0fc540331b3f4f63204410ec6683a4ca80b4014e21750da9bdacda9e7b58a"
+    }
+  }
+}

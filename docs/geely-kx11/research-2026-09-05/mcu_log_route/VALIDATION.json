@@ -1,0 +1,30 @@
+{
+  "json_parse": "passed",
+  "python_syntax": "passed",
+  "original_pcap_decode": "45incoming payloads,45empty reverse packets",
+  "offline_only": true,
+  "vehicle_access": false,
+  "full_decompilations_in_publish_set": false,
+  "files": [
+    {
+      "path": "report.md",
+      "sha256": "83c70028f72dbaefdc0270ca00cbc7b47a193aa30f148d2e973aed8a72b87c91",
+      "size": 14061
+    },
+    {
+      "path": "evidence.json",
+      "sha256": "dab60014d6497bc68a3646655a493f3c91fe4066b36ce8796840a7d6df9d7351",
+      "size": 20140
+    },
+    {
+      "path": "pcap_mcu_summary.json",
+      "sha256": "d6d3a84f6767a96e09f72d79b64b68c59f48c44b504328b1f2a582cc9081711e",
+      "size": 47671
+    },
+    {
+      "path": "decode_mcu_pcap.py",
+      "sha256": "27b665c1bdaa056a60b4e804293c548b051b66bfa00d24d8c8cb9e5d25f0007a",
+      "size": 3643
+    }
+  ]
+}

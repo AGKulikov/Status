@@ -1,0 +1,1933 @@
+{
+  "schema": "architecture-primary-evidence-v1",
+  "offline_only": true,
+  "date": "2026-09-05",
+  "entries": [
+    {
+      "id": "AD-E01",
+      "archive": "KX11-QNX-Deep-Evidence.zip",
+      "archive_sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "member": "KX11-QNX-Deep-Evidence/qnx/files/scripts/startup.sh",
+      "bytes": 30116,
+      "sha256": "db9d3c055ed19c240546bdeebaadf7a07c291c201707b46ca4c396dd35dfb729",
+      "excerpt": [
+        {
+          "line": 456,
+          "text": "# $1 == 'system' name from qvm config file"
+        },
+        {
+          "line": 457,
+          "text": "# $2 == host side pathspace's basename."
+        },
+        {
+          "line": 458,
+          "text": "# $3 == interface name"
+        },
+        {
+          "line": 459,
+          "text": "# $4 == mac address"
+        },
+        {
+          "line": 460,
+          "text": "# $5 == interface name"
+        },
+        {
+          "line": 461,
+          "text": "    if [[ -z $5 ]]; then"
+        },
+        {
+          "line": 462,
+          "text": "\tINTERFACE=vp"
+        },
+        {
+          "line": 463,
+          "text": "    else"
+        },
+        {
+          "line": 464,
+          "text": "\tINTERFACE=$5"
+        },
+        {
+          "line": 465,
+          "text": "    fi"
+        },
+        {
+          "line": 466,
+          "text": "    mount -T io-pkt -o peer=/dev/qvm/$1/$2,bind=/dev/vdevpeers/$3,mac=$4,name=$INTERFACE /lib/dll/devnp-vdevpeer-net.so"
+        },
+        {
+          "line": 783,
+          "text": "mount -T io-pkt -o peer=/dev/qvm/la/la_to_host,bind=/dev/vdevpeer/vp0,mac=<MAC_REDACTED> /lib/dll/devnp-vdevpeer-net.so"
+        },
+        {
+          "line": 803,
+          "text": ""
+        },
+        {
+          "line": 804,
+          "text": "if [ \"$isPin154Set\" = \"0\" ]"
+        },
+        {
+          "line": 805,
+          "text": "then"
+        },
+        {
+          "line": 806,
+          "text": "      ln -f -s /etc/linux-la.config /ramdisk/linux.config"
+        },
+        {
+          "line": 807,
+          "text": "else"
+        },
+        {
+          "line": 808,
+          "text": "      ln -f -s /etc/linux-lv.config /ramdisk/linux.config"
+        },
+        {
+          "line": 809,
+          "text": "fi"
+        },
+        {
+          "line": 810,
+          "text": ""
+        },
+        {
+          "line": 811,
+          "text": "    $ON $DEFAULT_ROOT_T dt_patch -i /vm/images_la/sa8155-vm-la.dtb -o /tmp/la.dtb -p label=pmem_shared_mem,replace=gvm_pmem"
+        },
+        {
+          "line": 812,
+          "text": "    $ON $DEFAULT_ROOT_T dt_patch -i /vm/images_lv/sa8155-vm-lv.dtb -o /tmp/lv.dtb -p label=pmem_shared_mem,replace=gvm_pmem"
+        },
+        {
+          "line": 813,
+          "text": ""
+        },
+        {
+          "line": 814,
+          "text": ""
+        },
+        {
+          "line": 815,
+          "text": ""
+        },
+        {
+          "line": 816,
+          "text": ""
+        },
+        {
+          "line": 817,
+          "text": ""
+        },
+        {
+          "line": 818,
+          "text": "chmod a+w /etc/system/config"
+        },
+        {
+          "line": 833,
+          "text": ""
+        },
+        {
+          "line": 834,
+          "text": ""
+        },
+        {
+          "line": 835,
+          "text": "log_launch \"GVM(s)\""
+        },
+        {
+          "line": 836,
+          "text": "        echo \"launching VM\""
+        },
+        {
+          "line": 837,
+          "text": "\t$ON $VMM_SERVICE_ON_ARGS $ASLR_FLAG $VMM_SERVICE_BINARY $VMM_SERVICE_ARGS"
+        },
+        {
+          "line": 838,
+          "text": "\t$ON $VMM_LIFECYCLE_ON_ARGS $VMM_LIFECYCLE_BINARY &"
+        },
+        {
+          "line": 869,
+          "text": ""
+        },
+        {
+          "line": 870,
+          "text": "if [ $SECPOL_ENABLE -eq 1 ];then"
+        },
+        {
+          "line": 871,
+          "text": "    on -T ifconfig_t -u 50:50 ifconfig vp0 up"
+        },
+        {
+          "line": 872,
+          "text": "    on -T ifconfig_t -u 50:50 ifconfig bridge0 create"
+        },
+        {
+          "line": 873,
+          "text": "    brconfig bridge0 add vp0 up"
+        },
+        {
+          "line": 874,
+          "text": "else"
+        },
+        {
+          "line": 875,
+          "text": "    ifconfig vp0 up"
+        },
+        {
+          "line": 876,
+          "text": "    ifconfig bridge0 create"
+        },
+        {
+          "line": 877,
+          "text": "    brconfig bridge0 add vp0 up"
+        },
+        {
+          "line": 878,
+          "text": "fi"
+        },
+        {
+          "line": 933,
+          "text": "   waitfor /dev/msm_npu"
+        },
+        {
+          "line": 934,
+          "text": "fi"
+        },
+        {
+          "line": 935,
+          "text": ""
+        },
+        {
+          "line": 936,
+          "text": "$ON $IOSERVICE_ON_ARGS $ASLR_FLAG io_service --log_level=7 &"
+        },
+        {
+          "line": 937,
+          "text": "if [ $SECPOL_ENABLE -eq 1 ];then"
+        },
+        {
+          "line": 938,
+          "text": "    on -T ifconfig_t -u 50:50 ifconfig emac0 up"
+        },
+        {
+          "line": 939,
+          "text": "else"
+        },
+        {
+          "line": 940,
+          "text": "    ifconfig emac0 up"
+        },
+        {
+          "line": 941,
+          "text": "    brconfig bridge0 add emac0 up"
+        },
+        {
+          "line": 942,
+          "text": "    ifconfig emac0 198.18.34.2/16"
+        },
+        {
+          "line": 943,
+          "text": "    out32 0x00020050 0x1100000"
+        },
+        {
+          "line": 944,
+          "text": "fi"
+        },
+        {
+          "line": 1010,
+          "text": "if ( [ \"KX11_LOW\" = $VARIANT ] || [ \"KX11_MID\" = $VARIANT ] )"
+        },
+        {
+          "line": 1011,
+          "text": "then"
+        },
+        {
+          "line": 1012,
+          "text": "    if [ \"$isPin154Set\" = \"0\" ]"
+        },
+        {
+          "line": 1013,
+          "text": "    then"
+        },
+        {
+          "line": 1014,
+          "text": "        . /avm/start_avm.sh &"
+        },
+        {
+          "line": 1015,
+          "text": "    else"
+        },
+        {
+          "line": 1016,
+          "text": "        echo \"No avm in upgrade mode\""
+        },
+        {
+          "line": 1017,
+          "text": "    fi"
+        },
+        {
+          "line": 1018,
+          "text": "fi"
+        },
+        {
+          "line": 1019,
+          "text": ""
+        },
+        {
+          "line": 1020,
+          "text": "# DLT setup"
+        },
+        {
+          "line": 1029,
+          "text": "if [ \"$isPin154Set\" = \"0\" ]"
+        },
+        {
+          "line": 1030,
+          "text": "then"
+        },
+        {
+          "line": 1031,
+          "text": ""
+        },
+        {
+          "line": 1032,
+          "text": "    # Slm application launch"
+        },
+        {
+          "line": 1033,
+          "text": "    echo \"Starting slm applications for android\""
+        },
+        {
+          "line": 1034,
+          "text": "    slm -r none /etc/slm_ecarx_android.xml &"
+        },
+        {
+          "line": 1035,
+          "text": "    echo \"Apps startup through slm completed\""
+        },
+        {
+          "line": 1036,
+          "text": "    sleep 4"
+        },
+        {
+          "line": 1037,
+          "text": ""
+        },
+        {
+          "line": 1038,
+          "text": "    #echo start camera_onoff"
+        },
+        {
+          "line": 1039,
+          "text": "    #/bin/camera_onoff &"
+        },
+        {
+          "line": 1040,
+          "text": ""
+        },
+        {
+          "line": 1041,
+          "text": "    sleep 8"
+        },
+        {
+          "line": 1042,
+          "text": "    echo \"y\" | slay ssplash"
+        },
+        {
+          "line": 1043,
+          "text": "else"
+        },
+        {
+          "line": 1044,
+          "text": "    on -R 0x0F /bin/UDS_PRV_Gateway > /dev/null &"
+        },
+        {
+          "line": 1045,
+          "text": "    sleep 2"
+        },
+        {
+          "line": 1046,
+          "text": ""
+        },
+        {
+          "line": 1047,
+          "text": "    echo \"Starting slm applications for linux\""
+        },
+        {
+          "line": 1048,
+          "text": "    slm -r none /etc/slm_ecarx_linux.xml &"
+        },
+        {
+          "line": 1049,
+          "text": "    echo \"Apps startup through slm completed\""
+        },
+        {
+          "line": 1050,
+          "text": "fi"
+        },
+        {
+          "line": 1051,
+          "text": ""
+        },
+        {
+          "line": 1052,
+          "text": "echo \"Startup complete\""
+        }
+      ],
+      "scope": "Primary startup script. Branch code proves configured alternatives; runtime branch needs corroborating live state."
+    },
+    {
+      "id": "AD-E02",
+      "archive": "KX11-Update-Package-Evidence.zip",
+      "archive_sha256": "b434c6c25d763de3649e22a57c0e0e1e6bf6e0b7df372b8072b96be3aedaeebc",
+      "member": "KX11-Update-Package-Evidence/qnx/files/etc/linux-la.config",
+      "bytes": 29304,
+      "sha256": "78ec50fdbf5ed785dd019307fa9e1b9b9a70247891edb3d2d67be3c821bccbce",
+      "excerpt": [
+        {
+          "line": 1,
+          "text": "system la"
+        },
+        {
+          "line": 64,
+          "text": "load /vm/images_la/linux-la.img"
+        },
+        {
+          "line": 65,
+          "text": ""
+        },
+        {
+          "line": 66,
+          "text": "## Add skip_initramfs=1 to skip loading recovery GVM"
+        },
+        {
+          "line": 67,
+          "text": "cmdline \"console=ttyAMA0 earlycon=pl011,0x1c090000 debug user_debug=31 loglevel=9 print-fatal-signals=1 no_console_suspend androidboot.console=ttyAMA0 androidboot.hardware=qcom androidboot.selinux=permissive androidboot.memcg=1 root=/dev/vda init=/init androidboot.bootdevice=/dev/disk/system_b swiotlb=2048 gvmip=192.168.1.3 skip_initramfs=1 androidboot.serialno=<REDACTED>"
+        },
+        {
+          "line": 68,
+          "text": "#cmdline \"console=ttyMSM0,115200n8 earlycon=msm_geni_serial,0xa94000 debug user_debug=31 quiet loglevel=9 print-fatal-signals=1 no_console_suspend androidboot.console=ttyMSM0 androidboot.hardware=qcom androidboot.selinux=permissive androidboot.memcg=1 root=/dev/vda init=/init androidboot.bootdevice=/dev/disk/system_b swiotlb=2048 gvmip=192.168.3 skip_initramfs=1 androidboot.serialno=<REDACTED>"
+        },
+        {
+          "line": 69,
+          "text": ""
+        },
+        {
+          "line": 70,
+          "text": "fdt load /tmp/la.dtb"
+        },
+        {
+          "line": 134,
+          "text": "# system /dev/block/vda"
+        },
+        {
+          "line": 135,
+          "text": "vdev vdev-virtio-blk.so loc 0x1c0b0000 vmid 2 intr gic:40 hostdev /dev/disk/la_system_a dio enable"
+        },
+        {
+          "line": 167,
+          "text": "vdev vdev-virtio-net.so loc 0x1c0c0000 intr gic:41 peer /dev/vdevpeer/vp0 mac <MAC_REDACTED> name la_to_host"
+        }
+      ],
+      "scope": "Normal LA guest config; MAC and serial suppressed in excerpt."
+    },
+    {
+      "id": "AD-E03",
+      "archive": "KX11-Update-Package-Evidence.zip",
+      "archive_sha256": "b434c6c25d763de3649e22a57c0e0e1e6bf6e0b7df372b8072b96be3aedaeebc",
+      "member": "KX11-Update-Package-Evidence/qnx/files/etc/linux-lv.config",
+      "bytes": 29217,
+      "sha256": "1541fc05b071f5a6939373e5514ed3223f7616ebd02be4df70a75cbe443c9e2d",
+      "excerpt": [
+        {
+          "line": 1,
+          "text": "system la"
+        },
+        {
+          "line": 65,
+          "text": "load /vm/images_lv/linux-lv.img"
+        },
+        {
+          "line": 66,
+          "text": ""
+        },
+        {
+          "line": 67,
+          "text": "## Add skip_initramfs=1 to skip loading recovery GVM"
+        },
+        {
+          "line": 68,
+          "text": "cmdline \"console=ttyAMA0 earlycon=pl011,0x1c090000 debug user_debug=31 loglevel=9 print-fatal-signals=1 no_console_suspend androidboot.console=ttyAMA0 androidboot.hardware=qcom androidboot.selinux=permissive androidboot.memcg=1 root=/dev/vda init=/init androidboot.bootdevice=/dev/disk/system_b swiotlb=2048 gvmip=192.168.1.3 ip=192.168.1.3::192.168.1.3:255.255.255.0::eth0:off androidboot.serialno=<REDACTED>"
+        },
+        {
+          "line": 69,
+          "text": "#cmdline \"console=ttyMSM0,115200n8 earlycon=msm_geni_serial,0xa94000 debug user_debug=31 quiet loglevel=9 print-fatal-signals=1 no_console_suspend androidboot.console=ttyMSM0 androidboot.hardware=qcom androidboot.selinux=permissive androidboot.memcg=1 root=/dev/vda init=/init androidboot.bootdevice=/dev/disk/system_b swiotlb=2048 gvmip=192.168.3 skip_initramfs=1 androidboot.serialno=<REDACTED>"
+        },
+        {
+          "line": 70,
+          "text": ""
+        },
+        {
+          "line": 71,
+          "text": "fdt load /tmp/lv.dtb"
+        },
+        {
+          "line": 72,
+          "text": ""
+        },
+        {
+          "line": 73,
+          "text": ""
+        },
+        {
+          "line": 74,
+          "text": "## Ramdisk required for Failsafe Linux GVM "
+        },
+        {
+          "line": 75,
+          "text": "#initrd load /vm/images_lv/rootfs.cpio"
+        },
+        {
+          "line": 139,
+          "text": "# system /dev/block/vda"
+        },
+        {
+          "line": 140,
+          "text": "vdev vdev-virtio-blk.so loc 0x1c0b0000 vmid 2 intr gic:40 hostdev /dev/disk/la_system_a dio enable"
+        },
+        {
+          "line": 172,
+          "text": "vdev vdev-virtio-net.so loc 0x1c0c0000 intr gic:41 peer /dev/vdevpeer/vp0 mac <MAC_REDACTED> name la_to_host"
+        }
+      ],
+      "scope": "LV is alternative Failsafe Linux GVM for the same system la, not proof of a second VP guest."
+    },
+    {
+      "id": "AD-E04",
+      "archive": "KX11-Cruise-Trace-20260810-070156.zip",
+      "archive_sha256": "af378011351abbd3c3b96bb405dde444d7c90458e75d6e752cdbab11d5416c4f",
+      "member": "KX11-Cruise-Trace-20260810-070156/discovery-files/vendor_bin_init.ecarx.route.sh",
+      "bytes": 3086,
+      "sha256": "ff793ed637472de1a09f41c5710b35150b3dca68eb2325ac7311837419c97bc0",
+      "excerpt": [
+        {
+          "line": 13,
+          "text": ""
+        },
+        {
+          "line": 14,
+          "text": "TCAM_ETH_IP_ADDR=\"198.18.32.17\""
+        },
+        {
+          "line": 15,
+          "text": "AP_ETH_IP_ADDR=\"198.18.34.15\""
+        },
+        {
+          "line": 16,
+          "text": "VP_ETH_IP_ADDR=\"198.18.34.1\""
+        },
+        {
+          "line": 17,
+          "text": ""
+        },
+        {
+          "line": 18,
+          "text": "# For SOME/IP Multicast Route BEGIN"
+        },
+        {
+          "line": 19,
+          "text": "SOMEIP_MULTICAST=\"224.224.224.245\""
+        },
+        {
+          "line": 20,
+          "text": "SOMEIP_ROUTE_TABLE=2500"
+        },
+        {
+          "line": 21,
+          "text": "# For SOME/IP Multicast Route END"
+        },
+        {
+          "line": 22,
+          "text": ""
+        },
+        {
+          "line": 23,
+          "text": "# For AP-VP Route BEGIN"
+        },
+        {
+          "line": 24,
+          "text": "TO_VP=\"198.18.34.0/24\""
+        },
+        {
+          "line": 25,
+          "text": "AP_VP_ROUTE_TABLE=3000"
+        },
+        {
+          "line": 26,
+          "text": "AP_VP_ROUTE_PRI=3000"
+        },
+        {
+          "line": 27,
+          "text": "# For AP-VP Route END"
+        },
+        {
+          "line": 28,
+          "text": ""
+        },
+        {
+          "line": 29,
+          "text": "# For ASDM static Route BEGIN"
+        },
+        {
+          "line": 30,
+          "text": "ASDM_ROUTE_IFACE=\"eth0.5\""
+        },
+        {
+          "line": 31,
+          "text": "TO_ASDM=\"198.18.36.1/32\""
+        },
+        {
+          "line": 32,
+          "text": "ASDM_ROUTE_TABLE=3100"
+        },
+        {
+          "line": 33,
+          "text": "ASDM_ROUTE_PRI=3100"
+        },
+        {
+          "line": 34,
+          "text": "# For ASDM static Route END"
+        },
+        {
+          "line": 35,
+          "text": ""
+        },
+        {
+          "line": 36,
+          "text": "# For Vehicle IP Network Route BEGIN"
+        },
+        {
+          "line": 37,
+          "text": "VEHICLE_NETWORK_IFACE=\"eth0.11\""
+        },
+        {
+          "line": 38,
+          "text": "TO_VEHICLE_NETWORK=\"198.18.0.0/16\""
+        },
+        {
+          "line": 39,
+          "text": "VEHICLE_NETWORK_TABLE=3500"
+        },
+        {
+          "line": 40,
+          "text": "VEHICLE_NETWORK_PRI=3500"
+        },
+        {
+          "line": 41,
+          "text": "# For Vehicle IP Network Route END"
+        },
+        {
+          "line": 42,
+          "text": ""
+        },
+        {
+          "line": 43,
+          "text": "# For Backup Default IP Network Route BEGIN"
+        },
+        {
+          "line": 44,
+          "text": "BACKUP_DEFAULT_NETWORK_IFACE=\"eth0.11\""
+        },
+        {
+          "line": 71,
+          "text": "# For AP-VP Route END"
+        },
+        {
+          "line": 72,
+          "text": ""
+        },
+        {
+          "line": 73,
+          "text": "# For ASDM static Route BEGIN"
+        },
+        {
+          "line": 74,
+          "text": "$IP_OP rule delete table $ASDM_ROUTE_TABLE"
+        },
+        {
+          "line": 75,
+          "text": "$IP_OP route flush table $ASDM_ROUTE_TABLE"
+        },
+        {
+          "line": 76,
+          "text": "$IP_OP rule add to $TO_ASDM table $ASDM_ROUTE_TABLE pri $ASDM_ROUTE_PRI"
+        },
+        {
+          "line": 77,
+          "text": "$IP_OP route add $TO_ASDM dev $ASDM_ROUTE_IFACE table $ASDM_ROUTE_TABLE"
+        },
+        {
+          "line": 78,
+          "text": "# For ASDM static Route END"
+        },
+        {
+          "line": 79,
+          "text": ""
+        },
+        {
+          "line": 80,
+          "text": "# For Vehicle Network static Route BEGIN"
+        },
+        {
+          "line": 81,
+          "text": "$IP_OP rule delete table $VEHICLE_NETWORK_TABLE"
+        },
+        {
+          "line": 82,
+          "text": "$IP_OP route flush table $VEHICLE_NETWORK_TABLE"
+        },
+        {
+          "line": 83,
+          "text": "$IP_OP rule add to $TO_VEHICLE_NETWORK table $VEHICLE_NETWORK_TABLE pri $VEHICLE_NETWORK_PRI"
+        },
+        {
+          "line": 84,
+          "text": "$IP_OP route add $TO_VEHICLE_NETWORK dev $VEHICLE_NETWORK_IFACE table $VEHICLE_NETWORK_TABLE"
+        },
+        {
+          "line": 85,
+          "text": "# For Vehicle Network static Route END"
+        },
+        {
+          "line": 86,
+          "text": ""
+        },
+        {
+          "line": 87,
+          "text": "# For Backup IP Network static Route BEGIN"
+        },
+        {
+          "line": 88,
+          "text": "$IP_OP rule delete table $BACKUP_DEFAULT_NETWORK_TABLE"
+        },
+        {
+          "line": 89,
+          "text": "$IP_OP route flush table $BACKUP_DEFAULT_NETWORK_TABLE"
+        },
+        {
+          "line": 90,
+          "text": "$IP_OP rule add table $BACKUP_DEFAULT_NETWORK_TABLE pri $BACKUP_DEFAULT_NETWORK_PRI"
+        },
+        {
+          "line": 91,
+          "text": "$IP_OP route add default via $TCAM_ETH_IP_ADDR dev $BACKUP_DEFAULT_NETWORK_IFACE table $BACKUP_DEFAULT_NETWORK_TABLE"
+        },
+        {
+          "line": 92,
+          "text": "# For Backup IP Network static Route END"
+        },
+        {
+          "line": 93,
+          "text": ""
+        },
+        {
+          "line": 94,
+          "text": "# Dump current ip rule db"
+        },
+        {
+          "line": 95,
+          "text": "#init_ecarx_show_log `/system/bin/ip rule list`"
+        },
+        {
+          "line": 96,
+          "text": "#init_ecarx_show_log `/system/bin/ip route show tab \"$AP_VP_ROUTE_TABLE\"`"
+        }
+      ],
+      "scope": "Stock routes label VP, ASDM, TCAM; labels are not diagnostic ECU identities."
+    },
+    {
+      "id": "AD-E05",
+      "archive": "KX11-VP-QNX-Live-Window-Evidence-20260815-174011.zip",
+      "archive_sha256": "dda269c6fb96209da39499d825f1688b0805f9206190883598f8e09f7390042c",
+      "member": "KX11-VP-QNX-Live-Window-Evidence-20260815-174011/android/network.txt",
+      "bytes": 23299,
+      "sha256": "40da413ddd93da26eb5f1d2e6493bcdc8bd731eb6c2397406cef6388ac6faa1f",
+      "excerpt": [
+        {
+          "line": 99,
+          "text": "    inet 127.0.0.1/8 scope host lo"
+        },
+        {
+          "line": 100,
+          "text": "       valid_lft forever preferred_lft forever"
+        },
+        {
+          "line": 101,
+          "text": "4: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000"
+        },
+        {
+          "line": 102,
+          "text": "    inet 198.18.34.15/16 brd 198.18.255.255 scope global eth0"
+        },
+        {
+          "line": 103,
+          "text": "       valid_lft forever preferred_lft forever"
+        },
+        {
+          "line": 104,
+          "text": "6: eth0.2@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000"
+        },
+        {
+          "line": 105,
+          "text": "    inet 198.18.34.15/16 brd 198.18.255.255 scope global eth0.2"
+        },
+        {
+          "line": 106,
+          "text": "       valid_lft forever preferred_lft forever"
+        },
+        {
+          "line": 107,
+          "text": "7: eth0.3@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000"
+        },
+        {
+          "line": 108,
+          "text": "    inet 198.18.34.15/16 brd 198.18.255.255 scope global eth0.3"
+        },
+        {
+          "line": 109,
+          "text": "       valid_lft forever preferred_lft forever"
+        },
+        {
+          "line": 110,
+          "text": "8: eth0.4@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000"
+        },
+        {
+          "line": 111,
+          "text": "    inet 198.18.34.15/16 brd 198.18.255.255 scope global eth0.4"
+        },
+        {
+          "line": 112,
+          "text": "       valid_lft forever preferred_lft forever"
+        },
+        {
+          "line": 113,
+          "text": "9: eth0.5@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000"
+        },
+        {
+          "line": 114,
+          "text": "    inet 198.18.34.15/16 brd 198.18.255.255 scope global eth0.5"
+        },
+        {
+          "line": 115,
+          "text": "       valid_lft forever preferred_lft forever"
+        },
+        {
+          "line": 116,
+          "text": "10: eth0.6@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000"
+        },
+        {
+          "line": 117,
+          "text": "    inet 198.18.34.15/16 brd 198.18.255.255 scope global eth0.6"
+        },
+        {
+          "line": 118,
+          "text": "       valid_lft forever preferred_lft forever"
+        },
+        {
+          "line": 119,
+          "text": "11: eth0.11@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000"
+        },
+        {
+          "line": 120,
+          "text": "    inet 198.18.34.15/16 brd 198.18.255.255 scope global eth0.11"
+        },
+        {
+          "line": 128,
+          "text": "3000:\tfrom all to 198.18.34.0/24 lookup ecarx_ap_vp_route "
+        },
+        {
+          "line": 129,
+          "text": "3100:\tfrom all to 198.18.36.1 lookup ecarx_asdm_route "
+        },
+        {
+          "line": 130,
+          "text": "3500:\tfrom all to 198.18.0.0/16 lookup ecarx_vehicle_network_route "
+        },
+        {
+          "line": 146,
+          "text": "198.18.36.1 dev eth0.5 table ecarx_asdm_route scope link "
+        },
+        {
+          "line": 147,
+          "text": "default via 198.18.32.17 dev eth0.11 table ecarx_backup_default_route "
+        },
+        {
+          "line": 148,
+          "text": "198.18.0.0/16 dev eth0.11 table ecarx_vehicle_network_route scope link "
+        },
+        {
+          "line": 149,
+          "text": "198.18.34.0/24 dev eth0 table ecarx_ap_vp_route scope link "
+        },
+        {
+          "line": 191,
+          "text": "198.18.34.1 dev eth0 table ecarx_ap_vp_route src 198.18.34.15 uid 0 "
+        },
+        {
+          "line": 238,
+          "text": "198.18.34.1 dev eth0 lladdr <MAC_REDACTED> REACHABLE"
+        },
+        {
+          "line": 253,
+          "text": "198.18.34.2 dev eth0 lladdr <MAC_REDACTED> REACHABLE"
+        }
+      ],
+      "scope": "Saved live Android routes agree with route script; MAC redacted. PERMANENT ARP entries elsewhere are not proof of device presence."
+    },
+    {
+      "id": "AD-E06",
+      "archive": "KX11-QNX-CAN-Inventory.zip",
+      "archive_sha256": "42a23161cb9b79aa2a9a532fe3a8f949313c7db7b98949c93457caaac110ea70",
+      "member": "KX11-QNX-CAN-Inventory/qnx/files/etc/firmware/mpc5746c_firmware.elf",
+      "bytes": 2125940,
+      "sha256": "04f1ab0f659e147b715de6cbdbdd4edcaf738621b8eb78246df1637a88c0d832",
+      "excerpt": [],
+      "scope": "ELF and DWARF statically inspected; see mpc5746c_structure_evidence.json. Presence in filesystem does not prove deployed MCU image."
+    },
+    {
+      "id": "AD-E07",
+      "archive": "KX11-QNX-CAN-Inventory.zip",
+      "archive_sha256": "42a23161cb9b79aa2a9a532fe3a8f949313c7db7b98949c93457caaac110ea70",
+      "member": "KX11-QNX-CAN-Inventory/qnx/files/bin/can_driver",
+      "bytes": 18360,
+      "sha256": "d60ba7ab0bb07119cf24425ebc817a6e6bc41ab737944bab0d5dd737cfeeb28d",
+      "excerpt": [],
+      "scope": "ELF imports libspi_client; strings /dev/spi9 and /dev/can0. No execution performed."
+    },
+    {
+      "id": "AD-E08",
+      "archive": "KX11-QNX-CAN-Inventory.zip",
+      "archive_sha256": "42a23161cb9b79aa2a9a532fe3a8f949313c7db7b98949c93457caaac110ea70",
+      "member": "KX11-QNX-CAN-Inventory/qnx/files/bin/canflasher",
+      "bytes": 18336,
+      "sha256": "04a2868b7d01075b4110e21be0ecbcd8a92074d610436880f63cf99d9188fd41",
+      "excerpt": [],
+      "scope": "ELF strings reference multiple CCARD/SDX24/CV2X reference image names. No execution performed."
+    },
+    {
+      "id": "AD-E09",
+      "archive": "KX11-QNX-Deep-Evidence.zip",
+      "archive_sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/gateway_doip.ini",
+      "bytes": 3754,
+      "sha256": "21dd8bc8c767a0d5f58b30edc40bf2b5e328570937e5ab9c44fe16568703bbb4",
+      "excerpt": [
+        {
+          "line": 2,
+          "text": "[DoIPNodeConfiguration]"
+        },
+        {
+          "line": 3,
+          "text": "; ///@brief Number of Tester Can connect with DoIP server (ECU Address)"
+        },
+        {
+          "line": 4,
+          "text": "DoIPNumberOfSourceAddress=1"
+        },
+        {
+          "line": 5,
+          "text": "; ///@brief Source addresses, based on number of source addresses configured.\t"
+        },
+        {
+          "line": 6,
+          "text": "DoIPSourceAddress_0=0x0E80  \t"
+        },
+        {
+          "line": 7,
+          "text": "; ///@brief Number of Logical address supported by ECU(Including Physical logical address and Functional Logical Address)"
+        },
+        {
+          "line": 8,
+          "text": "DoIPNumberOfTargetAddress=7\t\t\t"
+        },
+        {
+          "line": 9,
+          "text": "; ///@brief Target supported Functional Logical Addresses,based on number of target addresses configured.\t"
+        },
+        {
+          "line": 10,
+          "text": "DoIPTargetAddressFunctional_0=0xE401\t\t"
+        },
+        {
+          "line": 11,
+          "text": "DoIPTargetAddressFunctional_1=0xE402\t\t"
+        },
+        {
+          "line": 12,
+          "text": "DoIPTargetAddressFunctional_2=0xE403\t\t"
+        },
+        {
+          "line": 13,
+          "text": "DoIPTargetAddressFunctional_3=0xE404\t\t"
+        },
+        {
+          "line": 14,
+          "text": "DoIPTargetAddressFunctional_4=0x1FFF"
+        },
+        {
+          "line": 15,
+          "text": "DoIPTargetAddressFunctional_5=0x1202"
+        },
+        {
+          "line": 16,
+          "text": "; ///@brief Target Physical Logical Address\t"
+        },
+        {
+          "line": 17,
+          "text": "DoIPTargetAddressPhysical=0xE000\t\t"
+        },
+        {
+          "line": 18,
+          "text": ";"
+        },
+        {
+          "line": 21,
+          "text": "; ///@brief Network Protocol Supported"
+        },
+        {
+          "line": 22,
+          "text": "; ///@param 0  Disable"
+        },
+        {
+          "line": 23,
+          "text": "; ///@param 1  Enable\t"
+        },
+        {
+          "line": 24,
+          "text": "; ///@brief TransportProtocol TCP/IP"
+        },
+        {
+          "line": 25,
+          "text": "TransportProtocolTCP=1\t\t"
+        },
+        {
+          "line": 26,
+          "text": "; ///@brief TransportProtocol UDP"
+        },
+        {
+          "line": 27,
+          "text": "TransportProtocolUDP=0\t"
+        },
+        {
+          "line": 28,
+          "text": ";///@bried TransPortProtocol Server"
+        },
+        {
+          "line": 29,
+          "text": "; ///@param 0 : TCP/UDP  socket  will act as Client [non standard DOIP]"
+        },
+        {
+          "line": 30,
+          "text": "; ///@param 1 : TCP/UDP socket  will act as server [DOIP standard]"
+        },
+        {
+          "line": 31,
+          "text": "TransportProtocolMode=0 \t"
+        },
+        {
+          "line": 32,
+          "text": ";"
+        },
+        {
+          "line": 33,
+          "text": ""
+        },
+        {
+          "line": 78,
+          "text": "; ///@brief Vehicle Identification Number"
+        },
+        {
+          "line": 79,
+          "text": ";"
+        },
+        {
+          "line": 80,
+          "text": "Vin=0x01\t\t\t\t\t\t\t"
+        },
+        {
+          "line": 81,
+          "text": "Vin=0x02\t\t\t\t\t\t\t"
+        },
+        {
+          "line": 82,
+          "text": "Vin=0x03\t\t\t\t\t\t\t\t"
+        },
+        {
+          "line": 83,
+          "text": "Vin=0x04"
+        },
+        {
+          "line": 84,
+          "text": "Vin=0x05"
+        },
+        {
+          "line": 85,
+          "text": "Vin=0x06"
+        },
+        {
+          "line": 86,
+          "text": "Vin=0x07"
+        }
+      ],
+      "scope": "Configured logical targets/protocol, not discovered physical ECUs; other access fields must be audited in code before any conclusion."
+    },
+    {
+      "id": "AD-E10",
+      "archive": "KX11-QNX-Deep-Evidence.zip",
+      "archive_sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/gateway_uds.ini",
+      "bytes": 5752,
+      "sha256": "86d612afdd085c3ad1c8b87467c6eb075aab3d1bcec9624d7f65955eae117b3d",
+      "excerpt": [
+        {
+          "line": 35,
+          "text": "; /*! udsCore is the container for the configuration values for the UDS - DoIP TP interface. */"
+        },
+        {
+          "line": 36,
+          "text": "[udsTpDoip]"
+        },
+        {
+          "line": 37,
+          "text": ""
+        },
+        {
+          "line": 38,
+          "text": "; /*! ecuSourceAddress  - It defines the logical source address of the ECU */"
+        },
+        {
+          "line": 39,
+          "text": "; /*! Range - 0x0000 - 0xFFFF */"
+        },
+        {
+          "line": 40,
+          "text": "ecuSourceAddress = 0xE000"
+        },
+        {
+          "line": 41,
+          "text": ""
+        },
+        {
+          "line": 42,
+          "text": "; /*! Below configuration defines the logical physical address of the client to be accepted by the ECU*/"
+        },
+        {
+          "line": 43,
+          "text": "; /*! noOfPhysicalAddressSupported  - It defines the total number of logical physical address of the client to be accepted by the ECU */;"
+        },
+        {
+          "line": 44,
+          "text": "; /*! Range - 1..255 */ "
+        },
+        {
+          "line": 45,
+          "text": "noOfPhysicalAddressSupported = 1"
+        },
+        {
+          "line": 46,
+          "text": ""
+        },
+        {
+          "line": 47,
+          "text": "; /*! physicalAddress_n -It defines the logical physical address ofthe client to be accepted by the ECU . \"n\" - reprents the index of the number of address . range ( 0 .. noOfPhysicalAddressSupported -1) */"
+        },
+        {
+          "line": 48,
+          "text": "; /*! Value : 0x0000 - 0xFFFE . The value 0xFFFF is considered as an Invalid value and if configured the request will not be accepted */"
+        },
+        {
+          "line": 49,
+          "text": "physicalAddress_0 = 0x0E80"
+        },
+        {
+          "line": 50,
+          "text": ""
+        },
+        {
+          "line": 51,
+          "text": ""
+        },
+        {
+          "line": 52,
+          "text": "; /*! Below configuration defines the logical functional address of the client to be accepted by the ECU*/"
+        },
+        {
+          "line": 53,
+          "text": "; /*! noOfFunctionalAddressSupported - It defines the total number of logical functional address of the client to be accepted by the ECU */;"
+        },
+        {
+          "line": 54,
+          "text": "; /*! Range - 1..255 */ "
+        },
+        {
+          "line": 55,
+          "text": "noOfFunctionalAddressSupported = 2"
+        },
+        {
+          "line": 56,
+          "text": ""
+        },
+        {
+          "line": 57,
+          "text": "; /*! functionalAddress_n -It defines the logical physical address of the client to be accepted by the ECU . \"n\" - reprents the index of the number of address . range ( 0 .. noOfFunctionalAddressSupported -1) */"
+        },
+        {
+          "line": 63,
+          "text": "; INI configuration file for UDS Services ."
+        },
+        {
+          "line": 64,
+          "text": "; fileName : uds_services.ini"
+        },
+        {
+          "line": 65,
+          "text": "; filePath : The configuration file should be in \"/tmp/\" or \"/etc/uds/\" . If the file path needs to be changed , update mUdsCoreIniFilePath1 in CUdsCoreComponent class."
+        },
+        {
+          "line": 66,
+          "text": ""
+        },
+        {
+          "line": 67,
+          "text": "; /*! udsCore is the container for the generic configuration values for the uds core. */ "
+        }
+      ],
+      "scope": "Core lists two functional addresses, different coverage from DoIP config."
+    },
+    {
+      "id": "AD-E11",
+      "archive": "KX11-QNX-Deep-Evidence.zip",
+      "archive_sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/sw-version-info.txt",
+      "bytes": 121,
+      "sha256": "2062fc7816f3978028cf37f3f073d3b68ee6042c81322a459c06d7a93ef8f2e5",
+      "excerpt": [
+        {
+          "line": 1,
+          "text": "ER_SW_VERSION = 20.24.10.24031.0ER3908"
+        },
+        {
+          "line": 2,
+          "text": "ES_SW_VERSION = 20.24.10.24031.01600"
+        },
+        {
+          "line": 3,
+          "text": "SW_BUILD_DATE = Mon Jan 15 13:37:29 CST 2024"
+        }
+      ],
+      "scope": "Version text of obtained QNX filesystem snapshot, not version of every ECU."
+    },
+    {
+      "id": "AD-E12",
+      "archive": "KX11-VP-Firmware-Evidence.zip",
+      "archive_sha256": "22b2540fc8aeb3c57ba1d43255c0d2fdbbe31fd88eaca4cb72e9ca6cb14828b8",
+      "member": "KX11-VP-Firmware-Evidence/android/files/lcfg/AP_Version.properties",
+      "bytes": 109,
+      "sha256": "b9d6bf7271cb7f4036497175029cef51fc4b74cb111ac7dc4cdbc9e24c1457d1",
+      "excerpt": [
+        {
+          "line": 1,
+          "text": "#Version information for AP function local config"
+        },
+        {
+          "line": 2,
+          "text": "#Tues Mar 02 08:35:51 GMT+08:00 2019"
+        },
+        {
+          "line": 3,
+          "text": ""
+        },
+        {
+          "line": 4,
+          "text": "#Version information"
+        }
+      ],
+      "scope": "File contains comments only: no usable AP version value."
+    },
+    {
+      "id": "AD-E13",
+      "archive": "KX11-QNX-Deep-Evidence.zip",
+      "archive_sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/slm_ecarx_android.xml",
+      "bytes": 2848,
+      "sha256": "1c7a3ef6170da67896eea3c5cb343f387e69c68ad3b66b16ddbf38ae6096fd02",
+      "excerpt": [
+        {
+          "line": 22,
+          "text": "    <SLM:component name=\"sc_qnx_vip_proxy\">"
+        },
+        {
+          "line": 23,
+          "text": "    <SLM:command>on</SLM:command>"
+        },
+        {
+          "line": 24,
+          "text": "    <SLM:args>-R 0x0F /bin/sc_qnx_vip_proxy</SLM:args>"
+        },
+        {
+          "line": 25,
+          "text": "    <SLM:depend state=\"session\">vsomeipd</SLM:depend>"
+        },
+        {
+          "line": 26,
+          "text": "    <SLM:repair>replace</SLM:repair>"
+        },
+        {
+          "line": 27,
+          "text": "    </SLM:component>"
+        },
+        {
+          "line": 28,
+          "text": ""
+        },
+        {
+          "line": 29,
+          "text": "    <SLM:component name=\"DiagServices\">"
+        },
+        {
+          "line": 30,
+          "text": "    <SLM:command>on</SLM:command>"
+        },
+        {
+          "line": 31,
+          "text": "    <SLM:args>-R 0x0F /bin/DiagServices</SLM:args>"
+        },
+        {
+          "line": 32,
+          "text": "    <SLM:depend state=\"session\">vsomeipd</SLM:depend>"
+        },
+        {
+          "line": 33,
+          "text": "    <SLM:repair>replace</SLM:repair>"
+        },
+        {
+          "line": 34,
+          "text": "    </SLM:component>"
+        },
+        {
+          "line": 62,
+          "text": "    <SLM:component name=\"SwVersionService\">"
+        },
+        {
+          "line": 63,
+          "text": "    <SLM:command>on</SLM:command>"
+        },
+        {
+          "line": 64,
+          "text": "    <SLM:args>-R 0x0F /bin/SwVersionService</SLM:args>"
+        },
+        {
+          "line": 65,
+          "text": "    <SLM:depend state=\"session\">vsomeipd</SLM:depend>"
+        },
+        {
+          "line": 66,
+          "text": "    <!--SLM:stdout>/dev/null</SLM:stdout-->"
+        },
+        {
+          "line": 67,
+          "text": "    <SLM:stderr>/dev/null</SLM:stderr>"
+        },
+        {
+          "line": 68,
+          "text": "    <SLM:repair>replace</SLM:repair>"
+        },
+        {
+          "line": 69,
+          "text": "    </SLM:component>"
+        },
+        {
+          "line": 70,
+          "text": ""
+        },
+        {
+          "line": 71,
+          "text": "    <SLM:component name=\"UDS_SOMEIP_Gateway\">"
+        },
+        {
+          "line": 72,
+          "text": "    <SLM:command>on</SLM:command>"
+        },
+        {
+          "line": 73,
+          "text": "    <SLM:args>-R 0x0F /bin/UDS_SOMEIP_Gateway</SLM:args>"
+        },
+        {
+          "line": 74,
+          "text": "    <SLM:depend state=\"session\">vsomeipd</SLM:depend>"
+        },
+        {
+          "line": 75,
+          "text": "    <SLM:stdout>/dev/slog2/stdout</SLM:stdout>"
+        },
+        {
+          "line": 76,
+          "text": "    <SLM:stderr>/dev/slog2/stderr</SLM:stderr>"
+        },
+        {
+          "line": 77,
+          "text": "    <SLM:repair>replace</SLM:repair>"
+        },
+        {
+          "line": 78,
+          "text": "\t</SLM:component>"
+        }
+      ],
+      "scope": "SLM components configured for normal Android mode; these are processes, not physical ECUs."
+    },
+    {
+      "id": "AD-E14",
+      "archive": "KX11-QNX-Deep-Evidence.zip",
+      "archive_sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/slm_ecarx_linux.xml",
+      "bytes": 1166,
+      "sha256": "1e44bce25c3e5b5f7094ed001a6a2f76eb39a0bc228325a5236f1757c4804c43",
+      "excerpt": [
+        {
+          "line": 13,
+          "text": "\t<SLM:component name=\"fs_update_client\">"
+        },
+        {
+          "line": 14,
+          "text": "\t<SLM:command>on</SLM:command>"
+        },
+        {
+          "line": 15,
+          "text": "\t<SLM:args>-R 0x0F /usr/bin/fs_update_client</SLM:args>"
+        },
+        {
+          "line": 16,
+          "text": "\t<SLM:depend state=\"session\">vsomeipd</SLM:depend>"
+        },
+        {
+          "line": 17,
+          "text": "\t<SLM:repair>replace</SLM:repair>"
+        },
+        {
+          "line": 18,
+          "text": "\t</SLM:component>"
+        }
+      ],
+      "scope": "Failsafe branch config starts fs_update_client."
+    },
+    {
+      "id": "AD-E15",
+      "archive": "KX11-Update-Package-Evidence.zip",
+      "archive_sha256": "b434c6c25d763de3649e22a57c0e0e1e6bf6e0b7df372b8072b96be3aedaeebc",
+      "member": "KX11-Update-Package-Evidence/qnx/files/etc/manifest.xml",
+      "bytes": 10112,
+      "sha256": "380a745133acb029f612f1c1224ff94600e353e1c2674bb8406095c8549267b8",
+      "excerpt": [],
+      "scope": "Update partition manifest; parsed structure in manifest_summary.json. Manifest is not a live installed-image inventory."
+    },
+    {
+      "id": "AD-E16",
+      "archive": "KX11-Update-Package-Evidence.zip",
+      "archive_sha256": "b434c6c25d763de3649e22a57c0e0e1e6bf6e0b7df372b8072b96be3aedaeebc",
+      "member": "KX11-Update-Package-Evidence/qnx/files/bin/update_from_usb.sh",
+      "bytes": 4638,
+      "sha256": "008414881adb88fd384e6cf4fc07036cd180d98a58eb2fc1fc25a23d6ab59d1b",
+      "excerpt": [
+        {
+          "line": 12,
+          "text": "UPDATE_MANIFEST=\"$MOUNT_PATH/Tools/Autogrator/resources/cards/update_manifest\""
+        },
+        {
+          "line": 13,
+          "text": ""
+        },
+        {
+          "line": 14,
+          "text": "if [ $(find $MOUNT_PATH -name \"GAC-Image--ci.fpf.GAC.dev.MAIN.Build_*.tar.gz\" | wc -l) -gt 0 ]"
+        },
+        {
+          "line": 15,
+          "text": "then"
+        },
+        {
+          "line": 16,
+          "text": "    echo \"Tar file is found !!!\""
+        },
+        {
+          "line": 68,
+          "text": "sync"
+        },
+        {
+          "line": 69,
+          "text": "echo \"Copy of Images complete.\""
+        },
+        {
+          "line": 70,
+          "text": ""
+        },
+        {
+          "line": 71,
+          "text": "echo \"Slaying qvm\""
+        },
+        {
+          "line": 72,
+          "text": "slay qvm"
+        },
+        {
+          "line": 73,
+          "text": "sleep 5"
+        },
+        {
+          "line": 74,
+          "text": ""
+        },
+        {
+          "line": 75,
+          "text": "echo \"Starting the flash...\""
+        },
+        {
+          "line": 76,
+          "text": "swdl-powersafe -d $UPDATE_MANIFEST -S 3"
+        },
+        {
+          "line": 77,
+          "text": ""
+        },
+        {
+          "line": 78,
+          "text": "echo \"Flash is successful !!!\""
+        },
+        {
+          "line": 79,
+          "text": "echo \"Rebooting the target\""
+        },
+        {
+          "line": 80,
+          "text": "shutdown"
+        }
+      ],
+      "scope": "Generic package path plus update sequence; a Flash successful echo is unconditional after swdl call, not proof of successful update."
+    },
+    {
+      "id": "AD-E17",
+      "archive": "KX11-QNX-Deep-Evidence.zip",
+      "archive_sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/early-net.cfg",
+      "bytes": 707,
+      "sha256": "060d7e47107b02c3fe80e8bc8d52e66b354e46f0c829c737349e81a894d97f3d",
+      "excerpt": [
+        {
+          "line": 15,
+          "text": "ifconfig emac0 192.168.1.1 up"
+        },
+        {
+          "line": 16,
+          "text": ""
+        }
+      ],
+      "scope": "Early startup address before late production network configuration; not an alternative identity for VP."
+    },
+    {
+      "id": "AD-E18",
+      "archive": "KX11-QNX-Deep-Evidence.zip",
+      "archive_sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/vsomeip.json",
+      "bytes": 4375,
+      "sha256": "459d45f5f8395d32e5c3f7079df28e47f0790516afef8c078171ded28d19d315",
+      "excerpt": [
+        {
+          "line": 1,
+          "text": "{"
+        },
+        {
+          "line": 2,
+          "text": "\t\"unicast\" : \"198.18.34.2\","
+        },
+        {
+          "line": 3,
+          "text": "\t\"logging\" : {"
+        }
+      ],
+      "scope": "QNX SOME/IP configured unicast .2."
+    },
+    {
+      "id": "AD-E19",
+      "archive": "KX11-Cruise-Trace-20260810-070156.zip",
+      "archive_sha256": "af378011351abbd3c3b96bb405dde444d7c90458e75d6e752cdbab11d5416c4f",
+      "member": "KX11-Cruise-Trace-20260810-070156/discovery-files/vendor_bin_init.qti.can.sh",
+      "bytes": 1723,
+      "sha256": "4671905799e3d40771cde55d1db08fd01e652d5122bc26fb299ac4f35e0c44ac",
+      "excerpt": [
+        {
+          "line": 29,
+          "text": ""
+        },
+        {
+          "line": 30,
+          "text": "target_type=`getprop ro.hardware.type`"
+        },
+        {
+          "line": 31,
+          "text": ""
+        },
+        {
+          "line": 32,
+          "text": "case \"$target_type\" in"
+        },
+        {
+          "line": 33,
+          "text": "    \"automotive\")"
+        },
+        {
+          "line": 34,
+          "text": "    ip link set can0 type can bitrate 250000"
+        },
+        {
+          "line": 35,
+          "text": "    ip link set up can0"
+        },
+        {
+          "line": 36,
+          "text": "    ;;"
+        },
+        {
+          "line": 37,
+          "text": "esac"
+        }
+      ],
+      "scope": "Conditional generic Android CAN script; cannot establish active can0 or its vehicle bus."
+    },
+    {
+      "id": "AD-E20",
+      "package": "Geely_KX11_Knowledge_v1.0",
+      "member": "firmware/service_evidence/CarSignalService.disasm.txt",
+      "sha256": "ec60ffba6ddb9f32f1802dc176274d5d58a4f894c00cbb43a7d996d75c21c1b5",
+      "scope": "printApvpVersion lines 96–163 reads 33877 PA_AP_Version, but prints VP label using 33525 PA_ErrorReport. Separate getPA_VP_Version uses a different ID in catalog."
+    },
+    {
+      "id": "AD-E21",
+      "package": "Geely_KX11_Knowledge_v1.0",
+      "member": "firmware/methods.json",
+      "sha256": "edecd61811cd2a2e3b75175e5d4da47aeb461c13a02592963ad8dca8a9bfbd32",
+      "scope": "Exact SDK includes diagnostics IDtcManager, IPartInfos, IDiagnosticMonitor, power and VP managers; methods are static capabilities, not live ECU scan."
+    },
+    {
+      "id": "AD-E22",
+      "package": "Geely_KX11_Knowledge_v1.0",
+      "member": "firmware/mapping/constants_by_value.json",
+      "sha256": "c6d16f9e38a9bd7b789880f90453177d98866731cd14adff86931b69429440b1",
+      "scope": "46 selected diagnostic/power constants in sdk_architecture_evidence.json. ECU_TYPE enumeration is a software declaration."
+    },
+    {
+      "id": "AD-E23",
+      "package": "Geely_KX11_Knowledge_v1.0",
+      "member": "firmware/cb_command_routes.json",
+      "sha256": "e783ef5950e10ef28339721c4ae196d639c9ffdaf543cb00b3a75c501e19dee2",
+      "scope": "15 selected power/VP static write routes in sdk_architecture_evidence.json. Hardware receiver/allowed transitions not proven."
+    },
+    {
+      "id": "AD-E24",
+      "package": "Geely_KX11_Knowledge_v1.0",
+      "member": "firmware/service_evidence/IECarXCarImpl.disasm.txt",
+      "sha256": "09c706fa67159e3a214c9bde20fd642382bcf3715bac6581a0218c4e164ed047",
+      "scope": "setCarServiceHelper checks UID 1000; this check cannot be generalized to every API."
+    },
+    {
+      "id": "AD-E25",
+      "package": "Geely_KX11_Knowledge_v1.0",
+      "member": "cruise/cluster_structures.json",
+      "sha256": "a1a6836e7ee700774f6e76a1565563fc94371a0c782bbd2543db6a5f45b86c77",
+      "scope": "Previous verified SPI payload/DWARF evidence retained; new report expands architecture boundaries."
+    },
+    {
+      "id": "AD-E26",
+      "package": "Geely_KX11_Knowledge_v1.0",
+      "member": "cruise/pcap_reanalysis.json",
+      "sha256": "b7f9b5ee6f01576ecdbff28b99befc3e9dc74c2726683b29545f5943c020b821",
+      "scope": "Previous verified VP UDP observations; groups cannot identify physical ECU owners alone."
+    },
+    {
+      "id": "AD-E27",
+      "package": "Geely_KX11_Knowledge_v1.0",
+      "member": "firmware/native/protobuf_field_numbers.json",
+      "sha256": "16b415183cff70bfe5939a8a480c405f7221256c9c5399bc48b76f60e67c47ba",
+      "scope": "Power control message has ten field tags; tags are not enum semantics or executing ECU addresses."
+    },
+    {
+      "id": "AD-E28",
+      "archive": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip",
+      "archive_sha256": "6f67719476170e2d19ff6f7de2810374a77c5b4078b9c5993986d76d913bfb33",
+      "member": "KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+      "bytes": 26741094,
+      "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd",
+      "excerpt": [
+        {
+          "line": 72162,
+          "text": "         1786312508.662  2132  2171 D ECarXCAR.McuLog_Panic: PA_McuLog{availability = Active, dataValue = [MCU_Version]20.24.10.23024.41141, statusValue = 0, formatValue = 0}"
+        },
+        {
+          "line": 72806,
+          "text": "         1786312508.779  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:PWR:DBG:DES = 00000005, FES = 00000040, FRR = 00000000"
+        },
+        {
+          "line": 72807,
+          "text": "         1786312508.779  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:AUDIOSTM:DBG:[LcfgDB]PDC38Low:38,38,99,99,99"
+        },
+        {
+          "line": 72808,
+          "text": "         1786312508.779  2132  2171 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 15:IPC:DBG:[FSM]Init completed"
+        },
+        {
+          "line": 72809,
+          "text": "         1786312508.779  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:CC:DBG:CC_init=(44)[128,1,2,2,1,1,1,1,1,1][4,2,1,1,1,1,1,2,1,128]"
+        },
+        {
+          "line": 72810,
+          "text": "         1786312508.779  2132  2171 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 30:SH:DBG:HmiSeatVentnFirstLeTmr = 15"
+        },
+        {
+          "line": 72811,
+          "text": "         1786312508.779  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:DM:DBG:DriveMode_Profile_Init = 0"
+        },
+        {
+          "line": 72812,
+          "text": "         1786312508.779  2132  2171 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 10:IOHARDWARE:DBG:DTC_Batt_Check Normal"
+        },
+        {
+          "line": 72813,
+          "text": "         1786312508.779  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:42 5010:DIAG:DBG:ComMsts[2],NMSts[4],NMmod[3]ComReqMod[0],FrMod[2],CanMod[2],LinMod[2],Usersts[0][0][4][0],FrNmCnt[1]"
+        },
+        {
+          "line": 72814,
+          "text": "         1786312508.779  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 10:PWR:DBG:[C]Usgmod=1,Carmod=0,VehicleEnergyLvl=High,Door=2,IPLM.Pri=0,IPLM.Req=0,LockSts=3,LockTrig=9,APStatus=0,SoftKey=0,PlayBtn=0,Tr15=0,popEs=0,popsd=0,APupdata=0,FactoryRes=0"
+        },
+        {
+          "line": 73021,
+          "text": "         1786312508.843  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 10:PWR:DBG:Voltage=Start,BG=0,IM=0,AP=0,EM=0,qnx=0,and=0,ps_hold=0,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 73549,
+          "text": "         1786312509.077  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:41 4085:PWR:DBG:Voltage=Normal,BG=0,IM=0,AP=1,EM=0,qnx=0,and=0,ps_hold=0,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 73884,
+          "text": "         1786312509.290  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:41 4135:PWR:DBG:Voltage=Normal,BG=0,IM=0,AP=1,EM=0,qnx=0,and=0,ps_hold=1,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 74132,
+          "text": "         1786312509.384  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:42 5125:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=1,EM=0,qnx=0,and=0,ps_hold=1,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 74629,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:45 8035:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=1,EM=0,qnx=1,and=0,ps_hold=1,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 74630,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:AUDIOSTM:DBG:[LcfgDB]PDC301High:24,24,99,99,99"
+        },
+        {
+          "line": 74631,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:CC:DBG:listofnodav_init=[1,2,1,1,2,1,1,1,1,1][1,1,1,1,1,1,1,1,1,1]"
+        },
+        {
+          "line": 74632,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 45:CL:DBG:CL: Clm_FanMode[KX11:Disable]."
+        },
+        {
+          "line": 74633,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 35:SS:DBG: 9"
+        },
+        {
+          "line": 74634,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:45 8065:PWR:DBG:[C]Usgmod=1,Carmod=0,VehicleEnergyLvl=High,Door=1,IPLM.Pri=0,IPLM.Req=0,LockSts=1,LockTrig=9,APStatus=0,SoftKey=0,PlayBtn=0,Tr15=0,popEs=0,popsd=0,APupdata=0,FactoryRes=0"
+        },
+        {
+          "line": 74635,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:AUDIOSTM:DBG:[LcfgDB]PDC304Low:38,38,99,99,99"
+        },
+        {
+          "line": 74636,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:CC:DBG:listofnodav_init=[1,1,2,1,2,1,1,1,2,1][1,1,1,1,1,1,1,1,1,1]"
+        },
+        {
+          "line": 74637,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 50:CL:DBG:CL: Clm_RearDef[Disable]."
+        },
+        {
+          "line": 74638,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 35:SS:DBG: 11"
+        },
+        {
+          "line": 74639,
+          "text": "         1786312509.533  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:45 8065:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=1,EM=0,qnx=1,and=0,ps_hold=1,psd_status=0,HeartBeatEn=1"
+        },
+        {
+          "line": 75096,
+          "text": "         1786312509.974  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:53 15785:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=1,EM=1,qnx=1,and=0,ps_hold=1,psd_status=0,HeartBeatEn=1"
+        },
+        {
+          "line": 75326,
+          "text": "         1786312510.191  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:55 17185:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=2,EM=1,qnx=1,and=1,ps_hold=1,psd_status=0,HeartBeatEn=1"
+        }
+      ],
+      "scope": "Relayed PA_McuLog in live Android log. Preserve distinction between Android receipt timestamp, embedded date and embedded counter."
+    },
+    {
+      "id": "AD-E29",
+      "archive": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip",
+      "archive_sha256": "e32dcf2f2f8ae9140dd4d595e56190286520e62f036e47272c7b8ed754362fdc",
+      "member": "KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+      "bytes": 26636368,
+      "sha256": "77be2e03401681dede19835fbb41696a4f330796c101ca531e41d0bca511580e",
+      "excerpt": [
+        {
+          "line": 77404,
+          "text": "         1786334383.376  2259  2298 D ECarXCAR.McuLog_Panic: PA_McuLog{availability = Active, dataValue = [MCU_Version]20.24.10.23024.41141, statusValue = 0, formatValue = 0}"
+        },
+        {
+          "line": 77712,
+          "text": "         1786334383.435  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:16 4995:DIAG:DBG:ComMsts[2],NMSts[4],NMmod[3]ComReqMod[0],FrMod[2],CanMod[2],LinMod[2],Usersts[0][0][4][0],FrNmCnt[1]"
+        },
+        {
+          "line": 77713,
+          "text": "         1786334383.435  2259  2298 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 5:PWR:DBG:[C]Usgmod=1,Carmod=0,VehicleEnergyLvl=High,Door=2,IPLM.Pri=0,IPLM.Req=0,LockSts=3,LockTrig=9,APStatus=0,SoftKey=0,PlayBtn=0,Tr15=0,popEs=0,popsd=0,APupdata=0,FactoryRes=0"
+        },
+        {
+          "line": 78949,
+          "text": "         1786334383.523  2259  2298 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 10:PWR:DBG:Voltage=Start,BG=0,IM=0,AP=0,EM=0,qnx=0,and=0,ps_hold=0,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 79725,
+          "text": "         1786334383.739  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:15 4385:PWR:DBG:Voltage=Normal,BG=0,IM=0,AP=1,EM=0,qnx=0,and=0,ps_hold=0,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 80330,
+          "text": "         1786334384.035  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:15 4435:PWR:DBG:Voltage=Normal,BG=0,IM=0,AP=1,EM=0,qnx=0,and=0,ps_hold=1,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 81171,
+          "text": "         1786334384.235  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:16 5525:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=1,EM=0,qnx=0,and=0,ps_hold=1,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 81689,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:19 8275:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=1,EM=0,qnx=1,and=0,ps_hold=1,psd_status=0,HeartBeatEn=0"
+        },
+        {
+          "line": 81690,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:AUDIOSTM:DBG:[LcfgDB]PDC301High:24,24,99,99,99"
+        },
+        {
+          "line": 81691,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:CC:DBG:listofnodav_init=[1,2,1,1,2,1,1,1,1,1][1,1,1,1,1,1,1,1,1,1]"
+        },
+        {
+          "line": 81692,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 45:CL:DBG:CL: Clm_FanMode[KX11:Disable]."
+        },
+        {
+          "line": 81693,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 30:SS:DBG: 9"
+        },
+        {
+          "line": 81694,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:19 8315:PWR:DBG:[C]Usgmod=1,Carmod=0,VehicleEnergyLvl=High,Door=1,IPLM.Pri=0,IPLM.Req=0,LockSts=1,LockTrig=9,APStatus=0,SoftKey=0,PlayBtn=0,Tr15=0,popEs=0,popsd=0,APupdata=0,FactoryRes=0"
+        },
+        {
+          "line": 81695,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:AUDIOSTM:DBG:[LcfgDB]PDC304Low:38,38,99,99,99"
+        },
+        {
+          "line": 81696,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 00-00 00:00:00 0:CC:DBG:listofnodav_init=[1,1,2,1,2,1,1,1,2,1][1,1,1,1,1,1,1,1,1,1]"
+        },
+        {
+          "line": 81697,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 45:CL:DBG:CL: Clm_RearDef[Disable]."
+        },
+        {
+          "line": 81698,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 01-01 00:00:00 35:SS:DBG: 11"
+        },
+        {
+          "line": 81699,
+          "text": "         1786334384.426  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:19 8315:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=1,EM=0,qnx=1,and=0,ps_hold=1,psd_status=0,HeartBeatEn=1"
+        },
+        {
+          "line": 83039,
+          "text": "         1786334384.844  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:27 16415:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=1,EM=1,qnx=1,and=0,ps_hold=1,psd_status=0,HeartBeatEn=1"
+        },
+        {
+          "line": 83609,
+          "text": "         1786334385.026  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:29 17775:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=2,EM=1,qnx=1,and=1,ps_hold=1,psd_status=0,HeartBeatEn=1"
+        },
+        {
+          "line": 85742,
+          "text": "         1786334386.509  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:39 27795:PWR:DBG:Voltage=Normal,BG=0,IM=1,AP=2,EM=1,qnx=1,and=1,ps_hold=1,psd_status=1,HeartBeatEn=1"
+        }
+      ],
+      "scope": "Independent boot reproduces MCU version and ordered PWR transitions. Physical MCU/VP identity still unresolved."
+    },
+    {
+      "id": "AD-E30",
+      "archive": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip",
+      "archive_sha256": "6f67719476170e2d19ff6f7de2810374a77c5b4078b9c5993986d76d913bfb33",
+      "member": "KX11-Bus-Capture-20260810-005510-27602-1234567/actions/actions.csv",
+      "bytes": 41,
+      "sha256": "413e03b3ab374d6d6cde6516f65ed28adfbc6719689d6b095f62992b87cacdb7",
+      "excerpt": [],
+      "scope": "Header only; no physical action windows. Archive contains no PCAP/CAN raw capture members."
+    },
+    {
+      "id": "AD-E31",
+      "archive": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip",
+      "archive_sha256": "e32dcf2f2f8ae9140dd4d595e56190286520e62f036e47272c7b8ed754362fdc",
+      "member": "KX11-Bus-Capture-20260810-065954-28002-1234567/actions/actions.csv",
+      "bytes": 41,
+      "sha256": "413e03b3ab374d6d6cde6516f65ed28adfbc6719689d6b095f62992b87cacdb7",
+      "excerpt": [],
+      "scope": "Header only; no physical action windows. Archive contains no PCAP/CAN raw capture members."
+    },
+    {
+      "id": "AD-E32",
+      "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+      "archive_sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+      "member": "KX11-HU-Route-20260810-070911-29994-1234567/android/car-service-dumps.txt",
+      "bytes": 1576656,
+      "sha256": "58ab362c92dba543d5a68351d671fb7a0b6713b7e866528cc6df8f6fac93d73e",
+      "excerpt": [
+        {
+          "line": 1659,
+          "text": "    CarPropertyConfig{mPropertyId=561021685, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=PA_ErrorReport, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class [B}"
+        },
+        {
+          "line": 1713,
+          "text": "    CarPropertyConfig{mPropertyId=561021643, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=PA_VP_Version, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class [B}"
+        },
+        {
+          "line": 1714,
+          "text": "    CarPropertyConfig{mPropertyId=561021644, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=PA_Device_IHUID, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class [B}"
+        },
+        {
+          "line": 1715,
+          "text": "    CarPropertyConfig{mPropertyId=561021645, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=PA_Device_SN, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class [B}"
+        },
+        {
+          "line": 1716,
+          "text": "    CarPropertyConfig{mPropertyId=561021646, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=PA_Device_VPVersion_HD, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class [B}"
+        },
+        {
+          "line": 1819,
+          "text": "    CarPropertyConfig{mPropertyId=561022037, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=PA_AP_Version, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class [B}"
+        }
+      ],
+      "scope": "Live property config corroborates separate PA_ErrorReport, PA_VP_Version, PA_Device_VPVersion_HD and PA_AP_Version; these lines are configurations, not measured version values."
+    }
+  ]
+}

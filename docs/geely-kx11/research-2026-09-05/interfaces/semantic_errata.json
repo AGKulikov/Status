@@ -1,0 +1,466 @@
+{
+  "schema": "geely-frozen-interface-semantic-errata-v1",
+  "applies_to_entry_index_sha256": "cd2d0823c33072015977b2fef236f29fcc843194a792d25e3d0e8ca736cc9964",
+  "frozen_entries_changed": false,
+  "scope": "Semantic corrections to role labels and duplicate-number interpretation, not a modification of source declarations, values, keys or frozen totals.",
+  "duplicate_number_interpretation": {
+    "adapt_declarations": 909,
+    "distinct_numeric_values": 808,
+    "repeated_numeric_declarations": 101,
+    "replacement_wording_ru": "909 деклараций содержат 808 различных чисел и 101 повторное числовое объявление, включая алиасы и совпадения разных API-контекстов. Числовое равенство само по себе не доказывает семантическую эквивалентность.",
+    "same_name_only_groups_repeated_declarations": 77,
+    "mixed_name_groups_repeated_declarations": 24,
+    "all_aliases_assertion_valid": false
+  },
+  "broad_role_rule": {
+    "matches": {
+      "namespace": "adaptapi",
+      "declaration_role": "function_id_declaration"
+    },
+    "matched_entries": 792,
+    "corrected_default_role": "function_named_declaration_unresolved",
+    "reason": "The original selector and role assignment use name/class conventions. A field containing _FUNC_ is not thereby proven to be an independent function identifier; state values also contain _FUNC_.",
+    "explicit_state_value_overrides": 20,
+    "entries_remaining_under_unresolved_default_role": 772,
+    "precedence": "Apply explicit state-value overrides first; otherwise apply the corrected default role. Independent stronger static route evidence remains separately available."
+  },
+  "state_value_declarations": [
+    {
+      "entry_key": "adaptapi:713",
+      "name": "SETTING_FUNC_DIGITAL_KEY_SUSPENSION_IDLE",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_SUSPENSION",
+      "state_name": "IDLE",
+      "value": 0,
+      "stored_baseline_id_hex": "0x00000000",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/713"
+      }
+    },
+    {
+      "entry_key": "adaptapi:714",
+      "name": "SETTING_FUNC_DIGITAL_KEY_SUSPENSION_REJECT_BNCM",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_SUSPENSION",
+      "state_name": "REJECT_BNCM",
+      "value": 5,
+      "stored_baseline_id_hex": "0x00000005",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/714"
+      }
+    },
+    {
+      "entry_key": "adaptapi:715",
+      "name": "SETTING_FUNC_DIGITAL_KEY_SUSPENSION_REJECT_CARMOD",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_SUSPENSION",
+      "state_name": "REJECT_CARMOD",
+      "value": 3,
+      "stored_baseline_id_hex": "0x00000003",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/715"
+      }
+    },
+    {
+      "entry_key": "adaptapi:716",
+      "name": "SETTING_FUNC_DIGITAL_KEY_SUSPENSION_REJECT_KEY_NOT_EXIST",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_SUSPENSION",
+      "state_name": "REJECT_KEY_NOT_EXIST",
+      "value": 4,
+      "stored_baseline_id_hex": "0x00000004",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/716"
+      }
+    },
+    {
+      "entry_key": "adaptapi:717",
+      "name": "SETTING_FUNC_DIGITAL_KEY_SUSPENSION_REJECT_USGMOD",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_SUSPENSION",
+      "state_name": "REJECT_USGMOD",
+      "value": 2,
+      "stored_baseline_id_hex": "0x00000002",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/717"
+      }
+    },
+    {
+      "entry_key": "adaptapi:718",
+      "name": "SETTING_FUNC_DIGITAL_KEY_SUSPENSION_SUCCESS",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_SUSPENSION",
+      "state_name": "SUCCESS",
+      "value": 1,
+      "stored_baseline_id_hex": "0x00000001",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/718"
+      }
+    },
+    {
+      "entry_key": "adaptapi:720",
+      "name": "SETTING_FUNC_DIGITAL_KEY_TERMINATION_IDLE",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_TERMINATION",
+      "state_name": "IDLE",
+      "value": 0,
+      "stored_baseline_id_hex": "0x00000000",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/720"
+      }
+    },
+    {
+      "entry_key": "adaptapi:721",
+      "name": "SETTING_FUNC_DIGITAL_KEY_TERMINATION_REJECT_BNCM",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_TERMINATION",
+      "state_name": "REJECT_BNCM",
+      "value": 6,
+      "stored_baseline_id_hex": "0x00000006",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/721"
+      }
+    },
+    {
+      "entry_key": "adaptapi:722",
+      "name": "SETTING_FUNC_DIGITAL_KEY_TERMINATION_REJECT_CARMOD",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_TERMINATION",
+      "state_name": "REJECT_CARMOD",
+      "value": 3,
+      "stored_baseline_id_hex": "0x00000003",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/722"
+      }
+    },
+    {
+      "entry_key": "adaptapi:723",
+      "name": "SETTING_FUNC_DIGITAL_KEY_TERMINATION_REJECT_KEY_NOT_EXIST",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_TERMINATION",
+      "state_name": "REJECT_KEY_NOT_EXIST",
+      "value": 4,
+      "stored_baseline_id_hex": "0x00000004",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/723"
+      }
+    },
+    {
+      "entry_key": "adaptapi:724",
+      "name": "SETTING_FUNC_DIGITAL_KEY_TERMINATION_REJECT_NO_KEY",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_TERMINATION",
+      "state_name": "REJECT_NO_KEY",
+      "value": 5,
+      "stored_baseline_id_hex": "0x00000005",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/724"
+      }
+    },
+    {
+      "entry_key": "adaptapi:725",
+      "name": "SETTING_FUNC_DIGITAL_KEY_TERMINATION_REJECT_USGMOD",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_TERMINATION",
+      "state_name": "REJECT_USGMOD",
+      "value": 2,
+      "stored_baseline_id_hex": "0x00000002",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/725"
+      }
+    },
+    {
+      "entry_key": "adaptapi:726",
+      "name": "SETTING_FUNC_DIGITAL_KEY_TERMINATION_SUCCESS",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_TERMINATION",
+      "state_name": "SUCCESS",
+      "value": 1,
+      "stored_baseline_id_hex": "0x00000001",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/726"
+      }
+    },
+    {
+      "entry_key": "adaptapi:728",
+      "name": "SETTING_FUNC_DIGITAL_KEY_UNPAIR_IDLE",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_UNPAIR",
+      "state_name": "IDLE",
+      "value": 0,
+      "stored_baseline_id_hex": "0x00000000",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/728"
+      }
+    },
+    {
+      "entry_key": "adaptapi:729",
+      "name": "SETTING_FUNC_DIGITAL_KEY_UNPAIR_REJECT_BNCM",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_UNPAIR",
+      "state_name": "REJECT_BNCM",
+      "value": 6,
+      "stored_baseline_id_hex": "0x00000006",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/729"
+      }
+    },
+    {
+      "entry_key": "adaptapi:730",
+      "name": "SETTING_FUNC_DIGITAL_KEY_UNPAIR_REJECT_CARMOD",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_UNPAIR",
+      "state_name": "REJECT_CARMOD",
+      "value": 3,
+      "stored_baseline_id_hex": "0x00000003",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/730"
+      }
+    },
+    {
+      "entry_key": "adaptapi:731",
+      "name": "SETTING_FUNC_DIGITAL_KEY_UNPAIR_REJECT_NO_KEY",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_UNPAIR",
+      "state_name": "REJECT_NO_KEY",
+      "value": 5,
+      "stored_baseline_id_hex": "0x00000005",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/731"
+      }
+    },
+    {
+      "entry_key": "adaptapi:732",
+      "name": "SETTING_FUNC_DIGITAL_KEY_UNPAIR_REJECT_NO_MOBILE",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_UNPAIR",
+      "state_name": "REJECT_NO_MOBILE",
+      "value": 4,
+      "stored_baseline_id_hex": "0x00000004",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/732"
+      }
+    },
+    {
+      "entry_key": "adaptapi:733",
+      "name": "SETTING_FUNC_DIGITAL_KEY_UNPAIR_REJECT_USGMOD",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_UNPAIR",
+      "state_name": "REJECT_USGMOD",
+      "value": 2,
+      "stored_baseline_id_hex": "0x00000002",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/733"
+      }
+    },
+    {
+      "entry_key": "adaptapi:734",
+      "name": "SETTING_FUNC_DIGITAL_KEY_UNPAIR_SUCCESS",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "context": "DIGITAL_KEY_UNPAIR",
+      "state_name": "SUCCESS",
+      "value": 1,
+      "stored_baseline_id_hex": "0x00000001",
+      "original_declaration_role": "function_id_declaration",
+      "corrected_declaration_role": "state_value_declaration",
+      "basis": "Literal declaration name and value in the corresponding digital-key state family. No runtime transition meaning or installed feature support is inferred.",
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/734"
+      }
+    }
+  ],
+  "configuration_sensor_group_context_collisions": [
+    {
+      "numeric_value": 8388864,
+      "hex": "0x00800100",
+      "relationship": "same number in distinct API contexts; semantic alias is not established",
+      "declarations": [
+        {
+          "entry_key": "adaptapi:12",
+          "name": "CONFIG_INFO_TEM",
+          "declaring_class": "Lcom/ecarx/xui/adaptapi/car/base/ICarInfo;",
+          "api_context": "car_info_configuration",
+          "source": {
+            "file": "firmware/catalog.json",
+            "json_pointer": "/adaptapi/12"
+          }
+        },
+        {
+          "entry_key": "adaptapi:251",
+          "name": "SENSOR_GROUP_TYPE_GYRO",
+          "declaring_class": "Lcom/ecarx/xui/adaptapi/car/sensor/ISensorGroup;",
+          "api_context": "sensor_group_type",
+          "source": {
+            "file": "firmware/catalog.json",
+            "json_pointer": "/adaptapi/251"
+          }
+        }
+      ]
+    },
+    {
+      "numeric_value": 8389120,
+      "hex": "0x00800200",
+      "relationship": "same number in distinct API contexts; semantic alias is not established",
+      "declarations": [
+        {
+          "entry_key": "adaptapi:5",
+          "name": "CONFIG_INFO_FINGERPRINT",
+          "declaring_class": "Lcom/ecarx/xui/adaptapi/car/base/ICarInfo;",
+          "api_context": "car_info_configuration",
+          "source": {
+            "file": "firmware/catalog.json",
+            "json_pointer": "/adaptapi/5"
+          }
+        },
+        {
+          "entry_key": "adaptapi:250",
+          "name": "SENSOR_GROUP_TYPE_ACCE",
+          "declaring_class": "Lcom/ecarx/xui/adaptapi/car/sensor/ISensorGroup;",
+          "api_context": "sensor_group_type",
+          "source": {
+            "file": "firmware/catalog.json",
+            "json_pointer": "/adaptapi/250"
+          }
+        }
+      ]
+    },
+    {
+      "numeric_value": 8389376,
+      "hex": "0x00800300",
+      "relationship": "same number in distinct API contexts; semantic alias is not established",
+      "declarations": [
+        {
+          "entry_key": "adaptapi:1",
+          "name": "CONFIG_INFO_DVR",
+          "declaring_class": "Lcom/ecarx/xui/adaptapi/car/base/ICarInfo;",
+          "api_context": "car_info_configuration",
+          "source": {
+            "file": "firmware/catalog.json",
+            "json_pointer": "/adaptapi/1"
+          }
+        },
+        {
+          "entry_key": "adaptapi:252",
+          "name": "SENSOR_GROUP_TYPE_PULES",
+          "declaring_class": "Lcom/ecarx/xui/adaptapi/car/sensor/ISensorGroup;",
+          "api_context": "sensor_group_type",
+          "source": {
+            "file": "firmware/catalog.json",
+            "json_pointer": "/adaptapi/252"
+          }
+        }
+      ]
+    },
+    {
+      "numeric_value": 8389632,
+      "hex": "0x00800400",
+      "relationship": "same number in distinct API contexts; semantic alias is not established",
+      "declarations": [
+        {
+          "entry_key": "adaptapi:2",
+          "name": "CONFIG_INFO_DVR_INNERCAM",
+          "declaring_class": "Lcom/ecarx/xui/adaptapi/car/base/ICarInfo;",
+          "api_context": "car_info_configuration",
+          "source": {
+            "file": "firmware/catalog.json",
+            "json_pointer": "/adaptapi/2"
+          }
+        },
+        {
+          "entry_key": "adaptapi:253",
+          "name": "SENSOR_GROUP_TYPE_W4M",
+          "declaring_class": "Lcom/ecarx/xui/adaptapi/car/sensor/ISensorGroup;",
+          "api_context": "sensor_group_type",
+          "source": {
+            "file": "firmware/catalog.json",
+            "json_pointer": "/adaptapi/253"
+          }
+        }
+      ]
+    }
+  ],
+  "consumer_rules": [
+    "Always retain namespace, declaring class, declaration name and entry_key; never join Adapt declarations using only a numeric ID.",
+    "Read this errata together with the frozen pages and source evidence. Pages intentionally preserve the original baseline bytes.",
+    "The id field in the frozen index is a literal declaration value. It is not a universal assertion that this value is an executable function ID.",
+    "These 20 state constants and four context collisions are concrete corrections, not a complete audit of every semantic role in the shared SDK.",
+    "No firmware is executed and no command is sent to the vehicle by this errata generator."
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "date": "2026-09-05",
+  "offline_only": true,
+  "system_rows": 25,
+  "entity_rows": 45,
+  "json_parse_pass": true,
+  "python_syntax_pass": true,
+  "mac_redaction_main_outputs_pass": true,
+  "publish_file_whitelist": [
+    "report.md",
+    "systems.json",
+    "ecu_registry.json",
+    "primary_evidence.json",
+    "mpc5746c_structure_evidence.json",
+    "relayed_mcu_logs.json",
+    "sdk_architecture_evidence.json",
+    "manifest_summary.json",
+    "additional_archive_scan.json",
+    "build_evidence.py",
+    "build_systems.py"
+  ],
+  "sha256": {
+    "report.md": "1277251de477d4091af213e9c3b46dfd33d0797de74998acd16cc6ed73958116",
+    "systems.json": "db56ac18fe85b14a26fc815ee1c43d1d606d398b293f1b3ed4e8dd22d9d0e471",
+    "ecu_registry.json": "491cee8e105ac9515389103cf4fa4fc4b6cd57766dec22357e6f869cb40343f6",
+    "primary_evidence.json": "d84d0a7485be4cbb1dddaed3755addbef0b93b2b4d9c5bbd91c1f4ff3dbc1f4c",
+    "mpc5746c_structure_evidence.json": "0f37dd69ace1be4b894b66f963d9461388ee9ac1c480f5aa398f937127f1ea02",
+    "relayed_mcu_logs.json": "7cf784f8d38eca47d3f74d9d6c2998b67769c80b0e77f4feccfe74ddf2ee7663",
+    "sdk_architecture_evidence.json": "ccfb23add29c5770b658de07879e39a8667b7256b1e89c77df5d5158dfd33b4f",
+    "manifest_summary.json": "de4bbf2f20aec99bb6e87a987a16b9e081782c069e5718418b39aaeeeaee9b92",
+    "additional_archive_scan.json": "3a5600c84564ed601fa2839ac65d8381ad91da6de2995ccd24dc63c65e82bb57",
+    "build_evidence.py": "2b9d1d0e60878cefd79a652380d9bd6652ee7c0cca7880e67a4d7a4ba72b19b1",
+    "build_systems.py": "05cf8e2bc790a2299c7b55bd79c17e87fe19c8b0c2e32ab47f903568c92d1ff8"
+  },
+  "do_not_publish": [
+    "extracted/",
+    "raw original archives",
+    "full third-party binaries/configs"
+  ],
+  "validation_scope": "Original analysis output validation; the following reproducibility scripts were not included in the public selection.",
+  "not_in_public_selection": [
+    "build_evidence.py",
+    "build_systems.py"
+  ]
+}

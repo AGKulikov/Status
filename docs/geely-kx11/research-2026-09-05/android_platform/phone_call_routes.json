@@ -1,0 +1,2244 @@
+[
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/control/ControlKeyBroadcastReceiver;",
+    "method": "<init>",
+    "descriptor": "()V",
+    "code_offset": 513564,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v0, Landroid/content/BroadcastReceiver;-><init>()V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/control/ControlKeyBroadcastReceiver;",
+    "method": "handleCallAction",
+    "descriptor": "(Landroid/content/Intent;)V",
+    "code_offset": 513588,
+    "calls": [
+      {
+        "offset": "0x6",
+        "call": "v5, v1, v0, Landroid/content/Intent;->getIntExtra(Ljava/lang/String; I)I"
+      },
+      {
+        "offset": "0x54",
+        "call": "Lcom/ecarx/btphone/control/ControlKeyManager;->getInstance()Lcom/ecarx/btphone/control/IControlKeyActionCallBack;"
+      },
+      {
+        "offset": "0x5c",
+        "call": "v0, Lcom/ecarx/btphone/control/IControlKeyActionCallBack;->onRCallLongEvent()V"
+      },
+      {
+        "offset": "0x6e",
+        "call": "Lcom/ecarx/btphone/control/ControlKeyManager;->getInstance()Lcom/ecarx/btphone/control/IControlKeyActionCallBack;"
+      },
+      {
+        "offset": "0x76",
+        "call": "v0, Lcom/ecarx/btphone/control/IControlKeyActionCallBack;->onRCallShortEvent()V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x2",
+        "string": "v1, \"ecarx.extra.ECARX_KEY_ACTION_TYPE\""
+      },
+      {
+        "offset": "0xe",
+        "string": "v2, \"ecarx_bt_swsm\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/control/ControlKeyBroadcastReceiver;",
+    "method": "handleMuteAction",
+    "descriptor": "(Landroid/content/Intent;)V",
+    "code_offset": 513744,
+    "calls": [
+      {
+        "offset": "0x6",
+        "call": "v5, v1, v0, Landroid/content/Intent;->getIntExtra(Ljava/lang/String; I)I"
+      },
+      {
+        "offset": "0x54",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x5c",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCallManager;->setRingtoneMute()V"
+      },
+      {
+        "offset": "0x6e",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x76",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCallManager;->setRingtoneMute()V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x2",
+        "string": "v1, \"ecarx.extra.ECARX_KEY_ACTION_TYPE\""
+      },
+      {
+        "offset": "0xe",
+        "string": "v2, \"ecarx_bt_swsm\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/control/ControlKeyBroadcastReceiver;",
+    "method": "onReceive",
+    "descriptor": "(Landroid/content/Context; Landroid/content/Intent;)V",
+    "code_offset": 513900,
+    "calls": [
+      {
+        "offset": "0x14",
+        "call": "v8, Landroid/content/Intent;->toString()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x44",
+        "call": "v8, Landroid/content/Intent;->getAction()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x60",
+        "call": "v8, Landroid/content/Intent;->getAction()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x80",
+        "call": "v2, v0, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0x94",
+        "call": "v5, v0, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xa0",
+        "call": "v4, v0, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xc0",
+        "call": "v8, Landroid/content/Intent;->getAction()Ljava/lang/String;"
+      },
+      {
+        "offset": "0xde",
+        "call": "v2, v0, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xea",
+        "call": "v6, v8, Lcom/ecarx/btphone/control/ControlKeyBroadcastReceiver;->handleCallAction(Landroid/content/Intent;)V"
+      },
+      {
+        "offset": "0xf0",
+        "call": "v5, v0, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xfc",
+        "call": "v6, v8, Lcom/ecarx/btphone/control/ControlKeyBroadcastReceiver;->handleMuteAction(Landroid/content/Intent;)V"
+      },
+      {
+        "offset": "0x102",
+        "call": "v4, v0, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0x10e",
+        "call": "Lcom/ecarx/btphone/ui/incall/InCallUiStateMachine;->getInstance()Lcom/ecarx/btphone/ui/incall/InCallUiStateMachine;"
+      },
+      {
+        "offset": "0x116",
+        "call": "v2, Lcom/ecarx/btphone/ui/incall/InCallUiStateMachine;->getCurrentStateCode()I"
+      },
+      {
+        "offset": "0x14e",
+        "call": "v6, v8, Lcom/ecarx/btphone/control/ControlKeyBroadcastReceiver;->handleCallAction(Landroid/content/Intent;)V"
+      },
+      {
+        "offset": "0x154",
+        "call": "v6, Lcom/ecarx/btphone/control/ControlKeyBroadcastReceiver;->abortBroadcast()V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x2a",
+        "string": "v1, \"ecarx_bt_swsm\""
+      },
+      {
+        "offset": "0x7c",
+        "string": "v2, \"ecarx.intent.action.ECARX_KEY_RCALL_EVENT\""
+      },
+      {
+        "offset": "0x88",
+        "string": "v4, \"ecarx.intent.action.ECARX_KEY_RMULTIFUNCTION_EVENT\""
+      },
+      {
+        "offset": "0x8c",
+        "string": "v5, \"ecarx.intent.action.ECARX_KEY_MUTE_EVENT\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/EcarxDimMenuReceiver;",
+    "method": "<init>",
+    "descriptor": "()V",
+    "code_offset": 545340,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v0, Landroid/content/BroadcastReceiver;-><init>()V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/EcarxDimMenuReceiver;",
+    "method": "onReceive",
+    "descriptor": "(Landroid/content/Context; Landroid/content/Intent;)V",
+    "code_offset": 545364,
+    "calls": [
+      {
+        "offset": "0x14",
+        "call": "v9, Landroid/content/Intent;->getAction()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x34",
+        "call": "v9, Landroid/content/Intent;->getAction()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x3c",
+        "call": "v0, Ljava/lang/String;->hashCode()I"
+      },
+      {
+        "offset": "0x58",
+        "call": "v0, v2, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0x6c",
+        "call": "v0, v2, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0x80",
+        "call": "v0, v2, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0x94",
+        "call": "v0, v2, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xa8",
+        "call": "v0, v2, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xbc",
+        "call": "v0, v2, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xd0",
+        "call": "v0, v2, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xec",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0xf4",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCallManager;->getPrimaryCall()Lcom/ecarx/btphone/telecom/UiCall;"
+      },
+      {
+        "offset": "0x100",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCall;->getState()I"
+      },
+      {
+        "offset": "0x10c",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x114",
+        "call": "v1, Lcom/ecarx/btphone/telecom/UiCallManager;->getMuted()Z"
+      },
+      {
+        "offset": "0x11e",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x126",
+        "call": "v2, v1, Lcom/ecarx/btphone/telecom/UiCallManager;->setMuted(Z)V"
+      },
+      {
+        "offset": "0x130",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x138",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCallManager;->answerAndEndCall()V"
+      },
+      {
+        "offset": "0x142",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x14a",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCallManager;->setRingtoneMute()V"
+      },
+      {
+        "offset": "0x152",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x15a",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCallManager;->answerAndHoldCall()V"
+      },
+      {
+        "offset": "0x166",
+        "call": "v9, v0, Landroid/content/Intent;->getParcelableExtra(Ljava/lang/String;)Landroid/os/Parcelable;"
+      },
+      {
+        "offset": "0x178",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCall;->getState()I"
+      },
+      {
+        "offset": "0x1b6",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x1c0",
+        "call": "v1, v0, v6, v3, Lcom/ecarx/btphone/telecom/UiCallManager;->rejectCall(Lcom/ecarx/btphone/telecom/UiCall; Z Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x1d2",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x1da",
+        "call": "v1, Lcom/ecarx/btphone/telecom/UiCallManager;->disconnectCall()V"
+      },
+      {
+        "offset": "0x1e2",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x1ea",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCallManager;->getPrimaryCall()Lcom/ecarx/btphone/telecom/UiCall;"
+      },
+      {
+        "offset": "0x1f6",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x1fe",
+        "call": "v1, v0, Lcom/ecarx/btphone/telecom/UiCallManager;->answerCall(Lcom/ecarx/btphone/telecom/UiCall;)V"
+      },
+      {
+        "offset": "0x204",
+        "call": "Ljava/lang/System;->currentTimeMillis()J"
+      },
+      {
+        "offset": "0x20c",
+        "call": "v0, v1, v2, Lcom/ecarx/btphone/telecom/UiCall;->setStartTimeMillis(J)V"
+      },
+      {
+        "offset": "0x218",
+        "call": "v9, v0, Landroid/content/Intent;->getStringExtra(Ljava/lang/String;)Ljava/lang/String;"
+      },
+      {
+        "offset": "0x220",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x228",
+        "call": "v1, v0, v6, Lcom/ecarx/btphone/telecom/UiCallManager;->safePlaceCallInternal(Ljava/lang/String; Z)V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x54",
+        "string": "v2, \"ecarx.intent.broadcast.action.ECARX_DIM_RINGTONEMUTE\""
+      },
+      {
+        "offset": "0x68",
+        "string": "v2, \"ecarx.intent.broadcast.action.ECARX_DIM_ANSWERCALL\""
+      },
+      {
+        "offset": "0x7c",
+        "string": "v2, \"ecarx.intent.broadcast.action.ECARX_DIM_OUTCALL\""
+      },
+      {
+        "offset": "0x90",
+        "string": "v2, \"ecarx.intent.broadcast.action.ECARX_DIM_MUTESTATE\""
+      },
+      {
+        "offset": "0xa4",
+        "string": "v2, \"ecarx.intent.broadcast.action.ECARX_DIM_ANSWERANDENDONGOINGCALL\""
+      },
+      {
+        "offset": "0xb8",
+        "string": "v2, \"ecarx.intent.broadcast.action.ECARX_DIM_ANSWERANDHOLDONGOINGCALL\""
+      },
+      {
+        "offset": "0xcc",
+        "string": "v2, \"ecarx.intent.broadcast.action.ECARX_DIM_DECLINECALL\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "<clinit>",
+    "descriptor": "()V",
+    "code_offset": 552888,
+    "calls": [],
+    "protocol_strings": [
+      {
+        "offset": "0x2",
+        "string": "v0, \"com.ecarx.btphone\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "<init>",
+    "descriptor": "()V",
+    "code_offset": 552916,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v1, Landroid/telecom/InCallService;-><init>()V"
+      },
+      {
+        "offset": "0xa",
+        "call": "v0, v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      },
+      {
+        "offset": "0x18",
+        "call": "v0, Ljava/util/ArrayList;-><init>()V"
+      },
+      {
+        "offset": "0x26",
+        "call": "v0, Ljava/util/concurrent/CopyOnWriteArrayList;-><init>()V"
+      },
+      {
+        "offset": "0x34",
+        "call": "v0, v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl$1;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      },
+      {
+        "offset": "0x42",
+        "call": "v0, v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl$5;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      },
+      {
+        "offset": "0x50",
+        "call": "v0, v1, Lcom/ecarx/btphone/telecom/-$$Lambda$InCallServiceImpl$xhRS5zEdsQ-mlMTUGlVoG3R__uU;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$000",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)Landroid/bluetooth/BluetoothDevice;",
+    "code_offset": 552308,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getConnectedDevice()Landroid/bluetooth/BluetoothDevice;"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$100",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl; Z)V",
+    "code_offset": 553024,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v0, v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->syncBluetoothStates(Z)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$200",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)Landroid/bluetooth/BluetoothPbapClient;",
+    "code_offset": 552500,
+    "calls": [],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$202",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl; Landroid/bluetooth/BluetoothPbapClient;)Landroid/bluetooth/BluetoothPbapClient;",
+    "code_offset": 552524,
+    "calls": [],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$300",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)Ljava/util/List;",
+    "code_offset": 552840,
+    "calls": [],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$302",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl; Ljava/util/List;)Ljava/util/List;",
+    "code_offset": 552864,
+    "calls": [],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$402",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl; Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;)Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;",
+    "code_offset": 552792,
+    "calls": [],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$500",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V",
+    "code_offset": 553048,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v0, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->disposePbapCallback()V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$600",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)Ljava/lang/Runnable;",
+    "code_offset": 552816,
+    "calls": [],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$700",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl; I I)V",
+    "code_offset": 553072,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v0, v1, v2, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->refreshDownloadStates(I I)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "access$800",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl; I)V",
+    "code_offset": 553096,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v0, v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->refreshRepository(I)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "clearRepository",
+    "descriptor": "()V",
+    "code_offset": 553120,
+    "calls": [
+      {
+        "offset": "0x14",
+        "call": "v1, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x1a",
+        "call": "Lcom/ecarx/btphone/repositories/FavoritesRepository;->get()Lcom/ecarx/btphone/repositories/FavoritesRepository;"
+      },
+      {
+        "offset": "0x22",
+        "call": "v0, Lcom/ecarx/btphone/repositories/FavoritesRepository;->clearCache()V"
+      },
+      {
+        "offset": "0x28",
+        "call": "Lcom/ecarx/btphone/repositories/ContactRepository;->get()Lcom/ecarx/btphone/repositories/ContactRepository;"
+      },
+      {
+        "offset": "0x30",
+        "call": "v0, Lcom/ecarx/btphone/repositories/ContactRepository;->cleanData()V"
+      },
+      {
+        "offset": "0x36",
+        "call": "Lcom/ecarx/btphone/repositories/RecentRepository;->get()Lcom/ecarx/btphone/repositories/RecentRepository;"
+      },
+      {
+        "offset": "0x3e",
+        "call": "v0, Lcom/ecarx/btphone/repositories/RecentRepository;->cleanData()V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x10",
+        "string": "v1, \"ecarx_bt_pbap\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "disposePbapCallback",
+    "descriptor": "()V",
+    "code_offset": 553208,
+    "calls": [
+      {
+        "offset": "0x8",
+        "call": "v1, v2, Lcom/ecarx/btphone/telecom/InCallServiceImpl$4;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      },
+      {
+        "offset": "0xe",
+        "call": "v0, v1, Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;->registerPbapListener(Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension$IPbapListener;)Z"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "getConnectedDevice",
+    "descriptor": "()Landroid/bluetooth/BluetoothDevice;",
+    "code_offset": 552336,
+    "calls": [
+      {
+        "offset": "0x14",
+        "call": "v3, v1, Lcom/ecarx/btphone/utils/LogUtils;->i(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x22",
+        "call": "v1, Landroid/bluetooth/BluetoothPbapClient;->getConnectedDevices()Ljava/util/List;"
+      },
+      {
+        "offset": "0x60",
+        "call": "v1, v0, Lcom/ecarx/btphone/utils/LogUtils;->i(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x6e",
+        "call": "v0, Ljava/util/List;->size()I"
+      },
+      {
+        "offset": "0x80",
+        "call": "v0, v2, Ljava/util/List;->get(I)Ljava/lang/Object;"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x5c",
+        "string": "v1, \"ecarx_bt_con\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "notifyPhoneBookStateChanged",
+    "descriptor": "(I I)V",
+    "code_offset": 554280,
+    "calls": [
+      {
+        "offset": "0x4",
+        "call": "v0, Ljava/util/List;->iterator()Ljava/util/Iterator;"
+      },
+      {
+        "offset": "0xc",
+        "call": "v0, Ljava/util/Iterator;->hasNext()Z"
+      },
+      {
+        "offset": "0x18",
+        "call": "v0, Ljava/util/Iterator;->next()Ljava/lang/Object;"
+      },
+      {
+        "offset": "0x24",
+        "call": "v1, v3, v4, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadPhoneBookListener;->onDownloadPhoneBookStateChanged(I I)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "refreshDownloadStates",
+    "descriptor": "(I I)V",
+    "code_offset": 555548,
+    "calls": [
+      {
+        "offset": "0x42",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0xac",
+        "call": "Lcom/ecarx/btphone/App;->getInstance()Lcom/ecarx/btphone/App;"
+      },
+      {
+        "offset": "0xb4",
+        "call": "v1, Lcom/ecarx/btphone/App;->isAppForground()Z"
+      },
+      {
+        "offset": "0xc4",
+        "call": "v1, v11, Lcom/ecarx/btphone/telecom/-$$Lambda$InCallServiceImpl$Dd5eug8LGKcrHFfvBUTCy3M-klQ;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      },
+      {
+        "offset": "0xca",
+        "call": "v6, v1, Lcom/ecarx/btphone/utils/RxManager;->justOnMain(Ljava/lang/Object; Lcom/ecarx/btphone/utils/ISubscribe;)V"
+      },
+      {
+        "offset": "0xd0",
+        "call": "v11, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->clearRepository()V"
+      },
+      {
+        "offset": "0xda",
+        "call": "v1, v12, v0, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->setState(I I)V"
+      },
+      {
+        "offset": "0xe0",
+        "call": "v11, v12, v13, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->notifyPhoneBookStateChanged(I I)V"
+      },
+      {
+        "offset": "0x126",
+        "call": "v1, v12, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->getState(I)I"
+      },
+      {
+        "offset": "0x16e",
+        "call": "v1, v12, v0, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->setState(I I)V"
+      },
+      {
+        "offset": "0x174",
+        "call": "Lcom/ecarx/btphone/App;->getInstance()Lcom/ecarx/btphone/App;"
+      },
+      {
+        "offset": "0x17c",
+        "call": "v0, Lcom/ecarx/btphone/App;->isAppForground()Z"
+      },
+      {
+        "offset": "0x198",
+        "call": "Lcom/ecarx/btphone/App;->getInstance()Lcom/ecarx/btphone/App;"
+      },
+      {
+        "offset": "0x1a0",
+        "call": "v1, Lcom/ecarx/btphone/App;->isAppForground()Z"
+      },
+      {
+        "offset": "0x1c0",
+        "call": "v0, v11, Lcom/ecarx/btphone/telecom/-$$Lambda$InCallServiceImpl$xlDh3AkRjjrCXduqV0L_ieao0jY;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      },
+      {
+        "offset": "0x1c6",
+        "call": "v6, v0, Lcom/ecarx/btphone/utils/RxManager;->justOnMain(Ljava/lang/Object; Lcom/ecarx/btphone/utils/ISubscribe;)V"
+      },
+      {
+        "offset": "0x1cc",
+        "call": "v11, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->clearRepository()V"
+      },
+      {
+        "offset": "0x1d2",
+        "call": "v11, v12, v13, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->notifyPhoneBookStateChanged(I I)V"
+      },
+      {
+        "offset": "0x218",
+        "call": "v8, v12, v7, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->setState(I I)V"
+      },
+      {
+        "offset": "0x232",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x240",
+        "call": "v1, Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;->getPhoneBookContactsCount()I"
+      },
+      {
+        "offset": "0x272",
+        "call": "v2, v7, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x284",
+        "call": "v11, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0x28c",
+        "call": "v2, v7, Lcom/ecarx/btphone/utils/ToastUtils;-><init>(Landroid/content/Context;)V"
+      },
+      {
+        "offset": "0x298",
+        "call": "v11, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0x2a6",
+        "call": "v9, v10, Landroid/content/Context;->getString(I)Ljava/lang/String;"
+      },
+      {
+        "offset": "0x2ae",
+        "call": "v2, v7, v9, Lcom/ecarx/btphone/utils/ToastUtils;->showIconToast(I Ljava/lang/CharSequence;)V"
+      },
+      {
+        "offset": "0x2e0",
+        "call": "Lcom/ecarx/btphone/App;->getInstance()Lcom/ecarx/btphone/App;"
+      },
+      {
+        "offset": "0x2e8",
+        "call": "v2, Lcom/ecarx/btphone/App;->isAppForground()Z"
+      },
+      {
+        "offset": "0x304",
+        "call": "Lcom/ecarx/btphone/App;->getInstance()Lcom/ecarx/btphone/App;"
+      },
+      {
+        "offset": "0x30c",
+        "call": "v5, Lcom/ecarx/btphone/App;->isAppForground()Z"
+      },
+      {
+        "offset": "0x32c",
+        "call": "v2, v11, Lcom/ecarx/btphone/telecom/-$$Lambda$InCallServiceImpl$XRZkaF0SZioG6Z_QTEkuvfM-uQU;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      },
+      {
+        "offset": "0x332",
+        "call": "v6, v2, Lcom/ecarx/btphone/utils/RxManager;->justOnMain(Ljava/lang/Object; Lcom/ecarx/btphone/utils/ISubscribe;)V"
+      },
+      {
+        "offset": "0x354",
+        "call": "v1, Ljava/lang/Exception;->getLocalizedMessage()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x36e",
+        "call": "v8, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x374",
+        "call": "v11, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->downloadCallLog()V"
+      },
+      {
+        "offset": "0x38e",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x39c",
+        "call": "v1, Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;->getPhoneBookContactsCount()I"
+      },
+      {
+        "offset": "0x3ce",
+        "call": "v2, v5, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x41a",
+        "call": "v1, Ljava/lang/Exception;->getLocalizedMessage()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x434",
+        "call": "v8, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x43a",
+        "call": "v11, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->downloadFavorite()V"
+      },
+      {
+        "offset": "0x452",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x460",
+        "call": "v1, Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;->getPhoneBookContactsCount()I"
+      },
+      {
+        "offset": "0x492",
+        "call": "v2, v4, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x4b4",
+        "call": "v1, Ljava/lang/Exception;->getLocalizedMessage()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x4ce",
+        "call": "v8, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x4d4",
+        "call": "v11, v12, v13, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->notifyPhoneBookStateChanged(I I)V"
+      },
+      {
+        "offset": "0x4e0",
+        "call": "v1, v12, v0, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->setState(I I)V"
+      },
+      {
+        "offset": "0x4e6",
+        "call": "v11, v12, v13, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->notifyPhoneBookStateChanged(I I)V"
+      },
+      {
+        "offset": "0x4f2",
+        "call": "v0, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->isAllDownloadSuccess()Z"
+      },
+      {
+        "offset": "0x4fe",
+        "call": "Lcom/ecarx/btphone/App;->getInstance()Lcom/ecarx/btphone/App;"
+      },
+      {
+        "offset": "0x506",
+        "call": "v0, Lcom/ecarx/btphone/App;->isAppForground()Z"
+      },
+      {
+        "offset": "0x512",
+        "call": "Lcom/ecarx/btphone/repositories/ContactRepository;->get()Lcom/ecarx/btphone/repositories/ContactRepository;"
+      },
+      {
+        "offset": "0x51a",
+        "call": "v0, Lcom/ecarx/btphone/repositories/ContactRepository;->checkDbHasContacts()V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x3e",
+        "string": "v2, \"ecarx_bt_pbap\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "refreshRepository",
+    "descriptor": "(I)V",
+    "code_offset": 556920,
+    "calls": [
+      {
+        "offset": "0x32",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x56",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x5c",
+        "call": "Lcom/ecarx/btphone/repositories/FavoritesRepository;->get()Lcom/ecarx/btphone/repositories/FavoritesRepository;"
+      },
+      {
+        "offset": "0x64",
+        "call": "v1, v0, Lcom/ecarx/btphone/repositories/FavoritesRepository;->getFavoritesContacts(Z)Ljava/util/List;"
+      },
+      {
+        "offset": "0x78",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x7e",
+        "call": "Lcom/ecarx/btphone/repositories/RecentRepository;->get()Lcom/ecarx/btphone/repositories/RecentRepository;"
+      },
+      {
+        "offset": "0x86",
+        "call": "v1, v0, Lcom/ecarx/btphone/repositories/RecentRepository;->getRecentList(Z)Ljava/util/List;"
+      },
+      {
+        "offset": "0x9a",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0xa0",
+        "call": "Lcom/ecarx/btphone/repositories/ContactRepository;->get()Lcom/ecarx/btphone/repositories/ContactRepository;"
+      },
+      {
+        "offset": "0xa8",
+        "call": "v1, v0, Lcom/ecarx/btphone/repositories/ContactRepository;->getContacts(Z)Ljava/util/List;"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x2e",
+        "string": "v2, \"ecarx_bt_pbap\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "registerReceiver",
+    "descriptor": "()V",
+    "code_offset": 557160,
+    "calls": [
+      {
+        "offset": "0x14",
+        "call": "v1, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x1e",
+        "call": "v0, Landroid/content/IntentFilter;-><init>()V"
+      },
+      {
+        "offset": "0x28",
+        "call": "v0, v1, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x32",
+        "call": "v0, v1, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x3c",
+        "call": "v0, v1, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x46",
+        "call": "v0, v1, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x50",
+        "call": "v0, v1, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x5a",
+        "call": "v0, v1, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x64",
+        "call": "v0, v1, Landroid/content/IntentFilter;->addAction(Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x6e",
+        "call": "v3, v1, v0, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->registerReceiver(Landroid/content/BroadcastReceiver; Landroid/content/IntentFilter;)Landroid/content/Intent;"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x24",
+        "string": "v1, \"android.bluetooth.pbapclient.profile.action.ACTION_PULL_COMPLETE\""
+      },
+      {
+        "offset": "0x2e",
+        "string": "v1, \"android.bluetooth.adapter.action.STATE_CHANGED\""
+      },
+      {
+        "offset": "0x38",
+        "string": "v1, \"android.bluetooth.device.action.ACL_DISCONNECTED\""
+      },
+      {
+        "offset": "0x42",
+        "string": "v1, \"android.bluetooth.device.action.ACL_CONNECTED\""
+      },
+      {
+        "offset": "0x4c",
+        "string": "v1, \"android.bluetooth.pbapclient.profile.action.CONNECTION_STATE_CHANGED\""
+      },
+      {
+        "offset": "0x56",
+        "string": "v1, \"android.bluetooth.headsetclient.profile.action.CONNECTION_STATE_CHANGED\""
+      },
+      {
+        "offset": "0x60",
+        "string": "v1, \"android.intent.action.CONFIGURATION_CHANGED\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "startMyForeground",
+    "descriptor": "()V",
+    "code_offset": 557368,
+    "calls": [
+      {
+        "offset": "0xe",
+        "call": "v0, v2, v1, v3, Landroid/app/NotificationChannel;-><init>(Ljava/lang/String; Ljava/lang/CharSequence; I)V"
+      },
+      {
+        "offset": "0x14",
+        "call": "v0, v3, Landroid/app/NotificationChannel;->setLockscreenVisibility(I)V"
+      },
+      {
+        "offset": "0x1e",
+        "call": "v7, v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;"
+      },
+      {
+        "offset": "0x2c",
+        "call": "v1, v0, Landroid/app/NotificationManager;->createNotificationChannel(Landroid/app/NotificationChannel;)V"
+      },
+      {
+        "offset": "0x36",
+        "call": "v4, v7, v2, Landroidx/core/app/NotificationCompat$Builder;-><init>(Landroid/content/Context; Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x40",
+        "call": "v2, v4, Landroidx/core/app/NotificationCompat$Builder;->setOngoing(Z)Landroidx/core/app/NotificationCompat$Builder;"
+      },
+      {
+        "offset": "0x4a",
+        "call": "v5, v6, Landroidx/core/app/NotificationCompat$Builder;->setSound(Landroid/net/Uri;)Landroidx/core/app/NotificationCompat$Builder;"
+      },
+      {
+        "offset": "0x56",
+        "call": "v5, v6, Landroidx/core/app/NotificationCompat$Builder;->setSmallIcon(I)Landroidx/core/app/NotificationCompat$Builder;"
+      },
+      {
+        "offset": "0x62",
+        "call": "v5, v6, Landroidx/core/app/NotificationCompat$Builder;->setContentTitle(Ljava/lang/CharSequence;)Landroidx/core/app/NotificationCompat$Builder;"
+      },
+      {
+        "offset": "0x6c",
+        "call": "v5, v6, Landroidx/core/app/NotificationCompat$Builder;->setPriority(I)Landroidx/core/app/NotificationCompat$Builder;"
+      },
+      {
+        "offset": "0x78",
+        "call": "v5, v6, Landroidx/core/app/NotificationCompat$Builder;->setCategory(Ljava/lang/String;)Landroidx/core/app/NotificationCompat$Builder;"
+      },
+      {
+        "offset": "0x80",
+        "call": "v5, Landroidx/core/app/NotificationCompat$Builder;->build()Landroid/app/Notification;"
+      },
+      {
+        "offset": "0x8c",
+        "call": "v7, v6, v5, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->startForeground(I Landroid/app/Notification;)V"
+      },
+      {
+        "offset": "0xa2",
+        "call": "v3, v4, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x8",
+        "string": "v2, \"ecarx_btphone\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "syncBluetoothConnected",
+    "descriptor": "(Z)V",
+    "code_offset": 557556,
+    "calls": [
+      {
+        "offset": "0x32",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x38",
+        "call": "Lcom/ecarx/btphone/App;->getInstance()Lcom/ecarx/btphone/App;"
+      },
+      {
+        "offset": "0x40",
+        "call": "v1, Lcom/ecarx/btphone/App;->getBluetoothService()Lcom/ecarx/btphone/IBluetoothService;"
+      },
+      {
+        "offset": "0x4c",
+        "call": "v1, v8, Lcom/ecarx/btphone/IBluetoothService;->syncConnected(Z)V"
+      },
+      {
+        "offset": "0x6e",
+        "call": "v4, Landroid/os/RemoteException;->getMessage()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x88",
+        "call": "v2, v0, Lcom/ecarx/btphone/utils/LogUtils;->e(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x8e",
+        "call": "v4, Landroid/os/RemoteException;->printStackTrace()V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x2e",
+        "string": "v2, \"ecarx_bt_pbap\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "syncBluetoothStates",
+    "descriptor": "(Z)V",
+    "code_offset": 557736,
+    "calls": [
+      {
+        "offset": "0x4",
+        "call": "v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->clearRepository()V"
+      },
+      {
+        "offset": "0xe",
+        "call": "v0, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->resetStates()V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "downloadCallLog",
+    "descriptor": "()V",
+    "code_offset": 553248,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v6, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getConnectedDevice()Landroid/bluetooth/BluetoothDevice;"
+      },
+      {
+        "offset": "0x1c",
+        "call": "v1, v4, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->access$1000(Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates; I)V"
+      },
+      {
+        "offset": "0x2e",
+        "call": "v3, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x3a",
+        "call": "v1, v2, Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;->syncPhonebook(I)Z"
+      },
+      {
+        "offset": "0x80",
+        "call": "v3, v1, Lcom/ecarx/btphone/utils/LogUtils;->e(Ljava/lang/String; [Ljava/lang/Object;)V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0xe",
+        "string": "v3, \"ecarx_bt_pbap\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "downloadContacts",
+    "descriptor": "(Landroid/bluetooth/BluetoothDevice;)V",
+    "code_offset": 553400,
+    "calls": [
+      {
+        "offset": "0x32",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x38",
+        "call": "v7, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getConnectedDevice()Landroid/bluetooth/BluetoothDevice;"
+      },
+      {
+        "offset": "0x56",
+        "call": "v5, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->isDownloading()Z"
+      },
+      {
+        "offset": "0x7e",
+        "call": "v6, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->getPbDownloadState()I"
+      },
+      {
+        "offset": "0x9a",
+        "call": "v6, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->getChDownloadState()I"
+      },
+      {
+        "offset": "0xb4",
+        "call": "v2, v0, Lcom/ecarx/btphone/utils/LogUtils;->e(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0xc0",
+        "call": "v5, v0, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->access$900(Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates; I)V"
+      },
+      {
+        "offset": "0xd2",
+        "call": "v2, v5, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0xdc",
+        "call": "v3, v0, Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;->syncPhonebook(I)Z"
+      },
+      {
+        "offset": "0x110",
+        "call": "Lcom/ecarx/btphone/App;->getInstance()Lcom/ecarx/btphone/App;"
+      },
+      {
+        "offset": "0x118",
+        "call": "v0, Lcom/ecarx/btphone/App;->getHandler()Landroid/os/Handler;"
+      },
+      {
+        "offset": "0x128",
+        "call": "v0, v3, v5, v6, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable; J)Z"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x2e",
+        "string": "v2, \"ecarx_bt_pbap\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "downloadFavorite",
+    "descriptor": "()V",
+    "code_offset": 553780,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v6, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getConnectedDevice()Landroid/bluetooth/BluetoothDevice;"
+      },
+      {
+        "offset": "0x1c",
+        "call": "v1, v4, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->setFavDownloadState(I)V"
+      },
+      {
+        "offset": "0x2e",
+        "call": "v3, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x3a",
+        "call": "v1, v2, Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;->syncPhonebook(I)Z"
+      },
+      {
+        "offset": "0x80",
+        "call": "v3, v1, Lcom/ecarx/btphone/utils/LogUtils;->e(Ljava/lang/String; [Ljava/lang/Object;)V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0xe",
+        "string": "v3, \"ecarx_bt_pbap\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "getDownloadStates",
+    "descriptor": "()Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;",
+    "code_offset": 552768,
+    "calls": [],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "lambda$new$3$InCallServiceImpl",
+    "descriptor": "()V",
+    "code_offset": 553932,
+    "calls": [
+      {
+        "offset": "0x14",
+        "call": "v0, v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates;->access$900(Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadStates; I)V"
+      },
+      {
+        "offset": "0x1a",
+        "call": "Lcom/ecarx/btphone/App;->getInstance()Lcom/ecarx/btphone/App;"
+      },
+      {
+        "offset": "0x22",
+        "call": "v0, Lcom/ecarx/btphone/App;->isAppForground()Z"
+      },
+      {
+        "offset": "0x32",
+        "call": "v5, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0x3a",
+        "call": "v0, v2, Lcom/ecarx/btphone/utils/ToastUtils;-><init>(Landroid/content/Context;)V"
+      },
+      {
+        "offset": "0x46",
+        "call": "v5, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0x54",
+        "call": "v3, v4, Landroid/content/Context;->getString(I)Ljava/lang/String;"
+      },
+      {
+        "offset": "0x5c",
+        "call": "v0, v2, v3, Lcom/ecarx/btphone/utils/ToastUtils;->showIconMultiLineToast(I Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x62",
+        "call": "v5, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->clearRepository()V"
+      },
+      {
+        "offset": "0x6a",
+        "call": "v5, v0, v1, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->notifyPhoneBookStateChanged(I I)V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x0",
+        "string": "v0, \"ecarx_bt_pbap\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "lambda$refreshDownloadStates$0$InCallServiceImpl",
+    "descriptor": "(Ljava/lang/String;)V",
+    "code_offset": 554064,
+    "calls": [
+      {
+        "offset": "0x4",
+        "call": "v3, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0xc",
+        "call": "v0, v1, Lcom/ecarx/btphone/utils/ToastUtils;-><init>(Landroid/content/Context;)V"
+      },
+      {
+        "offset": "0x12",
+        "call": "v3, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0x20",
+        "call": "v1, v2, Landroid/content/Context;->getString(I)Ljava/lang/String;"
+      },
+      {
+        "offset": "0x2e",
+        "call": "v0, v2, v1, Lcom/ecarx/btphone/utils/ToastUtils;->showIconMultiLineToast(I Ljava/lang/String;)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "lambda$refreshDownloadStates$1$InCallServiceImpl",
+    "descriptor": "(Ljava/lang/String;)V",
+    "code_offset": 554136,
+    "calls": [
+      {
+        "offset": "0x4",
+        "call": "v3, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0xc",
+        "call": "v0, v1, Lcom/ecarx/btphone/utils/ToastUtils;-><init>(Landroid/content/Context;)V"
+      },
+      {
+        "offset": "0x12",
+        "call": "v3, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0x20",
+        "call": "v1, v2, Landroid/content/Context;->getString(I)Ljava/lang/String;"
+      },
+      {
+        "offset": "0x2e",
+        "call": "v0, v2, v1, Lcom/ecarx/btphone/utils/ToastUtils;->showIconMultiLineToast(I Ljava/lang/String;)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "lambda$refreshDownloadStates$2$InCallServiceImpl",
+    "descriptor": "(Ljava/lang/String;)V",
+    "code_offset": 554208,
+    "calls": [
+      {
+        "offset": "0x4",
+        "call": "v3, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0xc",
+        "call": "v0, v1, Lcom/ecarx/btphone/utils/ToastUtils;-><init>(Landroid/content/Context;)V"
+      },
+      {
+        "offset": "0x12",
+        "call": "v3, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0x20",
+        "call": "v1, v2, Landroid/content/Context;->getString(I)Ljava/lang/String;"
+      },
+      {
+        "offset": "0x2e",
+        "call": "v0, v2, v1, Lcom/ecarx/btphone/utils/ToastUtils;->showIconToast(I Ljava/lang/CharSequence;)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "onBind",
+    "descriptor": "(Landroid/content/Intent;)Landroid/os/IBinder;",
+    "code_offset": 552548,
+    "calls": [
+      {
+        "offset": "0x1a",
+        "call": "v4, Lcom/ecarx/btphone/utils/CommonUtils;->dumpIntent(Landroid/content/Intent;)Ljava/lang/String;"
+      },
+      {
+        "offset": "0x3a",
+        "call": "v1, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x40",
+        "call": "v4, Landroid/content/Intent;->getAction()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x4c",
+        "call": "v1, v0, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0x5c",
+        "call": "v0, v3, Lcom/ecarx/btphone/telecom/InCallServiceImpl$LocalBinder;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      },
+      {
+        "offset": "0x64",
+        "call": "v3, v4, Landroid/telecom/InCallService;->onBind(Landroid/content/Intent;)Landroid/os/IBinder;"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x36",
+        "string": "v1, \"ecarx_bt_hfp\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "onCallAdded",
+    "descriptor": "(Landroid/telecom/Call;)V",
+    "code_offset": 554344,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v4, v5, Landroid/telecom/InCallService;->onCallAdded(Landroid/telecom/Call;)V"
+      },
+      {
+        "offset": "0x6",
+        "call": "Lcom/ecarx/btphone/UiBluetoothMonitor;->get()Lcom/ecarx/btphone/UiBluetoothMonitor;"
+      },
+      {
+        "offset": "0xe",
+        "call": "v0, Lcom/ecarx/btphone/UiBluetoothMonitor;->getConnectedPhoneNumber2()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x40",
+        "call": "v5, Landroid/telecom/Call;->toString()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x60",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x6a",
+        "call": "v5, v1, Landroid/telecom/Call;->registerCallback(Landroid/telecom/Call$Callback;)V"
+      },
+      {
+        "offset": "0x74",
+        "call": "v5, Landroid/telecom/Call;->getState()I"
+      },
+      {
+        "offset": "0x7c",
+        "call": "v1, v5, v2, Landroid/telecom/Call$Callback;->onStateChanged(Landroid/telecom/Call; I)V"
+      },
+      {
+        "offset": "0x86",
+        "call": "v1, Ljava/util/concurrent/CopyOnWriteArrayList;->iterator()Ljava/util/Iterator;"
+      },
+      {
+        "offset": "0x8e",
+        "call": "v1, Ljava/util/Iterator;->hasNext()Z"
+      },
+      {
+        "offset": "0x9a",
+        "call": "v1, Ljava/util/Iterator;->next()Ljava/lang/Object;"
+      },
+      {
+        "offset": "0xa6",
+        "call": "v2, v5, Lcom/ecarx/btphone/telecom/InCallServiceImpl$Callback;->onTelecomCallAdded(Landroid/telecom/Call;)V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x5c",
+        "string": "v2, \"ecarx_bt_hfp\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "onCallAudioStateChanged",
+    "descriptor": "(Landroid/telecom/CallAudioState;)V",
+    "code_offset": 554536,
+    "calls": [
+      {
+        "offset": "0x1a",
+        "call": "v4, Landroid/telecom/CallAudioState;->toString()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x3a",
+        "call": "v1, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x40",
+        "call": "Lcom/ecarx/btphone/telecom/UiCallManager;->get()Lcom/ecarx/btphone/telecom/UiCallManager;"
+      },
+      {
+        "offset": "0x48",
+        "call": "v0, Lcom/ecarx/btphone/telecom/UiCallManager;->getPrimaryCall()Lcom/ecarx/btphone/telecom/UiCall;"
+      },
+      {
+        "offset": "0x58",
+        "call": "v0, Ljava/util/concurrent/CopyOnWriteArrayList;->iterator()Ljava/util/Iterator;"
+      },
+      {
+        "offset": "0x60",
+        "call": "v0, Ljava/util/Iterator;->hasNext()Z"
+      },
+      {
+        "offset": "0x6c",
+        "call": "v0, Ljava/util/Iterator;->next()Ljava/lang/Object;"
+      },
+      {
+        "offset": "0x78",
+        "call": "v1, v4, Lcom/ecarx/btphone/telecom/InCallServiceImpl$Callback;->onCallAudioStateChanged(Landroid/telecom/CallAudioState;)V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x36",
+        "string": "v1, \"ecarx_bt_hfp\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "onCallRemoved",
+    "descriptor": "(Landroid/telecom/Call;)V",
+    "code_offset": 554700,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v4, v5, Landroid/telecom/InCallService;->onCallRemoved(Landroid/telecom/Call;)V"
+      },
+      {
+        "offset": "0x6",
+        "call": "Lcom/ecarx/btphone/UiBluetoothMonitor;->get()Lcom/ecarx/btphone/UiBluetoothMonitor;"
+      },
+      {
+        "offset": "0xe",
+        "call": "v0, Lcom/ecarx/btphone/UiBluetoothMonitor;->getConnectedPhoneNumber2()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x40",
+        "call": "v5, Landroid/telecom/Call;->toString()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x60",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x6a",
+        "call": "v1, Ljava/util/concurrent/CopyOnWriteArrayList;->iterator()Ljava/util/Iterator;"
+      },
+      {
+        "offset": "0x72",
+        "call": "v1, Ljava/util/Iterator;->hasNext()Z"
+      },
+      {
+        "offset": "0x7e",
+        "call": "v1, Ljava/util/Iterator;->next()Ljava/lang/Object;"
+      },
+      {
+        "offset": "0x8a",
+        "call": "v2, v5, Lcom/ecarx/btphone/telecom/InCallServiceImpl$Callback;->onTelecomCallRemoved(Landroid/telecom/Call;)V"
+      },
+      {
+        "offset": "0x96",
+        "call": "v5, v1, Landroid/telecom/Call;->unregisterCallback(Landroid/telecom/Call$Callback;)V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x5c",
+        "string": "v2, \"ecarx_bt_hfp\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "onCanAddCallChanged",
+    "descriptor": "(Z)V",
+    "code_offset": 554876,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v3, v4, Landroid/telecom/InCallService;->onCanAddCallChanged(Z)V"
+      },
+      {
+        "offset": "0x38",
+        "call": "v1, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "onCreate",
+    "descriptor": "()V",
+    "code_offset": 554956,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v8, Landroid/telecom/InCallService;->onCreate()V"
+      },
+      {
+        "offset": "0x20",
+        "call": "Landroid/os/Process;->myPid()I"
+      },
+      {
+        "offset": "0x38",
+        "call": "Ljava/lang/Thread;->currentThread()Ljava/lang/Thread;"
+      },
+      {
+        "offset": "0x40",
+        "call": "v3, Ljava/lang/Thread;->getName()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x58",
+        "call": "Ljava/lang/Thread;->currentThread()Ljava/lang/Thread;"
+      },
+      {
+        "offset": "0x60",
+        "call": "v3, Ljava/lang/Thread;->getId()J"
+      },
+      {
+        "offset": "0x80",
+        "call": "v2, v1, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x86",
+        "call": "v8, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->registerReceiver()V"
+      },
+      {
+        "offset": "0x8c",
+        "call": "v8, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->startMyForeground()V"
+      },
+      {
+        "offset": "0x92",
+        "call": "Landroid/bluetooth/BluetoothAdapter;->getDefaultAdapter()Landroid/bluetooth/BluetoothAdapter;"
+      },
+      {
+        "offset": "0x9e",
+        "call": "v2, v8, Lcom/ecarx/btphone/telecom/InCallServiceImpl$2;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl;)V"
+      },
+      {
+        "offset": "0xa8",
+        "call": "v1, v8, v2, v4, Landroid/bluetooth/BluetoothAdapter;->getProfileProxy(Landroid/content/Context; Landroid/bluetooth/BluetoothProfile$ServiceListener; I)Z"
+      },
+      {
+        "offset": "0xae",
+        "call": "v8, Lcom/ecarx/xui/adaptapi/device/Device;->create(Landroid/content/Context;)Lcom/ecarx/xui/adaptapi/device/Device;"
+      },
+      {
+        "offset": "0xce",
+        "call": "v2, Ljava/lang/Object;->toString()Ljava/lang/String;"
+      },
+      {
+        "offset": "0xec",
+        "call": "v5, v4, Lcom/ecarx/btphone/utils/LogUtils;->e(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x106",
+        "call": "v5, v0, Lcom/ecarx/btphone/utils/LogUtils;->e(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x116",
+        "call": "v3, v8, v2, Lcom/ecarx/btphone/telecom/InCallServiceImpl$3;-><init>(Lcom/ecarx/btphone/telecom/InCallServiceImpl; Lcom/ecarx/xui/adaptapi/device/Device;)V"
+      },
+      {
+        "offset": "0x11c",
+        "call": "v0, v3, Lcom/ecarx/xui/adaptapi/binder/IConnectable;->registerConnectWatcher(Lcom/ecarx/xui/adaptapi/binder/IConnectable$IConnectWatcher;)V"
+      },
+      {
+        "offset": "0x122",
+        "call": "v0, Lcom/ecarx/xui/adaptapi/binder/IConnectable;->connect()V"
+      },
+      {
+        "offset": "0x12a",
+        "call": "v2, Lcom/ecarx/xui/adaptapi/device/Device;->getBtExtension()Lcom/ecarx/xui/adaptapi/device/ext/IBtExtension;"
+      },
+      {
+        "offset": "0x132",
+        "call": "v4, Lcom/ecarx/xui/adaptapi/device/ext/IBtExtension;->getPbapExtension()Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;"
+      },
+      {
+        "offset": "0x156",
+        "call": "v2, Lcom/ecarx/xui/adaptapi/device/Device;->getBtExtension()Lcom/ecarx/xui/adaptapi/device/ext/IBtExtension;"
+      },
+      {
+        "offset": "0x15e",
+        "call": "v7, Ljava/lang/Object;->toString()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x178",
+        "call": "v5, v4, Lcom/ecarx/btphone/utils/LogUtils;->e(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x196",
+        "call": "v2, Lcom/ecarx/xui/adaptapi/device/Device;->getBtExtension()Lcom/ecarx/xui/adaptapi/device/ext/IBtExtension;"
+      },
+      {
+        "offset": "0x19e",
+        "call": "v6, Lcom/ecarx/xui/adaptapi/device/ext/IBtExtension;->getPbapExtension()Lcom/ecarx/xui/adaptapi/device/ext/IPbapExtension;"
+      },
+      {
+        "offset": "0x1a6",
+        "call": "v6, Ljava/lang/Object;->toString()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x1c0",
+        "call": "v5, v0, Lcom/ecarx/btphone/utils/LogUtils;->e(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x1c6",
+        "call": "v8, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->disposePbapCallback()V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x7c",
+        "string": "v2, \"ecarx_bt_pbap\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "onDestroy",
+    "descriptor": "()V",
+    "code_offset": 555436,
+    "calls": [
+      {
+        "offset": "0x14",
+        "call": "v1, v0, Lcom/ecarx/btphone/utils/LogUtils;->i(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x1a",
+        "call": "v3, Landroid/telecom/InCallService;->onDestroy()V"
+      },
+      {
+        "offset": "0x24",
+        "call": "v3, v0, Lcom/ecarx/btphone/telecom/InCallServiceImpl;->unregisterReceiver(Landroid/content/BroadcastReceiver;)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "onSilenceRinger",
+    "descriptor": "()V",
+    "code_offset": 555496,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v3, Landroid/telecom/InCallService;->onSilenceRinger()V"
+      },
+      {
+        "offset": "0x1a",
+        "call": "v1, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "onUnbind",
+    "descriptor": "(Landroid/content/Intent;)Z",
+    "code_offset": 552676,
+    "calls": [
+      {
+        "offset": "0x1a",
+        "call": "v4, Lcom/ecarx/btphone/utils/CommonUtils;->dumpIntent(Landroid/content/Intent;)Ljava/lang/String;"
+      },
+      {
+        "offset": "0x3a",
+        "call": "v1, v0, Lcom/ecarx/btphone/utils/LogUtils;->d(Ljava/lang/String; [Ljava/lang/Object;)V"
+      },
+      {
+        "offset": "0x40",
+        "call": "v3, v4, Landroid/telecom/InCallService;->onUnbind(Landroid/content/Intent;)Z"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x36",
+        "string": "v1, \"ecarx_bt_hfp\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "registerCallback",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl$Callback;)V",
+    "code_offset": 557116,
+    "calls": [
+      {
+        "offset": "0x4",
+        "call": "v0, v2, Ljava/util/concurrent/CopyOnWriteArrayList;->contains(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0x14",
+        "call": "v0, v2, Ljava/util/concurrent/CopyOnWriteArrayList;->add(Ljava/lang/Object;)Z"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "removeDownloadPhoneBookLister",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadPhoneBookListener;)V",
+    "code_offset": 557296,
+    "calls": [
+      {
+        "offset": "0x4",
+        "call": "v0, v2, Ljava/util/List;->remove(Ljava/lang/Object;)Z"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "setDownloadPhoneBookListener",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl$DownloadPhoneBookListener;)V",
+    "code_offset": 557324,
+    "calls": [
+      {
+        "offset": "0x4",
+        "call": "v0, v2, Ljava/util/List;->contains(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0x14",
+        "call": "v0, v2, Ljava/util/List;->add(Ljava/lang/Object;)Z"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/telecom/InCallServiceImpl;",
+    "method": "unregisterCallback",
+    "descriptor": "(Lcom/ecarx/btphone/telecom/InCallServiceImpl$Callback;)V",
+    "code_offset": 557776,
+    "calls": [
+      {
+        "offset": "0x4",
+        "call": "v0, v2, Ljava/util/concurrent/CopyOnWriteArrayList;->remove(Ljava/lang/Object;)Z"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/ui/NoViewActivity;",
+    "method": "<clinit>",
+    "descriptor": "()V",
+    "code_offset": 592668,
+    "calls": [],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/ui/NoViewActivity;",
+    "method": "<init>",
+    "descriptor": "()V",
+    "code_offset": 592696,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v0, Lcom/ecarx/btphone/ui/common/BaseActivity;-><init>()V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/ui/NoViewActivity;",
+    "method": "handleIntent",
+    "descriptor": "()V",
+    "code_offset": 592720,
+    "calls": [
+      {
+        "offset": "0xa",
+        "call": "v0, Landroid/content/Intent;->getAction()Ljava/lang/String;"
+      },
+      {
+        "offset": "0x60",
+        "call": "v0, Ljava/lang/String;->length()I"
+      },
+      {
+        "offset": "0x6c",
+        "call": "Lcom/ecarx/btphone/telecom/HiCarStateReceiver;->checkAndShowHiCarToast()Z"
+      },
+      {
+        "offset": "0x7a",
+        "call": "v0, Ljava/lang/String;->hashCode()I"
+      },
+      {
+        "offset": "0x92",
+        "call": "v0, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xaa",
+        "call": "v2, v7, Landroid/telephony/PhoneNumberUtils;->getNumberFromIntent(Landroid/content/Intent; Landroid/content/Context;)Ljava/lang/String;"
+      },
+      {
+        "offset": "0xb2",
+        "call": "v7, Lcom/ecarx/btphone/ui/NoViewActivity;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0xba",
+        "call": "v4, Lcom/ecarx/btphone/utils/CommonUtils;->getDefaultPhoneType(Landroid/content/Context;)Ljava/lang/String;"
+      },
+      {
+        "offset": "0xc6",
+        "call": "v5, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0xd2",
+        "call": "Lcom/ecarx/btphone/UiBluetoothMonitor;->get()Lcom/ecarx/btphone/UiBluetoothMonitor;"
+      },
+      {
+        "offset": "0xda",
+        "call": "v5, Lcom/ecarx/btphone/UiBluetoothMonitor;->isHfpConnected()Z"
+      },
+      {
+        "offset": "0xec",
+        "call": "v3, Lcom/ecarx/tip/toast/XCToast;->showShort(I)V"
+      },
+      {
+        "offset": "0x100",
+        "call": "v6, v2, v3, Lcom/ecarx/btphone/ui/MainPresenter;->safePlaceCall(Ljava/lang/String; Z)V"
+      },
+      {
+        "offset": "0x10c",
+        "call": "v3, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z"
+      },
+      {
+        "offset": "0x118",
+        "call": "v7, Lcom/ecarx/btphone/ui/NoViewActivity;->getApplicationContext()Landroid/content/Context;"
+      },
+      {
+        "offset": "0x120",
+        "call": "v3, v2, Lcom/ecarx/btphone/utils/ELineCallLogUtils;->callOnlinePhone(Landroid/content/Context; Ljava/lang/String;)V"
+      },
+      {
+        "offset": "0x12c",
+        "call": "v7, v1, Lcom/ecarx/btphone/ui/NoViewActivity;->setIntent(Landroid/content/Intent;)V"
+      },
+      {
+        "offset": "0x132",
+        "call": "v7, Lcom/ecarx/btphone/ui/NoViewActivity;->finish()V"
+      }
+    ],
+    "protocol_strings": [
+      {
+        "offset": "0x8e",
+        "string": "v4, \"android.intent.action.CALL\""
+      }
+    ]
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/ui/NoViewActivity;",
+    "method": "onConfigurationChanged",
+    "descriptor": "(Landroid/content/res/Configuration;)V",
+    "code_offset": 593052,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v3, v4, Lcom/ecarx/btphone/ui/common/BaseActivity;->onConfigurationChanged(Landroid/content/res/Configuration;)V"
+      },
+      {
+        "offset": "0x1a",
+        "call": "v3, Lcom/ecarx/btphone/ui/NoViewActivity;->finish()V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/ui/NoViewActivity;",
+    "method": "onCreate",
+    "descriptor": "(Landroid/os/Bundle;)V",
+    "code_offset": 593104,
+    "calls": [
+      {
+        "offset": "0x0",
+        "call": "v1, v2, Lcom/ecarx/btphone/ui/common/BaseActivity;->onCreate(Landroid/os/Bundle;)V"
+      },
+      {
+        "offset": "0xa",
+        "call": "v0, v1, Lcom/ecarx/btphone/ui/MainPresenter;-><init>(Landroid/content/Context;)V"
+      },
+      {
+        "offset": "0x1c",
+        "call": "v1, Lcom/ecarx/btphone/ui/NoViewActivity;->getIntent()Landroid/content/Intent;"
+      },
+      {
+        "offset": "0x28",
+        "call": "v1, Lcom/ecarx/btphone/ui/NoViewActivity;->handleIntent()V"
+      }
+    ],
+    "protocol_strings": []
+  },
+  {
+    "source": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "dex": "classes.dex",
+    "class": "Lcom/ecarx/btphone/ui/NoViewActivity;",
+    "method": "onStop",
+    "descriptor": "()V",
+    "code_offset": 593168,
+    "calls": [
+      {
+        "offset": "0x14",
+        "call": "v3, Lcom/ecarx/btphone/ui/common/BaseActivity;->onStop()V"
+      },
+      {
+        "offset": "0x1a",
+        "call": "v3, Lcom/ecarx/btphone/ui/NoViewActivity;->removePresenters()V"
+      }
+    ],
+    "protocol_strings": []
+  }
+]

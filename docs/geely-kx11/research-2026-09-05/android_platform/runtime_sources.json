@@ -1,0 +1,56 @@
+{
+  "archive": "ecarx-hud-dump.tar",
+  "sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+  "sources": [
+    {
+      "member": "ecarx-hud-dump/hud-packages.txt",
+      "bytes": 1744,
+      "sha256": "d6788d58bc77595e709e1e3192e7e0c0e491e0c36c75e16127458e80ee5fa0d3"
+    },
+    {
+      "member": "ecarx-hud-dump/services.txt",
+      "bytes": 269500,
+      "sha256": "7d95dd8aa02f38414faabbd2e534387d113154cf074a05f3d36e55ba54c7ebe1"
+    },
+    {
+      "member": "ecarx-hud-dump/windows.txt",
+      "bytes": 130925,
+      "sha256": "987c24288faa5f66b0774ea09ad9138a141ee5613157f27d5fb94183714753a0"
+    },
+    {
+      "member": "ecarx-hud-dump/layers.txt",
+      "bytes": 9190,
+      "sha256": "e9958603ea4b30c251254319cf19501b2722d25b078a7892a75e32d584131b47"
+    },
+    {
+      "member": "ecarx-hud-dump/system-packages.txt",
+      "bytes": 3423,
+      "sha256": "33a813498033313ab067a5d84b2c2687afe8251f4b116be05e13e472cf205a4e"
+    },
+    {
+      "member": "ecarx-hud-dump/processes.txt",
+      "bytes": 37158,
+      "sha256": "acf4ed466d65159e4a767f129082e4ae957d1a22612f0a4c442f860df31288ef"
+    },
+    {
+      "member": "ecarx-hud-dump/display.txt",
+      "bytes": 22195,
+      "sha256": "ab2b1d7d32ab00941ef96fb44d7c2a0fde7acc46a5b30e9974cf3450214f985f"
+    },
+    {
+      "member": "ecarx-hud-dump/binder-services.txt",
+      "bytes": 8062,
+      "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d"
+    },
+    {
+      "member": "ecarx-hud-dump/surfaceflinger.txt",
+      "bytes": 218124,
+      "sha256": "53e0e73accbc4e98bb1c1676555eca9ab91b5b61520d9041418daafc2be0194c"
+    },
+    {
+      "member": "ecarx-hud-dump/window-displays.txt",
+      "bytes": 31275,
+      "sha256": "9f5f637843004379adf6c99b151dbfbf723ec70913d354d193998a3c95089715"
+    }
+  ]
+}

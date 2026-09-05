@@ -1,0 +1,507 @@
+{
+  "version": "1.1",
+  "date": "2026-09-05",
+  "scope": "Derived research reports, indices, selected analytical evidence and offline tools. This manifest excludes itself to avoid recursive hashes.",
+  "base_git_commit": "3e5f2182c261c66010c7cdf718a5b2e4b989a9e6",
+  "publication_rules": [
+    "REL-008",
+    "REL-016",
+    "KNOW-004"
+  ],
+  "files": [
+    {
+      "path": "COVERAGE_RU.md",
+      "bytes": 165267,
+      "sha256": "fd4a4d6bfa3ef07099d1c2dea4f79b9613b7c5424088c5a1e1d142f807ad6ea9"
+    },
+    {
+      "path": "DATA_PLAN_RU.md",
+      "bytes": 9883,
+      "sha256": "36b68d3f7e4884ce630b8282431689c171514375b4cb29851249aff56c0c982d"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2801,
+      "sha256": "b7a2b8ca0ab9229954c7721cd9c9de7bf5e11e29fd8752b98cff32e7395589e8"
+    },
+    {
+      "path": "RESEARCH_LOG_RU.md",
+      "bytes": 13289,
+      "sha256": "89a949ba901fb170f82e5bb0395a2c67084ee3469db89d7525a60e235605d097"
+    },
+    {
+      "path": "VALIDATION.json",
+      "bytes": 995,
+      "sha256": "0da798c7c1bbc7f146fba850300091b0868bf6286802858317a0b49757d82856"
+    },
+    {
+      "path": "android_platform/component_manifest_index.json",
+      "bytes": 44121,
+      "sha256": "f65b1bfadae6adf3ffeef03267a2372e3493364a9c466714ab55450ac9bde1ae"
+    },
+    {
+      "path": "android_platform/ecarx_service_interfaces.json",
+      "bytes": 103634,
+      "sha256": "36b9dd86d16edc0a0a01c92d133892fd4c6fe7c93dd32101547ca5729449b4ac"
+    },
+    {
+      "path": "android_platform/phone_call_routes.json",
+      "bytes": 77075,
+      "sha256": "7e4d5dbab1f335b3d622affa2f3c5355405a781177e975880cc55bcf0b4528b9"
+    },
+    {
+      "path": "android_platform/platform_evidence.json",
+      "bytes": 170257,
+      "sha256": "6d0d4cb7a59061a16fe8c1e2d22f77e62253b7a085560c7ec36f7680e0f58de6"
+    },
+    {
+      "path": "android_platform/report.md",
+      "bytes": 16726,
+      "sha256": "453818c103499ae0f2b1f676deb67773e90d0be213468529102462dcf0bc1a9d"
+    },
+    {
+      "path": "android_platform/runtime_sources.json",
+      "bytes": 1813,
+      "sha256": "35a7f8dfda34a900f9d9c718dc089f12d3c261fe4c174fdd8618214da73c7164"
+    },
+    {
+      "path": "android_platform/selected_sources.json",
+      "bytes": 8865,
+      "sha256": "36961be7c8a3006a862b85b70fa089667beeafcf682135e22d0c040569e4b8cb"
+    },
+    {
+      "path": "android_platform/supplemental_interfaces.json",
+      "bytes": 83002,
+      "sha256": "e777009707302e63a44d7f7c4a3267689b9554bad00568bbbe6484f23563e120"
+    },
+    {
+      "path": "android_platform/supplemental_sources.json",
+      "bytes": 4250,
+      "sha256": "a84cf59376b17c0baa986d08b5c5845282a37d5ec1e903446ac197dd425e5f6a"
+    },
+    {
+      "path": "android_platform/systems.json",
+      "bytes": 53634,
+      "sha256": "d6890cecfaf78b191d2bac1e728ddd3c7edd8e25872e5868cf95f71cdc1c94b9"
+    },
+    {
+      "path": "architecture_domains/VALIDATION.json",
+      "bytes": 1958,
+      "sha256": "88ca2fdc55f4d63a26f0c514f33dd03a6332793103727c9fdc68aad2aafcaa7d"
+    },
+    {
+      "path": "architecture_domains/additional_archive_scan.json",
+      "bytes": 44787,
+      "sha256": "3a5600c84564ed601fa2839ac65d8381ad91da6de2995ccd24dc63c65e82bb57"
+    },
+    {
+      "path": "architecture_domains/ecu_registry.json",
+      "bytes": 14787,
+      "sha256": "491cee8e105ac9515389103cf4fa4fc4b6cd57766dec22357e6f869cb40343f6"
+    },
+    {
+      "path": "architecture_domains/manifest_summary.json",
+      "bytes": 7910,
+      "sha256": "de4bbf2f20aec99bb6e87a987a16b9e081782c069e5718418b39aaeeeaee9b92"
+    },
+    {
+      "path": "architecture_domains/mpc5746c_structure_evidence.json",
+      "bytes": 76047,
+      "sha256": "0f37dd69ace1be4b894b66f963d9461388ee9ac1c480f5aa398f937127f1ea02"
+    },
+    {
+      "path": "architecture_domains/primary_evidence.json",
+      "bytes": 64027,
+      "sha256": "d84d0a7485be4cbb1dddaed3755addbef0b93b2b4d9c5bbd91c1f4ff3dbc1f4c"
+    },
+    {
+      "path": "architecture_domains/relayed_mcu_logs.json",
+      "bytes": 281368,
+      "sha256": "7cf784f8d38eca47d3f74d9d6c2998b67769c80b0e77f4feccfe74ddf2ee7663"
+    },
+    {
+      "path": "architecture_domains/report.md",
+      "bytes": 27751,
+      "sha256": "1277251de477d4091af213e9c3b46dfd33d0797de74998acd16cc6ed73958116"
+    },
+    {
+      "path": "architecture_domains/sdk_architecture_evidence.json",
+      "bytes": 171870,
+      "sha256": "ccfb23add29c5770b658de07879e39a8667b7256b1e89c77df5d5158dfd33b4f"
+    },
+    {
+      "path": "architecture_domains/systems.json",
+      "bytes": 44308,
+      "sha256": "dc75dfd2d4f8dd612fbdd38dfefbf4c7af2a26c7247b544c23c859a94dd77a75"
+    },
+    {
+      "path": "comfort_systems/SHA256SUMS.json",
+      "bytes": 366,
+      "sha256": "8c3438d367b65be146f565b9a7d64f9da516ce393dbc3dc24d0cf3e12f2da787"
+    },
+    {
+      "path": "comfort_systems/bytecode_evidence.json",
+      "bytes": 22783,
+      "sha256": "c936bb0fc38abf52279e7f6eff57348a68ccb144a2b3bcf323d954db3e14afd2"
+    },
+    {
+      "path": "comfort_systems/new_function_routes.json",
+      "bytes": 162895,
+      "sha256": "06674c68e5c9b2247794ae1ca8f1ec77bdfa98994a2b0d5c8a49cb77673b16e7"
+    },
+    {
+      "path": "comfort_systems/report.md",
+      "bytes": 15453,
+      "sha256": "d1df9f11b2f863483669ab27ca78bef48c4f02c977dc81d11f17bdead912e561"
+    },
+    {
+      "path": "comfort_systems/systems.json",
+      "bytes": 67154,
+      "sha256": "3e3658de6a6d5b549b0f9818b974b39abdc53476b9353c256832f21e6415ff84"
+    },
+    {
+      "path": "continuation/systems.json",
+      "bytes": 16811,
+      "sha256": "4e04f68ec828d55259e5842938dbe71fa011e805d41cbb015bb2ce5ab620df8f"
+    },
+    {
+      "path": "corpus/archive_member_inventory.json",
+      "bytes": 1032924,
+      "sha256": "65a991f52baa33ac727ad2e515f3825c384325ca6091c68af6ee8f953dc4a46e"
+    },
+    {
+      "path": "corpus/build_corpus_inventory.py",
+      "bytes": 5650,
+      "sha256": "0356e90b134a9ff4fd46eecdc705b1c135e2c7b1b28f737a797cbb0a86419661"
+    },
+    {
+      "path": "corpus/corpus_inventory.json",
+      "bytes": 68610,
+      "sha256": "8885b5d0d2ca22ec1e9dae991a208f1d9b2fb61ed9b1168d34515deef8bbb9ba"
+    },
+    {
+      "path": "interfaces/PAGES_VALIDATION.json",
+      "bytes": 776,
+      "sha256": "f35317fe5dc9ca2aadfe08c4920e3a12f9b38bd20a029f769e256508a318e437"
+    },
+    {
+      "path": "interfaces/README.md",
+      "bytes": 2990,
+      "sha256": "d89b3a92968c28155b86afc7a6dbb979f7eaa235925052affe6839c0a0c71b14"
+    },
+    {
+      "path": "interfaces/REPORT_RU.md",
+      "bytes": 16510,
+      "sha256": "ab121d6792b388c7f8c03bf26903abf5d72b4fd3cfc222fc9dab8cfed1ae503c"
+    },
+    {
+      "path": "interfaces/SEMANTIC_ERRATA_RU.md",
+      "bytes": 5869,
+      "sha256": "aa026023f5e7ab80e69593ff0f2be7f8641126dd72e028ea55a57b0063fa9844"
+    },
+    {
+      "path": "interfaces/VALIDATION.json",
+      "bytes": 2821,
+      "sha256": "b1c2311be35b365d30d79649bec048156bc93d4bb04a19225c4703dc8c99650a"
+    },
+    {
+      "path": "interfaces/ZERO_CONSTANTS_AUDIT_RU.md",
+      "bytes": 4416,
+      "sha256": "9bc32190eb991505ec315bba718995dc2fbdb51ae140108a6a4080b33d085d1e"
+    },
+    {
+      "path": "interfaces/ZERO_CONSTANTS_VALIDATION.json",
+      "bytes": 515,
+      "sha256": "89d54d306426c4d78e07d8c8cdf4efb6c74425addde0005c6530a8d8d88cf083"
+    },
+    {
+      "path": "interfaces/android_standard_ids.json",
+      "bytes": 42145,
+      "sha256": "35023995efe9b58aa6b74885559a0390505d88b0862051ddf2d595bb221d5b56"
+    },
+    {
+      "path": "interfaces/api_groups.json",
+      "bytes": 74298,
+      "sha256": "b15eeb1920ac947bce58cf7d38cbcfcd77c5d037a2543d8c14cbff26d6675805"
+    },
+    {
+      "path": "interfaces/audit_implicit_zero_constants.py",
+      "bytes": 13187,
+      "sha256": "8f0ef62582df56e25a9a60a00443f57c5b51d9c1c82ddab6a56333bc71daeed6"
+    },
+    {
+      "path": "interfaces/build_coverage_inventory.py",
+      "bytes": 31217,
+      "sha256": "3992b9f10b19a7f27cb066ee93aca5915cda30e47babd6985a07ec1c1db3de28"
+    },
+    {
+      "path": "interfaces/build_semantic_errata.py",
+      "bytes": 10753,
+      "sha256": "1a855293286e53e4d1d56d8f3ee0f14136de96a4f2c31423928853f0ac79d982"
+    },
+    {
+      "path": "interfaces/class_inventory.json",
+      "bytes": 1856627,
+      "sha256": "366a7c89fb92bfdc74f93efbe8b497e643579bdc33b02985981de41037dbec60"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0001.json",
+      "bytes": 299340,
+      "sha256": "d746bd1f97a56d915620d059216fecc2e07ab6a68c3d2976aa6a6201de82724d"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0002.json",
+      "bytes": 298123,
+      "sha256": "3c3724b92f5664d982dc433a884d07f8db4bb1116ce5686edcc7e10c9aeb67bd"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0003.json",
+      "bytes": 298450,
+      "sha256": "0720edf85c8917bdaac3b4573fe0b205748573c83682cbfed510032968c2f33f"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0004.json",
+      "bytes": 299104,
+      "sha256": "38bc86432ea940caab295b46b92eaea796f8c94a9c4c6e2571cedf6c1b8b49e7"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0005.json",
+      "bytes": 298578,
+      "sha256": "9f5fe6eba6c1293bffcd5cdaf72e628e9586a0825cfa890eec72f344098e8c04"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0006.json",
+      "bytes": 299324,
+      "sha256": "3849285c3160f2849eeec9db834e5f775a4fbf2b39fd4421cc3e91729b385e7d"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0007.json",
+      "bytes": 299332,
+      "sha256": "b32ef331d910d740d312331a3608447d0c141f877c6d25f84bb4dfa1d81bfd5e"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0008.json",
+      "bytes": 299970,
+      "sha256": "61098ddb3e85535fb21f2c47fc332f03fb4c8e19d8dae766e86d6620321d9b8e"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0009.json",
+      "bytes": 298993,
+      "sha256": "372510920b6f1857c00364d96fd9db8a9b8a7facc86d13acfb5c9edc7fb54014"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0010.json",
+      "bytes": 299763,
+      "sha256": "fa22c02d6f33b29b3a2168777e778a89b097c55d3575fe00991ba2ade237ba34"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0011.json",
+      "bytes": 297733,
+      "sha256": "1049e6f703563ce9d000d839f96f718553ddba9bf078d9ec858ba63f5f653a8c"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0012.json",
+      "bytes": 297937,
+      "sha256": "5aad57b563cb0bd5396ca9d795bfcf6c6a0b646a8d6c4563eebb666fe7b3526c"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0013.json",
+      "bytes": 299134,
+      "sha256": "9284ce874f2d227c8550302a60517a1f3c6ed1329735e139e1d73e41bff14f4c"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0014.json",
+      "bytes": 299611,
+      "sha256": "2d0889ed2e5bdb610c1cb65e83b2e47d666059a476afbab49693b3141038da24"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0015.json",
+      "bytes": 299237,
+      "sha256": "8250b7c4e6b863c6eed76fe717112fd388c03bc797f2de86ca48694a58fa2c2e"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0016.json",
+      "bytes": 297971,
+      "sha256": "b31c315f643d19ed2efd7acef95fda88b9627065bc7338523234c1e51d797d55"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0017.json",
+      "bytes": 299753,
+      "sha256": "cfa1cda117f21713d3a4c19a80de973007182402190690701cce94d5de2c4be9"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0018.json",
+      "bytes": 299819,
+      "sha256": "ce06da8a8cd5882209282c09ccbf1b1caa378fa0fce60702ccaade76daa3bb2b"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0019.json",
+      "bytes": 299827,
+      "sha256": "54e3f93784880bb62a51c6eb8311822f359af5d862cc3a06de96dbb70176b439"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0020.json",
+      "bytes": 298339,
+      "sha256": "dee9fd620b6c6a0dd8e2f8265a41033dc711cb2df1c0c3ea64c62f72b945e8f2"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0021.json",
+      "bytes": 299121,
+      "sha256": "c38b796c890f476d68fd2cbe0f07bc59f1c27789c67e78d32b9abd61fa1920b2"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0022.json",
+      "bytes": 298865,
+      "sha256": "01a6c65f0b778f8174c2d0cccc057ce90bd703dbf36835b3a34827e604537af9"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0023.json",
+      "bytes": 299958,
+      "sha256": "481de0263d02a8fb2f6514743fb3260d63e59cdc1fedd9d86967ac92feaf1ebe"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0024.json",
+      "bytes": 298524,
+      "sha256": "b9b05bf43f4d9c227e3f534b8d0e69b091c591cac8b07178a2000557562ab599"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0025.json",
+      "bytes": 299285,
+      "sha256": "498b3628343f6946d108708d29d2617c8594d6ac15171c246a9445c63d413909"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0026.json",
+      "bytes": 299681,
+      "sha256": "ac5169f038bd8a4c767f23b984adf09122cebda95a91a53201d68b693c150ff1"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0027.json",
+      "bytes": 299479,
+      "sha256": "0d0feaa228c1d09f3263a541de155c46c0fd81a427183adc8e889687595ebd61"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0028.json",
+      "bytes": 298329,
+      "sha256": "2242f16226361b28eaeee49d54fb108e70ef4ebd5261b11117c58aed3ac92b95"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0029.json",
+      "bytes": 298384,
+      "sha256": "0fbfa77bb039b40bc29e81befed4e0dbc958bc9dd6710d6e63b25d71ada0be32"
+    },
+    {
+      "path": "interfaces/entries/interfaces-0030.json",
+      "bytes": 29586,
+      "sha256": "39084f06c5df5435f3c8f6724e756c039e1c957595d12f94f308a843884dfedf"
+    },
+    {
+      "path": "interfaces/entries_manifest.json",
+      "bytes": 11885,
+      "sha256": "27d7a6c26dd1da13b4417c970615dcb126b89b50d2f1ebfee3419df6581a8b4a"
+    },
+    {
+      "path": "interfaces/lookup_interfaces.py",
+      "bytes": 5665,
+      "sha256": "41f0fc540331b3f4f63204410ec6683a4ca80b4014e21750da9bdacda9e7b58a"
+    },
+    {
+      "path": "interfaces/publish_interface_pages.py",
+      "bytes": 4748,
+      "sha256": "5db5dd77d71a45158a1a41757aa8b046665d89b88b66deef34cd495a1d8ca1ea"
+    },
+    {
+      "path": "interfaces/semantic_errata.json",
+      "bytes": 20812,
+      "sha256": "f684f23623a782079887b3124b64ca4fd3c0bf8d61219b1f23ee954dff8f4ead"
+    },
+    {
+      "path": "interfaces/source_index.json",
+      "bytes": 2581,
+      "sha256": "7990b33938073f7d19d52c41938aad1f7c9f5fdb3c659d61a6df96181e7f4d94"
+    },
+    {
+      "path": "interfaces/summary.json",
+      "bytes": 2908,
+      "sha256": "76bcd7ec1e21cff4fb3b8456fa861cb71fe901b7d66d10c2e050a169c997d53b"
+    },
+    {
+      "path": "interfaces/supplemental_route_ids.json",
+      "bytes": 6028,
+      "sha256": "1f27bc09e3489955b5d85a353aba640d9abc02130b9f2149555eac4355b2d804"
+    },
+    {
+      "path": "interfaces/supplemental_zero_constants.json",
+      "bytes": 210957,
+      "sha256": "9809832bb75338099f80ca50b6e8afb5d7804d89a2025ac81fd5fef53a1ac221"
+    },
+    {
+      "path": "interfaces/uncovered_families.json",
+      "bytes": 34528,
+      "sha256": "03dd5e4211e72fa14b4f28ec3e66e53a2647b48bdb6a97fa1158826bb082bf56"
+    },
+    {
+      "path": "mcu_log_route/VALIDATION.json",
+      "bytes": 846,
+      "sha256": "6f3023167e664b453508038197a9e6d8b46fd7cc834ca4d2e90147ac8b0ee294"
+    },
+    {
+      "path": "mcu_log_route/decode_mcu_pcap.py",
+      "bytes": 3643,
+      "sha256": "27b665c1bdaa056a60b4e804293c548b051b66bfa00d24d8c8cb9e5d25f0007a"
+    },
+    {
+      "path": "mcu_log_route/evidence.json",
+      "bytes": 20140,
+      "sha256": "dab60014d6497bc68a3646655a493f3c91fe4066b36ce8796840a7d6df9d7351"
+    },
+    {
+      "path": "mcu_log_route/pcap_mcu_summary.json",
+      "bytes": 47671,
+      "sha256": "d6d3a84f6767a96e09f72d79b64b68c59f48c44b504328b1f2a582cc9081711e"
+    },
+    {
+      "path": "mcu_log_route/report.md",
+      "bytes": 14061,
+      "sha256": "83c70028f72dbaefdc0270ca00cbc7b47a193aa30f148d2e973aed8a72b87c91"
+    },
+    {
+      "path": "powertrain_chassis/report.md",
+      "bytes": 15853,
+      "sha256": "73e4428da82637b3387b5e9054051f0ccc09a0b41fd23192c38bf1099aa3deca"
+    },
+    {
+      "path": "powertrain_chassis/sdk_findings.json",
+      "bytes": 31705,
+      "sha256": "a7e5b247698c57c58238e4d68d721c4793eb6e68200cc4f9a832962f9e43c558"
+    },
+    {
+      "path": "powertrain_chassis/source_hashes.json",
+      "bytes": 736,
+      "sha256": "9c5b597b4e9d72405dfcafe56e372b43ddee403c51466dc5e52fd06a53edd39a"
+    },
+    {
+      "path": "powertrain_chassis/systems.json",
+      "bytes": 2005171,
+      "sha256": "6b406a99ca2b0b082feca1078944c32cd98fd636d2c51801f107b8adcdde7c6b"
+    },
+    {
+      "path": "systems.json",
+      "bytes": 165145,
+      "sha256": "0f978f0e2fa5ea2f6c81c7e917289c412a7ff67d5e089c67d260e5c05d64d01b"
+    }
+  ],
+  "excluded_classes": [
+    "Original firmware and APK/JAR/ELF/DEX/PCAP archives",
+    "Full third-party decompilation and disassembly",
+    "Private keys, tokens, pairing material and personal notification/call/contact payloads",
+    "Private extraction directories and large intermediate method indices"
+  ],
+  "domain_validation_notes": "Per-domain validation files may preserve original analysis hashes. Final publication bytes, including reviewed wording/path changes, are fixed by this manifest; top-level VALIDATION.json describes the integrated checks.",
+  "review_corrections": [
+    "Distinguish profile void command from asynchronous result",
+    "Limit massage and roof claims to static mapper/registration facts",
+    "Do not infer DMS absence or physical ECU topology",
+    "Separate declared HVAC step from boundary validation",
+    "Apply semantic state-value and duplicate-context corrections without modifying frozen pages"
+  ]
+}

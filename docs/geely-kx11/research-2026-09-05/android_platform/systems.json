@@ -1,0 +1,811 @@
+{
+  "schema_version": "1.0",
+  "date": "2026-09-05",
+  "scope": "Android platform expansion beyond original14 research questions; selective static and runtime evidence, not exhaustive ECU inventory.",
+  "systems": [
+    {
+      "id": "PLAT_POWER",
+      "title": "Питание, сон, пробуждение и режимы головной системы",
+      "known": [
+        {
+          "claim": "Живой powersomeip Binder имеет IECarXCarPower, Android PowerSomeIPService работает под UID1000; одновременно живёт native powersomeip HAL.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/binder-services.txt",
+              "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d",
+              "pointer": "line 8"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/services.txt",
+              "sha256": "7d95dd8aa02f38414faabbd2e534387d113154cf074a05f3d36e55ba54c7ebe1",
+              "pointer": "lines 2319–2327"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/processes.txt",
+              "sha256": "acf4ed466d65159e4a767f129082e4ae957d1a22612f0a4c442f860df31288ef",
+              "pointer": "line 259"
+            }
+          ]
+        },
+        {
+          "claim": "apStatusChange управляет mute, сохраняет lastAPStatus и выключает/восстанавливает Wi-Fi/Bluetooth по wifi_pre_state/bt_pre_state. Это отдельный штатный владелец жизненного цикла связности, помимо Natro/Helper.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "packages/ecarx.powersomeip.service/base.apk",
+              "sha256": "b1971dc52243211e39125228a8b5736ea3311db74dc31ab119f5db99d6e4bb12",
+              "pointer": "classes.dex:Lecarx/powersomeip/service/PowerSomeIPServiceImpl;->apStatusChange(I)V; turnOnBTWIFI()V; turnWifiBtOffWithNoReason()V"
+            }
+          ]
+        },
+        {
+          "claim": "PowerSomeIPHALCallback.ScPwIVIMngrReqState(B) отбрасывает повтор requestType, обращается к IIplm.ReleaseResourceGroup, затем PowerManager.onQNXRequest(B). Это доказанная software-связь запроса QNX с Android power path, не команда двигателя.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "packages/ecarx.powersomeip.service/base.apk",
+              "sha256": "b1971dc52243211e39125228a8b5736ea3311db74dc31ab119f5db99d6e4bb12",
+              "pointer": "classes.dex:PowerSomeIPServiceImpl$PowerSomeIPHALCallback;->ScPwIVIMngrReqState(B)V code_offset 0x7880; instruction offsets 0x66,0xbc"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Полная таблица AP/IM/EM/IPLM и допустимых переходов; путь в изменённом Android PowerManager; тайминги сна/пробуждения и их связь с конкретными сбоями ANCS/музыки; когда питание снимается физически."
+      ],
+      "hardware_presence": "Android service, native process and Binder observed; controller/ECU power ownership beyond this software boundary unresolved.",
+      "control_route_status": "STATIC_IMPLEMENTATION + RUNTIME_SERVICE_PRESENT; no new power action performed; engine control not established.",
+      "needed_artifact": [
+        "Сначала существующие Android services/framework power implementations и boot/suspend логи; при недостатке — синхронная запись штатного сна/пробуждения без принудительного сброса Bluetooth."
+      ],
+      "next_offline_step": "Раскрыть access$-переходы PowerSomeIPServiceImpl, таблицы callback IDs и сопоставить с PowerManager.onQNXRequest и PA_Power_Res; затем связать с уже сохранёнными boot-логами.",
+      "exactscan_scope": [
+        "181-member system ZIP inventory; targeted complete PowerSomeIP DEX method inspection; runtime TAR service/process records; no sleep test."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_DISPLAY",
+      "title": "Дисплеи, питание PSD, яркость и день/ночь",
+      "known": [
+        {
+          "claim": "Runtime подтверждает четыре логических display: 0=1920×720/60Hz; 1=1920×720/60Hz; 2=1920×1080/30Hz; 3=1920×720/60Hz. Имена HDMI не устанавливают физическую роль каждого выхода.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/display.txt",
+              "sha256": "ab2b1d7d32ab00941ef96fb44d7c2a0fde7acc46a5b30e9974cf3450214f985f",
+              "pointer": "lines 64,86,108,130"
+            }
+          ]
+        },
+        {
+          "claim": "EcarxMultidisplayService.onBind возвращает null; onCreate публикует Binder ecarx_multidisplay. Путь через bindService сам по себе не даёт этого интерфейса.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "packages/com.ecarx.car.multidisplay/base.apk",
+              "sha256": "73e6dd017c06e1999741f32e77008f09664595856f718ecd0e22c20e8a95a06f",
+              "pointer": "classes.dex:EcarxMultidisplayService.onBind code_offset0xe04; onCreate0xe4c, instruction0x2c"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/binder-services.txt",
+              "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d",
+              "pointer": "line2"
+            }
+          ]
+        },
+        {
+          "claim": "setPsdDisplayOnAndOff допускает 2=on и 1=off, направляет их в CB_Power_PSDStatus. Getter manager при отсутствии сервиса/RemoteException возвращает 0 INVALID. Это отдельный PSD power path; не обобщать на HUD/DIM.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "packages/com.ecarx.car.multidisplay/base.apk",
+              "sha256": "73e6dd017c06e1999741f32e77008f09664595856f718ecd0e22c20e8a95a06f",
+              "pointer": "classes.dex:Lcom/ecarx/car/multidisplay/a;->setPsdDisplayOnAndOff(I)Z"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.jar",
+              "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+              "pointer": "classes.dex:Lecarx/multidisplay/EcarxMultidisplayManager;->getPsdDisplayOnAndOff()I"
+            }
+          ]
+        },
+        {
+          "claim": "IECarXCarPower отдельно содержит CSD/PSD brightness, day/night/theme/screensaver параметры; общий метод display on/off AdaptAPI не описывает весь этот набор.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.car.jar",
+              "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+              "pointer": "classes.dex:Lecarx/car/IECarXCarPower;"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "PSD⇄физический дисплей в каждой конфигурации; runtime зоны яркости и шкалы; ограничения сна/передачи; pixel-owner штатных крыльев; независимый эффект power и screensaver."
+      ],
+      "hardware_presence": "Four logical display devices observed; physical mapping of every output and optional PSD variants incomplete.",
+      "control_route_status": "PSD setter statically traced to CB; display enumeration observed; physical execution and full backlight mapping OPEN.",
+      "needed_artifact": [
+        "Сначала существующие multidisplay callbacks/config и display snapshots; только затем видео с синхронным состоянием конкретного физического экрана."
+      ],
+      "next_offline_step": "Связать onPsdScreenOnOff/onPA_Power_Res с native PSD HAL и carconfig; изучить brightness setters и отдельные PA feedback.",
+      "exactscan_scope": [
+        "Runtime display.txt four exact device entries; multidisplay APK complete method inventory and targeted bodies; framework signatures."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_AUDIO",
+      "title": "Аудиотракт, источники, микширование и автомобильные предупреждения",
+      "known": [
+        {
+          "claim": "Живой ecarx_audio_service и EcarxAudioService сосуществуют с AudioFlinger/audio policy и native audiocontrol HAL. Приложение плеера не является единственным владельцем звука.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/binder-services.txt",
+              "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d",
+              "pointer": "lines17,113,147"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/services.txt",
+              "sha256": "7d95dd8aa02f38414faabbd2e534387d113154cf074a05f3d36e55ba54c7ebe1",
+              "pointer": "line809"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/processes.txt",
+              "sha256": "acf4ed466d65159e4a767f129082e4ae957d1a22612f0a4c442f860df31288ef",
+              "pointer": "lines220–222"
+            }
+          ]
+        },
+        {
+          "claim": "EcarxAudioManager разделяет ENT/NAVI/BEEP каналы0/1/2; отдельные mixSource NAVI, HFT, VR, eCall, duckMasterAudioVolume/Siri, PDCWarning и DIMSoundWarningLevel. Числа — SDK namespace, не CAN.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.car.audio.jar",
+              "sha256": "6a8ca28bbcca9c5b73974488de18ab9f14b79b912f05f84088ca9d8a2842b539",
+              "pointer": "classes.dex:Lcom/ecarx/car/audio/manager/EcarxAudioManager; fields CHANNEL_* and MIX_SOURCE_*; IEcarxAudio methods"
+            }
+          ]
+        },
+        {
+          "claim": "В общем API есть EQ, balance/fader, speed-volume, Bose/Harman/ClariFi и isInternalAmplifier. Наличие таких символов не подтверждает каждую аудиокомплектацию.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.car.audio.jar",
+              "sha256": "6a8ca28bbcca9c5b73974488de18ab9f14b79b912f05f84088ca9d8a2842b539",
+              "pointer": "classes.dex:Lcom/ecarx/car/audio/manager/IEcarxAudio;"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Физические каналы усилителя/динамиков, codec routing, permission enforcement и mix priority; кто удерживает mute после boot/call/PDC; фактическая поддержка DSP опций."
+      ],
+      "hardware_presence": "Audio service stack observed; exact amplifier/DSP equipment and channel topology not established.",
+      "control_route_status": "SDK setters and Binder observed; full service/native/audio hardware chain not yet traced.",
+      "needed_artifact": [
+        "Сначала имеющиеся audio libraries/service APK; при пробеле — audio_policy конфигурация и снимки audio focus/routing во время штатных переходов."
+      ],
+      "next_offline_step": "Найти реализацию EcarxAudioService и источник audio_policy; связать API channels/mix with focus и native audiocontrol, не отключая предупреждения.",
+      "exactscan_scope": [
+        "ecarx.car.audio.jar class/method/constant inventory; targeted manager wrappers; runtime service/process evidence; no audio-policy config in selected181member archive."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_RADIO",
+      "title": "Радиоприёмник AM/FM/DAB и дорожные объявления",
+      "known": [
+        {
+          "claim": "ts_radiomanager Binder IRadioServiceBase и broadcastradio существуют одновременно; живут vendor.ecarx.ts.radioservice@1.0 и vendor.ecarx.xma.broadcastradio@2.1.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/binder-services.txt",
+              "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d",
+              "pointer": "lines18,54"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/processes.txt",
+              "sha256": "acf4ed466d65159e4a767f129082e4ae957d1a22612f0a4c442f860df31288ef",
+              "pointer": "lines248–249"
+            }
+          ]
+        },
+        {
+          "claim": "IRadioServiceBase имеет tuneToAmFm/tuneToDAB, seek/scan, source switch и отдельные TA/news/alarm/link параметры. MediaSession next/previous не описывает эту систему полностью.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx_radio_base.jar",
+              "sha256": "cd5a5b2cbc6462a3d80ba96ecd56e90a18b129e4577781ba7564bb1cb85c978f",
+              "pointer": "classes.dex:Lcom/ts/base/aidl/IRadioServiceBase;"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Какая ветвь является production backend; единицы частоты/диапазоны/регион; наличие DAB hardware; приоритеты и возврат после TA/eCall; доступ к native от обычного приложения."
+      ],
+      "hardware_presence": "Radio software and native processes observed; DAB and tuner hardware options unverified.",
+      "control_route_status": "SDK interface and runtime services present; production path and physical tuning unverified.",
+      "needed_artifact": [
+        "Сначала имеющиеся ecarx_radio_service.jar и radio/native dependencies; конфигурация региона/тюнера при её отсутствии."
+      ],
+      "next_offline_step": "Связать radio service wrapper с двумя HAL и callback RadioInfo; разобрать единицы tuning и enum источника.",
+      "exactscan_scope": [
+        "Two radio framework JAR signature inventory; runtime Binder/process services; no station history or user presets read."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_BLUETOOTH",
+      "title": "Bluetooth: профильные соединения, BLE и сосуществование стеков",
+      "known": [
+        {
+          "claim": "В одном runtime видны BluetoothManager/GATT, A2DPsink, AVRCPcontroller, HFPclient, PBAPclient и MAPclient плюс отдельный ECARX extension. Наличие общего Bluetooth ON не подтверждает готовность каждого профиля.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/binder-services.txt",
+              "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d",
+              "pointer": "lines11,23"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/services.txt",
+              "sha256": "7d95dd8aa02f38414faabbd2e534387d113154cf074a05f3d36e55ba54c7ebe1",
+              "pointer": "lines579,883,1122,1140,1478,1635,3044"
+            }
+          ]
+        },
+        {
+          "claim": "ECARX extension содержит auto/passive connect, HFP auto-reject и PBAP sync API; ecarx.jar также содержит отдельный PSDBluetoothManager. Это разные интерфейсы, не автоматически один общий канал ANCS.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.jar",
+              "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+              "pointer": "classes.dex:Lecarx/bluetooth/IEcarxBluetoothServiceExtension; and Lecarx/psd/PSDBluetoothManager;"
+            }
+          ]
+        },
+        {
+          "claim": "В новом архиве есть ts-dm-foundation-lib с DeviceBluetoothProfileManager/BluetoothConnectManager и nFore config: MaxAclNum4; MaxDeviceNum2; MaxHfpNum/MaxAvpNum/MaxPbapNum2; LeScanEnable=true. MaxAclNum4 не является доказательством четырёх одновременно работающих ANCS/BLE каналов.",
+          "sources": [
+            {
+              "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+              "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+              "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+              "sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+              "pointer": "lines14,21,32,38,44,201"
+            },
+            {
+              "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+              "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+              "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/ts-dm-foundation-lib.jar",
+              "sha256": "0d16660234e6eab5ed615155fafeb087dabb6618d87ba6fe8922826f5c338617",
+              "pointer": "classes.dex class index"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Активный production owner nFore/Android/TS-DM и profile arbitration; реальное число BLE соединений; взаимоисключение CarPlay; взаимодействие с OEM power lifecycle и повторным сопряжением."
+      ],
+      "hardware_presence": "Android Bluetooth HAL/profile services observed; software config is not measurement of simultaneous hardware capacity.",
+      "control_route_status": "Several concrete software interfaces identified; complete connection state machine and ANCS ownership OPEN.",
+      "needed_artifact": [
+        "Сначала ts-dm-foundation/ts-platform/Bluetooth APK из уже полученного нового архива и прежние Natro logs; новое измерение только для оставшейся границы."
+      ],
+      "next_offline_step": "Проследить BluetoothConnectManager/DeviceBluetoothProfileManager до сервиса и профилей; отдельно сопоставить PowerSomeIP enable/disable с эпохами ANCS.",
+      "exactscan_scope": [
+        "One selected latest Bluetooth archive: six named config/framework/APK/package members; two JAR class indexes; Bluetooth manifest. HCI, pairing keys, bonded-device databases and notification payloads not read. Other five Bluetooth archives inventoried by parent, not decoded here."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_PHONE",
+      "title": "Обычная телефония, контакты, кнопки звонка и DIM",
+      "known": [
+        {
+          "claim": "У XCBTPhone3 нет sharedUserId system; runtime работает под u0_a19. InCallServiceImpl exported=true защищён BIND_INCALL_SERVICE; BluetoothService работает в :remote. Приложение телефонии не тождественно системному Bluetooth service.",
+          "sources": [
+            {
+              "archive": "KX11-stock-launcher-phone-20260807-160844.zip",
+              "archive_sha256": "9a6be424d3d4f01d6c9172c6c943022e8f9872f1e5e8a787bd900717fd261e59",
+              "member": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+              "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+              "pointer": "AndroidManifest.xml: InCallServiceImpl, BluetoothService"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/processes.txt",
+              "sha256": "acf4ed466d65159e4a767f129082e4ae957d1a22612f0a4c442f860df31288ef",
+              "pointer": "lines390,396"
+            }
+          ]
+        },
+        {
+          "claim": "Manifest содержит NoViewActivity с CALL и отдельные DIM receiver actions для outcall/answer/decline/answer-and-hold/answer-and-end/ringtone-mute; отдельный key receiver CALL/RCALL/MUTE. Это конкретные входы штатного UI, но ещё не готовый проверенный API Natro.",
+          "sources": [
+            {
+              "archive": "KX11-stock-launcher-phone-20260807-160844.zip",
+              "archive_sha256": "9a6be424d3d4f01d6c9172c6c943022e8f9872f1e5e8a787bd900717fd261e59",
+              "member": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+              "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+              "pointer": "AndroidManifest.xml: NoViewActivity, EcarxDimMenuReceiver, ControlKeyBroadcastReceiver"
+            }
+          ]
+        },
+        {
+          "claim": "EcarxDimMenuReceiver.onReceive вызывает UiCallManager: answerCall/answerAndHoldCall/answerAndEndCall, rejectCall/disconnectCall, mute и safePlaceCallInternal. InCallServiceImpl получает Android Telecom onCallAdded/onCallRemoved. Статически подтверждены выбранные участки цепи, полный lifecycle и доступ внешнего UID ещё не установлены.",
+          "sources": [
+            {
+              "archive": "KX11-stock-launcher-phone-20260807-160844.zip",
+              "archive_sha256": "9a6be424d3d4f01d6c9172c6c943022e8f9872f1e5e8a787bd900717fd261e59",
+              "member": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+              "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+              "pointer": "classes.dex:Lcom/ecarx/btphone/telecom/EcarxDimMenuReceiver;->onReceive code_offset0x85254; Lcom/ecarx/btphone/telecom/InCallServiceImpl;->onCallAdded0x87568/onCallRemoved0x876cc; selected call references in phone_call_routes.json"
+            }
+          ]
+        },
+        {
+          "claim": "Оба архива launcher-phone содержат побайтно одинаковые выбранные phone APK и component reports; второе имя не означает новую версию phone firmware.",
+          "sources": [
+            {
+              "archive": "KX11-stock-launcher-phone-20260807-160844.zip",
+              "archive_sha256": "9a6be424d3d4f01d6c9172c6c943022e8f9872f1e5e8a787bd900717fd261e59",
+              "member": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+              "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+              "pointer": "whole-member SHA-256"
+            },
+            {
+              "archive": "KX11-stock-launcher-phone-20260807-1605954.zip",
+              "archive_sha256": "d396b01f2f5396a2d06decff6acac7ed1dd5abd5a9b39fd4f364955941e1cbd5",
+              "member": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+              "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+              "pointer": "whole-member SHA-256"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Полный call/hold/swap/ringtone/audio route lifecycle; ограничения вызывающего UID и payload DIM broadcast; активный телефон при двух подключениях; приоритет вызова на HUD/приборке."
+      ],
+      "hardware_presence": "Phone app and HFPclient/Telecom runtime services present; no call attempt or contact data inspected.",
+      "control_route_status": "Manifest entry points plus selected receiver/service method references; physical call control not verified.",
+      "needed_artifact": [
+        "Сначала уже полученный XCBTPhone3 APK и существующие call-service state snapshots; звонки/контакты в новые материалы не нужны для первичного control-flow разбора."
+      ],
+      "next_offline_step": "Продолжить EcarxDimMenuReceiver/ControlKeyBroadcastReceiver→call manager→Android Telecom/HFP и извлечь только контракт extras, permission checks и state conditions.",
+      "exactscan_scope": [
+        "Two launcher-phone ZIPs: three selected members each with hashes; phone manifest; four exact phone class method references; no phonebook or call log content."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_CARPLAY",
+      "title": "CarPlay, проекция и взаимодействие с Bluetooth/Wi-Fi/звуком",
+      "known": [
+        {
+          "claim": "Runtime имеет оба пакета com.ts.carplay и com.ts.carplay.app, CarPlayService и CarPlayRemoteService; ts-carplay-adapter.jar содержит отдельные adapters audio/video/Bluetooth/Wi-Fi/location.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/services.txt",
+              "sha256": "7d95dd8aa02f38414faabbd2e534387d113154cf074a05f3d36e55ba54c7ebe1",
+              "pointer": "lines183,2162"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/processes.txt",
+              "sha256": "acf4ed466d65159e4a767f129082e4ae957d1a22612f0a4c442f860df31288ef",
+              "pointer": "lines356,362"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ts-carplay-adapter.jar",
+              "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+              "pointer": "classes.dex:com/ts/carplay/adapter/* interface index"
+            }
+          ]
+        },
+        {
+          "claim": "Audio adapter выделяет request/abandon focus и duck; Wi-Fi adapter start/stop SoftAP; Bluetooth adapter coexistence/auto-connect и classic profiles; location adapter получает gear, speed, GPGGA/GPRMC. Это интерфейсный состав, не подтверждение режима беспроводного подключения.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ts-carplay-adapter.jar",
+              "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+              "pointer": "classes.dex:IAudioAdapter, IWifiAdapter, IBluetoothAdapter, ILocationAdapterListener"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "USB/беспроводной режим конкретной комплектации; владелец focus/projection display; влияние на ANCS/HFP/Wi-Fi; разрешения car.permission.CARPLAY_APP и отказ после sleep."
+      ],
+      "hardware_presence": "CarPlay processes/services observed; actual paired session and wireless hardware capability not established.",
+      "control_route_status": "Adapter APIs and running service stack identified; full session graph OPEN.",
+      "needed_artifact": [
+        "Сначала имеющиеся ts-platform-library и adapter/service code; только затем обезличенный session-state log если останется пробел."
+      ],
+      "next_offline_step": "Связать StateManager session state с focus owners, Wi-Fi AP и Bluetooth coexistence; проверить очистку после disconnect/suspend.",
+      "exactscan_scope": [
+        "ts-carplay-adapter interface/constant index; ts-platform-library class index; runtime service entries only; no pairing material."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_LOCATION",
+      "title": "GNSS, положение, NMEA и автомобильные данные навигации",
+      "known": [
+        {
+          "claim": "Runtime подтверждает location Binder и native vendor.ecarx.xma.gnss@1.0 process; init rc запускает GNSS HAL с группами system/gps/radio/inet.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/binder-services.txt",
+              "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d",
+              "pointer": "line59"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/processes.txt",
+              "sha256": "acf4ed466d65159e4a767f129082e4ae957d1a22612f0a4c442f860df31288ef",
+              "pointer": "line254"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.gnss_1.0-service.rc",
+              "sha256": "3a9a7674c0587f57fa1828e6b903b4ed23a856eb7374f1bfcf5600784ea98ce4",
+              "pointer": "lines1–4"
+            }
+          ]
+        },
+        {
+          "claim": "CarPlay location interface отдельно предоставляет GPGGA/GPRMC, скорость и передачу; координатная система выбирается ILocationAdapter.setMapCoordinateSystem. GPS и vehicle-position paths нельзя считать одним измерением.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ts-carplay-adapter.jar",
+              "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+              "pointer": "classes.dex:ILocationAdapter and ILocationAdapterListener"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Первичный приёмник/антенна; native decoder; источники fused location/dead reckoning; шкалы и timestamp; WGS/GCJ преобразования и валидность quality flags."
+      ],
+      "hardware_presence": "GNSS software process and Android location service observed; physical receiver and antenna linkage unresolved.",
+      "control_route_status": "Observation interfaces identified; independent measurement quality and full raw-to-map route OPEN.",
+      "needed_artifact": [
+        "Сначала имеющиеся GNSS native binary и config, adapter location implementation; при пробеле — обезличенные качество/timestamp/скорость без координат поездки."
+      ],
+      "next_offline_step": "Сравнить источники ILocationAdapter с Android location и vendor GNSS callbacks; отделить ECU velocity, NMEA time и callback-arrival time.",
+      "exactscan_scope": [
+        "GNSS init source and runtime process; interface signatures only; no route/coordinate content read."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_TCAM",
+      "title": "TCAM: eCall/bCall/iCall, микрофон, удалённые функции и диагностика",
+      "known": [
+        {
+          "claim": "Живой tcam Binder ITcamService, Android TcamService и native tcam HAL подтверждены одним runtime snapshot.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/binder-services.txt",
+              "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d",
+              "pointer": "line10"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/services.txt",
+              "sha256": "7d95dd8aa02f38414faabbd2e534387d113154cf074a05f3d36e55ba54c7ebe1",
+              "pointer": "line2923"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/processes.txt",
+              "sha256": "acf4ed466d65159e4a767f129082e4ae957d1a22612f0a4c442f860df31288ef",
+              "pointer": "line261"
+            }
+          ]
+        },
+        {
+          "claim": "ITcamService/TcamManager разделяют call state/type/support/callback mode, IHU microphone use, CarLocator support, RVDC/remote diagnostics, vehicle IP table и reset support. Это собственная subsystem chain, не обычный Bluetooth вызов.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.jar",
+              "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+              "pointer": "classes.dex:Lecarx/tcam/ITcamService; and ITcamServiceCallback;"
+            }
+          ]
+        },
+        {
+          "claim": "Общий интерфейс содержит также charging/light-show поля; они не доказывают наличие зарядки или такого режима на бензиновом KX11.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.jar",
+              "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+              "pointer": "classes.dex:Lecarx/tcam/ITcamService; charging and lightingShow methods"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Физический TCAM/SIM и региональный backend; какой вызов реально поддерживается; приоритет/микрофон/аудиовыход при eCall; lifecycle RVDC authorization; допустимый reset protocol."
+      ],
+      "hardware_presence": "TCAM software service stack observed; exact physical module/region/backend and optional features unverified.",
+      "control_route_status": "Signatures and runtime service presence; no emergency call, remote command or reset invoked.",
+      "needed_artifact": [
+        "Сначала имеющиеся TCAM native interfaces и service APK, конфигурация региона/support; не нужны пробные экстренные звонки."
+      ],
+      "next_offline_step": "Сопоставить get/isSupported API с параметрами carconfig и callback enum; определить границы обычной телефонии, audio mix и удалённого backend.",
+      "exactscan_scope": [
+        "ecarx.jar full top-level service interface inventory; runtime Binder/process/service records; no personal POI, call or password values."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_NETWORK",
+      "title": "Связность: Wi-Fi, Ethernet, модем и внутренние сервисы",
+      "known": [
+        {
+          "claim": "Runtime одновременно регистрирует connectivity/ethernet/wifi и vendor connectivity process. Статический vsomeip.json задаёт Android .15, discovery peer .2, порт30490 и приложения PowerSomeIP/PAS/AVM/USB-update/Diag/QnxSlog.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/binder-services.txt",
+              "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d",
+              "pointer": "lines65–71"
+            },
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/processes.txt",
+              "sha256": "acf4ed466d65159e4a767f129082e4ae957d1a22612f0a4c442f860df31288ef",
+              "pointer": "line250"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "vendor-native/_vendor_etc/vsomeip.json",
+              "sha256": "a6709912048aec6d8b1c85f71ef5080de6fd54171493bf64e1a9fde88e2fe88b",
+              "pointer": "/unicast,/applications,/service-discovery"
+            }
+          ]
+        },
+        {
+          "claim": "IECarXCarPower имеет отдельный getModemStatus; TCAM интерфейс предоставляет external/master/slave IP и vehicle IP table. Названия адресов не устанавливают физическую топологию ECU.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.car.jar",
+              "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+              "pointer": "classes.dex:IECarXCarPower.getModemStatus"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.jar",
+              "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+              "pointer": "classes.dex:ITcamService network/status methods"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Полная L2/L3 topology/gateway ownership, modem/TCAM role, routes/firewall and resource arbitration; связь .1 VP с этими отдельными SOME/IP services."
+      ],
+      "hardware_presence": "Several live OS/HAL networking services observed; SIM/modem physical ownership and complete routing unresolved.",
+      "control_route_status": "Runtime services and local config confirmed; complete interdomain control route OPEN.",
+      "needed_artifact": [
+        "Сначала уже собранные network/VM/QNX configs и native connectivity; новые network snapshots только по выявленному отсутствию конкретной привязки."
+      ],
+      "next_offline_step": "Сопоставить registrations/apps/ports с native client constructors и QNX configs; не объединять VP UDP50335/50500 с discovery30490.",
+      "exactscan_scope": [
+        "System vsomeip.json and init; runtime Binder/process entries; no credentials, SSID or personal address book output."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_UI",
+      "title": "Штатный UI, жесты, шторка, launcher и оконные владельцы",
+      "known": [
+        {
+          "claim": "Новый runtime точно фиксирует ecarx.notificationcenterui/.ControlBoardService, action ecarx.notificationcenterui.action.CONTROLLER_BOARD, UID1000; рядом есть GestureService и InputService. Это продвигает поиск от имени пакета к конкретным работающим компонентам.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/services.txt",
+              "sha256": "7d95dd8aa02f38414faabbd2e534387d113154cf074a05f3d36e55ba54c7ebe1",
+              "pointer": "lines728–739,2050,2829"
+            }
+          ]
+        },
+        {
+          "claim": "Также живут ECARX SystemUI plugin AppWatcher/UserData services, PartialService и MediaWindowStateService; механизм UI priority нельзя описать одним SystemUI пакетом.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/services.txt",
+              "sha256": "7d95dd8aa02f38414faabbd2e534387d113154cf074a05f3d36e55ba54c7ebe1",
+              "pointer": "lines241,928,1038,1207"
+            }
+          ]
+        },
+        {
+          "claim": "Runtime видит ecarx_daemon_OverlayDisplay#0…4. Имена слоёв и ServiceRecord не устанавливают владельца каждого пикселя крыльев/машинки и не доказывают безопасный disable-компонент.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/layers.txt",
+              "sha256": "e9958603ea4b30c251254319cf19501b2722d25b078a7892a75e32d584131b47",
+              "pointer": "lines148–152"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Кто принимает edge gesture; IPC от жеста к ControlBoard; другие обязанности ControlBoardService; parent/layerStack pixel attribution; точный обратимый suppress API."
+      ],
+      "hardware_presence": "Named software components and layers observed; physical pixel ownership and complete gesture chain unresolved.",
+      "control_route_status": "Runtime component anchor strengthened; no component disabled, window injected or priority changed.",
+      "needed_artifact": [
+        "Сначала поиск XCNotificationCenterUI/gesture/input APK в уже собранном корпусе и существующие window snapshots; если их нет — запросить только конкретные APK/config."
+      ],
+      "next_offline_step": "Найти consumers action CONTROLLER_BOARD и bind/start цепь; проверить manifest/component permissions и дополнительные функции до выбора точки подавления.",
+      "exactscan_scope": [
+        "Runtime service headers/actions/process only; layer names only; user window titles/content not copied. Existing Natro2.7.7 parking policy untouched."
+      ],
+      "physical_effect_verified": null
+    },
+    {
+      "id": "PLAT_UPDATE",
+      "title": "Обновления, диагностика и права системных сервисов",
+      "known": [
+        {
+          "claim": "Runtime имеет ota, dtcnl, usbupdate и QnxSlog Binder services; init запускает отдельные OTA/DTC/PKI native HAL. Это самостоятельные жизненные циклы, а не обычная установка APK.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-dump.tar",
+              "archive_sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+              "member": "ecarx-hud-dump/binder-services.txt",
+              "sha256": "85ef68a99461601d5633caaf676985ea33456374bf50301738357fda50c7ef6d",
+              "pointer": "lines3,4,14,15"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.ota_1.0-service.rc",
+              "sha256": "d5f50dcd1c985f3f88158d3f8384f75dfafad29ae2a37716b2bc217182ba9f47",
+              "pointer": "lines1–4"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.pkicertificate_1.0-service.rc",
+              "sha256": "e03f1389e76c08aeed84175da5053220827cfc575f0aee5e0d286f1d39991bce",
+              "pointer": "lines1–4"
+            }
+          ]
+        },
+        {
+          "claim": "IOtaService имеет assignment/download/install consent/scheduled installation/resource group API и callbacks; IDtcnlService различает getDtcCodeStatus и setDtcCode. Название get/set не отменяет побочных эффектов диагностических/обновляющих действий.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.jar",
+              "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+              "pointer": "classes.dex:Lecarx/ota/IOtaService; IOtaServiceCallback; Lecarx/dtcnl/IDtcnlService;"
+            }
+          ]
+        },
+        {
+          "claim": "Manifest PowerSomeIPService и MultidisplayService имеют sharedUserId system и explicit exported=true; SettingsProvider экспортирует authority EcarxSettings. Это не доказательство допустимости вызова от Natro: runtime UID, Binder checks и SELinux остаются отдельными границами.",
+          "sources": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "packages/ecarx.powersomeip.service/base.apk",
+              "sha256": "b1971dc52243211e39125228a8b5736ea3311db74dc31ab119f5db99d6e4bb12",
+              "pointer": "AndroidManifest.xml"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "packages/com.ecarx.car.multidisplay/base.apk",
+              "sha256": "73e6dd017c06e1999741f32e77008f09664595856f718ecd0e22c20e8a95a06f",
+              "pointer": "AndroidManifest.xml"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "packages/com.ecarx.providers.settings/base.apk",
+              "sha256": "4ce3d3ce216fcac5c240e8c6efbe85c40bafabebecdb63a49a260b142d43d046",
+              "pointer": "AndroidManifest.xml"
+            }
+          ]
+        }
+      ],
+      "not_known": [
+        "Полный boot/update recovery graph; доверенные подписи и региональные constraints; диагностические DTC владельцы/значения; Binder permission checks/SELinux для каждого API; policy persistence через reboot/update."
+      ],
+      "hardware_presence": "Update/diagnostics software services present; does not identify all physical ECU or supported firmware targets.",
+      "control_route_status": "Interface/config/runtime presence established; update/routine/reset/write not executed or qualified.",
+      "needed_artifact": [
+        "Сначала имеющиеся OTA/DTC/PKI APK/native/config и metadata; приватные сертификаты/ключи не запрашивать и не публиковать."
+      ],
+      "next_offline_step": "Разделить software update targets, consent/status callbacks и необратимые операции; установить service-side enforcement без обхода прав.",
+      "exactscan_scope": [
+        "12 system APK manifests decoded; selected ecarx.jar interfaces; init configs; runtime service records; no key contents, update payload execution or private credential export."
+      ],
+      "physical_effect_verified": null
+    }
+  ]
+}

@@ -1,0 +1,1031 @@
+{
+  "schema_version": 1,
+  "analysis_date": "2026-09-05",
+  "scope": "Offline source audit of comfort/body interfaces from one exact system SDK and prior evidence. No commands executed; not a complete vehicle specification.",
+  "source": {
+    "archive": "ecarx-hud-system-20260727-010640.zip",
+    "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+    "member": "framework/system_framework/ecarx.adaptapi.jar",
+    "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+    "dex_entry": "classes.dex"
+  },
+  "systems": [
+    {
+      "id": "COMF-001",
+      "title": "Двери, центральный замок и капот",
+      "known": [
+        {
+          "finding": "BCM_FUNC_DOOR 0x21020100 для четырёх дверей/капота читает 30382/30388/30385/30391/30417. BCM_FUNC_DOOR_LOCK0x21020200 читает 30611; обе регистрации помечены active, но setter замка отсутствует.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Bcm->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Исполнитель немедленного lock/unlock из ГУ; anti-theft и deadlock; механика блокировки и допустимые режимы."
+      ],
+      "control_route_status": "read_only_in_public_registration",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Штатный consumer блокировки и схема кузовного ECU из уже имеющихся APK/диагностики.",
+      "next_offline_step": "Найти references на 30611 и низкоуровневые LockgCenReq в штатном settings, сравнить command и status enum."
+    },
+    {
+      "id": "COMF-002",
+      "title": "Детские замки и детский сценарий",
+      "known": [
+        {
+          "finding": "BCM_FUNC_CHILD_SAFETY_LOCK0x21020400: zone16→CB_ChdLockReLeft/property33243/PA33841;zone64→33244/33842. API1→raw2,API0→raw1; feedbackraw1→API1,raw2→API0. Командная и статусная кодировки различаются.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Bcm->buildFunctions()V"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/firmware/cb_command_routes.json",
+              "sha256": "e783ef5950e10ef28339721c4ae196d639c9ffdaf543cb00b3a75c501e19dee2",
+              "pointer": "routes:CB_ChdLockReLeft/Right"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "0x21020700 использует отдельные CB_*_ChdMod33245/33246 и PA33843/33844. Это не алиас обычных детских замков.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Bcm->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Наличие электрического управления на конкретной машине; взаимодействие Child scene и ручной настройки; сохранение после засыпания."
+      ],
+      "control_route_status": "write_route_static_confirmed",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "PA33841–33844 с availability/data и штатный экран детских замков.",
+      "next_offline_step": "Сопоставить LockgCenReq2 со статусным enum, затем потребителей сцен и уже записанные 33841–33844."
+    },
+    {
+      "id": "COMF-003",
+      "title": "Физический и цифровой ключ",
+      "known": [
+        {
+          "finding": "CarKey createDigitalKey/delDigitalKeyItem/delAllDigitalKey/registerDigitalKeyCallback/unregisterDigitalKeyCallback возвращают false без действий; getDigitalKeys всегда пустой массив; cancelDiscovery пустой. Это реализация-заглушка.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "CarKey->createDigitalKey(I)Z; getDigitalKeys()[DigitalKeyInfo; cancelDiscovery()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "startDiscovery/readRealKey/unbindCarKey вызывают CB_PSET_ConnectKey(property33254) со значениями 0/1/17; unbindCarKey(int) игнорирует переданный ID. readRealKey — запись запроса, не пассивное чтение.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "CarKey->startDiscovery()V; readRealKey()V; unbindCarKey(I)V"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/firmware/cb_command_routes.json",
+              "sha256": "e783ef5950e10ef28339721c4ae196d639c9ffdaf543cb00b3a75c501e19dee2",
+              "pointer": "routes:CB_PSET_ConnectKey"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Реальный смысл 0/1/17 в ECU, обратная связь 33853 и привязка физического ключа; существует ли отдельный сервис цифровых ключей вне этого SDK."
+      ],
+      "control_route_status": "mixed_stub_and_command_route",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "CarKey callback33853 и штатный менеджер ключей; подтверждение комплектации.",
+      "next_offline_step": "Разобрать CarKey$1 и PA_PSET_ConnectKey; искать другой service реализации digital key, не вызывать unbind для исследования."
+    },
+    {
+      "id": "COMF-004",
+      "title": "Профили пользователя и память настроек",
+      "known": [
+        {
+          "finding": "Действия профиля разрешаются только при PA33855.data==1. getCurrentId читает 33845; getUserProfileData/applyUserProfileData работают только для текущего профиля.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "UserProfile->notAllow()Z; getCurrentId()I; getUserProfileData(I)IProfile; applyUserProfileData(I,IProfile)Z"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "addUserProfile и addUserProfileCopyFrom отправляют CB_PSET_NewProfile33249, но всегда возвращают-1; результат приходит асинхронно через PA callbacks. Возврат-1 не доказывает, что профиль не создан.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "UserProfile->addUserProfile()I; addUserProfileCopyFrom(I)I"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "switchUserProfile(from,to) игнорирует from и выбирает to через CB_PSET_RequestActiveProfile 33248. applyUserProfileData возвращает true после вызова void-команды CB_PSET_ProfileCloudData, не дожидаясь асинхронного подтверждения результата.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "UserProfile->switchUserProfile(II)Z; applyUserProfileData(I,IProfile)Z"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Полный список восстанавливаемых полей, воздействие на сиденья/зеркала, конфликт облачных и локальных профилей, атомарность/откат."
+      ],
+      "control_route_status": "write_route_static_confirmed_async_result_required",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Аннотации ProfileFunction, Profileclouddata, штатный profile consumer, существующий 33855/33873/33875.",
+      "next_offline_step": "Составить карту каждого ProfileFunction→protobuf field→устройства, разобрать результирующие callback33845–33849/33874; не считать snapshot другого профиля доступным."
+    },
+    {
+      "id": "COMF-005",
+      "title": "Багажник и высота открытия",
+      "known": [
+        {
+          "finding": "Дверь багажника 0x21020100/zone0x20000000 выбирает две CB ветви по PA33675/33676; управление высотой 0x2c010800 отдельное. Общий успешный return не равен фактическому открытию.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Bcm->buildFunctions()V; lambda$buildFunctions$2"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/firmware/mapping/report.md",
+              "sha256": "af2b3e70d31bd543a261fc44e31d45ea2330795ae3c94a86c8daaf155fe59f50",
+              "pointer": "Багажник"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Ограничения по передаче/скорости, прерывание препятствием, калибровка/память высоты и оба PA одновременно active."
+      ],
+      "control_route_status": "write_route_static_confirmed_conditional",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Штатный consumer багажника и сигналы препятствия/допуска из текущих архивов.",
+      "next_offline_step": "Восстановить точную таблицу обеих ветвей и переходы target/current; исключить повторение импульса при неполном ответе."
+    },
+    {
+      "id": "COMF-006",
+      "title": "Боковые стёкла и защита от защемления",
+      "known": [
+        {
+          "finding": "Позиции переводятся в raw1..26 с шагом 4%; групповые зоны выполняют последовательные CB, не атомарную операцию. non-EX11 mapper боковых окон не объясняет все pause enum, объявленные в supported list.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Bcm->convertToWindowSignal(F)I; buildFunctions()V"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/firmware/mapping/report.md",
+              "sha256": "af2b3e70d31bd543a261fc44e31d45ea2330795ae3c94a86c8daaf155fe59f50",
+              "pointer": "Окна и люк"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Чем останавливать боковое стекло в KX11, anti-pinch/learned position и поведение при потере соединения; настоящая обратная связь от мотора."
+      ],
+      "control_route_status": "write_route_static_confirmed_stop_semantics_incomplete",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Штатный window-control consumer и записанные moving/anti-pinch/availability состояния.",
+      "next_offline_step": "Связать PA33833–33840 с CurrentPos/MovingState; проследить несовпадение pause списка и non-EX11 callback."
+    },
+    {
+      "id": "COMF-007",
+      "title": "Люк, наклон и шторка панорамы",
+      "known": [
+        {
+          "finding": "Люк и шторка используют разные зоны 4/8 и отдельные пары press/release CB33193–33196, позиции 33197/33198 и наклон 33199. Регистрация наклона отправляет CB_SunRoofTiltReq; дополнительных CB закрытия люка/шторки в этой регистрации нет. Совместный физический эффект не проверен.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Bcm->buildFunctions()V"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/firmware/mapping/report.md",
+              "sha256": "af2b3e70d31bd543a261fc44e31d45ea2330795ae3c94a86c8daaf155fe59f50",
+              "pointer": "Окна и люк"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Последовательность координации крыши/шторки; пределы, rain-close, защемление, калибровка и автозакрытие после выключения."
+      ],
+      "control_route_status": "write_route_static_confirmed",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Штатная roof UI логика и PA/CarSignal roof status/obstacle/config.",
+      "next_offline_step": "Разобрать pressed/released/tilt и текущую позицию 30479/30476, движение 30477/30475, связанные sensor fault enums."
+    },
+    {
+      "id": "COMF-008",
+      "title": "Дворники, омыватели и датчик дождя",
+      "known": [
+        {
+          "finding": "Сервисное положение 0x200c0100: zoneDEFAULT/1→CB_CL_WipFrntSrvMod32837/PA33346;zone2→задний 32838/33347. Настройка auto rear wiping0x200c0200→32836/33345. Управление принадлежит ClimateManager, несмотря на кузовное назначение.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Vehicle->buildFunctions()V"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/firmware/cb_command_routes.json",
+              "sha256": "e783ef5950e10ef28339721c4ae196d639c9ffdaf543cb00b3a75c501e19dee2",
+              "pointer": "routes:CB_CL_WipFrntSrvMod/CB_CL_WipReSrvMod/CB_CL_WipReAutReq"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Мгновенный wipe/wash, скоростные ступени, дождевой сенсор, жидкость/обогрев форсунок, аппаратные допуски service position."
+      ],
+      "control_route_status": "settings_routes_confirmed_actuation_incomplete",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Доступные Wip/Wash/Rain raw сигналы и штатный потребитель сервисного режима.",
+      "next_offline_step": "Развести live actuation, retained setting, service operation и hardware config; нельзя трактовать rear-auto как немедленный взмах."
+    },
+    {
+      "id": "COMF-009",
+      "title": "Зеркала: моторы, наклон, складывание и обогрев",
+      "known": [
+        {
+          "finding": "Настройки auto-fold0x20090200 и reverse-dipping0x20090300 имеют CB33035/33036 и PA33644/33645. Отдельный MConfig моторный fold0x21060100 не подтверждает, что этот маршрут реализован текущим системным Bcm.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Vehicle->buildFunctions()V"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/controls/report.md",
+              "sha256": "328811e24ecea6fddcbc3befc12f52587a8bc28cf6a4dde5b23f0b817c636364",
+              "pointer": "Зеркала сложить/разложить"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Немедленное fold/unfold в runtime SDK, моторное движение стекла, позиционная память/обратная связь, привязка обогрева к заднему стеклу."
+      ],
+      "control_route_status": "settings_confirmed_motor_route_unresolved",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Системный consumer зеркал и фактический classloader MConfig; существующие mirror motor properties.",
+      "next_offline_step": "Найти регистрацию 0x21060100 по всем системным/APK DEX, проверить fork версии и обратный motor-status, не подменять автоскладыванием."
+    },
+    {
+      "id": "COMF-010",
+      "title": "Наружный свет и световые сценарии",
+      "known": [
+        {
+          "finding": "BCM_FUNC_LIGHT_DIPPED_BEAM фактически использует CB_AFSLight_Setting33027/PA33636, общий с AFS-setting. Поворотники 0x21051100/0x21051200 — только reading30421.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Bcm->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "Лево-/правостороннее движение 0x2b020100 кодируется LEFT→raw1,RIGHT→raw0 через CB_LeftRightSetting; welcome mode1..6→raw0..5. Это сохранённые настройки, не прямое зажигание лампы.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Lamp->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Прямые low/high/fog/hazard actuators, уровень корректора, ограничения AUTO/AFS, физическая конфигурация фар."
+      ],
+      "control_route_status": "mixed_read_only_and_settings_routes",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Штатный lighting UI, lamp ECU/конфигурация и actual light-status.",
+      "next_offline_step": "Разобрать consumer0x20040e00, отличить requested state от monitor/fault и настройки схемы света."
+    },
+    {
+      "id": "COMF-011",
+      "title": "Лампы чтения и салонный свет",
+      "known": [
+        {
+          "finding": "Индивидуальные CB_ReadLight* используют 1=on,2=off; all switch1=on,0=off. Courtesy light имеет отдельную настройку через PA33825.",
+          "evidence": [
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/controls/report.md",
+              "sha256": "328811e24ecea6fddcbc3befc12f52587a8bc28cf6a4dde5b23f0b817c636364",
+              "pointer": "Лампы чтения и ароматизация"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Lamp->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Установленные зоны/плафоны, реакции на двери/блокировку, master-vs-local приоритет и восстановление."
+      ],
+      "control_route_status": "write_routes_static_confirmed",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Availability локальных PA и штатная логика courtesy/door.",
+      "next_offline_step": "Сопоставить автоматический courtesy с ручными CB и проверить признаки third-row отдельно от реального KX11."
+    },
+    {
+      "id": "COMF-012",
+      "title": "Атмосферная подсветка и палитра",
+      "known": [
+        {
+          "finding": "Текущий AmbienceLight цвет 0x200a0900 для KX11 DEFAULT-zone принимает таблицу 72 RGB integer entries; EX11 имеет другую 64-entry палитру и зонирование. Это другой contract, чем 13 именованных color enum клиента.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "AmbienceLight-><clinit>()V; getKx11OrEx11Value()[I; buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "KING scene определяется PA33926==11 и переводит 24 active status-проверки подсветки в notactive. Сбой доступности настройки может быть следствием сценария, а не неисправностью ламп.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "AmbienceLight->isKingMode()Z; getKX11ColorSetStatus()FunctionStatus; getKX11LightIntensitySetStatus()FunctionStatus"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "Поддерживаемый BREATHE mode0x200a0206 добавляется по PA33799, но setAmbLiMod принимает 0/0x200a0202/03/04/08; для 06 сначала вызывает CB_AmbLiAll(1), потом остаётся FAILED. Возврат FAILED не гарантирует отсутствие побочного эффекта.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "AmbienceLight->getAmbienceLightModeSupportedValue()[I; setAmbLiMod(I)ApiResult"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Активный runtime SDK/palette/compatibility для Natro, устранение несогласованного BREATHE пути, фактический RGB формат и число цветов оборудования."
+      ],
+      "control_route_status": "write_routes_static_confirmed_contract_mismatches",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Consumer штатной подсветки, PA33793–33829 и SceneMod actual state.",
+      "next_offline_step": "Сверить яркость/цвет/эффект Natro с 0x200a0900, palette и lambda; не считать mode06 безвредной probe."
+    },
+    {
+      "id": "COMF-013",
+      "title": "Климат: температура и единицы",
+      "known": [
+        {
+          "finding": "PA33460 выбирает C/F. SDK min/max/step:15.5..28.5°C/0.5 или 59..85°F/1. convertTemper2Index truncates float, а checkTemper проверяет публичные min/max. Клиентский диапазон Natro16..30 не совпадает с этим контрактом.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->checkTemper(F)Z; convertTemper2Index(F)I; lambda$buildFunctions$16/17/18"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/controls/report.md",
+              "sha256": "328811e24ecea6fddcbc3befc12f52587a8bc28cf6a4dde5b23f0b817c636364",
+              "pointer": "Температура"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Как LO/HI отображает штатная UI; совпадает ли реально загруженный Hvac с системным; conversion на неожиданных PA/NaN."
+      ],
+      "control_route_status": "write_route_static_confirmed_client_range_mismatch",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Штатный климат consumer temperature conversion, существующий PA33460 и classloader origin.",
+      "next_offline_step": "Проверить Natro capability min/max/step и локальные helper bounds; не принимать 29–30 как допустимые только потому, что ползунок их даёт."
+    },
+    {
+      "id": "COMF-014",
+      "title": "Климат: вентилятор, зоны и потоки",
+      "known": [
+        {
+          "finding": "PA fan имеет status0=manual/status1=AUTO; неправильный getter возвращает 255. Наличие raw fan-level без mode недостаточно. Manual KX11 list0..9,EX11 list0..5; front/rear routes различны.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->lambda$buildFunctions$0/1/2/3/4/5/6/7/8; buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "Climate-zone getClimateZone:config5→TRIPLE,129→FOUR,все прочие→DUAL. Возврат DUAL по умолчанию не является независимым доказательством физического числа зон.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->getClimateZone(I)I"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Какие задние actuators/панель установлены; freshness после сна; поддерживаемые режимы и ошибочные raw."
+      ],
+      "control_route_status": "write_routes_static_confirmed",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Статус fan и данные вместе, cfg HVAC-zone и штатный UI.",
+      "next_offline_step": "Сопоставить архивные config и PA33317/33335, фильтрацию manual/AUTO, не отображать 255 как скорость."
+    },
+    {
+      "id": "COMF-015",
+      "title": "Обогрев стёкол и осушение",
+      "known": [
+        {
+          "finding": "Электрообогрев лобового и max defrost разные функции; статус front/rear при popup33338/33339 availability1,data1 принудительно error. Это дополнительный отказный источник помимо основного PA.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->lambda$buildFunctions$11/12; buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Смысл popup-причин, условия температуры/энергии/времени, совместимость rain/humidity sensors и алгоритмы повторного включения."
+      ],
+      "control_route_status": "write_routes_static_confirmed_multi_signal_status",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Schemas PA_CL_FrntDefrostPopup/RearDefrostPopup и штатное уведомление.",
+      "next_offline_step": "Связать popup с actual heater state и diagnostics; не сбрасывать ошибку одной повторной записью."
+    },
+    {
+      "id": "COMF-016",
+      "title": "Климатические предложения, REQUEST и CONFIRM",
+      "known": [
+        {
+          "finding": "AUTO_ION_REQUEST0x100c0200,DEHUMIDIFICATION_REQUEST0x100d0100 и CLOSE_WINDOW_REMIND_REQUEST0x100f0200 — входящие события без setter. Соответствующие CONFIRM —write-only ответы; слово REQUEST не означает запуск функции.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "Ответы CONFIRM имеют разные mapper: ионизация public0/1/2→raw2/1/0 через 32862; осушение 0/1/2→0/1/1 через 32821; окна 0/1/2→0/1/0 через 32839. Общий обработчик dialog-result сломает смысл.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->buildFunctions()V"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/firmware/cb_command_routes.json",
+              "sha256": "e783ef5950e10ef28339721c4ae196d639c9ffdaf543cb00b3a75c501e19dee2",
+              "pointer": "CB_PM25_HmiPopUpResp; CB_CL_HumPop; CB_CL_ClmCloseWinPop"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "UI-смысл третьего ответа, жизненный цикл предложения, реакция при повторе/устаревшем dialog и физическая инициирующая логика ECU."
+      ],
+      "control_route_status": "event_response_routes_static_confirmed",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Штатные popup consumers и результативные feedback после выбора.",
+      "next_offline_step": "Разобрать каждый callback request и UI кнопки, привязать ответ к актуальному событию; не выполнять universal toggle."
+    },
+    {
+      "id": "COMF-017",
+      "title": "Предварительный и послепоездочный климат",
+      "known": [
+        {
+          "finding": "PRE0x100a0100→CB_CL_Pre32797/PA33329;POST0x100a0200→CB_CL_Post32796/PA33330,0/1. Эти paths не описывают отдельно запуск двигателя, wake-up, расписание или удалённый доступ.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->buildFunctions()V"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/firmware/cb_command_routes.json",
+              "sha256": "e783ef5950e10ef28339721c4ae196d639c9ffdaf543cb00b3a75c501e19dee2",
+              "pointer": "CB_CL_Pre;CB_CL_Post"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Реальная поддержка ICE KX11; зависимость от двигателя/АКБ/режима питания, ограничение длительности и выход из стоянки."
+      ],
+      "control_route_status": "write_route_static_confirmed_hardware_unknown",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "PA33329/33330 support, HVAC/engine topology и штатный consumer.",
+      "next_offline_step": "Сравнить с гибридными общими SDK ветками; выяснить смысл PA permission прежде чем показывать как remote-start."
+    },
+    {
+      "id": "COMF-018",
+      "title": "Качество воздуха, фильтр и ароматизация",
+      "known": [
+        {
+          "finding": "Fragrance main on0x100b0100 вызывает тот же CB_Fragra_LvlReq32869 что level, но on→raw2. Включение выбирает среднюю интенсивность, не обязательно последнюю.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Fragrance->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "AIR_FRAGRANCE_TYPE0x100b0200 объявляет ароматы, однако эта регистрация имеет только status — ни getter, ни setter. Реальный slot0x100b0400 выбирает один из A/B/C через соответствующий TypRatReq(100); type-id read0x100b0500 использует slot как zone.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Fragrance->buildFunctions()V; lambda$buildFunctions$1/2"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "Уровень становится notactive при PA33406.data==3; refreshing popup0x100b1200 read-only, active фиксирован и события фильтруются.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Fragrance->lambda$buildFunctions$0; buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Наличие cartridges/ionizer/PM/CO2/filter-life аппаратуры, реальный смысл slot/type-ID, единицы измерений и lifespan."
+      ],
+      "control_route_status": "mixed_static_control_and_placeholder",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Runtime availability PA33396/33406/33418–33420 и штатный fragrance/air-quality consumer.",
+      "next_offline_step": "Не переносить имена шести ароматов в UI как установленное оборудование; проверить sensors и доступные consumers в APK."
+    },
+    {
+      "id": "COMF-019",
+      "title": "Позиция сидений, easy-entry и память",
+      "known": [
+        {
+          "finding": "Существующие пути 32982–32989 — direction1/2 и stop0, не абсолютные миллиметры. Easy-entry0x20170100 отдельная настройка водителя; профиль может вызывать иной слой восстановления.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Seat->buildFunctions()V"
+            },
+            {
+              "file": "Geely_KX11_Knowledge_v1.0/firmware/mapping/report.md",
+              "sha256": "af2b3e70d31bd543a261fc44e31d45ea2330795ae3c94a86c8daaf155fe59f50",
+              "pointer": "Сиденья"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Настоящие координаты, calibration/anti-pinch, необходимость periodic hold, остановка при потерянном touch/Binder, конфликт memory и ручной регулировки."
+      ],
+      "control_route_status": "write_route_static_confirmed_stop_timing_unknown",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Штатный seat consumer и profile-field mappings.",
+      "next_offline_step": "Разобрать удержание и остановку штатной UI, связать PA33565+ с motoractuals; не считать callback долготу движения."
+    },
+    {
+      "id": "COMF-020",
+      "title": "Подогрев и вентиляция сидений, таймеры",
+      "known": [
+        {
+          "finding": "AUTO_*_TIME mapper реализует только public TIME1/2/3→5/15/30; TIME4 и OFF0 есть среди интерфейсных констант, но не в registered supported list этих функций. Вентиляционный таймер имеет зоны 1/4, отопительный 1/4/16/64.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->convertHeatTimerGear(I)I; convertVentilationTimer(I)I; buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Что значит таймер: сохранённая длительность/оставшееся время; установленность rear/auto функций; thermal/fault-conditions."
+      ],
+      "control_route_status": "write_routes_static_confirmed_narrower_than_enum_catalog",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Штатный timer consumer и PA33367–33381.",
+      "next_offline_step": "Выяснить остановку через основной level/switch, не через несуществующее TIME_OFF; анализировать availability и данные раздельно."
+    },
+    {
+      "id": "COMF-021",
+      "title": "Массаж сидений и программа hot-stone",
+      "known": [
+        {
+          "finding": "Массаж разделён на intensity 0x10050700, switch 0x10050a00 и program 0x10050b00. В mapper интенсивности public OFF 0 и LEVEL1 оба преобразуются в raw 0. Это вывод о преобразовании значения в SDK, а не проверенный физический результат. Выключение следует исследовать через отдельный switch.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->convertSeatMassgLevelToVP(I)I; buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "Программы 1..8→raw0..7; первая исключается из supported list, если PA33621/33622 notavailable. Программы 9/A объявлены, но этим mapper не реализованы.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->getHotStoneSupportValues(I)[I; convertSeatMassgProgToVP(I)I"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Наличие массажных элементов; связь hot-stone с подогревом; длительность и физические программы."
+      ],
+      "control_route_status": "write_route_static_confirmed_equipment_unverified",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "PA33599/33603 и 33621/33622, штатный seat massage consumer.",
+      "next_offline_step": "Разобрать callbacks intensity/switch, физические команды и поддержку комплектации прежде чем показывать новые опции."
+    },
+    {
+      "id": "COMF-022",
+      "title": "Подогрев руля и его AUTO-режим",
+      "known": [
+        {
+          "finding": "AUTO_STEERING_WHEEL_HEAT0x10090200 read-only: signal30472,0→off,любое иное→LEVEL1; advertised levels2/3 не восстанавливаются этим getter. AUTO_SWITCH0x10090400 — отдельный writable CB_SWH_AutoReq32859/PA33383.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "Manual heat status учитывает PA33385.data==5 как error вдобавок к PA33384 availability.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->lambda$buildFunctions$21"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Код 30472 и фактические thermalfaults, положение AUTO на KX11, смысл TIME декларации без регистрации."
+      ],
+      "control_route_status": "mixed_read_only_and_write_switch",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "SchemaSteerWhlHeatg/state diagnostics, PA33383–33385 и штатная UI.",
+      "next_offline_step": "Развести AUTO-state / AUTO-switch / manual-level; не пытаться управлять чтением AUTO-level."
+    },
+    {
+      "id": "COMF-023",
+      "title": "Беспроводная зарядка телефона",
+      "known": [
+        {
+          "finding": "WPC_WORK_MODE0x26010100 принимает OFF0 и AUTO0x26010101→CB_WPC_Setting; charge-states0x26020100 только readPA33626. raw0→OVERHEAT,1→STANDBY,2→CHARGING,3→FOD,4→OVERVOLTAGE,5→OVERPOWER,6→ERROR,7/9→OFF,8→FULL; иное→UNKNOWN255.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Wpc->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Физическая катушка / мощность / температурные пороги, реальные PEPS interruption/no-device состояния; DEFAULTOFF mapping7/9."
+      ],
+      "control_route_status": "write_setting_and_read_status_static_confirmed",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "WPC manager/fault schema и реальный PA33625/33626 support.",
+      "next_offline_step": "Не считать raw0 выключением; проследить штатный индикатор ошибок WPC и его consumer."
+    },
+    {
+      "id": "COMF-024",
+      "title": "Сценарии салона: мойка, дети, отдых итеатр",
+      "known": [
+        {
+          "finding": "Семь bool функций сходятся к одному CB_SCEMOD_SceneModSeld 33272 и PA 33926: wash 9, children 2, awakening 1, romantic 4, king 11, queen 14, nap 3; их OFF всегда raw 0. Это один селектор режима, не семь независимых флагов.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "SceneMode->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        },
+        {
+          "finding": "Theater 0x2f010100 работает в zone 4 через отдельный CB_SCEMOD_PassSceneModSeld 33271 / PA 33928, raw 6. Нельзя приравнивать к global scene.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "SceneMode->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Какие функции физически составляют сценарий; условия входа, выхода и отката; пользовательский приоритет и реальное оснащение."
+      ],
+      "control_route_status": "write_routes_static_confirmed_composite_effects_unknown",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Scenemod PA 33911–33928, штатный consumer сценариев и трассировки составных действий.",
+      "next_offline_step": "Разобрать состав режимов. Общая OFF может выключить текущую другую сцену, поэтому нельзя делать независимые асинхронные переключатели."
+    },
+    {
+      "id": "COMF-025",
+      "title": "Датчики комфорта, присутствия и опциональное оборудование",
+      "known": [
+        {
+          "finding": "Сигналы и enum присутствуют в общем SDK, но fixed-active для climate zones, ambient и popup и непустой список значений не подтверждают датчик. Для оборудования нужно раздельно проверять cfg, availability PA и осмысленные живые измерения.",
+          "evidence": [
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Hvac->getClimateZone(I)I; buildFunctions()V"
+            },
+            {
+              "archive": "ecarx-hud-system-20260727-010640.zip",
+              "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+              "member": "framework/system_framework/ecarx.adaptapi.jar",
+              "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+              "dex_entry": "classes.dex",
+              "pointer": "Fragrance->buildFunctions()V"
+            }
+          ],
+          "confidence": "static_source_verified",
+          "physical_result_verified": null,
+          "physical_test_performed": false
+        }
+      ],
+      "not_known": [
+        "Полная карта occupancy / rain / sunload / humidity / air quality / window obstacle, калибровка, свежесть и точная комплектация."
+      ],
+      "control_route_status": "read_and_config_catalog_only",
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "needed_artifact": "Перечень ECU и конфигурация; Sensor mappings из уже восстановленного системного SDK.",
+      "next_offline_step": "Распределить датчики по системам и для каждого связать конфигурацию, измерение, потребителя и обозначение недостоверного значения."
+    }
+  ]
+}

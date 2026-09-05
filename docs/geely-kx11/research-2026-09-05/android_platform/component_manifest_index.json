@@ -1,0 +1,1114 @@
+[
+  {
+    "member": "packages/com.ecarx.hud/base.apk",
+    "sha256": "6d70e5db72c61419c9007aa13b4f0a1265937420a1abf2b00a3ceaea1905f995",
+    "manifest_sha256": "7c44589d740da74461ac3b9e3369a66eed96155dbf339e4f47e13e800fc7a4f7",
+    "package": "com.ecarx.hud",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [],
+    "uses_permissions": [
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.BIND_INCALL_SERVICE",
+      "android.permission.READ_PHONE_STATE",
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.ACCESS_WIFI_STATE",
+      "android.permission.READ_LOGS"
+    ],
+    "components": [
+      {
+        "type": "activity",
+        "android:name": "com.ecarx.hud.calibration.CalibrationActivity",
+        "android:configChanges": "0x00000200",
+        "resolved_name": "com.ecarx.hud.calibration.CalibrationActivity",
+        "intent_actions": []
+      },
+      {
+        "type": "activity",
+        "android:name": "com.ecarx.hud.calibration.PressureLineActivity",
+        "android:configChanges": "0x00000200",
+        "resolved_name": "com.ecarx.hud.calibration.PressureLineActivity",
+        "intent_actions": []
+      },
+      {
+        "type": "activity",
+        "android:name": "com.ecarx.hud.hud.HomeActivity",
+        "android:launchMode": "2",
+        "android:configChanges": "0x00000200",
+        "resolved_name": "com.ecarx.hud.hud.HomeActivity",
+        "intent_actions": []
+      },
+      {
+        "type": "receiver",
+        "android:name": "com.ecarx.hud.receiver.BootBroadcastReceiver",
+        "resolved_name": "com.ecarx.hud.receiver.BootBroadcastReceiver",
+        "intent_actions": [
+          "android.intent.action.BOOT_COMPLETED"
+        ]
+      }
+    ]
+  },
+  {
+    "member": "packages/ecarx.dimprotocol.service/base.apk",
+    "sha256": "c435f1be2402be76355172f7d50d66d1de782a792cea912851c7571a1fd4739c",
+    "manifest_sha256": "0a18202b58b91c8adec2388312b1edc577ca4dc573eeaf6420503098938dafd2",
+    "package": "ecarx.dimprotocol.service",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [],
+    "uses_permissions": [],
+    "components": [
+      {
+        "type": "service",
+        "android:name": ".DIMProtocolService",
+        "android:singleUser": "true",
+        "resolved_name": "ecarx.dimprotocol.service.DIMProtocolService",
+        "intent_actions": [
+          "android.intent.action.START_DIMPROTOCOL_SERVICE"
+        ]
+      }
+    ]
+  },
+  {
+    "member": "packages/com.ecarx.dimmenu/base.apk",
+    "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+    "manifest_sha256": "fc0e6633fee81170c27020ed3abe1aad334e8294e8e9326d114018fd65632050",
+    "package": "com.ecarx.dimmenu",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [],
+    "uses_permissions": [
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.SYSTEM_OVERLAY_WINDOW",
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.READ_USER_DICTIONARY",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.INTERNET",
+      "android.permission.READ_PHONE_STATE",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.BIND_INCALL_SERVICE",
+      "android.permission.CONTROL_LOCATION_UPDATES",
+      "android.permission.FOREGROUND_SERVICE",
+      "android.permission.BLUETOOTH",
+      "android.permission.BLUETOOTH_ADMIN",
+      "android.permission.READ_CONTACTS",
+      "android.permission.WRITE_CONTACTS",
+      "android.car.permission.CAR_CONTROL_AUDIO_VOLUME",
+      "android.permission.WAKE_LOCK",
+      "car.permission.CARPLAY_APP",
+      "android.permission.MODIFY_AUDIO_ROUTING"
+    ],
+    "components": [
+      {
+        "type": "activity",
+        "android:name": "com.ecarx.dimmenu.MainActivity",
+        "android:configChanges": "0x40002224",
+        "resolved_name": "com.ecarx.dimmenu.MainActivity",
+        "intent_actions": [
+          "android.intent.action.MAIN"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:name": "com.ecarx.dimmenu.receiver.BootReceiver",
+        "resolved_name": "com.ecarx.dimmenu.receiver.BootReceiver",
+        "intent_actions": [
+          "android.intent.action.BOOT_COMPLETED",
+          "StartDimAPK",
+          "StartDimShow"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:name": "com.ecarx.dimmenu.receiver.MediaButtonReceiver",
+        "resolved_name": "com.ecarx.dimmenu.receiver.MediaButtonReceiver",
+        "intent_actions": [
+          "android.intent.action.MEDIA_BUTTON",
+          "ecarx.intent.music.app.pause",
+          "ecarx.intent.music.app.resume"
+        ]
+      },
+      {
+        "type": "service",
+        "android:name": "com.ecarx.dimmenu.app.service.ExternalAIDLService1",
+        "android:persistent": "true",
+        "android:exported": "true",
+        "resolved_name": "com.ecarx.dimmenu.app.service.ExternalAIDLService1",
+        "intent_actions": [
+          "android.intent.action.START_DIM_SERVICE"
+        ]
+      }
+    ]
+  },
+  {
+    "member": "packages/ecarx.powersomeip.service/base.apk",
+    "sha256": "b1971dc52243211e39125228a8b5736ea3311db74dc31ab119f5db99d6e4bb12",
+    "manifest_sha256": "a8398ef834e271d0fbd5d5b35494e67bed5d1630b8d4733747d6aac455c85780",
+    "package": "ecarx.powersomeip.service",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [],
+    "uses_permissions": [
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.BROADCAST_STICKY"
+    ],
+    "components": [
+      {
+        "type": "service",
+        "android:name": ".PowerSomeIPService",
+        "android:exported": "true",
+        "resolved_name": "ecarx.powersomeip.service.PowerSomeIPService",
+        "intent_actions": [
+          "android.intent.action.START_POWERSOMEIP_SERVICE"
+        ]
+      }
+    ]
+  },
+  {
+    "member": "packages/com.ecarx.sdk.openapi/base.apk",
+    "sha256": "eab4552733023ca7a323df2b9ae35b036107e3895ad5fd01b7b27540f47ed158",
+    "manifest_sha256": "bebf2c824528b49c621cf51d455a529f09330bb90115cee51251e1a4331434c8",
+    "package": "com.ecarx.sdk.openapi",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [
+      {
+        "android:name": "com.ecarx.sdk.oepnapi.PROVIDER_API",
+        "android:protectionLevel": "0x00000000"
+      }
+    ],
+    "uses_permissions": [
+      "android.permission.READ_PHONE_STATE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.FOREGROUND_SERVICE",
+      "android.car.permission.CAR_VENDOR_EXTENSION",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.ACCESS_WIFI_STATE",
+      "ecarx.permission.ACCESS_DEVICE_SEVICE",
+      "ecarx.xsf.gkuiservice.permission.CORE_SERVICE",
+      "ecarx.oem.permission.VR_PERMISSION",
+      "ecarx.oem.permission.OPENAPI_NAVI_PERMISSION",
+      "ecarx.oem.permission.MEMBER_PERMISSION",
+      "com.ecarx.smartcloud.permission.WEATHER_API",
+      "ecarx.permission.ACCESS_AWARENESS_SERVICE",
+      "ecarx.permission.READ_LICENSE",
+      "android.permission.INTERNET",
+      "android.permission.READ_LOGS",
+      "android.permission.REQUEST_INSTALL_PACKAGES",
+      "android.permission.READ_EXTERNAL_STORAGE"
+    ],
+    "components": [
+      {
+        "type": "service",
+        "android:name": "com.ecarx.sdk.openapi.ServicePoolService",
+        "android:exported": "true",
+        "resolved_name": "com.ecarx.sdk.openapi.ServicePoolService",
+        "intent_actions": [
+          "ecarx.intent.action.OpenAPIService"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:name": "com.ecarx.sdk.openapi.BootCompletedReceiver",
+        "resolved_name": "com.ecarx.sdk.openapi.BootCompletedReceiver",
+        "intent_actions": [
+          "android.intent.action.BOOT_COMPLETED"
+        ]
+      },
+      {
+        "type": "provider",
+        "android:name": "com.ecarx.sdk.openapi.defaultsetting.AppSettingProvider",
+        "android:enabled": "true",
+        "android:exported": "true",
+        "android:authorities": "com.ecarx.sdk.openapi.defaultsetting.provider",
+        "android:grantUriPermissions": "false",
+        "resolved_name": "com.ecarx.sdk.openapi.defaultsetting.AppSettingProvider",
+        "intent_actions": []
+      },
+      {
+        "type": "provider",
+        "android:name": "com.ecarx.sdk.openapi.OpenAPIContentProvider",
+        "android:enabled": "true",
+        "android:exported": "true",
+        "android:authorities": "com.ecarx.sdk.openapi.contentprovider",
+        "resolved_name": "com.ecarx.sdk.openapi.OpenAPIContentProvider",
+        "intent_actions": []
+      },
+      {
+        "type": "service",
+        "android:name": "com.ecarx.sdk.openapi.EASFrameworkService",
+        "android:enabled": "true",
+        "android:exported": "true",
+        "resolved_name": "com.ecarx.sdk.openapi.EASFrameworkService",
+        "intent_actions": [
+          "com.ecarx.easframework.intent.action.EASFRAMEWORK"
+        ]
+      },
+      {
+        "type": "service",
+        "android:name": "com.ecarx.errorreporter.sender.LegacySenderService",
+        "android:enabled": "@7F040004",
+        "android:exported": "false",
+        "android:process": ":acra",
+        "resolved_name": "com.ecarx.errorreporter.sender.LegacySenderService",
+        "intent_actions": []
+      },
+      {
+        "type": "service",
+        "android:name": "com.ecarx.errorreporter.sender.JobSenderService",
+        "android:permission": "android.permission.BIND_JOB_SERVICE",
+        "android:enabled": "@7F040003",
+        "android:exported": "false",
+        "android:process": ":acra",
+        "resolved_name": "com.ecarx.errorreporter.sender.JobSenderService",
+        "intent_actions": []
+      },
+      {
+        "type": "provider",
+        "android:name": "com.ecarx.errorreporter.attachment.AcraContentProvider",
+        "android:exported": "false",
+        "android:process": ":acra",
+        "android:authorities": "com.ecarx.sdk.openapi.acra",
+        "android:grantUriPermissions": "true",
+        "resolved_name": "com.ecarx.errorreporter.attachment.AcraContentProvider",
+        "intent_actions": []
+      }
+    ]
+  },
+  {
+    "member": "packages/ecarx.adaptapi.platform/base.apk",
+    "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+    "manifest_sha256": "771be84bd24648dd0e5714314e97a572c2506f292abc3685e9ff4ee8c9d58480",
+    "package": "ecarx.adaptapi.platform",
+    "sharedUserId": null,
+    "application_permission": null,
+    "permissions_declared": [],
+    "uses_permissions": [
+      "android.permission.WRITE_SETTINGS",
+      "android.permission.WRITE_SECURE_SETTINGS"
+    ],
+    "components": [
+      {
+        "type": "activity",
+        "android:name": "ecarx.adaptapi.platform.AdaptBasePreferenceActivity",
+        "resolved_name": "ecarx.adaptapi.platform.AdaptBasePreferenceActivity",
+        "intent_actions": [
+          "android.intent.action.MAIN"
+        ]
+      }
+    ]
+  },
+  {
+    "member": "packages/ecarx.geea.platform.api.signal/base.apk",
+    "sha256": "b4abefa6b4805f7d7af93599fbd7ef538080fd90f15902eb5c127dc9c0ab74b3",
+    "manifest_sha256": "4f730190a83161b63845d99c320a664117b7210357f6fb3c83b93f3cbe2893a5",
+    "package": "ecarx.geea.platform.api.signal",
+    "sharedUserId": null,
+    "application_permission": null,
+    "permissions_declared": [],
+    "uses_permissions": [
+      "android.permission.WRITE_SETTINGS",
+      "android.permission.WRITE_SECURE_SETTINGS",
+      "ecarx.car.permission.CAR_HVAC"
+    ],
+    "components": [
+      {
+        "type": "activity",
+        "android:name": "ecarx.geea.platform.api.signal.CarSignalBaseActivity",
+        "resolved_name": "ecarx.geea.platform.api.signal.CarSignalBaseActivity",
+        "intent_actions": [
+          "android.intent.action.MAIN"
+        ]
+      }
+    ]
+  },
+  {
+    "member": "packages/ecarx.geea.platform.api.vf/base.apk",
+    "sha256": "ed7be7cf92ecc686fa94b872874fef763aaef0e6fcfae7b930f2e4580a172de5",
+    "manifest_sha256": "a3d7c5c8f26e1c61528344af2ec5f77982954e49fe3cfa2b0ce91169ba06ea14",
+    "package": "ecarx.geea.platform.api.vf",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [],
+    "uses_permissions": [
+      "android.permission.WRITE_SETTINGS",
+      "android.permission.WRITE_SECURE_SETTINGS"
+    ],
+    "components": [
+      {
+        "type": "activity",
+        "android:name": "ecarx.geea.platform.api.vf.CBPABasePreferenceActivity",
+        "resolved_name": "ecarx.geea.platform.api.vf.CBPABasePreferenceActivity",
+        "intent_actions": [
+          "android.intent.action.MAIN"
+        ]
+      }
+    ]
+  },
+  {
+    "member": "packages/com.ecarx.car/base.apk",
+    "sha256": "1cab337a3c056d6ba2a7a58f12638c2b7137f672a1613a2fb78305602c6683f3",
+    "manifest_sha256": "1c40e7262f0571a3aa849c873b63637c1f11808fb04f659da034e321e17f687c",
+    "package": "com.ecarx.car",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [
+      {
+        "android:label": "car signal",
+        "android:name": "ecarx.car.permission.CAR_HVAC",
+        "android:protectionLevel": "0x00000000"
+      }
+    ],
+    "uses_permissions": [
+      "android.permission.MODIFY_AUDIO_ROUTING",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.INTERNET",
+      "android.permission.NET_ADMIN",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.CHANGE_NETWORK_STATE"
+    ],
+    "components": [
+      {
+        "type": "service",
+        "android:name": ".ECarXCarService",
+        "android:exported": "true",
+        "android:singleUser": "true",
+        "resolved_name": "com.ecarx.car.ECarXCarService",
+        "intent_actions": [
+          "ecarx.car.IECarXCar"
+        ]
+      },
+      {
+        "type": "activity",
+        "android:name": "com.ecarx.car.DeviceStorageLowDialog",
+        "android:launchMode": "3",
+        "resolved_name": "com.ecarx.car.DeviceStorageLowDialog",
+        "intent_actions": []
+      }
+    ]
+  },
+  {
+    "member": "packages/com.ecarx.car.multidisplay/base.apk",
+    "sha256": "73e6dd017c06e1999741f32e77008f09664595856f718ecd0e22c20e8a95a06f",
+    "manifest_sha256": "5cc1461fe489d3818c30e030c212451a83fd78fef5003e386d0ce332d1a259fd",
+    "package": "com.ecarx.car.multidisplay",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [],
+    "uses_permissions": [
+      "android.permission.MANAGE_ACTIVITY_STACKS"
+    ],
+    "components": [
+      {
+        "type": "service",
+        "android:name": ".EcarxMultidisplayService",
+        "android:enabled": "true",
+        "android:exported": "true",
+        "resolved_name": "com.ecarx.car.multidisplay.EcarxMultidisplayService",
+        "intent_actions": [
+          "android.intent.action.START_MULTIDISPLAY_SERVICE"
+        ]
+      }
+    ]
+  },
+  {
+    "member": "packages/com.ecarx.providers.settings/base.apk",
+    "sha256": "4ce3d3ce216fcac5c240e8c6efbe85c40bafabebecdb63a49a260b142d43d046",
+    "manifest_sha256": "e2653b9cbe08f7add18ce2b6e940af7529126591d4a54f6352790ac24e544631",
+    "package": "com.ecarx.providers.settings",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [],
+    "uses_permissions": [],
+    "components": [
+      {
+        "type": "provider",
+        "android:name": "EcarxSettingsProvider",
+        "android:exported": "true",
+        "android:multiprocess": "false",
+        "android:authorities": "EcarxSettings",
+        "android:initOrder": "100",
+        "android:singleUser": "true",
+        "android:visibleToInstantApps": "true",
+        "resolved_name": "com.ecarx.providers.settings.EcarxSettingsProvider",
+        "intent_actions": []
+      }
+    ]
+  },
+  {
+    "member": "packages/ecarx.settings/base.apk",
+    "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+    "manifest_sha256": "ad35942dab2bbbc3f5320c117e8d1428e3c5350b87aab0893e806c37f3b4af47",
+    "package": "ecarx.settings",
+    "sharedUserId": "android.uid.system",
+    "application_permission": null,
+    "permissions_declared": [
+      {
+        "android:name": "android.permission.NETWORK_SETTINGS"
+      }
+    ],
+    "uses_permissions": [
+      "android.permission.WRITE_SETTINGS",
+      "android.permission.INTERNET",
+      "android.permission.CHANGE_CONFIGURATION",
+      "android.permission.CAR_POWER",
+      "android.permission.WRITE_SECURE_SETTINGS",
+      "android.permission.SET_TIME",
+      "android.permission.MASTER_CLEAR",
+      "android.permission.SET_TIME_ZONE",
+      "android.permission.KILL_BACKGROUND_PROCESSES",
+      "android.permission.BLUETOOTH",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.BLUETOOTH_ADMIN",
+      "android.permission.MODIFY_AUDIO_SETTINGS",
+      "android.permission.RECORD_AUDIO",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "ecarx.controlboard.permission.ADD_CAR_SETTINGS",
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.MOUNT_UNMOUNT_FILESYSTEMS",
+      "android.permission.READ_PHONE_STATE",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "car.permission.ACCESS_DM_STATE",
+      "car.permission.CARPLAY_APP",
+      "car.permission.CHANGE_DM_STATE",
+      "android.permission.READ_LOGS",
+      "android.permission.WAKE_LOCK",
+      "android.permission.BROADCAST_STICKY",
+      "android.permission.SET_ACTIVITY_WATCHER",
+      "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+      "android.permission.ACCESS_WIFI_STATE",
+      "android.permission.CHANGE_WIFI_STATE",
+      "android.permission.OVERRIDE_WIFI_CONFIG",
+      "android.permission.CHANGE_NETWORK_STATE",
+      "android.car.permission.CAR_CONTROL_AUDIO_VOLUME",
+      "android.car.permission.CAR_VENDOR_EXTENSION",
+      "android.permission.BLUETOOTH_PRIVILEGED",
+      "android.permission.INTERACT_ACROSS_USERS",
+      "android.permission.MODIFY_PHONE_STATE",
+      "android.permission.REQUEST_INSTALL_PACKAGES"
+    ],
+    "components": [
+      {
+        "type": "activity",
+        "android:label": "@7F100021",
+        "android:name": "ecarx.settings.setting.SysSettingActivity",
+        "android:exported": "true",
+        "android:taskAffinity": "ecarx.settings.sys",
+        "android:launchMode": "2",
+        "android:screenOrientation": "0",
+        "android:configChanges": "0x00000F80",
+        "android:windowSoftInputMode": "0x00000020",
+        "android:resizeableActivity": "false",
+        "resolved_name": "ecarx.settings.setting.SysSettingActivity",
+        "intent_actions": [
+          "android.intent.action.MAIN",
+          "android.settings.WIRELESS_SETTINGS",
+          "android.settings.WIFI_SETTINGS",
+          "android.settings.BLUETOOTH_SETTINGS",
+          "android.settings.AP_SETTINGS",
+          "android.settings.WPC_SETTINGS",
+          "android.settings.TIMEFORMAT_SETTINGS",
+          "android.settings.NOTIFICATION_SETTINGS",
+          "android.settings.VOLUME_SETTINGS",
+          "android.settings.DAY_NIGHT_SETTINGS",
+          "ecarx.intent.action.ECARX_VR_APP_OPEN",
+          "android.intent.action.VIEW",
+          "ecarx.settings.action.BACK_HOME",
+          "ecarx.intent.action.ECARX_VR_APP_OPEN"
+        ]
+      },
+      {
+        "type": "activity",
+        "android:label": "@7F100020",
+        "android:name": "ecarx.settings.setting.CarSettingActivity",
+        "android:exported": "true",
+        "android:taskAffinity": "ecarx.settings.car",
+        "android:launchMode": "2",
+        "android:screenOrientation": "0",
+        "android:configChanges": "0x00002D80",
+        "android:windowSoftInputMode": "0x00000020",
+        "android:resizeableActivity": "false",
+        "resolved_name": "ecarx.settings.setting.CarSettingActivity",
+        "intent_actions": [
+          "android.intent.action.MAIN",
+          "ecarx.intent.action.ECARX_LAUNCH_APP_CAR_SETTINGS",
+          "ecarx.intent.action.ECARX_LAUNCH_APP_CAR_SETTINGS_CLOSE",
+          "android.intent.action.VIEW",
+          "ecarx.settings.action.DRIVE_MODE",
+          "ecarx.settings.action.BACK_HOME",
+          "ecarx.intent.action.ECARX_VR_APP_OPEN"
+        ]
+      },
+      {
+        "type": "activity",
+        "android:name": "ecarx.settings.setting.DetailsActivity",
+        "android:exported": "true",
+        "android:launchMode": "2",
+        "android:screenOrientation": "0",
+        "android:configChanges": "0x00000D84",
+        "android:windowSoftInputMode": "0x00000020",
+        "android:resizeableActivity": "false",
+        "resolved_name": "ecarx.settings.setting.DetailsActivity",
+        "intent_actions": [
+          "android.settings.APP_NOTIFICATION_SETTINGS"
+        ]
+      },
+      {
+        "type": "activity",
+        "android:theme": "@7F1100F6",
+        "android:name": "ecarx.settings.setting.BTQuickActivity",
+        "android:exported": "true",
+        "android:launchMode": "2",
+        "android:screenOrientation": "0",
+        "android:resizeableActivity": "true",
+        "resolved_name": "ecarx.settings.setting.BTQuickActivity",
+        "intent_actions": [
+          "ecarx.settings.action.BT_QUICK"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:name": "ecarx.settings.receiver.BluetoothReceiver",
+        "resolved_name": "ecarx.settings.receiver.BluetoothReceiver",
+        "intent_actions": [
+          "android.IBluetooth.device.action.PAIRING_REQUEST",
+          "android.IBluetooth.device.action.FOUND"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:name": "ecarx.settings.receiver.PresentationReceiver",
+        "resolved_name": "ecarx.settings.receiver.PresentationReceiver",
+        "intent_actions": [
+          "ecarx.intent.action.OPERATE_BLUETOOTH",
+          "ecarx.intent.action.OPERATE_4G",
+          "ecarx.intent.action.OPERATE_WPC",
+          "ecarx.intent.action.OPERATE_AP"
+        ]
+      },
+      {
+        "type": "provider",
+        "android:name": "ecarx.settings.provider.AppAccessInfoProvider",
+        "android:exported": "true",
+        "android:authorities": "ecarx.settings",
+        "resolved_name": "ecarx.settings.provider.AppAccessInfoProvider",
+        "intent_actions": []
+      },
+      {
+        "type": "service",
+        "android:name": "ecarx.settings.service.NoticeAccessService",
+        "android:enabled": "true",
+        "android:exported": "true",
+        "resolved_name": "ecarx.settings.service.NoticeAccessService",
+        "intent_actions": [
+          "com.ecarx.providerapp.NoticeAccessService"
+        ]
+      },
+      {
+        "type": "service",
+        "android:name": "ecarx.settings.service.DrivingModeService",
+        "android:exported": "true",
+        "resolved_name": "ecarx.settings.service.DrivingModeService",
+        "intent_actions": [
+          "ecarx.settings.ACTION_DRIVE_MODE"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:name": "ecarx.settings.setting.SettingActivity$VrBroadcastReceiver",
+        "resolved_name": "ecarx.settings.setting.SettingActivity$VrBroadcastReceiver",
+        "intent_actions": [
+          "ecarx.intent.broadcast.action.ECARX_VR_APP_CLOSE"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:name": "ecarx.settings.receiver.XiaoKaReceiver",
+        "resolved_name": "ecarx.settings.receiver.XiaoKaReceiver",
+        "intent_actions": [
+          "ecarx.intent.broadcast.action.ECARX_VR_APP_CLOSE"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:name": "ecarx.settings.receiver.DrivingModeReceiver",
+        "resolved_name": "ecarx.settings.receiver.DrivingModeReceiver",
+        "intent_actions": [
+          "ecarx.action.ECARX_ACTION_DRIVE_MODE"
+        ]
+      },
+      {
+        "type": "activity",
+        "android:theme": "@7F11000C",
+        "android:name": "com.ecarx.lightshow.LightShowActivity",
+        "android:exported": "true",
+        "android:launchMode": "2",
+        "android:screenOrientation": "0",
+        "android:configChanges": "0x00002D84",
+        "android:resizeableActivity": "false",
+        "resolved_name": "com.ecarx.lightshow.LightShowActivity",
+        "intent_actions": [
+          "ecarx.intent.action.LIGHT_SHOW"
+        ]
+      },
+      {
+        "type": "service",
+        "android:name": "ecarx.settings.service.WidgetService",
+        "resolved_name": "ecarx.settings.service.WidgetService",
+        "intent_actions": []
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C2",
+        "android:name": "ecarx.settings.vehicle.setting.widget.DaytimeRunningLightWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.DaytimeRunningLightWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.DaytimeRunningLightWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001CB",
+        "android:name": "ecarx.settings.vehicle.setting.widget.RearviewMirrorFoldingWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.RearviewMirrorFoldingWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.RearviewMirrorFoldingWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001DC",
+        "android:name": "ecarx.settings.vehicle.setting.widget.TrafficVideoRestrictionWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.TrafficVideoRestrictionWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.TrafficVideoRestrictionWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001DF",
+        "android:name": "ecarx.settings.vehicle.setting.widget.WelcomeLampWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.WelcomeLampWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.WelcomeLampWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001E1",
+        "android:name": "ecarx.settings.vehicle.setting.widget.WindowVentilateWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.WindowVentilateWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.WindowVentilateWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001BC",
+        "android:name": "ecarx.settings.vehicle.setting.widget.AutomaticLockOutTheDoorWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.AutomaticLockOutTheDoorWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.automatic.lock.out.the.door.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001BD",
+        "android:name": "ecarx.settings.vehicle.setting.widget.AutomaticUnlockingNearTheDoorWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.AutomaticUnlockingNearTheDoorWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.automatic.unlocking.near.the.door.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001BB",
+        "android:name": "ecarx.settings.vehicle.setting.widget.ClosedDoorAutomaticDoorClosingWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.ClosedDoorAutomaticDoorClosingWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.close.door.automatic.door.closing.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001D5",
+        "android:name": "ecarx.settings.vehicle.setting.widget.CloseSkylightUmbrellaWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.CloseSkylightUmbrellaWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.close.skylight.unbrella.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C4",
+        "android:name": "ecarx.settings.vehicle.setting.widget.FortificationTypeHintsWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.FortificationTypeHintsWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.fortification.type.hints.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001DA",
+        "android:name": "ecarx.settings.vehicle.setting.widget.TouchMusicWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.TouchMusicWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.touch.music.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C0",
+        "android:name": "ecarx.settings.vehicle.setting.widget.BlindSpotDectWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.BlindSpotDectWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.blind.spot.dect.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001BA",
+        "android:name": "ecarx.settings.vehicle.setting.widget.AtmosphereLampsWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.AtmosphereLampsWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.atmosphere.lamps.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001B8",
+        "android:name": "ecarx.settings.vehicle.setting.widget.AnyDoorLockCarWarningWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.AnyDoorLockCarWarningWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.any.door.lock.car.warning.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001D3",
+        "android:name": "ecarx.settings.vehicle.setting.widget.RlsWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.RlsWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.rls.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001DE",
+        "android:name": "ecarx.settings.vehicle.setting.widget.VolumeFollowSpeedWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.VolumeFollowSpeedWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.volume.follow.speed.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001E0",
+        "android:name": "ecarx.settings.vehicle.setting.widget.WindowClampWarningWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.WindowClampWarningWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.window.clamp.warning.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001D1",
+        "android:name": "ecarx.settings.vehicle.setting.widget.PowerOnLockAlarmWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.PowerOnLockAlarmWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.power.on.lock.alarm.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001E2",
+        "android:name": "ecarx.settings.vehicle.setting.widget.WiperFollowReverseGearWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.WiperFollowReverseGearWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.wiper.follow.reverse.gear.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C1",
+        "android:name": "ecarx.settings.vehicle.setting.widget.BSGWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.BSGWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.bsg.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001CA",
+        "android:name": "ecarx.settings.vehicle.setting.widget.LaneMaintenanceAssistanceWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.LaneMaintenanceAssistanceWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.lane.maintenance.assistance.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C8",
+        "android:name": "ecarx.settings.vehicle.setting.widget.IntelligentPilotageWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.IntelligentPilotageWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.intelligent.pilotage.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001D8",
+        "android:name": "ecarx.settings.vehicle.setting.widget.SpeedLimitReminderWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.SpeedLimitReminderWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.speed.limit.reminder.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001DB",
+        "android:name": "ecarx.settings.vehicle.setting.widget.TrafficRecorderWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.TrafficRecorderWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.traffic.recorder.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001E3",
+        "android:name": "ecarx.settings.vehicle.setting.widget.WpcWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.WpcWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.wpc.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001D2",
+        "android:name": "ecarx.settings.vehicle.setting.widget.ReversingCarWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.ReversingCarWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.reversing.car.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001CF",
+        "android:name": "ecarx.settings.vehicle.setting.widget.PostCollisionWarningWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.PostCollisionWarningWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.collision.warning.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001CC",
+        "android:name": "ecarx.settings.vehicle.setting.widget.MirrorTiltedWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.MirrorTiltedWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.mirror.tilted.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C9",
+        "android:name": "ecarx.settings.vehicle.setting.widget.LaneChangeAIDWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.LaneChangeAIDWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.lane.change.aid.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001CD",
+        "android:name": "ecarx.settings.vehicle.setting.widget.OpenDoorWarningWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.OpenDoorWarningWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.open.door.warning.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C6",
+        "android:name": "ecarx.settings.vehicle.setting.widget.HeadUpDisplaySwitchWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.HeadUpDisplaySwitchWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.display.headup.switch.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C5",
+        "android:name": "ecarx.settings.vehicle.setting.widget.HeadUpDisplayAuToWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.HeadUpDisplayAuToWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.display.headup.auto.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001D4",
+        "android:name": "ecarx.settings.vehicle.setting.widget.SailingWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.SailingWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.sailing.Widget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001B9",
+        "android:name": "ecarx.settings.vehicle.setting.widget.AssistLandChangeWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.AssistLandChangeWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.AssistLandChangeWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001BE",
+        "android:name": "ecarx.settings.vehicle.setting.widget.AutomaticParkingWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.AutomaticParkingWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.AutomaticParkingWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C3",
+        "android:name": "ecarx.settings.vehicle.setting.widget.EscSportWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.EscSportWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.EscSportWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001CE",
+        "android:name": "ecarx.settings.vehicle.setting.widget.ParkAssistanceSystemWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.ParkAssistanceSystemWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.ParkAssistanceSystemWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001D6",
+        "android:name": "ecarx.settings.vehicle.setting.widget.SlowSteepSlopesWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.SlowSteepSlopesWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.SlowSteepSlopesWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001DD",
+        "android:name": "ecarx.settings.vehicle.setting.widget.VehicleDeviationWarningWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.VehicleDeviationWarningWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.VehicleDeviationWarningWidget"
+        ]
+      },
+      {
+        "type": "receiver",
+        "android:label": "@7F1001C7",
+        "android:name": "ecarx.settings.vehicle.setting.widget.InductionLockWidget",
+        "resolved_name": "ecarx.settings.vehicle.setting.widget.InductionLockWidget",
+        "intent_actions": [
+          "android.appwidget.action.APPWIDGET_UPDATE",
+          "com.example.action.ACTION_SWITCH",
+          "com.example.action.ACTION_SWITCH.InductionLockWidget"
+        ]
+      }
+    ]
+  }
+]

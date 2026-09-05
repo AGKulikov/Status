@@ -1,19 +1,55 @@
 {
-  "version": "1.0",
-  "date": "2026-09-04",
-  "note": "This is a research queue, not scheduled or automatically executed work.",
+  "version": "1.1",
+  "date": "2026-09-05",
+  "note": "Рабочая очередь приоритетных вопросов, а не исчерпывающий перечень и не расписание автоматических действий. Подробные неизвестные, аппаратные ограничения, необходимые артефакты и следующие шаги остаются в 94 связанных карточках. Сначала используются уже собранные исходники и архивы; новые наблюдения запрашиваются только для конкретного остаточного пробела.",
+  "coverage": {
+    "question_count": 50,
+    "system_card_count": 94,
+    "system_card_sources": [
+      "research-2026-09-05/architecture_domains/systems.json",
+      "research-2026-09-05/powertrain_chassis/systems.json",
+      "research-2026-09-05/android_platform/systems.json",
+      "research-2026-09-05/comfort_systems/systems.json",
+      "research-2026-09-05/continuation/systems.json"
+    ],
+    "covered_system_card_count": 94,
+    "uncovered_system_ids": [],
+    "meaning": "coverage_ids связывает приоритетную тему с карточкой; наличие связи не означает полного исследования системы или подтверждения физического управления.",
+    "preserved_question_ids": [
+      "CRUISE_WRITE",
+      "LIMITER_VALUE",
+      "VP_IDENTITY",
+      "RUNTIME_SDK",
+      "CAMERA_STATE",
+      "PAS_PAUSE",
+      "CLUSTER_WINGS",
+      "HUD_PROFILE",
+      "MEDIA_LATENCY",
+      "SHADE_OWNER",
+      "WINDOW_SEAT",
+      "TELEMETRY_SCALE",
+      "BODY_SUPPORT",
+      "CAN_OWNERSHIP"
+    ],
+    "preservation_note": "Поля PAS_PAUSE сохранены из текущего исходника дословно; сведения о выпуске не являются новым результатом этого исследования."
+  },
   "questions": [
     {
       "id": "CRUISE_WRITE",
       "priority": "P1",
       "function": "Программные MAIN/SET/RES/+/− и лимитер",
       "status": "OPEN",
-      "known": "6 read properties не кодируются исходящим VHAL; ASDM status2↔3 наблюдается",
+      "known": "Шесть READ-свойств не кодируются исходящим VHAL; ASDM status 2↔3 наблюдался. Настройки ACC/HWA не установлены как MAIN/SET/RES; сохранённый канал MCU-журнала не является маршрутом этих команд.",
       "missing_evidence": "Конкретный поддержанный command route и получатель ECU/MCU",
-      "next_step": "Связать VP .1 с полученными образами и production обработчиком кнопок; не повторять set READ свойств",
+      "next_step": "Проверить production consumer кнопок и уже полученный HU-Route, сопоставить с обработчиками peer .1; установить supported route и обратный статус. Исходящие кадры не воспроизводить.",
       "sources": [
         "cruise/report.md",
-        "cruise/vhal_switch_audit.json"
+        "cruise/vhal_switch_audit.json",
+        "research-2026-09-05/powertrain_chassis/systems.json",
+        "research-2026-09-05/architecture_domains/systems.json"
+      ],
+      "coverage_ids": [
+        "ADAS-CRUISE"
       ]
     },
     {
@@ -21,11 +57,15 @@
       "priority": "P1",
       "function": "Режим и заданная скорость лимитера",
       "status": "OPEN",
-      "known": "AdjSpdLimnSts/CrsCtrlrSts в сохранённых журналах invalid/-1",
+      "known": "AdjSpdLimnSts/CrsCtrlrSts в прежних журналах invalid/−1. Статически 31354 — READ; настройки предупреждения о скорости и TSR compensation не устанавливают заданную скорость лимитера.",
       "missing_evidence": "Сигнал режима и числовая шкала скорости из правильного домена",
-      "next_step": "Найти сообщение, коррелирующее с независимым визуальным изменением; исходящие кадры не воспроизводить",
+      "next_step": "В уже сохранённых callback/PCAP и штатном потребителе найти отдельные mode/set-speed поля; разобрать invalid, единицы и точный decoder. Сопоставление с визуальным значением остаётся отдельным доказательством.",
       "sources": [
-        "cruise/report.md"
+        "cruise/report.md",
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "ADAS-LIMITER"
       ]
     },
     {
@@ -33,11 +73,20 @@
       "priority": "P1",
       "function": "Кто владеет 198.18.34.1",
       "status": "OPEN",
-      "known": "UDP peer .1:50500 и QNX startup .2 подтверждены",
-      "missing_evidence": "Привязка IP/MAC к домену, образу и процессу",
-      "next_step": "Разобрать уже выгруженные VM/network конфиги и регистрацию endpoint",
+      "known": "В исходном PCAP повторно подтверждены 45 входящих MCU-log пакетов 0099/00c8 от 198.18.34.1:50500 к Android .15:50335. QNX/qconn имеет .2. LA и LV конфигурируют system la с одинаковым виртуальным peer; LV — Failsafe guest. Это не привязывает .1 к физическому MCU или linux-lv.img.",
+      "missing_evidence": "Процесс, сетевой интерфейс и исполняемый образ владельца .1:50500; первоначальный источник MCU-текста за транспортным peer; независимая привязка к установленному оборудованию.",
+      "next_step": "Сопоставить endpoint bind/registration в имеющихся native библиотеках и VM/network config; связать отдельный PA_VP_Version с образом. printApvpVersion читает PA_ErrorReport, поэтому его ярлык VpVersion не использовать как идентификацию.",
       "sources": [
-        "cruise/report.md"
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/architecture_domains/primary_evidence.json",
+        "research-2026-09-05/architecture_domains/sdk_architecture_evidence.json",
+        "research-2026-09-05/mcu_log_route/report.md",
+        "research-2026-09-05/mcu_log_route/pcap_mcu_summary.json"
+      ],
+      "coverage_ids": [
+        "ARCH-004",
+        "ARCH-005",
+        "ARCH-016"
       ]
     },
     {
@@ -47,10 +96,16 @@
       "status": "OPEN",
       "known": "758 CB/PA ID различаются между копиями SDK; exact static mapping извлечён",
       "missing_evidence": "Runtime class origin для конкретного приложения/класса",
-      "next_step": "Фиксировать loader/source/version и runtime constants существующим Research Agent; не выбирать ID по одному имени",
+      "next_step": "Сначала сопоставить имеющиеся classloader paths, packages/framework dependencies и исходные DEX; для каждого клиента записать класс, source SHA и значения. Только отсутствующее runtime происхождение станет точечным запросом.",
       "sources": [
         "firmware/conflicts.json",
-        "firmware/sdk_to_hal.json"
+        "firmware/sdk_to_hal.json",
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "ARCH-001",
+        "ARCH-021"
       ]
     },
     {
@@ -63,7 +118,11 @@
       "next_step": "Сопоставить PAC watcher, 29021, 29043 и 28995 с видимостью и конфигурацией; считать 3 только частным подтверждённым случаем",
       "sources": [
         "controls/camera_route.json",
-        "controls/report.md"
+        "controls/report.md",
+        "research-2026-09-05/continuation/systems.json"
+      ],
+      "coverage_ids": [
+        "BASE-CAMERA"
       ]
     },
     {
@@ -79,6 +138,9 @@
         "observations/camera_gear_transitions.json",
         "../../release-manifests/NATRO-2.7.7.md",
         "../../PROJECT_REQUIREMENTS_RU.md#11-текущие-обязательные-проверки-перед-следующим-apk"
+      ],
+      "coverage_ids": [
+        "BASE-PAS"
       ]
     },
     {
@@ -86,11 +148,18 @@
       "priority": "P1",
       "function": "Владелец крыльев и штатной машинки",
       "status": "OPEN",
-      "known": "Тест I испорчен восстановлением до ручной метки; K3 даёт 1920×1080",
+      "known": "Прежний тест I имеет метку после восстановления. Новый runtime подтверждает четыре логических дисплея и ecarx_daemon_OverlayDisplay#0…4; размеры 1920×1080 и имена слоёв не идентифицируют физические пиксели крыльев.",
       "missing_evidence": "Синхронная привязка к владельцу surface и физическим пикселям",
-      "next_step": "Повторить один изолированный вариант с меткой до восстановления и отдельным наблюдением DIM/HUD",
+      "next_step": "Сначала свести сохранённые layer/window snapshots с parent, layerStack, процессами и временем теста; отдельно разобрать QNX/display конфигурацию. Если останется пробел, потребуется один синхронный опыт с меткой до восстановления.",
       "sources": [
-        "display/report.md"
+        "display/report.md",
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-09-05/continuation/systems.json"
+      ],
+      "coverage_ids": [
+        "BASE-DIM",
+        "PLAT_DISPLAY",
+        "PLAT_UI"
       ]
     },
     {
@@ -102,7 +171,13 @@
       "missing_evidence": "Валидный active profile/PEN и независимый физический эффект",
       "next_step": "Сначала установить причину invalid PA и неизвестного профиля; не подставлять 15 и не повторять перебор enum",
       "sources": [
-        "display/report.md"
+        "display/report.md",
+        "research-2026-09-05/continuation/systems.json",
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "BASE-HUD",
+        "PLAT_DISPLAY"
       ]
     },
     {
@@ -112,9 +187,15 @@
       "status": "PARTLY_RESOLVED",
       "known": "Три остановки main thread дольше 8 секунд; timestamp начинается внутри callback",
       "missing_evidence": "Нажатие → callback → dispatch → player → audio на общей временной шкале",
-      "next_step": "Исправить блокировки UI отдельной задачей; добавить eventTime, downTime и время callback; не считать текущую метрику полной задержкой",
+      "next_step": "Разобрать уже собранные input/media traces и места блокировки UI; восстановить eventTime/downTime/callback/dispatch/audio timeline, повторы и long-press. Отдельно отметить отсутствующую аппаратную метку нажатия.",
       "sources": [
-        "display/report.md"
+        "display/report.md",
+        "research-2026-09-05/continuation/systems.json",
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "BASE-MEDIAKEY",
+        "PLAT_AUDIO"
       ]
     },
     {
@@ -122,11 +203,16 @@
       "priority": "P1",
       "function": "Штатная шторка и жест открытия",
       "status": "OPEN",
-      "known": "Штатный package и существующая панель Natro найдены",
-      "missing_evidence": "Конкретный component/gesture owner и надёжное восстановление",
-      "next_step": "Изучить component и IPC перед адресным изменением; не отключать SystemUI целиком",
+      "known": "Runtime фиксирует ecarx.notificationcenterui/.ControlBoardService, action ecarx.notificationcenterui.action.CONTROLLER_BOARD, UID1000; рядом действуют GestureService и InputService. Конкретный компонент найден, вся цепь edge gesture ещё не разобрана.",
+      "missing_evidence": "Получатель жеста и IPC до ControlBoard; другие обязанности сервиса; component permissions; обратимый штатный suppress/restore контракт и его оконное подтверждение.",
+      "next_step": "Найти XCNotificationCenterUI/gesture/input APK среди уже сохранённых архивов, разобрать consumers CONTROLLER_BOARD и bind/start chain, manifest и service-side проверки. ServiceRecord сам по себе не является разрешением на отключение компонента.",
       "sources": [
-        "controls/report.md"
+        "controls/report.md",
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-09-05/android_platform/runtime_sources.json"
+      ],
+      "coverage_ids": [
+        "PLAT_UI"
       ]
     },
     {
@@ -134,11 +220,16 @@
       "priority": "P2",
       "function": "Остановка окон и движения сидений",
       "status": "PARTLY_RESOLVED",
-      "known": "Window raw 1…26 соответствует 0…100% с шагом 4; у сидений есть направление и stop; разобраны 110 Adapt routes",
-      "missing_evidence": "Таймаут и stop при потере фокуса/Binder; runtime support комплектации",
-      "next_step": "Подтвердить цикл в штатном клиенте и физический feedback; не приписывать единицы миллиметров команде направления",
+      "known": "Окна: raw 1…26 → 0…100% с шагом 4; групповая запись последовательна и не атомарна. Сиденья: направления 1/2, stop 0. В non-EX11 ветви окна обнаружено расхождение регистрации pause и mapper.",
+      "missing_evidence": "Реальный stop при отпускании, потере фокуса/Binder/сне; препятствие и anti-pinch feedback; границы зон, положение и остаточное движение; значение расхождения pause на нужном SDK.",
+      "next_step": "Свести штатный press/release lifecycle, оконный mapper и PA33833…33840; для сидений отделить направления от абсолютных координат и памяти. Установить, кто гарантирует stop при разрыве клиента.",
       "sources": [
-        "firmware/mapping/report.md"
+        "firmware/mapping/report.md",
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-006",
+        "COMF-019"
       ]
     },
     {
@@ -146,12 +237,21 @@
       "priority": "P2",
       "function": "Единицы и свежесть телеметрии",
       "status": "PARTLY_RESOLVED",
-      "known": "SDK getter может читать кэш; 55 ID менялись в журналах; извлечены 2355 статических SignalId",
-      "missing_evidence": "Шкалы, качество и timestamps для нужных метрик",
-      "next_step": "Выбирать точный typed decoder и callback; не трактовать initialValue как измерение",
+      "known": "По байтам Sensor установлены: EngSpdDispd31381×0.5; FuLvl30932×0.2×1000; DayToSrv30871×24; угол31515/1024 и скорость руля31516/128; TPMS давление×1.373 и температура−50. Эти преобразования не доказывают единицы каждого публичного поля, signedness, свежесть или валидность.",
+      "missing_evidence": "Typed unit contract, invalid markers, signedness руля, источник времени и max age; связь качества/Qf/MsgOldFlg с последним сохранённым значением; разделение fixed initialValue и измерения.",
+      "next_step": "Связать точные Sensor getters с их штатными потребителями и public IDs, затем проверить формулы на уже записанных raw/public парах. TPMS MsgOldFlg анализировать отдельно от availability, которая напрямую его не проверяет.",
       "sources": [
         "firmware/report.md",
-        "observations/observed_signals.json"
+        "observations/observed_signals.json",
+        "research-2026-09-05/powertrain_chassis/systems.json",
+        "research-2026-09-05/powertrain_chassis/sdk_findings.json"
+      ],
+      "coverage_ids": [
+        "PT-ENGINE",
+        "PT-FUEL",
+        "CH-STEERING",
+        "CH-TPMS",
+        "ADAS-PERCEPTION"
       ]
     },
     {
@@ -159,11 +259,20 @@
       "priority": "P2",
       "function": "Оснащение: подсветка, задние сиденья, ароматизация",
       "status": "OPEN",
-      "known": "Публичные и PA вызовы извлечены",
-      "missing_evidence": "Поддержка каждой зоны и enum на комплектации пользователя",
-      "next_step": "Запрашивать support и allowed values, затем независимый feedback; наличие enum не доказывает наличие оборудования",
+      "known": "Разобраны carconfig/zone/allowed-value ветви и fixed Active ответы. Общие SDK enum, климатические зоны, aroma slots, третий ряд ремней и suspension setters не доказывают оснащение конкретного KX11.",
+      "missing_evidence": "Подтверждённая комплектация и доступность каждой зоны; installed part identity, независимый PA/датчик и физическое исполнение; расхождение заявленного support и реального устройства.",
+      "next_step": "Собрать матрицу конфигурация → разрешённая зона/enum → getter/callback → свидетельство установленного оборудования. Для ароматизации разобрать PA33406 и статусные TYPE/слоты; не использовать fixed Active как аппаратный тест.",
       "sources": [
-        "controls/report.md"
+        "controls/report.md",
+        "research-2026-09-05/comfort_systems/systems.json",
+        "research-2026-09-05/powertrain_chassis/systems.json",
+        "research-2026-09-05/architecture_domains/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-018",
+        "COMF-025",
+        "CH-SUSPENSION",
+        "SRS-BELTS"
       ]
     },
     {
@@ -171,11 +280,630 @@
       "priority": "P2",
       "function": "Роль MPC5746/CAN и другие SPI-каналы",
       "status": "OPEN",
-      "known": "ELF PowerPC получен; SPI4 bridge имеет 89 полей; reset_stats изменял старую статистику",
-      "missing_evidence": "Связь образа с работающей прошивкой и исполнительным доменом",
-      "next_step": "Продолжить офлайн-анализ ownership/config; исключить чтение reset_stats; не выполнять прошивку и перебор команд",
+      "known": "MPC5746 ELF содержит FreeRTOS/CAN/SPI/board-power и reference-board ADP-STARVIP/ALCOR dual-SoC признаки. QNX can_driver указывает SPI9; IPCL SPI4 — отдельный IHU обмен. Два исходных Android-лога передают MCU_Version 20.24.10.23024.41141 через PA_McuLog.",
+      "missing_evidence": "Соответствие reference ELF установленной версии MCU; владельцы SPI4/SPI9 и физических CAN/FlexRay/LIN; путь от transport endpoint к контроллеру и конкретному ECU.",
+      "next_step": "Сравнить version/build metadata образов с сообщаемой MCU-версией, затем call graph driver/IPCL и board configuration. Продолжать по сохранённым байтам; reset_stats не является чтением неизменяемой статистики.",
       "sources": [
-        "cruise/report.md"
+        "cruise/report.md",
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/architecture_domains/mpc5746c_structure_evidence.json",
+        "research-2026-09-05/architecture_domains/relayed_mcu_logs.json",
+        "research-2026-09-05/mcu_log_route/report.md"
+      ],
+      "coverage_ids": [
+        "ARCH-008",
+        "ARCH-009",
+        "ARCH-010",
+        "ARCH-011",
+        "ARCH-024"
+      ]
+    },
+    {
+      "id": "DOMAIN_BOOT_GRAPH",
+      "priority": "P1",
+      "function": "Как связаны Android, QNX, LA/LV, гипервизор и перезапуски?",
+      "status": "OPEN",
+      "known": "QNX startup и qvm конфиги задают Android guest и виртуальный Ethernet; LV — failsafe ветвь system la. Имена файлов и reference-board banners не определяют набор установленных вычислителей.",
+      "missing_evidence": "Полный boot graph, условия выбора LA/LV, watchdog ownership, границы перезапуска guest/service/host и состояние после каждого восстановления.",
+      "next_step": "Связать startup branches, GPIO154, qvm options, watchdog и service registrations с существующими boot logs; разнести build-time конфиг и наблюдавшийся запуск.",
+      "sources": [
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/architecture_domains/primary_evidence.json"
+      ],
+      "coverage_ids": [
+        "ARCH-001",
+        "ARCH-002",
+        "ARCH-003",
+        "ARCH-019"
+      ]
+    },
+    {
+      "id": "NETWORK_OWNERSHIP",
+      "priority": "P1",
+      "function": "Какие интерфейсы и процессы обслуживают автомобильные сети?",
+      "status": "OPEN",
+      "known": "Есть мост QNX vp0/emac0; Android routes ведут ASDM .36.1 через eth0.5, car /16 через eth0.11, gateway TCAM .32.17. Discovery30490 и VP50335/50500 — разные интерфейсные контракты.",
+      "missing_evidence": "L2/L3 путь каждого сервиса, VLAN/bridge ownership, bind address, фильтрация и направление proxy; физическое присутствие адресата не следует из PERMANENT ARP.",
+      "next_step": "Свести имеющиеся routes, qvm, vsomeip и native client constructors в таблицу endpoint → process → interface → next hop; отметить ненаблюдавшиеся узлы.",
+      "sources": [
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "ARCH-005",
+        "ARCH-006",
+        "ARCH-007",
+        "PLAT_NETWORK"
+      ]
+    },
+    {
+      "id": "ECU_INVENTORY",
+      "priority": "P1",
+      "function": "Каков подтверждённый состав ECU и деталей автомобиля?",
+      "status": "OPEN",
+      "known": "IECU перечисляет возможные IHU/CSD/WPC/CCSM/AUD/TEM2/VCM/PAC; PartInfo описывает assembly/module/config. Эти enum, 23 update images и 23 MCU log groups не являются списком физических ECU.",
+      "missing_evidence": "Для каждого установленного ECU: независимая аппаратная идентичность, диагностический адрес, part/version, шина и роль; неизвестные и отсутствующие позиции должны различаться.",
+      "next_step": "Сначала разобрать существующие PartInfo/diagnostic/stock records и полный member inventory; пополнять ecu_registry только с точным источником и SHA, отдельно от software_groups.",
+      "sources": [
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/architecture_domains/ecu_registry.json",
+        "research-2026-09-05/corpus/archive_member_inventory.json"
+      ],
+      "coverage_ids": [
+        "ARCH-012",
+        "ARCH-014",
+        "ARCH-025"
+      ]
+    },
+    {
+      "id": "DIAG_DTC",
+      "priority": "P1",
+      "function": "Как работают DoIP/UDS, DTC и диагностические владельцы?",
+      "status": "OPEN",
+      "known": "QNX DoIP задаёт один physical target 0xE000 и шесть functional addresses; UDS config содержит иную функциональную группировку. Android имеет dtcnl; getDtcCodeStatus и setDtcCode различны.",
+      "missing_evidence": "Кто отвечает за адрес, где gateway, какая таблица DTC/статусов актуальна, что локально и что пересылается, какие операции имеют побочный эффект.",
+      "next_step": "Проследить существующие DoIP/UDS config и native dispatch до обработчиков, декодировать уже записанные diagnostic logs. Функциональный адрес не считать отдельным ECU.",
+      "sources": [
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "ARCH-013",
+        "ARCH-015",
+        "PLAT_UPDATE"
+      ]
+    },
+    {
+      "id": "VERSION_PROVENANCE",
+      "priority": "P1",
+      "function": "Как связать версии AP/VP/QNX/MCU с точными образами?",
+      "status": "OPEN",
+      "known": "Получены QNX build labels и MCU_Version из двух boot logs. printApvpVersion помечает PA_ErrorReport как VpVersion; отдельный PA_VP_Version имеет ID33483. Копии некоторых библиотек в разных архивах имеют одинаковый SHA.",
+      "missing_evidence": "Версия реально исполняемого компонента, соответствующий image/header и конфигурация; совместимость между доменами и происхождение каждого runtime экземпляра.",
+      "next_step": "Построить таблицу runtime callback → version field → image hash/header → build configuration; проверить дубликаты по SHA, не по имени/дате архива.",
+      "sources": [
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/architecture_domains/sdk_architecture_evidence.json",
+        "research-2026-09-05/architecture_domains/relayed_mcu_logs.json"
+      ],
+      "coverage_ids": [
+        "ARCH-016",
+        "ARCH-014"
+      ]
+    },
+    {
+      "id": "POWER_LIFECYCLE",
+      "priority": "P1",
+      "function": "Как устроены питание, сон и восстановление связности?",
+      "status": "OPEN",
+      "known": "MCU relay показывает последовательности AP/IM/EM/qnx/and/ps_hold. PowerSomeIP управляет mute, Wi-Fi и Bluetooth; QNX request проходит через IPLM.ReleaseResourceGroup к PowerManager.onQNXRequest.",
+      "missing_evidence": "Состояния и разрешённые переходы каждого автомата, причины wake/sleep, сохранение ресурсов, условия heartbeat и фактическое снятие питания; embedded counter не установлен как миллисекунды.",
+      "next_step": "Раскрыть PowerSomeIP handlers и изменённый PowerManager, сопоставить PA_Power_Res и два boot timelines; отделить время источника MCU от Android получения и связи с ANCS/audio сбоями.",
+      "sources": [
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-09-05/architecture_domains/relayed_mcu_logs.json"
+      ],
+      "coverage_ids": [
+        "ARCH-017",
+        "ARCH-018",
+        "PLAT_POWER"
+      ]
+    },
+    {
+      "id": "UPDATE_RECOVERY",
+      "priority": "P1",
+      "function": "Как выбираются update targets и выполняется восстановление?",
+      "status": "OPEN",
+      "known": "Манифест содержит 23 image entries, не 23 ECU; обнаружена отдельная failsafe ветвь. OTA, USB update и PKI имеют свои сервисы; текст Flash successful в generic скрипте не проверяет exit status updater.",
+      "missing_evidence": "Подписи и совместимость payload, реальные A/B назначения, boot selection, rollback и сценарий прерывания; условия consent/install и восстановления после ошибки.",
+      "next_step": "По существующим metadata/config/code построить update state graph и проверить каждую запись main/backup, включая cmnlib; отделить подготовку, статус и операции записи. Образы не исполнять.",
+      "sources": [
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-09-05/architecture_domains/manifest_summary.json"
+      ],
+      "coverage_ids": [
+        "ARCH-020",
+        "PLAT_UPDATE"
+      ]
+    },
+    {
+      "id": "ACCESS_POLICY",
+      "priority": "P1",
+      "function": "Каковы реальные права клиента и границы доступа между доменами?",
+      "status": "OPEN",
+      "known": "System UID, exported=true, Binder presence и SDK setter установлены у отдельных компонентов, но не доказывают доступ обычного UID. QNX policy/VM configuration задают отдельную границу.",
+      "missing_evidence": "Проверки calling UID/signature/permission/SELinux для каждого выбранного API, область полномочий native peer и сохранение policy через reboot/update.",
+      "next_step": "Проследить service-side checks выбранных маршрутов, соотнести manifest с init/SELinux/QNX policy и caller context. Документировать отказ и официальный контракт без обхода контроля.",
+      "sources": [
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "ARCH-021",
+        "ARCH-022",
+        "PLAT_UPDATE"
+      ]
+    },
+    {
+      "id": "MCU_LOG_ORIGIN",
+      "priority": "P1",
+      "function": "Что именно передаёт MCU-log канал и как восстановить время событий?",
+      "status": "OPEN",
+      "known": "IPCP0099/00c8 → VHAL0x217082F3 → SDK33523 → ECarXCarLogService раскрыт по native/DEX и 45 пакетам. 1307 Android-строк двух boot logs содержат версию и 23 software groups; Panic — имя свойства, не признак аварии каждой записи.",
+      "missing_evidence": "Источник текста за peer, накопление/повтор/потери, единицы и epoch внутренних меток, смысл поля payload+4, условия availability/status/format; связь DIAG network-management с реальными шинами.",
+      "next_step": "Свести PCAP и MCU embedded timeline; найти producer и CB_LogServiceStatusAP lifecycle в сохранённых образах. Не считать число строк количеством событий или log group физическим ECU.",
+      "sources": [
+        "research-2026-09-05/architecture_domains/systems.json",
+        "research-2026-09-05/mcu_log_route/report.md",
+        "research-2026-09-05/mcu_log_route/evidence.json",
+        "research-2026-09-05/mcu_log_route/pcap_mcu_summary.json"
+      ],
+      "coverage_ids": [
+        "ARCH-023",
+        "ARCH-024"
+      ]
+    },
+    {
+      "id": "ENGINE_FUEL",
+      "priority": "P1",
+      "function": "Как интерпретировать двигатель, топливо и сервисные измерения?",
+      "status": "OPEN",
+      "known": "Sensor оборотов использует EngSpdDispd31381×0.5; EngNSafe со значением−1 не доказывает отсутствие оборотов. Уровень топлива, процент, расход и сервисный счётчик — отдельные каналы.",
+      "missing_evidence": "Единицы расхода и объёма, текущий/накопленный смысл, validity масла/охлаждения/давления, источник данных и преобразования каждого публичного getter.",
+      "next_step": "Связать Sensor getters с точными raw IDs и UI formatting, проверить уже сохранённые raw/public пары и quality flags; не переносить формулу одного поля на одноимённое соседнее.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "PT-ENGINE",
+        "PT-FUEL"
+      ]
+    },
+    {
+      "id": "TRANSMISSION_STARTSTOP",
+      "priority": "P1",
+      "function": "Что означают состояния коробки и управление автоматическим старт-стопом?",
+      "status": "OPEN",
+      "known": "GearLvrIndcn31385 задаёт P/R/N/D и отдельную manual ветвь; фактическая передача31414 отдельна. CB_SS_Activation — настройка автоматического старт-стопа, не доказанный запуск двигателя.",
+      "missing_evidence": "Владелец TCU feedback, manual/current/recommended gear, причины запрета старт-стопа, подтверждение настройки и сохранение между циклами питания.",
+      "next_step": "Разобрать state/PEN/PA33634 и штатные отображения gearbox/start-stop, проверить нулевые enum по DEX; не интерпретировать setting как управление стартером.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "PT-TRANSMISSION",
+        "PT-STARTSTOP"
+      ]
+    },
+    {
+      "id": "DRIVEMODE_AWD",
+      "priority": "P1",
+      "function": "Как режим движения связан с индивидуальным профилем и полным приводом?",
+      "status": "OPEN",
+      "known": "Для режима найден CB32877 и отдельные PA/PEN; широкий SDK enum не определяет режимы KX11. PA33434 полного привода — READ BYTES, прямое управление муфтой не установлено.",
+      "missing_evidence": "Допустимые режимы комплектации, требуемый confirmation, затронутые подсистемы, persistence и семантика AWD torque/status feedback.",
+      "next_step": "Сопоставить штатный mode chooser, allowed values, PA/PEN и individual-profile fields с записанными переходами; разобрать AWD payload отдельно от настройки режима.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "PT-DRIVEMODE",
+        "CH-AWD"
+      ]
+    },
+    {
+      "id": "BRAKE_CONTROL",
+      "priority": "P1",
+      "function": "Где граница между тормозной телеметрией, brake feel и ABS/ESC настройкой?",
+      "status": "OPEN",
+      "known": "Педаль/момент имеют READ и quality поля. ESC sport использует CB33026/PA33635, а raw31318 — BYTES с PEN. Brake feel в профиле не доказывает команду тормозного давления.",
+      "missing_evidence": "Единицы и validity педали/момента, current intervention/fault ABS/ESC, подтверждение sport режима и условия доступности; исполнительный маршрут не установлен.",
+      "next_step": "Раскрыть BYTES/PEN и штатный status consumer, отделить requested setting, accepted state и intervention; сопоставить counters/checksums в уже собранной телеметрии.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "CH-BRAKES",
+        "CH-ABS-ESC"
+      ]
+    },
+    {
+      "id": "EPB_AUTOHOLD_HDC",
+      "priority": "P1",
+      "function": "Как различаются EPB, AutoHold, HDC и парковочное экстренное торможение?",
+      "status": "OPEN",
+      "known": "EPB soft-switch29325 имеет INT32 RW и enum Apply/Release, но converter/runtime не раскрыты. Auto-apply33041 и AutoHold setting отдельны. Публичный PBC_EPB_SWITCH фактически ведёт к PEB32980/33562, не к EPB.",
+      "missing_evidence": "Полные converters и interlocks EPB/HDC, press/release lifecycle, обратные applied/holding/fault состояния; PEB inhibition и поддержка оборудования.",
+      "next_step": "Статически связать каждый отдельный CB/PA с production consumer и PEN; проверить условия скорости/передачи/педали по коду и сохранённым логам. RW/echo не считать исполнением.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "CH-EPB",
+        "CH-AUTOHOLD-HDC",
+        "CH-PEB"
+      ]
+    },
+    {
+      "id": "STEERING_SUSPENSION",
+      "priority": "P1",
+      "function": "Как читаются руль и состояния подвески, какие настройки реально поддержаны?",
+      "status": "OPEN",
+      "known": "Sensor делит угол31515 на1024, скорость31516 на128 без sign extension в проверенном getter. Общий SDK имеет height/damping CB32886/PA33452; наличие регулируемой подвески не доказано.",
+      "missing_evidence": "Signedness, ноль, диапазон, единицы и invalid/Qf руля; доступность и смысл suspension states, реальные actuators и interlocks, если они установлены.",
+      "next_step": "Найти typed consumers руля и обработку uint16/signed границы; сопоставить suspension support/config/PartInfo до исследования setter semantics.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "CH-STEERING",
+        "CH-SUSPENSION"
+      ]
+    },
+    {
+      "id": "TPMS_FRESHNESS",
+      "priority": "P1",
+      "function": "Когда значения давления и температуры шин являются свежими и пригодными?",
+      "status": "OPEN",
+      "known": "Для четырёх колёс есть 40 READ-каналов; Sensor применяет P×1.373 и T−50. Availability учитывает config19, carMode, usageMode и PTimeout, но непосредственно не проверяет MsgOldFlg.",
+      "missing_evidence": "Единица публичного давления, invalid markers, возраст последней передачи, wheel association и приоритеты low-pressure/battery/fill warnings; cached число может быть устаревшим.",
+      "next_step": "Разобрать штатный tyre consumer и MsgOldFlg/PTimeout вместе с timestamp; свести уже сохранённые четыре колеса в raw/value/quality/time таблицу.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "CH-TPMS"
+      ]
+    },
+    {
+      "id": "ADAS_MODES",
+      "priority": "P1",
+      "function": "Как отличить настройку, готовность, предупреждение и вмешательство ADAS?",
+      "status": "OPEN",
+      "known": "LKA/ELKA/EMA/HWA, CMS/AEB, LCA/RCW/RCTA/DOW и DPS имеют отдельные настройки и PA. TSR compensation может быть командой шага Plus/Minus, а не абсолютным смещением; driver reminder не доказывает DMS camera.",
+      "missing_evidence": "Для каждой семьи: installed support, enum/PEN, enable/request/active/fault, условия скорости/полос/водителя и источник обратного подтверждения; reserved значения не являются меню.",
+      "next_step": "По каждой связанной карточке отдельно проследить штатный setting/status consumer; раскрыть BYTES/PEN и нормализовать state machine. Не выводить вмешательство из одного echo настройки.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "ADAS-LANE",
+        "ADAS-COLLISION",
+        "ADAS-SIDE",
+        "ADAS-TSR",
+        "ADAS-DRIVER"
+      ]
+    },
+    {
+      "id": "PERCEPTION_GEOMETRY",
+      "priority": "P1",
+      "function": "Какие поля описывают реальные полосы и объекты восприятия?",
+      "status": "OPEN",
+      "known": "В экспортах 32 поля коэффициентов полос имеют фиксированные initial-like значения, девять объектных полей−1. Это не подтверждает валидную геометрию или полный список объектов.",
+      "missing_evidence": "Схема BYTES, единицы/координаты, count/track ID, validity/confidence, timestamps и источник восприятия; lifecycle появления/исчезновения целей.",
+      "next_step": "Найти producer/consumer схемы в имеющихся ASDM/ADAS библиотеках и записанных payload; различить начальную конфигурацию, cache и измерение до визуализации.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "ADAS-PERCEPTION"
+      ]
+    },
+    {
+      "id": "SRS_STATUS",
+      "priority": "P1",
+      "function": "Как читать состояния ремней и аварий, не смешивая их с исполнительными системами?",
+      "status": "OPEN",
+      "known": "Замок ремня, оснащённость и комфортное подтягивание — разные признаки. CrashStsSafe имеет status/counter/checksum; RecOfImpct — отдельный READ. Их наличие не раскрывает airbag trigger или EDR.",
+      "missing_evidence": "Реальные места ремней и occupancy, validity/latched semantics, текущий crash против исторического record; диагностический владелец и разрешённый read contract.",
+      "next_step": "Разобрать consumers и quality/record lifecycle по существующим материалам; третьерядные enum сопоставить с комплектацией. Данные SRS исследовать без активаций и сбросов.",
+      "sources": [
+        "research-2026-09-05/powertrain_chassis/systems.json"
+      ],
+      "coverage_ids": [
+        "SRS-BELTS",
+        "SRS-IMPACT"
+      ]
+    },
+    {
+      "id": "LOCKS_KEYS",
+      "priority": "P1",
+      "function": "Как работают двери, детские замки и физический/цифровой ключ?",
+      "status": "OPEN",
+      "known": "BCM door/lock ветви содержат READ и fixed Active; child-lock CB и PA кодируют 1/2 асимметрично. Ряд digital-key методов — stubs; readRealKey/unbind пишут CB33254, unbind не использует переданный ID.",
+      "missing_evidence": "Реальный immediate lock/unlock route, deadlock/anti-theft и interlocks; зона детского замка; production key owner, PA33853, async подтверждение и побочные эффекты.",
+      "next_step": "Проследить штатные callers и отдельный key service, сравнить CB/PA enum; составить read/write/side-effect контракт каждого метода до выбора действий.",
+      "sources": [
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-001",
+        "COMF-002",
+        "COMF-003"
+      ]
+    },
+    {
+      "id": "PROFILE_SCENES",
+      "priority": "P1",
+      "function": "Как профили и сценарии меняют несколько систем и восстанавливают состояние?",
+      "status": "OPEN",
+      "known": "Profile getter/apply привязаны к current profile; add отправляет CB и возвращает−1, apply true не является ack. Семь cabin-сценариев пишут один CB33272, общий OFF0; theater — отдельный CB33271/PA33928.",
+      "missing_evidence": "Асинхронное подтверждение, field ownership seat/mirror/climate, атомарность/rollback, конфликты сценариев и поведение после отказа/сна; shared value не набор независимых флагов.",
+      "next_step": "Связать PA33845/33855 и 33926/33928 со штатными profile/scene consumers, восстановить таблицу изменяемых полей и последовательность возврата.",
+      "sources": [
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-004",
+        "COMF-024"
+      ]
+    },
+    {
+      "id": "TRUNK_ROOF",
+      "priority": "P1",
+      "function": "Как устроены полный цикл багажника, люка и шторки?",
+      "status": "OPEN",
+      "known": "Багажник имеет отдельные position/status и height ветви. Люк/шторка используют разные зоны4/8, press/release и position CB33193…33199.",
+      "missing_evidence": "Конечные положения, stop/release, anti-pinch/obstacle, калибровка, дождевые и скоростные ограничения, взаимная последовательность крыши и шторки.",
+      "next_step": "Разобрать штатный lifecycle и PA feedback каждой зоны, связать высоту багажника с калибровкой; найти обработку прерывания клиента и неполного завершения.",
+      "sources": [
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-005",
+        "COMF-007"
+      ]
+    },
+    {
+      "id": "WIPERS_MIRRORS",
+      "priority": "P2",
+      "function": "Какие команды управляют дворниками и зеркалами, а какие меняют настройки?",
+      "status": "OPEN",
+      "known": "Wiper service имеет front/rear CB32837/32838 и autoRear32836; mirror autofold33035/dip33036 — отдельные settings. Их наличие не устанавливает direct wipe или motor-position API.",
+      "missing_evidence": "Владелец ручного взмаха/омывателя, дождевой AUTO, парковка щёток; motor/fold/heat зеркал, память, зоны и feedback конечного положения.",
+      "next_step": "Проследить ClimateManager/wiper и BCM/MConfig mirror consumers до актуального mapper; отделить настройку автоматизации от непосредственной команды и результата.",
+      "sources": [
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-008",
+        "COMF-009"
+      ]
+    },
+    {
+      "id": "LIGHTING_AMBIENT",
+      "priority": "P2",
+      "function": "Как различаются прямое освещение, автоматические режимы и салонные палитры?",
+      "status": "OPEN",
+      "known": "Dipped-beam публичная настройка ведёт к AFS33027, не прямому ближнему свету. Individual reading OFF2 отличается от all OFF0. KX11 DEFAULT имеет 72 RGB entries; BREATHE может сначала включить all и затем вернуть FAILED.",
+      "missing_evidence": "Владельцы реальных ламп/зон, яркость и приоритет door/courtesy/scene; enum/palette варианты, persistence и побочные эффекты частичного отказа.",
+      "next_step": "Связать setters, status/availability и штатную палитру нужного carconfig; проверить ветви side effect before error и влияние KING33926==11.",
+      "sources": [
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-010",
+        "COMF-011",
+        "COMF-012"
+      ]
+    },
+    {
+      "id": "HVAC_CONTRACT",
+      "priority": "P1",
+      "function": "Каковы единицы, зоны, режимы вентилятора и ограничения климата?",
+      "status": "OPEN",
+      "known": "Температура зависит от C/F: 15.5…28.5°C шаг0.5 или59…85°F шаг1. KX11 manual fan0…9, EX11 0…5; PA AUTO/status и popup/error независимы от requested значения.",
+      "missing_evidence": "LO/HI/invalid, действующая SDK/config ветвь, реальные зоны, направление потока, AUTO против manual, interlocks обогрева/осушения и подтверждение результата.",
+      "next_step": "Проверить getters/setters/support по каждой зоне и PA33460, сопоставить штатный UI formatting; разобрать PA error/availability до расширения диапазонов клиента.",
+      "sources": [
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-013",
+        "COMF-014",
+        "COMF-015"
+      ]
+    },
+    {
+      "id": "HVAC_EVENTS_PREPOST",
+      "priority": "P1",
+      "function": "Как отличить климатическое предложение от команды и предварительного режима?",
+      "status": "OPEN",
+      "known": "REQUEST auto-ion/dehumidify/close-window — входящие события, CONFIRM — ответы с разными raw mappings. Pre/post климат имеют CB32797/32796 и PA; это не доказанный remote engine start. Aroma ON задаёт raw2, не прежнюю интенсивность.",
+      "missing_evidence": "Lifecycle предложения, event correlation и повтор, условия питания pre/post на бензиновом KX11, ограничения воздуха/осушения/картриджей и побочные эффекты ответа.",
+      "next_step": "Найти штатные request consumers и timeout/cancel handling; проследить pre/post power conditions и aroma PA33406/slot ratio. Не применять CONFIRM вне соответствующего события.",
+      "sources": [
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-016",
+        "COMF-017",
+        "COMF-018"
+      ]
+    },
+    {
+      "id": "SEAT_THERMAL_MASSAGE",
+      "priority": "P2",
+      "function": "Как работают нагрев, вентиляция, массаж и AUTO подогрева руля?",
+      "status": "OPEN",
+      "known": "Seat timers1/2/3→5/15/30, но объявленные OFF/TIME4 не равны поддержке. Massage OFF и level1 оба raw0 при отдельном switch; программы1…8→0…7. AUTO подогрева руля отделён от manual levels.",
+      "missing_evidence": "Duration против remaining, реальные зоны и температурные ограничения, выключение/перегрев, массажные программы и hot-stone equipment, persistence и точность feedback уровней.",
+      "next_step": "Свести support/allowed values с setter branches и PA/error для каждой зоны, разобрать hot-stone gate и отдельные AUTO/manual states; сначала подтвердить оборудование.",
+      "sources": [
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-020",
+        "COMF-021",
+        "COMF-022"
+      ]
+    },
+    {
+      "id": "WPC_STATE",
+      "priority": "P2",
+      "function": "Что означают настройка и состояния беспроводной зарядки?",
+      "status": "OPEN",
+      "known": "WPC OFF/AUTO setting и PA33626 — разные enum: raw0 означает OVERHEAT, не OFF; состояния включают FOD, over-voltage, over-power, charging и full.",
+      "missing_evidence": "Фактическое оборудование, причина ошибок, receiver detection, условия питания/температуры, единицы мощности и callback freshness; accepted setting не доказывает заряд.",
+      "next_step": "Проследить штатный WPC status/error consumer и конфигурацию, сопоставить PA transitions из существующих logs с power lifecycle и запросом AUTO.",
+      "sources": [
+        "research-2026-09-05/comfort_systems/systems.json"
+      ],
+      "coverage_ids": [
+        "COMF-023"
+      ]
+    },
+    {
+      "id": "AUDIO_ROUTING",
+      "priority": "P1",
+      "function": "Кто управляет аудиоканалами, mute и приоритетами предупреждений?",
+      "status": "OPEN",
+      "known": "Есть OEM audio Binder/service, AudioFlinger/policy и native audiocontrol. API разделяет ENT/NAVI/BEEP и mix NAVI/HFT/VR/eCall/PDC; Bose/Harman/ClariFi enum не доказывают DSP комплектацию.",
+      "missing_evidence": "Физическая топология codec/amp/channels, mix/focus priority, хозяин mute после boot/call/PDC, service permissions, feedback и восстановление прерванного источника.",
+      "next_step": "Найти EcarxAudioService/native implementations и audio_policy в текущем корпусе; связать API channel/mix с routing/focus и PowerSomeIP. Предупреждения не отключать.",
+      "sources": [
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "PLAT_AUDIO"
+      ]
+    },
+    {
+      "id": "RADIO_BACKEND",
+      "priority": "P2",
+      "function": "Какой сервис управляет радио и каковы единицы диапазонов?",
+      "status": "OPEN",
+      "known": "Одновременно наблюдаются ts_radiomanager, broadcastradio и два native HAL; interface содержит AM/FM/DAB tune, seek/scan, TA/news/alarm.",
+      "missing_evidence": "Production backend, частотные единицы/регион, установленный DAB tuner, доступ caller, source switch и возврат после TA/eCall.",
+      "next_step": "Проследить ecarx_radio_service и RadioInfo callbacks до обоих HAL, извлечь region/tuner config и точный frequency enum contract.",
+      "sources": [
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "PLAT_RADIO"
+      ]
+    },
+    {
+      "id": "BLUETOOTH_COEXISTENCE",
+      "priority": "P1",
+      "function": "Кто владеет Bluetooth/BLE/ANCS и восстановлением профильных соединений?",
+      "status": "OPEN",
+      "known": "Наблюдаются A2DPsink/AVRCP/HFP/PBAP/MAP, ECARX extension и TS-DM/nFore config. MaxAclNum4/MaxDeviceNum2 не измеряют число одновременных ANCS сессий; PowerSomeIP может выключать и восстанавливать BT.",
+      "missing_evidence": "Production owner, per-profile arbitration, GATT subscriptions/reconnect epochs, coexistence CarPlay, реальное BLE ограничение и причина каждого сохранённого сбоя.",
+      "next_step": "Разобрать BluetoothConnectManager/DeviceBluetoothProfileManager в уже найденных JAR/APK и существующие Bluetooth/Natro logs; связать события с PowerSomeIP без содержимого личных уведомлений.",
+      "sources": [
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-09-05/continuation/systems.json"
+      ],
+      "coverage_ids": [
+        "PLAT_BLUETOOTH",
+        "BASE-ANCS"
+      ]
+    },
+    {
+      "id": "PHONE_CARPLAY",
+      "priority": "P1",
+      "function": "Как телефония и CarPlay делят вызовы, дисплей, Wi-Fi и звук?",
+      "status": "OPEN",
+      "known": "DIM receiver XCBTPhone3 статически ведёт к UiCallManager/Telecom; приложение не system UID. CarPlay имеет отдельные services и audio/video/BT/Wi-Fi/location adapters; интерфейс SoftAP не доказывает wireless session.",
+      "missing_evidence": "Extras/permissions и state conditions call/hold/swap/mute, выбор двух телефонов, HFP путь; CarPlay session/focus/coexistence, cleanup при disconnect/suspend и установленный режим проекции.",
+      "next_step": "Продолжить receiver→UiCallManager→Telecom/HFP, затем CarPlay StateManager→focus/SoftAP/BT; использовать существующие записи, не отправлять вызовы и телефонные сообщения.",
+      "sources": [
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-09-05/android_platform/phone_call_routes.json"
+      ],
+      "coverage_ids": [
+        "PLAT_PHONE",
+        "PLAT_CARPLAY"
+      ]
+    },
+    {
+      "id": "GNSS_SOURCES",
+      "priority": "P2",
+      "function": "Откуда приходят координаты, NMEA, скорость и время навигации?",
+      "status": "OPEN",
+      "known": "Runtime имеет Android location и vendor GNSS HAL; CarPlay ILocationAdapter отдельно предоставляет NMEA, скорость/передачу и выбор map coordinate system.",
+      "missing_evidence": "Источник GNSS и vehicle-position, dead reckoning, WGS/GCJ преобразование, единицы/accuracy/fix validity и timestamps; callback arrival не равно времени измерения.",
+      "next_step": "Сравнить ILocationAdapter implementation с Android location/vendor callbacks и сохранёнными metadata, разделить NMEA time, ECU velocity и время получения.",
+      "sources": [
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "PLAT_LOCATION"
+      ]
+    },
+    {
+      "id": "TCAM_REMOTE",
+      "priority": "P1",
+      "function": "Как устроены TCAM, аварийные вызовы и удалённые функции?",
+      "status": "OPEN",
+      "known": "Подтверждены tcam Binder, Android TcamService и native HAL; API разделяет eCall/bCall/iCall, callback mode, IHU microphone, CarLocator, RVDC и reset support.",
+      "missing_evidence": "SIM/регион/backend, installed support, call state и mic/audio priority, разрешения remote diagnostics, границы reset и owner автомобильного IP-table.",
+      "next_step": "Связать get/isSupported и callbacks с carconfig/native dispatch и audio mix; отделить TCAM от Bluetooth телефонии. Реальные аварийные вызовы, reset и remote commands не запускать.",
+      "sources": [
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-09-05/architecture_domains/systems.json"
+      ],
+      "coverage_ids": [
+        "PLAT_TCAM",
+        "ARCH-007"
+      ]
+    },
+    {
+      "id": "NAV_GUIDANCE",
+      "priority": "P1",
+      "function": "Кто создаёт навигационные подсказки HUD/DIM и арбитрирует два маршрута?",
+      "status": "OPEN",
+      "known": "Ранее выделены NAVI display API; новый разбор подтверждает отдельные GNSS и CarPlay location paths. NAVI ID сам по себе не является выключателем штатной навигации.",
+      "missing_evidence": "Production guidance owner, манёвры/полосы/дистанции и их единицы, display target, session lifecycle, приоритет штатной навигации и проекции и очистка устаревших подсказок.",
+      "next_step": "Найти сохранённые navigation consumers, callbacks и route-state поля, связать с display и CarPlay session; отделить координатное измерение от построенного маршрута.",
+      "sources": [
+        "research-2026-09-05/continuation/systems.json",
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "BASE-NAV",
+        "PLAT_LOCATION",
+        "PLAT_CARPLAY"
+      ]
+    },
+    {
+      "id": "VOICE_CONTROL",
+      "priority": "P2",
+      "function": "Как устроены штатный голосовой помощник и доступ к микрофону?",
+      "status": "OPEN",
+      "known": "Audio API содержит VR/eCall/HFT mix и приоритетные каналы; это не раскрывает пакет распознавания, языки или контракт автомобильных команд.",
+      "missing_evidence": "Voice package/service, push-to-talk/wake-word, локальное/сетевое распознавание, языки, разрешения клиента, mic arbitration и подтверждение выполнения каждой команды.",
+      "next_step": "По существующему system/member inventory найти manifest и consumers VR, затем связать key/wake activation с audio focus и проверками прав; отдельно записать реально отсутствующие материалы.",
+      "sources": [
+        "research-2026-09-05/continuation/systems.json",
+        "research-2026-09-05/android_platform/systems.json"
+      ],
+      "coverage_ids": [
+        "BASE-VOICE",
+        "PLAT_AUDIO"
       ]
     }
   ]

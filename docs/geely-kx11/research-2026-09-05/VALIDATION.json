@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-05",
+  "scope": "Local publication validation; not vehicle acceptance. Earlier per-domain validations retain their original source scopes.",
+  "checks": {
+    "json_parse_and_python_syntax": true,
+    "system_rows_and_source_record_pointers": 94,
+    "questions": 50,
+    "prior_question_ids_preserved": 14,
+    "parking_question_original_fields_unchanged": true,
+    "all_systems_linked_to_questions": 94,
+    "lossless_primary_entries": 4440,
+    "verified_pages": 30,
+    "lookup_semantic_state_correction_and_regression_queries": true,
+    "zero_fields": 305,
+    "explicit_semantic_state_overrides": 20,
+    "markdown_file_links_checked": 271,
+    "all_259_prior_requirement_ids_preserved": true,
+    "existing_rows_changed_only_gate048": true,
+    "new_requirement_id": "KNOW-004",
+    "requirement_and_gate_rows": 260,
+    "publication_whitelist_and_sensitive_pattern_check": true,
+    "vehicle_commands_executed": false,
+    "apk_built": false
+  },
+  "errors": []
+}

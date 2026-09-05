@@ -1,0 +1,495 @@
+{
+  "schema": "geely-mcu-log-route-audit-v1",
+  "date": "2026-09-05",
+  "scope": "Offline saved source analysis; no vehicle access; no binary execution; no external writes",
+  "route": {
+    "service": 153,
+    "service_hex": "0x0099",
+    "method": 200,
+    "method_hex": "0x00C8",
+    "expected_payload_size": 1416,
+    "full_udp_payload_size": 1432,
+    "hal_prop": 561021683,
+    "hal_hex": "0x217082F3",
+    "sdk_id": 33523,
+    "sdk_hex": "0x82F3",
+    "property": "PA_McuLog_Panic",
+    "native_access": "READ",
+    "native_change_mode": "ON_CHANGE",
+    "native_type": "BYTES",
+    "sdk_get_area_argument": 1,
+    "consumer_class": "com.ecarx.car.ECarXCarLogService",
+    "log_tag": "ECarXCAR.McuLog_Panic"
+  },
+  "native_evidence": {
+    "library_sha256": "b6feed82f777bfa8773c03b78c1f17038e122f492ef85126c095354a29c16756",
+    "converter_va": "0x125B60",
+    "service_read_va": "0x125BA0",
+    "service_table_va": "0x24F370",
+    "table_index": 43,
+    "table_entry_va": "0x24F41C",
+    "service_case_va": "0x12605C",
+    "method_compare_va": "0x126060",
+    "size_compare_va": "0x12606C",
+    "payload_copy_va": "0x129380",
+    "property_literal_va": "0x244A04",
+    "property_literal_load_va": "0x129388",
+    "property_and_area_store_va": "0x129398",
+    "protobuf_serializer_va": "0x1ACAF8",
+    "input_dispatch": {
+      "impl_sha256": "f33e214a7102409febb40abe8c09ec960903fd869765c5db6940be015c703c85",
+      "received_cb_va": "0x132628",
+      "peer_string_copy_va": "0x1326B4",
+      "peer_port_copy_va": "0x1326B8",
+      "rx_thread_va": "0x1329F0",
+      "pa_converter_call_va": "0x132ADC"
+    }
+  },
+  "payload_layout": [
+    {
+      "offset": 0,
+      "length": 4,
+      "encoding": "big-endian uint32",
+      "field": "availability",
+      "protobuf_tag": 1
+    },
+    {
+      "offset": 4,
+      "length": 4,
+      "field": null,
+      "status": "not read by native converter; formal meaning remains unresolved",
+      "observed_uint32_be": 1400,
+      "observed_packets": 45,
+      "hypothesis": "fixed text-field capacity; not actual text length"
+    },
+    {
+      "offset": 8,
+      "length": 1400,
+      "encoding": "NUL-terminated text",
+      "field": "data",
+      "protobuf_tag": 2
+    },
+    {
+      "offset": 1408,
+      "length": 4,
+      "encoding": "big-endian uint32",
+      "field": "format",
+      "protobuf_tag": 4
+    },
+    {
+      "offset": 1412,
+      "length": 4,
+      "encoding": "big-endian uint32",
+      "field": "status",
+      "protobuf_tag": 3
+    }
+  ],
+  "length_handling": {
+    "native": "logs size mismatch; memcpy min(input_size,1416) into static buffer then continues",
+    "offline_decoder": "requires exact1416-byte payload and matching IPCP length; rejects fragmented IPv4 datagrams"
+  },
+  "java_evidence": [
+    {
+      "source": "ECarXCarService.apk",
+      "dex": "classes2.dex",
+      "cls": "Lcom/ecarx/car/ECarXCarLogService;",
+      "method": "<init>",
+      "descriptor": "(Landroid/content/Context; Lcom/ecarx/car/CarSignalService;)V",
+      "offset": 1722468
+    },
+    {
+      "source": "ECarXCarService.apk",
+      "dex": "classes2.dex",
+      "cls": "Lcom/ecarx/car/ECarXCarLogService;",
+      "method": "ensureTAGById",
+      "descriptor": "(I)Ljava/lang/String;",
+      "offset": 1722428
+    },
+    {
+      "source": "ECarXCarService.apk",
+      "dex": "classes2.dex",
+      "cls": "Lcom/ecarx/car/ECarXCarLogService;",
+      "method": "initFilter",
+      "descriptor": "()V",
+      "offset": 1723384
+    },
+    {
+      "source": "ECarXCarService.apk",
+      "dex": "classes2.dex",
+      "cls": "Lcom/ecarx/car/ECarXCarLogService;",
+      "method": "printOutEventLog",
+      "descriptor": "(Lecarx/car/hardware/property/ECarXCarPropertyEvent;)V",
+      "offset": 1723428
+    },
+    {
+      "source": "ecarx.adaptapi.jar",
+      "dex": "classes.dex",
+      "cls": "Lecarx/car/hardware/vehicle/ECarXCarMculogpanicManager;",
+      "method": "<init>",
+      "descriptor": "()V",
+      "offset": 1789692
+    },
+    {
+      "source": "ecarx.adaptapi.jar",
+      "dex": "classes.dex",
+      "cls": "Lecarx/car/hardware/vehicle/ECarXCarMculogpanicManager;",
+      "method": "<init>",
+      "descriptor": "(Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;)V",
+      "offset": 1789716
+    },
+    {
+      "source": "ecarx.adaptapi.jar",
+      "dex": "classes.dex",
+      "cls": "Lecarx/car/hardware/vehicle/ECarXCarMculogpanicManager;",
+      "method": "getPA_McuLog_Panic",
+      "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_McuLog_Panic;",
+      "offset": 1789612
+    },
+    {
+      "source": "ecarx.adaptapi.jar",
+      "dex": "classes.dex",
+      "cls": "Lecarx/car/hardware/vehicle/PATypes$PA_McuLog_Panic;",
+      "method": "<init>",
+      "descriptor": "(Lvendor/ecarx/xma/pa/nano/VendorVehicleHalPAProto$PAByteType;)V",
+      "offset": 1896796
+    },
+    {
+      "source": "ecarx.adaptapi.jar",
+      "dex": "classes.dex",
+      "cls": "Lecarx/car/hardware/vehicle/PATypes$PA_McuLog_Panic;",
+      "method": "toString",
+      "descriptor": "()Ljava/lang/String;",
+      "offset": 1896656
+    }
+  ],
+  "peer_evidence": {
+    "verification_level": "independent original PCAP read and payload decode in this audit",
+    "summary_file": "pcap_mcu_summary.json",
+    "archive": "KX11-VP-Action-Evidence-20260815-190324_83890.zip",
+    "archive_sha256": "770a60c64e3730f3718ff3783cb8d86ec016f4856751a137678eed7fb66427c6",
+    "member": "KX11-VP-Action-Evidence-20260815-190324_83890/capture/vp-channel.pcap",
+    "sha256": "3297d0cba84ef94f309688098beaf01051ddd12f8c4739fb1f2b177e3d22e82c",
+    "incoming_endpoint": "198.18.34.1:50500",
+    "android_endpoint": "198.18.34.15:50335",
+    "incoming_packet_count": 45,
+    "empty_reverse_packet_count": 45,
+    "all_payloads_size": 1416,
+    "availability": 1,
+    "status": 0,
+    "format": 0,
+    "text_length_range": [
+      133,
+      861
+    ],
+    "all_nul_terminated": true,
+    "offset4_be_uint32": 1400,
+    "mcu_version_in_this_pcap": false,
+    "message_type_both_directions": 1,
+    "interpretation_limit": "transport peer is not proof of originating MCU hardware or QNX identity; no strict ACK semantics inferred from empty reverse payloads"
+  },
+  "observed_mcu_version": {
+    "value": "20.24.10.23024.41141",
+    "status": "text inside decoded MCU log envelope in two saved Bus-Capture logcats",
+    "hardware_identity": null,
+    "image_file_identity": null,
+    "original_log_sources": [
+      {
+        "archive": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip",
+        "member": "KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+        "line": 72162,
+        "verified_text": "         1786312508.662  2132  2171 D ECarXCAR.McuLog_Panic: PA_McuLog{availability = Active, dataValue = [MCU_Version]20.24.10.23024.41141, statusValue = 0, formatValue = 0}"
+      },
+      {
+        "archive": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip",
+        "member": "KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+        "line": 77404,
+        "verified_text": "         1786334383.376  2259  2298 D ECarXCAR.McuLog_Panic: PA_McuLog{availability = Active, dataValue = [MCU_Version]20.24.10.23024.41141, statusValue = 0, formatValue = 0}"
+      }
+    ]
+  },
+  "associated_android_log_service": {
+    "constructor_set": {
+      "sdk_id": 33285,
+      "property": "CB_LogServiceStatusAP",
+      "hal_hex": "0x21408205",
+      "area": 1,
+      "value": 1,
+      "status": "statically observed stock constructor action; not executed here"
+    },
+    "file_write_switch": "persist.service.logcat.enable",
+    "file_directory": "/data/McuLog",
+    "logcat_print_precedes_file_switch": true,
+    "file_rotation_bytes": 10485760
+  },
+  "sources": [
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "vendor-native/_vendor_lib64/vhal_v1_0_net_impl-lib.so",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "sha256": "b6feed82f777bfa8773c03b78c1f17038e122f492ef85126c095354a29c16756",
+      "size": 2567824
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "vendor-native/_vendor_lib64/vendor.ecarx.xma.automotive.vehicle_1.0-impl-lib.so",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "sha256": "f33e214a7102409febb40abe8c09ec960903fd869765c5db6940be015c703c85",
+      "size": 1448440
+    },
+    {
+      "archive": "ecarx-hud-system-20260727-010640.zip",
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "size": 1135817
+    },
+    {
+      "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+      "member": "KX11-HU-Route-20260810-070911-29994-1234567/native/maps/vhal_v1_0_net_impl-lib.so",
+      "archive_sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+      "sha256": "b6feed82f777bfa8773c03b78c1f17038e122f492ef85126c095354a29c16756",
+      "size": 2567824
+    },
+    {
+      "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+      "member": "KX11-HU-Route-20260810-070911-29994-1234567/packages/com.ecarx.car/ECarXCarService.apk",
+      "archive_sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+      "sha256": "1cab337a3c056d6ba2a7a58f12638c2b7137f672a1613a2fb78305602c6683f3",
+      "size": 6816872
+    },
+    {
+      "archive": "KX11-VP-Action-Evidence-20260815-190324_83890.zip",
+      "archive_sha256": "770a60c64e3730f3718ff3783cb8d86ec016f4856751a137678eed7fb66427c6",
+      "member": "KX11-VP-Action-Evidence-20260815-190324_83890/capture/vp-channel.pcap",
+      "sha256": "3297d0cba84ef94f309688098beaf01051ddd12f8c4739fb1f2b177e3d22e82c",
+      "size": 5982895
+    }
+  ],
+  "limitations": [
+    "No hardware identity inferred from MCU_Version",
+    "No equivalence to mpc5746c reference-board image inferred",
+    "Panic tag does not by itself establish crash",
+    "Android outer timestamp does not date each embedded MCU line",
+    "No cruise actuator command found by this logging-route audit"
+  ],
+  "prior_pcap_analysis": {
+    "source": "Geely_KX11_Knowledge_v1.0/cruise/pcap_reanalysis.json",
+    "verification_level": "Prior13PCAP analysis;45of64incoming packets independently re-decoded from one original PCAP in this audit;19not freshly re-decoded",
+    "source_sha256": "b7f9b5ee6f01576ecdbff28b99befc3e9dc74c2726683b29545f5943c020b821",
+    "incoming_endpoint": "198.18.34.1:50500",
+    "android_endpoint": "198.18.34.15:50335",
+    "incoming_packet_count": 64,
+    "pcap_count": 13,
+    "outgoing_empty_packet_count": 64,
+    "interpretation_limit": "transport peer is not proof of originating MCU hardware or QNX identity",
+    "packet_groups": [
+      {
+        "file": "KX11-Cruise-Trace-20260809-093747/KX11-Cruise-Trace-20260809-093747/actions/03-PLUS/someip.pcap",
+        "sha256": "c68e69e831990ae522ae87f4f115bb97e5b6ba05555e1bc4703a3a00e6bb1d70",
+        "groups": {
+          "in 0099/00c8 len=1432": 2,
+          "out 0099/00c8 len=16": 2
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 624,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 624,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 12,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 2,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 1
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-093747/KX11-Cruise-Trace-20260809-093747/actions/06-CRUISE_MAIN/someip.pcap",
+        "sha256": "18c08bf3fed3144391bfcf609bd9b0344db8680e9cb9ad373373df7b8fddd817",
+        "groups": {
+          "in 0099/00c8 len=1432": 1,
+          "out 0099/00c8 len=16": 1
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 635,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 635,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 11,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 2,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 1
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-093747/KX11-Cruise-Trace-20260809-093747/actions/02-CRUISE_MODE_SELECT/someip.pcap",
+        "sha256": "15a3c733b81bee2eb062562684a3d0ea9ea3516f390674e9b82c8fe72f241872",
+        "groups": {
+          "in 0099/00c8 len=1432": 2,
+          "out 0099/00c8 len=16": 2
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 631,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 631,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 12,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 4,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 2
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-093747/KX11-Cruise-Trace-20260809-093747/actions/05-CANCEL/someip.pcap",
+        "sha256": "07e6366419b8787ea94fecb6f9d2f8bba29851ed2bf91da72b2867da0cb85592",
+        "groups": {
+          "in 0099/00c8 len=1432": 1,
+          "out 0099/00c8 len=16": 1
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 640,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 640,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 11,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.15:5353 -> 224.0.0.251:5353": 7,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 2,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 1
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-093747/KX11-Cruise-Trace-20260809-093747/actions/04-MINUS/someip.pcap",
+        "sha256": "5a94e1cfb568f304faa6ec1791f7cb1d4cf182574108258bc9ce8234658805b4",
+        "groups": {
+          "in 0099/00c8 len=1432": 2,
+          "out 0099/00c8 len=16": 2
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 633,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 633,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 12,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 4,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 2
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-093747/KX11-Cruise-Trace-20260809-093747/actions/01-LIMITER_SELECT/someip.pcap",
+        "sha256": "240fe0568a77895b6a6e197ee04a2b58352db1b9cc89163ce43a7748d5476c30",
+        "groups": {
+          "in 0099/00c8 len=1432": 2,
+          "out 0099/00c8 len=16": 2
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 656,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 656,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 2,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 1,
+          "198.18.34.15:5353 -> 224.0.0.251:5353": 7
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-093747/KX11-Cruise-Trace-20260809-093747/transport/tcpdump-root-test/someip.pcap",
+        "sha256": "d23e97f6846698719c4ef75e01508f6bea9977743f21412c7c862eab5d423a9f",
+        "groups": {
+          "in 0099/00c8 len=1432": 1,
+          "out 0099/00c8 len=16": 1
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 163,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 163,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 3,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 3,
+          "198.18.34.15:5353 -> 224.0.0.251:5353": 14
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-101433/KX11-Cruise-Trace-20260809-101433/actions/02-MAIN_OFF_CONFIRM/someip.pcap",
+        "sha256": "95cebef550311a2767a92a74106187dc16f1072b0060fad22108e167e764dc44",
+        "groups": {
+          "in 0099/00c8 len=1432": 2,
+          "out 0099/00c8 len=16": 2
+        },
+        "udp_flows": {
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 664,
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 663,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 11,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 2,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 1
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-101433/KX11-Cruise-Trace-20260809-101433/actions/01-MAIN_ON_CONFIRM/someip.pcap",
+        "sha256": "d5d1198a0ade215ab2cfe38e87592f4122d3ae6e7c6d61555536c9011c9b0c94",
+        "groups": {
+          "in 0099/00c8 len=1432": 2,
+          "out 0099/00c8 len=16": 2
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 640,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 640,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.15:5353 -> 224.0.0.251:5353": 42,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 2,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 1
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-101433/KX11-Cruise-Trace-20260809-101433/actions/05-LIMITER_MAIN_OFF_CONFIRM/someip.pcap",
+        "sha256": "a9aeb442d974fab2f3d774328588889c156c3b0bdd7ace13f595a05dde7fe3ca",
+        "groups": {
+          "in 0099/00c8 len=1432": 1,
+          "out 0099/00c8 len=16": 1
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 633,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 633,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 12,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 4,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 2,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 12
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-101433/KX11-Cruise-Trace-20260809-101433/actions/04-LIMITER_MAIN_ON_CONFIRM/someip.pcap",
+        "sha256": "661c0360680c06f55e924add98ea5ca31547b1cf486513f179d2b94c8a57afa8",
+        "groups": {
+          "in 0099/00c8 len=1432": 2,
+          "out 0099/00c8 len=16": 2
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 642,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 642,
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 12,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 2,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 1
+        }
+      },
+      {
+        "file": "KX11-Cruise-Trace-20260809-101433/KX11-Cruise-Trace-20260809-101433/actions/03-LIMITER_SELECT_CONFIRM/someip.pcap",
+        "sha256": "d2b2334be8e7984c82ee49c071f634cc0eeef199f2ab9e706b8bef20ea4e064c",
+        "groups": {
+          "in 0099/00c8 len=1432": 1,
+          "out 0099/00c8 len=16": 1
+        },
+        "udp_flows": {
+          "198.18.32.1:50001 -> 198.18.255.255:50001": 12,
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 623,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 623,
+          "198.18.34.15:50001 -> 198.18.255.255:50001": 11,
+          "198.18.34.2:30490 -> 198.18.34.15:30490": 2,
+          "198.18.34.15:30490 -> 198.18.34.2:30490": 1,
+          "198.18.34.15:5353 -> 224.0.0.251:5353": 7
+        }
+      },
+      {
+        "file": "KX11-VP-Action-Evidence-20260815-190324_83890/KX11-VP-Action-Evidence-20260815-190324_83890/capture/vp-channel.pcap",
+        "sha256": "3297d0cba84ef94f309688098beaf01051ddd12f8c4739fb1f2b177e3d22e82c",
+        "groups": {
+          "in 0099/00c8 len=1432": 45,
+          "out 0099/00c8 len=16": 45
+        },
+        "udp_flows": {
+          "198.18.34.1:50500 -> 198.18.34.15:50335": 14929,
+          "198.18.34.15:50335 -> 198.18.34.1:50500": 14929
+        }
+      }
+    ]
+  }
+}

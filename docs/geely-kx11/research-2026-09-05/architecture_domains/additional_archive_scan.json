@@ -1,0 +1,821 @@
+[
+  {
+    "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+    "sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+    "text_files_scanned": 175,
+    "text_bytes_scanned": 5141284,
+    "matches": [
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/6303-ecarx.settings-maps.txt",
+        "sha256": "1480413319f7500a8acdbbe97cd01fea256a5e492c37c1e879490dee427a68ba",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 168,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 169,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1600,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1601,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 2081,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 2082,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/2423-r.audio.service-maps.txt",
+        "sha256": "3d138068a1e171b5a1113649fff79381e8916df485b05bf54c20536524300f38",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 154,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 155,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1229,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1230,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1710,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1711,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/2388-com.android.car-maps.txt",
+        "sha256": "6e578b3a013f2e122ef117634ecbee8bd3f466cb88b866c99905882501338f4e",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 154,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 155,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1367,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1368,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1848,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1849,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/2724-viders.settings-maps.txt",
+        "sha256": "28edacccf5ec61c3438a904529a6051bfce5700b0944b2d69d9c7e57dd44ccd8",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 154,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 155,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1209,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1210,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1690,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1691,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/2799-sf.inputservice-maps.txt",
+        "sha256": "932e368ffe80d5eea37a946add5adb992fae83087b357896b0f38281545b6323",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 154,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 155,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1375,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1376,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1856,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1857,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/2838-arx.sdk.openapi-maps.txt",
+        "sha256": "f8bfab6a9c548209afa25f8b3b5faeb48ad7717d479e7cf046f4127f1bafb8c5",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 166,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 167,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1542,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1543,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 2023,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 2024,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/2259-com.ecarx.car-maps.txt",
+        "sha256": "8f70952a3eeb0f24a587264c2f75c09b055b80c8df238a0e1f14098866f82afc",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 164,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 165,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1389,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1390,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1870,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1871,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/2759-rotocol.service-maps.txt",
+        "sha256": "83c613d7cc6c7fcdb7f9caeea39e29ac1de283991b50a0c34fafa4434d03cdc2",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 158,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 159,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1238,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1239,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1720,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1721,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/2781-rsomeip.service-maps.txt",
+        "sha256": "04c4a0d5502d3b78bb9854c3671be749645a88dfec534037719d9c019e594f5b",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 154,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 155,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1276,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1277,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1757,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1758,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/5011-com.ecarx.hud-maps.txt",
+        "sha256": "cd9aa506a36a3523030cb68cdf7a856fb315aae6dcb8415d668eeab07a836600",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 160,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 161,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1446,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1447,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1927,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1928,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/8599-m.ecarx.dimmenu-maps.txt",
+        "sha256": "5218c711999926cf3016157ec8b5e24b896535abcca4916a7e9340b5ca2709bf",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 164,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 165,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1405,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1406,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1886,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1887,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/proc/3673-ar.multidisplay-maps.txt",
+        "sha256": "c4de24f7beeceaf9caac3fa9cc686e4d5b6460f7315187a8c60446b74f217c44",
+        "match_count": 6,
+        "matches": [
+          {
+            "line": 154,
+            "text": "754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 155,
+            "text": "75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 1225,
+            "text": "74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 1226,
+            "text": "74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 1706,
+            "text": "74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 1707,
+            "text": "74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-HU-Route-20260810-070911-29994-1234567/android/car-service-dumps.txt",
+        "sha256": "58ab362c92dba543d5a68351d671fb7a0b6713b7e866528cc6df8f6fac93d73e",
+        "match_count": 10,
+        "matches": [
+          {
+            "line": 764,
+            "text": "    CarPropertyConfig{mPropertyId=557875523, mAccess=3, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=CB_Dem_LostUDPCommunicationWithASDM, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 767,
+            "text": "    CarPropertyConfig{mPropertyId=557875525, mAccess=3, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=CB_Dem_IncompatibleIPBusSignalReceivedFromASDM, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 1713,
+            "text": "    CarPropertyConfig{mPropertyId=561021643, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=PA_VP_Version, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class [B}"
+          },
+          {
+            "line": 1716,
+            "text": "    CarPropertyConfig{mPropertyId=561021646, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=PA_Device_VPVersion_HD, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class [B}"
+          },
+          {
+            "line": 2074,
+            "text": "    CarPropertyConfig{mPropertyId=557871564, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=NetASDMActvtPrio, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 2075,
+            "text": "    CarPropertyConfig{mPropertyId=557871565, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=NetASDMActvtResourceGroup, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 2095,
+            "text": "    CarPropertyConfig{mPropertyId=557871585, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=ZZZAsdmSignalEnd, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 3124,
+            "text": "    CarPropertyConfig{mPropertyId=557872901, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=SteerWhlBtnPsd, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 4089,
+            "text": "    CarPropertyConfig{mPropertyId=557873786, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=AdjSpdLimnSts, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 4226,
+            "text": "    CarPropertyConfig{mPropertyId=557873795, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=CrsCtrlrSts, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      }
+    ],
+    "has_raw_capture": false
+  },
+  {
+    "archive": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip",
+    "sha256": "6f67719476170e2d19ff6f7de2810374a77c5b4078b9c5993986d76d913bfb33",
+    "text_files_scanned": 15,
+    "text_bytes_scanned": 26951077,
+    "matches": [
+      {
+        "member": "KX11-Bus-Capture-20260810-005510-27602-1234567/config/AP_LocalConfig.properties",
+        "sha256": "c6922f0ef4ca44ae73c80b0cf1a9cd261f182a035af5d4d747f780a1e81ee3ac",
+        "match_count": 1,
+        "matches": [
+          {
+            "line": 50,
+            "text": "#LCFG_Ethernet_ARP_Table=198.18.34.1  <MAC_REDACTED>"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-Bus-Capture-20260810-005510-27602-1234567/android/identity-build-power.txt",
+        "sha256": "0b015f799af02357e2185c21040e6382b7416c235c70d8080708878c8222a745",
+        "match_count": 3,
+        "matches": [
+          {
+            "line": 21,
+            "text": "    CarPropertyConfig{mPropertyId=557872901, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=SteerWhlBtnPsd, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 42,
+            "text": "    CarPropertyConfig{mPropertyId=557873786, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=AdjSpdLimnSts, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 43,
+            "text": "    CarPropertyConfig{mPropertyId=557873795, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=CrsCtrlrSts, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+        "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd",
+        "match_count": 18,
+        "matches": [
+          {
+            "line": 16717,
+            "text": "         1786312496.217  3526  3526 D CrashReport-Native: Parsing line: 754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 16718,
+            "text": "         1786312496.217  3526  3526 D CrashReport-Native: Parsing line: 75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 17531,
+            "text": "         1786312496.251  3526  3526 D CrashReport-Native: Parsing line: 77304fc000-7730505000 r--s 00000000 fe:00 21609                          /system/fonts/NotoSerifTamil-Regular.ttf"
+          },
+          {
+            "line": 17532,
+            "text": "         1786312496.251  3526  3526 D CrashReport-Native: Parsing line: 7730505000-7730516000 r-xp 00000000 fe:00 22144                          /system/lib64/libaudioutils.so"
+          },
+          {
+            "line": 18947,
+            "text": "         1786312496.739  3812  3812 D CrashReport-Native: Parsing line: 754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 18948,
+            "text": "         1786312496.739  3812  3812 D CrashReport-Native: Parsing line: 75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 59192,
+            "text": "         1786312503.759  2132  2725 D HalClient: setValue cbdemincompatibleipbussignalreceivedfromasdm value: 0"
+          },
+          {
+            "line": 74793,
+            "text": "         1786312509.791  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:48 11155:PWR:DBG:VGM.Rg=10,VGM.Pri=0,TCAM.Rg=0,TCAM.Pri=0,DMM.Rg=0,DMM.Pri=0,DVR.Rg=0,DVR.Pri=0,ASDM.Rg=0,ASDM.Pri=0,PAS.Rg=0,PAS.Pri=0,DIM.Rg=0,DIM.Pri=0,AP.req=0,AP.Pri=0"
+          },
+          {
+            "line": 75086,
+            "text": "         1786312509.974  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:54:49 12095:PWR:DBG:VGM.Rg=10,VGM.Pri=0,TCAM.Rg=0,TCAM.Pri=0,DMM.Rg=0,DMM.Pri=0,DVR.Rg=0,DVR.Pri=0,ASDM.Rg=0,ASDM.Pri=0,PAS.Rg=0,PAS.Pri=0,DIM.Rg=0,DIM.Pri=0,AP.req=1,AP.Pri=1"
+          },
+          {
+            "line": 83701,
+            "text": "         1786312513.658  6044  7584 D AbsCarFunction::DayMode: isFunctionSupported function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] status active"
+          },
+          {
+            "line": 83702,
+            "text": "         1786312513.658  6044  7584 D AbsCarFunction::DayMode: getFunctionValue function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] value 15.0"
+          },
+          {
+            "line": 83703,
+            "text": "         1786312513.658  6044  7584 D VehicleHelper:DayMode: getCustomizeFunctionValue: function:IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] results:15.0"
+          },
+          {
+            "line": 83734,
+            "text": "         1786312513.660  6044  7584 D AbsCarFunction::DayMode: isFunctionSupported function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] status active"
+          },
+          {
+            "line": 83735,
+            "text": "         1786312513.660  6044  7584 D AbsCarFunction::DayMode: getFunctionValue function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] value 15.0"
+          },
+          {
+            "line": 83736,
+            "text": "         1786312513.660  6044  7584 D VehicleHelper:DayMode: getCustomizeFunctionValue: function:IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] results:15.0"
+          },
+          {
+            "line": 112330,
+            "text": "         1786312519.977  2132  2171 D ECarXCAR.McuLog_Panic: 08-10 00:55:19 41195:PWR:DBG:VGM.Rg=0,VGM.Pri=0,TCAM.Rg=0,TCAM.Pri=0,DMM.Rg=0,DMM.Pri=0,DVR.Rg=0,DVR.Pri=0,ASDM.Rg=0,ASDM.Pri=0,PAS.Rg=0,PAS.Pri=0,DIM.Rg=0,DIM.Pri=0,AP.req=1,AP.Pri=1"
+          },
+          {
+            "line": 141968,
+            "text": "         1786312540.256  4024 13819 I XCBTPhone3: [20240314_2337][RxCachedThreadScheduler-2]<ContactRepository>  loadContacts contact xxx: ContactData{mId=337585, mDisplayName='Александр Иванов', mStarred=false, mAddrList=[], mPhoneList=[PhoneItem{mNumber='89250500520', mNumType=2', mStarred=false}], mEmailList=[], mPhotoUri='null', mSoryToken='null', mLetter='#', mFavoritesName='Александр Иванов'}  >onSuccess(ContactRepository.java:361)"
+          },
+          {
+            "line": 142503,
+            "text": "         1786312540.394  4024 13819 D XCBTPhone3: [20240314_2337][RxCachedThreadScheduler-2]<######>  mContactNameMap【保存号码和联系人名字】---number = 89250500520---displayName = Александр Иванов,--photoUri = null  >syncContactNameAndPhoto(ContactRepository.java:127)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-Bus-Capture-20260810-005510-27602-1234567/android/processes-services-fds.txt",
+        "sha256": "2bbb36a029ecdffd9c16d9f8cb4eac9db87bdcd7df948241420f889405c2c3e5",
+        "match_count": 4,
+        "matches": [
+          {
+            "line": 15,
+            "text": "shell         8965   892 sh                          sh -c ?echo \"=== PROCESSES ===\"?ps -A -o USER,PID,PPID,NAME,ARGS 2>&1 | grep -Ei \"qnx|someip|vehicle|car.?signal|cluster|dim|smartcore|can|flexray|asdm|vddm|gateway\" || true?echo \"=== SERVICES ===\"?service list 2>&1 | grep -Ei \"qnx|vehicle|car|signal|cluster|dim|can|power\" || true?echo \"=== HAL ===\"?lshal -ti 2>&1 | grep -Ei \"qnx|vehicle|car|signal|cluster|dim|can\" || true?echo \"=== RELEVANT FDS ===\"?for p in /proc/[0-9]*; do?  [ -d \"$p\" ] || continue?  comm=\"$(cat \"$p/comm\" 2>/dev/null)\"?  cmd=\"$(tr \"\\000\" \" \" < \"$p/cmdline\" 2>/dev/null)\"?  printf \"%s %s\\n\" \"$comm\" \"$cmd\" | grep -Eqi \"qnx|someip|vehicle|cluster|dim|smartcore|can|flexray|asdm|vddm\" || continue?  echo \"PID=${p##*/} COMM=$comm CMD=$cmd\"?  ls -la \"$p/fd\" 2>&1 | grep -Ei \"hab|vsock|rpmsg|virtio|can|spi|vip|ttydim|socket\" || true?done"
+          },
+          {
+            "line": 16,
+            "text": "shell         8969  8965 grep                        grep -Ei qnx|someip|vehicle|car.?signal|cluster|dim|smartcore|can|flexray|asdm|vddm|gateway"
+          },
+          {
+            "line": 81,
+            "text": "ps -A -o USER,PID,PPID,NAME,ARGS 2>&1 | grep -Ei \"qnx|someip|vehicle|car.?signal|cluster|dim|smartcore|can|flexray|asdm|vddm|gateway\" || true"
+          },
+          {
+            "line": 92,
+            "text": "\" \"$comm\" \"$cmd\" | grep -Eqi \"qnx|someip|vehicle|cluster|dim|smartcore|can|flexray|asdm|vddm\" || continue"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-Bus-Capture-20260810-005510-27602-1234567/android/network-can-flexray.txt",
+        "sha256": "dfe20c4a701c893be1a2695facb7b5baa36497a73ce3cd4f758604f050e90be2",
+        "match_count": 2,
+        "matches": [
+          {
+            "line": 175,
+            "text": "198.18.36.1 dev eth0.5 table ecarx_asdm_route scope link "
+          },
+          {
+            "line": 249,
+            "text": "198.18.34.1 dev eth0 table ecarx_ap_vp_route src 198.18.34.15 uid 2000 "
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      }
+    ],
+    "has_raw_capture": false
+  },
+  {
+    "archive": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip",
+    "sha256": "e32dcf2f2f8ae9140dd4d595e56190286520e62f036e47272c7b8ed754362fdc",
+    "text_files_scanned": 15,
+    "text_bytes_scanned": 26852239,
+    "matches": [
+      {
+        "member": "KX11-Bus-Capture-20260810-065954-28002-1234567/config/AP_LocalConfig.properties",
+        "sha256": "c6922f0ef4ca44ae73c80b0cf1a9cd261f182a035af5d4d747f780a1e81ee3ac",
+        "match_count": 1,
+        "matches": [
+          {
+            "line": 50,
+            "text": "#LCFG_Ethernet_ARP_Table=198.18.34.1  <MAC_REDACTED>"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-Bus-Capture-20260810-065954-28002-1234567/android/identity-build-power.txt",
+        "sha256": "63fc9b40ffbf8f3119a06d16aedb69153c2ae14a70519af961d6f4c49dd4e328",
+        "match_count": 3,
+        "matches": [
+          {
+            "line": 21,
+            "text": "    CarPropertyConfig{mPropertyId=557872901, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=SteerWhlBtnPsd, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 42,
+            "text": "    CarPropertyConfig{mPropertyId=557873786, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=AdjSpdLimnSts, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          },
+          {
+            "line": 43,
+            "text": "    CarPropertyConfig{mPropertyId=557873795, mAccess=1, mAreaType=0, mChangeMode=1, mConfigArray=[], mConfigString=CrsCtrlrSts, mMaxSampleRate=0.0, mMinSampleRate=0.0, mSupportedAreas={}, mType=class java.lang.Integer}"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+        "sha256": "77be2e03401681dede19835fbb41696a4f330796c101ca531e41d0bca511580e",
+        "match_count": 32,
+        "matches": [
+          {
+            "line": 15321,
+            "text": "         1786334370.733  3693  3693 D CrashReport-Native: Parsing line: 754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 15322,
+            "text": "         1786334370.733  3693  3693 D CrashReport-Native: Parsing line: 75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 16219,
+            "text": "         1786334370.744  3693  3693 D CrashReport-Native: Parsing line: 74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 16220,
+            "text": "         1786334370.744  3693  3693 D CrashReport-Native: Parsing line: 74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 16666,
+            "text": "         1786334370.748  3693  3693 D CrashReport-Native: Parsing line: 74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 16667,
+            "text": "         1786334370.749  3693  3693 D CrashReport-Native: Parsing line: 74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 17665,
+            "text": "         1786334370.963  3908  3908 D CrashReport-Native: Parsing line: 754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 17666,
+            "text": "         1786334370.963  3908  3908 D CrashReport-Native: Parsing line: 75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 18683,
+            "text": "         1786334370.996  3908  3908 D CrashReport-Native: Parsing line: 74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 18684,
+            "text": "         1786334370.996  3908  3908 D CrashReport-Native: Parsing line: 74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 60240,
+            "text": "         1786334376.882  2259  2275 D HalClient: setValue cbdemincompatibleipbussignalreceivedfromasdm value: 0"
+          },
+          {
+            "line": 75736,
+            "text": "         1786334382.968  6303  6303 W VehicleHelper:no Module: registerFunctionValueWatcher function= IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_STANDSTILL [0x2a050500] false"
+          },
+          {
+            "line": 77995,
+            "text": "         1786334383.477  6079  7101 D AbsCarFunction::DayMode: isFunctionSupported function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] status active"
+          },
+          {
+            "line": 78000,
+            "text": "         1786334383.477  6079  7101 D AbsCarFunction::DayMode: getFunctionValue function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] value 15.0"
+          },
+          {
+            "line": 78001,
+            "text": "         1786334383.477  6079  7101 D VehicleHelper:DayMode: getCustomizeFunctionValue: function:IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] results:15.0"
+          },
+          {
+            "line": 78017,
+            "text": "         1786334383.478  6079  7101 D AbsCarFunction::DayMode: isFunctionSupported function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] status active"
+          },
+          {
+            "line": 78018,
+            "text": "         1786334383.478  6079  7101 D AbsCarFunction::DayMode: getFunctionValue function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] value 15.0"
+          },
+          {
+            "line": 78020,
+            "text": "         1786334383.478  6079  7101 D VehicleHelper:DayMode: getCustomizeFunctionValue: function:IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] results:15.0"
+          },
+          {
+            "line": 78578,
+            "text": "         1786334383.502  6079  7171 D AbsCarFunction::DayMode: isFunctionSupported function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] status active"
+          },
+          {
+            "line": 78579,
+            "text": "         1786334383.502  6079  7171 D AbsCarFunction::DayMode: getFunctionValue function IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] zone VehicleZone.ZONE_ALL [0x80000000] value 15.0"
+          },
+          {
+            "line": 78580,
+            "text": "         1786334383.502  6079  7171 D VehicleHelper:DayMode: getCustomizeFunctionValue: function:IVehicle.SETTING_FUNC_BRIGHTNESS_MAX [0x20150500] results:15.0"
+          },
+          {
+            "line": 82360,
+            "text": "         1786334384.626  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:22 11165:PWR:DBG:VGM.Rg=10,VGM.Pri=0,TCAM.Rg=0,TCAM.Pri=0,DMM.Rg=0,DMM.Pri=0,DVR.Rg=0,DVR.Pri=0,ASDM.Rg=0,ASDM.Pri=0,PAS.Rg=0,PAS.Pri=0,DIM.Rg=0,DIM.Pri=0,AP.req=0,AP.Pri=0"
+          },
+          {
+            "line": 82527,
+            "text": "         1786334384.724  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:23 12065:PWR:DBG:VGM.Rg=10,VGM.Pri=0,TCAM.Rg=0,TCAM.Pri=0,DMM.Rg=0,DMM.Pri=0,DVR.Rg=0,DVR.Pri=0,ASDM.Rg=0,ASDM.Pri=0,PAS.Rg=0,PAS.Pri=0,DIM.Rg=0,DIM.Pri=0,AP.req=1,AP.Pri=1"
+          },
+          {
+            "line": 93124,
+            "text": "         1786334387.145  7094  7094 D CrashReport-Native: Parsing line: 754cd000-75505000 r--s 00000000 fe:00 387                                /system/framework/boot-ecarx.vdex"
+          },
+          {
+            "line": 93125,
+            "text": "         1786334387.145  7094  7094 D CrashReport-Native: Parsing line: 75505000-75506000 r--p 00005000 fe:00 628                                /system/framework/arm64/boot-ecarx.oat"
+          },
+          {
+            "line": 93373,
+            "text": "         1786334387.161  7094  7094 D CrashReport-Native: Parsing line: 74d34ff000-74d3505000 r--s 00000000 fe:00 21702                          /system/fonts/NotoSansCoptic-Regular.ttf"
+          },
+          {
+            "line": 93374,
+            "text": "         1786334387.161  7094  7094 D CrashReport-Native: Parsing line: 74d3505000-74d3523000 r--s 00000000 fe:00 21703                          /system/fonts/NotoNaskhArabicUI-Regular.ttf"
+          },
+          {
+            "line": 93570,
+            "text": "         1786334387.184  7094  7094 D CrashReport-Native: Parsing line: 74d4501000-74d4505000 rw-p 00000000 00:05 26494                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 93571,
+            "text": "         1786334387.184  7094  7094 D CrashReport-Native: Parsing line: 74d4505000-74d4509000 rw-p 00000000 00:05 26493                          /dev/ashmem/dalvik-thread local mark stack (deleted)"
+          },
+          {
+            "line": 122516,
+            "text": "         1786334395.727  2259  2298 D ECarXCAR.McuLog_Panic: 08-10 06:59:52 41195:PWR:DBG:VGM.Rg=0,VGM.Pri=0,TCAM.Rg=0,TCAM.Pri=0,DMM.Rg=0,DMM.Pri=0,DVR.Rg=0,DVR.Pri=0,ASDM.Rg=0,ASDM.Pri=0,PAS.Rg=0,PAS.Pri=0,DIM.Rg=0,DIM.Pri=0,AP.req=1,AP.Pri=1"
+          },
+          {
+            "line": 140694,
+            "text": "         1786334408.635  4317 12526 I XCBTPhone3: [20240314_2337][RxCachedThreadScheduler-2]<ContactRepository>  loadContacts contact xxx: ContactData{mId=337979, mDisplayName='Александр Иванов', mStarred=false, mAddrList=[], mPhoneList=[PhoneItem{mNumber='89250500520', mNumType=2', mStarred=false}], mEmailList=[], mPhotoUri='null', mSoryToken='null', mLetter='#', mFavoritesName='Александр Иванов'}  >onSuccess(ContactRepository.java:361)"
+          },
+          {
+            "line": 141174,
+            "text": "         1786334408.769  4317 12526 D XCBTPhone3: [20240314_2337][RxCachedThreadScheduler-2]<######>  mContactNameMap【保存号码和联系人名字】---number = 89250500520---displayName = Александр Иванов,--photoUri = null  >syncContactNameAndPhoto(ContactRepository.java:127)"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-Bus-Capture-20260810-065954-28002-1234567/android/processes-services-fds.txt",
+        "sha256": "12c4858b2783edda5b28b5be05f6eb8750d7278dfa2a718c733e6fd6d772b53c",
+        "match_count": 4,
+        "matches": [
+          {
+            "line": 15,
+            "text": "shell        10795   872 sh                          sh -c ?echo \"=== PROCESSES ===\"?ps -A -o USER,PID,PPID,NAME,ARGS 2>&1 | grep -Ei \"qnx|someip|vehicle|car.?signal|cluster|dim|smartcore|can|flexray|asdm|vddm|gateway\" || true?echo \"=== SERVICES ===\"?service list 2>&1 | grep -Ei \"qnx|vehicle|car|signal|cluster|dim|can|power\" || true?echo \"=== HAL ===\"?lshal -ti 2>&1 | grep -Ei \"qnx|vehicle|car|signal|cluster|dim|can\" || true?echo \"=== RELEVANT FDS ===\"?for p in /proc/[0-9]*; do?  [ -d \"$p\" ] || continue?  comm=\"$(cat \"$p/comm\" 2>/dev/null)\"?  cmd=\"$(tr \"\\000\" \" \" < \"$p/cmdline\" 2>/dev/null)\"?  printf \"%s %s\\n\" \"$comm\" \"$cmd\" | grep -Eqi \"qnx|someip|vehicle|cluster|dim|smartcore|can|flexray|asdm|vddm\" || continue?  echo \"PID=${p##*/} COMM=$comm CMD=$cmd\"?  ls -la \"$p/fd\" 2>&1 | grep -Ei \"hab|vsock|rpmsg|virtio|can|spi|vip|ttydim|socket\" || true?done"
+          },
+          {
+            "line": 16,
+            "text": "shell        10799 10795 grep                        grep -Ei qnx|someip|vehicle|car.?signal|cluster|dim|smartcore|can|flexray|asdm|vddm|gateway"
+          },
+          {
+            "line": 69,
+            "text": "ps -A -o USER,PID,PPID,NAME,ARGS 2>&1 | grep -Ei \"qnx|someip|vehicle|car.?signal|cluster|dim|smartcore|can|flexray|asdm|vddm|gateway\" || true"
+          },
+          {
+            "line": 80,
+            "text": "\" \"$comm\" \"$cmd\" | grep -Eqi \"qnx|someip|vehicle|cluster|dim|smartcore|can|flexray|asdm|vddm\" || continue"
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      },
+      {
+        "member": "KX11-Bus-Capture-20260810-065954-28002-1234567/android/network-can-flexray.txt",
+        "sha256": "b8d687e6685c6111933507549374c824a03dac8878389d788fab36126469c315",
+        "match_count": 2,
+        "matches": [
+          {
+            "line": 175,
+            "text": "198.18.36.1 dev eth0.5 table ecarx_asdm_route scope link "
+          },
+          {
+            "line": 254,
+            "text": "198.18.34.1 dev eth0 table ecarx_ap_vp_route src 198.18.34.15 uid 2000 "
+          }
+        ],
+        "selection": "first 250 relevant matches, not full log decoding"
+      }
+    ],
+    "has_raw_capture": false
+  }
+]

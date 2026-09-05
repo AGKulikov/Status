@@ -1,0 +1,231 @@
+{
+  "archive": "/workspace/scratch/ed09f1994860/audit-work/originals/ecarx-hud-system-20260727-010640.zip",
+  "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+  "sources": [
+    {
+      "member": "packages/com.ecarx.hud/base.apk",
+      "sha256": "6d70e5db72c61419c9007aa13b4f0a1265937420a1abf2b00a3ceaea1905f995",
+      "size": 11262144
+    },
+    {
+      "member": "packages/ecarx.dimprotocol.service/base.apk",
+      "sha256": "c435f1be2402be76355172f7d50d66d1de782a792cea912851c7571a1fd4739c",
+      "size": 29174
+    },
+    {
+      "member": "packages/com.ecarx.dimmenu/base.apk",
+      "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+      "size": 7864621
+    },
+    {
+      "member": "packages/ecarx.powersomeip.service/base.apk",
+      "sha256": "b1971dc52243211e39125228a8b5736ea3311db74dc31ab119f5db99d6e4bb12",
+      "size": 58216
+    },
+    {
+      "member": "packages/com.ecarx.sdk.openapi/base.apk",
+      "sha256": "eab4552733023ca7a323df2b9ae35b036107e3895ad5fd01b7b27540f47ed158",
+      "size": 3005711
+    },
+    {
+      "member": "packages/ecarx.adaptapi.platform/base.apk",
+      "sha256": "517de12dc167fc3570579eec8203cfc0c85fc95448b3b0f8355770ef7ba9211e",
+      "size": 2339956
+    },
+    {
+      "member": "packages/ecarx.geea.platform.api.signal/base.apk",
+      "sha256": "b4abefa6b4805f7d7af93599fbd7ef538080fd90f15902eb5c127dc9c0ab74b3",
+      "size": 1443566
+    },
+    {
+      "member": "packages/ecarx.geea.platform.api.vf/base.apk",
+      "sha256": "ed7be7cf92ecc686fa94b872874fef763aaef0e6fcfae7b930f2e4580a172de5",
+      "size": 1445417
+    },
+    {
+      "member": "packages/com.ecarx.car/base.apk",
+      "sha256": "1cab337a3c056d6ba2a7a58f12638c2b7137f672a1613a2fb78305602c6683f3",
+      "size": 6816872
+    },
+    {
+      "member": "packages/com.ecarx.car.multidisplay/base.apk",
+      "sha256": "73e6dd017c06e1999741f32e77008f09664595856f718ecd0e22c20e8a95a06f",
+      "size": 16791
+    },
+    {
+      "member": "packages/com.ecarx.providers.settings/base.apk",
+      "sha256": "4ce3d3ce216fcac5c240e8c6efbe85c40bafabebecdb63a49a260b142d43d046",
+      "size": 70749
+    },
+    {
+      "member": "framework/system_framework/android.car.jar",
+      "sha256": "cb7100dbcba4ec2ed883e79a22eaf5f2d245f062f6284d5d96cae2d373834e7d",
+      "size": 132019
+    },
+    {
+      "member": "framework/system_framework/car-frameworks-service.jar",
+      "sha256": "7da3c38227effffb323d21f46239dc619d0d158dbd8e1a9ab4acf8f13794d764",
+      "size": 3708
+    },
+    {
+      "member": "framework/system_framework/ecarx-carservice-starter.jar",
+      "sha256": "1302217f180159737a77a938775d8e03781bfac0fbd0acc10971b19299317c44",
+      "size": 1135
+    },
+    {
+      "member": "framework/system_framework/ecarx-theme-launcher-service.jar",
+      "sha256": "d152ceaf6fcab2b22a50dd9faeead22c9cb6154a339750a31637fb1bf4d55bb4",
+      "size": 1579
+    },
+    {
+      "member": "framework/system_framework/ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "size": 1135817
+    },
+    {
+      "member": "framework/system_framework/ecarx.car.audio.jar",
+      "sha256": "6a8ca28bbcca9c5b73974488de18ab9f14b79b912f05f84088ca9d8a2842b539",
+      "size": 15790
+    },
+    {
+      "member": "framework/system_framework/ecarx.car.jar",
+      "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+      "size": 594600
+    },
+    {
+      "member": "framework/system_framework/ecarx.gkui.openapi.impl.jar",
+      "sha256": "389884082b3e313b81efffae3802afd97876bef6318f6d5299ddf8d9e588894b",
+      "size": 384026
+    },
+    {
+      "member": "framework/system_framework/ecarx.jar",
+      "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+      "size": 75561
+    },
+    {
+      "member": "framework/system_framework/ecarx_radio_base.jar",
+      "sha256": "cd5a5b2cbc6462a3d80ba96ecd56e90a18b129e4577781ba7564bb1cb85c978f",
+      "size": 19092
+    },
+    {
+      "member": "framework/system_framework/ecarx_radio_service.jar",
+      "sha256": "10790b367ce1b5fbea1c99302ddf60166d912dbf14db9fe3301f42dfe52c3d1f",
+      "size": 50645
+    },
+    {
+      "member": "framework/system_framework/ts-carplay-adapter.jar",
+      "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+      "size": 1256310
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/android.hardware.automotive.evs_1.0-ais.rc",
+      "sha256": "ac5d52a9384a57966d5e5cbf4c375433353f45fc70bb53121b6b1269fb6501a1",
+      "size": 184
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.audiocontrol_1.0-service.rc",
+      "sha256": "675e95e321b0f821154a844888b8fedc27115b575dddeacdc085824c2423f89a",
+      "size": 156
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.broadcastradio_2.1-service.rc",
+      "sha256": "d0a41a843648058d5f4119d9881632fb01f72754fd2150dbb464ea039c9ecf4e",
+      "size": 151
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.connectivity_1.0-service.rc",
+      "sha256": "84089a68e5a74dcb1062e1f7978db2aa1bbbcb172a3cc554b82bf8e3a3a94452",
+      "size": 147
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.csd_1.0-service.rc",
+      "sha256": "d719a55d638d5b4ff092edd0c9fd999bb323bbf353d77ed2d20085744681ac06",
+      "size": 134
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.dimprotocol_1.0-service.rc",
+      "sha256": "02255733288dc29863dfb4b0e5133dd07b3cf1b6a0088be8c3f4bee5d288a868",
+      "size": 150
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.dtcnl_1.0-service.rc",
+      "sha256": "0f1f1219a71fb5cd9b454bbba3b5f02a2797b6caaa57f6fd2152e09723120969",
+      "size": 138
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.gnss_1.0-service.rc",
+      "sha256": "3a9a7674c0587f57fa1828e6b903b4ed23a856eb7374f1bfcf5600784ea98ce4",
+      "size": 146
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.iplm_1.0-service.rc",
+      "sha256": "0bd5e72f8b3a764acd9f64013ab7884ed134ad4a8dd108fb280c2859789ce641",
+      "size": 118
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.ota_1.0-service.rc",
+      "sha256": "d5f50dcd1c985f3f88158d3f8384f75dfafad29ae2a37716b2bc217182ba9f47",
+      "size": 134
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.pas_1.0-service.rc",
+      "sha256": "a7848a51f826ae27264c9ee9d2f318f4b41def1f5b3f4600566afca10c7f2526",
+      "size": 134
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.pkicertificate_1.0-service.rc",
+      "sha256": "e03f1389e76c08aeed84175da5053220827cfc575f0aee5e0d286f1d39991bce",
+      "size": 160
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.powersomeip_1.0-service.rc",
+      "sha256": "b95e134b7a893a43d28929b486811ae3a8ff6d78cabba4bcd1c2f4920117dd36",
+      "size": 154
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.psd_1.0-service.rc",
+      "sha256": "9e24c8bc01aa688923c0b732e93982b0fa7156fd18d65994b1604ed8ebc50fff",
+      "size": 134
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.ecarx.xma.tcam_1.0-service.rc",
+      "sha256": "e0712a0a229ced4a32b282bb3a6e634bf8cbcc2397cda308be27094e226327a0",
+      "size": 136
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.hardware.automotive.vehicle_1.0-service.ecarx.rc",
+      "sha256": "d624cc2e40551883e51561b0758c0e44e9a8febae966f608c83954784ea1b57c",
+      "size": 148
+    },
+    {
+      "member": "vendor-native/_vendor_etc/init/vendor.qti.automotive.qcarcam_1.0-service.rc",
+      "sha256": "29ed59d8c0e5d97b7e46cec69b8b07195532afb3620012a47354aa8ebe0e5e32",
+      "size": 154
+    },
+    {
+      "member": "vendor-native/_vendor_etc/permissions/vendor.ecarx.hardware.type.dimprotocol.xml",
+      "sha256": "dc0f3927fd02452a9e97a3ad1b026010eda45ae232bad8a1cb28258387ed17b3",
+      "size": 168
+    },
+    {
+      "member": "vendor-native/_vendor_etc/permissions/vendor.ecarx.hardware.type.powersomeip.xml",
+      "sha256": "b569ed00a1484704f591bb11ebc4a9718dcfb5ae5bd1f217c734522a647986bf",
+      "size": 168
+    },
+    {
+      "member": "vendor-native/_vendor_etc/selinux/vendor_property_contexts",
+      "sha256": "d0885ccd3f9160880f8e1f2bcd1a54697acc55b81d94eab70b5cc183f930ec47",
+      "size": 11890
+    },
+    {
+      "member": "vendor-native/_vendor_etc/vsomeip.json",
+      "sha256": "a6709912048aec6d8b1c85f71ef5080de6fd54171493bf64e1a9fde88e2fe88b",
+      "size": 989
+    },
+    {
+      "member": "report.txt",
+      "sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+      "size": 71431
+    }
+  ]
+}

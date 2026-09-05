@@ -1,0 +1,446 @@
+{
+  "scope": "Bounded analytical excerpts supporting critical control-contract findings. Not executable and not full third-party decompilation.",
+  "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+  "evidence": [
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "CarKey",
+      "method": "cancelDiscovery()V",
+      "method_disassembly_sha256": "da2c97e8e9b73af3ab391a34b006c074edd6c6e2efb3e6542c10459dc2b00e19",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 return-void "
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "CarKey",
+      "method": "createDigitalKey(I)Z",
+      "method_disassembly_sha256": "6b887986a9f67bce67e242d5d67869d002db6c8d67bf813855eb957923210d79",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const/4 v0, 0",
+        "0002 return v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "CarKey",
+      "method": "getDigitalKeys()[Lcom/ecarx/xui/adaptapi/car/userprofile/DigitalKeyInfo;",
+      "method_disassembly_sha256": "63585d7eed200e43436803bf7c2a9454ac1603db68eeb0e4abf79556f7c65dac",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const/4 v0, 0",
+        "0002 new-array v0, v0, [Lcom/ecarx/xui/adaptapi/car/userprofile/DigitalKeyInfo;",
+        "0006 return-object v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "CarKey",
+      "method": "readRealKey()V",
+      "method_disassembly_sha256": "4ebe98e9309d9640ad94b29e823882c62c582dda54da447f7a6ca6c54236437f",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 iget-object v0, v2, Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;->mECarXCarProfileManager Lecarx/car/hardware/vehicle/ECarXCarProfileManager;",
+        "0004 const/4 v1, 1",
+        "0006 invoke-virtual v0, v1, Lecarx/car/hardware/vehicle/ECarXCarProfileManager;->CB_PSET_ConnectKey(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "000c goto +5h",
+        "000e move-exception v0",
+        "0010 invoke-virtual v0, Ljava/lang/Exception;->printStackTrace()V",
+        "0016 return-void "
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "CarKey",
+      "method": "startDiscovery()V",
+      "method_disassembly_sha256": "8379bf98b66cad0b59a7714d92a105a71b83d9b3938f7f7e17aa0bb961ca8596",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 iget-object v0, v2, Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;->mECarXCarProfileManager Lecarx/car/hardware/vehicle/ECarXCarProfileManager;",
+        "0004 const/4 v1, 0",
+        "0006 invoke-virtual v0, v1, Lecarx/car/hardware/vehicle/ECarXCarProfileManager;->CB_PSET_ConnectKey(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "000c return-void "
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "CarKey",
+      "method": "unbindCarKey(I)V",
+      "method_disassembly_sha256": "f497c574ab00f116bf50d45bf7995b23225f479138e3b31e9df4a25bb9d04801",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 iget-object v0, v2, Lcom/ecarx/xui/adaptapi/car/userprofile/CarKey;->mECarXCarProfileManager Lecarx/car/hardware/vehicle/ECarXCarProfileManager;",
+        "0004 const/16 v1, 17",
+        "0008 invoke-virtual v0, v1, Lecarx/car/hardware/vehicle/ECarXCarProfileManager;->CB_PSET_ConnectKey(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "000e goto +5h",
+        "0010 move-exception v0",
+        "0012 invoke-virtual v0, Ljava/lang/Exception;->printStackTrace()V",
+        "0018 return-void "
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "UserProfile",
+      "method": "notAllow()Z",
+      "method_disassembly_sha256": "9126b4e6951cb6dd94d9027f473e40c676de7b601580df310bfce2b89ae456d4",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const v0, 33855",
+        "0006 invoke-virtual v4, v0, Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;->getPAData(I)Ljava/lang/Object;",
+        "000c move-result-object v0",
+        "000e check-cast v0, Lecarx/car/hardware/vehicle/PATypes$PA_PSET_PChangeAllowed;",
+        "0012 const/4 v1, 1",
+        "0014 if-eqz v0, +00bh",
+        "0018 invoke-virtual v0, Lecarx/car/hardware/vehicle/PATypes$PA_PSET_PChangeAllowed;->getData()I",
+        "001e move-result v2",
+        "0020 if-eq v2, v1, +003h",
+        "0024 goto +3h",
+        "0026 const/4 v1, 0",
+        "0028 nop ",
+        "002a if-eqz v1, +009h",
+        "002e const-string v2, \"Profile_API\"",
+        "0032 const-string v3, \"profile operation not allow\"",
+        "0036 invoke-static v2, v3, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I",
+        "003c return v1"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "UserProfile",
+      "method": "addUserProfile()I",
+      "method_disassembly_sha256": "817f94e3e762ef9c916bc21ecbdc617afb28bde7f632e8043268522705a48e8c",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const-string v0, \"Profile_API\"",
+        "0004 const-string v1, \"addUserProfile\"",
+        "0008 invoke-static v0, v1, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I",
+        "000e invoke-direct v3, Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;->nextCreateProfile()I",
+        "0014 move-result v0",
+        "0016 const/4 v1, 1",
+        "0018 invoke-direct v3, v1, v0, v1, Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;->onUserProfileActionStatus(I I I)V",
+        "001e invoke-direct v3, Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;->notAllow()Z",
+        "0024 move-result v2",
+        "0026 if-eqz v2, +007h",
+        "002a const/4 v2, 4",
+        "002c invoke-direct v3, v1, v0, v2, Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;->onUserProfileActionStatus(I I I)V",
+        "0032 goto +bh",
+        "0034 const/4 v2, 2",
+        "0036 invoke-direct v3, v1, v0, v2, Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;->onUserProfileActionStatus(I I I)V",
+        "003c iget-object v1, v3, Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;->mECarXCarProfileManager Lecarx/car/hardware/vehicle/ECarXCarProfileManager;",
+        "0040 const/4 v2, 0",
+        "0042 invoke-virtual v1, v2, Lecarx/car/hardware/vehicle/ECarXCarProfileManager;->CB_PSET_NewProfile(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "0048 const/4 v1, -1",
+        "004a return v1"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "UserProfile",
+      "method": "getSupportUserProfileCount()I",
+      "method_disassembly_sha256": "055345aa93cfa82aba34d2a8b1aa4ec790a862d1b6ba6cb695a6e96df2f31d14",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const/4 v0, 5",
+        "0002 return v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "UserProfile",
+      "method": "switchUserProfile(I I)Z",
+      "method_disassembly_sha256": "b7b4e95f4838a216083697f87058b4674d3c3c6831c826d1928c6f152ec65c6b",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "002c const/4 v0, 1",
+        "002e const/4 v1, 3",
+        "0036 invoke-direct v5, Lcom/ecarx/xui/adaptapi/car/userprofile/UserProfile;->notAllow()Z",
+        "003e const/4 v3, 0",
+        "0040 const/4 v4, 4",
+        "0042 if-eqz v2, +006h",
+        "004c return v3",
+        "0056 if-ne v7, v2, +006h",
+        "0060 return v0",
+        "0062 const/4 v2, 2",
+        "006e invoke-virtual v1, v7, Lecarx/car/hardware/vehicle/ECarXCarProfileManager;->CB_PSET_RequestActiveProfile(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "007a if-ne v1, v2, +003h",
+        "0082 return v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "Hvac",
+      "method": "checkTemper(F)Z",
+      "method_disassembly_sha256": "9fd64325b621615234b9812c655ef830718db1ffaa0988b43790039b7db7c577",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const v0, 268829184",
+        "0006 invoke-virtual v3, v0, Lcom/ecarx/xui/adaptapi/car/hvac/Hvac;->getCustomizeFunctionValue(I)F",
+        "000c move-result v0",
+        "000e const v1, 268829440",
+        "0014 invoke-virtual v3, v1, Lcom/ecarx/xui/adaptapi/car/hvac/Hvac;->getCustomizeFunctionValue(I)F",
+        "001a move-result v1",
+        "001c cmpl-float v2, v4, v1",
+        "0020 if-ltz v2, +008h",
+        "0024 cmpg-float v2, v4, v0",
+        "0028 if-gtz v2, +004h",
+        "002c const/4 v2, 1",
+        "002e goto +2h",
+        "0030 const/4 v2, 0",
+        "0032 return v2"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "Hvac",
+      "method": "convertSeatMassgLevelToVP(I)I",
+      "method_disassembly_sha256": "4bc784238233ef32525d91e9d60a4a89bd9a30843f1a97fcf6bcfaaf86739f53",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const/4 v0, 0",
+        "0002 packed-switch v2, +000000bh",
+        "0008 goto +7h",
+        "000a const/4 v0, 2",
+        "000c goto +5h",
+        "000e const/4 v0, 1",
+        "0010 goto +3h",
+        "0012 const/4 v0, 0",
+        "0014 nop ",
+        "0016 return v0",
+        "0018 packed-switch-payload 10050701 10050702 10050703"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "Hvac",
+      "method": "convertTemper2Index(F)I",
+      "method_disassembly_sha256": "5c866c38a9ecb3b3a02655d4d5c38e1ca99c28943e895f11ce43963aeeb556ee",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const v0, 33460",
+        "0006 const/4 v1, 0",
+        "0008 invoke-virtual v4, v0, v1, Lcom/ecarx/xui/adaptapi/car/hvac/Hvac;->getIntValue(I I)I",
+        "000e move-result v0",
+        "0010 const/high16 v1, 1065353216",
+        "0014 const/4 v2, 1",
+        "0016 if-ne v0, v2, +009h",
+        "001a const/high16 v2, 1114374144",
+        "001e sub-float v2, v5, v2",
+        "0022 add-float/2addr v2, v1",
+        "0024 float-to-int v1, v2",
+        "0026 return v1",
+        "0028 const/high16 v2, 1098383360",
+        "002c sub-float v2, v5, v2",
+        "0030 const/high16 v3, 1056964608",
+        "0034 div-float/2addr v2, v3",
+        "0036 add-float/2addr v2, v1",
+        "0038 float-to-int v1, v2",
+        "003a return v1"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "Hvac",
+      "method": "getClimateZone(I)I",
+      "method_disassembly_sha256": "fb3bf1b87cf88b10d01dffdef6a78480fb39d4e06e6d23682562c452beb774a2",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const/4 v0, 5",
+        "0002 if-ne v2, v0, +006h",
+        "0006 const v0, 268502275",
+        "000c return v0",
+        "000e const/16 v0, 129",
+        "0012 if-ne v2, v0, +006h",
+        "0016 const v0, 268502276",
+        "001c return v0",
+        "001e const v0, 268502274",
+        "0024 return v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "Hvac",
+      "method": "lambda$buildFunctions$16(Ljava/lang/Integer;)Ljava/lang/Float;",
+      "method_disassembly_sha256": "2a2b1afe40d33f8b6b95cdd530e35b1e17b7006122279d0f89b6f04b6f13b3d5",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 invoke-virtual v2, Ljava/lang/Integer;->intValue()I",
+        "0006 move-result v0",
+        "0008 const/4 v1, 1",
+        "000a if-ne v0, v1, +009h",
+        "000e const/high16 v0, 1118437376",
+        "0012 invoke-static v0, Ljava/lang/Float;->valueOf(F)Ljava/lang/Float;",
+        "0018 move-result-object v0",
+        "001a return-object v0",
+        "001c const/high16 v0, 1105461248",
+        "0020 invoke-static v0, Ljava/lang/Float;->valueOf(F)Ljava/lang/Float;",
+        "0026 move-result-object v0",
+        "0028 return-object v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "Hvac",
+      "method": "lambda$buildFunctions$17(Ljava/lang/Integer;)Ljava/lang/Float;",
+      "method_disassembly_sha256": "b39ee05c8b7571b954ff19437dfbb655878d97664857e8bbe4016e6cad99cccb",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 invoke-virtual v2, Ljava/lang/Integer;->intValue()I",
+        "0006 move-result v0",
+        "0008 const/4 v1, 1",
+        "000a if-ne v0, v1, +009h",
+        "000e const/high16 v0, 1114374144",
+        "0012 invoke-static v0, Ljava/lang/Float;->valueOf(F)Ljava/lang/Float;",
+        "0018 move-result-object v0",
+        "001a return-object v0",
+        "001c const/high16 v0, 1098383360",
+        "0020 invoke-static v0, Ljava/lang/Float;->valueOf(F)Ljava/lang/Float;",
+        "0026 move-result-object v0",
+        "0028 return-object v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "Hvac",
+      "method": "lambda$buildFunctions$18(Ljava/lang/Integer;)Ljava/lang/Float;",
+      "method_disassembly_sha256": "2d2e7bf5524305bb5620bccefec1fe798ed6a40d6db38965f4e8fc38e44e3857",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 invoke-virtual v2, Ljava/lang/Integer;->intValue()I",
+        "0006 move-result v0",
+        "0008 const/4 v1, 1",
+        "000a if-ne v0, v1, +009h",
+        "000e const/high16 v0, 1065353216",
+        "0012 invoke-static v0, Ljava/lang/Float;->valueOf(F)Ljava/lang/Float;",
+        "0018 move-result-object v0",
+        "001a return-object v0",
+        "001c const/high16 v0, 1056964608",
+        "0020 invoke-static v0, Ljava/lang/Float;->valueOf(F)Ljava/lang/Float;",
+        "0026 move-result-object v0",
+        "0028 return-object v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "AmbienceLight",
+      "method": "getKX11ColorSetStatus()Lcom/ecarx/xui/adaptapi/FunctionStatus;",
+      "method_disassembly_sha256": "d779dd9f9ff61c4ff69ced532a85f771499aa40ac9f248e732e995e87dcfe47c",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const v0, 33808",
+        "0006 invoke-virtual v2, v0, Lcom/ecarx/xui/adaptapi/car/vehicle/AmbienceLight;->getFunctionStatus(I)Lcom/ecarx/xui/adaptapi/FunctionStatus;",
+        "000c move-result-object v0",
+        "000e sget-object v1, Lcom/ecarx/xui/adaptapi/FunctionStatus;->active Lcom/ecarx/xui/adaptapi/FunctionStatus;",
+        "0012 if-ne v0, v1, +00bh",
+        "0016 invoke-virtual v2, Lcom/ecarx/xui/adaptapi/car/vehicle/AmbienceLight;->isKingMode()Z",
+        "001c move-result v1",
+        "001e if-eqz v1, +005h",
+        "0022 sget-object v1, Lcom/ecarx/xui/adaptapi/FunctionStatus;->notactive Lcom/ecarx/xui/adaptapi/FunctionStatus;",
+        "0026 return-object v1",
+        "0028 return-object v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "AmbienceLight",
+      "method": "setAmbLiMod(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "method_disassembly_sha256": "43bfa627cfb2a72f020de3cd435edf5d3aa51fb97684fee966933311eed00b36",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 sget-object v0, Lecarx/car/hardware/annotation/ApiResult;->FAILED Lecarx/car/hardware/annotation/ApiResult;",
+        "0004 if-nez v4, +009h",
+        "0008 iget-object v1, v3, Lcom/ecarx/xui/adaptapi/car/vehicle/AmbienceLight;->mAmbliManager Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+        "000c const/4 v2, 0",
+        "000e invoke-virtual v1, v2, Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_AmbLiAll(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "0014 goto +7h",
+        "0016 iget-object v1, v3, Lcom/ecarx/xui/adaptapi/car/vehicle/AmbienceLight;->mAmbliManager Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+        "001a const/4 v2, 1",
+        "001c invoke-virtual v1, v2, Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_AmbLiAll(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "0022 if-eqz v4, +00bh",
+        "0026 const v1, 537526792",
+        "002c if-eq v4, v1, +006h",
+        "0030 packed-switch v4, +0000010h",
+        "0036 goto +bh",
+        "0038 iget-object v1, v3, Lcom/ecarx/xui/adaptapi/car/vehicle/AmbienceLight;->mAmbliManager Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+        "003c invoke-direct v3, v4, Lcom/ecarx/xui/adaptapi/car/vehicle/AmbienceLight;->converToAmbliMode(I)I",
+        "0042 move-result v2",
+        "0044 invoke-virtual v1, v2, Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_AmbLiModSetting(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "004a move-result-object v0",
+        "004c return-object v0",
+        "004e nop ",
+        "0050 packed-switch-payload 200a0202 200a0203 200a0204"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "AmbienceLight",
+      "method": "isKingMode()Z",
+      "method_disassembly_sha256": "948ecf86187d6071374d221688241df5283949531fcc407936f2300fd442287d",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 const/4 v0, 0",
+        "0002 const v1, 33926",
+        "0008 invoke-virtual v3, v1, v0, Lcom/ecarx/xui/adaptapi/car/vehicle/AmbienceLight;->getIntValue(I I)I",
+        "000e move-result v1",
+        "0010 const/16 v2, 11",
+        "0014 if-ne v1, v2, +004h",
+        "0018 const/4 v0, 1",
+        "001a nop ",
+        "001c return v0"
+      ]
+    },
+    {
+      "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "dex_entry": "classes.dex",
+      "class_short": "Vehicle",
+      "method": "lambda$buildFunctions$1(Lcom/ecarx/xui/adaptapi/car/vehicle/Vehicle; Ljava/lang/Integer;)Lecarx/car/hardware/annotation/ApiResult;",
+      "method_disassembly_sha256": "862ffa9e0ee686b207e9a570923556eec3785a196e3caa859d990f25c7bf38dc",
+      "extraction": "selected instructions; offsets relative to method, not complete class",
+      "instructions": [
+        "0000 iget-object v0, v4, Lcom/ecarx/xui/adaptapi/car/vehicle/Vehicle;->mECarXCarVfcipwakeupManager Lecarx/car/hardware/vehicle/ECarXCarVfcipwakeupManager;",
+        "0004 const/4 v1, 1",
+        "0006 invoke-virtual v0, v1, Lecarx/car/hardware/vehicle/ECarXCarVfcipwakeupManager;->CB_SetVehTcam(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "000c move-result-object v0",
+        "000e sget-object v2, Lecarx/car/hardware/annotation/ApiResult;->SUCCEED Lecarx/car/hardware/annotation/ApiResult;",
+        "0012 if-ne v2, v0, +026h",
+        "0016 iget-object v2, v4, Lcom/ecarx/xui/adaptapi/car/vehicle/Vehicle;->mCarSignalManager Lecarx/car/hardware/signal/CarSignalManager;",
+        "001a invoke-virtual v2, v1, Lecarx/car/hardware/signal/CarSignalManager;->setHmiCarLocatorSetReq(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "0020 move-result-object v0",
+        "0022 const-string v1, \"Vehicle_AdaptAPi\"",
+        "0026 new-instance v2, Ljava/lang/StringBuilder;",
+        "002a invoke-direct v2, Ljava/lang/StringBuilder;-><init>()V",
+        "0030 const-string v3, \"setHmiCarLocatorSetReq status = \"",
+        "0034 invoke-virtual v2, v3, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+        "003a invoke-virtual v2, v5, Ljava/lang/StringBuilder;->append(Ljava/lang/Object;)Ljava/lang/StringBuilder;",
+        "0040 const-string v3, \" result: \"",
+        "0044 invoke-virtual v2, v3, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+        "004a invoke-virtual v2, v0, Ljava/lang/StringBuilder;->append(Ljava/lang/Object;)Ljava/lang/StringBuilder;",
+        "0050 invoke-virtual v2, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;",
+        "0056 move-result-object v2",
+        "0058 invoke-static v1, v2, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I",
+        "005e return-object v0"
+      ]
+    }
+  ]
+}

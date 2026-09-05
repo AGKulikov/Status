@@ -1,0 +1,2136 @@
+{
+  "schema_version": "1.1",
+  "date": "2026-09-05",
+  "scope": "94 research areas, including overlaps and explicitly unresolved areas; not 94 ECUs and not a complete hardware inventory.",
+  "systems": [
+    {
+      "id": "COMF-001",
+      "title": "Двери, центральный замок и капот",
+      "not_known": [
+        "Исполнитель немедленного lock/unlock из ГУ; anti-theft и deadlock; механика блокировки и допустимые режимы."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "read_only_in_public_registration",
+      "needed_artifact": "Штатный consumer блокировки и схема кузовного ECU из уже имеющихся APK/диагностики.",
+      "next_offline_step": "Найти references на 30611 и низкоуровневые LockgCenReq в штатном settings, сравнить command и status enum.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "BCM_FUNC_DOOR 0x21020100 для четырёх дверей/капота читает 30382/30388/30385/30391/30417. BCM_FUNC_DOOR_LOCK0x21020200 читает 30611; обе регистрации помечены active, но setter замка отсутствует."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/0"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-002",
+      "title": "Детские замки и детский сценарий",
+      "not_known": [
+        "Наличие электрического управления на конкретной машине; взаимодействие Child scene и ручной настройки; сохранение после засыпания."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_route_static_confirmed",
+      "needed_artifact": "PA33841–33844 с availability/data и штатный экран детских замков.",
+      "next_offline_step": "Сопоставить LockgCenReq2 со статусным enum, затем потребителей сцен и уже записанные 33841–33844.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "BCM_FUNC_CHILD_SAFETY_LOCK0x21020400: zone16→CB_ChdLockReLeft/property33243/PA33841;zone64→33244/33842. API1→raw2,API0→raw1; feedbackraw1→API1,raw2→API0. Командная и статусная кодировки различаются.",
+        "0x21020700 использует отдельные CB_*_ChdMod33245/33246 и PA33843/33844. Это не алиас обычных детских замков."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/1"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-003",
+      "title": "Физический и цифровой ключ",
+      "not_known": [
+        "Реальный смысл 0/1/17 в ECU, обратная связь 33853 и привязка физического ключа; существует ли отдельный сервис цифровых ключей вне этого SDK."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "mixed_stub_and_command_route",
+      "needed_artifact": "CarKey callback33853 и штатный менеджер ключей; подтверждение комплектации.",
+      "next_offline_step": "Разобрать CarKey$1 и PA_PSET_ConnectKey; искать другой service реализации digital key, не вызывать unbind для исследования.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "CarKey createDigitalKey/delDigitalKeyItem/delAllDigitalKey/registerDigitalKeyCallback/unregisterDigitalKeyCallback возвращают false без действий; getDigitalKeys всегда пустой массив; cancelDiscovery пустой. Это реализация-заглушка.",
+        "startDiscovery/readRealKey/unbindCarKey вызывают CB_PSET_ConnectKey(property33254) со значениями 0/1/17; unbindCarKey(int) игнорирует переданный ID. readRealKey — запись запроса, не пассивное чтение."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/2"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-004",
+      "title": "Профили пользователя и память настроек",
+      "not_known": [
+        "Полный список восстанавливаемых полей, воздействие на сиденья/зеркала, конфликт облачных и локальных профилей, атомарность/откат."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_route_static_confirmed_async_result_required",
+      "needed_artifact": "Аннотации ProfileFunction, Profileclouddata, штатный profile consumer, существующий 33855/33873/33875.",
+      "next_offline_step": "Составить карту каждого ProfileFunction→protobuf field→устройства, разобрать результирующие callback33845–33849/33874; не считать snapshot другого профиля доступным.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Действия профиля разрешаются только при PA33855.data==1. getCurrentId читает 33845; getUserProfileData/applyUserProfileData работают только для текущего профиля.",
+        "addUserProfile и addUserProfileCopyFrom отправляют CB_PSET_NewProfile33249, но всегда возвращают-1; результат приходит асинхронно через PA callbacks. Возврат-1 не доказывает, что профиль не создан.",
+        "switchUserProfile(from,to) игнорирует from и выбирает to через CB_PSET_RequestActiveProfile 33248. applyUserProfileData возвращает true после вызова void-команды CB_PSET_ProfileCloudData, не дожидаясь асинхронного подтверждения результата."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/3"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-005",
+      "title": "Багажник и высота открытия",
+      "not_known": [
+        "Ограничения по передаче/скорости, прерывание препятствием, калибровка/память высоты и оба PA одновременно active."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_route_static_confirmed_conditional",
+      "needed_artifact": "Штатный consumer багажника и сигналы препятствия/допуска из текущих архивов.",
+      "next_offline_step": "Восстановить точную таблицу обеих ветвей и переходы target/current; исключить повторение импульса при неполном ответе.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Дверь багажника 0x21020100/zone0x20000000 выбирает две CB ветви по PA33675/33676; управление высотой 0x2c010800 отдельное. Общий успешный return не равен фактическому открытию."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/4"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-006",
+      "title": "Боковые стёкла и защита от защемления",
+      "not_known": [
+        "Чем останавливать боковое стекло в KX11, anti-pinch/learned position и поведение при потере соединения; настоящая обратная связь от мотора."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_route_static_confirmed_stop_semantics_incomplete",
+      "needed_artifact": "Штатный window-control consumer и записанные moving/anti-pinch/availability состояния.",
+      "next_offline_step": "Связать PA33833–33840 с CurrentPos/MovingState; проследить несовпадение pause списка и non-EX11 callback.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Позиции переводятся в raw1..26 с шагом 4%; групповые зоны выполняют последовательные CB, не атомарную операцию. non-EX11 mapper боковых окон не объясняет все pause enum, объявленные в supported list."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/5"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-007",
+      "title": "Люк, наклон и шторка панорамы",
+      "not_known": [
+        "Последовательность координации крыши/шторки; пределы, rain-close, защемление, калибровка и автозакрытие после выключения."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_route_static_confirmed",
+      "needed_artifact": "Штатная roof UI логика и PA/CarSignal roof status/obstacle/config.",
+      "next_offline_step": "Разобрать pressed/released/tilt и текущую позицию 30479/30476, движение 30477/30475, связанные sensor fault enums.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Люк и шторка используют разные зоны 4/8 и отдельные пары press/release CB33193–33196, позиции 33197/33198 и наклон 33199. Регистрация наклона отправляет CB_SunRoofTiltReq; дополнительных CB закрытия люка/шторки в этой регистрации нет. Совместный физический эффект не проверен."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/6"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-008",
+      "title": "Дворники, омыватели и датчик дождя",
+      "not_known": [
+        "Мгновенный wipe/wash, скоростные ступени, дождевой сенсор, жидкость/обогрев форсунок, аппаратные допуски service position."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "settings_routes_confirmed_actuation_incomplete",
+      "needed_artifact": "Доступные Wip/Wash/Rain raw сигналы и штатный потребитель сервисного режима.",
+      "next_offline_step": "Развести live actuation, retained setting, service operation и hardware config; нельзя трактовать rear-auto как немедленный взмах.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Сервисное положение 0x200c0100: zoneDEFAULT/1→CB_CL_WipFrntSrvMod32837/PA33346;zone2→задний 32838/33347. Настройка auto rear wiping0x200c0200→32836/33345. Управление принадлежит ClimateManager, несмотря на кузовное назначение."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/7"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-009",
+      "title": "Зеркала: моторы, наклон, складывание и обогрев",
+      "not_known": [
+        "Немедленное fold/unfold в runtime SDK, моторное движение стекла, позиционная память/обратная связь, привязка обогрева к заднему стеклу."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "settings_confirmed_motor_route_unresolved",
+      "needed_artifact": "Системный consumer зеркал и фактический classloader MConfig; существующие mirror motor properties.",
+      "next_offline_step": "Найти регистрацию 0x21060100 по всем системным/APK DEX, проверить fork версии и обратный motor-status, не подменять автоскладыванием.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Настройки auto-fold0x20090200 и reverse-dipping0x20090300 имеют CB33035/33036 и PA33644/33645. Отдельный MConfig моторный fold0x21060100 не подтверждает, что этот маршрут реализован текущим системным Bcm."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/8"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-010",
+      "title": "Наружный свет и световые сценарии",
+      "not_known": [
+        "Прямые low/high/fog/hazard actuators, уровень корректора, ограничения AUTO/AFS, физическая конфигурация фар."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "mixed_read_only_and_settings_routes",
+      "needed_artifact": "Штатный lighting UI, lamp ECU/конфигурация и actual light-status.",
+      "next_offline_step": "Разобрать consumer0x20040e00, отличить requested state от monitor/fault и настройки схемы света.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "BCM_FUNC_LIGHT_DIPPED_BEAM фактически использует CB_AFSLight_Setting33027/PA33636, общий с AFS-setting. Поворотники 0x21051100/0x21051200 — только reading30421.",
+        "Лево-/правостороннее движение 0x2b020100 кодируется LEFT→raw1,RIGHT→raw0 через CB_LeftRightSetting; welcome mode1..6→raw0..5. Это сохранённые настройки, не прямое зажигание лампы."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/9"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-011",
+      "title": "Лампы чтения и салонный свет",
+      "not_known": [
+        "Установленные зоны/плафоны, реакции на двери/блокировку, master-vs-local приоритет и восстановление."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_routes_static_confirmed",
+      "needed_artifact": "Availability локальных PA и штатная логика courtesy/door.",
+      "next_offline_step": "Сопоставить автоматический courtesy с ручными CB и проверить признаки third-row отдельно от реального KX11.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Индивидуальные CB_ReadLight* используют 1=on,2=off; all switch1=on,0=off. Courtesy light имеет отдельную настройку через PA33825."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/10"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-012",
+      "title": "Атмосферная подсветка и палитра",
+      "not_known": [
+        "Активный runtime SDK/palette/compatibility для Natro, устранение несогласованного BREATHE пути, фактический RGB формат и число цветов оборудования."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_routes_static_confirmed_contract_mismatches",
+      "needed_artifact": "Consumer штатной подсветки, PA33793–33829 и SceneMod actual state.",
+      "next_offline_step": "Сверить яркость/цвет/эффект Natro с 0x200a0900, palette и lambda; не считать mode06 безвредной probe.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Текущий AmbienceLight цвет 0x200a0900 для KX11 DEFAULT-zone принимает таблицу 72 RGB integer entries; EX11 имеет другую 64-entry палитру и зонирование. Это другой contract, чем 13 именованных color enum клиента.",
+        "KING scene определяется PA33926==11 и переводит 24 active status-проверки подсветки в notactive. Сбой доступности настройки может быть следствием сценария, а не неисправностью ламп.",
+        "Поддерживаемый BREATHE mode0x200a0206 добавляется по PA33799, но setAmbLiMod принимает 0/0x200a0202/03/04/08; для 06 сначала вызывает CB_AmbLiAll(1), потом остаётся FAILED. Возврат FAILED не гарантирует отсутствие побочного эффекта."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/11"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-013",
+      "title": "Климат: температура и единицы",
+      "not_known": [
+        "Как LO/HI отображает штатная UI; совпадает ли реально загруженный Hvac с системным; conversion на неожиданных PA/NaN."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_route_static_confirmed_client_range_mismatch",
+      "needed_artifact": "Штатный климат consumer temperature conversion, существующий PA33460 и classloader origin.",
+      "next_offline_step": "Проверить Natro capability min/max/step и локальные helper bounds; не принимать 29–30 как допустимые только потому, что ползунок их даёт.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "PA33460 выбирает C/F. SDK min/max/step:15.5..28.5°C/0.5 или 59..85°F/1. convertTemper2Index truncates float, а checkTemper проверяет публичные min/max. Клиентский диапазон Natro16..30 не совпадает с этим контрактом."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/12"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-014",
+      "title": "Климат: вентилятор, зоны и потоки",
+      "not_known": [
+        "Какие задние actuators/панель установлены; freshness после сна; поддерживаемые режимы и ошибочные raw."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_routes_static_confirmed",
+      "needed_artifact": "Статус fan и данные вместе, cfg HVAC-zone и штатный UI.",
+      "next_offline_step": "Сопоставить архивные config и PA33317/33335, фильтрацию manual/AUTO, не отображать 255 как скорость.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "PA fan имеет status0=manual/status1=AUTO; неправильный getter возвращает 255. Наличие raw fan-level без mode недостаточно. Manual KX11 list0..9,EX11 list0..5; front/rear routes различны.",
+        "Climate-zone getClimateZone:config5→TRIPLE,129→FOUR,все прочие→DUAL. Возврат DUAL по умолчанию не является независимым доказательством физического числа зон."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/13"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-015",
+      "title": "Обогрев стёкол и осушение",
+      "not_known": [
+        "Смысл popup-причин, условия температуры/энергии/времени, совместимость rain/humidity sensors и алгоритмы повторного включения."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_routes_static_confirmed_multi_signal_status",
+      "needed_artifact": "Schemas PA_CL_FrntDefrostPopup/RearDefrostPopup и штатное уведомление.",
+      "next_offline_step": "Связать popup с actual heater state и diagnostics; не сбрасывать ошибку одной повторной записью.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Электрообогрев лобового и max defrost разные функции; статус front/rear при popup33338/33339 availability1,data1 принудительно error. Это дополнительный отказный источник помимо основного PA."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/14"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-016",
+      "title": "Климатические предложения, REQUEST и CONFIRM",
+      "not_known": [
+        "UI-смысл третьего ответа, жизненный цикл предложения, реакция при повторе/устаревшем dialog и физическая инициирующая логика ECU."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "event_response_routes_static_confirmed",
+      "needed_artifact": "Штатные popup consumers и результативные feedback после выбора.",
+      "next_offline_step": "Разобрать каждый callback request и UI кнопки, привязать ответ к актуальному событию; не выполнять universal toggle.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "AUTO_ION_REQUEST0x100c0200,DEHUMIDIFICATION_REQUEST0x100d0100 и CLOSE_WINDOW_REMIND_REQUEST0x100f0200 — входящие события без setter. Соответствующие CONFIRM —write-only ответы; слово REQUEST не означает запуск функции.",
+        "Ответы CONFIRM имеют разные mapper: ионизация public0/1/2→raw2/1/0 через 32862; осушение 0/1/2→0/1/1 через 32821; окна 0/1/2→0/1/0 через 32839. Общий обработчик dialog-result сломает смысл."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/15"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-017",
+      "title": "Предварительный и послепоездочный климат",
+      "not_known": [
+        "Реальная поддержка ICE KX11; зависимость от двигателя/АКБ/режима питания, ограничение длительности и выход из стоянки."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_route_static_confirmed_hardware_unknown",
+      "needed_artifact": "PA33329/33330 support, HVAC/engine topology и штатный consumer.",
+      "next_offline_step": "Сравнить с гибридными общими SDK ветками; выяснить смысл PA permission прежде чем показывать как remote-start.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "PRE0x100a0100→CB_CL_Pre32797/PA33329;POST0x100a0200→CB_CL_Post32796/PA33330,0/1. Эти paths не описывают отдельно запуск двигателя, wake-up, расписание или удалённый доступ."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/16"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-018",
+      "title": "Качество воздуха, фильтр и ароматизация",
+      "not_known": [
+        "Наличие cartridges/ionizer/PM/CO2/filter-life аппаратуры, реальный смысл slot/type-ID, единицы измерений и lifespan."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "mixed_static_control_and_placeholder",
+      "needed_artifact": "Runtime availability PA33396/33406/33418–33420 и штатный fragrance/air-quality consumer.",
+      "next_offline_step": "Не переносить имена шести ароматов в UI как установленное оборудование; проверить sensors и доступные consumers в APK.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Fragrance main on0x100b0100 вызывает тот же CB_Fragra_LvlReq32869 что level, но on→raw2. Включение выбирает среднюю интенсивность, не обязательно последнюю.",
+        "AIR_FRAGRANCE_TYPE0x100b0200 объявляет ароматы, однако эта регистрация имеет только status — ни getter, ни setter. Реальный slot0x100b0400 выбирает один из A/B/C через соответствующий TypRatReq(100); type-id read0x100b0500 использует slot как zone.",
+        "Уровень становится notactive при PA33406.data==3; refreshing popup0x100b1200 read-only, active фиксирован и события фильтруются."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/17"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-019",
+      "title": "Позиция сидений, easy-entry и память",
+      "not_known": [
+        "Настоящие координаты, calibration/anti-pinch, необходимость periodic hold, остановка при потерянном touch/Binder, конфликт memory и ручной регулировки."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_route_static_confirmed_stop_timing_unknown",
+      "needed_artifact": "Штатный seat consumer и profile-field mappings.",
+      "next_offline_step": "Разобрать удержание и остановку штатной UI, связать PA33565+ с motoractuals; не считать callback долготу движения.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Существующие пути 32982–32989 — direction1/2 и stop0, не абсолютные миллиметры. Easy-entry0x20170100 отдельная настройка водителя; профиль может вызывать иной слой восстановления."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/18"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-020",
+      "title": "Подогрев и вентиляция сидений, таймеры",
+      "not_known": [
+        "Что значит таймер: сохранённая длительность/оставшееся время; установленность rear/auto функций; thermal/fault-conditions."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_routes_static_confirmed_narrower_than_enum_catalog",
+      "needed_artifact": "Штатный timer consumer и PA33367–33381.",
+      "next_offline_step": "Выяснить остановку через основной level/switch, не через несуществующее TIME_OFF; анализировать availability и данные раздельно.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "AUTO_*_TIME mapper реализует только public TIME1/2/3→5/15/30; TIME4 и OFF0 есть среди интерфейсных констант, но не в registered supported list этих функций. Вентиляционный таймер имеет зоны 1/4, отопительный 1/4/16/64."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/19"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-021",
+      "title": "Массаж сидений и программа hot-stone",
+      "not_known": [
+        "Наличие массажных элементов; связь hot-stone с подогревом; длительность и физические программы."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_route_static_confirmed_equipment_unverified",
+      "needed_artifact": "PA33599/33603 и 33621/33622, штатный seat massage consumer.",
+      "next_offline_step": "Разобрать callbacks intensity/switch, физические команды и поддержку комплектации прежде чем показывать новые опции.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Массаж разделён на intensity 0x10050700, switch 0x10050a00 и program 0x10050b00. В mapper интенсивности public OFF 0 и LEVEL1 оба преобразуются в raw 0. Это вывод о преобразовании значения в SDK, а не проверенный физический результат. Выключение следует исследовать через отдельный switch.",
+        "Программы 1..8→raw0..7; первая исключается из supported list, если PA33621/33622 notavailable. Программы 9/A объявлены, но этим mapper не реализованы."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/20"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-022",
+      "title": "Подогрев руля и его AUTO-режим",
+      "not_known": [
+        "Код 30472 и фактические thermalfaults, положение AUTO на KX11, смысл TIME декларации без регистрации."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "mixed_read_only_and_write_switch",
+      "needed_artifact": "SchemaSteerWhlHeatg/state diagnostics, PA33383–33385 и штатная UI.",
+      "next_offline_step": "Развести AUTO-state / AUTO-switch / manual-level; не пытаться управлять чтением AUTO-level.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "AUTO_STEERING_WHEEL_HEAT0x10090200 read-only: signal30472,0→off,любое иное→LEVEL1; advertised levels2/3 не восстанавливаются этим getter. AUTO_SWITCH0x10090400 — отдельный writable CB_SWH_AutoReq32859/PA33383.",
+        "Manual heat status учитывает PA33385.data==5 как error вдобавок к PA33384 availability."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/21"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-023",
+      "title": "Беспроводная зарядка телефона",
+      "not_known": [
+        "Физическая катушка / мощность / температурные пороги, реальные PEPS interruption/no-device состояния; DEFAULTOFF mapping7/9."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_setting_and_read_status_static_confirmed",
+      "needed_artifact": "WPC manager/fault schema и реальный PA33625/33626 support.",
+      "next_offline_step": "Не считать raw0 выключением; проследить штатный индикатор ошибок WPC и его consumer.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "WPC_WORK_MODE0x26010100 принимает OFF0 и AUTO0x26010101→CB_WPC_Setting; charge-states0x26020100 только readPA33626. raw0→OVERHEAT,1→STANDBY,2→CHARGING,3→FOD,4→OVERVOLTAGE,5→OVERPOWER,6→ERROR,7/9→OFF,8→FULL; иное→UNKNOWN255."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/22"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-024",
+      "title": "Сценарии салона: мойка, дети, отдых итеатр",
+      "not_known": [
+        "Какие функции физически составляют сценарий; условия входа, выхода и отката; пользовательский приоритет и реальное оснащение."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "write_routes_static_confirmed_composite_effects_unknown",
+      "needed_artifact": "Scenemod PA 33911–33928, штатный consumer сценариев и трассировки составных действий.",
+      "next_offline_step": "Разобрать состав режимов. Общая OFF может выключить текущую другую сцену, поэтому нельзя делать независимые асинхронные переключатели.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Семь bool функций сходятся к одному CB_SCEMOD_SceneModSeld 33272 и PA 33926: wash 9, children 2, awakening 1, romantic 4, king 11, queen 14, nap 3; их OFF всегда raw 0. Это один селектор режима, не семь независимых флагов.",
+        "Theater 0x2f010100 работает в zone 4 через отдельный CB_SCEMOD_PassSceneModSeld 33271 / PA 33928, raw 6. Нельзя приравнивать к global scene."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/23"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "COMF-025",
+      "title": "Датчики комфорта, присутствия и опциональное оборудование",
+      "not_known": [
+        "Полная карта occupancy / rain / sunload / humidity / air quality / window obstacle, калибровка, свежесть и точная комплектация."
+      ],
+      "hardware_presence": "Не установлено этой статической проверкой; декларации общего SDK не подтверждают комплектацию KX11.",
+      "control_route_status": "read_and_config_catalog_only",
+      "needed_artifact": "Перечень ECU и конфигурация; Sensor mappings из уже восстановленного системного SDK.",
+      "next_offline_step": "Распределить датчики по системам и для каждого связать конфигурацию, измерение, потребителя и обозначение недостоверного значения.",
+      "domain": "Кузов и комфорт",
+      "known": [
+        "Сигналы и enum присутствуют в общем SDK, но fixed-active для climate zones, ambient и popup и непустой список значений не подтверждают датчик. Для оборудования нужно раздельно проверять cfg, availability PA и осмысленные живые измерения."
+      ],
+      "evidence_record": {
+        "file": "comfort_systems/systems.json",
+        "json_pointer": "/systems/24"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PT-ENGINE",
+      "title": "Двигатель: обороты, состояние, охлаждение и масло",
+      "not_known": [
+        "Качество и свежесть RPM, температура/качество остальных датчиков, карта ECU двигателя, рабочие состояния, момент, ограничения и версии калибровок."
+      ],
+      "hardware_presence": "Живые числовые каналы оборотов/расхода наблюдались; идентификатор ECU и полная аппаратная конфигурация не получены.",
+      "control_route_status": "Телеметрия READ подтверждена на уровне SDK/VHAL; прямое управление двигателем не установлено.",
+      "needed_artifact": "Сначала извлечь штатный Sensor implementation; если его недостаточно — диагностический списокECU и синхронный журнал штатной приборки.",
+      "next_offline_step": "Формула RPM уже проверена. Продолжить с quality/свежестью данных, температурой/состоянием двигателя и связью кэша Sensor с обновлениями ECU.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "В raw SDK есть разные каналы EngSpdDispd31381 и EngNSafeEngN31459. В сохранённых экспортах первый содержит меняющиеся числа1500…1928, второй только-1. Нельзя объявлять обороты недоступными по одному getEngNSafeEngN.",
+        "CarSignal getEngSpdDispd возвращает getIntProperty(31381,1) без масштабирования; физическая единица/множитель этим методом не заданы.",
+        "Повторный разбор оригинального Sensor установил: EngSpdDispd31381 умножается на0.5; raw1500 даёт Sensor750. Публичный ID1050880 — SENSOR_TYPE_RPM."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/0"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PT-FUEL",
+      "title": "Топливо, расход и сервисные счётчики",
+      "not_known": [
+        "Единицы, счётчик против скорости расхода, сброс/переполнение, источник остатка топлива, дистанция доТО."
+      ],
+      "hardware_presence": "Часть числовых каналов наблюдалась; полной ECU-идентификации нет.",
+      "control_route_status": "Телеметрия и отдельные сервисные API объявлены; исполнительный контроль подачи топлива не найден.",
+      "needed_artifact": "Штатный Sensor/Trip implementation, затем при необходимости только сопоставимый журнал показаний.",
+      "next_offline_step": "Разделить текущий расход, накопленный расход, уровень, запасхода и сервисные счётчики с точными формулами.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "EngFuCns и EngFuCnsFild — отдельные READ сигналы; в экспортах первый-1, второй меняется. Фильтрованное значение нельзя автоматически считать литрами/100км.",
+        "Сервисные счётчики не эквивалентны текущим показаниям датчиков.",
+        "Оригинальный Sensor пересчитывает FuLvlIndcdFuLvlValFromFuTbl30932 как raw×0.2×1000; процентный канал30895 отдельный. DayToSrv30871 умножается на24."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/1"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PT-TRANSMISSION",
+      "title": "Коробка: селектор, фактическая и рекомендуемая передача",
+      "not_known": [
+        "Тип и версия TCU, ограничения переключения, управление P/D/R/M, фактические передаточные числа; независимая верификация PtGearAct. Привязка GearLvrIndcn в Sensor уже установлена."
+      ],
+      "hardware_presence": "Данные селектора и фактической передачи наблюдались; число передач не выводится из широкого enum SDK.",
+      "control_route_status": "READ статусы подтверждены; исполняемый маршрут выбора передачи из ГУ не установлен.",
+      "needed_artifact": "Штатный Sensor implementation; диагностическая идентификацияTCU при отсутствии вдампах.",
+      "next_offline_step": "Публичная привязка GearLvrIndcn установлена. Проверить getManMod, независимую семантику PtGearAct и качество/время каждого канала.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "GearLvrIndcn31385 и PtGearAct31414 — разные READ каналы, оба содержат меняющиеся значения; GearIndcnRec31475…31477 — ещё одно семейство, в экспортах только-1.",
+        "В SDK объявлены разные enum-схемы GearLvrIndcn2 и PtGearAct1; одинаковое число1 в них не имеет общего смысла. Связь каждого getter с enum требует проверки употребления, а не сходстваимени.",
+        "Точный Sensor.getGera привязывает GearLvrIndcn0→P,1→R,2→N,3→D; manual4 и остальные значения обрабатывает через GearIndcnRecGearIndcn. PtGearAct в этом публичном маршруте не используется."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/2"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PT-STARTSTOP",
+      "title": "Автоматический старт-стоп двигателя",
+      "not_known": [
+        "Условия запрета start-stop, текущее engine-run-state, сохранение профиля и runtime-доступность. Полярность OnOff2 уже установлена."
+      ],
+      "hardware_presence": "Комплектация и runtime-поддержка отдельно не подтверждены.",
+      "control_route_status": "Настроечный CB/PA маршрут подтверждён статически; прямой запуск/остановка двигателя не подтверждены.",
+      "needed_artifact": "Sensor/Vehicle реализация иPАstate имеющегося корпуса; после неё только целевой журнал штатной настройки.",
+      "next_offline_step": "Полярность OnOff2 уже установлена. Проверить PA33634: доступность, статус и данные; разделить состояние работающего двигателя и настройку автоматического start-stop.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "SETTING_FUNC_ENGINE_STOP_START0x20020100 в Vehicle.buildFunctions идёт вCB_SS_Activation, с отдельнымPA33634. Это настройкаStartStop, не доказанная команда зажигания/запуска двигателя.",
+        "setEngStrtStopSetg использует OnOff2, аCB_SS_Activation — иноймаршрут. Нельзя переносить0/1междуAPI.",
+        "OnOff2 полностью проверен: On=0,Off=1,isValid принимает0/1. On был пропущен старымextractor из-за default-zero static field; это ошибка покрытия каталога, а не отсутствие командыOn."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/3"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PT-DRIVEMODE",
+      "title": "Режимы движения и индивидуальные профили",
+      "not_known": [
+        "Какие режимы аппаратно доступны вэтоймашине, условия переключения и подтверждения, сохранение и отмена, взаимодействие сTCU/AWD/EPS."
+      ],
+      "hardware_presence": "Живые профили каждого режима не подтверждены; EV/Hybrid не признаются установленным оборудованием.",
+      "control_route_status": "Статические настроечные CB/PA маршруты найдены; вся аппаратная реализация режима не раскрыта.",
+      "needed_artifact": "PA_DriveMode*из имеющихся логов и точная runtimeконфигурация; при отсутствии — штатный экранрежимов с синхроннойтрассировкой.",
+      "next_offline_step": "Разобратьтаймаутподтверждения/доступность/PEN и branchvehicle-specific в DriveMode implementation.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "ИмеютсяCB_DM_DriveMode32877 и отдельныеPA режима/доступности/времени/подтверждения; CB команда не равна PAобратнойсвязи.",
+        "DrvModReqType2 содержитECO,Comfort,Sport,Individual,EV,Hybrid,Snow,Mud,Sand,Rock иошибку15; это словарь общегoSDK, ане переченьрежимовKX11."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/4"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "CH-AWD",
+      "title": "Полный привод, муфты и распределение момента",
+      "not_known": [
+        "Топология привода, ECU/актуаторы, распределение момента, ограничениятемпературы, режимыотказа."
+      ],
+      "hardware_presence": "По этому корпусу не подтверждена конфигурация AWD-блока.",
+      "control_route_status": "Найдены только фрагменты настроек/отображения; маршрут исполнительного контроля не установлен.",
+      "needed_artifact": "ДиагностическаяидентификацияECU привода и штатнаясхемасоединений конкретнойкомплектации, если не найдутся вполныхархивах.",
+      "next_offline_step": "Поиск признаковAWD/DEM/Differential в имеющихся конфигурациях/протосхемах, отделение тематическогоPA от актуатора.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "Найден PA_DriveModeAWD33434 (BYTES/READ). НаличиеPA режимаAWD не описывает протокол управления муфтой или блокировками."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/5"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "CH-BRAKES",
+      "title": "Рабочие тормоза, педаль и качество измерений",
+      "not_known": [
+        "Непосредственноеуправлениедавлением/моментом, назначениеECU, единицы, контрольцелостности, реальныеqualityenum."
+      ],
+      "hardware_presence": "Значительная часть каналов в корпусе -1; это не доказывает отсутствие тормозного блока.",
+      "control_route_status": "READ телеметрия и настройки профиля различены; исполнительный путь торможения не установлен.",
+      "needed_artifact": "ДекодирующийпотребительSENSOR_TYPE_BRAKE_DEPTH иECU-идентификация.",
+      "next_offline_step": "Сопоставитькачество/счётчики сданными, проследитьмасштаб иvalidity безактивныхкоманд.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "Педаль, отношенияпедали, моменттрения поколёсам, ABS/Brake warning представлены самостоятельнымиREADканалами; многие вэкспортахтолько-1.",
+        "Для рядасемейств существуют Qf,Chks,Cntr. Числоосновногоканала безкачества ивремени нельзя считать провереннымизмерением.",
+        "CB_DM_Brake_Settings иCB_DM_BrakingPedalFeeling_Settings — настройкипрофиля, некоманды тормозногомомента."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/6"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "CH-ABS-ESC",
+      "title": "ABS/ESC и спортивная настройка стабилизации",
+      "not_known": [
+        "КакиемеханизмыESCменяетSport, границыскорости/состояния, диагностикаABS/ESC, обоснованныйPEN."
+      ],
+      "hardware_presence": "Runtime-поддержка настройки не установлена; READ семейства преимущественно -1 в экспортах.",
+      "control_route_status": "Настроечный CB/PA статически есть; алгоритмы и исполнительный контроль неизвестны.",
+      "needed_artifact": "PA33635 иштатныйобработчикSport; диагностическаяидентификацияABS/ESC приотсутствиивдампах.",
+      "next_offline_step": "ПроверитьPEN ираскрытьполярность/status+availability; затем связатьточныестатусныеenum.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "SETTING_FUNC_ESC_SPORT_MODE0x20020300→CB_PBC_ESCSportActiv33026→PA33635; этонастройка, азначения EscSt/EscWarnIndcnReq — отдельныеREADсигналы.",
+        "EscSptModReqdByDrvr31318 имееттипBYTES сProtoполямизначения иPEN; нельзя отправлятьвместонего одиночныйint."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/7"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "CH-EPB",
+      "title": "Электрический стояночный тормоз",
+      "not_known": [
+        "Эффективностькомандынаконкретномавтомобиле,гейты,каналподтверждения,наличиепульса/удержания,доставкадоECU."
+      ],
+      "hardware_presence": "Отдельные разрешающие статусы не имеют валидного наблюдения в этих логах.",
+      "control_route_status": "Статический кандидат исполнительного маршрута; runtime-исполнение и разрешения НЕ подтверждены.",
+      "needed_artifact": "Нативныйконвертер точногосвойства и штатныйпотребительEPB; ECU/физическоеисполнениенеизучатьчерезслепыезаписи.",
+      "next_offline_step": "РазобратьветвьconvertVehicleValue2Ipcp для0x2140728D иизвестныеусловияApplyEna/RelsEna; выявитьenumпроверку и реальныйtransport.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "НизкоуровневыйEpbSoftSwtCtrlSt29325→VHAL0x2140728D,INT32/READ_WRITE; setterвалидируется EpbSoftSwtCtrlSt:NoRequest0,ApplyRequest1,ReleaseRequest2,Forbidden3,Unknown4.",
+        "Прямойsoft-switch, автоматическоеприменениеCB_EPBAutoApply33041/PA33651 ипубличныйPBC_EPB_SWITCH — разныепути. Последнийфактическиведёт к парковочномуэкстренномуторможению (смCH-PEB).",
+        "READ EpbApplyEna/EpbRelsEna/secondary/состояние доступнывSDK, нов имеющихсяэкспортах-1."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/8"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "CH-AUTOHOLD-HDC",
+      "title": "AutoHold и помощь на спуске/подъёме",
+      "not_known": [
+        "Гейты,подтверждение,сохранение,значениекнопки,разницанастройкиидействующегоудержания,порогискорости/уклона."
+      ],
+      "hardware_presence": "HSA/HDC/AutoHold не считать подтверждёнными лишь по SDK.",
+      "control_route_status": "Настроечные/soft-switch маршруты есть статически; физическое поведение не раскрыто.",
+      "needed_artifact": "Реализация штатныхкнопок и PA/statusсовместносостояниемтормоза.",
+      "next_offline_step": "Проследитьsetter→команду→PA инеинтерпретироватьнастройкуOn как активноеудержание.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "AUTO_HOLD0x20060400→CB_PressAutoholdBtn/PA33652 отделён от AutHldSoftSwtEnaSts31355.",
+        "HillDwnCtrlSt31303 — отдельныйwriteсигнал, SwtStsforHillDwnCtrl31418 — read; CB_HillDescentSetting33037/PA33646 задаёт ещё одинуровеньAPI.",
+        "ИмяPressAutoholdBtn само по себе неустанавливаетимпульсный илиабсолютныйхарактеруправления."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/9"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "CH-STEERING",
+      "title": "Руль: угол, скорость и усилие",
+      "not_known": [
+        "Физическая единица и signed-представление угла/скорости, нулевая точка, калибровка, quality и актуаторные EPS команды. Формулы SDK уже извлечены."
+      ],
+      "hardware_presence": "Изменяющиеся угловые каналы есть; runtime-оборудование усилителя через ECU не идентифицировано.",
+      "control_route_status": "READ измерения и настройки усилия найдены; управление направлением автомобиля не установлено.",
+      "needed_artifact": "Sensor→SteerWhlSnsr implementation и потребитель штатнойприборки/парковки.",
+      "next_offline_step": "Подтвердитьsigned-преобразованиеиисключитьinvalidдоcast; сопоставитьQf,неугадыватьпомаксимумам.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "Raw SteerWhlSnsrAg31515 иAgSpd31516 вэкспортахсодержат и малые значения, и65287…65535; getterвозвращаетintбезпересчёта. Этооснованиепроверитьsigned16/scale, анепоказыватьдесяткитысячградусов.",
+        "Qf31519 наблюдался1и3; точнаяпривязкаqualityenumещёнепроверена.",
+        "CB_SteeringWheelAssistLevel_Settings иCB_STEER_SteerAsscLvl задают настройкуусилия; ониненаправляютколёса нацелевойугол.",
+        "Точный Sensor применяет угол raw/1024 и угловую скорость raw/128; sign-extension в этом методе и rawgetter нет. Это оставляет открытым согласование loggedunsigned16 с ожидаемым знаком и контрактом единицы."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/10"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "CH-SUSPENSION",
+      "title": "Подвеска и регулировка высоты/демпфирования",
+      "not_known": [
+        "Естьливданнойкомплектацииуправляемыеактуаторы,типконтроллера,калибровки,единицыигейты."
+      ],
+      "hardware_presence": "Наличие управляемой подвески не установлено.",
+      "control_route_status": "Только статика SDK/PA; runtime-маршрут не подтверждён.",
+      "needed_artifact": "ECU/комплектацияконкретногомашиныиздоступныхconfigurationфайлов,позже диагностическийсписок.",
+      "next_offline_step": "Сопоставитьvehicle-typeветки иconfig-поля,затемискатьфактическийECU; неопробоватьотсутствующееоборудование.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "ВSDKширокообъявлены датчикивысоты/quality,ошибки,режимыдемпфирования иCB_DM_Suspension_Settings32886/PA33452.",
+        "Большинство rawканалов вэкспортах-1,двавысотныхканала0; ниэто,ниширокийсписокSDKнедоказываютналичиерегулируемойподвески."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/11"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "CH-TPMS",
+      "title": "Шины: давление, температура, свежесть и предупреждения",
+      "not_known": [
+        "Контракт физической единицы давления/температуры, полный invalid-policy, время свежести, привязка датчиков, пороги и точность предупреждений. Формулы и статический availability-gate уже установлены."
+      ],
+      "hardware_presence": "Различающиеся измерения 4 колёс наблюдались; аппаратный инвентарь датчиков не раскрыт.",
+      "control_route_status": "READ каналы подтверждены; команды обучения/конфигурации конкретных датчиков не установлены.",
+      "needed_artifact": "SensorimplementationP/T/MsgOldFlg; при необходимости штатныепоказанияс меткойвремени.",
+      "next_offline_step": "Проверить typed unit contract, обработку MsgOldFlg и invalid markers в штатном потребителе. Сопоставить Sensor availability с хранением последнего значения и обновлением в логах.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "ДлякаждогоколесаестьP,T,MsgOldFlg,PTimeout,батарея,потерядаваления,предупреждения иTireFillgAssiPSts:40rawREADканаловдля4колёс.",
+        "MsgOldFlgнаблюдался0и1,приэтомчисленныеP/Tвкорпуседоступны. Поэтому наличиесохранённогодавлениянеозначаетсвежегоизмерения.",
+        "CarSignalgetterP/Tнеприменяетмножительилиoffset. ЕдиницывысшегоSensorAPIдолжныисследоватьсяотдельно.",
+        "Точные формулы Sensor уже установлены: давление raw×1.373, температура raw−50.",
+        "Availability P/T зависит от config19>1,carMode0,usageMode{13,2,11}; после этих условий PTimeout1→error,иначеactive. MsgOldFlg непосредственно в этом методе не проверяется."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/12"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ADAS-CRUISE",
+      "title": "Круиз: индикация, настройки и команды",
+      "not_known": [
+        "РеальныймаршруткнопокMAIN/SET/RES/+/-доADASконтроллера,условиягейтови подтверждение."
+      ],
+      "hardware_presence": "Наблюдения индикации/PCAP подтверждены; полный ADAS аппаратный инвентарь неизвестен.",
+      "control_route_status": "Индикация/настройки найдены; исполнительные команды круиза НЕ найдены.",
+      "needed_artifact": "ОставшиесяVP/nativeвходы/кнопочныймодуль вимеющихсяархивах; точнаяECUтопологияпринехватке.",
+      "next_offline_step": "Продолжитьнеразобранныенативныеветви/маршрутывпределахкорпуса,неповторятьужеотрицательныезаписи.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "Шестьприоритетныхкруизныхстатусовнеявляютсякомандами; прежнийdisassemblyдлянихотправляющегоserviceненашёл.",
+        "ACCandTSR/HWAнастроечныеCBесть,ноонинеявляются MAIN/SET/RES/+/-.",
+        "Сохранённыйcapabilityprobe публичныхSPEED_CONTROL APIвозвращалnotavailable/current255/supportednull; эторезультатконкретныхсессий."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/13"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ADAS-LIMITER",
+      "title": "Лимитер, ограничение предупреждения и скорость круиза",
+      "not_known": [
+        "Установка/активациялимита, маршрутфизическихкнопок, overrideиусловияотмены, отделениеотпредупрежденияTSR."
+      ],
+      "hardware_presence": "Штатная индикация из предыдущих исследований есть, ECU-топология неполная.",
+      "control_route_status": "Исполнительный маршрут не установлен.",
+      "needed_artifact": "Недостающиймаршруткнопок/ADASвтекущихVP/QNXматериалах.",
+      "next_offline_step": "ПроследитьконкретныйобработчикпубличногоLIMITATION/RANGE и проверятьpresenceотдельно.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "AdjSpdLimnSts31354 — READстатус. SDKобъявляет несколькоLIMITATION/RANGE функций, ноимянеустанавливаетограничениетягидвигателя.",
+        "Четыреприоритетныхпубличныхcruise/limiterAPI влогахвозвращалиnotavailable; этоограничениеисследованныхточеквхода, анедоказательствоневозможностицелойсистемы."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/14"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ADAS-LANE",
+      "title": "Полоса: LKA/ELKA/EMA/HWA и режимы предупреждений",
+      "not_known": [
+        "ПривязканастроеккфактическиустановленнымADAS,гейты,геометрия,quality,режимыотказаиприоритетручногоуправления."
+      ],
+      "hardware_presence": "Комплектация каждого ассистента не установлена по именам SDK.",
+      "control_route_status": "Настроечные CB/PA + READ статусы; непосредственная команда угла/момента EPS не установлена.",
+      "needed_artifact": "ADASimplementation,vehicleconfigsи реальныеPAavailability;",
+      "next_offline_step": "ПроверитьвесьbuildFunctionsADAS и разделитьavailable/enabled/active/fault.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "ЕстьотдельныеCBвключенияLKA,ELKA,EMA,HWA,режимаLKA итипаwarning. EnumIntvAndWarnModForLaneKeepAidSts различаетInactive0,InterventionAndWarning1,InterventionOnly2,WarningOnly3.",
+        "СырыестатусыAsyLaneKeepAidSts иAsyEmgy* наблюдались; наблюдениефлага0/1 само посебе не подтверждаеткомплектациюили фактическоевмешательство."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/15"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ADAS-COLLISION",
+      "title": "Предупреждение столкновения и AEB/CMS",
+      "not_known": [
+        "ФизическаяподдержкаAEB,порогиактивации,поведениенаотказе/засорении,совместимостьпрофилейPEN."
+      ],
+      "hardware_presence": "Флаг в SDK не подтверждает оборудование/калибровку конкретной машины.",
+      "control_route_status": "Настройки и индикация подтверждены статически; исполнительный маршрут тормозного момента не установлен.",
+      "needed_artifact": "ADASimplementation+PAavailability+конфигурациянаборaрадар/камера.",
+      "next_offline_step": "Связатьвалидаторы ссостояниями; зарезервированныезначенияневыдаватьзапользовательскиережимы.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "РаздельныеCllsnMtgtnOnoffSts/FctSts/FaultSts/WarnSts/ForwardWarn показывают: включено,функционирует,ошибкаипредупреждениенеодинbool.",
+        "CB_ASY_CMS32779 иCB_ASY_CMS_Warning32780 — отдельныекоманды; warning используетCllsnAidSnvtySeldSts,содержащийinactive0,off1,on2,medium3,high4иreserved5…7.",
+        "CllsnAidSnvtySeldSts28733 — BYTESproto сPEN,нескалярныйHALint."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/16"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ADAS-SIDE",
+      "title": "Боковые/задние ассистенты: LCA/RCW/RCTA/DOW",
+      "not_known": [
+        "Расположение/количестводатчиков,наличиекаждойфункции,гейтыдверей/передачи/скорости,фактическоеторможение."
+      ],
+      "hardware_presence": "Декларации общего SDK, без полной проверки комплектации.",
+      "control_route_status": "Настроечные CB и READ индикация; исполнительные маршруты не раскрыты.",
+      "needed_artifact": "PAavailability иконфигурацияADAS/Passap; припробелахECU-список.",
+      "next_offline_step": "Отделитьзаднее предупреждение/перекрёстныйтрафик/показграфики и сопоставитьсыройпротокол.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "LCA,предупреждениеLCA,RCW,RCTA,DOW,ELOW имеютраздельныеCBAPI; RCTAлевая/праваяиндикации — READ.",
+        "ДляRCTAобъявленыотдельныеграфика/громкость/activation, следовательнопоказкартинки ифункцияассистентанесовпадают."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/17"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ADAS-TSR",
+      "title": "TSR, превышение скорости и настройка смещения",
+      "not_known": [
+        "Полнаяцепочкаoffsetcommand→PA,единицы/проценты,границы,привязкакдорожнымзнакам,наличиефункцийвкомплектации."
+      ],
+      "hardware_presence": "TSR/ACC включение по флагам SDK — ненадёжная идентификация оборудования.",
+      "control_route_status": "Настроечные API найдены; использовать как команду скорости движения нельзя.",
+      "needed_artifact": "ADASbuildFunctions/SPEED_LIMIT_WARNING_OFFSET иживыеPAизимеющихсясессий.",
+      "next_offline_step": "Извлечьstep/absolute/value/percentветки;недопускатьподменыпространствкоманд.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "CB_ASY_SpeedCompensation32773 используетOffsForSpdWarnSetgReq:Inactive0,Plus1,Minus2. Этошаговаязаявка, анеабсолютное+1/-2км/ч.",
+        "ДругойenumOffsForSpdWarnSetgSts описываетMinus10,Minus5,Zero,Plus5,Plus10; привязкастатусакконкретномуPAпокаотдельнаяпроверка.",
+        "TSRwarningнастройкинеэквивалентнылимитеруилицелевойскоростикруиза."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/18"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ADAS-DRIVER",
+      "title": "Контроль водителя/усталости",
+      "not_known": [
+        "Алгоритм/типдатчика,камераилианализруления,privacy/data path,гейты,точныесостоянияиоборудование."
+      ],
+      "hardware_presence": "Наличие DMS-камеры в этой комплектации не подтверждено",
+      "control_route_status": "Только декларации/настройки без полного runtime-подтверждения.",
+      "needed_artifact": "ECU/config/штатныйпотребительDPS; ужесуществующиедампыпрежде новыхсъёмок.",
+      "next_offline_step": "НайтиреальныезависимостиDPS иналичиеаппаратныхисточников, неравнятьназваниесDK ккамере.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "SDKсодержитDPSиDPS_Reminder какраздельныенастройки; publicSENSOR_TYPE_TIREDNESS_DRIVING_STATE —декларациянаблюдения,анедоказательствоDMS-камеры."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/19"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ADAS-PERCEPTION",
+      "title": "Геометрия полос, объекты и качество восприятия",
+      "not_known": [
+        "Формулаполинома,координаты,scale/offset,validrange,обновление/качество,association объектов."
+      ],
+      "hardware_presence": "Широкий SDK даёт поля; доступность полезных геометрических данных не подтверждена.",
+      "control_route_status": "READ визуализационная/телеметрическая часть; интерфейсы восприятия ECU не декодированы.",
+      "needed_artifact": "Нативныйдекодерполос/объектови штатныйrendererприборки/QNX;",
+      "next_offline_step": "Искатьобработкуinvalidи единицдокорреляциисцен; повторяющиесязначениянесчитатьреальнымдвижением.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "Есть32READкоэффициентаAsyLine*PrmA/B/C/D; во всехсохранённыхпримерахониповторяют3000/1600/1000/1000. Такиецифрынельзяиспользоватькакготовуюгеометриюполосбезединиц/validity.",
+        "Есть9полейAsyObjForBigData0:скорости,дистанции,confidence,TTC,type; вэкспортахтолько-1.",
+        "ПриборочныйAsyObjType — отдельныйканал; этонедоказательство полноценногоobjectlist."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/20"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "CH-PEB",
+      "title": "Экстренное торможение при парковке",
+      "not_known": [
+        "НаличиеPEB,маршрутinhibitionкодa,пороги,актуаторнаячасть,реакциянаневалидныевходы."
+      ],
+      "hardware_presence": "PEB аппаратно/функционально не подтверждён наличием setting API.",
+      "control_route_status": "API связан с настройкой PEB; доказательства прямого применения/отпускания EPB через него нет",
+      "needed_artifact": "Passapimplementation/state machine иPAavailabilityизкорпуса.",
+      "next_offline_step": "Найтикодпричинзапрета иeffectivenessнаблюдение, сначалаoffline.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "ПубличноеSETTING_FUNC_PBC_EPB_SWITCH0x20061000 вVehicle.buildFunctions реальносвязано сCB_PEB_PrkgEmgBrkSysSwt32980 иPA33562. ЕгоимяEPBнеозначаеткомандустояночномутормозу.",
+        "ДляrawPrkgEmgBrkSysSwt28695 естьINT32RW,а PrkgEmgyBrkSysSts28996 —READ; настройкасистемыипроисходящееторможениенеодинаковы.",
+        "SDKenumInhbCdnOfPrkgEmgyBrkперечисляетусловиянедоступности(двери,ремень,ESC,некорректнаяскорость/передача,дождь,зеркало). Привязкаenumкконкретномуполюещёнепроверена."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/21"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "SRS-BELTS",
+      "title": "Ремни: замки, оснащённость и комфортное электронное подтягивание",
+      "not_known": [
+        "Точноесопоставлениеquality/state,наличиеэлектроприводаремней,логикаwarning,разделениекомфортнойифатальнойзащиты."
+      ],
+      "hardware_presence": "Комплектация сидений/датчиков не доказана полным словарём SDK.",
+      "control_route_status": "READ ремни и настройки комфорта; пиротехнический исполнительный маршрут не установлен.",
+      "needed_artifact": "SensorSAFE_BELT implementation иконфигурацияseating/ECU.",
+      "next_offline_step": "Сопоставитьequipped/status/valueипубличныйsensor;невыводитькомплектациюизнеиспользуемыхдеклараций.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "НакаждоеместозамокпредставленнесколькимиполямиBltLockSt1/BltLockSts,длязаднихместотдельноBltLockEquid. Нельзяподменятьналичиедатчиказначениемзамка.",
+        "SDKтакжеописываеттретийряд — этонедоказываеттретийрядвKX11.",
+        "CB_ElecSeatbelt_Driver/Passenger относятсяккомфортнойнастройке; это недоказанные командыпиропреднатяжителей."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/22"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "SRS-IMPACT",
+      "title": "SRS: аварийное состояние, записи удара и пиротехника",
+      "not_known": [
+        "ПолныйSRSблок,событиясрабатывания,EDR/диагностика,качествоизапреты,оборудованиеикалибровки."
+      ],
+      "hardware_presence": "Наличие базовой пассивной защиты пользовательского авто не равно идентификации каждой подушки/датчика по SDK.",
+      "control_route_status": "Видимая часть — READ телеметрия; алгоритмы и исполнение SRS не раскрыты.",
+      "needed_artifact": "ECU-идентификацияSRS иописаниядиагностическихданных,еслиихнетвдампах.",
+      "next_offline_step": "Разделитьсостояниевреальномвремени/историческуюзапись/checksum/counter;невыдаватьобщийSDKзаEDRдамп.",
+      "domain": "Силовая установка, шасси и безопасность",
+      "known": [
+        "CrashStsSafe содержитотдельныеChks,Cntr,Sts; RecOfImpct содержитнаправленияудара,Roll,DeltaV,orientation — READсигналы.",
+        "НазванияCrashFront/Side/Ped неявляютсякомандамиактивацииподушек. Нативногоисполнительногомаршрутапиротехникиневыявлено."
+      ],
+      "evidence_record": {
+        "file": "powertrain_chassis/systems.json",
+        "json_pointer": "/systems/23"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-001",
+      "title": "Android / AP и штатные сервисы IHU",
+      "not_known": [
+        "Полная цепочка текущих process→shared library→firmware version для всех сервисов.",
+        "Отдельность Android как физического ECU не установлена."
+      ],
+      "hardware_presence": "software_domain_confirmed",
+      "control_route_status": "software_domain_and_network_observed",
+      "needed_artifact": [
+        "Имеющиеся HU-Route proc maps/native maps и identity-build-power."
+      ],
+      "next_offline_step": "Сопоставить SHA загруженных библиотек, build props и exact SDK classloader с уже извлечённой картой; не подменять версию firmware версией Natro.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Наблюдён Android endpoint 198.18.34.15 и штатный route; normal LA config загружает Android guest."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/0"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-002",
+      "title": "QNX host и гипервизор",
+      "not_known": [
+        "Все границы виртуальных устройств, изоляции и рестарта доменов.",
+        "Текущее исполнение каждой условной ветви startup."
+      ],
+      "hardware_presence": "software_domain_confirmed",
+      "control_route_status": "host_and_guest_configuration_confirmed",
+      "needed_artifact": [
+        "QNX startup/SLM, linux configs, старые DIM Slog и boot window уже доступны."
+      ],
+      "next_offline_step": "Соединить VMM events из существующих логов с выбранным config и состояниями QNX/Android MCU relay.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "startup запускает VMM/lifecycle, создаёт guest peer; vsomeip unicast .34.2."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/1"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-003",
+      "title": "LA / LV: обычная работа и Failsafe guest",
+      "not_known": [
+        "Все условия перехода/восстановления LV и фактическая boot epoch каждого снимка."
+      ],
+      "hardware_presence": "alternative_guest_configs_not_evidence_of_two_ecus",
+      "control_route_status": "alternative_guest_configs_confirmed",
+      "needed_artifact": [
+        "Имеющиеся boot window / update archive."
+      ],
+      "next_offline_step": "Привязать маркеры upgrade mode и fs_update_client к logs; исключить ошибочный поиск production VP внутри LV только по имени.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Оба config объявляют system la и один la_to_host; LV Failsafe, переключение GPIO154."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/2"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-004",
+      "title": "VP peer 198.18.34.1:50500",
+      "not_known": [
+        "Физический чип/плата, активный образ, процесс-получатель и firmware ownership.",
+        "Полный набор доступных из AP штатных команд."
+      ],
+      "hardware_presence": "peer_observed_identity_unknown",
+      "control_route_status": "network_peer_observed_receiver_identity_unknown",
+      "needed_artifact": [
+        "Имеющиеся locator/update manifests, PA_McuLog путь и version interfaces."
+      ],
+      "next_offline_step": "Проследить incoming PA_McuLog и PA_VP_Version до IPCP group/method и сравнить наблюдённую MCU версию с имеющимися образами.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Штатный route называет .1 VP; двусторонний UDP подтверждён старым PCAP; живой сосед наблюдался."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/3"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-005",
+      "title": "Сетевой мост QNX и виртуальный Ethernet",
+      "not_known": [
+        "Все аппаратные порты/VLAN и конкретный switch peer за emac0."
+      ],
+      "hardware_presence": "virtual_interfaces_confirmed",
+      "control_route_status": "configured_bridge_plus_android_routes",
+      "needed_artifact": [
+        "Имеющиеся DTB, network dumps, HU-Route sysfs."
+      ],
+      "next_offline_step": "Восстановить таблицу physical/virtual interfaces и VLAN из DTB/sysfs; не называть vp0 физическим VP.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "vp0 связан с guest la; bridge добавляет vp0 и emac0."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/4"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-006",
+      "title": "Маршрут ASDM и автомобильные VLAN",
+      "not_known": [
+        "Физический ASDM identity и соответствие прямого адреса software group ASDM в VP потоке."
+      ],
+      "hardware_presence": "configured_endpoint_not_ecu_identity",
+      "control_route_status": "route_observed_no_control_proven",
+      "needed_artifact": [
+        "Существующие Ethernet PCAP; source/switch mapping."
+      ],
+      "next_offline_step": "Сопоставить трафик каждого VLAN с source/destination и штатными config, сохраняя distinction между прямым ECU и пересылаемой группой.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Route ASDM .36.1→eth0.5, vehicle /16→eth0.11; живые route совпадают."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/5"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-007",
+      "title": "TCAM и маршрут внешней связи",
+      "not_known": [
+        "Версия, hardware identity, режимы связи/сна и command consumers TCAM."
+      ],
+      "hardware_presence": "hardware_identity_unconfirmed",
+      "control_route_status": "configured_route_only",
+      "needed_artifact": [
+        "Имеющиеся native TCAM service/SDK и network snapshots."
+      ],
+      "next_offline_step": "Разобрать TCAM штатный клиент и различить route existence, modem state и фактическую сеть; не считать PERMANENT ARP живым ответом ECU.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Stock config называет .32.17 TCAM и задаёт запасной gateway."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/6"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-008",
+      "title": "MCU / VIP firmware на диске",
+      "not_known": [
+        "Загружен ли именно этот image на автомобильный MCU.",
+        "Совпадает ли он с production MCU_Version 20.24.10.23024.41141."
+      ],
+      "hardware_presence": "firmware_file_only",
+      "control_route_status": "binary_contents_proven_runtime_not_proven",
+      "needed_artifact": [
+        "Уже имеющиеся updater/manifest, загрузочные версии и version handler."
+      ],
+      "next_offline_step": "Офлайн разобрать process_get_fw_version и цепочку выбора image в flasher/updater; сравнить с MCU relay, не запускать flasher.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "MPC5746C ELF: 86 DWARF units, FreeRTOS/CAN/SPI/board power, несколько reference board вариантов."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/7"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-009",
+      "title": "QNX CAN resource manager через SPI9",
+      "not_known": [
+        "Запуск can_driver в production и физическая шина за ним."
+      ],
+      "hardware_presence": "device_file_not_runtime_hardware_proof",
+      "control_route_status": "static_driver_only",
+      "needed_artifact": [
+        "Имеющиеся startup/SLM и QNX process/device inventory."
+      ],
+      "next_offline_step": "По всем имеющимся процессным/загрузочным логам найти исполнение driver и аргументы; не выводить наличие канала по файлу.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "can_driver связывает SPI client с CAN device; canflasher содержит reference targets."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/8"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-010",
+      "title": "Android SocketCAN / FlexRay доступность",
+      "not_known": [
+        "Реальные физические контроллеры/доступ к Chassis CAN из AP."
+      ],
+      "hardware_presence": "unsupported_by_these_capture_artifacts",
+      "control_route_status": "no_raw_bus_route_proven",
+      "needed_artifact": [
+        "Bus-Capture devices-sysfs-devicetree/network-can-flexray уже доступны."
+      ],
+      "next_offline_step": "Сопоставить raw sysfs/kernel/netdev evidence и conditional script; не принимать вывод collector о распиновке как доказательство.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Generic init.qti.can conditional script существует; два Bus-Capture не содержат raw bus или action windows."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/9"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-011",
+      "title": "IPCL SPI4 обмен IHU",
+      "not_known": [
+        "Аппаратный peer SPI4 и связь с SPI9/MCU image.",
+        "Все transitions/frame lifecycle вне разобранных сообщений."
+      ],
+      "hardware_presence": "software_route_confirmed_peer_hardware_unknown",
+      "control_route_status": "specific_status_and_limited_output_route",
+      "needed_artifact": [
+        "Имеющиеся cluster ELF/DWARF и MCU image."
+      ],
+      "next_offline_step": "Проверить frame signatures и роли peer, не отождествлять два SPI по общей теме vehicle data.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Ранее подтверждены payload125/89fields и ограниченный исходящий OA; startup запускает cluster_controller."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/10"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-012",
+      "title": "Общий диагностический ECU inventory",
+      "not_known": [
+        "Полный список физических ECU с diagnostic address/HW/SW/version."
+      ],
+      "hardware_presence": "physical_inventory_incomplete",
+      "control_route_status": "no_vehicle_wide_inventory",
+      "needed_artifact": [
+        "Сначала результаты IPartInfos/diagnostic services в старых логах; ECU identity report только если отсутствует."
+      ],
+      "next_offline_step": "По существующим архивам искать прямые идентификационные ответы; хранить отдельно от списка процессов и software groups.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "SDK ECU_TYPE и DoIP targets доступны как статические декларации."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/11"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-013",
+      "title": "QNX DoIP / UDS gateways",
+      "not_known": [
+        "Полная routing/allowlist, active protocol branch и доступ к другим ECU."
+      ],
+      "hardware_presence": "software_components_confirmed",
+      "control_route_status": "configured_gateway_not_verified_vehicle_control",
+      "needed_artifact": [
+        "Реальные gateway ELF, ini, vsomeip и старые logs уже имеются."
+      ],
+      "next_offline_step": "Статически проследить config parser→target dispatcher и runtime init evidence; не считать functional address отдельным ECU.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "DoIP config имеет physical0xE000+6functional; UDS core иной функциональный subset; SLM запускает UDS_SOMEIP_Gateway."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/12"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-014",
+      "title": "Информация о деталях и сборках IHU",
+      "not_known": [
+        "Реализация источника каждого поля и непустые текущие ответы."
+      ],
+      "hardware_presence": "not_a_physical_inventory",
+      "control_route_status": "sdk_interface_only",
+      "needed_artifact": [
+        "Exact adaptapi implementation и старые service dumps."
+      ],
+      "next_offline_step": "Разобрать PartInfos.getPartInfoString до caller/provider; искать уже полученные значения перед новым запросом.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "IPartInfos объявляет core/delivery, AP/VP module/local config, post build numbers."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/13"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-015",
+      "title": "DTC / diagnostic monitor",
+      "not_known": [
+        "Какие физические домены покрывает каждый список DTC, code mapping/status/time и очистка."
+      ],
+      "hardware_presence": "diagnostic_software_present",
+      "control_route_status": "several_partial_diagnostic_paths",
+      "needed_artifact": [
+        "Имеющиеся DtcManager implementation, QNX ELF и MCU DIAG relay."
+      ],
+      "next_offline_step": "Составить владельцев DTC и read/clear semantics; не объединять разные списки как весь автомобиль.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "SDK IDtcManager/monitor, QNX DiagServices и диагностические OA существуют."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/14"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-016",
+      "title": "Идентичность версий AP/VP/QNX/MCU",
+      "not_known": [
+        "Полная схема version fields и их физические owners."
+      ],
+      "hardware_presence": "multiple_software_versions_observed",
+      "control_route_status": "mixed_sources_need_normalization",
+      "needed_artifact": [
+        "Все перечисленные источники уже в архиве."
+      ],
+      "next_offline_step": "Нормализовать отдельные поля и provenance; не выбирать случайный VpVersion label как версию ECU.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "QNX version text есть; AP_Version.properties пуст; dump VpVersion использует PA_ErrorReport; MCU relay version повторена дважды."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/15"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-017",
+      "title": "Питание IHU / режимы AP, IM, EM",
+      "not_known": [
+        "Все причины/guard transitions, отключение по энергии и связь с automotive use mode."
+      ],
+      "hardware_presence": "live_logical_states_observed",
+      "control_route_status": "observed_startup_states_static_command_wrappers",
+      "needed_artifact": [
+        "Реальные PowerSomeIPService/proxy implementation и уже сохранённые startup logs."
+      ],
+      "next_offline_step": "Восстановить state machines по handler/enum; сопоставить два boot histories и их embedded counters.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Power SDK задаёт раздельные states; MCU relay показывает AP0→1→2, IM, EM."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/16"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-018",
+      "title": "Сон, пробуждение и сохранение контекста",
+      "not_known": [
+        "Полный сон→wake цикл, причины wake, отложенная выгрузка логов и сохранность подписок/данных."
+      ],
+      "hardware_presence": "sleep_capability_not_fully_observed",
+      "control_route_status": "startup_subset_only",
+      "needed_artifact": [
+        "Сначала boot/live window и DLT архивы; новый цикл только если нужный переход не записан."
+      ],
+      "next_offline_step": "Классифицировать уже имеющиеся epochs как cold boot/wake/reconnect по реальным markers; не делать вывод по одному ignition.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "QNX/Android readiness раздельно логируется; SDK содержит partial/welcome/modem sleep статусы."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/17"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-019",
+      "title": "Перезапуски, watchdog и восстановление сервисов",
+      "not_known": [
+        "Полная причина→граница reset→восстановление подписок/экранов/сети."
+      ],
+      "hardware_presence": "software_lifecycle_confirmed",
+      "control_route_status": "software_recovery_hooks_found",
+      "needed_artifact": [
+        "Существующие crash/boot/MCU logs."
+      ],
+      "next_offline_step": "Связать watchdog/reconnect события в пределах единой эпохи; различать рестарт APK, Android guest, QNX и MCU.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "VMM lifecycle, Binder/VHAL reconnect и QNX health components существуют."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/18"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-020",
+      "title": "Обновления / разделы / rollback",
+      "not_known": [
+        "Production updater chain, фактические active banks, подпись/rollback/recovery outcome."
+      ],
+      "hardware_presence": "partition_artifacts_not_ecus",
+      "control_route_status": "update_mechanism_static_partial",
+      "needed_artifact": [
+        "Имеющиеся update package evidence, client binaries, manifest, postboot versions."
+      ],
+      "next_offline_step": "Сравнить consumer manifest и result status/active slot; не использовать generic script как инструкцию обновления.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "23 image manifest записи; LA/LV alternative; update script не проверяет swdl exit перед echo success."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/19"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-021",
+      "title": "Android permissions / Binder / VHAL access",
+      "not_known": [
+        "Разрешения каждого конечного API и доступ Natro в конкретной runtime configuration."
+      ],
+      "hardware_presence": "software_policy_layer",
+      "control_route_status": "one_check_proven_full_chain_unknown",
+      "needed_artifact": [
+        "Exact manifests, service bytecode, package dumps уже имеются."
+      ],
+      "next_offline_step": "Составить permission цепочку по конкретному API, не объявлять все методы открытыми или закрытыми по одному check.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "setCarServiceHelper проверяет UID1000; VHAL access и static write route отдельны."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/20"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-022",
+      "title": "QNX policy / виртуальная изоляция / диагностический доступ",
+      "not_known": [
+        "Какая policy активна на каждой epoch и какие проверки реально применяет конечный handler."
+      ],
+      "hardware_presence": "software_policy_layer",
+      "control_route_status": "configuration_only_not_access_bypass",
+      "needed_artifact": [
+        "Имеющиеся platform variables, QNX policy manifests и runtime logs."
+      ],
+      "next_offline_step": "Связать branch conditions с live state и service permissions; не выполнять изменение policy или security routines.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Startup и VM config имеют security/ASLR/virtual device branches; gateway config задаёт собственные параметры."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/21"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-023",
+      "title": "MCU relay: происхождение, семантика и время",
+      "not_known": [
+        "Источник до peer .1 и его hardware owner; связь конкретных 1307 строк двух boot history с восстановленным UDP→Java трактом; единицы embedded counter; фильтры/потеря сообщений."
+      ],
+      "hardware_presence": "logical_mcu_source_observed",
+      "control_route_status": "live_relay_observed_origin_mapping_pending",
+      "needed_artifact": [
+        "VHAL incoming converter и PA_McuLog service implementation уже доступны."
+      ],
+      "next_offline_step": "Проследить property→wire→peer; разделить embedded timestamp/counter и Android receipt; не считать McuLog_Panic всеобщим crash signal.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "1307 строк PA_McuLog, одна версия в двух boot histories, 23 software log groups."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/22"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-024",
+      "title": "Network management CAN / FlexRay / LIN",
+      "not_known": [
+        "Физическая топология, каждый controller/channel, state enum meanings и доступ из AP."
+      ],
+      "hardware_presence": "physical_bus_assignment_unknown",
+      "control_route_status": "network_management_status_only",
+      "needed_artifact": [
+        "Имеющиеся MCU relays и конфиги; по каждому bus затем production firmware mapping."
+      ],
+      "next_offline_step": "Построить наблюдённые значения/переходы и связать с callback источником; не выводить CAN IDs, распиновку или активные каналы из имён.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "MCU DIAG relay показывает ComM/NM и FrMod/CanMod/LinMod состояния."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/23"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "ARCH-025",
+      "title": "Наблюдаемость и полнота корпуса",
+      "not_known": [
+        "Окончательный полный inventory всех Library/прошлых исследовательских архивов."
+      ],
+      "hardware_presence": "not_applicable",
+      "control_route_status": "evidence_inventory_expanded",
+      "needed_artifact": [
+        "Уже материализованные дополнительные архивы и дальнейшая точная инвентаризация."
+      ],
+      "next_offline_step": "Не просить повторный замер до учёта содержимого уже сохранённых вложений; хранить глубину разбора по каждому архиву.",
+      "domain": "Архитектура, ECU, транспорт и жизненный цикл",
+      "known": [
+        "Дополнительные HU-Route/Bus-Capture несут version/boot data, хотя raw bus нет; прежние 64 источника не исчерпывают все материалы."
+      ],
+      "evidence_record": {
+        "file": "architecture_domains/systems.json",
+        "json_pointer": "/systems/24"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_POWER",
+      "title": "Питание, сон, пробуждение и режимы головной системы",
+      "not_known": [
+        "Полная таблица AP/IM/EM/IPLM и допустимых переходов; путь в изменённом Android PowerManager; тайминги сна/пробуждения и их связь с конкретными сбоями ANCS/музыки; когда питание снимается физически."
+      ],
+      "hardware_presence": "Android service, native process and Binder observed; controller/ECU power ownership beyond this software boundary unresolved.",
+      "control_route_status": "STATIC_IMPLEMENTATION + RUNTIME_SERVICE_PRESENT; no new power action performed; engine control not established.",
+      "needed_artifact": [
+        "Сначала существующие Android services/framework power implementations и boot/suspend логи; при недостатке — синхронная запись штатного сна/пробуждения без принудительного сброса Bluetooth."
+      ],
+      "next_offline_step": "Раскрыть access$-переходы PowerSomeIPServiceImpl, таблицы callback IDs и сопоставить с PowerManager.onQNXRequest и PA_Power_Res; затем связать с уже сохранёнными boot-логами.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "Живой powersomeip Binder имеет IECarXCarPower, Android PowerSomeIPService работает под UID1000; одновременно живёт native powersomeip HAL.",
+        "apStatusChange управляет mute, сохраняет lastAPStatus и выключает/восстанавливает Wi-Fi/Bluetooth по wifi_pre_state/bt_pre_state. Это отдельный штатный владелец жизненного цикла связности, помимо Natro/Helper.",
+        "PowerSomeIPHALCallback.ScPwIVIMngrReqState(B) отбрасывает повтор requestType, обращается к IIplm.ReleaseResourceGroup, затем PowerManager.onQNXRequest(B). Это доказанная software-связь запроса QNX с Android power path, не команда двигателя."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/0"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_DISPLAY",
+      "title": "Дисплеи, питание PSD, яркость и день/ночь",
+      "not_known": [
+        "PSD⇄физический дисплей в каждой конфигурации; runtime зоны яркости и шкалы; ограничения сна/передачи; pixel-owner штатных крыльев; независимый эффект power и screensaver."
+      ],
+      "hardware_presence": "Four logical display devices observed; physical mapping of every output and optional PSD variants incomplete.",
+      "control_route_status": "PSD setter statically traced to CB; display enumeration observed; physical execution and full backlight mapping OPEN.",
+      "needed_artifact": [
+        "Сначала существующие multidisplay callbacks/config и display snapshots; только затем видео с синхронным состоянием конкретного физического экрана."
+      ],
+      "next_offline_step": "Связать onPsdScreenOnOff/onPA_Power_Res с native PSD HAL и carconfig; изучить brightness setters и отдельные PA feedback.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "Runtime подтверждает четыре логических display: 0=1920×720/60Hz; 1=1920×720/60Hz; 2=1920×1080/30Hz; 3=1920×720/60Hz. Имена HDMI не устанавливают физическую роль каждого выхода.",
+        "EcarxMultidisplayService.onBind возвращает null; onCreate публикует Binder ecarx_multidisplay. Путь через bindService сам по себе не даёт этого интерфейса.",
+        "setPsdDisplayOnAndOff допускает 2=on и 1=off, направляет их в CB_Power_PSDStatus. Getter manager при отсутствии сервиса/RemoteException возвращает 0 INVALID. Это отдельный PSD power path; не обобщать на HUD/DIM.",
+        "IECarXCarPower отдельно содержит CSD/PSD brightness, day/night/theme/screensaver параметры; общий метод display on/off AdaptAPI не описывает весь этот набор."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/1"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_AUDIO",
+      "title": "Аудиотракт, источники, микширование и автомобильные предупреждения",
+      "not_known": [
+        "Физические каналы усилителя/динамиков, codec routing, permission enforcement и mix priority; кто удерживает mute после boot/call/PDC; фактическая поддержка DSP опций."
+      ],
+      "hardware_presence": "Audio service stack observed; exact amplifier/DSP equipment and channel topology not established.",
+      "control_route_status": "SDK setters and Binder observed; full service/native/audio hardware chain not yet traced.",
+      "needed_artifact": [
+        "Сначала имеющиеся audio libraries/service APK; при пробеле — audio_policy конфигурация и снимки audio focus/routing во время штатных переходов."
+      ],
+      "next_offline_step": "Найти реализацию EcarxAudioService и источник audio_policy; связать API channels/mix with focus и native audiocontrol, не отключая предупреждения.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "Живой ecarx_audio_service и EcarxAudioService сосуществуют с AudioFlinger/audio policy и native audiocontrol HAL. Приложение плеера не является единственным владельцем звука.",
+        "EcarxAudioManager разделяет ENT/NAVI/BEEP каналы0/1/2; отдельные mixSource NAVI, HFT, VR, eCall, duckMasterAudioVolume/Siri, PDCWarning и DIMSoundWarningLevel. Числа — SDK namespace, не CAN.",
+        "В общем API есть EQ, balance/fader, speed-volume, Bose/Harman/ClariFi и isInternalAmplifier. Наличие таких символов не подтверждает каждую аудиокомплектацию."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/2"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_RADIO",
+      "title": "Радиоприёмник AM/FM/DAB и дорожные объявления",
+      "not_known": [
+        "Какая ветвь является production backend; единицы частоты/диапазоны/регион; наличие DAB hardware; приоритеты и возврат после TA/eCall; доступ к native от обычного приложения."
+      ],
+      "hardware_presence": "Radio software and native processes observed; DAB and tuner hardware options unverified.",
+      "control_route_status": "SDK interface and runtime services present; production path and physical tuning unverified.",
+      "needed_artifact": [
+        "Сначала имеющиеся ecarx_radio_service.jar и radio/native dependencies; конфигурация региона/тюнера при её отсутствии."
+      ],
+      "next_offline_step": "Связать radio service wrapper с двумя HAL и callback RadioInfo; разобрать единицы tuning и enum источника.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "ts_radiomanager Binder IRadioServiceBase и broadcastradio существуют одновременно; живут vendor.ecarx.ts.radioservice@1.0 и vendor.ecarx.xma.broadcastradio@2.1.",
+        "IRadioServiceBase имеет tuneToAmFm/tuneToDAB, seek/scan, source switch и отдельные TA/news/alarm/link параметры. MediaSession next/previous не описывает эту систему полностью."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/3"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_BLUETOOTH",
+      "title": "Bluetooth: профильные соединения, BLE и сосуществование стеков",
+      "not_known": [
+        "Активный production owner nFore/Android/TS-DM и profile arbitration; реальное число BLE соединений; взаимоисключение CarPlay; взаимодействие с OEM power lifecycle и повторным сопряжением."
+      ],
+      "hardware_presence": "Android Bluetooth HAL/profile services observed; software config is not measurement of simultaneous hardware capacity.",
+      "control_route_status": "Several concrete software interfaces identified; complete connection state machine and ANCS ownership OPEN.",
+      "needed_artifact": [
+        "Сначала ts-dm-foundation/ts-platform/Bluetooth APK из уже полученного нового архива и прежние Natro logs; новое измерение только для оставшейся границы."
+      ],
+      "next_offline_step": "Проследить BluetoothConnectManager/DeviceBluetoothProfileManager до сервиса и профилей; отдельно сопоставить PowerSomeIP enable/disable с эпохами ANCS.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "В одном runtime видны BluetoothManager/GATT, A2DPsink, AVRCPcontroller, HFPclient, PBAPclient и MAPclient плюс отдельный ECARX extension. Наличие общего Bluetooth ON не подтверждает готовность каждого профиля.",
+        "ECARX extension содержит auto/passive connect, HFP auto-reject и PBAP sync API; ecarx.jar также содержит отдельный PSDBluetoothManager. Это разные интерфейсы, не автоматически один общий канал ANCS.",
+        "В новом архиве есть ts-dm-foundation-lib с DeviceBluetoothProfileManager/BluetoothConnectManager и nFore config: MaxAclNum4; MaxDeviceNum2; MaxHfpNum/MaxAvpNum/MaxPbapNum2; LeScanEnable=true. MaxAclNum4 не является доказательством четырёх одновременно работающих ANCS/BLE каналов."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/4"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_PHONE",
+      "title": "Обычная телефония, контакты, кнопки звонка и DIM",
+      "not_known": [
+        "Полный call/hold/swap/ringtone/audio route lifecycle; ограничения вызывающего UID и payload DIM broadcast; активный телефон при двух подключениях; приоритет вызова на HUD/приборке."
+      ],
+      "hardware_presence": "Phone app and HFPclient/Telecom runtime services present; no call attempt or contact data inspected.",
+      "control_route_status": "Manifest entry points plus selected receiver/service method references; physical call control not verified.",
+      "needed_artifact": [
+        "Сначала уже полученный XCBTPhone3 APK и существующие call-service state snapshots; звонки/контакты в новые материалы не нужны для первичного control-flow разбора."
+      ],
+      "next_offline_step": "Продолжить EcarxDimMenuReceiver/ControlKeyBroadcastReceiver→call manager→Android Telecom/HFP и извлечь только контракт extras, permission checks и state conditions.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "У XCBTPhone3 нет sharedUserId system; runtime работает под u0_a19. InCallServiceImpl exported=true защищён BIND_INCALL_SERVICE; BluetoothService работает в :remote. Приложение телефонии не тождественно системному Bluetooth service.",
+        "Manifest содержит NoViewActivity с CALL и отдельные DIM receiver actions для outcall/answer/decline/answer-and-hold/answer-and-end/ringtone-mute; отдельный key receiver CALL/RCALL/MUTE. Это конкретные входы штатного UI, но ещё не готовый проверенный API Natro.",
+        "EcarxDimMenuReceiver.onReceive вызывает UiCallManager: answerCall/answerAndHoldCall/answerAndEndCall, rejectCall/disconnectCall, mute и safePlaceCallInternal. InCallServiceImpl получает Android Telecom onCallAdded/onCallRemoved. Статически подтверждены выбранные участки цепи, полный lifecycle и доступ внешнего UID ещё не установлены.",
+        "Оба архива launcher-phone содержат побайтно одинаковые выбранные phone APK и component reports; второе имя не означает новую версию phone firmware."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/5"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_CARPLAY",
+      "title": "CarPlay, проекция и взаимодействие с Bluetooth/Wi-Fi/звуком",
+      "not_known": [
+        "USB/беспроводной режим конкретной комплектации; владелец focus/projection display; влияние на ANCS/HFP/Wi-Fi; разрешения car.permission.CARPLAY_APP и отказ после sleep."
+      ],
+      "hardware_presence": "CarPlay processes/services observed; actual paired session and wireless hardware capability not established.",
+      "control_route_status": "Adapter APIs and running service stack identified; full session graph OPEN.",
+      "needed_artifact": [
+        "Сначала имеющиеся ts-platform-library и adapter/service code; только затем обезличенный session-state log если останется пробел."
+      ],
+      "next_offline_step": "Связать StateManager session state с focus owners, Wi-Fi AP и Bluetooth coexistence; проверить очистку после disconnect/suspend.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "Runtime имеет оба пакета com.ts.carplay и com.ts.carplay.app, CarPlayService и CarPlayRemoteService; ts-carplay-adapter.jar содержит отдельные adapters audio/video/Bluetooth/Wi-Fi/location.",
+        "Audio adapter выделяет request/abandon focus и duck; Wi-Fi adapter start/stop SoftAP; Bluetooth adapter coexistence/auto-connect и classic profiles; location adapter получает gear, speed, GPGGA/GPRMC. Это интерфейсный состав, не подтверждение режима беспроводного подключения."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/6"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_LOCATION",
+      "title": "GNSS, положение, NMEA и автомобильные данные навигации",
+      "not_known": [
+        "Первичный приёмник/антенна; native decoder; источники fused location/dead reckoning; шкалы и timestamp; WGS/GCJ преобразования и валидность quality flags."
+      ],
+      "hardware_presence": "GNSS software process and Android location service observed; physical receiver and antenna linkage unresolved.",
+      "control_route_status": "Observation interfaces identified; independent measurement quality and full raw-to-map route OPEN.",
+      "needed_artifact": [
+        "Сначала имеющиеся GNSS native binary и config, adapter location implementation; при пробеле — обезличенные качество/timestamp/скорость без координат поездки."
+      ],
+      "next_offline_step": "Сравнить источники ILocationAdapter с Android location и vendor GNSS callbacks; отделить ECU velocity, NMEA time и callback-arrival time.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "Runtime подтверждает location Binder и native vendor.ecarx.xma.gnss@1.0 process; init rc запускает GNSS HAL с группами system/gps/radio/inet.",
+        "CarPlay location interface отдельно предоставляет GPGGA/GPRMC, скорость и передачу; координатная система выбирается ILocationAdapter.setMapCoordinateSystem. GPS и vehicle-position paths нельзя считать одним измерением."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/7"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_TCAM",
+      "title": "TCAM: eCall/bCall/iCall, микрофон, удалённые функции и диагностика",
+      "not_known": [
+        "Физический TCAM/SIM и региональный backend; какой вызов реально поддерживается; приоритет/микрофон/аудиовыход при eCall; lifecycle RVDC authorization; допустимый reset protocol."
+      ],
+      "hardware_presence": "TCAM software service stack observed; exact physical module/region/backend and optional features unverified.",
+      "control_route_status": "Signatures and runtime service presence; no emergency call, remote command or reset invoked.",
+      "needed_artifact": [
+        "Сначала имеющиеся TCAM native interfaces и service APK, конфигурация региона/support; не нужны пробные экстренные звонки."
+      ],
+      "next_offline_step": "Сопоставить get/isSupported API с параметрами carconfig и callback enum; определить границы обычной телефонии, audio mix и удалённого backend.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "Живой tcam Binder ITcamService, Android TcamService и native tcam HAL подтверждены одним runtime snapshot.",
+        "ITcamService/TcamManager разделяют call state/type/support/callback mode, IHU microphone use, CarLocator support, RVDC/remote diagnostics, vehicle IP table и reset support. Это собственная subsystem chain, не обычный Bluetooth вызов.",
+        "Общий интерфейс содержит также charging/light-show поля; они не доказывают наличие зарядки или такого режима на бензиновом KX11."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/8"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_NETWORK",
+      "title": "Связность: Wi-Fi, Ethernet, модем и внутренние сервисы",
+      "not_known": [
+        "Полная L2/L3 topology/gateway ownership, modem/TCAM role, routes/firewall and resource arbitration; связь .1 VP с этими отдельными SOME/IP services."
+      ],
+      "hardware_presence": "Several live OS/HAL networking services observed; SIM/modem physical ownership and complete routing unresolved.",
+      "control_route_status": "Runtime services and local config confirmed; complete interdomain control route OPEN.",
+      "needed_artifact": [
+        "Сначала уже собранные network/VM/QNX configs и native connectivity; новые network snapshots только по выявленному отсутствию конкретной привязки."
+      ],
+      "next_offline_step": "Сопоставить registrations/apps/ports с native client constructors и QNX configs; не объединять VP UDP50335/50500 с discovery30490.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "Runtime одновременно регистрирует connectivity/ethernet/wifi и vendor connectivity process. Статический vsomeip.json задаёт Android .15, discovery peer .2, порт30490 и приложения PowerSomeIP/PAS/AVM/USB-update/Diag/QnxSlog.",
+        "IECarXCarPower имеет отдельный getModemStatus; TCAM интерфейс предоставляет external/master/slave IP и vehicle IP table. Названия адресов не устанавливают физическую топологию ECU."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/9"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_UI",
+      "title": "Штатный UI, жесты, шторка, launcher и оконные владельцы",
+      "not_known": [
+        "Кто принимает edge gesture; IPC от жеста к ControlBoard; другие обязанности ControlBoardService; parent/layerStack pixel attribution; точный обратимый suppress API."
+      ],
+      "hardware_presence": "Named software components and layers observed; physical pixel ownership and complete gesture chain unresolved.",
+      "control_route_status": "Runtime component anchor strengthened; no component disabled, window injected or priority changed.",
+      "needed_artifact": [
+        "Сначала поиск XCNotificationCenterUI/gesture/input APK в уже собранном корпусе и существующие window snapshots; если их нет — запросить только конкретные APK/config."
+      ],
+      "next_offline_step": "Найти consumers action CONTROLLER_BOARD и bind/start цепь; проверить manifest/component permissions и дополнительные функции до выбора точки подавления.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "Новый runtime точно фиксирует ecarx.notificationcenterui/.ControlBoardService, action ecarx.notificationcenterui.action.CONTROLLER_BOARD, UID1000; рядом есть GestureService и InputService. Это продвигает поиск от имени пакета к конкретным работающим компонентам.",
+        "Также живут ECARX SystemUI plugin AppWatcher/UserData services, PartialService и MediaWindowStateService; механизм UI priority нельзя описать одним SystemUI пакетом.",
+        "Runtime видит ecarx_daemon_OverlayDisplay#0…4. Имена слоёв и ServiceRecord не устанавливают владельца каждого пикселя крыльев/машинки и не доказывают безопасный disable-компонент."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/10"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "PLAT_UPDATE",
+      "title": "Обновления, диагностика и права системных сервисов",
+      "not_known": [
+        "Полный boot/update recovery graph; доверенные подписи и региональные constraints; диагностические DTC владельцы/значения; Binder permission checks/SELinux для каждого API; policy persistence через reboot/update."
+      ],
+      "hardware_presence": "Update/diagnostics software services present; does not identify all physical ECU or supported firmware targets.",
+      "control_route_status": "Interface/config/runtime presence established; update/routine/reset/write not executed or qualified.",
+      "needed_artifact": [
+        "Сначала имеющиеся OTA/DTC/PKI APK/native/config и metadata; приватные сертификаты/ключи не запрашивать и не публиковать."
+      ],
+      "next_offline_step": "Разделить software update targets, consent/status callbacks и необратимые операции; установить service-side enforcement без обхода прав.",
+      "domain": "Сервисы головной системы",
+      "known": [
+        "Runtime имеет ota, dtcnl, usbupdate и QnxSlog Binder services; init запускает отдельные OTA/DTC/PKI native HAL. Это самостоятельные жизненные циклы, а не обычная установка APK.",
+        "IOtaService имеет assignment/download/install consent/scheduled installation/resource group API и callbacks; IDtcnlService различает getDtcCodeStatus и setDtcCode. Название get/set не отменяет побочных эффектов диагностических/обновляющих действий.",
+        "Manifest PowerSomeIPService и MultidisplayService имеют sharedUserId system и explicit exported=true; SettingsProvider экспортирует authority EcarxSettings. Это не доказательство допустимости вызова от Natro: runtime UID, Binder checks и SELinux остаются отдельными границами."
+      ],
+      "evidence_record": {
+        "file": "android_platform/systems.json",
+        "json_pointer": "/systems/11"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "BASE-CAMERA",
+      "title": "Камера 360 / AVM",
+      "not_known": [
+        "Физический смысл каждого режима, поддержка комплектации, окончание переходов и независимая видимость."
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Сопоставить имеющиеся PAC watchers, 29021/29043 и оконные события с временными метками.",
+      "domain": "Камера, парковка, дисплеи и взаимодействие",
+      "known": [
+        "Статическая внешняя ветвь и PAC callback разобраны; в прежнем корпусе config154=3, активный raw29021=1…5; значение3 — только частный наблюдавшийся случай."
+      ],
+      "evidence_record": {
+        "file": "continuation/systems.json",
+        "json_pointer": "/systems/0"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "BASE-PAS",
+      "title": "Парковочные датчики, окно PAS и приоритет уведомлений",
+      "not_known": [
+        "Соответствие свежих окон фактической графике; восстановление при Binder failure, зажигании и холодном старте."
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Сохранить NOTIF-009; проверить имеющиеся снимки, затем только недостающий синхронный опыт по GATE-046.",
+      "domain": "Камера, парковка, дисплеи и взаимодействие",
+      "known": [
+        "Текущая политика Natro2.7.7: окно com.ecarx.parking на основном дисплее, два свежих снимка закрытия, без TTL; камера независима. GATE-046 открыт."
+      ],
+      "evidence_record": {
+        "file": "continuation/systems.json",
+        "json_pointer": "/systems/1"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "BASE-HUD",
+      "title": "HUD: профили, PEN, маски содержимого",
+      "not_known": [
+        "Активный профиль, смысл PEN, причина invalid и независимый физический эффект."
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Разобрать текущий профиль и валидность; не подставлять15 и не повторять перебор enum.",
+      "domain": "Камера, парковка, дисплеи и взаимодействие",
+      "known": [
+        "В прежних опытах CB accepted/echo сочетались с invalid feedback; отдельный HUD PA оставался IntellDrv."
+      ],
+      "evidence_record": {
+        "file": "continuation/systems.json",
+        "json_pointer": "/systems/2"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "BASE-DIM",
+      "title": "Приборка DIM: крылья, машинка и владельцы графики",
+      "not_known": [
+        "Связь Android surface, QNX/LVDS и физических областей; независимый владелец каждого элемента."
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Свести старые timeline и слой/процесс; следующий физический опыт требует метки до восстановления.",
+      "domain": "Камера, парковка, дисплеи и взаимодействие",
+      "known": [
+        "Предыдущая отметка тестаI сделана после восстановления dimmenu; новый runtime подтверждает логические дисплеи и overlay, не владельца всех пикселей."
+      ],
+      "evidence_record": {
+        "file": "continuation/systems.json",
+        "json_pointer": "/systems/3"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "BASE-NAV",
+      "title": "Навигация: маршрут, HUD/DIM и координаты",
+      "not_known": [
+        "Владелец guidance, контракт манёвров/полос, источник координат и приоритет двух навигаций."
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Продолжить с PLAT_LOCATION/PLAT_CARPLAY и штатными consumer навигации; различать измерение координат и маршрут.",
+      "domain": "Камера, парковка, дисплеи и взаимодействие",
+      "known": [
+        "Есть отдельный GNSS/location тракт и NAVI display API; NAVI ID сам по себе не является выключателем штатной навигации."
+      ],
+      "evidence_record": {
+        "file": "continuation/systems.json",
+        "json_pointer": "/systems/4"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "BASE-MEDIAKEY",
+      "title": "Кнопки руля, события ввода и управление медиа",
+      "not_known": [
+        "Нажатие→callback→dispatch→player→audio, eventTime/downTime, повторы и long-press."
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Сопоставить сохранённые input/media traces; отделить торможениеUI от транспорта автомобиля.",
+      "domain": "Камера, парковка, дисплеи и взаимодействие",
+      "known": [
+        "Прежний журнал содержит три блокировки main thread дольше8секунд; timestamp внутри callback не измеряет полную задержку нажатия."
+      ],
+      "evidence_record": {
+        "file": "continuation/systems.json",
+        "json_pointer": "/systems/5"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "BASE-ANCS",
+      "title": "ANCS/BLE уведомления и восстановление соединений",
+      "not_known": [
+        "Владелец BLE-сеанса, подписки и reconnect, арбитрация с телефонией/CarPlay, причина конкретных сбоев."
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Сначала разобрать уже найденные Bluetooth логи с привязкой к PowerSomeIP; личные тексты уведомлений для этого не нужны.",
+      "domain": "Камера, парковка, дисплеи и взаимодействие",
+      "known": [
+        "Новый разбор установил штатные Bluetooth профили и владельца power lifecycle; конфигурационные лимиты nFore не доказывают число одновременных ANCS соединений."
+      ],
+      "evidence_record": {
+        "file": "continuation/systems.json",
+        "json_pointer": "/systems/6"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    },
+    {
+      "id": "BASE-VOICE",
+      "title": "Голосовое управление, микрофон и голосовые предупреждения",
+      "not_known": [
+        "Пакет и сервис распознавания, языки, push-to-talk/wake-word, маршрутизация микрофона и права клиента."
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Найти штатный manifest/consumer VR в существующем системном архиве и связь с audio focus; отметить отсутствующие материалы.",
+      "domain": "Камера, парковка, дисплеи и взаимодействие",
+      "known": [
+        "Аудиоинтерфейсы содержат VR/eCall/HFT mix; наличие этих обозначений не раскрывает штатный voice assistant."
+      ],
+      "evidence_record": {
+        "file": "continuation/systems.json",
+        "json_pointer": "/systems/7"
+      },
+      "physical_effect_verified_by_this_audit": null,
+      "vehicle_test_performed_by_this_audit": false
+    }
+  ]
+}
