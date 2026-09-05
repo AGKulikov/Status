@@ -24,7 +24,11 @@ public final class HudNavigationVisibilityContractTest {
 
         assertTrue(canvas.contains("!editor && isNavigation(item.type)"));
         assertTrue(canvas.contains("!data.navigationElementAvailable(item)"));
-        assertTrue(canvas.contains("if (editor) drawMapPlaceholder"));
+        // The editor-only placeholder now has a scoped edge mask around it. Keep checking
+        // that the NAV_MAP branch guards the draw, rather than requiring a one-line if body.
+        assertTrue(java.util.regex.Pattern.compile(
+                "case NAV_MAP:\\s*if\\s*\\(editor\\)\\s*\\{[^}]*drawMapPlaceholder\\(")
+                .matcher(canvas).find());
         assertTrue(runtime.contains("DIRECT_NAVIGATION_FRESH_MS = 3_000L"));
         assertTrue(runtime.contains("direct.isFreshAt("));
         assertTrue(runtime.contains("else if (!directSource)"));
