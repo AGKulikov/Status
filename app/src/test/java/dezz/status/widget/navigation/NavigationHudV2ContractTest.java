@@ -1194,7 +1194,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(backgroundLease.contains("invoke(mapKit(), \"onStop\")"));
         assertFalse(backgroundLease.contains("postDelayed(this"));
         assertFalse(client.contains("parseNavigationState(snapshotJson)"));
-        assertTrue(publisher.contains("readSnapshotInputs(currentGuidance, activeRoute)"));
+        assertTrue(publisher.contains("readSnapshotInputs(currentGuidance, activeRoute, routeStatus)"));
         assertTrue(client.contains("hudMapRenderer.updateNavigationState(navigationFrame)"));
         assertTrue(client.contains("clusterMapRenderer.updateNavigationState(navigationFrame)"));
         assertTrue(client.contains("jamFingerprint, jamStyle"));
@@ -1432,6 +1432,10 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.contains("getRequestPoints"));
         assertTrue(canvas.contains("HudNavigationVisuals.maneuver"));
         assertTrue(canvas.contains("drawManeuverCardText"));
+        assertTrue(canvas.contains("drawStockManeuverCardText"));
+        assertTrue(canvas.contains("stockCardRect(stockRows.main)"));
+        assertTrue(canvas.contains("nav.maneuverNextRoad, item.options.optBoolean(\"showDirection\", true)"));
+        assertTrue(canvas.contains("rows.roadText"));
         assertTrue(canvas.contains("nav.turnDistance"));
         assertTrue(canvas.contains("showRoadBadge"));
         assertTrue(canvas.contains("maneuverDirectionSigns"));
@@ -1592,10 +1596,12 @@ public final class NavigationHudV2ContractTest {
         assertTrue(profile.contains("routeLabelScalePercent / 100d"));
         assertTrue(publisher.contains("RoutePosition.getPoint()"));
         assertTrue(publisher.contains("invoke(routePosition, \"getPoint\")"));
-        assertTrue(publisher.contains("ROUTE_MATCH_HOLD_MS = 2_500L"));
-        assertTrue(publisher.contains("lastRouteMatchedLatitude"));
-        assertTrue(publisher.contains("latitude = routeLatitude"));
-        assertTrue(publisher.contains("longitude = routeLongitude"));
+        String positions = read(navigator.resolve("NavigationPositionPolicy.java"));
+        assertTrue(positions.contains("ROUTE_MATCH_HOLD_MS = 2_500L"));
+        assertTrue(publisher.contains("NavigationPositionPolicy.mayUseRoutePosition"));
+        assertTrue(publisher.contains("navigationPositionPolicy.select("));
+        assertTrue(publisher.contains("position.latitude, position.longitude, position.heading"));
+        assertTrue(publisher.contains("navigationPositionPolicy.reset()"));
         assertTrue(publisher.contains("polylinePosition = invoke(routePosition, \"positionOnRoute\""));
         assertTrue(publisher.contains("closestPositionOnRoute(route, currentPoint)"));
         assertTrue(publisher.contains("CLOSEST_TO_RAW_POINT"));

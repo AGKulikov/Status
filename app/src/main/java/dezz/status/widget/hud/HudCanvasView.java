@@ -677,29 +677,40 @@ public final class HudCanvasView extends View {
                 item.options.optInt("paddingRightPx", 10) * scale,
                 item.options.optInt("paddingBottomPx", 8) * scale);
         if (content.isEmpty()) return;
+        HudNavigationState nav = data.navigation();
+        String auxiliary = nav == null ? "" : stockManeuverAuxiliaryText(nav);
+        StockManeuverCardRows stockRows = nav != null && nav.direct
+                ? new StockManeuverCardRows(content.left, content.top, content.right, content.bottom,
+                        item.options.optInt("distanceAreaPercent", 56),
+                        Math.max(0f, item.options.optInt("textRowGapPx", 2) * scale),
+                        nav.maneuverNextRoad, item.options.optBoolean("showDirection", true),
+                        item.options.optBoolean("showRoadBadge", true)
+                                && !nav.maneuverDirectionSigns.isEmpty(), !auxiliary.isEmpty())
+                : null;
+        RectF mainContent = stockRows == null ? content : stockCardRect(stockRows.main);
         String layout = item.options.optString("arrowLayout", "LEFT");
-        RectF arrow = new RectF(content);
-        RectF text = new RectF(content);
+        RectF arrow = new RectF(mainContent);
+        RectF text = new RectF(mainContent);
         float arrowFraction = clamp(item.options.optInt("arrowAreaPercent", 38),
                 10, 75) / 100f;
         float gap = Math.max(0f, item.options.optInt("arrowTextGapPx", 6) * scale);
         if ("TOP".equals(layout) || "BOTTOM".equals(layout)) {
-            float split = content.height() * arrowFraction;
+            float split = mainContent.height() * arrowFraction;
             if ("TOP".equals(layout)) {
                 arrow.bottom = Math.max(arrow.top, arrow.top + split - gap * .5f);
                 text.top = Math.min(text.bottom, arrow.top + split + gap * .5f);
             } else {
                 text.bottom = Math.max(text.top, text.bottom - split - gap * .5f);
-                arrow.top = Math.min(arrow.bottom, content.bottom - split + gap * .5f);
+                arrow.top = Math.min(arrow.bottom, mainContent.bottom - split + gap * .5f);
             }
         } else {
-            float split = content.width() * arrowFraction;
+            float split = mainContent.width() * arrowFraction;
             if ("RIGHT".equals(layout)) {
-                text.right = Math.max(text.left, content.right - split - gap * .5f);
-                arrow.left = Math.min(arrow.right, content.right - split + gap * .5f);
+                text.right = Math.max(text.left, mainContent.right - split - gap * .5f);
+                arrow.left = Math.min(arrow.right, mainContent.right - split + gap * .5f);
             } else {
-                arrow.right = Math.max(arrow.left, content.left + split - gap * .5f);
-                text.left = Math.min(text.right, content.left + split + gap * .5f);
+                arrow.right = Math.max(arrow.left, mainContent.left + split - gap * .5f);
+                text.left = Math.min(text.right, mainContent.left + split + gap * .5f);
             }
         }
         RectF arrowContent = insetSides(arrow,
@@ -709,16 +720,94 @@ public final class HudCanvasView extends View {
                 item.options.optInt("arrowPaddingBottomPx", 3) * scale);
         float iconScale = clamp(item.options.optInt("sourceIconScalePercent", 100),
                 25, 250) / 100f;
-        arrowContent = scaleAroundCenter(arrowContent, iconScale, content);
+        arrowContent = scaleAroundCenter(arrowContent, iconScale, mainContent);
         RectF textContent = insetSides(text,
                 item.options.optInt("textPaddingLeftPx", 0) * scale,
                 item.options.optInt("textPaddingTopPx", 0) * scale,
                 item.options.optInt("textPaddingRightPx", 0) * scale,
                 item.options.optInt("textPaddingBottomPx", 0) * scale);
         if (!arrowContent.isEmpty()) drawManeuver(canvas, item, arrowContent, color);
-        if (!textContent.isEmpty()) {
+        if (stockRows != null) {
+            drawStockManeuverCardText(canvas, item, nav, stockRows, textContent,
+                    auxiliary, color, unitColor, scale);
+        } else if (!textContent.isEmpty()) {
             drawManeuverCardText(canvas, item, textContent, color, unitColor, scale);
         }
+    }
+
+    private static RectF stockCardRect(StockManeuverCardRows.Row row) {
+        return new RectF(row.left, row.top, row.right, row.bottom);
+    }
+
+    private static String stockManeuverAuxiliaryText(HudNavigationState nav) {
+        String value = nav.maneuverAuxiliaryText;
+        if ("NEXT_MANEUVER".equals(nav.maneuverAuxiliaryType)
+                && !nav.maneuverAuxiliaryDistance.isEmpty()) {
+            value = value.isEmpty() ? nav.maneuverAuxiliaryDistance
+                    : value + " · " + nav.maneuverAuxiliaryDistance;
+        }
+        return value;
+    }
+
+    private void drawStockManeuverCardText(Canvas canvas, HudElementConfig item,
+            HudNavigationState nav, StockManeuverCardRows rows, RectF distanceBounds,
+            String auxiliary, int color, int unitColor, float scale) {
+        // No description/title/street fallback: these are the fields of the visible stock card.
+        if (!distanceBounds.isEmpty()) {
+            float size = Math.min(item.options.optInt("distanceFontSizeSp", item.fontSizeSp)
+                    * scale, distanceBounds.height() * .72f);
+            drawStyledText(canvas, nav.turnDistance, distanceBounds, color, size,
+                    Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
+        }
+        if (rows.nextRoad != null) {
+            RectF road = stockCardTextRect(rows.nextRoad, item, scale);
+            if (!road.isEmpty()) {
+                float size = Math.min(item.options.optInt("directionFontSizeSp",
+                        Math.max(8, Math.round(item.fontSizeSp * .52f))) * scale,
+                        road.height() * .72f);
+                drawStyledText(canvas, rows.roadText, road, unitColor, size,
+                        Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
+            }
+        }
+        if (rows.signs != null) {
+            RectF signs = stockCardTextRect(rows.signs, item, scale);
+            if (!signs.isEmpty()) {
+                float size = Math.min(item.options.optInt("roadBadgeFontSizeSp",
+                        Math.max(8, Math.round(item.fontSizeSp * .50f))) * scale,
+                        signs.height() * .62f);
+                drawStockDirectionSigns(canvas, item, nav.maneuverDirectionSigns,
+                        signs, color, size, scale);
+            }
+        }
+        if (rows.auxiliary != null) {
+            RectF auxiliaryBounds = stockCardRect(rows.auxiliary);
+            if (auxiliaryBounds.isEmpty()) return;
+            int auxiliaryColor = optionColor(item, "auxiliaryColor", 0xE60B4DB5);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(auxiliaryColor, Math.round(
+                    Color.alpha(auxiliaryColor) * Color.alpha(color) / 255f)));
+            float radius = Math.max(2f, Math.min(auxiliaryBounds.height() * .28f, 7f * scale));
+            canvas.drawRoundRect(auxiliaryBounds, radius, radius, paint);
+            RectF text = stockCardTextRect(rows.auxiliary, item, scale);
+            text = insetSides(text, Math.max(3f, 6f * scale), 0f,
+                    Math.max(3f, 6f * scale), 0f);
+            if (!text.isEmpty()) {
+                float size = Math.min(item.options.optInt("auxiliaryFontSizeSp",
+                        Math.max(8, Math.round(item.fontSizeSp * .46f))) * scale,
+                        text.height() * .62f);
+                drawStyledText(canvas, auxiliary, text, color, size,
+                        Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
+            }
+        }
+    }
+
+    private static RectF stockCardTextRect(StockManeuverCardRows.Row row,
+            HudElementConfig item, float scale) {
+        return insetSides(stockCardRect(row),
+                item.options.optInt("textPaddingLeftPx", 0) * scale,
+                item.options.optInt("textPaddingTopPx", 0) * scale,
+                item.options.optInt("textPaddingRightPx", 0) * scale,
+                item.options.optInt("textPaddingBottomPx", 0) * scale);
     }
 
     /** Vector/text-only standalone forecast card; resizing never samples an intermediate bitmap. */
@@ -827,36 +916,8 @@ public final class HudCanvasView extends View {
 
         float detailLeft = detailBounds.left;
         if (!directionSigns.isEmpty()) {
-            float badgeGap = Math.max(3f, 5f * scale);
-            for (HudNavigationState.DirectionSignItem sign : directionSigns) {
-                if (detailLeft >= detailBounds.right) break;
-                textPaint.setTextSize(badgeSize);
-                textPaint.setTypeface(typeface(Math.max(600, item.fontWeight)));
-                float horizontalPadding = Math.max(2f, 5f * scale);
-                float maximum = Math.max(0f, detailBounds.right - detailLeft);
-                float badgeWidth = Math.min(maximum,
-                        textPaint.measureText(sign.text) + horizontalPadding * 2f);
-                if (badgeWidth < horizontalPadding * 2f + 1f) break;
-                float badgeHalfHeight = Math.min(detailBounds.height() * .5f,
-                        badgeSize * .62f + Math.max(1f, 2f * scale));
-                RectF badge = new RectF(detailLeft,
-                        detailBounds.centerY() - badgeHalfHeight,
-                        detailLeft + badgeWidth,
-                        detailBounds.centerY() + badgeHalfHeight);
-                int badgeColor = parseColor(sign.backgroundColor, null, 0xFF1478FF);
-                int badgeTextColor = parseColor(sign.textColor, null, Color.WHITE);
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(withAlpha(badgeColor, Math.round(
-                        Color.alpha(badgeColor) * Color.alpha(color) / 255f)));
-                canvas.drawRoundRect(badge, Math.max(2f, 3f * scale),
-                        Math.max(2f, 3f * scale), paint);
-                drawStyledText(canvas, sign.text,
-                        insetSides(badge, horizontalPadding, 0f, horizontalPadding, 0f),
-                        withAlpha(badgeTextColor, Color.alpha(color)), badgeSize,
-                        Layout.Alignment.ALIGN_CENTER, false,
-                        Math.max(600, item.fontWeight));
-                detailLeft = badge.right + badgeGap;
-            }
+            detailLeft = drawStockDirectionSigns(canvas, item, directionSigns,
+                    detailBounds, color, badgeSize, scale);
             if (!roadCandidate.isEmpty() && !containsDirectionSign(directionSigns, roadCandidate)
                     && detailLeft < detailBounds.right) {
                 drawStyledText(canvas, roadCandidate,
@@ -919,6 +980,43 @@ public final class HudCanvasView extends View {
                     color, auxiliarySize, Layout.Alignment.ALIGN_NORMAL, false,
                     Math.max(600, item.fontWeight));
         }
+    }
+
+    private float drawStockDirectionSigns(Canvas canvas, HudElementConfig item,
+            List<HudNavigationState.DirectionSignItem> directionSigns, RectF detailBounds,
+            int color, float badgeSize, float scale) {
+        float detailLeft = detailBounds.left;
+        float badgeGap = Math.max(3f, 5f * scale);
+        for (HudNavigationState.DirectionSignItem sign : directionSigns) {
+            if (detailLeft >= detailBounds.right) break;
+            textPaint.setTextSize(badgeSize);
+            textPaint.setTypeface(typeface(Math.max(600, item.fontWeight)));
+            float horizontalPadding = Math.max(2f, 5f * scale);
+            float maximum = Math.max(0f, detailBounds.right - detailLeft);
+            float badgeWidth = Math.min(maximum,
+                    textPaint.measureText(sign.text) + horizontalPadding * 2f);
+            if (badgeWidth < horizontalPadding * 2f + 1f) break;
+            float badgeHalfHeight = Math.min(detailBounds.height() * .5f,
+                    badgeSize * .62f + Math.max(1f, 2f * scale));
+            RectF badge = new RectF(detailLeft,
+                    detailBounds.centerY() - badgeHalfHeight,
+                    detailLeft + badgeWidth,
+                    detailBounds.centerY() + badgeHalfHeight);
+            int badgeColor = parseColor(sign.backgroundColor, null, 0xFF1478FF);
+            int badgeTextColor = parseColor(sign.textColor, null, Color.WHITE);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(badgeColor, Math.round(
+                    Color.alpha(badgeColor) * Color.alpha(color) / 255f)));
+            canvas.drawRoundRect(badge, Math.max(2f, 3f * scale),
+                    Math.max(2f, 3f * scale), paint);
+            drawStyledText(canvas, sign.text,
+                    insetSides(badge, horizontalPadding, 0f, horizontalPadding, 0f),
+                    withAlpha(badgeTextColor, Color.alpha(color)), badgeSize,
+                    Layout.Alignment.ALIGN_CENTER, false,
+                    Math.max(600, item.fontWeight));
+            detailLeft = badge.right + badgeGap;
+        }
+        return detailLeft;
     }
 
     private static boolean containsDirectionSign(

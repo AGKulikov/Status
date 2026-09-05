@@ -238,6 +238,10 @@ int getVersionCode() {
     if (version == '2.7.8') {
         return 208021311
     }
+    // Live position outside the route and complete stock maneuver-card rows.
+    if (version == '2.7.9') {
+        return 208021312
+    }
     if (version == '2.3.0') {
         return 208021254
     }

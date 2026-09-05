@@ -373,8 +373,6 @@ final class NavigatorStatePublisher {
     private static final long MIN_RESOLVE_RETRY_MS = 250L;
     private static final long MAX_RESOLVE_RETRY_MS = 5_000L;
     private static final long ROUTE_RECONCILE_CONFIRM_MS = 250L;
-    /** Hold the last map-matched point across a short RoutePosition publication gap. */
-    private static final long ROUTE_MATCH_HOLD_MS = 2_500L;
     private static final int MAX_POLYLINE_POINTS = 16_000;
     private static final int MAX_ENCODED_POLYLINE_CHARS = 190_000;
     private static final int MAX_TRAFFIC_RUNS = 2_048;
@@ -424,10 +422,8 @@ final class NavigatorStatePublisher {
     private long activeRouteTurnsSampleElapsedMs;
     private long lastRouteTurnsReadElapsedMs;
     private long lastTrafficLightsReadElapsedMs;
-    private double lastRouteMatchedLatitude = Double.NaN;
-    private double lastRouteMatchedLongitude = Double.NaN;
-    private double lastRouteMatchedBearing = Double.NaN;
-    private long lastRouteMatchedElapsedMs;
+    private final NavigationPositionPolicy navigationPositionPolicy = new NavigationPositionPolicy();
+    private String lastPositionDiagnostic = "";
     private Object activeRoutePolylineIndex;
     private long activeRoutePolylineIndexEpoch = Long.MIN_VALUE;
     private Object conditionsRoute;
@@ -666,7 +662,7 @@ final class NavigatorStatePublisher {
                 activeJamStyle = RoutePolylineStyler.readJamStyle(activeRoute);
                 activeJamFingerprint = activeJamStyle.fingerprint;
             }
-            SnapshotInputs inputs = readSnapshotInputs(currentGuidance, activeRoute);
+            SnapshotInputs inputs = readSnapshotInputs(currentGuidance, activeRoute, routeStatus);
             long elapsedNow = SystemClock.elapsedRealtime();
             boolean snapshotDue = forceSnapshot || routeChanged || forceRoute
                     || elapsedNow - lastSnapshotDispatchElapsedMs >= SNAPSHOT_INTERVAL_MS;
@@ -848,10 +844,17 @@ final class NavigatorStatePublisher {
      * Reads location and route progress once for both independent maps. The previous renderer
      * path repeated getRoutePosition/getPosition reflection separately for HUD and cluster.
      */
-    private SnapshotInputs readSnapshotInputs(Object currentGuidance, Object route)
+    private SnapshotInputs readSnapshotInputs(Object currentGuidance, Object route, String routeStatus)
             throws Exception {
         Object location = invoke(currentGuidance, "getLocation");
-        Object routePosition = route == null ? null : invoke(route, "getRoutePosition");
+        Object routePosition = null;
+        if (route != null) {
+            try {
+                routePosition = invoke(route, "getRoutePosition");
+            } catch (Throwable unavailable) {
+                // A route wrapper transition must not discard an available live location.
+            }
+        }
         double latitude = Double.NaN;
         double longitude = Double.NaN;
         double bearing = Double.NaN;
@@ -867,62 +870,46 @@ final class NavigatorStatePublisher {
             if (finite(speedMps)) speedKmh = Math.max(0d, speedMps * 3.6d);
         }
         RouteProgressSample progress = readRouteProgress(route, routePosition);
-        // Guidance.getLocation() is raw GNSS and can temporarily jump onto a parallel street.
-        // The stock Navigator renders RoutePosition.getPoint(), which is map-matched to the active
-        // route. Give both independent maps that same canonical point and heading while guidance is
-        // active; raw GNSS remains the bounded fallback during a transient RoutePosition gap.
-        if (routePosition != null) {
+        // A retained RoutePosition.getPoint() is a progress point, not proof that the vehicle is
+        // still on this route. Only confirmed on-route statuses allow matching (and its gap cache).
+        // Otherwise both maps and their cameras receive Guidance's live location and live heading.
+        // Keep route trimming independent: an off-route vehicle must not drag the old polyline.
+        double routeLatitude = Double.NaN;
+        double routeLongitude = Double.NaN;
+        double routeBearing = Double.NaN;
+        if (NavigationPositionPolicy.mayUseRoutePosition(route != null, routeStatus)
+                && routePosition != null) {
             try {
-                double routeBearing = number(invoke(routePosition, "heading"), Double.NaN);
-                if (finite(routeBearing)) bearing = routeBearing;
-            } catch (Throwable unavailable) {
-                // Some vendor builds omit heading(); position matching remains independently useful.
-            }
-        }
-        long nowElapsedMs = SystemClock.elapsedRealtime();
-        boolean matchedThisFrame = false;
-        if (route != null && routePosition != null) {
-            try {
-                // getPoint() exists even during the short interval in which DrivingRoute.getPosition()
-                // cannot yet be projected. Do not couple cursor matching to polyline trimming.
                 Object matchedPoint = invoke(routePosition, "getPoint");
-                double routeLatitude = number(
-                        invoke(matchedPoint, "getLatitude"), Double.NaN);
-                double routeLongitude = number(
-                        invoke(matchedPoint, "getLongitude"), Double.NaN);
-                if (finite(routeLatitude) && routeLatitude >= -90d && routeLatitude <= 90d
-                        && finite(routeLongitude) && routeLongitude >= -180d
-                        && routeLongitude <= 180d) {
-                    latitude = routeLatitude;
-                    longitude = routeLongitude;
-                    lastRouteMatchedLatitude = routeLatitude;
-                    lastRouteMatchedLongitude = routeLongitude;
-                    lastRouteMatchedBearing = bearing;
-                    lastRouteMatchedElapsedMs = nowElapsedMs;
-                    matchedThisFrame = true;
-                }
+                routeLatitude = number(invoke(matchedPoint, "getLatitude"), Double.NaN);
+                routeLongitude = number(invoke(matchedPoint, "getLongitude"), Double.NaN);
             } catch (Throwable unavailable) {
-                // Fall through to the last fresh matched point, then finally raw GNSS.
+                // A short matched-point gap may be bridged only while still confirmed on route.
+            }
+            try {
+                routeBearing = number(invoke(routePosition, "heading"), Double.NaN);
+            } catch (Throwable unavailable) {
+                // Heading availability is independent of matched-point availability.
             }
         }
-        if (!matchedThisFrame && route != null && lastRouteMatchedElapsedMs > 0L
-                && nowElapsedMs - lastRouteMatchedElapsedMs <= ROUTE_MATCH_HOLD_MS) {
-            latitude = lastRouteMatchedLatitude;
-            longitude = lastRouteMatchedLongitude;
-            if (finite(lastRouteMatchedBearing)) bearing = lastRouteMatchedBearing;
+        NavigationPositionPolicy.Position position = navigationPositionPolicy.select(
+                route != null, routeStatus, SystemClock.elapsedRealtime(),
+                latitude, longitude, bearing, routeLatitude, routeLongitude, routeBearing);
+        String positionDiagnostic = position.source + ", status=" + routeStatus;
+        if (!positionDiagnostic.equals(lastPositionDiagnostic)) {
+            lastPositionDiagnostic = positionDiagnostic;
+            sink.onDiagnostic("Guidance vehicle position source=" + positionDiagnostic);
         }
         NavigationFrame frame = new NavigationFrame(
-                latitude, longitude, bearing, speedKmh, route != null,
+                position.latitude, position.longitude, position.heading, speedKmh, route != null,
                 progress.valid, progress.segmentIndex, progress.segmentPosition,
                 progress.currentPoint);
         return new SnapshotInputs(frame, routePosition);
     }
 
     private void clearRouteMatchedPosition() {
-        lastRouteMatchedLatitude = Double.NaN;
-        lastRouteMatchedLongitude = Double.NaN;
-        lastRouteMatchedBearing = Double.NaN;
-        lastRouteMatchedElapsedMs = 0L;
+        navigationPositionPolicy.reset();
+        lastPositionDiagnostic = "";
     }
 
     private RouteProgressSample readRouteProgress(Object route, Object routePosition) {
@@ -939,7 +926,7 @@ final class NavigatorStatePublisher {
 
             // DrivingRoute.getPosition() describes completed guidance progress and can remain
             // ahead after a GNSS jump. Project the current RoutePosition first so trimming follows
-            // the same reversible, map-matched point as the cursor.
+            // the reversible route progress point. Off-route cursor motion is independent.
             Object polylinePosition = null;
             if (routePosition != null) {
                 try {
