@@ -247,6 +247,9 @@ public final class HudElementConfig {
                     options.put("blockedColor", "#FF7A1FA2");
                     options.put("unknownColor", "#FF8E8E93");
                     break;
+                case TURN_SIGNALS:
+                    textColor = "#FF34C759";
+                    // Fall through: shared animation/visibility defaults.
                 case TURN_SIGNAL_LEFT:
                 case TURN_SIGNAL_RIGHT:
                     options.put("animated", true);

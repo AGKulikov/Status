@@ -168,7 +168,8 @@ public final class HudCanvasView extends View {
             if (!shouldDraw(item)) continue;
             RectF bounds = bounds(item, geometry);
             drawElement(canvas, item, bounds, geometry.scale, geometry);
-            if ((item.type == HudElementType.TURN_SIGNAL_LEFT
+            if ((item.type == HudElementType.TURN_SIGNALS
+                    || item.type == HudElementType.TURN_SIGNAL_LEFT
                     || item.type == HudElementType.TURN_SIGNAL_RIGHT
                     || item.type == HudElementType.NAV_TRAFFIC_LIGHTS)
                     && item.options.optBoolean("animated",
@@ -345,6 +346,21 @@ public final class HudCanvasView extends View {
                 return;
             case NAV_ROUTE_GRAPHIC:
                 drawRouteGraphic(canvas, item, bounds);
+                return;
+            case TURN_SIGNALS:
+                float side = Math.min(bounds.height(), bounds.width() / 2f);
+                float top = bounds.centerY() - side / 2f;
+                long now = SystemClock.uptimeMillis();
+                boolean blink = item.options.optBoolean("animated", true);
+                int frequency = item.options.optInt("blinkFrequencyMs", 500);
+                if (HudTurnSignals.visible(data.turnSignalActive(true), editor, blink, now, frequency)) {
+                    drawTurnSignalShape(canvas, new RectF(bounds.left, top,
+                            bounds.left + side, top + side), textColor, true);
+                }
+                if (HudTurnSignals.visible(data.turnSignalActive(false), editor, blink, now, frequency)) {
+                    drawTurnSignalShape(canvas, new RectF(bounds.right - side, top,
+                            bounds.right, top + side), textColor, false);
+                }
                 return;
             case TURN_SIGNAL_LEFT:
                 drawTurnSignal(canvas, item, bounds, textColor, true);
@@ -1605,8 +1621,13 @@ public final class HudCanvasView extends View {
             int frequency = Math.max(150, item.options.optInt("blinkFrequencyMs", 500));
             if ((SystemClock.uptimeMillis() / frequency) % 2L == 0L) return;
         }
+        drawTurnSignalShape(canvas, bounds,
+                data.active(item) ? color : withAlpha(color, 65), left);
+    }
+
+    private void drawTurnSignalShape(Canvas canvas, RectF bounds, int color, boolean left) {
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(data.active(item) ? color : withAlpha(color, 65));
+        paint.setColor(color);
         float direction = left ? -1f : 1f;
         float cx = bounds.centerX();
         float cy = bounds.centerY();

@@ -1478,7 +1478,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(runtime.contains("NavigationBridgeStateStore.maneuverArtworkFor(direct)"));
         assertTrue(publisher.contains("image_maneuverballoon_maneuver"));
         assertTrue(publisher.contains("distanceMatches(displayDistance, expectedDistanceMeters)"));
-        assertTrue(publisher.contains("captureStockManeuverArtwork(imageView)"));
+        assertTrue(publisher.contains("maneuverArtwork.capture((ImageView) image)"));
+        String artwork = read(navigatorModRoot().resolve("StockManeuverArtwork.java"));
+        assertTrue(artwork.contains("image.draw(canvas)"));
+        assertTrue(artwork.contains("scratch.sameAs(publishedArtwork)"));
+        assertFalse(artwork.contains("System.identityHashCode"));
         assertTrue(client.contains("sendManeuverArtwork(sequence, maneuverIdentity, artwork)"));
         assertTrue(canvas.contains("if (!editor) return;"));
         assertFalse(cluster.contains("semanticIconAvailable"));

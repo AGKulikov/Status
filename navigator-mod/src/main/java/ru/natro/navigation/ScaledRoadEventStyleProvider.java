@@ -9,6 +9,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /** Delegates to Yandex's stock provider, then scales only its icon/caption size functions. */
 final class ScaledRoadEventStyleProvider implements InvocationHandler {
@@ -16,6 +17,7 @@ final class ScaledRoadEventStyleProvider implements InvocationHandler {
     private final Object proxy;
     private volatile int eventScalePercent = 100;
     private volatile int cameraScalePercent = 100;
+    private volatile RoadEventVisibility visibility;
 
     ScaledRoadEventStyleProvider(Object delegate, Class<?> providerClass) {
         this.delegate = delegate;
@@ -25,6 +27,13 @@ final class ScaledRoadEventStyleProvider implements InvocationHandler {
 
     Object proxy() {
         return proxy;
+    }
+
+    boolean setVisibility(Map<String, String> modes, boolean routeActive) {
+        RoadEventVisibility previous = visibility;
+        if (previous != null && previous.matches(modes, routeActive)) return false;
+        visibility = new RoadEventVisibility(modes, routeActive);
+        return true;
     }
 
     boolean setScales(int nextEventScalePercent, int nextCameraScalePercent) {
@@ -38,6 +47,26 @@ final class ScaledRoadEventStyleProvider implements InvocationHandler {
 
     @Override public Object invoke(Object ignored, Method method, Object[] arguments)
             throws Throwable {
+        RoadEventVisibility filter = visibility;
+        if (filter != null && "provideStyle".equals(method.getName())) {
+            Object properties = arguments == null || arguments.length == 0 ? null : arguments[0];
+            if (properties == null) return false;
+            try {
+                Object tags = invoke(properties, "getTags", new Class<?>[0]);
+                boolean onRoute = false;
+                try {
+                    onRoute = Boolean.TRUE.equals(invoke(properties, "isOnRoute", new Class<?>[0]));
+                } catch (Exception unavailableMembership) {
+                    // ALWAYS remains valid; ROUTE_ONLY requires positive native evidence.
+                }
+                if (!(tags instanceof Iterable) || !filter.allows((Iterable<?>) tags, onRoute)) {
+                    return false;
+                }
+            } catch (Exception unavailable) {
+                // An unavailable event has no verified membership. Never substitute routeActive.
+                return false;
+            }
+        }
         final Object result;
         try {
             result = method.invoke(delegate, arguments);

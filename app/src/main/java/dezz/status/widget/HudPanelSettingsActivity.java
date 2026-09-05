@@ -271,7 +271,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
     private void addElement() {
         ArrayList<HudElementType> types = new ArrayList<>();
         for (HudElementType type : HudElementType.values()) {
-            if (type != HudElementType.BACKDROP) types.add(type);
+            if (type != HudElementType.BACKDROP
+                    && type != HudElementType.TURN_SIGNAL_LEFT
+                    && type != HudElementType.TURN_SIGNAL_RIGHT) types.add(type);
         }
         String[] labels = new String[types.size()];
         for (int index = 0; index < types.size(); index++) {
@@ -882,12 +884,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         LinearLayout form = column();
         form.setPadding(dp(18), dp(8), dp(18), dp(24));
         scroll.addView(form);
-        form.addView(text("Режим «Только с маршрутом» проверяет штатный признак MapKit "
+        form.addView(text("Режим «Только на маршруте» проверяет штатный признак MapKit "
                 + "«на маршруте» для каждого события. Направление камеры отображается, "
                 + "когда оно есть в данных события.",
                 12, 0xFFB8C0CC));
 
-        final String[] modes = {"Не показывать", "Всегда", "Только с маршрутом"};
+        final String[] modes = {"Не показывать", "Всегда", "Только на маршруте"};
         ArrayList<RoadEventModeControl> controls = new ArrayList<>();
         String lastGroup = "";
         for (NavigationIntegrationConfig.RoadEventSpec spec
@@ -1140,6 +1142,14 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             }
         }
         switch (item.type) {
+            case TURN_SIGNALS:
+                visualSwitch(form, controls, "bool:animated", "Мигание",
+                        item.options.optBoolean("animated", true));
+                controls.put("int:blinkFrequencyMs", slider(form,
+                        "Длительность фазы мигания",
+                        item.options.optInt("blinkFrequencyMs", 500),
+                        150, 1000, 10, " мс"));
+                break;
             case CLOCK:
                 visualSpinner(form, controls, "string:clockMode", "Формат часов",
                         new String[]{"SYSTEM", "24H", "12H"},

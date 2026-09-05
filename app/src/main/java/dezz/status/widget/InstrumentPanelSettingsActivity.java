@@ -961,7 +961,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 + "когда MapKit пометил его как находящееся на активном маршруте. Направление "
                 + "камер берётся из штатных данных Яндекса.",
                 12, 0xFFB8C0CC));
-        String[] modes = {"Не показывать", "Всегда", "Только с маршрутом"};
+        String[] modes = {"Не показывать", "Всегда", "Только на маршруте"};
         List<RoadEventControl> controls = new ArrayList<>();
         String lastGroup = "";
         for (NavigationIntegrationConfig.RoadEventSpec spec

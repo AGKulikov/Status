@@ -491,8 +491,16 @@ public final class HudRuntimeData {
         return gear != null && Math.round(gear.value) == 2_097_712L;
     }
 
+    public boolean turnSignalActive(boolean left) {
+        CarIntegration.TelemetryValue sample = telemetry.get(left
+                ? "IBcm.turn_signal_left" : "IBcm.turn_signal_right");
+        return sample != null && Double.isFinite(sample.value) && sample.value >= .5d;
+    }
+
     public boolean active(@NonNull HudElementConfig item) {
         switch (item.type) {
+            case TURN_SIGNALS:
+                return turnSignalActive(true) || turnSignalActive(false);
             case HIGH_BEAM:
             case AUTO_HOLD:
             case TURN_SIGNAL_LEFT:
@@ -723,6 +731,10 @@ public final class HudRuntimeData {
             if (!item.enabled) continue;
             String id = metricId(item);
             if (!id.isEmpty()) ids.add(id);
+            if (item.type == HudElementType.TURN_SIGNALS) {
+                ids.add("IBcm.turn_signal_left");
+                ids.add("IBcm.turn_signal_right");
+            }
             if (item.type == HudElementType.FUEL_REFILL) {
                 ids.add("ISensor.fuel_level");
                 if (config.fuelSettingsFor(item).refillOnlyInPark) ids.add("ISensor.gear");

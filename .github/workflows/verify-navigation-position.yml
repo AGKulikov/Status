@@ -1,4 +1,4 @@
-name: Build Natro 2.7.9 off-route position and stock card and compatible Navigator candidate
+name: Build Natro 2.8.0 route event filter and paired turn signals and compatible Navigator candidate
 
 on:
   push:
@@ -20,8 +20,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '2.7.9'
-      VERSION_CODE: '208021312'
+      VERSION_NAME: '2.8.0'
+      VERSION_CODE: '208021313'
       ALLOW_UNSIGNED_RELEASE: 'true'
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -42,6 +42,8 @@ jobs:
           python3 tools/tests/test_navigation_mod_tools.py
           python3 tools/tests/test_navigation_position_policy.py
           python3 tools/tests/test_navigation_layer_order.py
+          python3 tools/tests/test_navigation_event_visibility.py
+          python3 tools/tests/test_stock_maneuver_artwork.py
       - name: Fetch pinned Apktool
         shell: bash
         run: |
@@ -55,16 +57,16 @@ jobs:
         run: |
           set -euo pipefail
           TOOLS="$ANDROID_HOME/build-tools/36.0.0"
-          OUT="$RUNNER_TEMP/natro-2.7.9-candidate"
+          OUT="$RUNNER_TEMP/natro-2.8.0-candidate"
           mkdir -p "$OUT/tools/lib"
           mapfile -t APK_FILES < <(find app/build/outputs/apk/geely/release -name '*.apk')
           test "${#APK_FILES[@]}" = 1
-          cp "${APK_FILES[0]}" "$OUT/Natro-2.7.9-unsigned.apk"
-          "$TOOLS/aapt" dump badging "$OUT/Natro-2.7.9-unsigned.apk" \
+          cp "${APK_FILES[0]}" "$OUT/Natro-2.8.0-unsigned.apk"
+          "$TOOLS/aapt" dump badging "$OUT/Natro-2.8.0-unsigned.apk" \
             > "$OUT/badging.txt"
-          grep -F "package: name='ru.natro.statuswidget' versionCode='208021312' versionName='2.7.9'" \
+          grep -F "package: name='ru.natro.statuswidget' versionCode='208021313' versionName='2.8.0'" \
             "$OUT/badging.txt"
-          if "$TOOLS/apksigner" verify "$OUT/Natro-2.7.9-unsigned.apk" >/dev/null 2>&1; then
+          if "$TOOLS/apksigner" verify "$OUT/Natro-2.8.0-unsigned.apk" >/dev/null 2>&1; then
             echo 'Candidate unexpectedly signed' >&2
             exit 1
           fi
@@ -78,8 +80,8 @@ jobs:
           jq -n --arg commit "$GITHUB_SHA" --arg tree "$(git rev-parse HEAD^{tree})" \
             --arg run "$GITHUB_RUN_ID" \
             --arg dex "$(sha256sum "$OUT/classes19.dex" | cut -d ' ' -f 1)" \
-            --arg sha "$(sha256sum "$OUT/Natro-2.7.9-unsigned.apk" | cut -d ' ' -f 1)" \
-            '{versionName:"2.7.9", versionCode:208021312, package:"ru.natro.statuswidget",
+            --arg sha "$(sha256sum "$OUT/Natro-2.8.0-unsigned.apk" | cut -d ' ' -f 1)" \
+            '{versionName:"2.8.0", versionCode:208021313, package:"ru.natro.statuswidget",
               sourceCommit:$commit, sourceTree:$tree, ciRunId:$run, unsignedSha256:$sha,
               navigator:{pairRequired:true, patchDexSha256:$dex, requiredCapability:"0x4000",
               baselineSha256:"663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f"}}' \
@@ -89,7 +91,7 @@ jobs:
       - name: Upload candidate and exact signing tools
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-2.7.9-candidate-${{ github.run_number }}
+          name: Natro-2.8.0-candidate-${{ github.run_number }}
           path: ${{ steps.candidate.outputs.path }}/*
           if-no-files-found: error
           retention-days: 7

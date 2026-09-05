@@ -8,6 +8,26 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public final class HudPanelConfigTest {
+    @Test public void pairedTurnSignalsAndLegacyElementsSurviveRoundTrip() throws Exception {
+        HudPanelConfig config = HudPanelConfig.defaults();
+        config.elements.clear();
+        HudElementConfig pair = HudElementConfig.create(HudElementType.TURN_SIGNALS,
+                1, config.gridColumns, config.gridRows);
+        pair.textColor = "#FF12AB34";
+        config.elements.add(pair);
+        config.elements.add(HudElementConfig.create(HudElementType.TURN_SIGNAL_LEFT,
+                1, config.gridColumns, config.gridRows));
+        config.elements.add(HudElementConfig.create(HudElementType.TURN_SIGNAL_RIGHT,
+                1, config.gridColumns, config.gridRows));
+        HudPanelConfig restored = HudPanelConfig.fromJson(config.toJson().toString());
+        assertEquals(3, restored.elements.size());
+        assertEquals(HudElementType.TURN_SIGNALS, restored.elements.get(0).type);
+        assertEquals("#FF12AB34", restored.elements.get(0).textColor);
+        assertEquals(pair.width, restored.elements.get(0).width);
+        assertEquals(HudElementType.TURN_SIGNAL_LEFT, restored.elements.get(1).type);
+        assertEquals(HudElementType.TURN_SIGNAL_RIGHT, restored.elements.get(2).type);
+    }
+
     @Test public void importedGeometryCannotOverrideHardwareSafetyBoundary() {
         HudPanelConfig value = HudPanelConfig.fromJson("{"
                 + "\"schema\":1,"

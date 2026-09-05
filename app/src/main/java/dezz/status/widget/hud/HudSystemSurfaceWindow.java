@@ -403,7 +403,8 @@ final class HudSystemSurfaceWindow {
             if (!item.enabled) continue;
             AutomationState automation = data.automation(item);
             if (automation.present && !automation.visible) continue;
-            if ((item.type == HudElementType.TURN_SIGNAL_LEFT
+            if ((item.type == HudElementType.TURN_SIGNALS
+                    || item.type == HudElementType.TURN_SIGNAL_LEFT
                     || item.type == HudElementType.TURN_SIGNAL_RIGHT)
                     && item.options.optBoolean("animated", true) && data.active(item)) {
                 long frequency = Math.max(150L,

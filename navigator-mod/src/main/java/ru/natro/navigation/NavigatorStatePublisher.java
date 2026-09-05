@@ -4,7 +4,6 @@ package ru.natro.navigation;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -439,10 +438,7 @@ final class NavigatorStatePublisher {
     private int builtManeuverArtworkSignature;
     private String lastSentManeuverArtworkIdentity = "";
     private int lastSentManeuverArtworkSignature;
-    private String cachedManeuverArtworkIdentity = "";
-    private String cachedManeuverArtworkDistance = "";
-    private int cachedManeuverArtworkSignature;
-    private Bitmap cachedManeuverArtwork;
+    private final StockManeuverArtwork maneuverArtwork = new StockManeuverArtwork();
 
     NavigatorStatePublisher(Sink sink) {
         this.sink = sink;
@@ -1265,23 +1261,8 @@ final class NavigatorStatePublisher {
             View image = viewByName(card, activity, "image_maneuverballoon_maneuver");
             if (image instanceof ImageView && visibleThroughParents(image)
                     && distanceMatches(displayDistance, expectedDistanceMeters)) {
-                ImageView imageView = (ImageView) image;
-                artworkSignature = artworkSignature(imageView);
-                if (maneuverIdentity.equals(cachedManeuverArtworkIdentity)
-                        && displayDistance.equals(cachedManeuverArtworkDistance)
-                        && artworkSignature == cachedManeuverArtworkSignature
-                        && cachedManeuverArtwork != null
-                        && !cachedManeuverArtwork.isRecycled()) {
-                    artwork = cachedManeuverArtwork;
-                } else {
-                    artwork = captureStockManeuverArtwork(imageView);
-                    if (artwork != null) {
-                        cachedManeuverArtworkIdentity = maneuverIdentity;
-                        cachedManeuverArtworkDistance = displayDistance;
-                        cachedManeuverArtworkSignature = artworkSignature;
-                        cachedManeuverArtwork = artwork;
-                    }
-                }
+                artwork = maneuverArtwork.capture((ImageView) image);
+                artworkSignature = maneuverArtwork.revision();
             }
             if (nextRoad.isEmpty() && signs.length() == 0
                     && auxiliary == ManeuverAuxiliary.EMPTY && artwork == null) {
@@ -1319,33 +1300,6 @@ final class NavigatorStatePublisher {
             return Math.abs(displayed - expectedMeters) <= tolerance;
         } catch (NumberFormatException invalid) {
             return false;
-        }
-    }
-
-    private static int artworkSignature(ImageView image) {
-        Drawable drawable = image.getDrawable();
-        Object stable = drawable == null ? null : drawable.getConstantState();
-        int result = 17;
-        result = 31 * result + System.identityHashCode(stable == null ? drawable : stable);
-        result = 31 * result + (drawable == null ? 0 : drawable.getLevel());
-        result = 31 * result + image.getWidth();
-        result = 31 * result + image.getHeight();
-        int[] state = image.getDrawableState();
-        if (state != null) for (int value : state) result = 31 * result + value;
-        return result;
-    }
-
-    private static Bitmap captureStockManeuverArtwork(ImageView image) {
-        int width = image.getWidth();
-        int height = image.getHeight();
-        if (width <= 0 || height <= 0 || width > 256 || height > 256
-                || (long) width * height > 65_536L) return null;
-        try {
-            Bitmap result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            image.draw(new Canvas(result));
-            return result;
-        } catch (RuntimeException unavailable) {
-            return null;
         }
     }
 

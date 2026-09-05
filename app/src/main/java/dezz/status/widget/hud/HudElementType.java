@@ -79,6 +79,7 @@ public enum HudElementType {
             "ISensor.ev_battery_level", 8, 3),
     HIGH_BEAM("Дальний свет", "Автомобиль", "IBcm.high_beam", 5, 4),
     AUTO_HOLD("Auto Hold", "Автомобиль", "External.auto_hold", 6, 3),
+    TURN_SIGNALS("Поворотники", "Автомобиль", "", 12, 4),
     TURN_SIGNAL_LEFT("Левый поворотник", "Автомобиль",
             "IBcm.turn_signal_left", 5, 4),
     TURN_SIGNAL_RIGHT("Правый поворотник", "Автомобиль",

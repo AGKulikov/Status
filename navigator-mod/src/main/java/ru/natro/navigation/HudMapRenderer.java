@@ -612,6 +612,11 @@ final class HudMapRenderer {
     private void applyRoadEventVisibility() {
         Object everywhere = roadEventsLayer;
         if (everywhere == null) return;
+        if (scaledRoadEventStyleProvider != null && scaledRoadEventStyleProvider.setVisibility(
+                profile.roadEventModes, routeGuidanceActive)) {
+            // MapKit caches accepted styles. Changing a mode must also re-evaluate existing pins.
+            resetRoadEventVisibilityForStyleRefresh();
+        }
         try {
             Class<?> eventTagClass = Class.forName("com.yandex.mapkit.road_events.EventTag");
             boolean unifiedCameraLayer = routeGuidanceActive
@@ -625,7 +630,8 @@ final class HudMapRenderer {
                 // Automotive NavigationLayer is deliberately forbidden on an independent
                 // OffscreenMapWindow: MapKit 30.3.0 terminates the process asynchronously with
                 // either camera configuration. The stable RoadEventsLayer remains source-native.
-                // ROUTE_ONLY is gated by fresh route state; MapKit may include a nearby event.
+                // This is only a coarse tag gate. ScaledRoadEventStyleProvider also checks the
+                // event's native on-route flag, so a nearby road is not accepted by routeActive.
                 boolean visible = !mergedCameraTag && ("ALWAYS".equals(mode)
                         || (routeGuidanceActive && "ROUTE_ONLY".equals(mode)));
                 invoke(everywhere, "setRoadEventVisible",
