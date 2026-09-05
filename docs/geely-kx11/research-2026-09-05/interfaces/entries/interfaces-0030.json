@@ -1,0 +1,876 @@
+{
+  "schema": "geely-interface-entry-page-v1",
+  "page_number": 30,
+  "entries": [
+    {
+      "entry_key": "adaptapi:885",
+      "namespace": "adaptapi",
+      "name": "SETTING_FUNC_WINDSCREEN_SERVICE_POSITION",
+      "id": 537657600,
+      "id_hex": "0x200C0100",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "declaration_name": "SETTING_FUNC_WINDSCREEN_SERVICE_POSITION",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/885"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "function_id_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": {
+        "source": {
+          "file": "firmware/mapping/function_routes.json",
+          "json_pointer": "/functions/88"
+        },
+        "join": "exact Adapt integer ID; declarative aliases retained",
+        "route_module": "Vehicle",
+        "has_setter_flag_in_prior_extraction": true,
+        "has_explicit_callback_route": true,
+        "read_signal_ids": [],
+        "read_pa_ids": [
+          33346,
+          33347
+        ],
+        "status_pa_ids": [
+          33346,
+          33347
+        ],
+        "not_a_zone_complete_route": true,
+        "lower_layer_entry_keys": {
+          "read_signal_ids": [],
+          "read_pa_ids": [
+            "manager_ids:289",
+            "manager_ids:291"
+          ],
+          "status_pa_ids": [
+            "manager_ids:289",
+            "manager_ids:291"
+          ]
+        }
+      }
+    },
+    {
+      "entry_key": "adaptapi:886",
+      "namespace": "adaptapi",
+      "name": "SETTING_FUNC_XCALL_KEY_LOCK",
+      "id": 538313216,
+      "id_hex": "0x20160200",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IVehicle;",
+      "declaration_name": "SETTING_FUNC_XCALL_KEY_LOCK",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/886"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "function_id_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:887",
+      "namespace": "adaptapi",
+      "name": "WPC_FUNC_CHARGE_STATES",
+      "id": 637665536,
+      "id_hex": "0x26020100",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IWpc;",
+      "declaration_name": "WPC_FUNC_CHARGE_STATES",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/887"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "function_id_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:888",
+      "namespace": "adaptapi",
+      "name": "WPC_FUNC_WORK_MODE",
+      "id": 637600000,
+      "id_hex": "0x26010100",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vehicle/IWpc;",
+      "declaration_name": "WPC_FUNC_WORK_MODE",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/888"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "function_id_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:889",
+      "namespace": "adaptapi",
+      "name": "VENDOR_FUNC_CUSTOM_KEY",
+      "id": 2147549440,
+      "id_hex": "0x80010100",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/vendor/IVendorFuncs;",
+      "declaration_name": "VENDOR_FUNC_CUSTOM_KEY",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/889"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "function_id_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:890",
+      "namespace": "adaptapi",
+      "name": "SENSOR_TYPE_CONTINUOUS",
+      "id": 1,
+      "id_hex": "0x00000001",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+      "declaration_name": "SENSOR_TYPE_CONTINUOUS",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/890"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "sensor_type_metadata",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:891",
+      "namespace": "adaptapi",
+      "name": "SENSOR_TYPE_EVENT",
+      "id": 2,
+      "id_hex": "0x00000002",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+      "declaration_name": "SENSOR_TYPE_EVENT",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/891"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "sensor_type_metadata",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:892",
+      "namespace": "adaptapi",
+      "name": "SENSOR_TYPE_GROUP",
+      "id": 3,
+      "id_hex": "0x00000003",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+      "declaration_name": "SENSOR_TYPE_GROUP",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/892"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "sensor_type_metadata",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:893",
+      "namespace": "adaptapi",
+      "name": "SENSOR_TYPE_NOT_SUPPORT",
+      "id": 0,
+      "id_hex": "0x00000000",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+      "declaration_name": "SENSOR_TYPE_NOT_SUPPORT",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/893"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "sensor_type_metadata",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:894",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_AMBIENCE_LIGHT_DRIVE_MODE",
+      "id": 251658752,
+      "id_hex": "0x0F000200",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_AMBIENCE_LIGHT_DRIVE_MODE",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/894"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:895",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_AMBIENCE_LIGHT_MOOD_LIGHT_COLOR",
+      "id": 251662080,
+      "id_hex": "0x0F000F00",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_AMBIENCE_LIGHT_MOOD_LIGHT_COLOR",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/895"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:896",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_AMBIENCE_LIGHT_MUSIC_MODE",
+      "id": 251659264,
+      "id_hex": "0x0F000400",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_AMBIENCE_LIGHT_MUSIC_MODE",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/896"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:897",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_AMBIENCE_LIGHT_WEATHER_MODE",
+      "id": 251659008,
+      "id_hex": "0x0F000300",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_AMBIENCE_LIGHT_WEATHER_MODE",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/897"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:898",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_AUTO_REAR_WIPER",
+      "id": 251658496,
+      "id_hex": "0x0F000100",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_AUTO_REAR_WIPER",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/898"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:899",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_FACE_ID_BIND",
+      "id": 251660032,
+      "id_hex": "0x0F000700",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_FACE_ID_BIND",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/899"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:900",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_FACE_ID_UNBIND",
+      "id": 251659776,
+      "id_hex": "0x0F000600",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_FACE_ID_UNBIND",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/900"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:901",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_HUD_MODE",
+      "id": 251660288,
+      "id_hex": "0x0F000800",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_HUD_MODE",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/901"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:902",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_PAS_3D_SURROUND",
+      "id": 251661056,
+      "id_hex": "0x0F000B00",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_PAS_3D_SURROUND",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/902"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:903",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_PAS_GUIDE",
+      "id": 251660544,
+      "id_hex": "0x0F000900",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_PAS_GUIDE",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/903"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:904",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_PAS_LOOKING_DOWN",
+      "id": 251661312,
+      "id_hex": "0x0F000C00",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_PAS_LOOKING_DOWN",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/904"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:905",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_PAS_OBSTACLE_DETECTION",
+      "id": 251660800,
+      "id_hex": "0x0F000A00",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_PAS_OBSTACLE_DETECTION",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/905"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:906",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_PAS_TRANSPARENT_MODEL",
+      "id": 251661824,
+      "id_hex": "0x0F000E00",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_PAS_TRANSPARENT_MODEL",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/906"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:907",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_PAS_TURN_ROUND",
+      "id": 251661568,
+      "id_hex": "0x0F000D00",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_PAS_TURN_ROUND",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/907"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    },
+    {
+      "entry_key": "adaptapi:908",
+      "namespace": "adaptapi",
+      "name": "CAR_FUNC_UNIT_VOLUME",
+      "id": 251659520,
+      "id_hex": "0x0F000500",
+      "declaring_class": "Lcom/ecarx/xui/adaptapi/car/userprofile/Profile;",
+      "declaration_name": "CAR_FUNC_UNIT_VOLUME",
+      "source_refs": [
+        0,
+        2,
+        5,
+        6
+      ],
+      "source": {
+        "file": "firmware/catalog.json",
+        "json_pointer": "/adaptapi/908"
+      },
+      "sdk_access": null,
+      "sdk_access_scope": "static property-method availability, not runtime authorization",
+      "methods": [],
+      "native_routes": [],
+      "runtime_support": null,
+      "physical_effect_confirmed": null,
+      "type_scope": "ID declaration is int; native payload type is in native_routes",
+      "observation": {
+        "recorded": null,
+        "reason": "not included in numeric CarSignal observation corpus"
+      },
+      "enum_schema_pointer": null,
+      "conflict_pointer": null,
+      "declaration_role": "profile_function_declaration",
+      "role_basis": "declaring class and literal declaration, not inferred physical hardware",
+      "adapt_route_summary": null
+    }
+  ]
+}

@@ -1,0 +1,871 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+package ru.natro.navigation;
+
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PointF;
+import android.graphics.RectF;
+import android.graphics.Typeface;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.util.Log;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/** Stock Yandex signal-and-seconds balloons anchored to upcoming route traffic lights. */
+final class TrafficLightMapLayer {
+    private static final String TAG = "NatroTrafficLights";
+    private static final long FRESH_MS = 3_000L;
+    /** Capacity only; the renderer never truncates an already published Windshield snapshot. */
+    private static final int EXPECTED_LIGHT_CAPACITY = 16;
+
+    private final Context context;
+    private final MapOverlayPlacementCoordinator placementCoordinator;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final ArrayList<Marker> markers = new ArrayList<>();
+    private final ArrayList<NavigatorStatePublisher.TrafficLightFrame> visibleScratch =
+            new ArrayList<>(EXPECTED_LIGHT_CAPACITY);
+    private Object map;
+    private Object collection;
+    private boolean enabled;
+    private boolean nightMode;
+    private int scalePercent = 100;
+    /** Empty preserves stock colours; configured ARGB recolours stock body/leg or the fallback. */
+    private String cardColor = "";
+    private float zIndex = NavigationMapProfile.layerZ(50);
+    private boolean latestRouteActive;
+    private List<NavigatorStatePublisher.TrafficLightFrame> latest =
+            Collections.emptyList();
+    private long latestSampleElapsedMs;
+    private long latestVisualFingerprint = Long.MIN_VALUE;
+    private long renderedStructureFingerprint = Long.MIN_VALUE;
+    private long renderedVisualFingerprint = Long.MIN_VALUE;
+    private boolean expiryPosted;
+
+    private final Runnable expire = new Runnable() {
+        @Override public void run() {
+            expiryPosted = false;
+            if (latestSampleElapsedMs <= 0L) return;
+            long remaining = FRESH_MS
+                    - (SystemClock.elapsedRealtime() - latestSampleElapsedMs);
+            if (remaining > 0L) {
+                expiryPosted = main.postDelayed(this, remaining);
+                return;
+            }
+            latest = Collections.emptyList();
+            latestSampleElapsedMs = 0L;
+            latestVisualFingerprint = Long.MIN_VALUE;
+            render();
+        }
+    };
+
+    TrafficLightMapLayer(Context context) {
+        this(context, new MapOverlayPlacementCoordinator());
+    }
+
+    TrafficLightMapLayer(Context context,
+                         MapOverlayPlacementCoordinator placementCoordinator) {
+        Context app = context.getApplicationContext();
+        this.context = app == null ? context : app;
+        this.placementCoordinator = placementCoordinator;
+    }
+
+    void attach(Object nextMap) {
+        if (map == nextMap) return;
+        detachMap();
+        map = nextMap;
+        discardExpiredSource();
+        scheduleExpiryIfNeeded();
+        render();
+    }
+
+    void detachMap() {
+        main.removeCallbacks(expire);
+        expiryPosted = false;
+        clearVisual();
+        collection = null;
+        map = null;
+    }
+
+    void apply(boolean nextEnabled, boolean nextNightMode, int nextScalePercent,
+               String nextCardColor, int layerPriority) {
+        int nextScale = Math.max(50, Math.min(250, nextScalePercent));
+        String normalizedCardColor = normalizedCardColor(nextCardColor);
+        float nextZ = NavigationMapProfile.layerZ(layerPriority);
+        boolean presentationChanged = nightMode != nextNightMode || scalePercent != nextScale
+                || !cardColor.equals(normalizedCardColor) || zIndex != nextZ;
+        boolean enabledChanged = enabled != nextEnabled;
+        if (!presentationChanged && !enabledChanged) return;
+        enabled = nextEnabled;
+        nightMode = nextNightMode;
+        scalePercent = nextScale;
+        cardColor = normalizedCardColor;
+        zIndex = nextZ;
+        MapObjectLayerFactory.setZIndex(collection, nextZ);
+        if (presentationChanged) renderedVisualFingerprint = Long.MIN_VALUE;
+        if (!enabled) {
+            main.removeCallbacks(expire);
+            expiryPosted = false;
+        } else {
+            discardExpiredSource();
+            scheduleExpiryIfNeeded();
+        }
+        render();
+    }
+
+    void update(boolean routeActive, long sampleElapsedMs,
+                List<NavigatorStatePublisher.TrafficLightFrame> values) {
+        if (routeActive == latestRouteActive
+                && sampleElapsedMs == latestSampleElapsedMs && values == latest) return;
+        latestRouteActive = routeActive;
+        long now = SystemClock.elapsedRealtime();
+        boolean fresh = routeActive && sampleElapsedMs > 0L
+                && now >= sampleElapsedMs && now - sampleElapsedMs <= FRESH_MS;
+        latest = fresh && values != null ? values : Collections.emptyList();
+        if (fresh) {
+            latestSampleElapsedMs = sampleElapsedMs;
+            scheduleExpiryIfNeeded();
+        } else {
+            latestSampleElapsedMs = 0L;
+            main.removeCallbacks(expire);
+            expiryPosted = false;
+        }
+        long fingerprint = visualFingerprint(latest);
+        if (fingerprint == latestVisualFingerprint) return;
+        latestVisualFingerprint = fingerprint;
+        if (enabled && map != null) render();
+    }
+
+    void clearData() {
+        main.removeCallbacks(expire);
+        expiryPosted = false;
+        latest = Collections.emptyList();
+        latestRouteActive = false;
+        latestSampleElapsedMs = 0L;
+        latestVisualFingerprint = Long.MIN_VALUE;
+        render();
+    }
+
+    /** Repositions only when another side becomes materially better after a camera move. */
+    void relayout() {
+        placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS);
+        if (!enabled || !latestRouteActive || visibleScratch.isEmpty()
+                || markers.size() != visibleScratch.size()) return;
+        boolean changed = false;
+        for (int index = 0; index < visibleScratch.size(); index++) {
+            NavigatorStatePublisher.TrafficLightFrame light = visibleScratch.get(index);
+            Marker marker = markers.get(index);
+            MapOverlayPlacementCoordinator.Placement next = reservePlacement(
+                    light, marker.placement, marker.footprints);
+            if (!next.sameSlot(marker.placement)) changed = true;
+        }
+        if (!changed) return;
+        try {
+            applyOriginalYandexViews(visibleScratch);
+        } catch (Throwable failure) {
+            Log.w(TAG, "Traffic-light balloons could not be repositioned", failure);
+        }
+    }
+
+    private void scheduleExpiryIfNeeded() {
+        if (!enabled || map == null || latestSampleElapsedMs <= 0L || expiryPosted) return;
+        long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
+        if (age < 0L || age > FRESH_MS) return;
+        expiryPosted = main.postDelayed(expire, Math.max(1L, FRESH_MS - age));
+    }
+
+    private void discardExpiredSource() {
+        if (latestSampleElapsedMs <= 0L) return;
+        long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
+        if (age >= 0L && age <= FRESH_MS) return;
+        latest = Collections.emptyList();
+        latestSampleElapsedMs = 0L;
+        latestVisualFingerprint = Long.MIN_VALUE;
+    }
+
+    private void render() {
+        if (map == null) return;
+        if (!enabled || !latestRouteActive || latest.isEmpty()) {
+            clearVisual();
+            return;
+        }
+        copyRenderableLights(latest, visibleScratch);
+        if (visibleScratch.isEmpty()) {
+            clearVisual();
+            return;
+        }
+        try {
+            long structure = structureFingerprint(visibleScratch);
+            long visual = visualFingerprint(visibleScratch);
+            if (structure != renderedStructureFingerprint
+                    || markers.size() != visibleScratch.size()) {
+                rebuild(visibleScratch, structure, visual);
+            } else if (visual != renderedVisualFingerprint) {
+                applyOriginalYandexViews(visibleScratch);
+                renderedVisualFingerprint = visual;
+            }
+        } catch (Throwable failure) {
+            // A guessed fallback could show a wrong phase to the driver. Hide instead.
+            Log.w(TAG, "Original Yandex traffic-light renderer failed", failure);
+            clearVisual();
+        }
+    }
+
+    private static void copyRenderableLights(
+            List<NavigatorStatePublisher.TrafficLightFrame> source,
+            ArrayList<NavigatorStatePublisher.TrafficLightFrame> target) {
+        target.clear();
+        for (NavigatorStatePublisher.TrafficLightFrame candidate : source) {
+            if (candidate == null || !candidate.hasMapPosition()) continue;
+            // Windshield identities describe separate valid route signals. Two neighbouring
+            // intersections, or MAIN/ADDITIONAL sections with close coordinates, must not be
+            // collapsed by an arbitrary metre radius. The screen-space coordinator gives every
+            // object its own reservation and may change only its leg, never list cardinality.
+            target.add(candidate);
+        }
+    }
+
+    private void rebuild(List<NavigatorStatePublisher.TrafficLightFrame> values,
+                         long structure, long visual) throws Exception {
+        Object currentCollection = collection;
+        if (currentCollection == null) {
+            currentCollection = MapObjectLayerFactory.create(map,
+                    MapSublayerOrder.TRAFFIC_LIGHTS,
+                    MapObjectLayerFactory.IGNORE, zIndex);
+            collection = currentCollection;
+        }
+        invoke(currentCollection, "clear", new Class<?>[0]);
+        markers.clear();
+        renderedStructureFingerprint = Long.MIN_VALUE;
+        renderedVisualFingerprint = Long.MIN_VALUE;
+        Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
+        for (NavigatorStatePublisher.TrafficLightFrame light : values) {
+            Object point = pointClass.getConstructor(double.class, double.class)
+                    .newInstance(light.latitude, light.longitude);
+            Object placemark = invoke(currentCollection, "addPlacemark",
+                    new Class<?>[]{pointClass}, point);
+            markers.add(new Marker(placemark));
+        }
+        applyOriginalYandexViews(values);
+        renderedStructureFingerprint = structure;
+        renderedVisualFingerprint = visual;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void applyOriginalYandexViews(
+            List<NavigatorStatePublisher.TrafficLightFrame> values) throws Exception {
+        try {
+            applyStockYandexViews(values);
+        } catch (Throwable unavailable) {
+            // Some 30.3.0 regional builds move the private Navigator view implementation while
+            // preserving the public Windshield payload. Keep the compact signal+seconds contract
+            // alive instead of deleting the complete traffic-light layer.
+            applyCompactFallbackViews(values);
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void applyStockYandexViews(
+            List<NavigatorStatePublisher.TrafficLightFrame> values) throws Exception {
+        placementCoordinator.clearOwner(
+                MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS);
+        Class<?> viewClass = Class.forName(
+                "ru.yandex.yandexnavi.ui.traffic.TrafficLightViewImpl");
+        Class<?> signalClass = Class.forName(
+                "com.yandex.mapkit.directions.traffic_lights.Signal");
+        Class<?> arrowClass = Class.forName(
+                "com.yandex.mapkit.directions.traffic_lights.RouteDirectionArrow");
+        Class<?> legClass = Class.forName("com.yandex.navikit.ui.balloons.LegPlacement");
+        Class<?> accentClass = Class.forName("com.yandex.navikit.ui.balloons.BalloonAccent");
+        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+        Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
+        Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass,
+                "NO_ROTATION");
+        Object primary = Enum.valueOf((Class<? extends Enum>) accentClass, "PRIMARY");
+
+        for (int index = 0; index < values.size(); index++) {
+            NavigatorStatePublisher.TrafficLightFrame light = values.get(index);
+            Marker marker = markers.get(index);
+            Object view = viewClass.getConstructor(Context.class, float.class)
+                    .newInstance(context, scalePercent / 100f);
+            Object signal = enumValue(signalClass, light.signal, "GREEN");
+            Object arrow = enumValue(arrowClass, light.arrow, "FORWARD");
+            viewClass.getMethod("setSignal", signalClass).invoke(view, signal);
+            viewClass.getMethod("setTime", Integer.class).invoke(view,
+                    light.secondsLeft < 0 ? null : Integer.valueOf(light.secondsLeft));
+            viewClass.getMethod("setArrowDirection", arrowClass).invoke(view, arrow);
+            viewClass.getMethod("setIsAdditional", boolean.class).invoke(view,
+                    "ADDITIONAL".equals(light.sectionType));
+            viewClass.getMethod("setAccent", accentClass).invoke(view, primary);
+            viewClass.getMethod("setIsNightMode", boolean.class).invoke(view, nightMode);
+            if (!cardColor.isEmpty()) {
+                // 30.3.0 exposes no public colour setter, but its exact reviewed implementation
+                // owns two fill Paints and BalloonTextureImpl's leg colour. Updating those keeps
+                // the stock signal gradients, direction arrow, countdown typography and shape.
+                applyConfiguredCardColor(view, viewClass, resolvedCardColor());
+            }
+            List<MapOverlayPlacementCoordinator.Footprint> footprints =
+                    measureStockFootprints(view, viewClass, legClass,
+                            scalePercent / 100f);
+            MapOverlayPlacementCoordinator.Placement placement =
+                    reservePlacement(light, marker.placement, footprints);
+            Object stockLeg = Enum.valueOf((Class<? extends Enum>) legClass,
+                    placement.legName);
+            viewClass.getMethod("setLegPlacement", legClass).invoke(view, stockLeg);
+            Object provider = viewClass.getMethod("createTexture").invoke(view);
+            Object anchor = viewClass.getMethod("getAnchor").invoke(view);
+            float anchorX = ((Number) invoke(anchor, "getX", new Class<?>[0])).floatValue();
+            float anchorY = ((Number) invoke(anchor, "getY", new Class<?>[0])).floatValue();
+
+            Object style = styleClass.getConstructor().newInstance();
+            invoke(style, "setAnchor", new Class<?>[]{PointF.class},
+                    new PointF(anchorX, anchorY));
+            invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
+            // TrafficLightViewImpl(Context, scale) already created the final physical texture.
+            invoke(style, "setScale", new Class<?>[]{Float.class}, Float.valueOf(1f));
+            invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
+            invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
+            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
+            applyCompositeIcon(marker, provider, style, placement.legName,
+                    cardColor.isEmpty() ? stockTrafficLightLegColor() : resolvedCardColor());
+            invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
+            marker.view = view;
+            marker.imageProvider = provider;
+            marker.iconStyle = style;
+            marker.placement = placement;
+            marker.footprints = footprints;
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void applyCompactFallbackViews(
+            List<NavigatorStatePublisher.TrafficLightFrame> values) throws Exception {
+        placementCoordinator.clearOwner(
+                MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS);
+        Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
+        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+        Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
+        Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass,
+                "NO_ROTATION");
+        List<MapOverlayPlacementCoordinator.Footprint> countdownFootprints =
+                compactTrafficLightFootprints(true);
+        List<MapOverlayPlacementCoordinator.Footprint> signalOnlyFootprints =
+                compactTrafficLightFootprints(false);
+        for (int index = 0; index < values.size(); index++) {
+            NavigatorStatePublisher.TrafficLightFrame light = values.get(index);
+            Marker marker = markers.get(index);
+            List<MapOverlayPlacementCoordinator.Footprint> footprints = light.secondsLeft >= 0
+                    ? countdownFootprints : signalOnlyFootprints;
+            MapOverlayPlacementCoordinator.Placement placement =
+                    reservePlacement(light, marker.placement, footprints);
+            FallbackTexture texture = compactTrafficLightBitmap(light, placement.legName);
+            Bitmap bitmap = texture.bitmap;
+            Object provider = providerClass.getMethod("fromBitmap", Bitmap.class)
+                    .invoke(null, bitmap);
+            Object style = styleClass.getConstructor().newInstance();
+            invoke(style, "setAnchor", new Class<?>[]{PointF.class},
+                    texture.anchor);
+            invoke(style, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
+            // The compact vector/text card is rasterised directly at the selected physical size.
+            invoke(style, "setScale", new Class<?>[]{Float.class}, Float.valueOf(1f));
+            invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
+            invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
+            invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
+            applyCompositeIcon(marker, provider, style, placement.legName,
+                    resolvedCardColor());
+            invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
+            marker.view = bitmap;
+            marker.imageProvider = provider;
+            marker.iconStyle = style;
+            marker.placement = placement;
+            marker.footprints = footprints;
+        }
+    }
+
+    /**
+     * One placemark owns both parts, so MapKit collision handling cannot hide the connector while
+     * leaving a detached countdown card. The connector's normalized anchor is its sharp tip and
+     * therefore remains exactly at the traffic-light geometry for every pan/zoom/tilt frame.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void applyCompositeIcon(Marker marker, Object bodyProvider, Object bodyStyle,
+                                    String legName, int connectorColor) throws Exception {
+        ConnectorTexture connector = trafficLightConnector(legName, connectorColor);
+        Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
+        Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
+        Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
+        Object connectorProvider = providerClass.getMethod("fromBitmap", Bitmap.class)
+                .invoke(null, connector.bitmap);
+        Object connectorStyle = styleClass.getConstructor().newInstance();
+        Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass,
+                "NO_ROTATION");
+        invoke(connectorStyle, "setAnchor", new Class<?>[]{PointF.class}, connector.anchor);
+        invoke(connectorStyle, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
+        // The vector connector is rasterised at its final physical size for this profile.
+        invoke(connectorStyle, "setScale", new Class<?>[]{Float.class}, Float.valueOf(1f));
+        invoke(connectorStyle, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
+        invoke(connectorStyle, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
+        invoke(connectorStyle, "setZIndex", new Class<?>[]{Float.class},
+                Float.valueOf(zIndex - .01f));
+
+        Object composite = invoke(marker.placemark, "useCompositeIcon", new Class<?>[0]);
+        // Replacing the two named parts avoids a blank frame on every countdown update.
+        invoke(composite, "setIcon",
+                new Class<?>[]{String.class, providerClass, styleClass},
+                "traffic-light-connector", connectorProvider, connectorStyle);
+        invoke(composite, "setIcon",
+                new Class<?>[]{String.class, providerClass, styleClass},
+                "traffic-light-body", bodyProvider, bodyStyle);
+        marker.connectorBitmap = connector.bitmap;
+        marker.connectorProvider = connectorProvider;
+        marker.connectorStyle = connectorStyle;
+    }
+
+    /** Re-rasterises simple vector geometry directly for the selected physical card size. */
+    private ConnectorTexture trafficLightConnector(String legName, int connectorColor) {
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        float scale = scalePercent / 100f;
+        // Navigator 30.3.0 uses traffic_light_leg_size=34dp for a corner leg. Match that
+        // reach so this guaranteed part covers the complete stock connector, not only its tip.
+        float stockLegLength = navigatorDimension(
+                "traffic_light_leg_size", 34f * density);
+        float length = Math.max(14f, stockLegLength * scale);
+        float halfWidth = Math.max(3f, 6f * density * scale);
+        float padding = Math.max(2f, density);
+        float[] direction = connectorDirection(legName);
+        float dx = direction[0];
+        float dy = direction[1];
+        float magnitude = (float) Math.hypot(dx, dy);
+        dx /= magnitude;
+        dy /= magnitude;
+        float endX = dx * length;
+        float endY = dy * length;
+        float normalX = -dy * halfWidth;
+        float normalY = dx * halfWidth;
+        float firstX = endX + normalX;
+        float firstY = endY + normalY;
+        float secondX = endX - normalX;
+        float secondY = endY - normalY;
+        float minX = Math.min(0f, Math.min(firstX, secondX));
+        float maxX = Math.max(0f, Math.max(firstX, secondX));
+        float minY = Math.min(0f, Math.min(firstY, secondY));
+        float maxY = Math.max(0f, Math.max(firstY, secondY));
+        int width = Math.max(1, (int) Math.ceil(maxX - minX + padding * 2f));
+        int height = Math.max(1, (int) Math.ceil(maxY - minY + padding * 2f));
+        float offsetX = padding - minX;
+        float offsetY = padding - minY;
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Path path = new Path();
+        path.moveTo(offsetX, offsetY);
+        path.lineTo(offsetX + firstX, offsetY + firstY);
+        path.lineTo(offsetX + secondX, offsetY + secondY);
+        path.close();
+        Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        fill.setStyle(Paint.Style.FILL);
+        fill.setColor(connectorColor);
+        canvas.drawPath(path, fill);
+        if (cardColor.isEmpty()) {
+            Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
+            outline.setStyle(Paint.Style.STROKE);
+            outline.setStrokeJoin(Paint.Join.ROUND);
+            outline.setStrokeWidth(Math.max(1f, density * .65f));
+            outline.setColor(nightMode ? 0x667D8490 : 0x55383C44);
+            canvas.drawPath(path, outline);
+        }
+        return new ConnectorTexture(bitmap,
+                new PointF(offsetX / width, offsetY / height));
+    }
+
+    /** Reads the same package resource used by TrafficLightViewImpl, with a reviewed fallback. */
+    private int stockTrafficLightLegColor() {
+        try {
+            int id = context.getResources().getIdentifier(
+                    "traffic_light_bg_primary", "color", context.getPackageName());
+            if (id != 0) return context.getColor(id);
+        } catch (Throwable ignored) {
+            // Exact 30.3.0 resource exists; regional fallback keeps rendering if it moves.
+        }
+        return nightMode ? 0xFF1A1A1A : 0xFF292C3D;
+    }
+
+    /** Exact 30.3.0 stock-view recolour; any regional drift falls back to our Canvas renderer. */
+    private static void applyConfiguredCardColor(
+            Object view, Class<?> viewClass, int color) throws Exception {
+        int changedPaints = 0;
+        Object active = privateField(view, viewClass, "backgroundPaint");
+        if (active instanceof Paint) {
+            ((Paint) active).setColor(color);
+            changedPaints++;
+        }
+        for (String name : new String[]{"backgroundPaintPrimary$delegate",
+                "backgroundPaintSecondary$delegate"}) {
+            Object lazyPaint = privateField(view, viewClass, name);
+            Object value = invoke(lazyPaint, "getValue", new Class<?>[0]);
+            if (value instanceof Paint) {
+                ((Paint) value).setColor(color);
+                changedPaints++;
+            }
+        }
+        if (changedPaints == 0) {
+            throw new IllegalStateException("No traffic-light background Paint");
+        }
+        Object texture = privateField(view, viewClass, "texture");
+        invoke(texture, "setLegColor", new Class<?>[]{int.class}, color);
+        Field dirty = viewClass.getDeclaredField("isDirty");
+        dirty.setAccessible(true);
+        dirty.setBoolean(view, true);
+    }
+
+    private static Object privateField(Object target, Class<?> owner, String name)
+            throws Exception {
+        Field field = owner.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
+    private int resolvedCardColor() {
+        if (!cardColor.isEmpty()) {
+            try {
+                return Color.parseColor(cardColor);
+            } catch (IllegalArgumentException ignored) {
+                // Configuration is validated twice, but fail back to the reviewed stock colour.
+            }
+        }
+        return nightMode ? 0xFF171A20 : 0xFF2B2E34;
+    }
+
+    private static String normalizedCardColor(String raw) {
+        String value = raw == null ? "" : raw.trim().toUpperCase(java.util.Locale.ROOT);
+        if (value.isEmpty()) return "";
+        if (value.matches("#[0-9A-F]{6}")) value = "#FF" + value.substring(1);
+        try {
+            Color.parseColor(value);
+            return value;
+        } catch (IllegalArgumentException invalid) {
+            return "";
+        }
+    }
+
+    private float navigatorDimension(String name, float fallback) {
+        try {
+            int id = context.getResources().getIdentifier(
+                    name, "dimen", context.getPackageName());
+            if (id != 0) return context.getResources().getDimension(id);
+        } catch (Throwable ignored) {
+            // Keep the reviewed physical fallback instead of dropping the complete layer.
+        }
+        return fallback;
+    }
+
+    /** Vector from exact source tip toward the body for every Yandex LegPlacement. */
+    private static float[] connectorDirection(String legName) {
+        if ("LEFT_CENTER".equals(legName)) return new float[]{1f, 0f};
+        if ("RIGHT_CENTER".equals(legName)) return new float[]{-1f, 0f};
+        if ("BOTTOM_LEFT".equals(legName)) return new float[]{1f, -1f};
+        if ("BOTTOM_RIGHT".equals(legName)) return new float[]{-1f, -1f};
+        if ("TOP_LEFT".equals(legName)) return new float[]{1f, 1f};
+        if ("TOP_RIGHT".equals(legName)) return new float[]{-1f, 1f};
+        if ("BOTTOM_CENTER".equals(legName)) return new float[]{0f, -1f};
+        if ("TOP_CENTER".equals(legName)) return new float[]{0f, 1f};
+        return new float[]{1f, 0f};
+    }
+
+    private MapOverlayPlacementCoordinator.Placement reservePlacement(
+            NavigatorStatePublisher.TrafficLightFrame light,
+            MapOverlayPlacementCoordinator.Placement previous,
+            List<MapOverlayPlacementCoordinator.Footprint> footprints) {
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        float scale = scalePercent / 100f;
+        int unit = Math.max(28, Math.min(180, Math.round(38f * density * scale)));
+        int estimatedWidth = light.secondsLeft >= 0 ? Math.round(unit * 2.18f) : unit;
+        int estimatedHeight = Math.round(unit * 1.24f);
+        if (footprints != null) {
+            for (MapOverlayPlacementCoordinator.Footprint footprint : footprints) {
+                if (footprint == null) continue;
+                estimatedWidth = Math.max(estimatedWidth, footprint.width);
+                estimatedHeight = Math.max(estimatedHeight, footprint.height);
+            }
+        }
+        // Right is only a deterministic tie-breaker. Projected route/viewport/collisions decide.
+        boolean preferRight = true;
+        return placementCoordinator.reserve(
+                MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS, light.id,
+                light.latitude, light.longitude,
+                estimatedWidth, estimatedHeight, preferRight,
+                light.routeSegmentIndex, light.routeSegmentPosition, previous, footprints);
+    }
+
+    /** Uses the actual TrafficLightViewImpl bitmap and anchor for every stock leg. */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static List<MapOverlayPlacementCoordinator.Footprint> measureStockFootprints(
+            Object view, Class<?> viewClass, Class<?> legClass,
+            float textureScale) throws Exception {
+        ArrayList<MapOverlayPlacementCoordinator.Footprint> result = new ArrayList<>(8);
+        Method setLeg = viewClass.getMethod("setLegPlacement", legClass);
+        Method getSize = viewClass.getMethod("getSize", legClass);
+        Method getAnchor = viewClass.getMethod("getAnchor");
+        float safeScale = Math.max(.01f, textureScale);
+        for (String legName : MapOverlayPlacementCoordinator.placementLegNames()) {
+            Object leg = Enum.valueOf((Class<? extends Enum>) legClass, legName);
+            Object size = getSize.invoke(view, leg);
+            setLeg.invoke(view, leg);
+            Object anchor = getAnchor.invoke(view);
+            int width = Math.max(1, Math.round(((Number) invoke(
+                    size, "getX", new Class<?>[0])).floatValue() * safeScale));
+            int height = Math.max(1, Math.round(((Number) invoke(
+                    size, "getY", new Class<?>[0])).floatValue() * safeScale));
+            float anchorX = ((Number) invoke(
+                    anchor, "getX", new Class<?>[0])).floatValue();
+            float anchorY = ((Number) invoke(
+                    anchor, "getY", new Class<?>[0])).floatValue();
+            result.add(new MapOverlayPlacementCoordinator.Footprint(
+                    legName, width, height, anchorX, anchorY));
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    /** Exact fallback bounds use the same vector layout rasterised after side selection. */
+    private List<MapOverlayPlacementCoordinator.Footprint> compactTrafficLightFootprints(
+            boolean countdown) {
+        ArrayList<MapOverlayPlacementCoordinator.Footprint> result = new ArrayList<>(8);
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        float scale = scalePercent / 100f;
+        int unit = Math.max(28, Math.min(180, Math.round(38f * density * scale)));
+        int cardWidth = countdown ? Math.round(unit * 1.95f) : unit;
+        int cardHeight = unit;
+        int tail = Math.max(5, Math.round(unit * .22f));
+        for (String legName : MapOverlayPlacementCoordinator.placementLegNames()) {
+            boolean horizontalTail = "LEFT_CENTER".equals(legName)
+                    || "RIGHT_CENTER".equals(legName);
+            boolean topTail = legName.startsWith("TOP_");
+            boolean bottomTail = legName.startsWith("BOTTOM_");
+            int width = cardWidth + (horizontalTail ? tail : 0);
+            int height = cardHeight + (topTail || bottomTail ? tail : 0);
+            float anchorX;
+            float anchorY;
+            if ("LEFT_CENTER".equals(legName)) {
+                anchorX = 0f;
+                anchorY = .5f;
+            } else if ("RIGHT_CENTER".equals(legName)) {
+                anchorX = 1f;
+                anchorY = .5f;
+            } else {
+                boolean leftCorner = legName.endsWith("LEFT");
+                boolean rightCorner = legName.endsWith("RIGHT");
+                float tipX = leftCorner ? cardWidth * .22f
+                        : rightCorner ? cardWidth * .78f : cardWidth * .5f;
+                anchorX = tipX / width;
+                anchorY = topTail ? 0f : 1f;
+            }
+            result.add(new MapOverlayPlacementCoordinator.Footprint(
+                    legName, width, height, anchorX, anchorY));
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    /** Yandex-like compact circle/countdown with a locator leg in regional fallback builds. */
+    private FallbackTexture compactTrafficLightBitmap(
+            NavigatorStatePublisher.TrafficLightFrame light, String legName) {
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        float scale = scalePercent / 100f;
+        int unit = Math.max(28, Math.min(180, Math.round(38f * density * scale)));
+        boolean countdown = light.secondsLeft >= 0;
+        int cardWidth = countdown ? Math.round(unit * 1.95f) : unit;
+        int cardHeight = unit;
+        int tail = Math.max(5, Math.round(unit * .22f));
+        boolean horizontalTail = "LEFT_CENTER".equals(legName)
+                || "RIGHT_CENTER".equals(legName);
+        boolean topTail = legName.startsWith("TOP_");
+        boolean bottomTail = legName.startsWith("BOTTOM_");
+        boolean leftTail = "LEFT_CENTER".equals(legName);
+        boolean rightTail = "RIGHT_CENTER".equals(legName);
+        int width = cardWidth + (horizontalTail ? tail : 0);
+        int height = cardHeight + (topTail || bottomTail ? tail : 0);
+        float offsetX = leftTail ? tail : 0f;
+        float offsetY = topTail ? tail : 0f;
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(resolvedCardColor());
+        android.graphics.Path leg = new android.graphics.Path();
+        PointF anchor;
+        if (leftTail) {
+            leg.moveTo(0f, height * .5f);
+            leg.lineTo(tail, height * .5f - tail * .45f);
+            leg.lineTo(tail, height * .5f + tail * .45f);
+            anchor = new PointF(0f, .5f);
+        } else if (rightTail) {
+            leg.moveTo(width, height * .5f);
+            leg.lineTo(width - tail, height * .5f - tail * .45f);
+            leg.lineTo(width - tail, height * .5f + tail * .45f);
+            anchor = new PointF(1f, .5f);
+        } else {
+            boolean leftCorner = legName.endsWith("LEFT");
+            boolean rightCorner = legName.endsWith("RIGHT");
+            float tipX = leftCorner ? cardWidth * .22f
+                    : rightCorner ? cardWidth * .78f : cardWidth * .5f;
+            float baseY;
+            float tipY;
+            if (topTail) {
+                tipY = 0f;
+                baseY = tail;
+                anchor = new PointF(tipX / width, 0f);
+            } else {
+                tipY = height;
+                baseY = height - tail;
+                anchor = new PointF(tipX / width, 1f);
+            }
+            leg.moveTo(tipX, tipY);
+            leg.lineTo(tipX - tail * .45f, baseY);
+            leg.lineTo(tipX + tail * .45f, baseY);
+        }
+        leg.close();
+        canvas.drawPath(leg, paint);
+        canvas.save();
+        canvas.translate(offsetX, offsetY);
+        float radius = unit * .36f;
+        float centerX = unit * .50f;
+        float centerY = unit * .50f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(resolvedCardColor());
+        RectF pill = new RectF(unit * .06f, unit * .13f,
+                cardWidth - unit * .06f, unit * .87f);
+        canvas.drawRoundRect(pill, unit * .30f, unit * .30f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(signalColor(light.signal));
+        canvas.drawCircle(centerX, centerY, radius, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1.5f, unit * .045f));
+        paint.setColor(0xB8FFFFFF);
+        canvas.drawCircle(centerX, centerY, radius, paint);
+        if (countdown) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTypeface(Typeface.DEFAULT_BOLD);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(unit * .42f);
+            paint.setColor(Color.WHITE);
+            Paint.FontMetrics metrics = paint.getFontMetrics();
+            float baseline = centerY - (metrics.ascent + metrics.descent) * .5f;
+            canvas.drawText(Integer.toString(light.secondsLeft),
+                    unit * 1.34f, baseline, paint);
+        }
+        canvas.restore();
+        return new FallbackTexture(bitmap, anchor);
+    }
+
+    private static int signalColor(String signal) {
+        if ("RED".equals(signal) || "RED_AND_YELLOW".equals(signal)) return 0xFFFF3045;
+        if ("YELLOW".equals(signal)) return 0xFFFFC928;
+        return 0xFF35D46F;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static Object enumValue(Class<?> enumClass, String raw, String fallback) {
+        String name = raw == null || raw.isEmpty() ? fallback : raw;
+        try {
+            return Enum.valueOf((Class<? extends Enum>) enumClass, name);
+        } catch (IllegalArgumentException invalid) {
+            return Enum.valueOf((Class<? extends Enum>) enumClass, fallback);
+        }
+    }
+
+    private void clearVisual() {
+        placementCoordinator.clearOwner(
+                MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS);
+        if (collection != null) {
+            try { invoke(collection, "clear", new Class<?>[0]); }
+            catch (Throwable ignored) {}
+        }
+        markers.clear();
+        renderedStructureFingerprint = Long.MIN_VALUE;
+        renderedVisualFingerprint = Long.MIN_VALUE;
+    }
+
+    private static long structureFingerprint(
+            List<NavigatorStatePublisher.TrafficLightFrame> values) {
+        long result = 0xcbf29ce484222325L;
+        int count = 0;
+        for (NavigatorStatePublisher.TrafficLightFrame value : values) {
+            if (value == null || !value.hasMapPosition()) continue;
+            count++;
+            result = mix(result, value.id.hashCode());
+            result = mix(result, Math.round(value.latitude * 1_000_000d));
+            result = mix(result, Math.round(value.longitude * 1_000_000d));
+            result = mix(result, value.routeSegmentIndex);
+            result = mix(result, Double.doubleToLongBits(value.routeSegmentPosition));
+        }
+        return mix(result, count);
+    }
+
+    private static long visualFingerprint(
+            List<NavigatorStatePublisher.TrafficLightFrame> values) {
+        long result = structureFingerprint(values);
+        int count = 0;
+        for (NavigatorStatePublisher.TrafficLightFrame value : values) {
+            if (value == null || !value.hasMapPosition()) continue;
+            count++;
+            result = mix(result, value.secondsLeft);
+            result = mix(result, value.signal.hashCode());
+            result = mix(result, value.sectionType.hashCode());
+            result = mix(result, value.arrow.hashCode());
+        }
+        return mix(result, count);
+    }
+
+    private static long mix(long value, long part) {
+        return (value ^ part) * 0x100000001b3L;
+    }
+
+    private static Object invoke(Object target, String name, Class<?>[] parameterTypes,
+                                 Object... arguments) throws Exception {
+        Method method = ReflectMethods.publicMethod(target.getClass(), name, parameterTypes);
+        return method.invoke(target, arguments);
+    }
+
+    private static final class Marker {
+        final Object placemark;
+        Object view;
+        Object imageProvider;
+        Object iconStyle;
+        Bitmap connectorBitmap;
+        Object connectorProvider;
+        Object connectorStyle;
+        MapOverlayPlacementCoordinator.Placement placement;
+        List<MapOverlayPlacementCoordinator.Footprint> footprints = Collections.emptyList();
+
+        Marker(Object placemark) {
+            this.placemark = placemark;
+        }
+    }
+
+    private static final class FallbackTexture {
+        final Bitmap bitmap;
+        final PointF anchor;
+
+        FallbackTexture(Bitmap bitmap, PointF anchor) {
+            this.bitmap = bitmap;
+            this.anchor = anchor;
+        }
+    }
+
+    private static final class ConnectorTexture {
+        final Bitmap bitmap;
+        final PointF anchor;
+
+        ConnectorTexture(Bitmap bitmap, PointF anchor) {
+            this.bitmap = bitmap;
+            this.anchor = anchor;
+        }
+    }
+}

@@ -1,0 +1,9 @@
+{
+  "firmware/catalog.json": "07fdcc6c6476886443fba7edc0a11426e587a157e5b5db9ef2f277cfc9afa488",
+  "observations/observed_signals.json": "a2b1e2f571b61c7d8788e00f2da1562339a28b1d22807d35811110b2345f108c",
+  "firmware/method_evidence.json": "5eef40c8f6642ec688be5172ad8a2829e521aa5cab8110085367fea5866f13b9",
+  "firmware/constants.json": "8051e309864246b41226bbfb272b5c5e6fd401b706509a49bade9279a45e5a38",
+  "firmware/mapping/Vehicle.annotated.java.txt": "cada0c718afc4a35b03bb37f091f41e40ea9998bb6ba5eec215196ffbcbc36fe",
+  "firmware/mapping/DriveMode.annotated.java.txt": "6c8f28c15d9eb33476b1be8cbac53f8093cd65ecd07fc7f022de10790b0c6a50",
+  "firmware/schemas.json": "f889112bb0b03c03fa2ac3be8437bfcf369052cd56183e2f3a2918aee9f325ef"
+}

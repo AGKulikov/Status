@@ -21,8 +21,12 @@ android {
     namespace "dezz.status.widget"
 
     compileSdkVersion 36
+    buildToolsVersion "36.0.0"
 
     defaultConfig {
+        // Keep the historical HA fork package unchanged: together with the stable signing key
+        // this allows every build to install as an in-place update over HA1058 and newer builds.
+        applicationId "ru.natro.statuswidget"
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
@@ -30,7 +34,7 @@ android {
         versionName rootProject.ext.appVersionName
 
         // Set the output APK name
-        setProperty("archivesBaseName", "status-widget-${versionName}")
+        setProperty("archivesBaseName", "status-widget-ha-${versionName}")
     }
 
     // Car-specific builds: each flavor wires in one vendor SDK via <flavor>Implementation and
@@ -52,7 +56,7 @@ android {
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach {
             def flavorTag = variant.flavorName == "geely" ? "" : "-${variant.flavorName}"
-            outputFileName = "status-widget-${variant.versionName}${flavorTag}-${variant.buildType.name}.apk"
+            outputFileName = "status-widget-ha-${variant.versionName}${flavorTag}-${variant.buildType.name}.apk"
         }
     }
 
@@ -63,20 +67,38 @@ android {
 
     signingConfigs {
         release {
-            storeFile file('../keystore.jks')
+            // CI/recovery builds keep the stable update key outside the repository. Local builds
+            // may still use the gitignored root keystore.jks for backwards compatibility.
+            storeFile file(System.getenv("KEYSTORE_FILE") ?: '../keystore.jks')
             storePassword System.getenv("KEY_PASSWORD")
-            keyAlias "key0"
+            // The stable HA14+ update container uses this alias. Keep it overridable for
+            // downstream forks, but never silently fall back to Android's debug key in CI.
+            keyAlias System.getenv("KEY_ALIAS") ?: "status-widget-ha"
             keyPassword System.getenv("KEY_PASSWORD")
+            // Android 9 KX11 upgrades are verified against the installed v3-signed lineage.
+            // Keep v2 for broad verifier compatibility and require v3 for in-place updates.
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = false
         }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            // Release-candidate CI may build one explicitly unsigned APK and hand those exact
+            // bytes to the trusted offline signer. Never fall back to Android's debug key.
+            if (System.getenv("ALLOW_UNSIGNED_RELEASE") != "true") {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             debuggable true
+            // CI (and an authorised local build) supplies the stable update key. Without it,
+            // retain Android's normal debug signing so contributors can still compile forks.
+            if (file('../keystore.jks').exists() && System.getenv("KEY_PASSWORD")) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
@@ -91,11 +113,21 @@ dependencies {
     implementation libs.appcompat
     implementation libs.core
     implementation libs.constraintlayout
+    // Required at runtime by androidx.profileinstaller.ProfileVerifier on Android 9.
+    implementation 'androidx.concurrent:concurrent-futures:1.3.0'
     implementation libs.material
+    implementation libs.okhttp
+    // Sprut's current cloud login proves password knowledge with
+    // Argon2id -> HKDF-SHA256 -> Ed25519 instead of sending the password.
+    implementation libs.bouncycastle
     implementation libs.recyclerview
 
     // eCarX AdaptAPI (Geely flavor only) — class-jar converted from the vendor-distributed
     // dex jar; bundled into the APK the same way the infoDash fork ships it. Main source set
     // must not import com.ecarx.* — only app/src/geely may.
     geelyImplementation files('libs/geely/ecarx-adaptapi.jar')
+    testImplementation 'junit:junit:4.13.2'
+    // Android's local-unit-test stub throws from org.json methods. Protocol fixtures need the
+    // real implementation so auth/catalog/event compatibility is tested on every CI build.
+    testImplementation 'org.json:json:20240303'
 }

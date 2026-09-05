@@ -1,0 +1,566 @@
+name: Build Natro 2.7.6 and Navigator HUD v2 candidate
+
+on:
+  push:
+    branches:
+      - 'feature/navigation-hud-v2'
+      - 'release/natro-2.7.6*'
+      - 'release/natro-2.7.5*'
+      - 'release/natro-2.7.4*'
+      - 'release/natro-2.7.3*'
+      - 'release/natro-2.7.2*'
+      - 'release/natro-2.7.1*'
+      - 'release/natro-2.7.0*'
+      - 'release/natro-2.6.9*'
+      - 'release/natro-2.6.8*'
+      - 'release/natro-2.6.7*'
+      - 'release/natro-2.6.6*'
+      - 'release/natro-2.6.5*'
+      - 'release/natro-2.6.4*'
+      - 'release/natro-2.6.2*'
+      - 'release/natro-2.5.9*'
+      - 'release/natro-2.5.8*'
+      - 'release/natro-2.5.7*'
+      - 'release/natro-2.5.6*'
+      - 'release/natro-2.5.5*'
+      - 'release/natro-2.5.4*'
+      - 'release/natro-2.5.3*'
+      - 'release/natro-2.4.6-signing-handoff'
+  pull_request:
+    branches: ['main']
+  workflow_dispatch:
+    inputs:
+      sign_pair:
+        description: 'Sign the verified Natro and Navigator pair'
+        required: true
+        default: false
+        type: boolean
+      baseline_url:
+        description: 'Short-lived private URL for the exact reviewed Navigator baseline'
+        required: false
+        type: string
+      hud_speed_baseline_url:
+        description: 'Optional short-lived URL for reviewed HUD Speed 76.0-L13 baseline'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  android:
+    if: >-
+      github.ref != 'refs/heads/release/natro-2.4.6-signing-handoff' &&
+      !contains(github.event.head_commit.message, '[secure-sign-pair]') &&
+      (github.event_name != 'workflow_dispatch' || !inputs.sign_pair)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: '2.7.6'
+      VERSION_CODE: '208021309'
+      ALLOW_UNSIGNED_RELEASE: 'true'
+      BUILD_TOOLS_VERSION: '36.0.0'
+      APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install exact Android build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" 'platforms;android-36' "build-tools;${BUILD_TOOLS_VERSION}"
+      - name: Unit tests and unsigned Natro release APK
+        run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+      - name: Verify Helper 70 active-data-SIM and release contract
+        run: sh ios/KX11-iPhone-ANCS-Helper-v70-personal/verify-v70-personal-contract.sh
+      - name: Compile isolated Navigator classes19.dex
+        run: bash tools/build_navigation_patch_dex.sh build/navigation-mod-ci
+      - name: Compile isolated HUD Speed bridge classes3.dex
+        run: bash tools/build_hud_speed_bridge_dex.sh build/hud-speed-bridge-ci
+      - name: Navigation APK baseline verifier self-tests
+        run: |
+          python3 -m py_compile \
+            tools/verify_navigation_mod_baseline.py \
+            tools/patch_navigation_map_activity.py \
+            tools/patch_navigation_map_view.py \
+            tools/patch_navigation_manifest_theme.py \
+            tools/repack_apk_entries.py
+          python3 tools/tests/test_verify_navigation_mod_baseline.py
+          python3 tools/tests/test_navigation_mod_tools.py
+      - name: Fetch pinned Apktool used by the isolated DEX rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            --output "$RUNNER_TEMP/apktool_3.0.3.jar" \
+            https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar
+          test "$(sha256sum "$RUNNER_TEMP/apktool_3.0.3.jar" | awk '{print $1}')" \
+            = "$APKTOOL_SHA256"
+      - name: Package unsigned pair and reproducible local toolchain
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/navigation-hud-v2-pair"
+          mkdir -p "$OUT"
+          NATRO=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
+          test -s "$NATRO"
+          cp "$NATRO" "$OUT/Natro-${VERSION_NAME}-unsigned-release.apk"
+          cp build/navigation-mod-ci/classes19.dex "$OUT/classes19.dex"
+          cp build/hud-speed-bridge-ci/classes3.dex "$OUT/classes3.dex"
+          cp "$RUNNER_TEMP/apktool_3.0.3.jar" "$OUT/apktool_3.0.3.jar"
+          tar -C "$ANDROID_HOME/build-tools" -czf \
+            "$OUT/android-build-tools-${BUILD_TOOLS_VERSION}.tar.gz" \
+            "$BUILD_TOOLS_VERSION"
+          TOOLS="$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}"
+          if "$TOOLS/apksigner" verify \
+              "$OUT/Natro-${VERSION_NAME}-unsigned-release.apk" >/dev/null 2>&1; then
+            echo 'Natro candidate unexpectedly contains a valid signature' >&2
+            exit 1
+          fi
+          "$TOOLS/zipalign" -c -P 16 -v 4 \
+            "$OUT/Natro-${VERSION_NAME}-unsigned-release.apk" >/dev/null
+          BADGING=$("$TOOLS/aapt" dump badging \
+            "$OUT/Natro-${VERSION_NAME}-unsigned-release.apk")
+          printf '%s\n' "$BADGING" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='${VERSION_CODE}' versionName='${VERSION_NAME}'"
+          printf '%s\n' "$BADGING" | grep -Fx "application-label:'Natro'"
+          printf '%s\n' "$BADGING" | grep -Fx "sdkVersion:'28'"
+          printf '%s\n' "$BADGING" | grep -Fx "targetSdkVersion:'28'"
+          if printf '%s\n' "$BADGING" | grep -F "application-debuggable"; then
+            echo 'Natro release candidate must not be debuggable' >&2
+            exit 1
+          fi
+          if unzip -Z1 "$OUT/Natro-${VERSION_NAME}-unsigned-release.apk" \
+              | grep -E '^lib/[^/]+/'; then
+            echo 'Natro must remain ABI-neutral for the Android 9 KX11 build' >&2
+            exit 1
+          fi
+          jq -n \
+            --arg schema 'natro-navigation-hud-v2-candidate/v1' \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sourceSha "$GITHUB_SHA" \
+            --arg sourceTree "$(git rev-parse 'HEAD^{tree}')" \
+            --arg versionName "$VERSION_NAME" \
+            --argjson versionCode "$VERSION_CODE" \
+            --arg apktoolSha256 "$APKTOOL_SHA256" \
+            --arg buildTools "$BUILD_TOOLS_VERSION" \
+            '{schema: $schema, repository: $repository, sourceSha: $sourceSha,
+              sourceTree: $sourceTree, natro: {versionName: $versionName,
+              versionCode: $versionCode, unsigned: true}, navigator: {
+              baselineSha256: "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f",
+              patchDex: "classes19.dex",
+              rendererPatch: "classes12.dex:MapView movable TextureView for floating launches",
+              themePatch: "existing-translucent-bootstrap+original-theme-restore"},
+              hudSpeed: {optional: true, package: "air.StrelkaHUDFREE",
+              versionName: "76.0-L13",
+              baselineSha256: "9b8a4a4a636968e9b2ca92c8399cdaf18112e9519aec433a9ee7fe42adb413dd",
+              patchDex: "classes3.dex"},
+              toolchain: {apktoolSha256: $apktoolSha256,
+              androidBuildTools: $buildTools}}' > "$OUT/candidate.json"
+          (
+            cd "$OUT"
+            sha256sum \
+              "Natro-${VERSION_NAME}-unsigned-release.apk" \
+              classes19.dex classes3.dex apktool_3.0.3.jar \
+              "android-build-tools-${BUILD_TOOLS_VERSION}.tar.gz" \
+              candidate.json > SHA256SUMS.txt
+            sha256sum -c SHA256SUMS.txt
+          )
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+      - name: Upload unsigned pair candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: navigation-hud-v2-pair-candidate-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ steps.candidate.outputs.path }}/*
+
+  sign-pair:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.sign_pair) ||
+      (github.event_name == 'push' &&
+      github.ref == 'refs/heads/feature/navigation-hud-v2' &&
+      contains(github.event.head_commit.message, '[secure-sign-pair]'))
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: write
+    env:
+      VERSION_NAME: '2.7.6'
+      VERSION_CODE: '208021309'
+      EXPECTED_NATRO_VERSION_NAME: '2.7.6'
+      EXPECTED_NATRO_VERSION_CODE: '208021309'
+      ALLOW_UNSIGNED_RELEASE: 'true'
+      BUILD_TOOLS_VERSION: '36.0.0'
+      APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
+      EXPECTED_BASELINE_SHA256: '663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f'
+      EXPECTED_HUD_SPEED_BASELINE_SHA256: '9b8a4a4a636968e9b2ca92c8399cdaf18112e9519aec433a9ee7fe42adb413dd'
+      EXPECTED_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install exact Android build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" 'platforms;android-36' "build-tools;${BUILD_TOOLS_VERSION}"
+      - name: Test and build exact unsigned pair candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+          bash tools/build_navigation_patch_dex.sh build/navigation-mod-ci
+          bash tools/build_hud_speed_bridge_dex.sh build/hud-speed-bridge-ci
+          python3 tools/tests/test_verify_navigation_mod_baseline.py
+          python3 tools/tests/test_navigation_mod_tools.py
+          CANDIDATE="$RUNNER_TEMP/candidate"
+          mkdir -p "$CANDIDATE"
+          NATRO=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
+          test -s "$NATRO"
+          cp "$NATRO" "$CANDIDATE/Natro-${VERSION_NAME}-unsigned-release.apk"
+          cp build/navigation-mod-ci/classes19.dex "$CANDIDATE/classes19.dex"
+          cp build/hud-speed-bridge-ci/classes3.dex "$CANDIDATE/classes3.dex"
+          curl --fail --location --retry 3 \
+            --output "$CANDIDATE/apktool_3.0.3.jar" \
+            https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar
+          test "$(sha256sum "$CANDIDATE/apktool_3.0.3.jar" | awk '{print $1}')" = \
+            "$APKTOOL_SHA256"
+          jq -n \
+            --arg schema 'natro-navigation-hud-v2-candidate/v1' \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg sourceSha "$GITHUB_SHA" \
+            --arg sourceTree "$(git rev-parse 'HEAD^{tree}')" \
+            --arg versionName "$VERSION_NAME" \
+            --argjson versionCode "$VERSION_CODE" \
+            --arg apktoolSha256 "$APKTOOL_SHA256" \
+            --arg buildTools "$BUILD_TOOLS_VERSION" \
+            '{schema: $schema, repository: $repository, sourceSha: $sourceSha,
+              sourceTree: $sourceTree, natro: {versionName: $versionName,
+              versionCode: $versionCode, unsigned: true}, navigator: {
+              baselineSha256: "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f",
+              patchDex: "classes19.dex",
+              rendererPatch: "classes12.dex:MapView movable TextureView for floating launches",
+              themePatch: "existing-translucent-bootstrap+original-theme-restore"},
+              hudSpeed: {optional: true, package: "air.StrelkaHUDFREE",
+              versionName: "76.0-L13",
+              baselineSha256: "9b8a4a4a636968e9b2ca92c8399cdaf18112e9519aec433a9ee7fe42adb413dd",
+              patchDex: "classes3.dex"},
+              toolchain: {apktoolSha256: $apktoolSha256,
+              androidBuildTools: $buildTools}}' > "$CANDIDATE/candidate.json"
+          (
+            cd "$CANDIDATE"
+            sha256sum \
+              "Natro-${VERSION_NAME}-unsigned-release.apk" \
+              classes19.dex classes3.dex apktool_3.0.3.jar candidate.json \
+              > SHA256SUMS.txt
+            sha256sum -c SHA256SUMS.txt
+          )
+      - name: Receive exact encrypted signing bundle when Actions secrets are unavailable
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HANDOFF_BRANCH: 'agent/natro-2.7.6-navigation-hud-signing'
+          SIGNING_BUNDLE_SHA256: '4fb34ee8aed62dad3896d7aa6240d4066ec9b6ef3da5459bca9d7d1c4c3b7fc0'
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          CONFIGURED=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || CONFIGURED=$((CONFIGURED + 1))
+          done
+          case "$CONFIGURED" in
+            3)
+              echo 'Complete GitHub Actions signing secrets are configured'
+              exit 0
+              ;;
+            0) ;;
+            *)
+              echo 'Signing credentials must be supplied completely or omitted completely' >&2
+              exit 1
+              ;;
+          esac
+          unset KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS
+          umask 077
+          TRANSPORT="$RUNNER_TEMP/natro-2.7.6-signing-transport"
+          SIGNING="$RUNNER_TEMP/natro-2.7.6-signing-material"
+          mkdir -p "$TRANSPORT/chunks" "$SIGNING"
+          PRIVATE="$TRANSPORT/private.pem"
+          PUBLIC="$TRANSPORT/public.pem"
+          ENCRYPTED="$TRANSPORT/signing-bundle.enc"
+          ARCHIVE="$TRANSPORT/signing-bundle.tar.gz"
+          PREFIX="natro276-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PUBLIC_PATH="release-handoff/${PREFIX}.pub"
+          ENCRYPTED_PATH="release-handoff/${PREFIX}.enc"
+
+          cleanup_transport() {
+            find "$TRANSPORT/chunks" -type f -exec shred -u -- {} + \
+              2>/dev/null || true
+            shred -u -- "$PRIVATE" "$PUBLIC" "$ENCRYPTED" "$ARCHIVE" \
+              "$TRANSPORT/encrypted.json" 2>/dev/null || true
+          }
+          trap cleanup_transport EXIT
+
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
+            -out "$PRIVATE" 2>/dev/null
+          openssl pkey -in "$PRIVATE" -pubout -out "$PUBLIC"
+          PUBLIC_CONTENT=$(base64 -w0 "$PUBLIC")
+          gh api --method PUT \
+            "repos/${GITHUB_REPOSITORY}/contents/${PUBLIC_PATH}" \
+            -f message="ci: publish ephemeral Natro 2.7.6 transport key [skip ci]" \
+            -f content="$PUBLIC_CONTENT" \
+            -f branch="$HANDOFF_BRANCH" >/dev/null
+          echo "::notice title=Natro 2.7.6 encrypted handoff::Waiting for ${ENCRYPTED_PATH}"
+
+          for _ in $(seq 1 180); do
+            if gh api \
+                "repos/${GITHUB_REPOSITORY}/contents/${ENCRYPTED_PATH}?ref=${HANDOFF_BRANCH}" \
+                > "$TRANSPORT/encrypted.json" 2>/dev/null; then
+              jq -r '.content' "$TRANSPORT/encrypted.json" \
+                | tr -d '\n' | base64 --decode > "$ENCRYPTED"
+              break
+            fi
+            sleep 5
+          done
+          test -s "$ENCRYPTED" || {
+            echo 'Timed out waiting for the encrypted signing handoff' >&2
+            exit 1
+          }
+          test $(( $(stat -c '%s' "$ENCRYPTED") % 512 )) -eq 0
+          split -b 512 -d -a 3 "$ENCRYPTED" "$TRANSPORT/chunks/chunk-"
+          : > "$ARCHIVE"
+          for chunk in "$TRANSPORT"/chunks/chunk-*; do
+            openssl pkeyutl -decrypt -inkey "$PRIVATE" \
+              -pkeyopt rsa_padding_mode:oaep \
+              -pkeyopt rsa_oaep_md:sha256 \
+              -pkeyopt rsa_mgf1_md:sha256 \
+              -in "$chunk" >> "$ARCHIVE"
+          done
+          test "$(sha256sum "$ARCHIVE" | awk '{print $1}')" \
+            = "$SIGNING_BUNDLE_SHA256"
+          tar -tzf "$ARCHIVE" | awk \
+            'BEGIN { ok=1 } /^\// || /(^|\/)\.\.($|\/)/ { ok=0 } END { exit ok ? 0 : 1 }'
+          tar -xzf "$ARCHIVE" -C "$SIGNING" \
+            --no-same-owner --no-same-permissions
+          chmod 600 "$SIGNING"/*
+          test -s "$SIGNING/status-widget-ha-update.jks"
+          test -s "$SIGNING/status-widget-ha-update.pass"
+          IFS= read -r BUNDLE_PASSWORD \
+            < "$SIGNING/status-widget-ha-update.pass"
+          test -n "$BUNDLE_PASSWORD"
+          export BUNDLE_PASSWORD
+          BUNDLE_CERT=$(keytool -J-Duser.language=en -J-Duser.country=US \
+            -list -v -keystore "$SIGNING/status-widget-ha-update.jks" \
+            -alias status-widget-ha -storepass:env BUNDLE_PASSWORD \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          unset BUNDLE_PASSWORD
+          test "$BUNDLE_CERT" = "$EXPECTED_CERT_SHA256"
+          touch "$SIGNING/verified.ready"
+      - name: Materialize and verify stable update key
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
+          PASSWORD_FILE="$RUNNER_TEMP/stable-update.pass"
+          ALIAS_FILE="$RUNNER_TEMP/stable-update.alias"
+          SIGNING="$RUNNER_TEMP/natro-2.7.6-signing-material"
+          CONFIGURED=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || CONFIGURED=$((CONFIGURED + 1))
+          done
+          case "$CONFIGURED" in
+            3)
+              printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+              printf '%s\n' "$KEY_PASSWORD" > "$PASSWORD_FILE"
+              printf '%s\n' "$KEY_ALIAS" > "$ALIAS_FILE"
+              ;;
+            0)
+              test -f "$SIGNING/verified.ready"
+              mv "$SIGNING/status-widget-ha-update.jks" "$KEYSTORE"
+              mv "$SIGNING/status-widget-ha-update.pass" "$PASSWORD_FILE"
+              printf '%s\n' 'status-widget-ha' > "$ALIAS_FILE"
+              ;;
+            *)
+              echo 'Signing credentials must be supplied completely or by encrypted handoff' >&2
+              exit 1
+              ;;
+          esac
+          chmod 600 "$KEYSTORE" "$PASSWORD_FILE" "$ALIAS_FILE"
+          IFS= read -r KEY_PASSWORD < "$PASSWORD_FILE"
+          IFS= read -r KEY_ALIAS < "$ALIAS_FILE"
+          test -n "$KEY_PASSWORD"
+          test -n "$KEY_ALIAS"
+          export KEY_PASSWORD
+          certificate=$(keytool -J-Duser.language=en -J-Duser.country=US \
+            -list -v -keystore "$KEYSTORE" -alias "$KEY_ALIAS" \
+            -storepass:env KEY_PASSWORD \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          test "$certificate" = "$EXPECTED_CERT_SHA256"
+      - name: Fetch exact reviewed Navigator baseline
+        shell: bash
+        env:
+          BASELINE_URL: ${{ inputs.baseline_url }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BASELINE="$RUNNER_TEMP/YN_30.3.0_T2_.apk"
+          IFS= read -r KEY_PASSWORD < "$RUNNER_TEMP/stable-update.pass"
+          IFS= read -r KEY_ALIAS < "$RUNNER_TEMP/stable-update.alias"
+          test -n "$KEY_PASSWORD"
+          test -n "$KEY_ALIAS"
+          if test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'; then
+            test -n "$BASELINE_URL"
+            echo "::add-mask::$BASELINE_URL"
+            curl --fail --location --retry 5 --retry-all-errors \
+              --silent --show-error --output "$BASELINE" "$BASELINE_URL"
+          else
+            MANIFEST="release-handoff/navigator-30.3.0.envelope.blobs"
+            ENVELOPE="$RUNNER_TEMP/navigator-30.3.0.secure-envelope"
+            CHUNK_JSON="$RUNNER_TEMP/navigator-envelope-chunk.json"
+            CHUNK_BIN="$RUNNER_TEMP/navigator-envelope-chunk.bin"
+            : > "$ENVELOPE"
+            index=0
+            while read -r blob_sha expected_size; do
+              index=$((index + 1))
+              curl --fail --location --retry 5 --retry-all-errors \
+                --silent --show-error \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2022-11-28' \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/git/blobs/$blob_sha" \
+                --output "$CHUNK_JSON"
+              jq -e --argjson expected "$expected_size" \
+                '.encoding == "base64" and .size == $expected' \
+                "$CHUNK_JSON" >/dev/null
+              jq -r '.content' "$CHUNK_JSON" | tr -d '\n' \
+                | base64 --decode > "$CHUNK_BIN"
+              test "$(wc -c < "$CHUNK_BIN" | tr -d ' ')" = "$expected_size"
+              cat "$CHUNK_BIN" >> "$ENVELOPE"
+              if test $((index % 25)) -eq 0; then
+                echo "Restored encrypted Navigator chunk $index"
+              fi
+            done < <(grep -v '^#' "$MANIFEST")
+            test "$index" = '203'
+            test "$(wc -c < "$ENVELOPE" | tr -d ' ')" = '149599892'
+            test "$(sha256sum "$ENVELOPE" | awk '{print $1}')" = \
+              'e2558714af1d3203ee057e85f5d213868f0a71340204af8ec308a270a4b27e38'
+            mkdir -p "$RUNNER_TEMP/secure-envelope-classes"
+            javac -d "$RUNNER_TEMP/secure-envelope-classes" \
+              tools/SecureBaselineEnvelope.java
+            export KEY_PASSWORD
+            java -cp "$RUNNER_TEMP/secure-envelope-classes" \
+              SecureBaselineEnvelope decrypt \
+              "$RUNNER_TEMP/stable-update-keystore.jks" "$KEY_ALIAS" \
+              "$ENVELOPE" "$BASELINE"
+            shred -u -- "$ENVELOPE" "$CHUNK_JSON" "$CHUNK_BIN" \
+              2>/dev/null || true
+          fi
+          test "$(sha256sum "$BASELINE" | awk '{print $1}')" = \
+            "$EXPECTED_BASELINE_SHA256"
+      - name: Fetch optional reviewed HUD Speed baseline
+        if: inputs.hud_speed_baseline_url != ''
+        shell: bash
+        env:
+          HUD_SPEED_BASELINE_URL: ${{ inputs.hud_speed_baseline_url }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$HUD_SPEED_BASELINE_URL"
+          BASELINE="$RUNNER_TEMP/HUD_Speed_v76_L_v13_FineControls.apk"
+          curl --fail --location --retry 5 --retry-all-errors \
+            --silent --show-error --output "$BASELINE" "$HUD_SPEED_BASELINE_URL"
+          test "$(sha256sum "$BASELINE" | awk '{print $1}')" = \
+            "$EXPECTED_HUD_SPEED_BASELINE_SHA256"
+      - name: Sign and fully verify Natro and Navigator
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE="$RUNNER_TEMP/candidate"
+          KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
+          PASSWORD_FILE="$RUNNER_TEMP/stable-update.pass"
+          ALIAS_FILE="$RUNNER_TEMP/stable-update.alias"
+          BASELINE="$RUNNER_TEMP/YN_30.3.0_T2_.apk"
+          HUD_SPEED_BASELINE="$RUNNER_TEMP/HUD_Speed_v76_L_v13_FineControls.apk"
+          OUTPUT="$RUNNER_TEMP/signed-pair"
+          cleanup() {
+            shred -u -- "$KEYSTORE" "$PASSWORD_FILE" "$ALIAS_FILE" \
+              "$BASELINE" "$HUD_SPEED_BASELINE" 2>/dev/null || true
+          }
+          trap cleanup EXIT HUP INT TERM
+          test -s "$KEYSTORE"
+          test -s "$BASELINE"
+          IFS= read -r KEY_PASSWORD < "$PASSWORD_FILE"
+          IFS= read -r KEY_ALIAS < "$ALIAS_FILE"
+          test -n "$KEY_PASSWORD"
+          test -n "$KEY_ALIAS"
+          export KEY_PASSWORD
+          KEYSTORE_FILE="$KEYSTORE" \
+            KEY_PASSWORD="$KEY_PASSWORD" \
+            KEY_ALIAS="$KEY_ALIAS" \
+            bash tools/sign_navigation_hud_v2_pair.sh \
+              "$BASELINE" \
+              "$CANDIDATE" \
+              "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}" \
+              "$OUTPUT"
+          if test -s "$HUD_SPEED_BASELINE"; then
+            HUD_SPEED_APK="$OUTPUT/HUD-Speed-76.0-L13-NatroBridge-signed.apk"
+            APKTOOL_JAR="$CANDIDATE/apktool_3.0.3.jar" \
+              KEYSTORE_FILE="$KEYSTORE" KEY_PASSWORD="$KEY_PASSWORD" \
+              KEY_ALIAS="$KEY_ALIAS" \
+              bash tools/sign_hud_speed_bridge_apk.sh \
+                "$HUD_SPEED_BASELINE" \
+                "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}" \
+                "$HUD_SPEED_APK"
+            HUD_SPEED_SHA256=$(sha256sum "$HUD_SPEED_APK" | awk '{print $1}')
+            REPORT_TMP=$(mktemp "$RUNNER_TEMP/release-report.XXXXXX.json")
+            jq --arg apk "$(basename "$HUD_SPEED_APK")" \
+              --arg sha256 "$HUD_SPEED_SHA256" \
+              --arg baselineSha256 "$EXPECTED_HUD_SPEED_BASELINE_SHA256" \
+              '.hudSpeed = {versionName: "76.0-L13", package: "air.StrelkaHUDFREE",
+                apk: $apk, sha256: $sha256, baselineSha256: $baselineSha256,
+                signatureSchemes: ["v2", "v3"], requiresUninstallOriginal: true}' \
+              "$OUTPUT/release-report.json" > "$REPORT_TMP"
+            mv "$REPORT_TMP" "$OUTPUT/release-report.json"
+            (
+              cd "$OUTPUT"
+              sha256sum Natro-*.apk YN_*.apk HUD-Speed-*.apk \
+                signature-reports.txt release-report.json KX11-COMPATIBILITY.txt \
+                > SHA256SUMS.txt
+              sha256sum -c SHA256SUMS.txt
+            )
+          fi
+          test "$(jq -er '.source.commit' "$OUTPUT/release-report.json")" = \
+            "$GITHUB_SHA"
+          test "$(jq -er '.source.tree' "$OUTPUT/release-report.json")" = \
+            "$(git rev-parse 'HEAD^{tree}')"
+          test "$(jq -er '.certificateSha256' "$OUTPUT/release-report.json")" = \
+            "$EXPECTED_CERT_SHA256"
+      - name: Upload only the verified signed pair
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: navigation-hud-v2-signed-2.7.6-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/signed-pair/*

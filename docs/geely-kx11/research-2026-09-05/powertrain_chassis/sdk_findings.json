@@ -1,0 +1,1192 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-05",
+  "source_archive": {
+    "name": "ecarx-hud-system-20260727-010640.zip",
+    "sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+  },
+  "scope": "Static exact SDK semantics. Runtime classloader origin remains unknown; callback period is not ECU sample rate. No commands executed.",
+  "formulas": [
+    {
+      "signal_ids": [
+        31381
+      ],
+      "name": "EngSpdDispd",
+      "formula": "raw * 0.5",
+      "verified_unit": "SENSOR_TYPE_RPM public ID1050880; Sensor scalar is RPM",
+      "example": {
+        "raw": 1500,
+        "sdk_value": 750
+      },
+      "offsets_hex": [
+        "0xbc",
+        "0xbe",
+        "0xc2",
+        "0xc4"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 188,
+            "op": "int-to-double",
+            "args": "v1, v9"
+          },
+          {
+            "offset": 190,
+            "op": "const-wide/high16",
+            "args": "v3, 4602678819172646912"
+          },
+          {
+            "offset": 194,
+            "op": "mul-double/2addr",
+            "args": "v1, v3"
+          },
+          {
+            "offset": 196,
+            "op": "double-to-float",
+            "args": "v0, v1"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        30584,
+        30593,
+        30666,
+        30675
+      ],
+      "name": "TPMS pressure",
+      "formula": "raw * 1.373",
+      "verified_unit": "scaled Sensor pressure; kPa is plausible but not asserted solely from this body",
+      "example": {
+        "raw": 161,
+        "sdk_value": 221.053
+      },
+      "offsets_hex": [
+        "0x102",
+        "0x104",
+        "0x10e",
+        "0x110"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 258,
+            "op": "int-to-double",
+            "args": "v1, v9"
+          },
+          {
+            "offset": 260,
+            "op": "const-wide",
+            "args": "v3, 4608862261461026603"
+          },
+          {
+            "offset": 270,
+            "op": "mul-double/2addr",
+            "args": "v1, v3"
+          },
+          {
+            "offset": 272,
+            "op": "double-to-float",
+            "args": "v0, v1"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        30587,
+        30596,
+        30669,
+        30678
+      ],
+      "name": "TPMS temperature",
+      "formula": "raw - 50",
+      "verified_unit": "scaled Sensor temperature; physical unit must be paired with API contract",
+      "example": {
+        "raw": 70,
+        "sdk_value": 20
+      },
+      "offsets_hex": [
+        "0xfa",
+        "0xfe"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 250,
+            "op": "add-int/lit8",
+            "args": "v1, v9, -50"
+          },
+          {
+            "offset": 254,
+            "op": "int-to-float",
+            "args": "v0, v1"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        31515
+      ],
+      "name": "SteerWhlSnsrAg",
+      "formula": "raw / 1024",
+      "verified_unit": "scaled Sensor angle; no int-to-short/sign-extension is present in this method",
+      "example": {
+        "raw": 65287,
+        "sdk_value": 63.7568359375
+      },
+      "offsets_hex": [
+        "0x96",
+        "0x98",
+        "0x9c",
+        "0x9e",
+        "0xa0"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 150,
+            "op": "int-to-double",
+            "args": "v1, v9"
+          },
+          {
+            "offset": 152,
+            "op": "const-wide/high16",
+            "args": "v3, 4562146422526312448"
+          },
+          {
+            "offset": 156,
+            "op": "mul-double/2addr",
+            "args": "v1, v3"
+          },
+          {
+            "offset": 158,
+            "op": "double-to-float",
+            "args": "v0, v1"
+          },
+          {
+            "offset": 160,
+            "op": "iput",
+            "args": "v0, v7, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->mSteerAngle F"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        31516
+      ],
+      "name": "SteerWhlSnsrAgSpd",
+      "formula": "raw / 128",
+      "verified_unit": "scaled Sensor angular speed; no sign extension in this method",
+      "offsets_hex": [
+        "0x8a",
+        "0x8c",
+        "0x90",
+        "0x92"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 138,
+            "op": "int-to-double",
+            "args": "v1, v9"
+          },
+          {
+            "offset": 140,
+            "op": "const-wide/high16",
+            "args": "v3, 4575657221408423936"
+          },
+          {
+            "offset": 144,
+            "op": "mul-double/2addr",
+            "args": "v1, v3"
+          },
+          {
+            "offset": 146,
+            "op": "double-to-float",
+            "args": "v0, v1"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        31544
+      ],
+      "name": "VehSpdLgtA",
+      "formula": "public scalar = raw * 0.00391; internal mVehicleSpeed = raw * 0.00391 * 3.6",
+      "verified_unit": "two different scaled representations; do not multiply both twice",
+      "offsets_hex": [
+        "0x62",
+        "0x64",
+        "0x6e",
+        "0x70",
+        "0x7a",
+        "0x7e",
+        "0x82",
+        "0x84",
+        "0x86"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 98,
+            "op": "int-to-double",
+            "args": "v1, v9"
+          },
+          {
+            "offset": 100,
+            "op": "const-wide",
+            "args": "v3, 4571157945236695716"
+          },
+          {
+            "offset": 110,
+            "op": "mul-double/2addr",
+            "args": "v1, v3"
+          },
+          {
+            "offset": 112,
+            "op": "const-wide",
+            "args": "v5, 4615288898129284301"
+          },
+          {
+            "offset": 122,
+            "op": "mul-double/2addr",
+            "args": "v1, v5"
+          },
+          {
+            "offset": 126,
+            "op": "iput",
+            "args": "v1, v7, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->mVehicleSpeed F"
+          },
+          {
+            "offset": 130,
+            "op": "int-to-double",
+            "args": "v1, v9"
+          },
+          {
+            "offset": 132,
+            "op": "mul-double/2addr",
+            "args": "v1, v3"
+          },
+          {
+            "offset": 134,
+            "op": "double-to-float",
+            "args": "v0, v1"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        31568,
+        31571,
+        31574,
+        31576
+      ],
+      "name": "wheel speed group",
+      "formula": "raw * 0.00391 * 3.6, sign selected from mGearState",
+      "verified_unit": "group representation; direction from separate31458 is not wheel direction per sensor",
+      "offsets_hex": [
+        "0x22",
+        "0x32",
+        "0x42",
+        "0x52"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 34,
+            "op": "invoke-direct",
+            "args": "v7, v9, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->getSpeedFromValue(I)F"
+          },
+          {
+            "offset": 50,
+            "op": "invoke-direct",
+            "args": "v7, v9, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->getSpeedFromValue(I)F"
+          },
+          {
+            "offset": 66,
+            "op": "invoke-direct",
+            "args": "v7, v9, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->getSpeedFromValue(I)F"
+          },
+          {
+            "offset": 82,
+            "op": "invoke-direct",
+            "args": "v7, v9, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->getSpeedFromValue(I)F"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        30932
+      ],
+      "name": "FuLvlIndcdFuLvlValFromFuTbl",
+      "formula": "raw * 0.2 * 1000",
+      "verified_unit": "public fuel-level scalar; percent channel is separate30895",
+      "offsets_hex": [
+        "0xc8",
+        "0xca",
+        "0xd4",
+        "0xd6",
+        "0xe0",
+        "0xe2"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 200,
+            "op": "int-to-double",
+            "args": "v1, v9"
+          },
+          {
+            "offset": 202,
+            "op": "const-wide",
+            "args": "v3, 4596373779694328218"
+          },
+          {
+            "offset": 212,
+            "op": "mul-double/2addr",
+            "args": "v1, v3"
+          },
+          {
+            "offset": 214,
+            "op": "const-wide",
+            "args": "v3, 4652007308841189376"
+          },
+          {
+            "offset": 224,
+            "op": "mul-double/2addr",
+            "args": "v1, v3"
+          },
+          {
+            "offset": 226,
+            "op": "double-to-float",
+            "args": "v0, v1"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        30931
+      ],
+      "name": "FuCnsIndcdVal",
+      "formula": "raw * 0.1",
+      "verified_unit": "separate from average/instant consumption packed input",
+      "offsets_hex": [
+        "0xe6",
+        "0xe8",
+        "0xea"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 230,
+            "op": "int-to-double",
+            "args": "v3, v9"
+          },
+          {
+            "offset": 232,
+            "op": "mul-double/2addr",
+            "args": "v3, v1"
+          },
+          {
+            "offset": 234,
+            "op": "double-to-float",
+            "args": "v0, v3"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        30871
+      ],
+      "name": "DayToSrv",
+      "formula": "raw * 24",
+      "verified_unit": "public service-time value; raw day count is converted",
+      "offsets_hex": [
+        "0xf2",
+        "0xf6"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 242,
+            "op": "mul-int/lit8",
+            "args": "v1, v9, 24"
+          },
+          {
+            "offset": 246,
+            "op": "int-to-float",
+            "args": "v0, v1"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        30502
+      ],
+      "name": "AmbTRawAmbTVal",
+      "formula": "raw * 0.1 - 70",
+      "verified_unit": "outside temperature Sensor scalar",
+      "offsets_hex": [
+        "0x122",
+        "0x124",
+        "0x126",
+        "0x130",
+        "0x132"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 290,
+            "op": "int-to-double",
+            "args": "v3, v9"
+          },
+          {
+            "offset": 292,
+            "op": "mul-double/2addr",
+            "args": "v3, v1"
+          },
+          {
+            "offset": 294,
+            "op": "const-wide",
+            "args": "v1, 4634626229029306368"
+          },
+          {
+            "offset": 304,
+            "op": "sub-double/2addr",
+            "args": "v3, v1"
+          },
+          {
+            "offset": 306,
+            "op": "double-to-float",
+            "args": "v0, v3"
+          }
+        ]
+      }
+    },
+    {
+      "signal_ids": [
+        30506
+      ],
+      "name": "CmptmtTFrntCmptmtTFrnt",
+      "formula": "raw * 0.1 - 60",
+      "verified_unit": "inside temperature Sensor scalar",
+      "offsets_hex": [
+        "0x114",
+        "0x116",
+        "0x118",
+        "0x11c",
+        "0x11e"
+      ],
+      "evidence": {
+        "source": {
+          "member": "framework/system_framework/ecarx.adaptapi.jar",
+          "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+          "dex_entry": "classes.dex"
+        },
+        "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+        "method": "getSensorVluFromSigVlu(I I)Ljava/lang/Float;",
+        "selected_instructions": [
+          {
+            "offset": 276,
+            "op": "int-to-double",
+            "args": "v3, v9"
+          },
+          {
+            "offset": 278,
+            "op": "mul-double/2addr",
+            "args": "v3, v1"
+          },
+          {
+            "offset": 280,
+            "op": "const-wide/high16",
+            "args": "v1, 4633641066610819072"
+          },
+          {
+            "offset": 284,
+            "op": "sub-double/2addr",
+            "args": "v3, v1"
+          },
+          {
+            "offset": 286,
+            "op": "double-to-float",
+            "args": "v0, v3"
+          }
+        ]
+      }
+    }
+  ],
+  "decoded_double_constants": [
+    {
+      "offset": 4,
+      "bits_signed_decimal": 4591870180066957722,
+      "ieee754_double": 0.1
+    },
+    {
+      "offset": 100,
+      "bits_signed_decimal": 4571157945236695716,
+      "ieee754_double": 0.00391
+    },
+    {
+      "offset": 112,
+      "bits_signed_decimal": 4615288898129284301,
+      "ieee754_double": 3.6
+    },
+    {
+      "offset": 140,
+      "bits_signed_decimal": 4575657221408423936,
+      "ieee754_double": 0.0078125
+    },
+    {
+      "offset": 152,
+      "bits_signed_decimal": 4562146422526312448,
+      "ieee754_double": 0.0009765625
+    },
+    {
+      "offset": 190,
+      "bits_signed_decimal": 4602678819172646912,
+      "ieee754_double": 0.5
+    },
+    {
+      "offset": 202,
+      "bits_signed_decimal": 4596373779694328218,
+      "ieee754_double": 0.2
+    },
+    {
+      "offset": 214,
+      "bits_signed_decimal": 4652007308841189376,
+      "ieee754_double": 1000.0
+    },
+    {
+      "offset": 260,
+      "bits_signed_decimal": 4608862261461026603,
+      "ieee754_double": 1.373
+    },
+    {
+      "offset": 280,
+      "bits_signed_decimal": 4633641066610819072,
+      "ieee754_double": 60.0
+    },
+    {
+      "offset": 294,
+      "bits_signed_decimal": 4634626229029306368,
+      "ieee754_double": 70.0
+    }
+  ],
+  "tpms_availability": {
+    "logic": [
+      "config19<=1: notavailable",
+      "config19>1 and carMode !=0 or usageMode outside {13,2,11}: notactive",
+      "appropriate wheel PTimeout ==1: error; otherwise active (after preceding gates)"
+    ],
+    "msg_old_flag": "not consulted in this exact function; separate raw MsgOldFlg exists",
+    "evidence": {
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      },
+      "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+      "method": "getTireTmANDPreStatus(I)Lcom/ecarx/xui/adaptapi/FunctionStatus;",
+      "selected_instructions": [
+        {
+          "offset": 0,
+          "op": "sget-object",
+          "args": "v0, Lcom/ecarx/xui/adaptapi/FunctionStatus;->notavailable Lcom/ecarx/xui/adaptapi/FunctionStatus;"
+        },
+        {
+          "offset": 8,
+          "op": "invoke-virtual",
+          "args": "v1, Lecarx/car/hardware/signal/CarSignalManager;->getcarconfig19()I"
+        },
+        {
+          "offset": 18,
+          "op": "if-le",
+          "args": "v1, v2, +087h"
+        },
+        {
+          "offset": 32,
+          "op": "invoke-virtual",
+          "args": "v4, v1, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->carModeAnyMatch([I)Z"
+        },
+        {
+          "offset": 40,
+          "op": "if-eqz",
+          "args": "v1, +079h"
+        },
+        {
+          "offset": 56,
+          "op": "invoke-virtual",
+          "args": "v4, v1, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->usageModeAnyMatch([I)Z"
+        },
+        {
+          "offset": 64,
+          "op": "if-eqz",
+          "args": "v1, +06dh"
+        },
+        {
+          "offset": 158,
+          "op": "invoke-virtual",
+          "args": "v1, Lecarx/car/hardware/signal/CarSignalManager;->getRiReTireMsgPTimeout()I"
+        },
+        {
+          "offset": 166,
+          "op": "if-ne",
+          "args": "v1, v2, +006h"
+        },
+        {
+          "offset": 170,
+          "op": "sget-object",
+          "args": "v1, Lcom/ecarx/xui/adaptapi/FunctionStatus;->error Lcom/ecarx/xui/adaptapi/FunctionStatus;"
+        },
+        {
+          "offset": 178,
+          "op": "sget-object",
+          "args": "v1, Lcom/ecarx/xui/adaptapi/FunctionStatus;->active Lcom/ecarx/xui/adaptapi/FunctionStatus;"
+        },
+        {
+          "offset": 282,
+          "op": "sget-object",
+          "args": "v1, Lcom/ecarx/xui/adaptapi/FunctionStatus;->notactive Lcom/ecarx/xui/adaptapi/FunctionStatus;"
+        },
+        {
+          "offset": 300,
+          "op": "fill-array-data-payload",
+          "args": "b'\\r\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x0b\\x00\\x00\\x00' | \\x0d\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x0b\\x00\\x00\\x00"
+        }
+      ]
+    }
+  },
+  "callback_period_ms": {
+    "values": {
+      "0": 5,
+      "1": 10,
+      "2": 60,
+      "3": 200,
+      "4": 500,
+      "5": 1000,
+      "16": 100,
+      "default": 200
+    },
+    "meaning": "SDK callback schedule; does not prove data freshness or underlying ECU rate",
+    "evidence": {
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      },
+      "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+      "method": "getCallbackPeriod(I)I",
+      "selected_instructions": [
+        {
+          "offset": 0,
+          "op": "const/16",
+          "args": "v0, 200"
+        },
+        {
+          "offset": 4,
+          "op": "const/16",
+          "args": "v1, 16"
+        },
+        {
+          "offset": 8,
+          "op": "if-eq",
+          "args": "v3, v1, +017h"
+        },
+        {
+          "offset": 12,
+          "op": "packed-switch",
+          "args": "v3, +0000018h"
+        },
+        {
+          "offset": 18,
+          "op": "goto",
+          "args": "+14h"
+        },
+        {
+          "offset": 20,
+          "op": "const/16",
+          "args": "v0, 1000"
+        },
+        {
+          "offset": 24,
+          "op": "goto",
+          "args": "+11h"
+        },
+        {
+          "offset": 26,
+          "op": "const/16",
+          "args": "v0, 500"
+        },
+        {
+          "offset": 30,
+          "op": "goto",
+          "args": "+eh"
+        },
+        {
+          "offset": 32,
+          "op": "const/16",
+          "args": "v0, 200"
+        },
+        {
+          "offset": 36,
+          "op": "goto",
+          "args": "+bh"
+        },
+        {
+          "offset": 38,
+          "op": "const/16",
+          "args": "v0, 60"
+        },
+        {
+          "offset": 42,
+          "op": "goto",
+          "args": "+8h"
+        },
+        {
+          "offset": 44,
+          "op": "const/16",
+          "args": "v0, 10"
+        },
+        {
+          "offset": 48,
+          "op": "goto",
+          "args": "+5h"
+        },
+        {
+          "offset": 50,
+          "op": "const/4",
+          "args": "v0, 5"
+        },
+        {
+          "offset": 52,
+          "op": "goto",
+          "args": "+3h"
+        },
+        {
+          "offset": 54,
+          "op": "const/16",
+          "args": "v0, 100"
+        },
+        {
+          "offset": 58,
+          "op": "return",
+          "args": "v0"
+        },
+        {
+          "offset": 60,
+          "op": "packed-switch-payload",
+          "args": "0 1 2 3 4 5"
+        }
+      ]
+    }
+  },
+  "gear_mapping": {
+    "raw_signal_id": 31385,
+    "raw0": "GEAR_P",
+    "raw1": "GEAR_R",
+    "raw2": "GEAR_N",
+    "raw3": "GEAR_D",
+    "raw4": "getManMod(GearIndcnRecGearIndcn31475)",
+    "default": "getManMod(GearIndcnRecGearIndcn31475)",
+    "public_values": {
+      "raw0": 2097712,
+      "raw1": 2097728,
+      "raw2": 2097680,
+      "raw3": 2097696
+    },
+    "evidence": {
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      },
+      "class": "Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;",
+      "method": "getGera()I",
+      "selected_instructions": [
+        {
+          "offset": 0,
+          "op": "const/4",
+          "args": "v0, -1"
+        },
+        {
+          "offset": 2,
+          "op": "const/4",
+          "args": "v1, -1"
+        },
+        {
+          "offset": 4,
+          "op": "const/4",
+          "args": "v2, -1"
+        },
+        {
+          "offset": 6,
+          "op": "iget-object",
+          "args": "v3, v4, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->mCarSignalManager Lecarx/car/hardware/signal/CarSignalManager;"
+        },
+        {
+          "offset": 10,
+          "op": "invoke-virtual",
+          "args": "v3, Lecarx/car/hardware/signal/CarSignalManager;->getGearLvrIndcn()I"
+        },
+        {
+          "offset": 16,
+          "op": "move-result",
+          "args": "v3"
+        },
+        {
+          "offset": 18,
+          "op": "move",
+          "args": "v1, v3"
+        },
+        {
+          "offset": 20,
+          "op": "iget-object",
+          "args": "v3, v4, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->mCarSignalManager Lecarx/car/hardware/signal/CarSignalManager;"
+        },
+        {
+          "offset": 24,
+          "op": "invoke-virtual",
+          "args": "v3, Lecarx/car/hardware/signal/CarSignalManager;->getGearIndcnRecGearIndcn()I"
+        },
+        {
+          "offset": 30,
+          "op": "move-result",
+          "args": "v3"
+        },
+        {
+          "offset": 32,
+          "op": "move",
+          "args": "v2, v3"
+        },
+        {
+          "offset": 34,
+          "op": "goto",
+          "args": "+5h"
+        },
+        {
+          "offset": 36,
+          "op": "move-exception",
+          "args": "v3"
+        },
+        {
+          "offset": 38,
+          "op": "invoke-virtual",
+          "args": "v3, Ljava/lang/Exception;->printStackTrace()V"
+        },
+        {
+          "offset": 44,
+          "op": "packed-switch",
+          "args": "v1, +000001eh"
+        },
+        {
+          "offset": 50,
+          "op": "invoke-direct",
+          "args": "v4, v2, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->getManMod(I)I"
+        },
+        {
+          "offset": 56,
+          "op": "move-result",
+          "args": "v0"
+        },
+        {
+          "offset": 58,
+          "op": "goto",
+          "args": "+16h"
+        },
+        {
+          "offset": 60,
+          "op": "invoke-direct",
+          "args": "v4, v2, Lcom/ecarx/xui/adaptapi/car/sensor/Sensor;->getManMod(I)I"
+        },
+        {
+          "offset": 66,
+          "op": "move-result",
+          "args": "v0"
+        },
+        {
+          "offset": 68,
+          "op": "goto",
+          "args": "+11h"
+        },
+        {
+          "offset": 70,
+          "op": "const",
+          "args": "v0, 2097696"
+        },
+        {
+          "offset": 76,
+          "op": "goto",
+          "args": "+dh"
+        },
+        {
+          "offset": 78,
+          "op": "const",
+          "args": "v0, 2097680"
+        },
+        {
+          "offset": 84,
+          "op": "goto",
+          "args": "+9h"
+        },
+        {
+          "offset": 86,
+          "op": "const",
+          "args": "v0, 2097728"
+        },
+        {
+          "offset": 92,
+          "op": "goto",
+          "args": "+5h"
+        },
+        {
+          "offset": 94,
+          "op": "const",
+          "args": "v0, 2097712"
+        },
+        {
+          "offset": 100,
+          "op": "nop",
+          "args": ""
+        },
+        {
+          "offset": 102,
+          "op": "return",
+          "args": "v0"
+        },
+        {
+          "offset": 104,
+          "op": "packed-switch-payload",
+          "args": "0 1 2 3 4"
+        }
+      ]
+    }
+  },
+  "onoff2_missing_zero": {
+    "class": "Lecarx/car/hardware/annotation/OnOff2;",
+    "on": 0,
+    "off": 1,
+    "isValid": "0 or 1",
+    "cause": "On has no non-default encoded_static_value and old constants extractor skipped it. Missing declaration value does not mean no On option.",
+    "evidence": {
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      },
+      "superclass": "Ljava/lang/Object;",
+      "methods": {
+        "<init>()V": [
+          {
+            "offset": 0,
+            "op": "invoke-direct",
+            "args": "v0, Ljava/lang/Object;-><init>()V"
+          },
+          {
+            "offset": 6,
+            "op": "return-void",
+            "args": ""
+          }
+        ],
+        "isValid(I)Z": [
+          {
+            "offset": 0,
+            "op": "const/4",
+            "args": "v0, 0"
+          },
+          {
+            "offset": 2,
+            "op": "if-eqz",
+            "args": "v2, +005h"
+          },
+          {
+            "offset": 6,
+            "op": "const/4",
+            "args": "v1, 1"
+          },
+          {
+            "offset": 8,
+            "op": "if-ne",
+            "args": "v2, v1, +003h"
+          },
+          {
+            "offset": 12,
+            "op": "const/4",
+            "args": "v0, 1"
+          },
+          {
+            "offset": 14,
+            "op": "return",
+            "args": "v0"
+          }
+        ],
+        "toString(I)Ljava/lang/String;": [
+          {
+            "offset": 0,
+            "op": "new-instance",
+            "args": "v0, Ljava/lang/StringBuilder;"
+          },
+          {
+            "offset": 4,
+            "op": "invoke-direct",
+            "args": "v0, Ljava/lang/StringBuilder;-><init>()V"
+          },
+          {
+            "offset": 10,
+            "op": "const-string",
+            "args": "v1, \"Invalid = \""
+          },
+          {
+            "offset": 14,
+            "op": "invoke-virtual",
+            "args": "v0, v1, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;"
+          },
+          {
+            "offset": 20,
+            "op": "invoke-virtual",
+            "args": "v0, v2, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;"
+          },
+          {
+            "offset": 26,
+            "op": "invoke-virtual",
+            "args": "v0, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;"
+          },
+          {
+            "offset": 32,
+            "op": "move-result-object",
+            "args": "v0"
+          },
+          {
+            "offset": 34,
+            "op": "packed-switch",
+            "args": "v2, +000000bh"
+          },
+          {
+            "offset": 40,
+            "op": "goto",
+            "args": "+7h"
+          },
+          {
+            "offset": 42,
+            "op": "const-string",
+            "args": "v0, \"Off\""
+          },
+          {
+            "offset": 46,
+            "op": "goto",
+            "args": "+4h"
+          },
+          {
+            "offset": 48,
+            "op": "const-string",
+            "args": "v0, \"On\""
+          },
+          {
+            "offset": 52,
+            "op": "nop",
+            "args": ""
+          },
+          {
+            "offset": 54,
+            "op": "return-object",
+            "args": "v0"
+          },
+          {
+            "offset": 56,
+            "op": "packed-switch-payload",
+            "args": "0 1"
+          }
+        ]
+      }
+    }
+  },
+  "steering_sign_gap": "The raw getter and Sensor scaler inspected here do not sign-extend16 bits. Logs contain values near65536. This is an unresolved representation/runtime path issue, not a verified signed decoding formula.",
+  "unit_provenance_gap": "Arithmetic constants and associations are established from DEX. Exact physical unit labels must also be read from typed API contract or actual consumer, not guessed from plausible numbers."
+}

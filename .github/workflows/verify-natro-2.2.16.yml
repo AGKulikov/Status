@@ -1,0 +1,105 @@
+name: Verify and build Natro 2.2.16
+
+on:
+  push:
+    branches: ['release/natro-2.2.16']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: '2.2.16'
+      VERSION_CODE: '208021250'
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Java 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Test and build unsigned release
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
+        run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+      - name: Verify identity and isolate unsigned APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "if (version == '2.2.16')" build.gradle
+          grep -Fq 'return 208021250' build.gradle
+          test -z "$(find app ios -type f \( -name '*.p8' -o -name 'AuthKey_*.p8' \) -print -quit)"
+          APK=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
+          test -n "$APK"
+          mv "$APK" "$RUNNER_TEMP/Natro-2.2.16-unsigned-release.apk"
+      - name: Upload unsigned candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Natro-2.2.16-unsigned-release
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/Natro-2.2.16-unsigned-release.apk
+      - name: Detect stable signing material
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          configured=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || configured=$((configured + 1))
+          done
+          test "$configured" = 0 -o "$configured" = 3
+          test "$configured" = 3 && echo 'available=true' >> "$GITHUB_OUTPUT" \
+            || echo 'available=false' >> "$GITHUB_OUTPUT"
+      - name: Sign with stable Natro update certificate
+        if: steps.signing.outputs.available == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STABLE_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
+        run: |
+          set -euo pipefail
+          umask 077
+          KEYSTORE="$RUNNER_TEMP/natro-stable-update.jks"
+          SIGNED="$RUNNER_TEMP/Natro-2.2.16-signed.apk"
+          trap 'shred -u -- "$KEYSTORE" 2>/dev/null || true' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          export KEY_PASSWORD
+          CERT=$(keytool -J-Duser.language=en -J-Duser.country=US -list -v \
+            -keystore "$KEYSTORE" -alias "$KEY_ALIAS" -storepass:env KEY_PASSWORD \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          test "$CERT" = "$STABLE_CERT_SHA256"
+          TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          "$TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEY_PASSWORD --key-pass env:KEY_PASSWORD --min-sdk-version 28 \
+            --v1-signing-enabled false --v2-signing-enabled false \
+            --v3-signing-enabled true --v4-signing-enabled false \
+            --out "$SIGNED" "$RUNNER_TEMP/Natro-2.2.16-unsigned-release.apk"
+          "$TOOLS/zipalign" -c -P 16 -v 4 "$SIGNED" >/dev/null
+          "$TOOLS/aapt" dump badging "$SIGNED" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='208021250' versionName='2.2.16'"
+          "$TOOLS/apksigner" verify --verbose --print-certs --min-sdk-version 28 "$SIGNED" \
+            | tee "$RUNNER_TEMP/Natro-2.2.16-certificates.txt"
+          grep -Fq "Signer #1 certificate SHA-256 digest: $STABLE_CERT_SHA256" \
+            "$RUNNER_TEMP/Natro-2.2.16-certificates.txt"
+      - name: Upload signed update
+        if: steps.signing.outputs.available == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Natro-2.2.16-signed-stable-update
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            ${{ runner.temp }}/Natro-2.2.16-signed.apk
+            ${{ runner.temp }}/Natro-2.2.16-certificates.txt

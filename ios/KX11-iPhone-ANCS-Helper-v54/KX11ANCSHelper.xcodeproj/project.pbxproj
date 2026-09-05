@@ -1,0 +1,282 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1B0000010000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000010000000000000001 /* AppDelegate.swift */; };
+		1B0000020000000000000002 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000020000000000000002 /* ViewController.swift */; };
+		1B00000A000000000000000A /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B00000C000000000000000C /* SceneDelegate.swift */; };
+		1B0000030000000000000003 /* BleRoleSwitchPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000050000000000000005 /* BleRoleSwitchPolicy.swift */; };
+		1B0000040000000000000004 /* IphoneBleWireProtocolV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000060000000000000006 /* IphoneBleWireProtocolV2.swift */; };
+		1B0000050000000000000005 /* HelperPeripheralRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000070000000000000007 /* HelperPeripheralRoute.swift */; };
+		1B0000060000000000000006 /* HelperCentralRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000080000000000000008 /* HelperCentralRoute.swift */; };
+		1B0000070000000000000007 /* HelperBleRuntimeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000090000000000000009 /* HelperBleRuntimeCoordinator.swift */; };
+		1B0000080000000000000008 /* HelperSwitchRuntimeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B00000A000000000000000A /* HelperSwitchRuntimeCoordinator.swift */; };
+		1B0000090000000000000009 /* HelperTelemetrySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B00000B000000000000000B /* HelperTelemetrySource.swift */; };
+		1B00000B000000000000000B /* HelperEnrollmentV1.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B00000D000000000000000D /* HelperEnrollmentV1.swift */; };
+		1B00000C000000000000000C /* CarRemoteProtocolV1.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B00000E000000000000000E /* CarRemoteProtocolV1.swift */; };
+		1B00000D000000000000000D /* CarControlUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B00000F000000000000000F /* CarControlUI.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		2B0000010000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		2B0000020000000000000002 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		2B0000030000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		2B0000040000000000000004 /* KX11ANCSHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KX11ANCSHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2B0000050000000000000005 /* BleRoleSwitchPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BleRoleSwitchPolicy.swift; sourceTree = "<group>"; };
+		2B0000060000000000000006 /* IphoneBleWireProtocolV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IphoneBleWireProtocolV2.swift; sourceTree = "<group>"; };
+		2B0000070000000000000007 /* HelperPeripheralRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperPeripheralRoute.swift; sourceTree = "<group>"; };
+		2B0000080000000000000008 /* HelperCentralRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperCentralRoute.swift; sourceTree = "<group>"; };
+		2B0000090000000000000009 /* HelperBleRuntimeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperBleRuntimeCoordinator.swift; sourceTree = "<group>"; };
+		2B00000A000000000000000A /* HelperSwitchRuntimeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperSwitchRuntimeCoordinator.swift; sourceTree = "<group>"; };
+		2B00000B000000000000000B /* HelperTelemetrySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperTelemetrySource.swift; sourceTree = "<group>"; };
+		2B00000C000000000000000C /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		2B00000D000000000000000D /* HelperEnrollmentV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperEnrollmentV1.swift; sourceTree = "<group>"; };
+		2B00000E000000000000000E /* CarRemoteProtocolV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarRemoteProtocolV1.swift; sourceTree = "<group>"; };
+		2B00000F000000000000000F /* CarControlUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarControlUI.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3B0000010000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4B0000010000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				4B0000020000000000000002 /* KX11ANCSHelper */,
+				4B0000040000000000000004 /* TransportCore */,
+				4B0000030000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4B0000020000000000000002 /* KX11ANCSHelper */ = {
+			isa = PBXGroup;
+			children = (
+				2B0000010000000000000001 /* AppDelegate.swift */,
+				2B00000C000000000000000C /* SceneDelegate.swift */,
+				2B0000020000000000000002 /* ViewController.swift */,
+				2B00000F000000000000000F /* CarControlUI.swift */,
+				2B0000030000000000000003 /* Info.plist */,
+			);
+			path = KX11ANCSHelper;
+			sourceTree = "<group>";
+		};
+		4B0000030000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2B0000040000000000000004 /* KX11ANCSHelper.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4B0000040000000000000004 /* TransportCore */ = {
+			isa = PBXGroup;
+			children = (
+				2B0000050000000000000005 /* BleRoleSwitchPolicy.swift */,
+				2B0000060000000000000006 /* IphoneBleWireProtocolV2.swift */,
+				2B00000D000000000000000D /* HelperEnrollmentV1.swift */,
+				2B00000E000000000000000E /* CarRemoteProtocolV1.swift */,
+				2B0000070000000000000007 /* HelperPeripheralRoute.swift */,
+				2B0000080000000000000008 /* HelperCentralRoute.swift */,
+				2B0000090000000000000009 /* HelperBleRuntimeCoordinator.swift */,
+				2B00000A000000000000000A /* HelperSwitchRuntimeCoordinator.swift */,
+				2B00000B000000000000000B /* HelperTelemetrySource.swift */,
+			);
+			name = TransportCore;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5B0000010000000000000001 /* KX11ANCSHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8B0000020000000000000002 /* Build configuration list for PBXNativeTarget "KX11ANCSHelper" */;
+			buildPhases = (
+				6B0000010000000000000001 /* Sources */,
+				3B0000010000000000000001 /* Frameworks */,
+				7B0000010000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KX11ANCSHelper;
+			productName = KX11ANCSHelper;
+			productReference = 2B0000040000000000000004 /* KX11ANCSHelper.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5B0000020000000000000002 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					5B0000010000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = 8B0000010000000000000001 /* Build configuration list for PBXProject "KX11ANCSHelper" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 4B0000010000000000000001;
+			productRefGroup = 4B0000030000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5B0000010000000000000001 /* KX11ANCSHelper */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7B0000010000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6B0000010000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1B0000010000000000000001 /* AppDelegate.swift in Sources */,
+				1B00000A000000000000000A /* SceneDelegate.swift in Sources */,
+				1B0000020000000000000002 /* ViewController.swift in Sources */,
+				1B00000D000000000000000D /* CarControlUI.swift in Sources */,
+				1B0000030000000000000003 /* BleRoleSwitchPolicy.swift in Sources */,
+				1B0000040000000000000004 /* IphoneBleWireProtocolV2.swift in Sources */,
+				1B00000B000000000000000B /* HelperEnrollmentV1.swift in Sources */,
+				1B00000C000000000000000C /* CarRemoteProtocolV1.swift in Sources */,
+				1B0000050000000000000005 /* HelperPeripheralRoute.swift in Sources */,
+				1B0000060000000000000006 /* HelperCentralRoute.swift in Sources */,
+				1B0000070000000000000007 /* HelperBleRuntimeCoordinator.swift in Sources */,
+				1B0000080000000000000008 /* HelperSwitchRuntimeCoordinator.swift in Sources */,
+				1B0000090000000000000009 /* HelperTelemetrySource.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		9B0000010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		9B0000020000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		9B0000030000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 54;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KX11ANCSHelper/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 54.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		9B0000040000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 54;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KX11ANCSHelper/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 54.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		8B0000010000000000000001 /* Build configuration list for PBXProject "KX11ANCSHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9B0000010000000000000001 /* Debug */,
+				9B0000020000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8B0000020000000000000002 /* Build configuration list for PBXNativeTarget "KX11ANCSHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9B0000030000000000000003 /* Debug */,
+				9B0000040000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5B0000020000000000000002 /* Project object */;
+}

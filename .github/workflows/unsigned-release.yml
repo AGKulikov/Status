@@ -1,0 +1,134 @@
+name: Build unsigned release candidate
+
+on:
+  push:
+    branches: ['release/v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unsigned-release-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build exact unsigned release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#release/}"
+          [[ "$VERSION" =~ ^v2\.8\.2-ha([0-9]+)$ ]]
+          REVISION="${BASH_REMATCH[1]}"
+          VERSION_CODE=$((208020000 + REVISION))
+          test "$VERSION_CODE" -gt 208021081
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Test and build exact unsigned release
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          ALLOW_UNSIGNED_RELEASE: 'true'
+          HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          test ! -e keystore.jks
+          chmod +x gradlew
+          ./gradlew --no-daemon --no-configuration-cache clean
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 testGeelyDebugUnitTest
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 assembleGeelyRelease
+
+          APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+          test -f "$APK"
+          unzip -Z1 "$APK" | grep -Fx 'resources.arsc'
+          RESOURCE_ENTRIES=$(unzip -Z1 "$APK" | grep -c '^res/')
+          test "$RESOURCE_ENTRIES" -gt 500
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump resources "$APK" >/dev/null
+          BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
+          echo "$BADGING"
+          echo "$BADGING" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='${VERSION_CODE}' versionName='${VERSION_NAME}'"
+          echo "$BADGING" | grep -F "sdkVersion:'28'"
+          echo "$BADGING" | grep -F "targetSdkVersion:'28'"
+          if echo "$BADGING" | grep -Fq "application-debuggable"; then
+            echo "Release candidate must not be debuggable" >&2
+            exit 1
+          fi
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
+          if "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$APK"; then
+            echo "Release handoff unexpectedly contains a signature" >&2
+            exit 1
+          fi
+
+          mkdir -p release-out
+          NAME="status-widget-ha-${VERSION_NAME}-unsigned.apk"
+          cp "$APK" "release-out/$NAME"
+          SHA=$(sha256sum "release-out/$NAME" | awk '{print $1}')
+          printf '%s  %s\n' "$SHA" "$NAME" > "release-out/$NAME.sha256"
+          jq -n \
+            --arg tag "$VERSION_NAME" \
+            --arg package "ru.natro.statuswidget" \
+            --arg versionName "$VERSION_NAME" \
+            --arg sourceSha "$HEAD_SHA" \
+            --arg workflowRunId "$GITHUB_RUN_ID" \
+            --arg unsignedSha256 "$SHA" \
+            --argjson versionCode "$VERSION_CODE" \
+            '{
+              tag: $tag,
+              package: $package,
+              versionName: $versionName,
+              versionCode: $versionCode,
+              sourceSha: $sourceSha,
+              workflowRunId: $workflowRunId,
+              unsignedSha256: $unsignedSha256
+            }' > release-out/manifest.json
+
+          # Keep offline recovery signing on the trusted workstation: upload the official
+          # Android SDK signer beside the unsigned bytes, never a keystore or password.
+          TOOLS="release-out/android-build-tools-36.0.0"
+          mkdir -p "$TOOLS/lib"
+          cp "$ANDROID_HOME/build-tools/36.0.0/apksigner" "$TOOLS/apksigner"
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" \
+            "$TOOLS/lib/apksigner.jar"
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" "$TOOLS/zipalign"
+          cp "$ANDROID_HOME/build-tools/36.0.0/NOTICE.txt" "$TOOLS/NOTICE.txt"
+
+      - name: Upload verified unsigned handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-widget-ha-${{ steps.version.outputs.name }}-unsigned
+          path: release-out/*
+          if-no-files-found: error
+          retention-days: 30

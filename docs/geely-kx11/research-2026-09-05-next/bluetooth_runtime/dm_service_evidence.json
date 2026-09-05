@@ -1,0 +1,1214 @@
+{
+  "schema_version": 1,
+  "scope": "Offline actual ts-dm-service server DEX and source presence correction; no physical acceptance",
+  "source": {
+    "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+    "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+    "bytes": 641997,
+    "basename": "ts-dm-service.apk",
+    "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+    "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1"
+  },
+  "duplicate_source": {
+    "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+    "member": "KX11-Cruise-Trace-20260809-085503/packages/com_ts_dm_service/ts-dm-service.apk",
+    "bytes": 641997,
+    "basename": "ts-dm-service.apk",
+    "archive_sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+    "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1"
+  },
+  "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+  "findings": [
+    {
+      "id": "DM01",
+      "namespace": "Android Binder / permission",
+      "kind": "observation_static_body",
+      "claim_ru": "onBind возвращает конкретный Stub d; connect/connectByRequest/disconnect требуют car.permission.CHANGE_DM_STATE, UID1000 обходится без permission query; прочие callers проходят checkCallingOrSelfPermission либо SecurityException.",
+      "limits_ru": "exported=true не означает доступность операции стороннему UID.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/service/DeviceManagerService;",
+          "method": "onBind",
+          "descriptor": "(Landroid/content/Intent;)Landroid/os/IBinder;",
+          "code_item_offset": "0x61a88",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/service/d;",
+          "method": "connect",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x657f0",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/service/d;",
+          "method": "connectByRequest",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/ConnectRequest;)I",
+          "code_item_offset": "0x65820",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/service/d;",
+          "method": "disconnect",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x65850",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/service/d;",
+          "method": "k",
+          "descriptor": "(Ljava/lang/String;)V",
+          "code_item_offset": "0x65984",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    },
+    {
+      "id": "DM02",
+      "namespace": "DM capability → foundation profile → Android profile",
+      "kind": "observation_static_body",
+      "claim_ru": "Controller делегирует ConnectionManager. Capability0 отвергается; 5 и6 идут в BtManager; 5 переводится в foundation profile1/HFP, 6 в profile2/A2DP. Низкоуровневый return1 превращается в DM return0, другие значения в -1.",
+      "limits_ru": "Это разные namespace. Android proxy16/11 доказаны отдельно BT-ST-001–003; return0 DM не есть физический connected.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/a;",
+          "method": "connect",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x59cfc",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/a;",
+          "method": "a",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/ConnectRequest;)I",
+          "code_item_offset": "0x59cb0",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/a;",
+          "method": "disconnect",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x59d58",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "a",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/ConnectRequest;)I",
+          "code_item_offset": "0x5a870",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "connect",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x5a918",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "disconnect",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x5a9a0",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/btmanager/a;",
+          "method": "connectProfile",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x5a138",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/btmanager/a;",
+          "method": "disconnectProfile",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x5a224",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/btmanager/a;",
+          "method": "i",
+          "descriptor": "(I)I",
+          "code_item_offset": "0x5a310",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    },
+    {
+      "id": "DM03",
+      "namespace": "FoundationProvider / IBluetoothManger",
+      "kind": "observation_static_body",
+      "claim_ru": "BluetoothDeviceManager создаётся factory d, запрашивает IBluetoothManger у FoundationProvider; connect/disconnect проходят через этот интерфейс, а не через собственный BluetoothGatt.",
+      "limits_ru": "Объявленные uses-library ts.platform.library и ts.dm.foundation.lib согласуются с маршрутом; точный runtime classloader origin одним manifest не доказан.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/d;",
+          "method": "a",
+          "descriptor": "(Landroid/content/Context; Landroid/os/Looper;)Lcom/ts/dm/lib/devicemanager/bluetooth/d;",
+          "code_item_offset": "0x5ea20",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "<init>",
+          "descriptor": "(Landroid/content/Context; Landroid/os/Looper;)V",
+          "code_item_offset": "0x5e304",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "connectProfile",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x5c650",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "disconnectProfile",
+          "descriptor": "(Ljava/lang/String; I)I",
+          "code_item_offset": "0x5c678",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    },
+    {
+      "id": "DM04",
+      "namespace": "DM local capability state / request admission",
+      "kind": "observation_static_body",
+      "claim_ru": "Connect возвращает1 для local state3/4 либо уже pending CONNECT; иначе вызывает foundation connectProfile. При return1 сам создаёт ProfileStatus3 callback и ставит 10000ms timer.",
+      "limits_ru": "Вызов onDeviceProfileStatusChanged может быть синтетическим подтверждением начала; не следует объявлять его независимым аппаратным feedback.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "c",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; I)I",
+          "code_item_offset": "0x5df8c",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "d",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; I)V",
+          "code_item_offset": "0x5e508",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "a",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; I I)Lts/car/dm/fsdk/interfaces/BluetoothDevice;",
+          "code_item_offset": "0x5e2a8",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "onDeviceProfileStatusChanged",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice; I)V",
+          "code_item_offset": "0x5e788",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    },
+    {
+      "id": "DM05",
+      "namespace": "Foundation ProfileStatus versus DM capability state",
+      "kind": "observation_static_body",
+      "claim_ru": "Disconnect для состояния вне3/4 возвращает1 без нового native вызова; pending DISCONNECT тоже дедуплицируется. После принятого запроса синтезируется foundation ProfileStatus2/DISCONNECTING. util.b.q переводит foundation2→DM5,3→3,4→4; default→2.",
+      "limits_ru": "Число2 нельзя переносить между namespace; constructed IllegalArgumentException в default не бросается, фактический return2.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "e",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; I)I",
+          "code_item_offset": "0x5e0a4",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "f",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; I)V",
+          "code_item_offset": "0x5e5a8",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/util/b;",
+          "method": "q",
+          "descriptor": "(I)I",
+          "code_item_offset": "0x61914",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    },
+    {
+      "id": "DM06",
+      "namespace": "Handler timeout / status reconciliation",
+      "kind": "observation_static_body",
+      "claim_ru": "Оба timer Runnable через10000ms перечитывают actual foundation getProfileConnectionState, создают callback текущего состояния и удаляют pending token. Оба используют один текст connect profile timeout, включая DISCONNECT timer.",
+      "limits_ru": "В этих Runnable нет повторного connect, adapter reset или удаления пары. Название log-сообщения не устанавливает тип запроса или физический сбой.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "d",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; I)V",
+          "code_item_offset": "0x5e508",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "f",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; I)V",
+          "code_item_offset": "0x5e5a8",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/b;",
+          "method": "run",
+          "descriptor": "()V",
+          "code_item_offset": "0x5e870",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/c;",
+          "method": "run",
+          "descriptor": "()V",
+          "code_item_offset": "0x5e95c",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "a",
+          "descriptor": "(Lcom/ts/dm/lib/devicemanager/bluetooth/a; Lcom/ts/car/sdk/dm/data/DmDevice; I)I",
+          "code_item_offset": "0x5df70",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "h",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; I)I",
+          "code_item_offset": "0x5e1fc",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    },
+    {
+      "id": "DM07",
+      "namespace": "Device update / pending cancellation",
+      "kind": "observation_static_body",
+      "claim_ru": "DeviceManager.l сначала вызывает BluetoothDeviceManager.v, затем listeners. v проверяет CONNECT/DISCONNECT для HFP/A2DP; pending CONNECT удаляется после выхода local state из3, DISCONNECT после выхода из5.",
+      "limits_ru": "Cleanup зависит от обновления модели устройства; он не добавляет самостоятельной диагностики причины разрыва.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "l",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice;)V",
+          "code_item_offset": "0x5da6c",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "v",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice;)V",
+          "code_item_offset": "0x5e7ec",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "b",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; Ljava/lang/String; I)V",
+          "code_item_offset": "0x5e3d0",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "a",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; Lts/car/dm/fsdk/interfaces/BluetoothDevice; I)V",
+          "code_item_offset": "0x5d208",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    },
+    {
+      "id": "DM08",
+      "namespace": "Projection/HFP arbitration",
+      "kind": "observation_static_body",
+      "claim_ru": "ConnectionManager регистрируется listener. Если обновлённое устройство имеет connected capability1 или2, b(device) перебирает device list и вызывает capability5/HFP disconnect у устройств с другим непустым адресом. Projection update e(...).+0x11a проходит в этот listener через DeviceManager.l.",
+      "limits_ru": "Это статическая политика модели projection; факт её исполнения в конкретной Bluetooth-эпохе пока не найден. Адреса устройств не сохраняются.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "<init>",
+          "descriptor": "(Landroid/content/Context; Lcom/ts/dm/lib/devicemanager/a;)V",
+          "code_item_offset": "0x5aa30",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "c",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice;)Z",
+          "code_item_offset": "0x5a83c",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "b",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice;)V",
+          "code_item_offset": "0x5aad4",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "a",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice; Lcom/ts/car/sdk/dm/data/DmDevice;)V",
+          "code_item_offset": "0x5aa74",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "e",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/ProjectionDevice; I)Lcom/ts/car/sdk/dm/data/DmDevice;",
+          "code_item_offset": "0x5c424",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "l",
+          "descriptor": "(Lcom/ts/car/sdk/dm/data/DmDevice;)V",
+          "code_item_offset": "0x5da6c",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    },
+    {
+      "id": "DM09",
+      "namespace": "Projection/HFP callback arbitration",
+      "kind": "observation_static_body",
+      "claim_ru": "При наличии tracked projection device новый профиль того же устройства игнорируется. Для другого устройства с connected HFP вызывается disconnect(capability5) по +0x92. Соседняя ветка A2DP имеет только log diconnect new A2DP connect и return; вызова disconnect в ней нет.",
+      "limits_ru": "Tracked projection reference не равно независимому подтверждению активной физической projection. Лог A2DP не доказывает выполненное отключение.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "onDeviceProfileStatusChanged",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice; I)V",
+          "code_item_offset": "0x5ab98",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "a",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice;)Z",
+          "code_item_offset": "0x5a770",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "b",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice;)Z",
+          "code_item_offset": "0x5a7d4",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/util/b;",
+          "method": "a",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice; Lcom/ts/car/sdk/dm/data/DmDevice;)Z",
+          "code_item_offset": "0x61618",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/projectionmanager/a;",
+          "method": "w",
+          "descriptor": "()Lcom/ts/car/sdk/dm/data/DmDevice;",
+          "code_item_offset": "0x5fb60",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/b;",
+          "method": "w",
+          "descriptor": "()Lcom/ts/car/sdk/dm/data/DmDevice;",
+          "code_item_offset": "0x5adf8",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    },
+    {
+      "id": "DM10",
+      "namespace": "Package identity / provenance",
+      "kind": "observation_metadata",
+      "claim_ru": "APK 4.5.9.0/versionCode28 имеется в двух Cruise-архивах с одним SHA; все шесть Bluetooth dumpsys имеют те же package version fields.",
+      "limits_ru": "Совпадение versionCode/versionName не доказывает байтовую идентичность APK августа14–15; свежий SHA проверяется перед решением о повторном переносе.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+          "member": "KX11-Cruise-Trace-20260809-085503/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1"
+        },
+        {
+          "member": "AndroidManifest.xml",
+          "container_member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "container_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "member_sha256": "e206f059f835a802af3273136ae984bef44f6361bc5882c72c1d536ba5f06e88",
+          "binary_xml_attributes": {
+            "package": "com.ts.dm.service",
+            "versionCode": 28,
+            "versionName": "4.5.9.0",
+            "exported": true,
+            "uses_library": [
+              "ts.platform.library",
+              "ts.dm.foundation.lib"
+            ]
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+          "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+          "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+          "member_sha256": "746987940c62cf845905cb32904c11e8fcaae8fd12faabefbc94a566db3677c6",
+          "lines": [
+            30,
+            35,
+            36
+          ],
+          "fields": {
+            "codePath": "/system/app/ts-dm-service",
+            "versionCode": "28",
+            "versionName": "4.5.9.0"
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+          "member_sha256": "4ffc0dc1b5a874a87e6c202cf14ebef9f8a58f1130c26e990f55fbe10c814003",
+          "lines": [
+            30,
+            35,
+            36
+          ],
+          "fields": {
+            "codePath": "/system/app/ts-dm-service",
+            "versionCode": "28",
+            "versionName": "4.5.9.0"
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+          "member_sha256": "56982dc4b8c0b0e0f01b0cca5c770070e4a7a55da565a30f0a3d9c806902cce0",
+          "lines": [
+            30,
+            35,
+            36
+          ],
+          "fields": {
+            "codePath": "/system/app/ts-dm-service",
+            "versionCode": "28",
+            "versionName": "4.5.9.0"
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+          "member_sha256": "3d23a6049f0e2245e97912a9f27a36ca5e91a9f701fb5614c2e5edfd9afff741",
+          "lines": [
+            30,
+            35,
+            36
+          ],
+          "fields": {
+            "codePath": "/system/app/ts-dm-service",
+            "versionCode": "28",
+            "versionName": "4.5.9.0"
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+          "member_sha256": "4d0b8d325244a2162e2bbc93c720d4883a5829f578792df7524fa87689f0d7ff",
+          "lines": [
+            30,
+            35,
+            36
+          ],
+          "fields": {
+            "codePath": "/system/app/ts-dm-service",
+            "versionCode": "28",
+            "versionName": "4.5.9.0"
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+          "member_sha256": "4d0b8d325244a2162e2bbc93c720d4883a5829f578792df7524fa87689f0d7ff",
+          "lines": [
+            30,
+            35,
+            36
+          ],
+          "fields": {
+            "codePath": "/system/app/ts-dm-service",
+            "versionCode": "28",
+            "versionName": "4.5.9.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "DM11",
+      "namespace": "Runtime selected DM log tags",
+      "kind": "observation_scoped_negative",
+      "claim_ru": "Пять точных DM arbitration/timeout-сообщений под tags ConnectionManager/BluetoothDeviceManager не встречены в шести сохранённых Bluetooth slices.",
+      "limits_ru": "Срезы фильтрованные; отсутствие строки не доказывает неисполнение кода или причину Natro teardown.",
+      "evidence": [
+        {
+          "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+          "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+          "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "9c2ef5ecbae8c3b9ec633aeb438a465bb914d86abd0962ab5621cc4b78d2819c",
+          "line_range": [
+            1,
+            3605
+          ],
+          "counts": {
+            "new_hfp_disconnect": 0,
+            "a2dp_log_only": 0,
+            "no_projection": 0,
+            "same_device_ignored": 0,
+            "profile_timeout": 0
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+          "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+          "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8f64e420a0443680a25cf6bf15c43a1d3e517a19501ffe89cd209602850b436a",
+          "line_range": [
+            1,
+            81687
+          ],
+          "counts": {
+            "new_hfp_disconnect": 0,
+            "a2dp_log_only": 0,
+            "no_projection": 0,
+            "same_device_ignored": 0,
+            "profile_timeout": 0
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+          "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+          "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+          "line_range": [
+            1,
+            51913
+          ],
+          "counts": {
+            "new_hfp_disconnect": 0,
+            "a2dp_log_only": 0,
+            "no_projection": 0,
+            "same_device_ignored": 0,
+            "profile_timeout": 0
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+          "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+          "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "4c3a5240662c15e09da0826e7a16199df50ad70bf6b600f74f68c0bf8c72ef15",
+          "line_range": [
+            1,
+            16820
+          ],
+          "counts": {
+            "new_hfp_disconnect": 0,
+            "a2dp_log_only": 0,
+            "no_projection": 0,
+            "same_device_ignored": 0,
+            "profile_timeout": 0
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+          "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+          "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+          "line_range": [
+            1,
+            83990
+          ],
+          "counts": {
+            "new_hfp_disconnect": 0,
+            "a2dp_log_only": 0,
+            "no_projection": 0,
+            "same_device_ignored": 0,
+            "profile_timeout": 0
+          }
+        },
+        {
+          "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+          "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+          "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+          "member_sha256": "8b588cdd8f0dac3b12658d17a77aa9c98b529f3b8a8c5a005582b172f58fc5a3",
+          "line_range": [
+            1,
+            10351
+          ],
+          "counts": {
+            "new_hfp_disconnect": 0,
+            "a2dp_log_only": 0,
+            "no_projection": 0,
+            "same_device_ignored": 0,
+            "profile_timeout": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "DM12",
+      "namespace": "DEX com/ts/dm scoped route search",
+      "kind": "observation_scoped_negative",
+      "claim_ru": "В инструкциях сохранённых com/ts/dm классов нет BluetoothGatt/connectGatt/ANCS/Ancs/ancs references.",
+      "limits_ru": "Это отрицание только указанного namespace/набора references, не доказательство отсутствия всех косвенных native возможностей или shared-library кода.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "method_bodies_scanned": 704,
+          "reference_patterns": [
+            "BluetoothGatt",
+            "connectGatt",
+            "ANCS",
+            "Ancs",
+            "ancs"
+          ],
+          "matches": []
+        }
+      ]
+    },
+    {
+      "id": "DM13",
+      "namespace": "Foundation callback → Handler → model → arbitration",
+      "kind": "observation_static_body",
+      "claim_ru": "BluetoothDeviceManager передаёт onDeviceProfileStatusChanged слушателям; DeviceManager ставит Runnable на свой Handler. Runnable вызывает c(BluetoothDevice,int): при найденной модели сначала обновляет её, затем рассылает profile callback слушателям, включая ConnectionManager.",
+      "limits_ru": "Та же callback-точка принимает синтетические статусы и timeout reconciliation. Сам callback не устанавливает независимый физический переход; неизвестное модели устройство этой веткой не рассылается. Поток Handler и задержка здесь не измерены.",
+      "evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "onDeviceProfileStatusChanged",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice; I)V",
+          "code_item_offset": "0x5e788",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/bluetooth/a;",
+          "method": "a",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice; I Lcom/ts/dm/lib/devicemanager/bluetooth/e;)V",
+          "code_item_offset": "0x5e3b8",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "onDeviceProfileStatusChanged",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice; I)V",
+          "code_item_offset": "0x5dd9c",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/-$$Lambda$a$1gW8Q_7rvATm3z4MN6P62a73UMY;",
+          "method": "run",
+          "descriptor": "()V",
+          "code_item_offset": "0x5baa0",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "lambda$1gW8Q_7rvATm3z4MN6P62a73UMY",
+          "descriptor": "(Lcom/ts/dm/lib/devicemanager/a; Lts/car/dm/fsdk/interfaces/BluetoothDevice; I)V",
+          "code_item_offset": "0x5daf0",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "c",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice; I)V",
+          "code_item_offset": "0x5d64c",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/devicemanager/a;",
+          "method": "b",
+          "descriptor": "(Lts/car/dm/fsdk/interfaces/BluetoothDevice; I)V",
+          "code_item_offset": "0x5d538",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+          "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+          "bytes": 641997,
+          "basename": "ts-dm-service.apk",
+          "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+          "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+          "dex_member": "classes.dex",
+          "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48",
+          "class": "Lcom/ts/dm/lib/connectionmanager/a;",
+          "method": "<init>",
+          "descriptor": "(Landroid/content/Context; Lcom/ts/dm/lib/devicemanager/a;)V",
+          "code_item_offset": "0x5aa30",
+          "instructions_offset_base": "code_item+0x10; relative instruction offsets in original DEX bytes"
+        }
+      ]
+    }
+  ]
+}

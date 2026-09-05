@@ -1,0 +1,39 @@
+{
+  "versionName": "2.7.7",
+  "versionCode": 208021310,
+  "package": "ru.natro.statuswidget",
+  "sourceCommit": "c84feb33e9d2d2b90a2d12ca30e6ca466edac7a3",
+  "sourceTree": "ea2a0f793101b1fb3b438551393eb1edd97b84f5",
+  "ciRunId": "33918568644",
+  "unsignedSha256": "56e552a5477075dd12494777e595ea2cbe7d99af322263e961351d306a767df8",
+  "signedApk": "Natro-2.7.7-signed.apk",
+  "signedSha256": "feb2a2aa258ad681475507d989d99e9f89bf20271a45edb97da3f1871e5a001e",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "signerCount": 1,
+  "zipalign16KiB": true,
+  "previous": {
+    "package": "ru.natro.statuswidget",
+    "versionCode": 208021309,
+    "versionName": "2.7.6",
+    "sha256": "34bcf7a40350a7f4cc620cb90a8a7316882d4a954a53e1babc134889d7df625f"
+  },
+  "installOverMetadataVerified": true,
+  "physicalKx11Verification": "pending",
+  "navigatorChanged": false,
+  "helperChanged": false,
+  "signingScriptSha256": "f03d428cc19f067dcb2ab54feefc117deb6ebbc7cbf84039b03fa4ffa38a2e4a",
+  "toolSha256": {
+    "aapt": "c076aeeee8bd3ce58395a093747202265ab80c6c12e59358f598a30a81fde13b",
+    "apksigner": "b47549e373b895ce6ca620d0c7887e674d9615ffa837a86ac601dcfd04adb0f0",
+    "lib/apksigner.jar": "3716d9311e55d2b0918a2fd9d54ba9e406c5f6abeea700b287f11259bc163dec",
+    "lib64/libLLVM_android.so": "f35907663f0069916f86aaafceadc55698f02a8f8cfc21bcd91833f849b2dc09",
+    "lib64/libbcc.so": "f69fd124a305f6d9774e62759e21f6aeea7f12745189d9d4b4ae99977761d83b",
+    "lib64/libbcinfo.so": "ff584620b65dfee59bcb5050c692398cf03fe9326b1e6daf1a92f1f30ac24cc6",
+    "lib64/libc++.so": "96a19cd2154a4423a61f8444e5d3148a608fa3033bc1a22285d19855a950d05a",
+    "lib64/libc++.so.1": "7eb2812ec39ab5c31f2fc9f906f412c713e76e0d07d6a6911108c7f886e24945",
+    "lib64/libclang_android.so": "f18899cc604a3a1a9b836804cdfeb1ff96b25faff2b75f5ff451037a4308660f",
+    "zipalign": "c5f559e946de5a9e7d58792181db20383b228877812136bc469d97ae00a43b0a"
+  }
+}

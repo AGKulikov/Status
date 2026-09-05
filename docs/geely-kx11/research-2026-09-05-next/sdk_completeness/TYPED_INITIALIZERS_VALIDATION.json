@@ -1,0 +1,85 @@
+{
+  "schema": "independent-typed-initializer-validation-v1",
+  "all_checks_pass": true,
+  "method": "Independent raw DEX class_data and encoded_array parser; arithmetic signed extension; byte-padded IEEE float/double decoding; exact float comparison including signed zero; NaN/Infinity payload preservation.",
+  "scope_prefixes": [
+    "Lcom/ecarx/",
+    "Lecarx/",
+    "Lvendor/ecarx/",
+    "Landroid/car/",
+    "Lcom/ts/"
+  ],
+  "counts": {
+    "all_encoded_static_initializers": 934525,
+    "all_field_declarations": 1618374,
+    "dex_files_checked": 621,
+    "scoped_field_occurrences_checked": 359668,
+    "scoped_encoded_static_initializers_checked": 292645,
+    "scoped_primitive_initializers_checked": 283133,
+    "all_negative_signed_initializers": 11073,
+    "all_ieee_initializers_checked": 4712
+  },
+  "all_initializer_counts_by_kind": {
+    "boolean": 6327,
+    "byte": 2856,
+    "char": 1211,
+    "double": 750,
+    "float": 3962,
+    "int": 822647,
+    "long": 13629,
+    "null": 30537,
+    "short": 1054,
+    "string": 51552
+  },
+  "scoped_initializer_counts_by_kind": {
+    "boolean": 876,
+    "byte": 1225,
+    "double": 37,
+    "float": 236,
+    "int": 276284,
+    "long": 234,
+    "null": 3960,
+    "short": 281,
+    "string": 9512
+  },
+  "corrections": {
+    "published_records": 1280,
+    "independently_required_records": 1280,
+    "by_kind": {
+      "byte": 10,
+      "double": 37,
+      "float": 236,
+      "int": 940,
+      "long": 57
+    },
+    "affected_baseline_declarations": 84
+  },
+  "synthetic_vectors": {
+    "valid_vectors": 35,
+    "invalid_vectors_rejected": 8,
+    "all_pass": true,
+    "failed_synthetic_vectors": []
+  },
+  "failure_counts": {},
+  "failure_samples": [],
+  "provenance": {
+    "validator_sha256": "e06ef0079752139eab3f31a1cae1fd0ab715487f1c89638f0cc7bc230f489366",
+    "decoder_under_validation_sha256": "c1c9a7a7fe12502db982cc9530c54bcb81bab789eb7bea8fd3a8d052ac1aee61",
+    "catalog_sources_sha256": "2809bf43197f4e141284c7d95cf1b4bf6fe735b0b47178486a7190adb979eec6",
+    "catalog_fields_sha256": "7f185ac7451d2004ca10c1b8ee95164876bda84b6a192536ea63e14bd65816d4",
+    "catalog_corrections_sha256": "7318e9944ac7fba338ed3a87f3db85761a28219bf83a82a08f0ae92d2032aaf7",
+    "raw_source_id_and_sha256_pairs_sha256": "0a4fee5508b90b8169d2187487a860b86c117aeb16715658c9b565901d097c24",
+    "private_typed_cache_hash_pairs_sha256": "faaa8eceb9bf0431141a8dca7c0a9c4e98b9f1edf2bea52144173dc4d00c3d85"
+  },
+  "limitations": [
+    "Validates encoded initializers and catalog correction coverage, not class initializer execution or final effective runtime values.",
+    "Disk DEX identity does not establish runtime classloader origin or physical vehicle support.",
+    "String/reference payload metadata is checked, but resolved reference values are outside this primitive normalization check.",
+    "Original extractor values are checked for preservation between public catalog and correction records, not independently re-created."
+  ],
+  "runtime_class_origin_verified": false,
+  "effective_runtime_values_computed": false,
+  "firmware_executed": false,
+  "vehicle_commands_sent": false,
+  "public_output_contains_foreign_method_bodies": false
+}

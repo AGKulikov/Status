@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "scope": "addressed offline gaps only; no control commands, no account/profile/key databases",
+  "targets": [
+    {
+      "id": "COMFORT-XCHVAC",
+      "package": "ecarx.hvac.app",
+      "exact_path": "/system/priv-app/XCHvac/XCHvac.apk",
+      "artifact_kind": "APK and package-resolved split APKs if any",
+      "already_available": false,
+      "evidence": [
+        {
+          "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+          "archive_sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+          "member": "KX11-HU-Route-20260810-070911-29994-1234567/android/all-packages.txt",
+          "sha256": "5e413cbc64b7cc9b72a2daca1b5116d1873f7571b17403c650050e53ebadf6df",
+          "line": 70
+        }
+      ],
+      "needed_for": [
+        "TempManager LO/HI selection to setCustomizeFunctionValue and finite/grid guards",
+        "production HVAC REQUEST/CONFIRM dialog semantic buttons and lifecycle",
+        "fan/seat climate/front-rear consumer availability and callback gates"
+      ],
+      "collection_policy": "Resolve installed pm path for this exact package; collect APK/splits and SHA256; package metadata and existing PID maps only; do not start activity or send commands."
+    },
+    {
+      "id": "COMFORT-SETTINGS-ORIGIN",
+      "package": "ecarx.settings",
+      "exact_path": "/system/app/XCSettings2/XCSettings2.apk",
+      "artifact_kind": "metadata, SHA256 and current process maps first; APK only if current hash differs",
+      "already_available": true,
+      "available_sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "evidence": [
+        {
+          "archive": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+          "archive_sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+          "member": "KX11-HU-Route-20260810-070911-29994-1234567/android/all-packages.txt",
+          "sha256": "5e413cbc64b7cc9b72a2daca1b5116d1873f7571b17403c650050e53ebadf6df",
+          "line": 87
+        }
+      ],
+      "needed_for": [
+        "runtime binding for boolean BREATHE consumer versus RGB function at0x2a010300",
+        "loaded class origin for seat CANCEL/STOP branch"
+      ],
+      "collection_policy": "Hash/dumpsys package/current PID maps; avoid redundant binary if unchanged."
+    }
+  ],
+  "no_target_claims": [
+    "Whitelist-only ecarx.airconditioner.service is not established as installed service",
+    "No installed separate digital-key APK established by current package index",
+    "No request for profile/key databases or credentials"
+  ],
+  "note": "XCHvac absent from all102 original archive/APK containers and11673 inventoried members; external package state may be newer.",
+  "resolved_offline_questions": [
+    "COMF-019 stock seat consumer, inherited base fragment/activity cleanup and typed SeatAdjustEvent subscriber already read from pinned Settings APK; do not request these same classes as an open offline gap."
+  ]
+}

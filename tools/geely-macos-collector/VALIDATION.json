@@ -1,0 +1,36 @@
+{
+  "status": "OFFLINE_SOURCE_TESTS_PASS",
+  "host": "Linux",
+  "python": "3.12.13",
+  "tests": {
+    "collector_qnx_baseline_and_launcher": 42,
+    "bluetooth_projection": 7,
+    "total": 49,
+    "failed": 0
+  },
+  "checks": [
+    "SHA equality before accepting Android bytes",
+    "Bounded process stdout/stderr, timeout, cleanup",
+    "Known-content deduplication and source-path receipts",
+    "Missing, permission, malformed and partial statuses remain distinct",
+    "Selected ADB device and hostile shell text quoting",
+    "Fail-closed private Bluetooth projection",
+    "Fixed proven QNX file-only dialect, protocol/exit/hash failure cleanup",
+    "Exact LV image exception, device/symlink/directory type rejection",
+    "Actual Bash launcher and CLI in a directory with spaces using synthetic ADB",
+    "Generated tar manifest verified entry by entry"
+  ],
+  "finite_plan_counts": {
+    "android_files": 22,
+    "qnx_files": 5,
+    "packages": 13,
+    "not_collectable_as_files": 5
+  },
+  "known_hashes": 19069,
+  "registered_sources_checked": 158,
+  "real_macos_test": false,
+  "real_kx11_test": false,
+  "apk_build": false,
+  "vehicle_commands_sent": false,
+  "gate_049": "OPEN: real Mac/KX11 archive required"
+}

@@ -1,0 +1,594 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+package dezz.status.widget.hud;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import dezz.status.widget.automation.AutomationContract;
+import dezz.status.widget.integration.SourceBinding;
+
+/** Mutable editor model for one independently addressable HUD element. */
+public final class HudElementConfig {
+    public static final int SCHEMA_VERSION = 1;
+    public static final String DIRECT_MAP_RENDERER = "DIRECT_SURFACE_V2";
+    public static final int MAX_TITLE_CHARS = 160;
+    public static final int MAX_FORMAT_CHARS = 256;
+    public static final int MAX_OPTIONS_CHARS = 32_768;
+
+    @NonNull public String id;
+    @NonNull public HudElementType type;
+    @NonNull public String title;
+    public int x;
+    public int y;
+    public int width;
+    public int height;
+    public int zIndex;
+    public boolean enabled = true;
+    @NonNull public String automationId;
+    @Nullable public SourceBinding sourceBinding;
+    @NonNull public String telemetryMetricId = "";
+    @NonNull public String textFormat = "%s";
+    @NonNull public String unit = "";
+    @NonNull public String textColor = "#FFFFFFFF";
+    @NonNull public String unitColor = "#CCFFFFFF";
+    @NonNull public String backgroundColor = "#00000000";
+    /** Decorative settings are used only by {@link HudElementType#BACKDROP}. */
+    public int backgroundOpacityPercent = 72;
+    public int cornerRadiusPx = 18;
+    @NonNull public String borderColor = "#FFFFFFFF";
+    public int borderOpacityPercent;
+    public int borderWidthPx;
+    public int fontSizeSp = 34;
+    public int fontWeight = 600;
+    /** LEFT, CENTER or RIGHT. */
+    @NonNull public String alignment = "CENTER";
+    public boolean wrapText;
+    public int brightness = 100;
+    /** Forward-compatible type-specific options retained by import/export. */
+    @NonNull public JSONObject options = new JSONObject();
+
+    public HudElementConfig(@NonNull String id, @NonNull HudElementType type) {
+        this.id = AutomationContract.requireSafeId(id);
+        this.type = type;
+        title = type.label;
+        automationId = id;
+        telemetryMetricId = type.defaultMetricId;
+        width = type.defaultWidth;
+        height = type.defaultHeight;
+    }
+
+    @NonNull
+    public static HudElementConfig create(@NonNull HudElementType type, int ordinal,
+                                          int gridColumns, int gridRows) {
+        String base = "hud_" + type.name().toLowerCase(java.util.Locale.ROOT);
+        String id = ordinal <= 1 ? base : base + "_" + ordinal;
+        HudElementConfig result = new HudElementConfig(id, type);
+        result.x = Math.max(0, Math.min(gridColumns - result.width,
+                ((ordinal - 1) * 3) % Math.max(1, gridColumns)));
+        result.y = Math.max(0, Math.min(gridRows - result.height,
+                ((ordinal - 1) * 2) % Math.max(1, gridRows)));
+        result.applyTypeDefaults();
+        result.normalize(gridColumns, gridRows);
+        return result;
+    }
+
+    public void applyTypeDefaults() {
+        try {
+            switch (type) {
+                case BACKDROP:
+                    backgroundColor = "#FF121923";
+                    backgroundOpacityPercent = 72;
+                    cornerRadiusPx = 18;
+                    borderColor = "#FFFFFFFF";
+                    borderOpacityPercent = 0;
+                    borderWidthPx = 0;
+                    break;
+                case HORIZONTAL_GROUP:
+                    options.put("memberIds", new org.json.JSONArray());
+                    options.put("gapPx", 0);
+                    options.put("paddingLeftPx", 0);
+                    options.put("paddingTopPx", 0);
+                    options.put("paddingRightPx", 0);
+                    options.put("paddingBottomPx", 0);
+                    options.put("marginLeftPx", 0);
+                    options.put("marginTopPx", 0);
+                    options.put("marginRightPx", 0);
+                    options.put("marginBottomPx", 0);
+                    options.put("horizontalAlignment", 0);
+                    options.put("verticalAlignment", 1);
+                    options.put("distribution", 0);
+                    break;
+                case CLOCK:
+                    options.put("clockMode", "SYSTEM");
+                    break;
+                case NAV_MAP:
+                    options.put("renderer", DIRECT_MAP_RENDERER);
+                    options.put("cornerRadiusPx", 0);
+                    options.put("opacityPercent", 100);
+                    options.put("transparentBackground", false);
+                    break;
+                case NAV_MANEUVER_ARROW:
+                    options.put("arrowAnimation", true);
+                    options.put("arrowLayout", "LEFT");
+                    options.put("preferSourceImage", true);
+                    options.put("hideWhenInactive", true);
+                    break;
+                case NAV_COMBINED:
+                    // A self-contained HUD widget. It is deliberately not part of NAV_MAP and
+                    // therefore keeps its own geometry, visibility and presentation settings.
+                    options.put("arrowAnimation", true);
+                    options.put("arrowLayout", "LEFT");
+                    options.put("preferSourceImage", true);
+                    // The stock maneuver bitmap is authoritative. A guessed replacement can
+                    // communicate a different lane/exit geometry, so the card leaves the icon
+                    // area empty if Yandex has not supplied its bitmap yet.
+                    options.put("sourceImageOnly", true);
+                    options.put("hideWhenInactive", true);
+                    options.put("hideWhenEmpty", true);
+                    options.put("showCardBackground", true);
+                    options.put("showRoadBadge", true);
+                    options.put("showDirection", true);
+                    options.put("cardColor", "#FF0758E8");
+                    options.put("roadBadgeColor", "#FF16A34A");
+                    options.put("cardOpacityPercent", 94);
+                    options.put("cardCornerRadiusPx", 18);
+                    options.put("cardBorderColor", "#00000000");
+                    options.put("cardBorderWidthPx", 0);
+                    options.put("paddingLeftPx", 10);
+                    options.put("paddingTopPx", 8);
+                    options.put("paddingRightPx", 10);
+                    options.put("paddingBottomPx", 8);
+                    options.put("arrowAreaPercent", 38);
+                    options.put("arrowTextGapPx", 6);
+                    options.put("arrowPaddingLeftPx", 3);
+                    options.put("arrowPaddingTopPx", 3);
+                    options.put("arrowPaddingRightPx", 3);
+                    options.put("arrowPaddingBottomPx", 3);
+                    options.put("sourceIconScalePercent", 100);
+                    options.put("textPaddingLeftPx", 0);
+                    options.put("textPaddingTopPx", 0);
+                    options.put("textPaddingRightPx", 0);
+                    options.put("textPaddingBottomPx", 0);
+                    options.put("distanceFontSizeSp", 34);
+                    options.put("directionFontSizeSp", 18);
+                    options.put("roadBadgeFontSizeSp", 17);
+                    options.put("distanceAreaPercent", 56);
+                    options.put("textRowGapPx", 2);
+                    options.put("roadBadgePaddingHorizontalPx", 5);
+                    options.put("roadBadgePaddingVerticalPx", 2);
+                    break;
+                case NAV_ROUTE_SUMMARY:
+                    options.put("hideWhenInactive", true);
+                    options.put("hideWhenEmpty", true);
+                    options.put("showCardBackground", true);
+                    options.put("cardColor", "#F21B1F24");
+                    options.put("cardOpacityPercent", 100);
+                    options.put("cardCornerRadiusPx", 18);
+                    options.put("cardBorderColor", "#00000000");
+                    options.put("cardBorderWidthPx", 0);
+                    options.put("paddingLeftPx", 14);
+                    options.put("paddingTopPx", 9);
+                    options.put("paddingRightPx", 14);
+                    options.put("paddingBottomPx", 9);
+                    options.put("metricsFontSizeSp", 25);
+                    options.put("progressBarHeightPx", 8);
+                    options.put("progressBarTopGapPx", 7);
+                    options.put("freeColor", "#FF72E300");
+                    options.put("lightColor", "#FFFFCC00");
+                    options.put("hardColor", "#FFFF3B30");
+                    options.put("veryHardColor", "#FFB00020");
+                    options.put("blockedColor", "#FF7A1FA2");
+                    options.put("unknownColor", "#FF8E8E93");
+                    options.put("completedColor", "#FF858A93");
+                    options.put("markerColor", "#FFFFC400");
+                    break;
+                case NAV_LANES:
+                    options.put("laneDistancePosition", "BOTTOM");
+                    options.put("laneThresholdMeters", 700);
+                    options.put("preferSourceImage", true);
+                    options.put("highlightColor", "#FF34C759");
+                    options.put("hideWhenInactive", true);
+                    break;
+                case NAV_SPEED_LIMIT:
+                    options.put("whiteSign", true);
+                    options.put("routeOnly", false);
+                    options.put("onlyWhenExceeded", false);
+                    options.put("overspeedDelta", 10);
+                    options.put("overspeedBlink", true);
+                    break;
+                case NAV_TRAFFIC_LIGHTS:
+                    options.put("style", "CAPSULE");
+                    options.put("orientation", "VERTICAL");
+                    options.put("countdownSide", "BOTTOM");
+                    options.put("showFrame", true);
+                    options.put("arrowAnimation", true);
+                    options.put("redColor", "#FFFF3B30");
+                    options.put("yellowColor", "#FFFFCC00");
+                    options.put("greenColor", "#FF34C759");
+                    options.put("unknownColor", "#FF6B7280");
+                    break;
+                case NAV_TRAFFIC_JAM:
+                    // This is a standalone Canvas card. It appears only while Navigator exposes
+                    // the nullable JamForecast and never becomes part of NAV_MAP.
+                    options.put("hideWhenInactive", true);
+                    options.put("hideWhenEmpty", true);
+                    options.put("showCardBackground", true);
+                    options.put("cardColor", "#F21B1F24");
+                    options.put("cardOpacityPercent", 100);
+                    options.put("cardCornerRadiusPx", 16);
+                    options.put("cardBorderColor", "#00000000");
+                    options.put("cardBorderWidthPx", 0);
+                    options.put("paddingLeftPx", 12);
+                    options.put("paddingTopPx", 5);
+                    options.put("paddingRightPx", 12);
+                    options.put("paddingBottomPx", 5);
+                    break;
+                case NAV_TRIP_PROGRESS:
+                    options.put("progressMode", "COMBINED");
+                    options.put("orientation", "HORIZONTAL");
+                    break;
+                case NAV_JAM_PROGRESS:
+                    options.put("orientation", "HORIZONTAL");
+                    options.put("freeColor", "#FF34C759");
+                    options.put("lightColor", "#FFFFCC00");
+                    options.put("hardColor", "#FFFF3B30");
+                    options.put("veryHardColor", "#FFB00020");
+                    options.put("blockedColor", "#FF7A1FA2");
+                    options.put("unknownColor", "#FF8E8E93");
+                    break;
+                case NAV_ROUTE_GRAPHIC:
+                    options.put("freeColor", "#FF34C759");
+                    options.put("lightColor", "#FFFFCC00");
+                    options.put("hardColor", "#FFFF3B30");
+                    options.put("veryHardColor", "#FFB00020");
+                    options.put("blockedColor", "#FF7A1FA2");
+                    options.put("unknownColor", "#FF8E8E93");
+                    break;
+                case TURN_SIGNALS:
+                    textColor = "#FF34C759";
+                    // Fall through: shared animation/visibility defaults.
+                case TURN_SIGNAL_LEFT:
+                case TURN_SIGNAL_RIGHT:
+                    options.put("animated", true);
+                    options.put("blinkFrequencyMs", 500);
+                    options.put("graphicStyle", "CHEVRON");
+                    options.put("hideWhenInactive", true);
+                    break;
+                case GEAR:
+                    options.put("gearMode", "FULL");
+                    options.put("letterOnly", false);
+                    options.put("numberOnly", false);
+                    options.put("letterColor", "#FFFFFFFF");
+                    options.put("numberColor", "#FFFFFFFF");
+                    options.put("hideDelaySeconds", 0);
+                    break;
+                case FUEL_LEVEL:
+                case FUEL_RANGE:
+                    options.put("yellowThreshold", 20d);
+                    options.put("redThreshold", 10d);
+                    options.put("hideAboveThreshold", false);
+                    break;
+                case FUEL_REFILL:
+                    options.put("tankCapacityLitres", 64d);
+                    options.put("automaticCapacity", true);
+                    options.put("onlyInPark", true);
+                    break;
+                case TIRE_PRESSURE_FRONT_LEFT:
+                case TIRE_PRESSURE_FRONT_RIGHT:
+                case TIRE_PRESSURE_REAR_LEFT:
+                case TIRE_PRESSURE_REAR_RIGHT:
+                    options.put("lowThreshold", 2.0d);
+                    options.put("blinkBelowThreshold", true);
+                    options.put("hideAboveThreshold", false);
+                    break;
+                default:
+                    break;
+            }
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    public void normalize(int gridColumns, int gridRows) {
+        id = AutomationContract.requireSafeId(id);
+        automationId = AutomationContract.requireSafeId(
+                automationId == null || automationId.trim().isEmpty() ? id : automationId);
+        title = bounded(title, MAX_TITLE_CHARS, type.label);
+        telemetryMetricId = bounded(telemetryMetricId, 256, "");
+        textFormat = bounded(textFormat, MAX_FORMAT_CHARS, "%s");
+        unit = bounded(unit, 64, "");
+        textColor = bounded(textColor, 32, "#FFFFFFFF");
+        unitColor = bounded(unitColor, 32, "#CCFFFFFF");
+        if (type == HudElementType.BACKDROP) {
+            backgroundColor = bounded(backgroundColor, 32, "#FF121923");
+            backgroundOpacityPercent = clamp(backgroundOpacityPercent, 0, 100);
+            cornerRadiusPx = clamp(cornerRadiusPx, 0, 500);
+            borderColor = bounded(borderColor, 32, "#FFFFFFFF");
+            borderOpacityPercent = clamp(borderOpacityPercent, 0, 100);
+            borderWidthPx = clamp(borderWidthPx, 0, 100);
+        } else {
+            // A widget frame is only geometry. Decorative surfaces are independent BACKDROP
+            // elements and can never be coupled to the widget's content.
+            backgroundColor = "#00000000";
+            backgroundOpacityPercent = 0;
+            cornerRadiusPx = 0;
+            borderColor = "#00000000";
+            borderOpacityPercent = 0;
+            borderWidthPx = 0;
+        }
+        alignment = normalizeAlignment(alignment);
+        gridColumns = clamp(gridColumns, 4, 200);
+        gridRows = clamp(gridRows, 2, 100);
+        width = clamp(width, 1, gridColumns);
+        height = clamp(height, 1, gridRows);
+        x = clamp(x, 0, Math.max(0, gridColumns - width));
+        y = clamp(y, 0, Math.max(0, gridRows - height));
+        zIndex = clamp(zIndex, -10_000, 10_000);
+        fontSizeSp = clamp(fontSizeSp, 8, 240);
+        fontWeight = clamp(fontWeight, 100, 900);
+        brightness = clamp(brightness, 0, 100);
+        if (options == null || options.toString().length() > MAX_OPTIONS_CHARS) {
+            options = new JSONObject();
+        }
+        if (type == HudElementType.NAV_MAP) {
+            try {
+                // A NAV_MAP is valid only as the new producer-to-Surface renderer. Never let an
+                // imported options object silently reactivate the removed bitmap bridge.
+                options.put("renderer", DIRECT_MAP_RENDERER);
+                options.put("cornerRadiusPx", clamp(
+                        options.optInt("cornerRadiusPx", 0), 0, 500));
+                options.put("opacityPercent", clamp(
+                        options.optInt("opacityPercent", 100), 20, 100));
+                options.put("transparentBackground",
+                        options.optBoolean("transparentBackground", false));
+                options.put("edgeBlurEnabled", options.optBoolean("edgeBlurEnabled", false));
+                options.put("edgeBlurStrengthPercent", clamp(
+                        options.optInt("edgeBlurStrengthPercent", 100), 0, 100));
+                options.put("edgeBlurSizePx", clamp(options.optInt("edgeBlurSizePx", 24), 0, 300));
+            } catch (JSONException impossible) {
+                throw new IllegalStateException(impossible);
+            }
+        }
+        if (type == HudElementType.NAV_COMBINED) {
+            normalizeCombinedNavigationOptions();
+        }
+        if (type == HudElementType.NAV_ROUTE_SUMMARY) {
+            normalizeRouteSummaryOptions();
+        }
+        if (type == HudElementType.NAV_TRAFFIC_JAM) {
+            normalizeTrafficJamOptions();
+        }
+        if (type == HudElementType.HORIZONTAL_GROUP) {
+            HudHorizontalGroup.normalizeOptions(this);
+        }
+    }
+
+    private void normalizeCombinedNavigationOptions() {
+        try {
+            // The combined card is a faithful transport surface, never a guessed maneuver.
+            options.put("preferSourceImage", true);
+            options.put("sourceImageOnly", true);
+            options.put("cardOpacityPercent", clamp(
+                    options.optInt("cardOpacityPercent", 94), 0, 100));
+            options.put("cardCornerRadiusPx", clamp(
+                    options.optInt("cardCornerRadiusPx", 18), 0, 160));
+            options.put("cardBorderWidthPx", clamp(
+                    options.optInt("cardBorderWidthPx", 0), 0, 24));
+            options.put("paddingLeftPx", clamp(
+                    options.optInt("paddingLeftPx", 10), 0, 160));
+            options.put("paddingTopPx", clamp(
+                    options.optInt("paddingTopPx", 8), 0, 160));
+            options.put("paddingRightPx", clamp(
+                    options.optInt("paddingRightPx", 10), 0, 160));
+            options.put("paddingBottomPx", clamp(
+                    options.optInt("paddingBottomPx", 8), 0, 160));
+            options.put("arrowAreaPercent", clamp(
+                    options.optInt("arrowAreaPercent", 38), 10, 75));
+            options.put("arrowTextGapPx", clamp(
+                    options.optInt("arrowTextGapPx", 6), 0, 80));
+            for (String key : new String[]{"arrowPaddingLeftPx", "arrowPaddingTopPx",
+                    "arrowPaddingRightPx", "arrowPaddingBottomPx", "textPaddingLeftPx",
+                    "textPaddingTopPx", "textPaddingRightPx", "textPaddingBottomPx"}) {
+                options.put(key, clamp(options.optInt(key,
+                        key.startsWith("arrowPadding") ? 3 : 0), 0, 120));
+            }
+            options.put("sourceIconScalePercent", clamp(
+                    options.optInt("sourceIconScalePercent", 100), 25, 250));
+            options.put("distanceFontSizeSp", clamp(
+                    options.optInt("distanceFontSizeSp", 34), 8, 160));
+            options.put("directionFontSizeSp", clamp(
+                    options.optInt("directionFontSizeSp", 18), 8, 120));
+            options.put("roadBadgeFontSizeSp", clamp(
+                    options.optInt("roadBadgeFontSizeSp", 17), 8, 120));
+            options.put("distanceAreaPercent", clamp(
+                    options.optInt("distanceAreaPercent", 56), 20, 80));
+            options.put("textRowGapPx", clamp(
+                    options.optInt("textRowGapPx", 2), 0, 60));
+            options.put("roadBadgePaddingHorizontalPx", clamp(
+                    options.optInt("roadBadgePaddingHorizontalPx", 5), 0, 60));
+            options.put("roadBadgePaddingVerticalPx", clamp(
+                    options.optInt("roadBadgePaddingVerticalPx", 2), 0, 40));
+            options.put("cardColor", bounded(
+                    options.optString("cardColor", "#FF0758E8"), 32, "#FF0758E8"));
+            options.put("roadBadgeColor", bounded(
+                    options.optString("roadBadgeColor", "#FF16A34A"), 32, "#FF16A34A"));
+            options.put("cardBorderColor", bounded(
+                    options.optString("cardBorderColor", "#00000000"),
+                    32, "#00000000"));
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void normalizeTrafficJamOptions() {
+        try {
+            options.put("hideWhenInactive", true);
+            options.put("hideWhenEmpty", true);
+            options.put("cardOpacityPercent", clamp(
+                    options.optInt("cardOpacityPercent", 100), 0, 100));
+            options.put("cardCornerRadiusPx", clamp(
+                    options.optInt("cardCornerRadiusPx", 16), 0, 160));
+            options.put("cardBorderWidthPx", clamp(
+                    options.optInt("cardBorderWidthPx", 0), 0, 24));
+            for (String key : new String[]{"paddingLeftPx", "paddingTopPx",
+                    "paddingRightPx", "paddingBottomPx"}) {
+                options.put(key, clamp(options.optInt(key,
+                        key.endsWith("LeftPx") || key.endsWith("RightPx") ? 12 : 5),
+                        0, 160));
+            }
+            options.put("cardColor", bounded(
+                    options.optString("cardColor", "#F21B1F24"), 32, "#F21B1F24"));
+            options.put("cardBorderColor", bounded(
+                    options.optString("cardBorderColor", "#00000000"),
+                    32, "#00000000"));
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void normalizeRouteSummaryOptions() {
+        try {
+            options.put("hideWhenInactive", true);
+            options.put("hideWhenEmpty", true);
+            options.put("cardOpacityPercent", clamp(
+                    options.optInt("cardOpacityPercent", 100), 0, 100));
+            options.put("cardCornerRadiusPx", clamp(
+                    options.optInt("cardCornerRadiusPx", 18), 0, 160));
+            options.put("cardBorderWidthPx", clamp(
+                    options.optInt("cardBorderWidthPx", 0), 0, 24));
+            for (String key : new String[]{"paddingLeftPx", "paddingTopPx",
+                    "paddingRightPx", "paddingBottomPx"}) {
+                int fallback = key.endsWith("LeftPx") || key.endsWith("RightPx") ? 14 : 9;
+                options.put(key, clamp(options.optInt(key, fallback), 0, 160));
+            }
+            options.put("metricsFontSizeSp", clamp(
+                    options.optInt("metricsFontSizeSp", 25), 8, 120));
+            options.put("progressBarHeightPx", clamp(
+                    options.optInt("progressBarHeightPx", 8), 2, 48));
+            options.put("progressBarTopGapPx", clamp(
+                    options.optInt("progressBarTopGapPx", 7), 0, 80));
+            String[][] colors = new String[][]{
+                    {"cardColor", "#F21B1F24"},
+                    {"cardBorderColor", "#00000000"},
+                    {"freeColor", "#FF72E300"},
+                    {"lightColor", "#FFFFCC00"},
+                    {"hardColor", "#FFFF3B30"},
+                    {"veryHardColor", "#FFB00020"},
+                    {"blockedColor", "#FF7A1FA2"},
+                    {"unknownColor", "#FF8E8E93"},
+                    {"completedColor", "#FF858A93"},
+                    {"markerColor", "#FFFFC400"}
+            };
+            for (String[] color : colors) {
+                options.put(color[0], bounded(
+                        options.optString(color[0], color[1]), 32, color[1]));
+            }
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    @NonNull
+    public JSONObject toJson() throws JSONException {
+        JSONObject out = new JSONObject();
+        out.put("schema", SCHEMA_VERSION);
+        out.put("id", id);
+        out.put("type", type.name());
+        out.put("title", title);
+        out.put("x", x).put("y", y).put("width", width).put("height", height);
+        out.put("zIndex", zIndex).put("enabled", enabled);
+        out.put("automationId", automationId);
+        if (sourceBinding != null && sourceBinding.isBound()) {
+            out.put("sourceBinding", sourceBinding.toJson());
+        }
+        out.put("telemetryMetricId", telemetryMetricId);
+        out.put("textFormat", textFormat).put("unit", unit);
+        out.put("textColor", textColor).put("unitColor", unitColor);
+        out.put("backgroundColor", backgroundColor);
+        out.put("backgroundOpacityPercent", backgroundOpacityPercent);
+        out.put("cornerRadiusPx", cornerRadiusPx);
+        out.put("borderColor", borderColor);
+        out.put("borderOpacityPercent", borderOpacityPercent);
+        out.put("borderWidthPx", borderWidthPx);
+        out.put("fontSizeSp", fontSizeSp).put("fontWeight", fontWeight);
+        out.put("alignment", alignment).put("wrapText", wrapText);
+        out.put("brightness", brightness);
+        out.put("options", new JSONObject(options.toString()));
+        return out;
+    }
+
+    @NonNull
+    public static HudElementConfig fromJson(@NonNull JSONObject source,
+                                            int gridColumns, int gridRows) {
+        HudElementType type = HudElementType.fromName(source.optString("type", ""));
+        if (type == null) throw new IllegalArgumentException("Unknown HUD element type");
+        HudElementConfig out = new HudElementConfig(source.optString("id", ""), type);
+        out.title = source.optString("title", type.label);
+        out.x = source.optInt("x", 0);
+        out.y = source.optInt("y", 0);
+        out.width = source.optInt("width", type.defaultWidth);
+        out.height = source.optInt("height", type.defaultHeight);
+        out.zIndex = source.optInt("zIndex", 0);
+        out.enabled = source.optBoolean("enabled", true);
+        out.automationId = source.optString("automationId", out.id);
+        JSONObject binding = source.optJSONObject("sourceBinding");
+        if (binding != null) out.sourceBinding = SourceBinding.fromJson(binding);
+        out.telemetryMetricId = source.optString("telemetryMetricId", type.defaultMetricId);
+        out.textFormat = source.optString("textFormat", "%s");
+        out.unit = source.optString("unit", "");
+        out.textColor = source.optString("textColor", "#FFFFFFFF");
+        out.unitColor = source.optString("unitColor", "#CCFFFFFF");
+        out.backgroundColor = source.optString("backgroundColor", "#00000000");
+        out.backgroundOpacityPercent = source.optInt("backgroundOpacityPercent", 72);
+        out.cornerRadiusPx = source.optInt("cornerRadiusPx", 18);
+        out.borderColor = source.optString("borderColor", "#FFFFFFFF");
+        out.borderOpacityPercent = source.optInt("borderOpacityPercent", 0);
+        out.borderWidthPx = source.optInt("borderWidthPx", 0);
+        out.fontSizeSp = source.optInt("fontSizeSp", 34);
+        out.fontWeight = source.optInt("fontWeight", 600);
+        out.alignment = source.optString("alignment", "CENTER");
+        out.wrapText = source.optBoolean("wrapText", false);
+        out.brightness = source.optInt("brightness", 100);
+        JSONObject options = source.optJSONObject("options");
+        if (options != null && options.toString().length() <= MAX_OPTIONS_CHARS) {
+            try {
+                out.options = new JSONObject(options.toString());
+            } catch (JSONException ignored) {
+                out.options = new JSONObject();
+            }
+        }
+        out.normalize(gridColumns, gridRows);
+        return out;
+    }
+
+    @NonNull
+    public HudElementConfig copy() {
+        try {
+            return fromJson(toJson(), 200, 100);
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    @NonNull
+    private static String normalizeAlignment(@Nullable String raw) {
+        String value = raw == null ? "" : raw.trim().toUpperCase(java.util.Locale.ROOT);
+        return "LEFT".equals(value) || "RIGHT".equals(value) ? value : "CENTER";
+    }
+
+    @NonNull
+    private static String bounded(@Nullable String raw, int maximum,
+                                  @NonNull String fallback) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.indexOf('\u0000') >= 0 || value.length() > maximum) return fallback;
+        return value;
+    }
+
+    private static int clamp(int value, int minimum, int maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+}

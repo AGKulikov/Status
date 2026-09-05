@@ -1,0 +1,1451 @@
+{
+  "scope": "All unique DEX files supplied by full corpus magic scan, preselected when either cruise enum byte name or one of four full 32-bit feature IDs exists. IDs have nonzero low16 bits; const/high16 cannot declare them directly. Instruction refs outside enum, not annotation/metadata refs. Arithmetic/reflective construction is outside this scan.",
+  "pattern": "DrvrCrsCtrlFctActvReq|DrvrCrsCtrlFctSeldTyp",
+  "feature_ids": [
+    537067776,
+    537068032,
+    537068800,
+    537069056
+  ],
+  "dex": [
+    {
+      "dex_sha256": "08932252974634a3f516cb87ba30a8252fb8e070eb1ff840908df332e64f6f19",
+      "bytes": 9427228,
+      "class_count": 8620,
+      "methods_scanned": 46838,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 210,
+          "id": 537067776
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 238,
+          "id": 537068032
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 266,
+          "id": 537068800
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 294,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": []
+      }
+    },
+    {
+      "dex_sha256": "1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+      "bytes": 6998208,
+      "class_count": 5880,
+      "methods_scanned": 38342,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lecarx/settings/proxy/function/support/FunctionSupportUtils;",
+          "method": "initAdapterKeys",
+          "descriptor": "()V",
+          "offset": 684,
+          "id": 537068800
+        },
+        {
+          "class": "Lecarx/settings/proxy/function/support/FunctionSupportUtils;",
+          "method": "initAdapterKeys",
+          "descriptor": "()V",
+          "offset": 864,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "1fe7c6ea33b89881247d9930d454ab015a76dbd8a3000b0a05220ce74b534cfd",
+      "bytes": 7065336,
+      "class_count": 6433,
+      "methods_scanned": 30190,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 240,
+          "id": 537067776
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 270,
+          "id": 537068032
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 300,
+          "id": 537068800
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 330,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "2c10fa5e90d400c489c7c7c76a86bc75de77dff01f545656ead9719a8f9965bd",
+      "bytes": 8010508,
+      "class_count": 8472,
+      "methods_scanned": 41662,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 210,
+          "id": 537067776
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 238,
+          "id": 537068032
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 266,
+          "id": 537068800
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 294,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "4eb373f4ae040306296f015beee77c09391c61a25ed488f64682aaef9a37b70f",
+      "bytes": 11382408,
+      "class_count": 10203,
+      "methods_scanned": 56689,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 0,
+          "id": 537068032
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 6,
+          "id": 537069056
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 12,
+          "id": 537067776
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 18,
+          "id": 537068800
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "decodeAdaptApiCapabilityValue",
+          "descriptor": "(I I)Ljava/lang/String;",
+          "offset": 0,
+          "id": 537068800
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "decodeAdaptApiCapabilityValue",
+          "descriptor": "(I I)Ljava/lang/String;",
+          "offset": 52,
+          "id": 537069056
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "decodeAdaptApiCapabilityValue",
+          "descriptor": "(I I)Ljava/lang/String;",
+          "offset": 116,
+          "id": 537067776
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "decodeAdaptApiCapabilityValue",
+          "descriptor": "(I I)Ljava/lang/String;",
+          "offset": 126,
+          "id": 537068032
+        }
+      ],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "608676008421db51e1b81596d97d2b9ce8350ef0286152301fe2f3f819bb02df",
+      "bytes": 3993644,
+      "class_count": 5177,
+      "methods_scanned": 18463,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 214,
+          "id": 537067776
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 242,
+          "id": 537068032
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 270,
+          "id": 537068800
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 298,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+      "bytes": 3911252,
+      "class_count": 5091,
+      "methods_scanned": 18037,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 214,
+          "id": 537067776
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 242,
+          "id": 537068032
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 270,
+          "id": 537068800
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 298,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "957897e605aba0fadcdec436f3371bdd66bdc335beb86846f275c469a8e6b82a",
+      "bytes": 2537112,
+      "class_count": 1926,
+      "methods_scanned": 11669,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "9ac1ee71f2be3dda7d89c46c63cdde4f147863c8206b3f5b7af98e3e13b41b52",
+      "bytes": 9334952,
+      "class_count": 9519,
+      "methods_scanned": 49763,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 210,
+          "id": 537067776
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 238,
+          "id": 537068032
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 266,
+          "id": 537068800
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 294,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+      "bytes": 2311568,
+      "class_count": 2905,
+      "methods_scanned": 11445,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "abd2d6de229a651ec30eab9f9e45ff79431edddeef6e18f45d533cd81ecd0c3a",
+      "bytes": 5948532,
+      "class_count": 5734,
+      "methods_scanned": 31714,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "d7fa4b044cad29969dc78c408870d596b5e7366bd5f0e44e86e3c25cbeb9806a",
+      "bytes": 11010256,
+      "class_count": 9608,
+      "methods_scanned": 55104,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 0,
+          "id": 537068032
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 6,
+          "id": 537069056
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 12,
+          "id": 537067776
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 18,
+          "id": 537068800
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "decodeAdaptApiCapabilityValue",
+          "descriptor": "(I I)Ljava/lang/String;",
+          "offset": 0,
+          "id": 537068800
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "decodeAdaptApiCapabilityValue",
+          "descriptor": "(I I)Ljava/lang/String;",
+          "offset": 52,
+          "id": 537069056
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "decodeAdaptApiCapabilityValue",
+          "descriptor": "(I I)Ljava/lang/String;",
+          "offset": 116,
+          "id": 537067776
+        },
+        {
+          "class": "Ldezz/status/widget/car/GeelyCarIntegration;",
+          "method": "decodeAdaptApiCapabilityValue",
+          "descriptor": "(I I)Ljava/lang/String;",
+          "offset": 126,
+          "id": 537068032
+        }
+      ],
+      "cruise_enum_fields": {
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctActvReq;": [
+          {
+            "name": "Activatedbyonoffbutton",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "Activatedbyresumebutton",
+            "value": 2,
+            "implicit_zero": false
+          },
+          {
+            "name": "Inactive",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_3",
+            "value": 3,
+            "implicit_zero": false
+          }
+        ],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp$Enum;": [],
+        "Lecarx/car/hardware/annotation/DrvrCrsCtrlFctSeldTyp;": [
+          {
+            "name": "AccFct_Main_Swt",
+            "value": 5,
+            "implicit_zero": false
+          },
+          {
+            "name": "AccFct_Resu",
+            "value": 6,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Main_Swt",
+            "value": 3,
+            "implicit_zero": false
+          },
+          {
+            "name": "CrsCtrlFct_Resu",
+            "value": 4,
+            "implicit_zero": false
+          },
+          {
+            "name": "Off",
+            "value": 0,
+            "implicit_zero": false
+          },
+          {
+            "name": "Reserved_7",
+            "value": 7,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Main_Swt",
+            "value": 1,
+            "implicit_zero": false
+          },
+          {
+            "name": "SpdLimFct_Resu",
+            "value": 2,
+            "implicit_zero": false
+          }
+        ]
+      }
+    },
+    {
+      "dex_sha256": "eb2f0811d98358e909fc7714da96494604debf01ceba248aa68f436a90e559ac",
+      "bytes": 2498572,
+      "class_count": 1856,
+      "methods_scanned": 10732,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "0b41edcd8b4a38c98a465fb8d0d1cbcd06b7ffe562bb669c4a29b7dd58c9b097",
+      "bytes": 4723048,
+      "class_count": 3004,
+      "methods_scanned": 22065,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "11e75aefee91df602130f61007e9d78b1d358714e06ffbf8b6ac0f5734f1bee0",
+      "bytes": 3165936,
+      "class_count": 1841,
+      "methods_scanned": 14714,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "1355ed4999a4fcb8c31a8e0d42d0edae24bb02328b932b9f55aec4db1fd0cf3e",
+      "bytes": 9298472,
+      "class_count": 7385,
+      "methods_scanned": 51440,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "1934d917f0398e965f4186767db04bb6c622022a80dc0bcce1bdc2e3ec46ab2f",
+      "bytes": 4153780,
+      "class_count": 4437,
+      "methods_scanned": 20931,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "212029fcafe9d87fa32b6b45fec012dcdb1cc3c949f57ea064a8db2ab4967ebf",
+      "bytes": 8871312,
+      "class_count": 6893,
+      "methods_scanned": 50089,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "30eb3a1083d2bbd17d2c2904b32868e03ba99b7e7d1312f109c000d2f1624b31",
+      "bytes": 8283220,
+      "class_count": 7342,
+      "methods_scanned": 45596,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 210,
+          "id": 537067776
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 238,
+          "id": 537068032
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 266,
+          "id": 537068800
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 294,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "345f037efd4c17b8f8405fea7e42847d1661cc672a554225d81f638f29d292bd",
+      "bytes": 1202944,
+      "class_count": 658,
+      "methods_scanned": 6080,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "3f2718052e3243e3231a57ac250d3fdd09f7115ad569a4e60ed41bbb832b1dc6",
+      "bytes": 3002844,
+      "class_count": 1253,
+      "methods_scanned": 13181,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "4c3bc35f87db83382d11c8b94456582a004dec5589adb4c28001b4583c77d82b",
+      "bytes": 16723236,
+      "class_count": 8818,
+      "methods_scanned": 57183,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "4c622f8ed92668abcda2623ff26e0df1c87838d3531d10ecec936a857884e7a4",
+      "bytes": 1727044,
+      "class_count": 1171,
+      "methods_scanned": 8748,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "62f531daec75dce11482df3b8330433b06291e0cf6a0bd2588f25aaff1257dae",
+      "bytes": 6635580,
+      "class_count": 5217,
+      "methods_scanned": 33251,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "6dd29e9b091b0efa66a76084f29d46a8af05580928af5a400e7af2b3a055d7b9",
+      "bytes": 13311920,
+      "class_count": 8818,
+      "methods_scanned": 57183,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "7959f77152352336635c88fba0b218ed7d1aaa0738c7f89ab1a2c840e6f3c081",
+      "bytes": 9144516,
+      "class_count": 7857,
+      "methods_scanned": 49775,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 210,
+          "id": 537067776
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 238,
+          "id": 537068032
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 266,
+          "id": 537068800
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 294,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "7eb55b391b57c8375f051fb1b219c95d5352471a3e65723b0a89a92e4f5f1557",
+      "bytes": 9629148,
+      "class_count": 6249,
+      "methods_scanned": 47833,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "80cbee34205002c18c68eece06303a2ab2051fcbf372aa36cdd1b263cc9ae01e",
+      "bytes": 3602496,
+      "class_count": 2220,
+      "methods_scanned": 17436,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "84788e434c43608033cfe88521b15be236e7f704654004020f38f51f4f9b1a6b",
+      "bytes": 4895820,
+      "class_count": 3571,
+      "methods_scanned": 28854,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "87c9ad57efbad8f08e9a5bb855c9bd4f1b1f7c7fa22cc174fbeada09a8145dd0",
+      "bytes": 5563028,
+      "class_count": 5007,
+      "methods_scanned": 30682,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "94597e3c072a6efc9f37dbebe37ad5c37e9691e1a8fb77b3abe15311b6122552",
+      "bytes": 4935004,
+      "class_count": 4266,
+      "methods_scanned": 29472,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "a02c661ceef87b824f7a31eb001c64f5e48af6f9c18bfbc3b3acbe45d7b0230c",
+      "bytes": 12626440,
+      "class_count": 8358,
+      "methods_scanned": 53502,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "a077cf234d175280f6b92c87456b30af8c2be4deb607d593631e69c12577c4f1",
+      "bytes": 14860356,
+      "class_count": 8796,
+      "methods_scanned": 54936,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf",
+      "bytes": 8678120,
+      "class_count": 7637,
+      "methods_scanned": 48478,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 210,
+          "id": 537067776
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 238,
+          "id": 537068032
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 266,
+          "id": 537068800
+        },
+        {
+          "class": "Lcom/ecarx/xui/adaptapi/car/CarLog;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "offset": 294,
+          "id": 537069056
+        }
+      ],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "a8541476bbea83ca7bbfa047c175cdd631dbbe6de6394a56989bfe1156300115",
+      "bytes": 9351212,
+      "class_count": 8143,
+      "methods_scanned": 49705,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "a9acefde5e74a00c22bb203ed2efc3ce68ce415a570851d30364bde397847e81",
+      "bytes": 605480,
+      "class_count": 442,
+      "methods_scanned": 2705,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "b5418b86cae5ccd0d13d1a2f69adb1b198da4afb54e8c6414fa14b9f8c49e46d",
+      "bytes": 4420340,
+      "class_count": 3723,
+      "methods_scanned": 23425,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "b960e2f60368d50005d3e50b1f68981b9cfa46b97ccb38abe2d11046733f4b0a",
+      "bytes": 2145656,
+      "class_count": 1852,
+      "methods_scanned": 12742,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "c052bc9bb0c1afc232a411c98a3fce409a12533d96af655942d3b0c80119119e",
+      "bytes": 10204332,
+      "class_count": 4751,
+      "methods_scanned": 39675,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "d3498fb1d4a52ce7ebb126336953fef2b600805be8c52c17588ac9cb697e809c",
+      "bytes": 10087092,
+      "class_count": 6276,
+      "methods_scanned": 47550,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "ef5b915eff5c8957a8df03c6a97a902d0cfd903d1a3076779519c1b3ed769141",
+      "bytes": 4377792,
+      "class_count": 3128,
+      "methods_scanned": 21696,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    },
+    {
+      "dex_sha256": "f2365ade25a63e4c1da1820b9ca2e9afbff0510cbf9ad3d208844bdf8f3eeb37",
+      "bytes": 10210892,
+      "class_count": 6580,
+      "methods_scanned": 47162,
+      "external_enum_instruction_references": [],
+      "feature_id_instruction_references": [],
+      "cruise_enum_fields": {}
+    }
+  ]
+}

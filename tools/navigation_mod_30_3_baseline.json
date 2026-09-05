@@ -1,0 +1,43 @@
+{
+  "schema": "natro-navigation-baseline/v1",
+  "name": "YN_30.3.0_T2 working protection baseline",
+  "package_name": "ru.yandex.yandexnavi",
+  "version_code": 739564630,
+  "baseline_apk_sha256": "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f",
+  "baseline_signer_sha256": "a4590f0a8ad6c6a30b87900289a918be0fd6b036f82d2ec4551f3caf2d910892",
+  "release_signer_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "required_signature_schemes": [
+    "v3"
+  ],
+  "mutable_entries": [
+    "AndroidManifest.xml",
+    "classes4.dex",
+    "classes12.dex"
+  ],
+  "allowed_new_entries": [
+    "classes19.dex"
+  ],
+  "release_required_changed_entries": [
+    "AndroidManifest.xml",
+    "classes4.dex",
+    "classes12.dex"
+  ],
+  "release_required_new_entries": [
+    "classes19.dex"
+  ],
+  "release_entry_sha256": {
+    "AndroidManifest.xml": "1e8d52eadd9f9561bc76cbeb6f22017d537af8b5eff8803e759be0694f8172e3",
+    "classes4.dex": "68f78d368c8051dc69cf689a3e4703c0c421740c29ca44af292e72243684216c",
+    "classes12.dex": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23"
+  },
+  "critical_entries": [
+    "resources.arsc",
+    "classes14.dex",
+    "classes18.dex"
+  ],
+  "critical_prefixes": [
+    "assets/",
+    "lib/",
+    "res/"
+  ]
+}

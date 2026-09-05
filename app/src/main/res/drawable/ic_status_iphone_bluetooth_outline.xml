@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Thin SF-Symbol-like Bluetooth rune. -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="1.35"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M11.55,2.55 L17.15,7.65 L11.55,12 L17.15,16.35 L11.55,21.45 L11.55,2.55 M11.55,12 L6.85,7.75 M11.55,12 L6.85,16.25" />
+</vector>

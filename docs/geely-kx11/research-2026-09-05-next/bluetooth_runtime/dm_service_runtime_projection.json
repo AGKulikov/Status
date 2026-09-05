@@ -1,0 +1,95 @@
+{
+  "scope": "exact five service strings under two known log tags; event types/timestamps only, no raw line or device identifiers",
+  "sources": [
+    {
+      "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+      "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+      "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "9c2ef5ecbae8c3b9ec633aeb438a465bb914d86abd0962ab5621cc4b78d2819c",
+      "line_count": 3605,
+      "counts": {
+        "new_hfp_disconnect": 0,
+        "a2dp_log_only": 0,
+        "no_projection": 0,
+        "same_device_ignored": 0,
+        "profile_timeout": 0
+      },
+      "events": []
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+      "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+      "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "8f64e420a0443680a25cf6bf15c43a1d3e517a19501ffe89cd209602850b436a",
+      "line_count": 81687,
+      "counts": {
+        "new_hfp_disconnect": 0,
+        "a2dp_log_only": 0,
+        "no_projection": 0,
+        "same_device_ignored": 0,
+        "profile_timeout": 0
+      },
+      "events": []
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+      "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+      "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+      "line_count": 51913,
+      "counts": {
+        "new_hfp_disconnect": 0,
+        "a2dp_log_only": 0,
+        "no_projection": 0,
+        "same_device_ignored": 0,
+        "profile_timeout": 0
+      },
+      "events": []
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+      "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+      "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "4c3a5240662c15e09da0826e7a16199df50ad70bf6b600f74f68c0bf8c72ef15",
+      "line_count": 16820,
+      "counts": {
+        "new_hfp_disconnect": 0,
+        "a2dp_log_only": 0,
+        "no_projection": 0,
+        "same_device_ignored": 0,
+        "profile_timeout": 0
+      },
+      "events": []
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+      "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+      "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+      "line_count": 83990,
+      "counts": {
+        "new_hfp_disconnect": 0,
+        "a2dp_log_only": 0,
+        "no_projection": 0,
+        "same_device_ignored": 0,
+        "profile_timeout": 0
+      },
+      "events": []
+    },
+    {
+      "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+      "member_sha256": "8b588cdd8f0dac3b12658d17a77aa9c98b529f3b8a8c5a005582b172f58fc5a3",
+      "line_count": 10351,
+      "counts": {
+        "new_hfp_disconnect": 0,
+        "a2dp_log_only": 0,
+        "no_projection": 0,
+        "same_device_ignored": 0,
+        "profile_timeout": 0
+      },
+      "events": []
+    }
+  ]
+}

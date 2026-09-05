@@ -1,0 +1,25 @@
+PASS: signed pair matches the reviewed ECARX KX11 contract
+
+Head unit: ECARX KX11 / Qualcomm / Android 9 (API 28)
+Main Natro content area: 1760x720
+HUD: Display ID 2, surface 1920x1080, plane 728x190 @ (0,720)
+Natro: ru.natro.statuswidget 2.8.0 (208021313), min/target API 28, ABI-neutral, v2+v3
+Navigator: ru.yandex.yandexnavi versionCode 739564630, min/target API 26/29, arm64-v8a, v3
+Shared release signer SHA-256: 6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75
+Natro APK SHA-256: 396ab3675011636536da64b20dcdb35808cbc457669db97a431fc32085669d1c
+Navigator APK SHA-256: 665953a5d32e750b2261e798508c3d177ad652b4d52c70275ccdb8ed40795cf4
+Navigator aapt badging: logically identical to baseline
+Navigator MapActivity: reviewed existing translucent bootstrap theme; original SplashAppTheme restored before onCreate
+Navigator background route: location GuidanceService retained in the main process; MapKit lease is active only for attached HUD/cluster surfaces
+Navigator resources.arsc and res/: byte-for-byte identical to baseline
+Navigator sharedUserId: absent (original Yandex Music is not signature-coupled)
+Window launch contract: Natro and Navigator contain navi_win/ddnavwin/MapActivity; only its reviewed translucent theme differs from baseline
+Navigator content boundary:
+  PASS: Navigator 30.3.0 baseline boundary preserved
+    protected entries: 17223
+    changed entries: AndroidManifest.xml, classes12.dex, classes4.dex
+    new entries: classes19.dex
+    signer SHA-256: 6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75
+    signature schemes: v3
+
+Static verification cannot prove OEM install policy, online/offline map loading, SurfaceFlinger routing, or coexistence with installed Yandex apps; run the supplied on-device checklist before daily use.

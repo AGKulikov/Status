@@ -1,0 +1,72 @@
+{
+  "sources": [
+    {
+      "baseline_source_ref": 0,
+      "baseline": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      },
+      "source_id": "sha256:8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971"
+    },
+    {
+      "baseline_source_ref": 1,
+      "baseline": {
+        "member": "framework/system_framework/ecarx.car.jar",
+        "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+        "dex_entry": "classes.dex"
+      },
+      "source_id": "sha256:a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847"
+    },
+    {
+      "baseline_source_ref": 2,
+      "baseline": {
+        "member": "framework/system_framework/ts-carplay-adapter.jar",
+        "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+        "dex_entry": "classes.dex"
+      },
+      "source_id": "sha256:608676008421db51e1b81596d97d2b9ce8350ef0286152301fe2f3f819bb02df"
+    },
+    {
+      "baseline_source_ref": 3,
+      "baseline": {
+        "member": "packages/com.ecarx.dimmenu/base.apk",
+        "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+        "dex_entry": "classes2.dex"
+      },
+      "source_id": "sha256:abd2d6de229a651ec30eab9f9e45ff79431edddeef6e18f45d533cd81ecd0c3a"
+    },
+    {
+      "baseline_source_ref": 4,
+      "baseline": {
+        "member": "packages/ecarx.settings/base.apk",
+        "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+        "dex_entry": "classes2.dex"
+      },
+      "source_id": "sha256:1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11"
+    },
+    {
+      "baseline_source_ref": 5,
+      "baseline": {
+        "member": "packages/com.ecarx.dimmenu/base.apk",
+        "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+        "dex_entry": "classes.dex"
+      },
+      "source_id": "sha256:08932252974634a3f516cb87ba30a8252fb8e070eb1ff840908df332e64f6f19"
+    },
+    {
+      "baseline_source_ref": 6,
+      "baseline": {
+        "member": "packages/ecarx.settings/base.apk",
+        "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+        "dex_entry": "classes.dex"
+      },
+      "source_id": "sha256:a66cf255da3a041e1e628f5601da05ace95bd310b0ec672def63696b3fafbfbf"
+    }
+  ],
+  "checks": {
+    "source_declarations_checked": 71833,
+    "exact_encoded_initializer_matches": 71833
+  },
+  "errors": []
+}

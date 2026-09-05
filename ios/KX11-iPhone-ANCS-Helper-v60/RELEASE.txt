@@ -1,0 +1,51 @@
+KX11 ANCS Helper v60 — compact Live Activity and vehicle-first companion
+Bundle ID: ru.natro.kx11ancshelper
+Build: 60
+Marketing version: 60.0
+Minimum iOS: 14.0 (Live Activity requires iOS 16.2)
+Paired runtime: Natro 2.2.8 using enrollment_v1_vectors.json, R/T and C5 wire fixtures
+Status: source candidate; Apple-SDK CI and physical-device checks are release gates
+
+Implemented in v60:
+
+- changes the user-facing application name from KX11ANCSHelper to Natro without changing its
+  bundle ID, App Group or Core Bluetooth restoration identifiers;
+- adds a complete Natro app-icon catalog using the same cyan/white N mark as Live Activity;
+- enlarges Lock Screen and Dynamic Island control icons, labels, status and temperature controls;
+  leading/trailing regions are width-bounded, single-line and scale down before clipping;
+- raises control labels to 14 pt on the Lock Screen and 12 pt in Dynamic Island, permits two
+  centered lines for longer function names, and raises live values/stage indicators to 12/8 pt;
+- coalesces fast ActivityKit changes and limits each activity to at most one submitted update per
+  3 seconds while retaining the newest vehicle state; explicit demo taps request an urgent flush;
+- replaces the rejected Helper 56 dynamic state with a compact, numeric, panel-specific payload;
+  a local encoder guard keeps every ActivityKit update below 3.5 KB (Apple limit: 4 KB);
+- moves vehicle name, four configured controls, vehicle visibility and the Monjaro image out of
+  dynamic state; the bundled image is 300×157 / 62 KB and fits the Lock Screen presentation;
+- automatically retires incompatible v55/v56 activities and recreates two v60 cards in foreground;
+- retains two configurable cards, but limits each to four glanceable actions; the full control
+  catalog now lives in contextual in-app category screens instead of a ten-button lock-screen grid;
+- fixes demo temperature/status/state delivery and gives one-shot actions a visible transient
+  response; heat, ventilation, fragrance, fan and option controls preserve their real levels;
+- avoids invalid CFPrefs suite access when an Xcode development profile lacks the App Group;
+  correctly signed builds continue using group.ru.natro.kx11ancshelper for interactive commands;
+- repairs persisted v56 FAILED/CLOSED and legacy first-launch states into the production Route A,
+  while retaining exact installation-ID and CONTROL proof before any telemetry or command opens;
+- replaces the long in-app function list with a vehicle overview, scenarios and five contextual
+  grids: Climate, Seats, Vehicle, Comfort and Media;
+- adds Passenger 1.14.0 capability-gated reading lights and fragrance levels (C5 IDs 60–65);
+- intentionally excludes massage and continuous seat-movement controls;
+- expands the privacy-filtered journal to 1,600 lines with per-process/session sequence markers,
+  detailed reducer/effect steps, Live Activity payload diagnostics and an export header;
+- keeps the original 39-ID C5 sync boundary plus optional v56/v60 capabilities for mixed versions;
+- preserves encrypted enrollment, exact-owner fencing, read-back confirmation, bounded command
+  age, mechanical confirmations and all Helper 56 transport safety invariants.
+
+Platform boundaries:
+
+- a local ActivityKit request normally starts while the app is foreground; a true background-first
+  start still requires an App Intent or APNs push-to-start supported by the installed iOS version;
+- Xcode signing must provision the same App Group for the app and Live Activity extension;
+- no signed IPA is produced by this repository; the Xcode project is the deliverable.
+
+Do not call this candidate stable until the Apple-SDK build and physical iPhone/KX11 acceptance
+matrix pass.

@@ -1,0 +1,626 @@
+{
+  "scope": "Cruise-specific evidence-derived additions. Existing files should be hash-skipped. No path scanning, launching firmware/updaters, device reads, replay or control writes. Unknown file absence is a valid result.",
+  "targets": [
+    {
+      "domain": "Android",
+      "path": "/ota_download/udisk_manifest.json",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "known_sha256": [],
+      "known_sources": [],
+      "required_variant": "Exact package already present for this vehicle/version; do not trigger download/update or mount.",
+      "status": "conditional_from_producer_code_not_observed_installed",
+      "maximum_bytes": 2147483648,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/ota_download/udisk_manifest.json'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "Android",
+      "path": "/ota_download/update-swp1.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "known_sha256": [],
+      "known_sources": [],
+      "required_variant": "Exact package already present for this vehicle/version; do not trigger download/update or mount.",
+      "status": "conditional_from_producer_code_not_observed_installed",
+      "maximum_bytes": 2147483648,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/ota_download/update-swp1.tar.gz'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "Android",
+      "path": "/ota_download/update-swl3.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "known_sha256": [],
+      "known_sources": [],
+      "required_variant": "Exact package already present for this vehicle/version; do not trigger download/update or mount.",
+      "status": "conditional_from_producer_code_not_observed_installed",
+      "maximum_bytes": 2147483648,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/ota_download/update-swl3.tar.gz'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "Android",
+      "path": "/ota_download/update-swl4.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "known_sha256": [],
+      "known_sources": [],
+      "required_variant": "Exact package already present for this vehicle/version; do not trigger download/update or mount.",
+      "status": "conditional_from_producer_code_not_observed_installed",
+      "maximum_bytes": 2147483648,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/ota_download/update-swl4.tar.gz'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "Android",
+      "path": "/ota_download/update-swlm.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "known_sha256": [],
+      "known_sources": [],
+      "required_variant": "Exact package already present for this vehicle/version; do not trigger download/update or mount.",
+      "status": "conditional_from_producer_code_not_observed_installed",
+      "maximum_bytes": 2147483648,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/ota_download/update-swlm.tar.gz'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "Android",
+      "path": "/ota_download/update-swl2.tar.gz",
+      "reason": "Missing real package/manifest bytes can identify payload ownership, part inventory, software version and any production VP/MCU payload. Part names alone do not identify MCU.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "local_evidence": "lv_image_inventory.json",
+          "member": "sbin/usb_update.sh",
+          "image_sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+        }
+      ],
+      "known_sha256": [],
+      "known_sources": [],
+      "required_variant": "Exact package already present for this vehicle/version; do not trigger download/update or mount.",
+      "status": "conditional_from_producer_code_not_observed_installed",
+      "maximum_bytes": 2147483648,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/ota_download/update-swl2.tar.gz'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "Android",
+      "path": "/vendor/bin/smartcore_update_client",
+      "reason": "Correlate actual package-copy branch with installed updater.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "known_sha256": [
+        "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2"
+      ],
+      "known_sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260810-070156.zip",
+          "member": "KX11-Cruise-Trace-20260810-070156/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "required_variant": "Installed variant matching the user vehicle; retain version and hash.",
+      "status": "known_file_collect_changed_variant",
+      "maximum_bytes": 536870912,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/vendor/bin/smartcore_update_client'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "Android",
+      "path": "/system/bin/smartcore_update_client",
+      "reason": "Existing second updater path; hash-equal copy adds no new semantics.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "known_sha256": [
+        "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2"
+      ],
+      "known_sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/system_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        },
+        {
+          "archive": "KX11-Cruise-Trace-20260810-070156.zip",
+          "member": "KX11-Cruise-Trace-20260810-070156/discovery-files/system_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "required_variant": "Installed variant matching the user vehicle; retain version and hash.",
+      "status": "known_file_collect_changed_variant",
+      "maximum_bytes": 536870912,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/system/bin/smartcore_update_client'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "Android",
+      "path": "/vendor/etc/usb_reflash_config.json",
+      "reason": "Real config selects ECARX/HIGH/folder/udisk_manifest.json; compare changed variants.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "known_sha256": [
+        "e2c5497a45848c25a521c00d1db7423721ae15f6de5aed143b574c47e2d79aa0"
+      ],
+      "known_sources": [
+        {
+          "archive": "KX11-VP-Firmware-Evidence.zip",
+          "member": "KX11-VP-Firmware-Evidence/android/files/vendor/etc/usb_reflash_config.json",
+          "sha256": "e2c5497a45848c25a521c00d1db7423721ae15f6de5aed143b574c47e2d79aa0",
+          "bytes": 271
+        }
+      ],
+      "required_variant": "Installed variant matching the user vehicle; retain version and hash.",
+      "status": "known_file_collect_changed_variant",
+      "maximum_bytes": 536870912,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/vendor/etc/usb_reflash_config.json'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "Android",
+      "path": "/system/etc/usb_reflash_config.json",
+      "reason": "Exact default config path appears in updater at VA0xea35; existence and alias to vendor config remain unproven.",
+      "source_evidence": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-152225.zip",
+          "member": "KX11-Cruise-Trace-20260809-152225/discovery-files/vendor_bin_smartcore_update_client",
+          "sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+          "bytes": 136400
+        }
+      ],
+      "known_sha256": [],
+      "known_sources": [],
+      "required_variant": "Installed variant matching the user vehicle; retain version and hash.",
+      "status": "conditional_from_producer_code_not_observed_installed",
+      "maximum_bytes": 536870912,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": [
+          "adb",
+          "exec-out",
+          "sh",
+          "-c",
+          "cat -- '/system/etc/usb_reflash_config.json'"
+        ],
+        "qconn_operation": null
+      }
+    },
+    {
+      "domain": "QNX",
+      "path": "/bin/sc_qnx_vip_proxy",
+      "reason": "Compare the six finite registered SOME/IP handlers with any changed vehicle variant.",
+      "source_evidence": [
+        {
+          "archive": "KX11-QNX-CAN-Inventory.zip",
+          "member": "KX11-QNX-CAN-Inventory/qnx/files/bin/sc_qnx_vip_proxy",
+          "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+          "bytes": 335440
+        },
+        {
+          "archive": "KX11-QNX-Deep-Evidence.zip",
+          "member": "KX11-QNX-Deep-Evidence/qnx/files/bin/sc_qnx_vip_proxy",
+          "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+          "bytes": 335440
+        },
+        {
+          "archive": "KX11-QNX-Live-Discovery.zip",
+          "member": "KX11-QNX-Live-Discovery/qnx/files/bin/sc_qnx_vip_proxy",
+          "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+          "bytes": 335440
+        }
+      ],
+      "known_sha256": [
+        "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55"
+      ],
+      "known_sources": [
+        {
+          "archive": "KX11-QNX-CAN-Inventory.zip",
+          "member": "KX11-QNX-CAN-Inventory/qnx/files/bin/sc_qnx_vip_proxy",
+          "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+          "bytes": 335440
+        },
+        {
+          "archive": "KX11-QNX-Deep-Evidence.zip",
+          "member": "KX11-QNX-Deep-Evidence/qnx/files/bin/sc_qnx_vip_proxy",
+          "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+          "bytes": 335440
+        },
+        {
+          "archive": "KX11-QNX-Live-Discovery.zip",
+          "member": "KX11-QNX-Live-Discovery/qnx/files/bin/sc_qnx_vip_proxy",
+          "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55",
+          "bytes": 335440
+        }
+      ],
+      "required_variant": "Installed variant matching the user vehicle; retain version and hash.",
+      "status": "known_file_collect_changed_variant",
+      "maximum_bytes": 536870912,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": null,
+        "qconn_operation": "review exact ordinary path before collection; file_open(O_RDONLY); file_stat; accept regular file only; file_read; file_close; no pre-open lstat available"
+      }
+    },
+    {
+      "domain": "QNX",
+      "path": "/bin/can_driver",
+      "reason": "Compare generic SPI/CAN resource-manager code; do not open the device node.",
+      "source_evidence": [
+        {
+          "archive": "KX11-QNX-CAN-Inventory.zip",
+          "member": "KX11-QNX-CAN-Inventory/qnx/files/bin/can_driver",
+          "sha256": "d60ba7ab0bb07119cf24425ebc817a6e6bc41ab737944bab0d5dd737cfeeb28d",
+          "bytes": 18360
+        }
+      ],
+      "known_sha256": [
+        "d60ba7ab0bb07119cf24425ebc817a6e6bc41ab737944bab0d5dd737cfeeb28d"
+      ],
+      "known_sources": [
+        {
+          "archive": "KX11-QNX-CAN-Inventory.zip",
+          "member": "KX11-QNX-CAN-Inventory/qnx/files/bin/can_driver",
+          "sha256": "d60ba7ab0bb07119cf24425ebc817a6e6bc41ab737944bab0d5dd737cfeeb28d",
+          "bytes": 18360
+        }
+      ],
+      "required_variant": "Installed variant matching the user vehicle; retain version and hash.",
+      "status": "known_file_collect_changed_variant",
+      "maximum_bytes": 536870912,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": null,
+        "qconn_operation": "review exact ordinary path before collection; file_open(O_RDONLY); file_stat; accept regular file only; file_read; file_close; no pre-open lstat available"
+      }
+    },
+    {
+      "domain": "QNX",
+      "path": "/bin/SwVersionService",
+      "reason": "Correlate QNX software-version provider.",
+      "source_evidence": [
+        {
+          "archive": "KX11-QNX-Deep-Evidence.zip",
+          "member": "KX11-QNX-Deep-Evidence/qnx/files/bin/SwVersionService",
+          "sha256": "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29",
+          "bytes": 46992
+        },
+        {
+          "archive": "KX11-Update-Package-Evidence(1).zip",
+          "member": "KX11-Update-Package-Evidence/qnx/files/bin/SwVersionService",
+          "sha256": "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29",
+          "bytes": 46992
+        },
+        {
+          "archive": "KX11-Update-Package-Evidence.zip",
+          "member": "KX11-Update-Package-Evidence/qnx/files/bin/SwVersionService",
+          "sha256": "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29",
+          "bytes": 46992
+        }
+      ],
+      "known_sha256": [
+        "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29"
+      ],
+      "known_sources": [
+        {
+          "archive": "KX11-QNX-Deep-Evidence.zip",
+          "member": "KX11-QNX-Deep-Evidence/qnx/files/bin/SwVersionService",
+          "sha256": "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29",
+          "bytes": 46992
+        },
+        {
+          "archive": "KX11-Update-Package-Evidence(1).zip",
+          "member": "KX11-Update-Package-Evidence/qnx/files/bin/SwVersionService",
+          "sha256": "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29",
+          "bytes": 46992
+        },
+        {
+          "archive": "KX11-Update-Package-Evidence.zip",
+          "member": "KX11-Update-Package-Evidence/qnx/files/bin/SwVersionService",
+          "sha256": "131c4ff4be957d68aeb759228a253e2de00ae21f94830e2b5aa462a2f4773f29",
+          "bytes": 46992
+        }
+      ],
+      "required_variant": "Installed variant matching the user vehicle; retain version and hash.",
+      "status": "known_file_collect_changed_variant",
+      "maximum_bytes": 536870912,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": null,
+        "qconn_operation": "review exact ordinary path before collection; file_open(O_RDONLY); file_stat; accept regular file only; file_read; file_close; no pre-open lstat available"
+      }
+    },
+    {
+      "domain": "QNX",
+      "path": "/etc/sw-version-info.txt",
+      "reason": "Record actual ES/ER QNX version with files.",
+      "source_evidence": [
+        {
+          "archive": "KX11-QNX-Deep-Evidence.zip",
+          "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/sw-version-info.txt",
+          "sha256": "2062fc7816f3978028cf37f3f073d3b68ee6042c81322a459c06d7a93ef8f2e5",
+          "bytes": 121
+        }
+      ],
+      "known_sha256": [
+        "2062fc7816f3978028cf37f3f073d3b68ee6042c81322a459c06d7a93ef8f2e5"
+      ],
+      "known_sources": [
+        {
+          "archive": "KX11-QNX-Deep-Evidence.zip",
+          "member": "KX11-QNX-Deep-Evidence/qnx/files/etc/sw-version-info.txt",
+          "sha256": "2062fc7816f3978028cf37f3f073d3b68ee6042c81322a459c06d7a93ef8f2e5",
+          "bytes": 121
+        }
+      ],
+      "required_variant": "Installed variant matching the user vehicle; retain version and hash.",
+      "status": "known_file_collect_changed_variant",
+      "maximum_bytes": 536870912,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": null,
+        "qconn_operation": "review exact ordinary path before collection; file_open(O_RDONLY); file_stat; accept regular file only; file_read; file_close; no pre-open lstat available"
+      }
+    },
+    {
+      "domain": "QNX",
+      "path": "/vm/images_lv/linux-lv.img",
+      "reason": "If changed, decode updated Linux LV initramfs offline for updater and log handler paths.",
+      "source_evidence": [
+        {
+          "archive": "KX11-VP-Firmware-Evidence.zip",
+          "member": "KX11-VP-Firmware-Evidence/qnx/files/vm/images_lv/linux-lv.img",
+          "sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680",
+          "bytes": 49506320
+        }
+      ],
+      "known_sha256": [
+        "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680"
+      ],
+      "known_sources": [
+        {
+          "archive": "KX11-VP-Firmware-Evidence.zip",
+          "member": "KX11-VP-Firmware-Evidence/qnx/files/vm/images_lv/linux-lv.img",
+          "sha256": "4a0cd3a681364059ace2c857d4d7436e0902660c43601b48d0ef735e86d23680",
+          "bytes": 49506320
+        }
+      ],
+      "required_variant": "Installed variant matching the user vehicle; retain version and hash.",
+      "status": "known_file_collect_changed_variant",
+      "maximum_bytes": 536870912,
+      "operation": {
+        "kind": "ordinary_file_read",
+        "follow_device_symlinks": false,
+        "vehicle_network_command": false,
+        "read_only_command": null,
+        "qconn_operation": "review exact ordinary path before collection; file_open(O_RDONLY); file_stat; accept regular file only; file_read; file_close; no pre-open lstat available"
+      }
+    }
+  ],
+  "not_collectable_through_current_android_qnx_filesystem": [
+    {
+      "domain": "Linux_LV_initramfs_runtime",
+      "path_pattern": "/data/kernellog/vp_*.log",
+      "proven_directory": "/data/kernellog",
+      "proven_prefix": "vp",
+      "evidence": "mcu_log SHA33d91dad416089274af3ec23b4e5b8824b69a5196313b3162c40bdfd65e4fd0b VA400a1c..400a3c passes directory and prefix to logging setup; generated names %s/%s_%d.log. Runtime guest alias into Android/QNX not established.",
+      "missing_fact": "Mounted location of LV /dev/block/vdb within an already-running accessible filesystem. No new mount or LV boot is authorized.",
+      "prohibited_action": "Do not execute mcu_log: callback400c1c performs mkdir and mount."
+    }
+  ],
+  "missing_fact_without_exact_collectable_path": [
+    "Production VP/MCU image corresponding to MCU version20.24.10.23024.41141 and hardware identity of 198.18.34.1:50500.",
+    "Wheel-switch receiving ECU handler and downstream cruise request/counter/checksum/eligibility semantics.",
+    "Meaning/ownership of swlm/swp1 package segments; names alone are insufficient."
+  ],
+  "excluded": [
+    "/dev/can*",
+    "/dev/spi*",
+    "raw block devices",
+    "firmware execution",
+    "updater execution",
+    "vehicle-network messages"
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "source_sha256": "9287dbe4041cca83207a853f99f887734e0338b1a8c20ded15dee117641d75b2",
+  "scope": "Only nearby ADRP+ADD references to known path strings; establishes code references, not installed file presence or package ownership.",
+  "references": [
+    {
+      "adrp_va": "0x8a90",
+      "add_va": "0x8a94",
+      "string_va": "0xe29c",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8aa4",
+      "add_va": "0x8aa8",
+      "string_va": "0xe2b2",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8b50",
+      "add_va": "0x8b54",
+      "string_va": "0xe30f",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8b64",
+      "add_va": "0x8b68",
+      "string_va": "0xe324",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8c58",
+      "add_va": "0x8c5c",
+      "string_va": "0xe351",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8c6c",
+      "add_va": "0x8c70",
+      "string_va": "0xe366",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8d5c",
+      "add_va": "0x8d60",
+      "string_va": "0xe393",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8d70",
+      "add_va": "0x8d74",
+      "string_va": "0xe3a8",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8e60",
+      "add_va": "0x8e64",
+      "string_va": "0xe3d5",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8e74",
+      "add_va": "0x8e78",
+      "string_va": "0xe3ea",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8f64",
+      "add_va": "0x8f68",
+      "string_va": "0xe417",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0x8f78",
+      "add_va": "0x8f7c",
+      "string_va": "0xe42c",
+      "register": "x1"
+    },
+    {
+      "adrp_va": "0xacb0",
+      "add_va": "0xacb8",
+      "string_va": "0xea35",
+      "register": "x19"
+    },
+    {
+      "adrp_va": "0xacd4",
+      "add_va": "0xacdc",
+      "string_va": "0xea35",
+      "register": "x19"
+    }
+  ]
+}

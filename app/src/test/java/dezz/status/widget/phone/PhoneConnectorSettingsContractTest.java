@@ -1,0 +1,317 @@
+/*
+ * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+package dezz.status.widget.phone;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+/** Source contract for the exact-device iPhone settings surface and its read-only data picker. */
+public final class PhoneConnectorSettingsContractTest {
+    @Test
+    public void preferencesUseTheRequiredStableKeysAndKeepAddressLocal() throws IOException {
+        String source = javaSource("Preferences.java");
+
+        assertTrue(source.contains("\"phoneConnectorEnabled\", false"));
+        assertTrue(source.contains("new Str(this, \"phoneDeviceAddress\", \"\")"));
+        assertFalse(source.contains("new Str(this,\n"
+                + "            \"phoneAncsDeviceAddress\", \"\")"));
+        assertTrue(source.contains("\"phoneNotificationsEnabled\", true"));
+        assertTrue(source.contains("\"phoneMessagesEnabled\", false"));
+        assertTrue(source.contains("\"phoneIncludeNotificationText\", false"));
+        assertTrue(source.contains("\"phoneStatusItems\""));
+        assertTrue(source.contains("\"phoneNotificationTickerEnabled\", false"));
+        assertTrue(source.contains("\"phoneNotificationTickerSeconds\", 10"));
+        assertTrue(source.contains("\"phoneNotificationTickerFields\""));
+        assertTrue(source.contains("\"phoneNotificationCategoryIds\""));
+        assertTrue(source.contains("\"phoneNotificationAppFilterMode\""));
+        assertTrue(source.contains("\"phoneNotificationAppFilterKeys\""));
+        assertTrue(source.contains("\"phoneNotificationTickerColor\""));
+        assertTrue(source.contains("\"phoneLowBatteryAlertEnabled\""));
+        assertTrue(source.contains("\"phoneLowBatteryAlertThreshold\""));
+        assertTrue(source.contains("\"phoneLowBatteryAlertColor\""));
+        assertTrue(source.contains("\"phoneLowBatteryAlertLatched\""));
+        assertTrue(source.contains("\"phoneSprutPresenceEnabled\", false"));
+        assertTrue(source.contains("\"phoneSprutPresencePath\", \"\""));
+        assertTrue(source.contains("\"phoneSprutAncsPresenceEnabled\", false"));
+        assertTrue(source.contains("\"phoneSprutAncsPresencePath\", \"\""));
+        assertTrue(source.substring(source.indexOf("SECRET_PREFERENCE_KEYS"),
+                source.indexOf("public static abstract class Preference"))
+                .contains("\"phoneDeviceAddress\""));
+        assertTrue(source.substring(source.indexOf("SECRET_PREFERENCE_KEYS"),
+                source.indexOf("public static abstract class Preference"))
+                .contains("\"phoneAncsDeviceAddress\""));
+    }
+
+    @Test
+    public void manifestDeclaresSettingsWithoutBroadSmsPermission() throws IOException {
+        String source = mainSource("AndroidManifest.xml");
+
+        assertFalse(source.contains("android.permission.READ_SMS"));
+        assertTrue(source.contains("android:name=\".PhoneConnectorSettingsActivity\""));
+        assertTrue(source.contains("android:screenOrientation=\"landscape\""));
+    }
+
+    @Test
+    public void settingsRequireOneExactPairedPhoneAndNeverAutoSelect() throws IOException {
+        String source = javaSource("PhoneConnectorSettingsActivity.java");
+
+        assertTrue(source.contains("BluetoothAdapter.getDefaultAdapter()"));
+        assertTrue(source.contains("adapter.getBondedDevices()"));
+        assertTrue(source.contains("BluetoothClass.Device.Major.PHONE"));
+        assertTrue(source.contains("normalizedName.contains(\"iphone\")"));
+        assertTrue(source.contains("selectedDeviceAddress = devices.get(position).address"));
+        assertTrue(source.contains("maskedAddress(value.address)"));
+        assertTrue(source.contains("String advertisedName = clean(device.getName())"));
+        assertTrue(source.contains("looksLikePhone(device, advertisedName)"));
+        assertFalse(source.contains("looksLikePhone(device, name)"));
+        assertTrue(source.contains(
+                "connectorRequested && selectedDeviceAddress.isEmpty()"));
+        assertTrue(source.contains("R.string.phone_choose_required"));
+        assertTrue(source.contains(
+                "preferences.phoneDeviceAddress.set(selectedDeviceAddress)"));
+        assertFalse(source.contains("preferences.phoneAncsDeviceAddress"));
+        assertTrue(source.contains(
+                "getString(R.string.phone_diag_ancs_transport_names)"));
+        assertFalse(source.contains("selectedDeviceAddress = position == 0"));
+        assertFalse(source.contains("labels[0] = getString(R.string.phone_no_device)"));
+    }
+
+    @Test
+    public void diagnosticsUsePhoneSnapshotAndDoNotRequireAndroidNotificationAccess()
+            throws IOException {
+        String source = javaSource("PhoneConnectorSettingsActivity.java");
+
+        assertTrue(source.contains("service.connectorValueSnapshot()"));
+        assertTrue(source.contains("value.connectorType != ConnectorType.PHONE"));
+        assertTrue(source.contains("\"diagnostics.ancs\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"connected\".equals(value.resourceId)"));
+        assertFalse(source.contains("Permissions.isNotificationAccessGranted"));
+        assertFalse(source.contains("ACTION_NOTIFICATION_LISTENER_SETTINGS"));
+        assertFalse(source.contains("phone_notification_access"));
+        assertFalse(source.contains("Manifest.permission.READ_SMS"));
+        assertFalse(source.contains("Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE"));
+        assertTrue(source.contains("REQUEST_ICON_STORAGE"));
+        assertTrue(source.contains("WRITE_EXTERNAL_STORAGE"));
+        assertTrue(source.contains("\"diagnostics.sms\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"diagnostics.device\".equals(value.resourceId)"));
+        assertTrue(source.contains("device.get(\"stock_connection\")"));
+        assertTrue(source.contains("device.get(\"ancs_setup\")"));
+        assertTrue(source.contains("\"diagnostics.last_app\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"diagnostics.last_error\".equals(value.resourceId)"));
+        assertTrue(source.contains("diagnosticsHandler.postDelayed(diagnosticsPoll, 500L)"));
+        assertTrue(source.contains("diagnosticsHandler.removeCallbacks(diagnosticsPoll)"));
+        assertTrue(source.contains("this::testAncsConnection"));
+        assertTrue(source.contains("!service.reconnectPhoneForDiagnostics()"));
+        assertTrue(source.contains("!preferences.phoneNotificationsEnabled.get()"));
+        assertTrue(source.contains("!preferences.phoneMessagesEnabled.get()"));
+        assertTrue(source.contains("localizedMapStatus(mapStatus)"));
+        assertTrue(source.contains("selectedBondedPhone() == null"));
+        assertTrue(source.contains("Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS"));
+        assertTrue(source.contains("manager.areNotificationsEnabled()"));
+        assertTrue(source.contains("NotificationManager.IMPORTANCE_NONE"));
+        assertTrue(source.contains("line(!ancsRequested || notificationDelivery"));
+        assertTrue(source.contains("localizedStockConnectionStatus(stockConnectionStatus)"));
+        assertTrue(source.contains("localizedAncsSetup(ancsSetup)"));
+        assertTrue(source.contains("\"battery.level_source\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"battery.charging\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"battery.charging_estimated\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"battery.charging_source\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"call.state\".equals(value.resourceId)"));
+        assertTrue(source.contains("phone_diag_charging_unknown"));
+        assertTrue(source.contains("phone_diag_source_android_metadata"));
+    }
+
+    @Test
+    public void applyReconfiguresRuntimeAndSprutPickerMatchesExporterRule()
+            throws IOException {
+        String source = javaSource("PhoneConnectorSettingsActivity.java");
+        String presentation = javaSource(
+                "PhoneNotificationAutomationSettingsActivity.java");
+
+        assertTrue(source.contains("SettingsBackNavigation.install(this, screen)"));
+        assertTrue(source.contains("if (service != null) {"));
+        assertTrue(source.contains("service.applyPreferences();"));
+        assertTrue(source.contains("WidgetServiceStarter.startIfNeeded(this);"));
+        assertTrue(source.contains("chooseSprutAccessory()"));
+        assertTrue(source.contains("chooseSprutService("));
+        assertTrue(source.contains("chooseSprutCharacteristic("));
+        assertTrue(source.contains("chooseAncsSprutAccessory()"));
+        assertTrue(source.contains("characteristic.writable()"));
+        assertTrue(source.contains("SprutActionValue.isBooleanLike(characteristic)"));
+        assertTrue(source.contains("value.path().stableId()"));
+        assertTrue(source.contains("selectedSprutPath = \"\""));
+        assertFalse(source.contains("PhoneConnectorController"));
+        assertTrue(source.contains("chooseStatusItems()"));
+        assertTrue(presentation.contains("chooseFields()"));
+        assertTrue(presentation.contains("chooseDuration()"));
+        assertTrue(presentation.contains("value < 1 || value > 120"));
+        assertTrue(presentation.contains("working.isEmpty()"));
+        assertTrue(presentation.contains(
+                "selectedFields.contains(PhoneStatusBarPolicy.FIELD_TOPIC)"));
+        assertTrue(presentation.contains("prefs.phoneIncludeNotificationText.set(true)"));
+        assertTrue(presentation.contains("order.add(BrickType.MEDIA)"));
+        assertTrue(presentation.contains(
+                "prefs.phoneStatusBarNotificationsEnabled.set(statusEnabled)"));
+        assertTrue(presentation.contains(
+                "prefs.phonePopupNotificationsEnabled.set(popupEnabled)"));
+        assertTrue(presentation.contains("PhoneNotificationAutomation.ensureConfigured(prefs)"));
+        assertTrue(presentation.contains("ScenarioSettingsActivity.intentForTarget(this,"));
+        assertTrue(presentation.contains("TargetScope.OVERLAY"));
+        assertTrue(source.contains("chooseNotificationCategories()"));
+        assertTrue(source.contains("chooseNotificationAppFilterMode()"));
+        assertTrue(source.contains("chooseNotificationApps()"));
+        assertTrue(source.contains("chooseLowBatteryThreshold"));
+        assertTrue(source.contains("chooseLowBatteryColor"));
+        assertTrue(source.contains("preferences.phoneNotificationCategoryIds.set("));
+        assertTrue(source.contains("preferences.phoneNotificationAppFilterMode.set("));
+        assertTrue(source.contains("preferences.phoneNotificationAppFilterKeys.set("));
+        assertTrue(presentation.contains("prefs.phoneStatusBarNotificationColor.set("));
+        assertTrue(source.contains("preferences.phoneLowBatteryAlertEnabled.set("));
+        assertTrue(source.contains("preferences.phoneLowBatteryAlertThreshold.set("));
+        assertTrue(source.contains("preferences.phoneLowBatteryAlertColor.set("));
+        assertTrue(source.contains("preferences.phoneLowBatteryAlertLatched.set(false)"));
+        assertTrue(source.contains("preferences.phoneSprutAncsPresenceEnabled.set("));
+        assertTrue(source.contains("preferences.phoneSprutAncsPresencePath.set("));
+        assertFalse(source.contains("statusBarNotificationsEnabled.isChecked()"));
+        assertFalse(source.contains("private MaterialSwitch statusBarNotificationsEnabled"));
+    }
+
+    @Test
+    public void partiallyRestoredSettingsNeverDereferenceMissingSwitches() throws IOException {
+        String source = javaSource("PhoneConnectorSettingsActivity.java");
+        String persist = source.substring(source.indexOf(
+                        "private boolean persistSettings(boolean showConfirmation)"),
+                source.indexOf("@SuppressLint(\"MissingPermission\")"));
+
+        assertTrue(source.contains("@Nullable MaterialSwitch value"));
+        assertTrue(source.contains(
+                "return value == null ? savedFallback : value.isChecked()"));
+        assertTrue(persist.contains(
+                "checked(connectorEnabled,\n                preferences.phoneConnectorEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(notificationsEnabled,\n                preferences.phoneNotificationsEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(messagesEnabled,\n                preferences.phoneMessagesEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(includeNotificationText,\n                preferences.phoneIncludeNotificationText.get())"));
+        assertTrue(persist.contains(
+                "checked(lowBatteryAlertEnabled,\n                preferences.phoneLowBatteryAlertEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(sprutPresenceEnabled,\n                preferences.phoneSprutPresenceEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(sprutAncsPresenceEnabled,\n                preferences.phoneSprutAncsPresenceEnabled.get())"));
+        assertFalse(persist.contains("connectorEnabled.isChecked()"));
+        assertFalse(persist.contains("notificationsEnabled.isChecked()"));
+        assertFalse(persist.contains("messagesEnabled.isChecked()"));
+        assertFalse(persist.contains("includeNotificationText.isChecked()"));
+        assertFalse(persist.contains("lowBatteryAlertEnabled.isChecked()"));
+        assertFalse(persist.contains("sprutPresenceEnabled.isChecked()"));
+        assertFalse(persist.contains("sprutAncsPresenceEnabled.isChecked()"));
+    }
+
+    @Test
+    public void settingsCatalogAndInformationPanelExposePhone() throws IOException {
+        String catalog = javaSource("settings/SettingsDestinationCatalog.java");
+        String picker = javaSource(
+                "launcher/information/InformationSourcePicker.java");
+        String hub = javaSource("SettingsHubActivity.java");
+
+        assertTrue(catalog.contains("\"connector_phone\""));
+        assertTrue(catalog.contains(
+                "\"dezz.status.widget.PhoneConnectorSettingsActivity\""));
+        assertTrue(hub.contains(
+                "PhoneConnectorSettingsActivity.maskedAddress(address)"));
+        assertFalse(hub.contains("\"Включено · \" + address"));
+        assertTrue(picker.contains("\"Sprut.hub\","));
+        assertTrue(picker.contains("\"Телефон\""));
+        assertTrue(picker.contains("value.connectorType != ConnectorType.PHONE"));
+        assertFalse(picker.contains(
+                "case \"diagnostics.device\": return \"Диагностика устройства\";"));
+        assertTrue(picker.contains("new SourceBinding(ConnectorType.PHONE"));
+        assertTrue(picker.contains("PhoneInformationSourcePolicy.valuePath(value.resourceId)"));
+        assertTrue(picker.contains("PhoneInformationSourcePolicy.displayValue(value)"));
+        assertTrue(picker.contains("PhoneInformationSourcePolicy.selectable(value.resourceId)"));
+        assertTrue(picker.contains("service.connectorValueSnapshot()"));
+    }
+
+    @Test
+    public void bothLocalesExplainSpecificDeviceAncsAndMaskedAddress() throws IOException {
+        String english = resourceSource("values/strings.xml");
+        String russian = resourceSource("values-ru/strings.xml");
+
+        for (String source : new String[]{english, russian}) {
+            assertTrue(source.contains("name=\"phone_connector_title\""));
+            assertTrue(source.contains("name=\"phone_choose_required\""));
+            assertTrue(source.contains("name=\"phone_diag_ancs_iphone\""));
+            assertTrue(source.contains("name=\"phone_sprut_target_title\""));
+            assertTrue(source.contains("name=\"phone_sprut_ancs_enable_title\""));
+            assertTrue(source.contains("name=\"phone_sprut_ancs_target_title\""));
+            assertTrue(source.contains("name=\"phone_privacy_hint\""));
+            assertTrue(source.contains("name=\"phone_diag_map_ready\""));
+            assertTrue(source.contains("name=\"phone_diag_map_waiting\""));
+            assertTrue(source.contains("name=\"phone_diag_ancs_authorization\""));
+            assertTrue(source.contains("name=\"phone_diag_ancs_ready_degraded\""));
+            assertTrue(source.contains("name=\"phone_diag_ancs_stock_pairing_required\""));
+            assertTrue(source.contains("name=\"phone_diag_ancs_stock_route\""));
+            assertTrue(source.contains("name=\"phone_diag_stock_connection\""));
+            assertTrue(source.contains("name=\"phone_diag_stock_not_registered\""));
+            assertTrue(source.contains("name=\"phone_diag_last_app\""));
+            assertTrue(source.contains("name=\"phone_test_ancs\""));
+            assertTrue(source.contains("name=\"phone_test_choose_source\""));
+            assertTrue(source.contains("name=\"phone_status_items_title\""));
+            assertTrue(source.contains("name=\"phone_status_notification_title\""));
+            assertTrue(source.contains(
+                    "name=\"phone_status_notification_duration_title\""));
+            assertTrue(source.contains(
+                    "name=\"phone_status_notification_fields_required\""));
+            assertTrue(source.contains("name=\"phone_filter_categories_title\""));
+            assertTrue(source.contains("name=\"phone_filter_app_mode_title\""));
+            assertTrue(source.contains("name=\"phone_filter_apps_title\""));
+            assertTrue(source.contains("name=\"phone_status_notification_color_title\""));
+            assertTrue(source.contains("name=\"phone_low_battery_enable_title\""));
+            assertTrue(source.contains("name=\"phone_low_battery_threshold_title\""));
+            assertTrue(source.contains("name=\"phone_low_battery_color_title\""));
+            assertTrue(source.contains("name=\"phone_diag_battery\""));
+            assertTrue(source.contains("name=\"phone_diag_charging_unknown\""));
+            assertTrue(source.contains("name=\"phone_diag_source_android_metadata\""));
+            assertFalse(source.contains("name=\"phone_allow_sms\""));
+            assertFalse(source.contains("name=\"phone_sms_permission_granted\""));
+        }
+        assertTrue(russian.contains("конкретного iPhone"));
+        assertTrue(russian.contains("маскированном виде"));
+        assertTrue(russian.contains("Android Notification Access"));
+        assertTrue(russian.contains("доступ к общему хранилищу SMS не требуются"));
+        assertTrue(russian.contains("не может принудительно вызвать запрос на iPhone"));
+        assertTrue(english.contains("cannot force an iPhone prompt"));
+    }
+
+    private static String javaSource(String relative) throws IOException {
+        return source(Paths.get("java", "dezz", "status", "widget").resolve(relative));
+    }
+
+    private static String resourceSource(String relative) throws IOException {
+        return source(Paths.get("res").resolve(relative));
+    }
+
+    private static String mainSource(String relative) throws IOException {
+        return source(Paths.get(relative));
+    }
+
+    private static String source(Path relative) throws IOException {
+        Path fromRoot = Paths.get("app", "src", "main").resolve(relative);
+        Path fromApp = Paths.get("src", "main").resolve(relative);
+        Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
+        return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+    }
+}

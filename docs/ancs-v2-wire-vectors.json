@@ -1,0 +1,38 @@
+{
+  "protocolVersion": 2,
+  "defaultAttPayloadBytes": 20,
+  "vectors": [
+    {
+      "name": "helper-peer-proof-telemetry-ancs",
+      "type": "H",
+      "mode": "android_central",
+      "installationId": "8f04fe8d-11c2-4b3a-9ab7-f4512aa2a21d",
+      "hex": "480201038f04fe8d11c24b3a9ab7f4512aa2a21d"
+    },
+    {
+      "name": "close-android-peripheral",
+      "type": "C",
+      "targetMode": "android_peripheral",
+      "switchTokenHex": "0102030405060708090a0b0c0d0e0f10",
+      "hex": "430202000102030405060708090a0b0c0d0e0f10"
+    },
+    {
+      "name": "close-ack-android-peripheral",
+      "type": "A",
+      "targetMode": "android_peripheral",
+      "switchTokenHex": "0102030405060708090a0b0c0d0e0f10",
+      "hex": "410202000102030405060708090a0b0c0d0e0f10"
+    },
+    {
+      "name": "telemetry-80-charging-lte-unlocked",
+      "type": "T",
+      "batteryPercent": 80,
+      "externalPower": true,
+      "chargeState": "charging",
+      "network": "lte",
+      "locked": false,
+      "sequence": 4660,
+      "hex": "54021350033412b7"
+    }
+  ]
+}

@@ -1,0 +1,893 @@
+name: Publish HA1243 Natro 2.2.9
+
+on:
+  push:
+    tags:
+      - 'natro-v2.2.9'
+    branches:
+      - 'release-resume/natro-v2.2.9'
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: 'Exact natro-v2.2.9 tag or the full 40-character SHA it points to'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      release_ref:
+        description: 'Exact natro-v2.2.9 tag or the full 40-character SHA it points to'
+        required: true
+        type: string
+    secrets:
+      KEYSTORE_BASE64:
+        required: false
+      KEY_PASSWORD:
+        required: false
+      KEY_ALIAS:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-ha1243-${{ inputs.release_ref || github.ref }}
+  cancel-in-progress: false
+
+env:
+  REQUESTED_RELEASE_REF: ${{ inputs.release_ref || (github.ref == 'refs/heads/release-resume/natro-v2.2.9' && 'natro-v2.2.9') || github.ref }}
+  RELEASE_TAG: 'natro-v2.2.9'
+  VERSION_NAME: '2.2.9'
+  VERSION_CODE: '208021243'
+  PACKAGE_NAME: 'ru.natro.statuswidget'
+  MIN_SDK: '28'
+  TARGET_SDK: '28'
+  HELPER_VERSION: '61.0'
+  HELPER_BUILD: '61'
+  HELPER_BUNDLE_ID: 'ru.natro.kx11ancshelper'
+  HELPER_TREE: 'f348eb3b65309891633da2e69db336cffb709880'
+  COLLECTOR_ASSET: 'KX11_Bluetooth_Collect.sh'
+  STABLE_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
+  BUILD_TOOLS_VERSION: '36.0.0'
+
+jobs:
+  build-verify:
+    name: Test and build exact unsigned Natro 2.2.9 bytes
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    permissions:
+      contents: read
+    outputs:
+      handoff_artifact: ${{ steps.handoff.outputs.artifact_name }}
+      unsigned_apk_sha256: ${{ steps.unsigned.outputs.apk_sha256 }}
+      source_sha: ${{ steps.identity.outputs.source_sha }}
+      source_tree: ${{ steps.identity.outputs.source_tree }}
+      source_short: ${{ steps.identity.outputs.source_short }}
+      tag_object: ${{ steps.identity.outputs.tag_object }}
+
+    steps:
+      - name: Checkout requested tag or full SHA without persisted credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.REQUESTED_RELEASE_REF }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Require exact immutable release tag and source commit
+        id: identity
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ env.REQUESTED_RELEASE_REF }}
+          CALLED_RELEASE_REF: ${{ inputs.release_ref }}
+        run: |
+          set -euo pipefail
+          TAG_REF="refs/tags/${RELEASE_TAG}"
+          case "$REQUESTED_REF" in
+            "$RELEASE_TAG"|"$TAG_REF") ;;
+            *)
+              [[ "$REQUESTED_REF" =~ ^[0-9a-f]{40}$ ]] || {
+                echo 'release_ref must be natro-v2.2.9 or its full lowercase commit SHA' >&2
+                exit 1
+              }
+              ;;
+          esac
+          git show-ref --verify --quiet "$TAG_REF" || {
+            echo "Required tag $TAG_REF does not exist" >&2
+            exit 1
+          }
+          SOURCE_SHA=$(git rev-parse 'HEAD^{commit}')
+          REQUESTED_SHA=$(git rev-parse "${REQUESTED_REF}^{commit}")
+          TAG_SHA=$(git rev-parse "${TAG_REF}^{commit}")
+          test "$SOURCE_SHA" = "$REQUESTED_SHA"
+          test "$SOURCE_SHA" = "$TAG_SHA"
+          if test "$GITHUB_EVENT_NAME" = 'push' \
+              && test -z "$CALLED_RELEASE_REF" \
+              && test "$GITHUB_REF" != 'refs/heads/release-resume/natro-v2.2.9'; then
+            test "$GITHUB_REF" = "$TAG_REF"
+            test "$(git rev-parse "${GITHUB_SHA}^{commit}")" = "$SOURCE_SHA"
+          fi
+          test -z "$(git status --short --ignore-submodules=none)"
+          SOURCE_TREE=$(git rev-parse 'HEAD^{tree}')
+          TAG_OBJECT=$(git rev-parse "$TAG_REF")
+          HELPER_ACTUAL_TREE=$(git rev-parse \
+            "${SOURCE_SHA}:ios/KX11-iPhone-ANCS-Helper-v61")
+          test "$HELPER_ACTUAL_TREE" = "$HELPER_TREE"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "source_tree=$SOURCE_TREE" >> "$GITHUB_OUTPUT"
+          echo "source_short=${SOURCE_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          echo "tag_object=$TAG_OBJECT" >> "$GITHUB_OUTPUT"
+
+      - name: Verify frozen Android and Helper identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "return '2.2.9'" build.gradle
+          grep -Fq 'return 208021243' build.gradle
+          grep -Fq 'Android version: `2.2.9`' release-manifests/HA1243.md
+          grep -Fq 'Android version code: `208021243`' release-manifests/HA1243.md
+          grep -Fq 'Package: `ru.natro.statuswidget`' release-manifests/HA1243.md
+          grep -Fq 'Release tag: `natro-v2.2.9`' release-manifests/HA1243.md
+          PROJECT=ios/KX11-iPhone-ANCS-Helper-v61/KX11ANCSHelper.xcodeproj/project.pbxproj
+          test "$(grep -Fc 'CURRENT_PROJECT_VERSION = 61;' "$PROJECT")" -eq 4
+          test "$(grep -Fc 'MARKETING_VERSION = 61.0;' "$PROJECT")" -eq 4
+          test "$(grep -Fc \
+            'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper;' "$PROJECT")" -eq 2
+          test "$(grep -Fc \
+            'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper.liveactivity;' "$PROJECT")" -eq 2
+
+      - name: Verify exact Helper v61 portable contract
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          bash ios/KX11-iPhone-ANCS-Helper-v61/verify-v61-contract.sh
+          test -z "$(git status --short --ignore-submodules=none)"
+
+      - name: Verify standalone macOS Bluetooth collector
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tools/KX11_Bluetooth_Collect.sh
+          BASH_COMPAT=3.2 bash -n tools/KX11_Bluetooth_Collect.sh
+          KX11_COLLECTOR_UNDER_TEST=tools/KX11_Bluetooth_Collect.sh \
+            bash tools/tests/test_KX11_Bluetooth_Collect.sh
+          test -z "$(git status --short --ignore-submodules=none)"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Install exact Android SDK and build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_HOME:-}"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
+          "$SDKMANAGER" \
+            'platforms;android-36' "build-tools;${BUILD_TOOLS_VERSION}"
+
+      - name: Run complete geelyDebug unit suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            clean testGeelyDebugUnitTest
+
+      - name: Assemble and verify exact unsigned geelyRelease input
+        id: unsigned
+        shell: bash
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            assembleGeelyRelease
+          BUILT="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+          test -s "$BUILT"
+          OUT="$RUNNER_TEMP/ha1243-unsigned-handoff"
+          mkdir -p "$OUT"
+          APK="$OUT/Natro-2.2.9-unsigned.apk"
+          cp "$BUILT" "$APK"
+          TOOLS="$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}"
+          if "$TOOLS/apksigner" verify "$APK" >/dev/null 2>&1; then
+            echo 'Gradle signing was not isolated: unsigned input already has a valid signature' >&2
+            exit 1
+          fi
+          unzip -Z1 "$APK" | grep -Fx 'AndroidManifest.xml'
+          unzip -Z1 "$APK" | grep -Fx 'resources.arsc'
+          unzip -Z1 "$APK" | grep -Fx 'classes.dex'
+          test "$(unzip -Z1 "$APK" | grep -c '^res/')" -gt 500
+          "$TOOLS/aapt" dump resources "$APK" >/dev/null
+          BADGING=$("$TOOLS/aapt" dump badging "$APK")
+          printf '%s\n' "$BADGING" | grep -F \
+            "package: name='${PACKAGE_NAME}' versionCode='${VERSION_CODE}' versionName='${VERSION_NAME}'"
+          LABELS=$(printf '%s\n' "$BADGING" | grep '^application-label')
+          printf '%s\n' "$LABELS" | grep -Fx "application-label:'Natro'"
+          if printf '%s\n' "$LABELS" \
+              | grep -Ev "^application-label(-[^:]+)?:'Natro'$"; then
+            echo 'Every localized application label must be exactly Natro' >&2
+            exit 1
+          fi
+          printf '%s\n' "$BADGING" | grep -F "sdkVersion:'${MIN_SDK}'"
+          printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'${TARGET_SDK}'"
+          if printf '%s\n' "$BADGING" | grep -Fq 'application-debuggable'; then
+            echo 'Unsigned release input must not be debuggable' >&2
+            exit 1
+          fi
+          "$TOOLS/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
+          APK_SHA=$(sha256sum "$APK" | awk '{print $1}')
+          echo "apk_sha256=$APK_SHA" >> "$GITHUB_OUTPUT"
+          test -z "$(git status --short --untracked-files=no --ignore-submodules=none)"
+
+      - name: Package source and immutable unsigned handoff
+        id: handoff
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ env.REQUESTED_RELEASE_REF }}
+          SOURCE_SHA: ${{ steps.identity.outputs.source_sha }}
+          SOURCE_TREE: ${{ steps.identity.outputs.source_tree }}
+          SOURCE_SHORT: ${{ steps.identity.outputs.source_short }}
+          TAG_OBJECT: ${{ steps.identity.outputs.tag_object }}
+          UNSIGNED_APK_SHA256: ${{ steps.unsigned.outputs.apk_sha256 }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/ha1243-unsigned-handoff"
+          TAG_REF="refs/tags/${RELEASE_TAG}"
+          SOURCE_ARCHIVE='Natro-2.2.9-source.tar.gz'
+          SOURCE_BUNDLE='Natro-2.2.9-source.bundle'
+          HELPER_ARCHIVE='KX11-iPhone-ANCS-Helper-v61-source.zip'
+          cp release-manifests/HA1243.md "$OUT/HA1243-release-notes.md"
+          cp tools/KX11_Bluetooth_Collect.sh "$OUT/$COLLECTOR_ASSET"
+          test -x "$OUT/$COLLECTOR_ASSET"
+          bash -n "$OUT/$COLLECTOR_ASSET"
+          BASH_COMPAT=3.2 bash -n "$OUT/$COLLECTOR_ASSET"
+          git archive --format=tar.gz --prefix='Natro-2.2.9-source/' \
+            --output="$OUT/$SOURCE_ARCHIVE" "$SOURCE_SHA"
+          git bundle create "$OUT/$SOURCE_BUNDLE" "$TAG_REF"
+          git bundle verify "$OUT/$SOURCE_BUNDLE" >/dev/null
+          # Keep the Helper subtree byte-identical, but preserve the repo-relative layout its
+          # portable contract intentionally consumes. Its shared wire/switch fixtures, telemetry
+          # contract and hosted build workflow are auditable source inputs, not generated files.
+          HELPER_PREFIX='KX11-iPhone-ANCS-Helper-v61-source/'
+          git archive --format=zip \
+            --prefix="$HELPER_PREFIX" \
+            --output="$OUT/$HELPER_ARCHIVE" \
+            "$SOURCE_SHA" \
+            ios/KX11-iPhone-ANCS-Helper-v61 \
+            docs/ancs-v2-wire-vectors-v52.json \
+            docs/TELEMETRY_REFRESH_V52.md \
+            docs/car-remote-v1-vectors.json \
+            app/src/main/java/dezz/status/widget/phone \
+            app/src/geely/java/dezz/status/widget/car/GeelyPassengerControlIntegration.java \
+            .github/workflows/verify-helper-v61.yml
+          HELPER_VERIFY_ROOT="$RUNNER_TEMP/ha1243-helper-source-verify"
+          mkdir -p "$HELPER_VERIFY_ROOT"
+          unzip -q "$OUT/$HELPER_ARCHIVE" -d "$HELPER_VERIFY_ROOT"
+          HELPER_VERIFY="$HELPER_VERIFY_ROOT/${HELPER_PREFIX}ios/KX11-iPhone-ANCS-Helper-v61/verify-v61-contract.sh"
+          test -x "$HELPER_VERIFY"
+          PYTHONDONTWRITEBYTECODE=1 bash "$HELPER_VERIFY"
+          SOURCE_ARCHIVE_SHA=$(sha256sum "$OUT/$SOURCE_ARCHIVE" | awk '{print $1}')
+          SOURCE_BUNDLE_SHA=$(sha256sum "$OUT/$SOURCE_BUNDLE" | awk '{print $1}')
+          HELPER_ARCHIVE_SHA=$(sha256sum "$OUT/$HELPER_ARCHIVE" | awk '{print $1}')
+          COLLECTOR_SHA=$(sha256sum "$OUT/$COLLECTOR_ASSET" | awk '{print $1}')
+          jq -n \
+            --arg schema 'natro-unsigned-handoff/v1' \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg tag "$RELEASE_TAG" \
+            --arg tagObjectSha "$TAG_OBJECT" \
+            --arg requestedRef "$REQUESTED_REF" \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg sourceTree "$SOURCE_TREE" \
+            --arg sourceArchiveSha256 "$SOURCE_ARCHIVE_SHA" \
+            --arg sourceBundleSha256 "$SOURCE_BUNDLE_SHA" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg helperArchiveSha256 "$HELPER_ARCHIVE_SHA" \
+            --arg collector "$COLLECTOR_ASSET" \
+            --arg collectorSha256 "$COLLECTOR_SHA" \
+            --arg unsignedSha256 "$UNSIGNED_APK_SHA256" \
+            '{schema: $schema, repository: $repository, tag: $tag,
+              tagObjectSha: $tagObjectSha, requestedRef: $requestedRef,
+              sourceSha: $sourceSha, sourceTree: $sourceTree,
+              sourceArchiveSha256: $sourceArchiveSha256,
+              sourceBundleSha256: $sourceBundleSha256,
+              helperTree: $helperTree, helperArchiveSha256: $helperArchiveSha256,
+              collector: {file: $collector, sha256: $collectorSha256,
+                platform: "macOS", headUnitAccess: "read-only"},
+              unsignedApk: "Natro-2.2.9-unsigned.apk",
+              unsignedApkSha256: $unsignedSha256}' \
+            > "$OUT/HA1243-unsigned-handoff.json"
+          (
+            cd "$OUT"
+            sha256sum \
+              Natro-2.2.9-unsigned.apk \
+              "$SOURCE_ARCHIVE" \
+              "$SOURCE_BUNDLE" \
+              "$HELPER_ARCHIVE" \
+              "$COLLECTOR_ASSET" \
+              HA1243-release-notes.md \
+              HA1243-unsigned-handoff.json \
+              > HA1243-unsigned-SHA256SUMS.txt
+            sha256sum -c HA1243-unsigned-SHA256SUMS.txt
+          )
+          test -z "$(find "$OUT" -maxdepth 1 -type f \
+            \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' \) -print)"
+          echo "artifact_name=ha1243-unsigned-handoff-${SOURCE_SHORT}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immutable unsigned handoff without signing secrets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.handoff.outputs.artifact_name }}
+          path: ${{ runner.temp }}/ha1243-unsigned-handoff/*
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-verify:
+    name: Sign exact handoff on a clean runner without repository code
+    needs: build-verify
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
+      apk_name: ${{ steps.package.outputs.apk_name }}
+      apk_sha256: ${{ steps.package.outputs.apk_sha256 }}
+      unsigned_apk_sha256: ${{ needs.build-verify.outputs.unsigned_apk_sha256 }}
+      source_sha: ${{ needs.build-verify.outputs.source_sha }}
+      source_tree: ${{ needs.build-verify.outputs.source_tree }}
+      tag_object: ${{ needs.build-verify.outputs.tag_object }}
+
+    steps:
+      - name: Download exact unsigned handoff on the clean runner
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.build-verify.outputs.handoff_artifact }}
+          path: ${{ runner.temp }}/ha1243-unsigned-handoff
+
+      - name: Verify handoff before any signing secret is exposed
+        shell: bash
+        env:
+          UNSIGNED_APK_SHA256: ${{ needs.build-verify.outputs.unsigned_apk_sha256 }}
+          SOURCE_SHA: ${{ needs.build-verify.outputs.source_sha }}
+          SOURCE_TREE: ${{ needs.build-verify.outputs.source_tree }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/ha1243-unsigned-handoff"
+          APK="$OUT/Natro-2.2.9-unsigned.apk"
+          COLLECTOR="$OUT/$COLLECTOR_ASSET"
+          test -s "$APK"
+          test -s "$COLLECTOR"
+          (cd "$OUT" && sha256sum -c HA1243-unsigned-SHA256SUMS.txt)
+          chmod 755 "$COLLECTOR"
+          test -x "$COLLECTOR"
+          test "$(sha256sum "$APK" | awk '{print $1}')" = "$UNSIGNED_APK_SHA256"
+          COLLECTOR_SHA=$(sha256sum "$COLLECTOR" | awk '{print $1}')
+          bash -n "$COLLECTOR"
+          BASH_COMPAT=3.2 bash -n "$COLLECTOR"
+          jq -e \
+            --arg tag "$RELEASE_TAG" \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg sourceTree "$SOURCE_TREE" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg collector "$COLLECTOR_ASSET" \
+            --arg collectorSha "$COLLECTOR_SHA" \
+            --arg unsignedSha "$UNSIGNED_APK_SHA256" \
+            '.tag == $tag and .sourceSha == $sourceSha
+              and .sourceTree == $sourceTree and .helperTree == $helperTree
+              and .collector.file == $collector
+              and .collector.sha256 == $collectorSha
+              and .unsignedApk == "Natro-2.2.9-unsigned.apk"
+              and .unsignedApkSha256 == $unsignedSha' \
+            "$OUT/HA1243-unsigned-handoff.json" >/dev/null
+          test -z "$(find "$OUT" -maxdepth 1 -type f \
+            \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' \) -print)"
+          test -n "${ANDROID_HOME:-}"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
+          "$SDKMANAGER" "build-tools;${BUILD_TOOLS_VERSION}"
+          TOOLS="$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}"
+          test -x "$TOOLS/apksigner"
+          test -x "$TOOLS/aapt"
+          test -x "$TOOLS/zipalign"
+          if "$TOOLS/apksigner" verify "$APK" >/dev/null 2>&1; then
+            echo 'Unsigned handoff unexpectedly contains a valid signature' >&2
+            exit 1
+          fi
+          BADGING=$("$TOOLS/aapt" dump badging "$APK")
+          printf '%s\n' "$BADGING" | grep -F \
+            "package: name='${PACKAGE_NAME}' versionCode='${VERSION_CODE}' versionName='${VERSION_NAME}'"
+          printf '%s\n' "$BADGING" | grep -Fx "application-label:'Natro'"
+          "$TOOLS/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
+
+      - name: Receive exact encrypted signing bundle when Actions secrets are unavailable
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HANDOFF_BRANCH: 'release/natro-2.2.9-helper61'
+          SIGNING_BUNDLE_SHA256: '4fb34ee8aed62dad3896d7aa6240d4066ec9b6ef3da5459bca9d7d1c4c3b7fc0'
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          CONFIGURED=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || CONFIGURED=$((CONFIGURED + 1))
+          done
+          case "$CONFIGURED" in
+            3)
+              echo 'Complete GitHub Actions signing secrets are configured'
+              exit 0
+              ;;
+            0) ;;
+            *)
+              echo 'Signing credentials must be supplied completely or omitted completely' >&2
+              exit 1
+              ;;
+          esac
+          unset KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS
+          umask 077
+          TRANSPORT="$RUNNER_TEMP/ha1243-signing-transport"
+          SIGNING="$RUNNER_TEMP/ha1243-signing"
+          mkdir -p "$TRANSPORT/chunks" "$SIGNING"
+          PRIVATE="$TRANSPORT/private.pem"
+          PUBLIC="$TRANSPORT/public.pem"
+          ENCRYPTED="$TRANSPORT/signing-bundle.enc"
+          ARCHIVE="$TRANSPORT/signing-bundle.tar.gz"
+          PREFIX="ha1243-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PUBLIC_PATH="release-handoff/${PREFIX}.pub"
+          ENCRYPTED_PATH="release-handoff/${PREFIX}.enc"
+
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
+            -out "$PRIVATE" 2>/dev/null
+          openssl pkey -in "$PRIVATE" -pubout -out "$PUBLIC"
+          PUBLIC_CONTENT=$(base64 -w0 "$PUBLIC")
+          gh api --method PUT \
+            "repos/${GITHUB_REPOSITORY}/contents/${PUBLIC_PATH}" \
+            -f message="ci: publish ephemeral HA1243 transport key [skip ci]" \
+            -f content="$PUBLIC_CONTENT" \
+            -f branch="$HANDOFF_BRANCH" >/dev/null
+          echo "::notice title=HA1243 encrypted handoff::Waiting for ${ENCRYPTED_PATH}"
+
+          for _ in $(seq 1 180); do
+            if gh api \
+                "repos/${GITHUB_REPOSITORY}/contents/${ENCRYPTED_PATH}?ref=${HANDOFF_BRANCH}" \
+                > "$TRANSPORT/encrypted.json" 2>/dev/null; then
+              jq -r '.content' "$TRANSPORT/encrypted.json" \
+                | tr -d '\n' | base64 --decode > "$ENCRYPTED"
+              break
+            fi
+            sleep 5
+          done
+          test -s "$ENCRYPTED" || {
+            echo 'Timed out waiting for the encrypted signing handoff' >&2
+            exit 1
+          }
+          test $(( $(stat -c '%s' "$ENCRYPTED") % 512 )) -eq 0
+          split -b 512 -d -a 3 "$ENCRYPTED" "$TRANSPORT/chunks/chunk-"
+          : > "$ARCHIVE"
+          for chunk in "$TRANSPORT"/chunks/chunk-*; do
+            openssl pkeyutl -decrypt -inkey "$PRIVATE" \
+              -pkeyopt rsa_padding_mode:oaep \
+              -pkeyopt rsa_oaep_md:sha256 \
+              -pkeyopt rsa_mgf1_md:sha256 \
+              -in "$chunk" >> "$ARCHIVE"
+          done
+          test "$(sha256sum "$ARCHIVE" | awk '{print $1}')" \
+            = "$SIGNING_BUNDLE_SHA256"
+          tar -tzf "$ARCHIVE" | awk \
+            'BEGIN { ok=1 } /^\// || /(^|\/)\.\.($|\/)/ { ok=0 } END { exit ok ? 0 : 1 }'
+          tar -xzf "$ARCHIVE" -C "$SIGNING" \
+            --no-same-owner --no-same-permissions
+          chmod 600 "$SIGNING"/*
+          test -s "$SIGNING/status-widget-ha-update.jks"
+          test -s "$SIGNING/status-widget-ha-update.pass"
+          IFS= read -r BUNDLE_PASSWORD \
+            < "$SIGNING/status-widget-ha-update.pass"
+          test -n "$BUNDLE_PASSWORD"
+          export BUNDLE_PASSWORD
+          KEYTOOL_OUTPUT=$(keytool -J-Duser.language=en -J-Duser.country=US \
+            -list -v -keystore "$SIGNING/status-widget-ha-update.jks" \
+            -alias status-widget-ha -storepass:env BUNDLE_PASSWORD)
+          BUNDLE_CERT=$(printf '%s\n' "$KEYTOOL_OUTPUT" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          unset BUNDLE_PASSWORD
+          test "$BUNDLE_CERT" = "$STABLE_CERT_SHA256"
+          touch "$SIGNING/verified.ready"
+
+          find "$TRANSPORT/chunks" -type f -exec shred -u -- {} +
+          shred -u -- "$PRIVATE" "$PUBLIC" "$ENCRYPTED" "$ARCHIVE" \
+            "$TRANSPORT/encrypted.json"
+          rmdir "$TRANSPORT/chunks" "$TRANSPORT"
+
+      - name: Sign only the verified handoff with the stable update keystore
+        id: sign
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          SIGNING="$RUNNER_TEMP/ha1243-signing"
+          KEYSTORE="$RUNNER_TEMP/ha1243-stable-keystore.jks"
+          PASSWORD_FILE=''
+          cleanup_files=("$KEYSTORE")
+          trap 'shred -u -- "${cleanup_files[@]}" 2>/dev/null || true' EXIT
+          if test -n "${KEYSTORE_BASE64:-}" \
+              && test -n "${KEY_PASSWORD:-}" \
+              && test -n "${KEY_ALIAS:-}"; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          elif test -z "${KEYSTORE_BASE64:-}" \
+              && test -z "${KEY_PASSWORD:-}" \
+              && test -z "${KEY_ALIAS:-}"; then
+            test -f "$SIGNING/verified.ready"
+            KEYSTORE="$SIGNING/status-widget-ha-update.jks"
+            PASSWORD_FILE="$SIGNING/status-widget-ha-update.pass"
+            cleanup_files=("$KEYSTORE" "$PASSWORD_FILE")
+            IFS= read -r KEY_PASSWORD < "$PASSWORD_FILE"
+            KEY_ALIAS='status-widget-ha'
+          else
+            echo 'Signing credentials must be supplied completely or by encrypted handoff' >&2
+            exit 1
+          fi
+          test -n "$KEY_PASSWORD"
+          test -n "$KEY_ALIAS"
+          export KEY_PASSWORD
+          test -s "$KEYSTORE"
+          KEYTOOL=$(command -v keytool)
+          test -x "$KEYTOOL"
+          KEYTOOL_OUTPUT=$("$KEYTOOL" -J-Duser.language=en -J-Duser.country=US \
+            -list -v -keystore "$KEYSTORE" -alias "$KEY_ALIAS" \
+            -storepass:env KEY_PASSWORD)
+          KEYSTORE_CERT=$(printf '%s\n' "$KEYTOOL_OUTPUT" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          test "$KEYSTORE_CERT" = "$STABLE_CERT_SHA256" || {
+            echo 'Configured keystore certificate is not the stable update certificate' >&2
+            exit 1
+          }
+          HANDOFF="$RUNNER_TEMP/ha1243-unsigned-handoff/Natro-2.2.9-unsigned.apk"
+          FINAL="$RUNNER_TEMP/ha1243-release"
+          mkdir -p "$FINAL"
+          APK_NAME='Natro-2.2.9-signed.apk'
+          SIGNED="$FINAL/$APK_NAME"
+          "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/apksigner" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEY_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --min-sdk-version "$MIN_SDK" \
+            --v1-signing-enabled false \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --v4-signing-enabled false \
+            --out "$SIGNED" \
+            "$HANDOFF"
+          test -s "$SIGNED"
+          echo "apk=$SIGNED" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Verify signed APK identity, resources, alignment and certificate
+        id: apk
+        shell: bash
+        env:
+          SIGNED_APK: ${{ steps.sign.outputs.apk }}
+        run: |
+          set -euo pipefail
+          TOOLS="$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}"
+          test -s "$SIGNED_APK"
+          unzip -Z1 "$SIGNED_APK" | grep -Fx 'AndroidManifest.xml'
+          unzip -Z1 "$SIGNED_APK" | grep -Fx 'resources.arsc'
+          unzip -Z1 "$SIGNED_APK" | grep -Fx 'classes.dex'
+          test "$(unzip -Z1 "$SIGNED_APK" | grep -c '^res/')" -gt 500
+          "$TOOLS/aapt" dump resources "$SIGNED_APK" >/dev/null
+          BADGING=$("$TOOLS/aapt" dump badging "$SIGNED_APK")
+          printf '%s\n' "$BADGING" | grep -F \
+            "package: name='${PACKAGE_NAME}' versionCode='${VERSION_CODE}' versionName='${VERSION_NAME}'"
+          LABELS=$(printf '%s\n' "$BADGING" | grep '^application-label')
+          printf '%s\n' "$LABELS" | grep -Fx "application-label:'Natro'"
+          if printf '%s\n' "$LABELS" \
+              | grep -Ev "^application-label(-[^:]+)?:'Natro'$"; then
+            echo 'Every localized application label must be exactly Natro' >&2
+            exit 1
+          fi
+          printf '%s\n' "$BADGING" | grep -F "sdkVersion:'${MIN_SDK}'"
+          printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'${TARGET_SDK}'"
+          if printf '%s\n' "$BADGING" | grep -Fq 'application-debuggable'; then
+            echo 'Signed release APK must not be debuggable' >&2
+            exit 1
+          fi
+          "$TOOLS/zipalign" -c -P 16 -v 4 "$SIGNED_APK" >/dev/null
+          REPORT="$RUNNER_TEMP/ha1243-release/apk-certificates.txt"
+          "$TOOLS/apksigner" verify --verbose --print-certs \
+            --min-sdk-version 24 "$SIGNED_APK" | tee "$REPORT"
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' "$REPORT"
+          grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' "$REPORT"
+          grep -Fq 'Number of signers: 1' "$REPORT"
+          grep -Fq \
+            "Signer #1 certificate SHA-256 digest: ${STABLE_CERT_SHA256}" \
+            "$REPORT"
+          echo "apk_sha256=$(sha256sum "$SIGNED_APK" | awk '{print $1}')" \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Package exact signed payload and provenance
+        id: package
+        shell: bash
+        env:
+          APK_NAME: ${{ steps.sign.outputs.apk_name }}
+          APK_SHA256: ${{ steps.apk.outputs.apk_sha256 }}
+          UNSIGNED_APK_SHA256: ${{ needs.build-verify.outputs.unsigned_apk_sha256 }}
+          SOURCE_SHA: ${{ needs.build-verify.outputs.source_sha }}
+          SOURCE_TREE: ${{ needs.build-verify.outputs.source_tree }}
+          SOURCE_SHORT: ${{ needs.build-verify.outputs.source_short }}
+          TAG_OBJECT: ${{ needs.build-verify.outputs.tag_object }}
+        run: |
+          set -euo pipefail
+          HANDOFF="$RUNNER_TEMP/ha1243-unsigned-handoff"
+          OUT="$RUNNER_TEMP/ha1243-release"
+          SOURCE_ARCHIVE='Natro-2.2.9-source.tar.gz'
+          SOURCE_BUNDLE='Natro-2.2.9-source.bundle'
+          HELPER_ARCHIVE='KX11-iPhone-ANCS-Helper-v61-source.zip'
+          cp "$HANDOFF/$SOURCE_ARCHIVE" "$OUT/$SOURCE_ARCHIVE"
+          cp "$HANDOFF/$SOURCE_BUNDLE" "$OUT/$SOURCE_BUNDLE"
+          cp "$HANDOFF/$HELPER_ARCHIVE" "$OUT/$HELPER_ARCHIVE"
+          cp "$HANDOFF/$COLLECTOR_ASSET" "$OUT/$COLLECTOR_ASSET"
+          cp "$HANDOFF/HA1243-release-notes.md" "$OUT/HA1243-release-notes.md"
+          SOURCE_ARCHIVE_SHA=$(sha256sum "$OUT/$SOURCE_ARCHIVE" | awk '{print $1}')
+          SOURCE_BUNDLE_SHA=$(sha256sum "$OUT/$SOURCE_BUNDLE" | awk '{print $1}')
+          HELPER_ARCHIVE_SHA=$(sha256sum "$OUT/$HELPER_ARCHIVE" | awk '{print $1}')
+          COLLECTOR_SHA=$(sha256sum "$OUT/$COLLECTOR_ASSET" | awk '{print $1}')
+          test -x "$OUT/$COLLECTOR_ASSET"
+          bash -n "$OUT/$COLLECTOR_ASSET"
+          BASH_COMPAT=3.2 bash -n "$OUT/$COLLECTOR_ASSET"
+          jq -e \
+            --arg sourceArchiveSha "$SOURCE_ARCHIVE_SHA" \
+            --arg sourceBundleSha "$SOURCE_BUNDLE_SHA" \
+            --arg helperArchiveSha "$HELPER_ARCHIVE_SHA" \
+            --arg collector "$COLLECTOR_ASSET" \
+            --arg collectorSha "$COLLECTOR_SHA" \
+            '.sourceArchiveSha256 == $sourceArchiveSha
+              and .sourceBundleSha256 == $sourceBundleSha
+              and .helperArchiveSha256 == $helperArchiveSha
+              and .collector.file == $collector
+              and .collector.sha256 == $collectorSha' \
+            "$HANDOFF/HA1243-unsigned-handoff.json" >/dev/null
+          jq -n \
+            --arg schema 'natro-release-provenance/v1' \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg tag "$RELEASE_TAG" \
+            --arg tagObjectSha "$TAG_OBJECT" \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg sourceTree "$SOURCE_TREE" \
+            --arg sourceArchiveSha256 "$SOURCE_ARCHIVE_SHA" \
+            --arg sourceBundleSha256 "$SOURCE_BUNDLE_SHA" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg helperVersion "$HELPER_VERSION" \
+            --arg helperBundleId "$HELPER_BUNDLE_ID" \
+            --arg helperArchiveSha256 "$HELPER_ARCHIVE_SHA" \
+            --arg collector "$COLLECTOR_ASSET" \
+            --arg collectorSha256 "$COLLECTOR_SHA" \
+            --arg packageName "$PACKAGE_NAME" \
+            --arg versionName "$VERSION_NAME" \
+            --arg signedApk "$APK_NAME" \
+            --arg signedApkSha256 "$APK_SHA256" \
+            --arg unsignedApkSha256 "$UNSIGNED_APK_SHA256" \
+            --arg signingCertificateSha256 "$STABLE_CERT_SHA256" \
+            --arg buildTools "$BUILD_TOOLS_VERSION" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg workflowRef "$GITHUB_WORKFLOW_REF" \
+            --arg workflowSha "$GITHUB_WORKFLOW_SHA" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg actor "$GITHUB_ACTOR" \
+            --argjson versionCode "$VERSION_CODE" \
+            --argjson helperBuild "$HELPER_BUILD" \
+            --argjson minSdk "$MIN_SDK" \
+            --argjson targetSdk "$TARGET_SDK" \
+            '{schema: $schema, repository: $repository, tag: $tag,
+              tagObjectSha: $tagObjectSha, sourceSha: $sourceSha,
+              sourceTree: $sourceTree,
+              sourceArchiveSha256: $sourceArchiveSha256,
+              sourceBundleSha256: $sourceBundleSha256,
+              helper: {version: $helperVersion, build: $helperBuild,
+                bundleId: $helperBundleId, tree: $helperTree,
+                sourceArchiveSha256: $helperArchiveSha256},
+              collector: {file: $collector, sha256: $collectorSha256,
+                platform: "macOS", headUnitAccess: "read-only"},
+              android: {appName: "Natro", package: $packageName,
+                versionName: $versionName, versionCode: $versionCode,
+                minSdk: $minSdk, targetSdk: $targetSdk,
+                flavor: "geely", buildType: "release", signed: true,
+                apk: $signedApk, apkSha256: $signedApkSha256,
+                unsignedInputSha256: $unsignedApkSha256,
+                certificateSha256: $signingCertificateSha256,
+                signatureSchemes: ["v2", "v3"]},
+              validation: {unitTask: "testGeelyDebugUnitTest",
+                helperContract: "verify-v61-contract.sh",
+                buildTask: "assembleGeelyRelease", buildTools: $buildTools,
+                signingRunnerCheckedOutRepository: false},
+              github: {workflow: $workflow, workflowRef: $workflowRef,
+                workflowSha: $workflowSha, runId: $runId,
+                runAttempt: $runAttempt, actor: $actor}}' \
+            > "$OUT/HA1243-provenance.json"
+          (
+            cd "$OUT"
+            sha256sum \
+              "$APK_NAME" \
+              "$SOURCE_ARCHIVE" \
+              "$SOURCE_BUNDLE" \
+              "$HELPER_ARCHIVE" \
+              "$COLLECTOR_ASSET" \
+              HA1243-release-notes.md \
+              HA1243-provenance.json \
+              apk-certificates.txt \
+              > SHA256SUMS.txt
+            sha256sum -c SHA256SUMS.txt
+          )
+          test ! -e "$OUT/Natro-2.2.9-unsigned.apk"
+          test -z "$(find "$OUT" -maxdepth 1 -type f \
+            \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' \) -print)"
+          echo "artifact_name=ha1243-natro-signed-${SOURCE_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
+          echo "apk_sha256=$APK_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload exact signed release, source and provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: ${{ runner.temp }}/ha1243-release/*
+          if-no-files-found: error
+          retention-days: 90
+
+  publish:
+    name: Publish immutable Natro 2.2.9 prerelease
+    needs: sign-verify
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download exact verified release payload
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.sign-verify.outputs.artifact_name }}
+          path: ${{ runner.temp }}/ha1243-release
+
+      - name: Recheck checksums and provenance before publication
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ needs.sign-verify.outputs.source_sha }}
+          SOURCE_TREE: ${{ needs.sign-verify.outputs.source_tree }}
+          APK_NAME: ${{ needs.sign-verify.outputs.apk_name }}
+          APK_SHA256: ${{ needs.sign-verify.outputs.apk_sha256 }}
+          UNSIGNED_APK_SHA256: ${{ needs.sign-verify.outputs.unsigned_apk_sha256 }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/ha1243-release"
+          test -s "$OUT/$APK_NAME"
+          test -s "$OUT/$COLLECTOR_ASSET"
+          (cd "$OUT" && sha256sum -c SHA256SUMS.txt)
+          chmod 755 "$OUT/$COLLECTOR_ASSET"
+          test -x "$OUT/$COLLECTOR_ASSET"
+          test "$(sha256sum "$OUT/$APK_NAME" | awk '{print $1}')" = "$APK_SHA256"
+          COLLECTOR_SHA=$(sha256sum "$OUT/$COLLECTOR_ASSET" | awk '{print $1}')
+          bash -n "$OUT/$COLLECTOR_ASSET"
+          BASH_COMPAT=3.2 bash -n "$OUT/$COLLECTOR_ASSET"
+          jq -e \
+            --arg tag "$RELEASE_TAG" \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg sourceTree "$SOURCE_TREE" \
+            --arg apk "$APK_NAME" \
+            --arg apkSha "$APK_SHA256" \
+            --arg unsignedApkSha "$UNSIGNED_APK_SHA256" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg collector "$COLLECTOR_ASSET" \
+            --arg collectorSha "$COLLECTOR_SHA" \
+            --arg cert "$STABLE_CERT_SHA256" \
+            '.tag == $tag and .sourceSha == $sourceSha
+              and .sourceTree == $sourceTree
+              and .helper.tree == $helperTree
+              and .collector.file == $collector
+              and .collector.sha256 == $collectorSha
+              and .android.appName == "Natro"
+              and .android.versionName == "2.2.9"
+              and .android.apk == $apk and .android.apkSha256 == $apkSha
+              and .android.unsignedInputSha256 == $unsignedApkSha
+              and .android.certificateSha256 == $cert
+              and .android.signatureSchemes == ["v2", "v3"]
+              and .validation.signingRunnerCheckedOutRepository == false' \
+            "$OUT/HA1243-provenance.json" >/dev/null
+
+      - name: Create one non-overwriting signed Natro prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.sign-verify.outputs.source_sha }}
+          TAG_OBJECT: ${{ needs.sign-verify.outputs.tag_object }}
+        run: |
+          set -euo pipefail
+          TAG_JSON=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")
+          REMOTE_TAG_OBJECT=$(jq -r '.object.sha' <<<"$TAG_JSON")
+          REMOTE_OBJECT_TYPE=$(jq -r '.object.type' <<<"$TAG_JSON")
+          test "$REMOTE_TAG_OBJECT" = "$TAG_OBJECT" || {
+            echo "Remote $RELEASE_TAG tag object moved after the verified build" >&2
+            exit 1
+          }
+          REMOTE_OBJECT_SHA="$REMOTE_TAG_OBJECT"
+          for _ in 1 2 3 4; do
+            case "$REMOTE_OBJECT_TYPE" in
+              commit) break ;;
+              tag)
+                TAG_JSON=$(gh api \
+                  "repos/${GITHUB_REPOSITORY}/git/tags/${REMOTE_OBJECT_SHA}")
+                REMOTE_OBJECT_SHA=$(jq -r '.object.sha' <<<"$TAG_JSON")
+                REMOTE_OBJECT_TYPE=$(jq -r '.object.type' <<<"$TAG_JSON")
+                ;;
+              *)
+                echo "Unsupported remote tag target type: $REMOTE_OBJECT_TYPE" >&2
+                exit 1
+                ;;
+            esac
+          done
+          test "$REMOTE_OBJECT_TYPE" = commit
+          test "$REMOTE_OBJECT_SHA" = "$SOURCE_SHA" || {
+            echo "Remote $RELEASE_TAG no longer resolves to the signed source commit" >&2
+            exit 1
+          }
+          OUT="$RUNNER_TEMP/ha1243-release"
+          TITLE='Natro — signed release 2.2.9 + Helper v61'
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # The GitHub UI creates the tag and its empty prerelease atomically. Accept only that
+            # exact empty placeholder; never replace or append to an existing release payload.
+            EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")
+            test "$(jq -r '.draft' <<<"$EXISTING")" = false
+            test "$(jq -r '.prerelease' <<<"$EXISTING")" = true
+            test "$(jq '.assets | length' <<<"$EXISTING")" -eq 0 || {
+              echo "Release $RELEASE_TAG already has assets; refusing to overwrite them" >&2
+              exit 1
+            }
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" \
+              --notes-file "$OUT/HA1243-release-notes.md" \
+              --prerelease
+            gh release upload "$RELEASE_TAG" "$OUT"/* \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" "$OUT"/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "$TITLE" \
+              --notes-file "$OUT/HA1243-release-notes.md" \
+              --prerelease
+          fi
+          PUBLISHED=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")
+          EXPECTED_COUNT=$(find "$OUT" -maxdepth 1 -type f | wc -l)
+          test "$(jq -r '.draft' <<<"$PUBLISHED")" = false
+          test "$(jq -r '.prerelease' <<<"$PUBLISHED")" = true
+          test "$(jq -r '.name' <<<"$PUBLISHED")" = "$TITLE"
+          test "$(jq '.assets | length' <<<"$PUBLISHED")" -eq "$EXPECTED_COUNT"
+          while IFS= read -r FILE; do
+            NAME=$(basename "$FILE")
+            SIZE=$(stat -c '%s' "$FILE")
+            jq -e --arg name "$NAME" --argjson size "$SIZE" \
+              '.assets[] | select(.name == $name and .size == $size)' \
+              <<<"$PUBLISHED" >/dev/null
+          done < <(find "$OUT" -maxdepth 1 -type f -print | sort)

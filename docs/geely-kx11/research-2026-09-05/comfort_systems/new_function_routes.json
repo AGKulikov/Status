@@ -1,0 +1,4446 @@
+{
+  "schema_version": 1,
+  "source_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+  "functions": [
+    {
+      "module": "Hvac",
+      "function_id": 268501248,
+      "function_hex": "0x10010100",
+      "names": [
+        "HVAC_FUNC_POWER"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33331,
+        33332,
+        33340
+      ],
+      "read_pa_literals": [
+        33331,
+        33332,
+        33340
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_AirCtrlOff(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_HvacReCtrl(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_SecRowOnOffSwith(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_AirCtrlOff",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32812,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_HvacReCtrl",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32813,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_SecRowOnOffSwith",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32819,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268501248
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268501504,
+      "function_hex": "0x10010200",
+      "names": [
+        "HVAC_FUNC_AUTO"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33311,
+        33354
+      ],
+      "read_pa_literals": [
+        33311,
+        33354
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_Auto(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_SecAutoSw(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_Auto",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32799,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/LongPresBtn;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_SecAutoSw",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32842,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268501504
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268501760,
+      "function_hex": "0x10010300",
+      "names": [
+        "HVAC_FUNC_AC"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33310
+      ],
+      "read_pa_literals": [
+        33310
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_AC(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_AC",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32798,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268501760
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268502016,
+      "function_hex": "0x10010400",
+      "names": [
+        "HVAC_FUNC_AC_MAX"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33316
+      ],
+      "read_pa_literals": [
+        33316
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_MaxAC(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_MaxAC",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32804,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268502016
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268502272,
+      "function_hex": "0x10010500",
+      "names": [
+        "HVAC_FUNC_CLIMATE_ZONE"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [],
+      "read_signal_literals": [
+        29405
+      ],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268502272
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268566784,
+      "function_hex": "0x10020100",
+      "names": [
+        "HVAC_FUNC_FAN_SPEED"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33317,
+        33335
+      ],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_FanLevel(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_SecFanLevel(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_FanLevel",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32805,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/HmiHvacFanLvl;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_SecFanLevel",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32816,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/HmiHvacFanLvl;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268566784
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268567040,
+      "function_hex": "0x10020200",
+      "names": [
+        "HVAC_FUNC_AUTO_FAN_SETTING"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33317,
+        33335
+      ],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_FanLevel(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_SecFanLevel(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_FanLevel",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32805,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/HmiHvacFanLvl;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_SecFanLevel",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32816,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/HmiHvacFanLvl;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268567040
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268632320,
+      "function_hex": "0x10030100",
+      "names": [
+        "HVAC_FUNC_CIRCULATION"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33312
+      ],
+      "read_pa_literals": [
+        33312
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_Rcirc(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_Rcirc",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32800,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/LongPresBtn;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268632320
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268632832,
+      "function_hex": "0x10030300",
+      "names": [
+        "HVAC_FUNC_CIRCULATION_LONG_TOUCH"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": false,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_Rcirc(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_Rcirc",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32800,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/LongPresBtn;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268632832
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268697856,
+      "function_hex": "0x10040100",
+      "names": [
+        "HVAC_FUNC_DEFROST_FRONT"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33325
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_FrontDefrost(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_FrontDefrost",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32809,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268697856
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268698112,
+      "function_hex": "0x10040200",
+      "names": [
+        "HVAC_FUNC_DEFROST_FRONT_MAX"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33322
+      ],
+      "read_pa_literals": [
+        33322
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_MaxDefrost(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_MaxDefrost",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32808,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268698112
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268698368,
+      "function_hex": "0x10040300",
+      "names": [
+        "HVAC_FUNC_DEFROST_REAR"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33326
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_RearDefrost(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_RearDefrost",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32810,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268698368
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268698880,
+      "function_hex": "0x10040500",
+      "names": [
+        "HVAC_FUNC_AUTO_DEFROST_FRONT"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33336
+      ],
+      "read_pa_literals": [
+        33336
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_AutoDefrostSetting(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_AutoDefrostSetting",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32817,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268698880
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268699136,
+      "function_hex": "0x10040600",
+      "names": [
+        "HVAC_FUNC_AUTO_DEFROST_REQUEST"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33337
+      ],
+      "read_pa_literals": [
+        33337
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268699136
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268699392,
+      "function_hex": "0x10040700",
+      "names": [
+        "HVAC_FUNC_AUTO_DEFROST_CONFIRM"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": false,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_AutoDefrostPop(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_AutoDefrostPop",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32818,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268699392
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268763392,
+      "function_hex": "0x10050100",
+      "names": [
+        "HVAC_FUNC_SEAT_VENTILATION"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33380,
+        33381
+      ],
+      "read_pa_literals": [
+        33376,
+        33377
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCV_FirstLeLvl(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCV_FirstRiLvl(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCV_FirstLeLvl",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32854,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaLvl;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCV_FirstRiLvl",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32855,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaLvl;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268763392
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268763648,
+      "function_hex": "0x10050200",
+      "names": [
+        "HVAC_FUNC_SEAT_HEATING"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33371,
+        33372,
+        33373,
+        33374
+      ],
+      "read_pa_literals": [
+        33363,
+        33364,
+        33365,
+        33366
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCH_FirstLeLvl(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCH_FirstRiLvl(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCH_SecLeLvl(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCH_SecRiLvl(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCH_FirstLeLvl",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32846,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaLvl;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCH_FirstRiLvl",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32847,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaLvl;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCH_SecLeLvl",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32850,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaLvl;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCH_SecRiLvl",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32851,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaLvl;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268763648
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268764160,
+      "function_hex": "0x10050400",
+      "names": [
+        "HVAC_FUNC_AUTO_SEAT_VENTILATION_TIME"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33380,
+        33381
+      ],
+      "read_pa_literals": [
+        33378,
+        33379
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCV_FirstLeTmr(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCV_FirstRiTmr(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCV_FirstLeTmr",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32856,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaTmr;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCV_FirstRiTmr",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32857,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaTmr;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268764160
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268764672,
+      "function_hex": "0x10050600",
+      "names": [
+        "HVAC_FUNC_AUTO_SEAT_HEATING_TIME"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33371,
+        33372,
+        33373,
+        33374
+      ],
+      "read_pa_literals": [
+        33367,
+        33368,
+        33369,
+        33370
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCH_FirstLeTmr(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCH_FirstRiTmr(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCH_SecLeTmr(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;->CB_SCH_SecRiTmr(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCH_FirstLeTmr",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32848,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaTmr;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCH_FirstRiTmr",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32849,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaTmr;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCH_SecLeTmr",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32852,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaTmr;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatclimateManager;",
+          "method": "CB_SCH_SecRiTmr",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32853,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SeatClimaTmr;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268764672
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268764928,
+      "function_hex": "0x10050700",
+      "names": [
+        "HVAC_FUNC_SEAT_MASSAGE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33599,
+        33603
+      ],
+      "read_pa_literals": [
+        33602,
+        33606
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;->CB_MassgFctMassgIntenDrvr(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;->CB_MassgFctMassgIntenPass(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+          "method": "CB_MassgFctMassgIntenDrvr",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33005,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/MassgIntenLvl;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+          "method": "CB_MassgFctMassgIntenPass",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33008,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/MassgIntenLvl;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268764928
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268765696,
+      "function_hex": "0x10050a00",
+      "names": [
+        "HVAC_FUNC_SEAT_MASSAGE_SWITCH"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33599,
+        33603
+      ],
+      "read_pa_literals": [
+        33600,
+        33604
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;->CB_MultMassgFctOnOffDrvr(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;->CB_MultMassgFctOnOffPass(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+          "method": "CB_MultMassgFctOnOffDrvr",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33003,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+          "method": "CB_MultMassgFctOnOffPass",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33006,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268765696
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268765952,
+      "function_hex": "0x10050b00",
+      "names": [
+        "HVAC_FUNC_SEAT_MASSAGE_PROGRAM"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33599,
+        33603
+      ],
+      "read_pa_literals": [
+        33601,
+        33605
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;->CB_MultMassgFctMassgProgDrvr(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;->CB_MultMassgFctMassgProgPass(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+          "method": "CB_MultMassgFctMassgProgDrvr",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33004,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/MassgProgTyp;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSeatctrlManager;",
+          "method": "CB_MultMassgFctMassgProgPass",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33007,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/MassgProgTyp;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268765952
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268828928,
+      "function_hex": "0x10060100",
+      "names": [
+        "HVAC_FUNC_TEMP"
+      ],
+      "kind": "customFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33318,
+        33319,
+        33333,
+        33334
+      ],
+      "read_pa_literals": [
+        33318,
+        33319,
+        33333,
+        33334
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_LeftTemp(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_RightTemp(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_SecLeftTemp(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_SecRightTemp(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_LeftTemp",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32806,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_RightTemp",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32807,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_SecLeftTemp",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32814,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_SecRightTemp",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32815,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268828928
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268829184,
+      "function_hex": "0x10060200",
+      "names": [
+        "HVAC_FUNC_TEMP_MAX"
+      ],
+      "kind": "customFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33460
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268829184
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268829440,
+      "function_hex": "0x10060300",
+      "names": [
+        "HVAC_FUNC_TEMP_MIN"
+      ],
+      "kind": "customFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33460
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268829440
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268829696,
+      "function_hex": "0x10060400",
+      "names": [
+        "HVAC_FUNC_TEMP_STEP"
+      ],
+      "kind": "customFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33460
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268829696
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268829952,
+      "function_hex": "0x10060500",
+      "names": [
+        "HVAC_FUNC_TEMP_DUAL"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33327
+      ],
+      "read_pa_literals": [
+        33327
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_Sync(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_Sync",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32811,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268829952
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268830208,
+      "function_hex": "0x10060600",
+      "names": [
+        "HVAC_FUNC_TEMP_UNIT"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33460
+      ],
+      "read_pa_literals": [
+        33460
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSystemsettingManager;->CB_SysSetTempUnit(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSystemsettingManager;",
+          "method": "CB_SysSetTempUnit",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32905,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/AmbTIndcdUnit;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268830208
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268894464,
+      "function_hex": "0x10070100",
+      "names": [
+        "HVAC_FUNC_BLOWING_MODE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33313,
+        33314,
+        33315
+      ],
+      "read_pa_literals": [
+        33313,
+        33314,
+        33315
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_ModeFrstLeft(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_ModeFrstRight(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_ModeSec(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_ModeFrstLeft",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32801,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/HmiCmptmtAirDistbnFrnt;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_ModeFrstRight",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32802,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/HmiCmptmtAirDistbnFrnt;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_ModeSec",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32803,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/HmiCmptmtAirDistbnFrnt;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268894464
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268895744,
+      "function_hex": "0x10070600",
+      "names": [
+        "HVAC_FUNC_BLOWING_TEMP_COLOR"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [],
+      "read_signal_literals": [
+        30498
+      ],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268895744
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268960000,
+      "function_hex": "0x10080100",
+      "names": [
+        "HVAC_FUNC_ECO_SWITCH"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33328
+      ],
+      "read_pa_literals": [
+        33328
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_ECOClimate(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_ECOClimate",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32823,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268960000
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268960512,
+      "function_hex": "0x10080300",
+      "names": [
+        "HVAC_FUNC_AUTO_DEHUMIDIFICATION"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33342
+      ],
+      "read_pa_literals": [
+        33342
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_HumCtrl(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_HumCtrl",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32820,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268960512
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269025536,
+      "function_hex": "0x10090100",
+      "names": [
+        "HVAC_FUNC_STEERING_WHEEL_HEAT"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33384
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSteerwhlheatgManager;->CB_SWH_ManualLvlReq(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSteerwhlheatgManager;",
+          "method": "CB_SWH_ManualLvlReq",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32860,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/SteerWhlHeatgOnCmdTyp;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269025536
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269025792,
+      "function_hex": "0x10090200",
+      "names": [
+        "HVAC_FUNC_AUTO_STEERING_WHEEL_HEAT"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33383
+      ],
+      "read_pa_literals": [],
+      "read_signal_literals": [
+        30472
+      ],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269025792
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269026304,
+      "function_hex": "0x10090400",
+      "names": [
+        "HVAC_FUNC_AUTO_STEERING_WHEEL_HEAT_SWITCH"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33383
+      ],
+      "read_pa_literals": [
+        33383
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarSteerwhlheatgManager;->CB_SWH_AutoReq(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarSteerwhlheatgManager;",
+          "method": "CB_SWH_AutoReq",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32859,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269026304
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269091072,
+      "function_hex": "0x100a0100",
+      "names": [
+        "HVAC_FUNC_PRE_CLIMATISATION"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33329
+      ],
+      "read_pa_literals": [
+        33329
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_Pre(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_Pre",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32797,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269091072
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269091328,
+      "function_hex": "0x100a0200",
+      "names": [
+        "HVAC_FUNC_POST_CLIMATISATION"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33330
+      ],
+      "read_pa_literals": [
+        33330
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_Post(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_Post",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32796,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269091328
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269222144,
+      "function_hex": "0x100c0100",
+      "names": [
+        "HVAC_FUNC_AUTO_ION"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33388
+      ],
+      "read_pa_literals": [
+        33395
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;->CB_PM25_IncomingAirQlyPopUpReq(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;",
+          "method": "CB_PM25_IncomingAirQlyPopUpReq",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32872,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269222144
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269222400,
+      "function_hex": "0x100c0200",
+      "names": [
+        "HVAC_FUNC_AUTO_ION_REQUEST"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33392
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269222400
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269222656,
+      "function_hex": "0x100c0300",
+      "names": [
+        "HVAC_FUNC_AUTO_ION_CONFIRM"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": false,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;->CB_PM25_HmiPopUpResp(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;",
+          "method": "CB_PM25_HmiPopUpResp",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32862,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/BookChargeSetResponse;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269222656
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269287680,
+      "function_hex": "0x100d0100",
+      "names": [
+        "HVAC_FUNC_AUTO_DEHUMIDIFICATION_REQUEST"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33343
+      ],
+      "read_pa_literals": [
+        33343
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269287680
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269287936,
+      "function_hex": "0x100d0200",
+      "names": [
+        "HVAC_FUNC_AUTO_DEHUMIDIFICATION_CONFIRM"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": false,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_HumPop(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_HumPop",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32821,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269287936
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269419008,
+      "function_hex": "0x100f0200",
+      "names": [
+        "HVAC_FUNC_AUTO_CLOSE_WINDOW_REMIND_REQUEST"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33348
+      ],
+      "read_pa_literals": [
+        33348
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269419008
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269418752,
+      "function_hex": "0x100f0100",
+      "names": [
+        "HVAC_FUNC_AUTO_CLOSE_WINDOW_REMIND"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33352
+      ],
+      "read_pa_literals": [
+        33352
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_TWinRfClsdPopSw(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_TWinRfClsdPopSw",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32840,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269418752
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269419264,
+      "function_hex": "0x100f0300",
+      "names": [
+        "HVAC_FUNC_AUTO_CLOSE_WINDOW_REMIND_CONFIRM"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": false,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_ClmCloseWinPop(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_ClmCloseWinPop",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32839,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269419264
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269484544,
+      "function_hex": "0x10100200",
+      "names": [
+        "HVAC_FUNC_CLIMATE_LOCK"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33353
+      ],
+      "read_pa_literals": [
+        33353
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_SecLockClimaSw(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_SecLockClimaSw",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32841,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269484544
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269485056,
+      "function_hex": "0x10100400",
+      "names": [
+        "HVAC_FUNC_G_CLEAN"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33355
+      ],
+      "read_pa_literals": [
+        33355
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_GClean(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_GClean",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32843,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269485056
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269615360,
+      "function_hex": "0x10120100",
+      "names": [
+        "HVAC_FUNC_INTELLIGENT_RECOMMENDATION"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33344
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269615360
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 269615616,
+      "function_hex": "0x10120200",
+      "names": [
+        "HVAC_FUNC_TEMP_OPTIMIZE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": false,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_IntelliClimaPop(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_IntelliClimaPop",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32822,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269615616
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Hvac",
+      "function_id": 268505344,
+      "function_hex": "0x10011100",
+      "names": [
+        "HVAC_FUNC_POWER_VR"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33331,
+        33332,
+        33340
+      ],
+      "read_pa_literals": [
+        33331,
+        33332,
+        33340
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_AirCtrlOff(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_HvacReCtrl(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;->CB_CL_SecRowOnOffSwith(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_AirCtrlOff",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32812,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_HvacReCtrl",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32813,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarClimateManager;",
+          "method": "CB_CL_SecRowOnOffSwith",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32819,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Hvac",
+        "method": "buildFunctions()V",
+        "function_id_literal": 268505344
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Fragrance",
+      "function_id": 269156608,
+      "function_hex": "0x100b0100",
+      "names": [
+        "HVAC_FUNC_AIR_FRAGRANCE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33396
+      ],
+      "read_pa_literals": [
+        33403
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;->CB_Fragra_LvlReq(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;",
+          "method": "CB_Fragra_LvlReq",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32869,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/HmiFragraLvlReq;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Fragrance",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269156608
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Fragrance",
+      "function_id": 269156864,
+      "function_hex": "0x100b0200",
+      "names": [
+        "HVAC_FUNC_AIR_FRAGRANCE_TYPE"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": false,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33396
+      ],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Fragrance",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269156864
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Fragrance",
+      "function_id": 269157120,
+      "function_hex": "0x100b0300",
+      "names": [
+        "HVAC_FUNC_AIR_FRAGRANCE_LEVEL"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33403
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;->CB_Fragra_LvlReq(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;",
+          "method": "CB_Fragra_LvlReq",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32869,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/HmiFragraLvlReq;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Fragrance",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269157120
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Fragrance",
+      "function_id": 269157376,
+      "function_hex": "0x100b0400",
+      "names": [
+        "HVAC_FUNC_AIR_FRAGRANCE_SLOT"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33396
+      ],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Fragrance",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269157376
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Fragrance",
+      "function_id": 269157632,
+      "function_hex": "0x100b0500",
+      "names": [
+        "HVAC_FUNC_AIR_FRAGRANCE_TYPE_ID"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33396
+      ],
+      "read_pa_literals": [
+        33408,
+        33409,
+        33410
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Fragrance",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269157632
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Fragrance",
+      "function_id": 269160704,
+      "function_hex": "0x100b1100",
+      "names": [
+        "HVAC_FUNC_AUTO_REFRESHING_FRAGRANCE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33396
+      ],
+      "read_pa_literals": [
+        33423
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;->CB_Fragra_FragRefrshAutSetg(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAirqlyandfragraManager;",
+          "method": "CB_Fragra_FragRefrshAutSetg",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                32873,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Fragrance",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269160704
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Fragrance",
+      "function_id": 269160960,
+      "function_hex": "0x100b1200",
+      "names": [
+        "HVAC_FUNC_REFRESHING_FRAGRANCE_POP"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": true,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33407
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.hvac.Fragrance",
+        "method": "buildFunctions()V",
+        "function_id_literal": 269160960
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 537526784,
+      "function_hex": "0x200a0200",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_MAINCOLOR"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lcom/ecarx/xui/adaptapi/car/vehicle/AmbienceLight;->lambda$dqyGUtbUgmcLaGoIlemqudxMDkI(Lcom/ecarx/xui/adaptapi/car/vehicle/AmbienceLight; I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 537526784
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 537527296,
+      "function_hex": "0x200a0400",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_TOPZONES"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33815
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_MoodLightSwitch(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_MoodLightSwitch",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33220,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 537527296
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 537528320,
+      "function_hex": "0x200a0800",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_INTERACTIVE_EFFECT"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33803,
+        33806,
+        33809,
+        33812
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone1StatusSettings(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone2StatusSettings(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone3StatusSettings(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_ZoneAllStatusSettings(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone1StatusSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33211,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone2StatusSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33214,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone3StatusSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33217,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_ZoneAllStatusSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33208,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 537528320
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 537528576,
+      "function_hex": "0x200a0900",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_COLOR_SET"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33805,
+        33808,
+        33811,
+        33814
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone1ColorSettings(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone2ColorSettings(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone3ColorSettings(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_ZoneAllColorSettings(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone1ColorSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33213,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone2ColorSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33216,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone3ColorSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33219,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_ZoneAllColorSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33210,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        }
+      ],
+      "model_overrides": [
+        "EX11",
+        "KX11"
+      ],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 537528576
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 704708864,
+      "function_hex": "0x2a010100",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_INTENSITY_SET"
+      ],
+      "kind": "customFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33804,
+        33807,
+        33810,
+        33813
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone1IntensitySettings(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone2IntensitySettings(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone3IntensitySettings(I)Lecarx/car/hardware/annotation/ApiResult;",
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_ZoneAllIntensitySettings(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone1IntensitySettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33212,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone2IntensitySettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33215,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone3IntensitySettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33218,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        },
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_ZoneAllIntensitySettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33209,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        }
+      ],
+      "model_overrides": [
+        "EX11",
+        "KX11"
+      ],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 704708864
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 704709376,
+      "function_hex": "0x2a010300",
+      "names": [
+        "SETTING_FUNC_BREATHE_MODE_COLOR"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33808
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_Zone1ColorSettings(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_Zone1ColorSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33213,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 704709376
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 704971008,
+      "function_hex": "0x2a050100",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_WELCOME_SHOW"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33826
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_WelcomeLight(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_WelcomeLight",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33231,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 704971008
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 704971264,
+      "function_hex": "0x2a050200",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_GOODBYE_SHOW"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33827
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_GoodbyeLight(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_GoodbyeLight",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33232,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 704971264
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 704971520,
+      "function_hex": "0x2a050300",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_ENDURANCE_MIL_REMINDER"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33816
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_AmbLiMilgOpenReq(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_AmbLiMilgOpenReq",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33221,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 704971520
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 704971776,
+      "function_hex": "0x2a050400",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_PHONE_CALL_REMINDER"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33817
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_AmbLiPhoneOpenReq(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_AmbLiPhoneOpenReq",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33222,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 704971776
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 705102336,
+      "function_hex": "0x2a070200",
+      "names": [
+        "SETTING_FUNC_TRANSITION_START_COLOR"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33801
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_TransitionColor1Settings(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_TransitionColor1Settings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33206,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 705102336
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 705102592,
+      "function_hex": "0x2a070300",
+      "names": [
+        "SETTING_FUNC_TRANSITION_END_COLOR"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33802
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_TransitionColor2Settings(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_TransitionColor2Settings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33207,
+                1,
+                "v4"
+              ]
+            }
+          ],
+          "validators": []
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 705102592
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "AmbienceLight",
+      "function_id": 705167616,
+      "function_hex": "0x2a080100",
+      "names": [
+        "SETTING_FUNC_AMBIENCE_LIGHT_EFFECT_SET"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [],
+      "read_pa_literals": [
+        33799
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;->CB_CustomEffect(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarAmbliManager;",
+          "method": "CB_CustomEffect",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33204,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/VFMiscCustomEffect;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.AmbienceLight",
+        "method": "buildFunctions()V",
+        "function_id_literal": 705167616
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Wpc",
+      "function_id": 637600000,
+      "function_hex": "0x26010100",
+      "names": [
+        "WPC_FUNC_WORK_MODE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33625
+      ],
+      "read_pa_literals": [
+        33625
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarWpcmodelManager;->CB_WPC_Setting(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarWpcmodelManager;",
+          "method": "CB_WPC_Setting",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33017,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.Wpc",
+        "method": "buildFunctions()V",
+        "function_id_literal": 637600000
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "Wpc",
+      "function_id": 637665536,
+      "function_hex": "0x26020100",
+      "names": [
+        "WPC_FUNC_CHARGE_STATES"
+      ],
+      "kind": "intFunction",
+      "has_setter": false,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33626
+      ],
+      "read_pa_literals": [
+        33626
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [],
+      "callback_property_routes": [],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.Wpc",
+        "method": "buildFunctions()V",
+        "function_id_literal": 637665536
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "SceneMode",
+      "function_id": 788595200,
+      "function_hex": "0x2f010200",
+      "names": [
+        "SCENE_FUNC_WASH_MODE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33914
+      ],
+      "read_pa_literals": [
+        33926
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;->CB_SCEMOD_SceneModSeld(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;",
+          "method": "CB_SCEMOD_SceneModSeld",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33272,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/PatSeld;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.SceneMode",
+        "method": "buildFunctions()V",
+        "function_id_literal": 788595200
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "SceneMode",
+      "function_id": 788596224,
+      "function_hex": "0x2f010600",
+      "names": [
+        "SCENE_FUNC_CHILDREN_MODE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33917
+      ],
+      "read_pa_literals": [
+        33926
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;->CB_SCEMOD_SceneModSeld(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;",
+          "method": "CB_SCEMOD_SceneModSeld",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33272,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/PatSeld;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.SceneMode",
+        "method": "buildFunctions()V",
+        "function_id_literal": 788596224
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "SceneMode",
+      "function_id": 788660736,
+      "function_hex": "0x2f020200",
+      "names": [
+        "SCENE_FUNC_AWAKENING"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33911
+      ],
+      "read_pa_literals": [
+        33926
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;->CB_SCEMOD_SceneModSeld(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;",
+          "method": "CB_SCEMOD_SceneModSeld",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33272,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/PatSeld;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.SceneMode",
+        "method": "buildFunctions()V",
+        "function_id_literal": 788660736
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "SceneMode",
+      "function_id": 788661760,
+      "function_hex": "0x2f020600",
+      "names": [
+        "SCENE_FUNC_ROMANTIC_MODE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33912
+      ],
+      "read_pa_literals": [
+        33926
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;->CB_SCEMOD_SceneModSeld(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;",
+          "method": "CB_SCEMOD_SceneModSeld",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33272,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/PatSeld;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.SceneMode",
+        "method": "buildFunctions()V",
+        "function_id_literal": 788661760
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "SceneMode",
+      "function_id": 788662016,
+      "function_hex": "0x2f020700",
+      "names": [
+        "SCENE_FUNC_KING_MODE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33925
+      ],
+      "read_pa_literals": [
+        33926
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;->CB_SCEMOD_SceneModSeld(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;",
+          "method": "CB_SCEMOD_SceneModSeld",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33272,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/PatSeld;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.SceneMode",
+        "method": "buildFunctions()V",
+        "function_id_literal": 788662016
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "SceneMode",
+      "function_id": 788594944,
+      "function_hex": "0x2f010100",
+      "names": [
+        "SCENE_FUNC_THEATER_MODE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33922
+      ],
+      "read_pa_literals": [
+        33928
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;->CB_SCEMOD_PassSceneModSeld(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;",
+          "method": "CB_SCEMOD_PassSceneModSeld",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33271,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/PatSeld;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.SceneMode",
+        "method": "buildFunctions()V",
+        "function_id_literal": 788594944
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "SceneMode",
+      "function_id": 788662528,
+      "function_hex": "0x2f020900",
+      "names": [
+        "SCENE_FUNC_QUEEN_MODE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33927
+      ],
+      "read_pa_literals": [
+        33926
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;->CB_SCEMOD_SceneModSeld(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;",
+          "method": "CB_SCEMOD_SceneModSeld",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33272,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/PatSeld;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.SceneMode",
+        "method": "buildFunctions()V",
+        "function_id_literal": 788662528
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    },
+    {
+      "module": "SceneMode",
+      "function_id": 788662272,
+      "function_hex": "0x2f020800",
+      "names": [
+        "SCENE_FUNC_NAP_MODE"
+      ],
+      "kind": "intFunction",
+      "has_setter": true,
+      "has_getter": true,
+      "fixed_active": false,
+      "status_pa_literals": [
+        33918
+      ],
+      "read_pa_literals": [
+        33926
+      ],
+      "read_signal_literals": [],
+      "direct_callback_targets": [
+        "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;->CB_SCEMOD_SceneModSeld(I)Lecarx/car/hardware/annotation/ApiResult;"
+      ],
+      "callback_property_routes": [
+        {
+          "class": "Lecarx/car/hardware/vehicle/ECarXCarScenemodManager;",
+          "method": "CB_SCEMOD_SceneModSeld",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "writes": [
+            {
+              "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+              "arguments": [
+                33272,
+                1,
+                "v5"
+              ]
+            }
+          ],
+          "validators": [
+            "Lecarx/car/hardware/annotation/PatSeld;"
+          ]
+        }
+      ],
+      "model_overrides": [],
+      "evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex",
+        "class": "com.ecarx.xui.adaptapi.car.vehicle.SceneMode",
+        "method": "buildFunctions()V",
+        "function_id_literal": 788662272
+      },
+      "warning": "Static registration only. PA arrays and callback lists are not paired by this summary; model/zone semantics require bytecode. Local callback lambdas can contain additional writes."
+    }
+  ]
+}

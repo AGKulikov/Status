@@ -1,0 +1,214 @@
+{
+  "evidence": "AD-E15",
+  "images": [
+    {
+      "img_name": "xbl.elf",
+      "img_type": "SECBOOT_SBL_SW_TYPE",
+      "rsha256sum": "3dd5afd52bcac8e5807006b4d0b2ddfb7071221a090f0e3ee3c5134eff81f12b",
+      "wsha256sum": "3dd5afd52bcac8e5807006b4d0b2ddfb7071221a090f0e3ee3c5134eff81f12b",
+      "main_pt": "xbl_a",
+      "backup_pt": "xbl_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "xbl_config.elf",
+      "img_type": "SECBOOT_SBL_SW_TYPE",
+      "rsha256sum": "8a1e7c759aeab8746c21275cc83b99fc6889ad09595d19ddcb82aa296eff10d8",
+      "wsha256sum": "8a1e7c759aeab8746c21275cc83b99fc6889ad09595d19ddcb82aa296eff10d8",
+      "main_pt": "xbl_config_a",
+      "backup_pt": "xbl_config_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "aop.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "92f45cc55479c49d25eed5313dbb7a7a742f83cff43367c743cca6230d8eb74a",
+      "wsha256sum": "92f45cc55479c49d25eed5313dbb7a7a742f83cff43367c743cca6230d8eb74a",
+      "main_pt": "aop_a",
+      "backup_pt": "aop_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "BTFM.bin",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "9336628fe5b4723e28b1bb7cbf394844e11c19689f91ca59baeef655dc586f31",
+      "wsha256sum": "9336628fe5b4723e28b1bb7cbf394844e11c19689f91ca59baeef655dc586f31",
+      "main_pt": "bluetooth_a",
+      "backup_pt": "bluetooth_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "cmnlib64.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "d8eef50dfb32f63c102b69e4f7ce8ac9fc9fdd137ddbe26789b870ad379b9fad",
+      "wsha256sum": "d8eef50dfb32f63c102b69e4f7ce8ac9fc9fdd137ddbe26789b870ad379b9fad",
+      "main_pt": "cmnlib64_a",
+      "backup_pt": "cmnlib64_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "cmnlib.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "7a64f667e1316dbf36dccf22cbf2e191fb463bcaae177c3f9cc3364d2b140aaa",
+      "wsha256sum": "7a64f667e1316dbf36dccf22cbf2e191fb463bcaae177c3f9cc3364d2b140aaa",
+      "main_pt": "cmnlib_a",
+      "backup_pt": "cmnlib_a",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "zeros_5sectors.bin",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "cc61635da46b2c9974335ea37e0b5fd660a5c8a42a89b271fa7ec2ac4b8b26f6",
+      "wsha256sum": "cc61635da46b2c9974335ea37e0b5fd660a5c8a42a89b271fa7ec2ac4b8b26f6",
+      "main_pt": "ddr",
+      "backup_pt": "NULL",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "dspso.bin",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "8494463106407092ea0d741f8757e87165cd8db68e5508ab48e08cd53a8b29c8",
+      "wsha256sum": "8494463106407092ea0d741f8757e87165cd8db68e5508ab48e08cd53a8b29c8",
+      "main_pt": "dsp_a",
+      "backup_pt": "dsp_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "km4.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "dacb55307e4f0d67ae38cd37812cd4a0c0c545af50d5340ea4e5d9fc2059d1c0",
+      "wsha256sum": "dacb55307e4f0d67ae38cd37812cd4a0c0c545af50d5340ea4e5d9fc2059d1c0",
+      "main_pt": "keymaster_a",
+      "backup_pt": "keymaster_a",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "logfs_ufs_8mb.bin",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "cadf6d7179d79ad39cbead824e2aa5394dd6447058d7990a2e37a94bb22e9e55",
+      "wsha256sum": "cadf6d7179d79ad39cbead824e2aa5394dd6447058d7990a2e37a94bb22e9e55",
+      "main_pt": "logfs",
+      "backup_pt": "NULL",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "NON-HLOS.bin",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "94f9dcd39b4527ed4b9b602c265895eb511fa81bee2c23cfb67bc0640ae41854",
+      "wsha256sum": "94f9dcd39b4527ed4b9b602c265895eb511fa81bee2c23cfb67bc0640ae41854",
+      "main_pt": "modem_a",
+      "backup_pt": "modem_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "multi_image.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "e6fac53b697a66e7b3bebdf9cba0e7931702c774ea498a6d96f85b034e0a5d16",
+      "wsha256sum": "e6fac53b697a66e7b3bebdf9cba0e7931702c774ea498a6d96f85b034e0a5d16",
+      "main_pt": "multiimgoem",
+      "backup_pt": "NULL",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "persist.img",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "927eb1216535bc4d017bda1e878d6955b79a581fc3316ab125a27c8cd5c1b569",
+      "wsha256sum": "927eb1216535bc4d017bda1e878d6955b79a581fc3316ab125a27c8cd5c1b569",
+      "main_pt": "la_persist",
+      "backup_pt": "NULL",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "qupv3fw.elf",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "e33cbe644ba8af4df40e56038806160ae3fe29f11dd76f0ad653f6abae173259",
+      "wsha256sum": "e33cbe644ba8af4df40e56038806160ae3fe29f11dd76f0ad653f6abae173259",
+      "main_pt": "qupfw_a",
+      "backup_pt": "qupfw_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "storsec.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "dac70be52b6fabf5ce0b31697b078d07f9918bc34c0f1081504d17c10449bc55",
+      "wsha256sum": "dac70be52b6fabf5ce0b31697b078d07f9918bc34c0f1081504d17c10449bc55",
+      "main_pt": "storsec",
+      "backup_pt": "NULL",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "uefi_sec.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "184754cdcc94872f87f7e3e48c2acd5a969024361335eb7e89e7c66bba2e51fd",
+      "wsha256sum": "184754cdcc94872f87f7e3e48c2acd5a969024361335eb7e89e7c66bba2e51fd",
+      "main_pt": "uefisecapp_a",
+      "backup_pt": "uefisecapp_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "hyp.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "f1520af7006d2cf6cc741d88633de25c6ee80f0741505fe52e5ab0355fe74b04",
+      "wsha256sum": "f1520af7006d2cf6cc741d88633de25c6ee80f0741505fe52e5ab0355fe74b04",
+      "main_pt": "hyp_a",
+      "backup_pt": "hyp_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "tz.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "9639c6edf0e26997686446fbdf2c4a6daa0e25ae2bae670ffb7fcdbca8eb47d4",
+      "wsha256sum": "9639c6edf0e26997686446fbdf2c4a6daa0e25ae2bae670ffb7fcdbca8eb47d4",
+      "main_pt": "tz_a",
+      "backup_pt": "tz_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "devcfg_auto.mbn",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "7aeb85f64fba116a23f9e689e9f58d59e5989689d55d70760c86ac706a926d2d",
+      "wsha256sum": "7aeb85f64fba116a23f9e689e9f58d59e5989689d55d70760c86ac706a926d2d",
+      "main_pt": "devcfg_a",
+      "backup_pt": "devcfg_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "system_la.img.sparse",
+      "img_type": "SECBOOT_AOSP_SPARSE_FILL_TYPE",
+      "rsha256sum": "__system.img.sparse_RHASH__",
+      "wsha256sum": "__system.img.sparse_WHASH__",
+      "main_pt": "system_a",
+      "backup_pt": "NULL",
+      "mpoint": "/"
+    },
+    {
+      "img_name": "abl.elf",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "4eaef73e67ef207675af0847ff8af48c40ca465277e38d3b6daa830d96f88265",
+      "wsha256sum": "4eaef73e67ef207675af0847ff8af48c40ca465277e38d3b6daa830d96f88265",
+      "main_pt": "abl_a",
+      "backup_pt": "abl_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "boot_la.img",
+      "img_type": "SECBOOT_RAW_TYPE",
+      "rsha256sum": "__boot.img_RHASH__",
+      "wsha256sum": "__boot.img_WHASH__",
+      "main_pt": "boot_a",
+      "backup_pt": "boot_b",
+      "mpoint": "NULL"
+    },
+    {
+      "img_name": "system.img",
+      "img_type": "SECBOOT_AOSP_SPARSE_FILL_TYPE",
+      "rsha256sum": "5865d72374bc707937deda223f6f26792ba274b271fa96b1a8c82f8991b3cac4",
+      "wsha256sum": "5865d72374bc707937deda223f6f26792ba274b271fa96b1a8c82f8991b3cac4",
+      "main_pt": "la_system",
+      "backup_pt": "NULL",
+      "mpoint": "NULL"
+    }
+  ],
+  "image_count": 23,
+  "warning": "Image/partition slots are not physical ECUs. Attributes describe update package expectations; not a current readback."
+}

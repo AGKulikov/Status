@@ -34,6 +34,9 @@ public final class CarIntegrationFactory {
 
     @NonNull
     public static CarIntegration create(@NonNull Context appContext) {
-        return new GeelyCarIntegration(appContext);
+        return new GeelyPassengerControlIntegration(
+                appContext,
+                new GeelyCarIntegration(appContext)
+        );
     }
 }

@@ -1,0 +1,5287 @@
+{
+  "source_archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+  "scope": "Static declarations/routes only; no physical ECU inventory implied. Selects fields formerly not used in whole-vehicle matrix.",
+  "constants": [
+    {
+      "value": "5",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IECU;->ECU_TYPE_AUD"
+    },
+    {
+      "value": "5",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;->PART_INFO_IHU_VP_LOCAL_CONFIG_NO"
+    },
+    {
+      "value": "5",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->CALLBACK_ID_RESET_SETTINGS_RESPONSE"
+    },
+    {
+      "value": "2",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IECU;->ECU_TYPE_CSD"
+    },
+    {
+      "value": "2",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;->PART_INFO_ECU_DELIVERY_ASSEMBLY_NO"
+    },
+    {
+      "value": "2",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->CALLBACK_ID_POP_ES"
+    },
+    {
+      "value": "2",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->IM_PARTIAL"
+    },
+    {
+      "value": "2",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->MODEM_STATUS_WORKING"
+    },
+    {
+      "value": "2",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->RESET_SETTINGS_RESPONSE_VEHICLE"
+    },
+    {
+      "value": "2",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->RESET_SETTING_VEHICLE"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IECU;->ECU_TYPE_IHU"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;->PART_INFO_ECU_CORE_ASSEMBLY_NO"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->CALLBACK_ID_MODEM_STATUS"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->CSD_STATUS_ON"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->EM_ON"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->IM_ON"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->MODEM_STATUS_STANDBY"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->POP_ES_SHOW"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->POP_SD_SHOW"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->RESET_SETTINGS_RESPONSE_FACTORY"
+    },
+    {
+      "value": "1",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->RESET_SETTING_FACTORY"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IECU;->ECU_TYPE_UNKNOWN"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->CALLBACK_ID_INFOTAINMENT_MODE"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->CSD_STATUS_OFF"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->EM_OFF"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->IM_OFF"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->MODEM_STATUS_SLEPP"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->POP_ES_HIDE"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->POP_SD_HIDE"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->RESET_NOTHING"
+    },
+    {
+      "value": "0",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->RESET_SETTINGS_RESPONSE_NORESPONSE"
+    },
+    {
+      "value": "3",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IECU;->ECU_TYPE_WPC"
+    },
+    {
+      "value": "3",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;->PART_INFO_IHU_VP_LOAD_MODULE_NO"
+    },
+    {
+      "value": "3",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->CALLBACK_ID_POP_SD"
+    },
+    {
+      "value": "3",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->IM_WELCOME"
+    },
+    {
+      "value": "3",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->RESET_SETTINGS_RESPONSE_FACTORY_AND_VEHICLE"
+    },
+    {
+      "value": "4",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IECU;->ECU_TYPE_CCSM"
+    },
+    {
+      "value": "4",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;->PART_INFO_IHU_AP_LOAD_MODULE_NO"
+    },
+    {
+      "value": "4",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->CALLBACK_ID_ENTERTAINMENT_MODE"
+    },
+    {
+      "value": "7",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IECU;->ECU_TYPE_VCM"
+    },
+    {
+      "value": "7",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;->PART_INFO_IHU_POST_BUILD_NO"
+    },
+    {
+      "value": "6",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IECU;->ECU_TYPE_TEM2"
+    },
+    {
+      "value": "6",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;->PART_INFO_IHU_AP_LOCAL_CONFIG_NO"
+    },
+    {
+      "value": "6",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->CALLBACK_ID_CSD_STATUS"
+    },
+    {
+      "value": "8",
+      "symbol": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IECU;->ECU_TYPE_PAC"
+    },
+    {
+      "value": "255",
+      "symbol": "Lcom/ecarx/xui/adaptapi/device/ext/PowerStatus;->STATUS_NG"
+    }
+  ],
+  "interfaces": [
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IBtDebug;",
+      "methods": [
+        {
+          "name": "enableDUTMode",
+          "descriptor": "(Z)Z",
+          "flags": "public abstract"
+        },
+        {
+          "name": "enableSSPMode",
+          "descriptor": "(Z)Z",
+          "flags": "public abstract"
+        },
+        {
+          "name": "enableVirtualSniffer",
+          "descriptor": "(Z)Z",
+          "flags": "public abstract"
+        },
+        {
+          "name": "isDUTModeEnabled",
+          "descriptor": "()Z",
+          "flags": "public abstract"
+        },
+        {
+          "name": "isSSPModeEnabled",
+          "descriptor": "()Z",
+          "flags": "public abstract"
+        },
+        {
+          "name": "isVirtualSnifferEnabled",
+          "descriptor": "()Z",
+          "flags": "public abstract"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor$IMonitorListener;",
+      "methods": [
+        {
+          "name": "onMonitorStatusChanged",
+          "descriptor": "(I I)V",
+          "flags": "public abstract"
+        },
+        {
+          "name": "onMonitorValueChanged",
+          "descriptor": "(I F)V",
+          "flags": "public abstract"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor;",
+      "methods": [
+        {
+          "name": "registerListener",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor$IMonitorListener; I)Z",
+          "flags": "public abstract"
+        },
+        {
+          "name": "registerListener",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor$IMonitorListener; [I)Z",
+          "flags": "public abstract"
+        },
+        {
+          "name": "setMonitorEnable",
+          "descriptor": "(I Z)Z",
+          "flags": "public abstract"
+        },
+        {
+          "name": "unregisterListener",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor$IMonitorListener;)Z",
+          "flags": "public abstract"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnostics;",
+      "methods": [
+        {
+          "name": "getBtDebug",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IBtDebug;",
+          "flags": "public abstract"
+        },
+        {
+          "name": "getDiagMonitor",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor;",
+          "flags": "public abstract"
+        },
+        {
+          "name": "getDtcManager",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IDtcManager;",
+          "flags": "public abstract"
+        },
+        {
+          "name": "getPartInfoManager",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;",
+          "flags": "public abstract"
+        },
+        {
+          "name": "getShCommandManager",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IShCommand;",
+          "flags": "public abstract"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IDtcManager;",
+      "methods": [
+        {
+          "name": "getDtcInfos",
+          "descriptor": "()Ljava/util/List;",
+          "flags": "public abstract"
+        },
+        {
+          "name": "registerWatcher",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDtcManager$IDtcInfoWatcher;)Z",
+          "flags": "public abstract"
+        },
+        {
+          "name": "unregisterWatcher",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDtcManager$IDtcInfoWatcher;)V",
+          "flags": "public abstract"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;",
+      "methods": [
+        {
+          "name": "getPartInfoString",
+          "descriptor": "(I)Ljava/lang/String;",
+          "flags": "public abstract"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/IShCommand;",
+      "methods": [
+        {
+          "name": "executeCommand",
+          "descriptor": "(I Ljava/lang/String; Lcom/ecarx/xui/adaptapi/car/diagnostics/IShCommand$ICommandCallback;)V",
+          "flags": "public abstract"
+        },
+        {
+          "name": "stopCommand",
+          "descriptor": "()V",
+          "flags": "public abstract"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/BtDebug;",
+      "methods": [
+        {
+          "name": "enableDUTMode",
+          "descriptor": "(Z)Z",
+          "flags": "public"
+        },
+        {
+          "name": "enableSSPMode",
+          "descriptor": "(Z)Z",
+          "flags": "public"
+        },
+        {
+          "name": "enableVirtualSniffer",
+          "descriptor": "(Z)Z",
+          "flags": "public"
+        },
+        {
+          "name": "isDUTModeEnabled",
+          "descriptor": "()Z",
+          "flags": "public"
+        },
+        {
+          "name": "isSSPModeEnabled",
+          "descriptor": "()Z",
+          "flags": "public"
+        },
+        {
+          "name": "isVirtualSnifferEnabled",
+          "descriptor": "()Z",
+          "flags": "public"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/DiagnosticMonitor;",
+      "methods": [
+        {
+          "name": "registerListener",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor$IMonitorListener; I)Z",
+          "flags": "public"
+        },
+        {
+          "name": "registerListener",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor$IMonitorListener; [I)Z",
+          "flags": "public"
+        },
+        {
+          "name": "setMonitorEnable",
+          "descriptor": "(I Z)Z",
+          "flags": "public"
+        },
+        {
+          "name": "unregisterListener",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor$IMonitorListener;)Z",
+          "flags": "public"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/Diagnostics;",
+      "methods": [
+        {
+          "name": "getBtDebug",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IBtDebug;",
+          "flags": "public"
+        },
+        {
+          "name": "getDiagMonitor",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IDiagnosticMonitor;",
+          "flags": "public"
+        },
+        {
+          "name": "getDtcManager",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IDtcManager;",
+          "flags": "public"
+        },
+        {
+          "name": "getPartInfoManager",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IPartInfos;",
+          "flags": "public"
+        },
+        {
+          "name": "getShCommandManager",
+          "descriptor": "()Lcom/ecarx/xui/adaptapi/car/diagnostics/IShCommand;",
+          "flags": "public"
+        },
+        {
+          "name": "initCarSignalManager",
+          "descriptor": "(Lecarx/car/ECarXCar; Lecarx/car/hardware/signal/CarSignalManager;)V",
+          "flags": "public"
+        },
+        {
+          "name": "onECarXCarServiceDeath",
+          "descriptor": "()V",
+          "flags": "public"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/DtcManager;",
+      "methods": [
+        {
+          "name": "getDtcInfos",
+          "descriptor": "()Ljava/util/List;",
+          "flags": "public"
+        },
+        {
+          "name": "registerWatcher",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDtcManager$IDtcInfoWatcher;)Z",
+          "flags": "public"
+        },
+        {
+          "name": "unregisterWatcher",
+          "descriptor": "(Lcom/ecarx/xui/adaptapi/car/diagnostics/IDtcManager$IDtcInfoWatcher;)V",
+          "flags": "public"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/PartInfos;",
+      "methods": [
+        {
+          "name": "getPartInfoString",
+          "descriptor": "(I)Ljava/lang/String;",
+          "flags": "public"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/car/diagnostics/ShCommand;",
+      "methods": [
+        {
+          "name": "executeCommand",
+          "descriptor": "(I Ljava/lang/String; Lcom/ecarx/xui/adaptapi/car/diagnostics/IShCommand$ICommandCallback;)V",
+          "flags": "public"
+        },
+        {
+          "name": "stopCommand",
+          "descriptor": "()V",
+          "flags": "public"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarApversionManager;",
+      "methods": [
+        {
+          "name": "getPA_AP_Version",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_AP_Version;",
+          "flags": "public"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "methods": [
+        {
+          "name": "CB_Power_APStatus",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_APUpdate",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_BG",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_IPLMInfo",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_InstallStatus",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_OTAUpdate",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_PSDStatus",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_PhotoView",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_PlayPausePress",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_Reboot",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_ResetSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_Restart",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_Softkey",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "CB_Power_TimeoutValue",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "getPA_Power_Res",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_Power_Res;",
+          "flags": "public"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVpversionManager;",
+      "methods": [
+        {
+          "name": "CB_VP_Reboot",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "flags": "public"
+        },
+        {
+          "name": "getPA_VP_Version",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_VP_Version;",
+          "flags": "public"
+        }
+      ],
+      "source": {
+        "member": "framework/system_framework/ecarx.adaptapi.jar",
+        "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+        "dex_entry": "classes.dex"
+      }
+    }
+  ],
+  "ids": [
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_paapversion",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarApversionManager;",
+      "id": 33877,
+      "id_hex": "0x00008455",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarApversionManager;",
+        "name": "ManagerId_paapversion",
+        "descriptor": "I",
+        "value": 33877,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008455"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_AP_Version",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_AP_Version;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33877"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33877,
+            "sdk_hex": "0x8455",
+            "hal_prop": 561022037,
+            "hal_hex": "0x21708455",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2498
+          },
+          "native_property": {
+            "index": 3465,
+            "prop": 561022037,
+            "hex": "0x21708455",
+            "configString": "PA_AP_Version",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x205f20",
+              "prop_access_store_va": "0x12b080",
+              "source_string_va": "0x152192",
+              "constructor_call_va": "0x12b0e8"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33877,
+        "sdk_hex": "0x8455",
+        "hal_prop": 561022037,
+        "hal_hex": "0x21708455",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2498
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbapvpinterfaceversion",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarApvppulseManager;",
+      "id": 32957,
+      "id_hex": "0x000080BD",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarApvppulseManager;",
+        "name": "ManagerId_cbapvpinterfaceversion",
+        "descriptor": "I",
+        "value": 32957,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000080BD"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_ApVp_InterfaceVersion",
+          "descriptor": "(Lvendor/ecarx/xma/pa/nano/VendorVehicleHalPAProto$Interfaceversion;)V",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 20,
+              "op": "invoke-virtual",
+              "args": "v0, v2, v3, v1, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setbytesProperty(I I [B)V"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 12,
+              "op": "const",
+              "args": "v2, 32957"
+            },
+            {
+              "offset": 18,
+              "op": "const/4",
+              "args": "v3, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32957,
+            "sdk_hex": "0x80BD",
+            "hal_prop": 561021117,
+            "hal_hex": "0x217080BD",
+            "payload_offset": "0x48",
+            "array_pair_index": 636
+          },
+          "native_property": {
+            "index": 2545,
+            "prop": 561021117,
+            "hex": "0x217080BD",
+            "configString": "CB_ApVp_InterfaceVersion",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1de6a0",
+              "prop_access_store_va": "0xdeb24",
+              "source_string_va": "0x14d03b",
+              "constructor_call_va": "0xdeb8c"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32957,
+        "sdk_hex": "0x80BD",
+        "hal_prop": 561021117,
+        "hal_hex": "0x217080BD",
+        "payload_offset": "0x48",
+        "array_pair_index": 636
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_paerrorreport",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarApvppulseManager;",
+      "id": 33525,
+      "id_hex": "0x000082F5",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarApvppulseManager;",
+        "name": "ManagerId_paerrorreport",
+        "descriptor": "I",
+        "value": 33525,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000082F5"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_ErrorReport",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_ErrorReport;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33525"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33525,
+            "sdk_hex": "0x82F5",
+            "hal_prop": 561021685,
+            "hal_hex": "0x217082F5",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2146
+          },
+          "native_property": {
+            "index": 3113,
+            "prop": 561021685,
+            "hex": "0x217082F5",
+            "configString": "PA_ErrorReport",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1f6d20",
+              "prop_access_store_va": "0x10dd3c",
+              "source_string_va": "0x1502f3",
+              "constructor_call_va": "0x10dda4"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33525,
+        "sdk_hex": "0x82F5",
+        "hal_prop": 561021685,
+        "hal_hex": "0x217082F5",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2146
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_padevicesuppliercode",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarDeviceManager;",
+      "id": 33488,
+      "id_hex": "0x000082D0",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarDeviceManager;",
+        "name": "ManagerId_padevicesuppliercode",
+        "descriptor": "I",
+        "value": 33488,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000082D0"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_Device_Supplier_Code",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_Device_Supplier_Code;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33488"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33488,
+            "sdk_hex": "0x82D0",
+            "hal_prop": 561021648,
+            "hal_hex": "0x217082D0",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2109
+          },
+          "native_property": {
+            "index": 3076,
+            "prop": 561021648,
+            "hex": "0x217082D0",
+            "configString": "PA_Device_Supplier_Code",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1f53b0",
+              "prop_access_store_va": "0x10ac20",
+              "source_string_va": "0x14ffdc",
+              "constructor_call_va": "0x10ac88"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33488,
+        "sdk_hex": "0x82D0",
+        "hal_prop": 561021648,
+        "hal_hex": "0x217082D0",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2109
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_padevicevpversionhd",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarDeviceManager;",
+      "id": 33486,
+      "id_hex": "0x000082CE",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarDeviceManager;",
+        "name": "ManagerId_padevicevpversionhd",
+        "descriptor": "I",
+        "value": 33486,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000082CE"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_Device_VPVersion_HD",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_Device_VPVersion_HD;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33486"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33486,
+            "sdk_hex": "0x82CE",
+            "hal_prop": 561021646,
+            "hal_hex": "0x217082CE",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2107
+          },
+          "native_property": {
+            "index": 3074,
+            "prop": 561021646,
+            "hex": "0x217082CE",
+            "configString": "PA_Device_VPVersion_HD",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1f5250",
+              "prop_access_store_va": "0x10a978",
+              "source_string_va": "0x14ffae",
+              "constructor_call_va": "0x10a9e0"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33486,
+        "sdk_hex": "0x82CE",
+        "hal_prop": 561021646,
+        "hal_hex": "0x217082CE",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2107
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_pahwversionreading",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarDiagdidManager;",
+      "id": 33713,
+      "id_hex": "0x000083B1",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarDiagdidManager;",
+        "name": "ManagerId_pahwversionreading",
+        "descriptor": "I",
+        "value": 33713,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000083B1"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_HW_Version_Reading",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_HW_Version_Reading;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33713"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33713,
+            "sdk_hex": "0x83B1",
+            "hal_prop": 561021873,
+            "hal_hex": "0x217083B1",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2334
+          },
+          "native_property": {
+            "index": 3301,
+            "prop": 561021873,
+            "hex": "0x217083B1",
+            "configString": "PA_HW_Version_Reading",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1fee60",
+              "prop_access_store_va": "0x11d6cc",
+              "source_string_va": "0x1514b4",
+              "constructor_call_va": "0x11d734"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33713,
+        "sdk_hex": "0x83B1",
+        "hal_prop": 561021873,
+        "hal_hex": "0x217083B1",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2334
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbdmpowertrainsettings",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarDrivemodeManager;",
+      "id": 32881,
+      "id_hex": "0x00008071",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarDrivemodeManager;",
+        "name": "ManagerId_cbdmpowertrainsettings",
+        "descriptor": "I",
+        "value": 32881,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008071"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_DM_Powertrain_Settings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [
+            "Lecarx/car/hardware/annotation/DrvModReqType2;"
+          ],
+          "property_operations": [
+            {
+              "offset": 28,
+              "op": "invoke-virtual",
+              "args": "v1, v2, v3, v5, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 20,
+              "op": "const",
+              "args": "v2, 32881"
+            },
+            {
+              "offset": 26,
+              "op": "const/4",
+              "args": "v3, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32881,
+            "sdk_hex": "0x8071",
+            "hal_prop": 557875313,
+            "hal_hex": "0x21408071",
+            "payload_offset": "0x48",
+            "array_pair_index": 560
+          },
+          "native_property": {
+            "index": 2469,
+            "prop": 557875313,
+            "hex": "0x21408071",
+            "configString": "CB_DM_Powertrain_Settings",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1db260",
+              "prop_access_store_va": "0xd8640",
+              "source_string_va": "0x14ca83",
+              "constructor_call_va": "0xd86a8"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32881,
+        "sdk_hex": "0x8071",
+        "hal_prop": 557875313,
+        "hal_hex": "0x21408071",
+        "payload_offset": "0x48",
+        "array_pair_index": 560
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_padrivemodepower",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarDrivemodeManager;",
+      "id": 33438,
+      "id_hex": "0x0000829E",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarDrivemodeManager;",
+        "name": "ManagerId_padrivemodepower",
+        "descriptor": "I",
+        "value": 33438,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x0000829E"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_DriveMode_Power",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_DriveMode_Power;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33438"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33438,
+            "sdk_hex": "0x829E",
+            "hal_prop": 561021598,
+            "hal_hex": "0x2170829E",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2059
+          },
+          "native_property": {
+            "index": 3026,
+            "prop": 561021598,
+            "hex": "0x2170829E",
+            "configString": "PA_DriveMode_Power",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1f3150",
+              "prop_access_store_va": "0x106978",
+              "source_string_va": "0x14fbd5",
+              "constructor_call_va": "0x1069e0"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33438,
+        "sdk_hex": "0x829E",
+        "hal_prop": 561021598,
+        "hal_hex": "0x2170829E",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2059
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_padrivemodepowertrainsettings",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarDrivemodeManager;",
+      "id": 33447,
+      "id_hex": "0x000082A7",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarDrivemodeManager;",
+        "name": "ManagerId_padrivemodepowertrainsettings",
+        "descriptor": "I",
+        "value": 33447,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000082A7"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_DriveMode_Powertrain_Settings",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_DriveMode_Powertrain_Settings;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33447"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33447,
+            "sdk_hex": "0x82A7",
+            "hal_prop": 561021607,
+            "hal_hex": "0x217082A7",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2068
+          },
+          "native_property": {
+            "index": 3035,
+            "prop": 561021607,
+            "hex": "0x217082A7",
+            "configString": "PA_DriveMode_Powertrain_Settings",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1f3780",
+              "prop_access_store_va": "0x107568",
+              "source_string_va": "0x14fca7",
+              "constructor_call_va": "0x1075d0"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33447,
+        "sdk_hex": "0x82A7",
+        "hal_prop": 561021607,
+        "hal_hex": "0x217082A7",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2068
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbgetdspversion",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarDspManager;",
+      "id": 32959,
+      "id_hex": "0x000080BF",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarDspManager;",
+        "name": "ManagerId_cbgetdspversion",
+        "descriptor": "I",
+        "value": 32959,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000080BF"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_GetDspVersion",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32959"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32959,
+            "sdk_hex": "0x80BF",
+            "hal_prop": 557875391,
+            "hal_hex": "0x214080BF",
+            "payload_offset": "0x48",
+            "array_pair_index": 638
+          },
+          "native_property": {
+            "index": 2547,
+            "prop": 557875391,
+            "hex": "0x214080BF",
+            "configString": "CB_GetDspVersion",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1de800",
+              "prop_access_store_va": "0xdedcc",
+              "source_string_va": "0x14d063",
+              "constructor_call_va": "0xdee34"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32959,
+        "sdk_hex": "0x80BF",
+        "hal_prop": 557875391,
+        "hal_hex": "0x214080BF",
+        "payload_offset": "0x48",
+        "array_pair_index": 638
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_padspversion",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarDspManager;",
+      "id": 33526,
+      "id_hex": "0x000082F6",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarDspManager;",
+        "name": "ManagerId_padspversion",
+        "descriptor": "I",
+        "value": 33526,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000082F6"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_DspVersion",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_DspVersion;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33526"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33526,
+            "sdk_hex": "0x82F6",
+            "hal_prop": 561021686,
+            "hal_hex": "0x217082F6",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2147
+          },
+          "native_property": {
+            "index": 3114,
+            "prop": 561021686,
+            "hex": "0x217082F6",
+            "configString": "PA_DspVersion",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1f6dd0",
+              "prop_access_store_va": "0x10de90",
+              "source_string_va": "0x150302",
+              "constructor_call_va": "0x10def8"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33526,
+        "sdk_hex": "0x82F6",
+        "hal_prop": 561021686,
+        "hal_hex": "0x217082F6",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2147
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerapstatus",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32891,
+      "id_hex": "0x0000807B",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerapstatus",
+        "descriptor": "I",
+        "value": 32891,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x0000807B"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_APStatus",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32891"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32891,
+            "sdk_hex": "0x807B",
+            "hal_prop": 557875323,
+            "hal_hex": "0x2140807B",
+            "payload_offset": "0x48",
+            "array_pair_index": 570
+          },
+          "native_property": {
+            "index": 2479,
+            "prop": 557875323,
+            "hex": "0x2140807B",
+            "configString": "CB_Power_APStatus",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1db940",
+              "prop_access_store_va": "0xd9388",
+              "source_string_va": "0x14cb7d",
+              "constructor_call_va": "0xd93f0"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32891,
+        "sdk_hex": "0x807B",
+        "hal_prop": 557875323,
+        "hal_hex": "0x2140807B",
+        "payload_offset": "0x48",
+        "array_pair_index": 570
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerapupdate",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32893,
+      "id_hex": "0x0000807D",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerapupdate",
+        "descriptor": "I",
+        "value": 32893,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x0000807D"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_APUpdate",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32893"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32893,
+            "sdk_hex": "0x807D",
+            "hal_prop": 557875325,
+            "hal_hex": "0x2140807D",
+            "payload_offset": "0x48",
+            "array_pair_index": 572
+          },
+          "native_property": {
+            "index": 2481,
+            "prop": 557875325,
+            "hex": "0x2140807D",
+            "configString": "CB_Power_APUpdate",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1dbaa0",
+              "prop_access_store_va": "0xd9630",
+              "source_string_va": "0x14cba0",
+              "constructor_call_va": "0xd9698"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32893,
+        "sdk_hex": "0x807D",
+        "hal_prop": 557875325,
+        "hal_hex": "0x2140807D",
+        "payload_offset": "0x48",
+        "array_pair_index": 572
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerbg",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32895,
+      "id_hex": "0x0000807F",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerbg",
+        "descriptor": "I",
+        "value": 32895,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x0000807F"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_BG",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32895"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32895,
+            "sdk_hex": "0x807F",
+            "hal_prop": 557875327,
+            "hal_hex": "0x2140807F",
+            "payload_offset": "0x48",
+            "array_pair_index": 574
+          },
+          "native_property": {
+            "index": 2483,
+            "prop": 557875327,
+            "hex": "0x2140807F",
+            "configString": "CB_Power_BG",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1dbc00",
+              "prop_access_store_va": "0xd98d8",
+              "source_string_va": "0x14cbca",
+              "constructor_call_va": "0xd9940"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32895,
+        "sdk_hex": "0x807F",
+        "hal_prop": 557875327,
+        "hal_hex": "0x2140807F",
+        "payload_offset": "0x48",
+        "array_pair_index": 574
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerinstallstatus",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32889,
+      "id_hex": "0x00008079",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerinstallstatus",
+        "descriptor": "I",
+        "value": 32889,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008079"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_InstallStatus",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32889"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32889,
+            "sdk_hex": "0x8079",
+            "hal_prop": 557875321,
+            "hal_hex": "0x21408079",
+            "payload_offset": "0x48",
+            "array_pair_index": 568
+          },
+          "native_property": {
+            "index": 2477,
+            "prop": 557875321,
+            "hex": "0x21408079",
+            "configString": "CB_Power_InstallStatus",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1db7e0",
+              "prop_access_store_va": "0xd90e0",
+              "source_string_va": "0x14cb4f",
+              "constructor_call_va": "0xd9148"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32889,
+        "sdk_hex": "0x8079",
+        "hal_prop": 557875321,
+        "hal_hex": "0x21408079",
+        "payload_offset": "0x48",
+        "array_pair_index": 568
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpoweriplminfo",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32897,
+      "id_hex": "0x00008081",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpoweriplminfo",
+        "descriptor": "I",
+        "value": 32897,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008081"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_IPLMInfo",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32897"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32897,
+            "sdk_hex": "0x8081",
+            "hal_prop": 557875329,
+            "hal_hex": "0x21408081",
+            "payload_offset": "0x48",
+            "array_pair_index": 576
+          },
+          "native_property": {
+            "index": 2485,
+            "prop": 557875329,
+            "hex": "0x21408081",
+            "configString": "CB_Power_IPLMInfo",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1dbd60",
+              "prop_access_store_va": "0xd9b80",
+              "source_string_va": "0x14cbe9",
+              "constructor_call_va": "0xd9be8"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32897,
+        "sdk_hex": "0x8081",
+        "hal_prop": 557875329,
+        "hal_hex": "0x21408081",
+        "payload_offset": "0x48",
+        "array_pair_index": 576
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerotaupdate",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32898,
+      "id_hex": "0x00008082",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerotaupdate",
+        "descriptor": "I",
+        "value": 32898,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008082"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_OTAUpdate",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32898"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32898,
+            "sdk_hex": "0x8082",
+            "hal_prop": 557875330,
+            "hal_hex": "0x21408082",
+            "payload_offset": "0x48",
+            "array_pair_index": 577
+          },
+          "native_property": {
+            "index": 2486,
+            "prop": 557875330,
+            "hex": "0x21408082",
+            "configString": "CB_Power_OTAUpdate",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1dbe10",
+              "prop_access_store_va": "0xd9cd4",
+              "source_string_va": "0x14cbfb",
+              "constructor_call_va": "0xd9d3c"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32898,
+        "sdk_hex": "0x8082",
+        "hal_prop": 557875330,
+        "hal_hex": "0x21408082",
+        "payload_offset": "0x48",
+        "array_pair_index": 577
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerphotoview",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32896,
+      "id_hex": "0x00008080",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerphotoview",
+        "descriptor": "I",
+        "value": 32896,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008080"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_PhotoView",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32896"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32896,
+            "sdk_hex": "0x8080",
+            "hal_prop": 557875328,
+            "hal_hex": "0x21408080",
+            "payload_offset": "0x48",
+            "array_pair_index": 575
+          },
+          "native_property": {
+            "index": 2484,
+            "prop": 557875328,
+            "hex": "0x21408080",
+            "configString": "CB_Power_PhotoView",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1dbcb0",
+              "prop_access_store_va": "0xd9a2c",
+              "source_string_va": "0x14cbd6",
+              "constructor_call_va": "0xd9a94"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32896,
+        "sdk_hex": "0x8080",
+        "hal_prop": 557875328,
+        "hal_hex": "0x21408080",
+        "payload_offset": "0x48",
+        "array_pair_index": 575
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerplaypausepress",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32894,
+      "id_hex": "0x0000807E",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerplaypausepress",
+        "descriptor": "I",
+        "value": 32894,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x0000807E"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_PlayPausePress",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32894"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32894,
+            "sdk_hex": "0x807E",
+            "hal_prop": 557875326,
+            "hal_hex": "0x2140807E",
+            "payload_offset": "0x48",
+            "array_pair_index": 573
+          },
+          "native_property": {
+            "index": 2482,
+            "prop": 557875326,
+            "hex": "0x2140807E",
+            "configString": "CB_Power_PlayPausePress",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1dbb50",
+              "prop_access_store_va": "0xd9784",
+              "source_string_va": "0x14cbb2",
+              "constructor_call_va": "0xd97ec"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32894,
+        "sdk_hex": "0x807E",
+        "hal_prop": 557875326,
+        "hal_hex": "0x2140807E",
+        "payload_offset": "0x48",
+        "array_pair_index": 573
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerpsdstatus",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32901,
+      "id_hex": "0x00008085",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerpsdstatus",
+        "descriptor": "I",
+        "value": 32901,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008085"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_PSDStatus",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32901"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32901,
+            "sdk_hex": "0x8085",
+            "hal_prop": 557875333,
+            "hal_hex": "0x21408085",
+            "payload_offset": "0x48",
+            "array_pair_index": 580
+          },
+          "native_property": {
+            "index": 2489,
+            "prop": 557875333,
+            "hex": "0x21408085",
+            "configString": "CB_Power_PSDStatus",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1dc020",
+              "prop_access_store_va": "0xda0d0",
+              "source_string_va": "0x14cc2f",
+              "constructor_call_va": "0xda138"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32901,
+        "sdk_hex": "0x8085",
+        "hal_prop": 557875333,
+        "hal_hex": "0x21408085",
+        "payload_offset": "0x48",
+        "array_pair_index": 580
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerreboot",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32900,
+      "id_hex": "0x00008084",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerreboot",
+        "descriptor": "I",
+        "value": 32900,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008084"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_Reboot",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32900"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32900,
+            "sdk_hex": "0x8084",
+            "hal_prop": 557875332,
+            "hal_hex": "0x21408084",
+            "payload_offset": "0x48",
+            "array_pair_index": 579
+          },
+          "native_property": {
+            "index": 2488,
+            "prop": 557875332,
+            "hex": "0x21408084",
+            "configString": "CB_Power_Reboot",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1dbf70",
+              "prop_access_store_va": "0xd9f7c",
+              "source_string_va": "0x14cc1f",
+              "constructor_call_va": "0xd9fe4"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32900,
+        "sdk_hex": "0x8084",
+        "hal_prop": 557875332,
+        "hal_hex": "0x21408084",
+        "payload_offset": "0x48",
+        "array_pair_index": 579
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerresetsettings",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32890,
+      "id_hex": "0x0000807A",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerresetsettings",
+        "descriptor": "I",
+        "value": 32890,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x0000807A"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_ResetSettings",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32890"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32890,
+            "sdk_hex": "0x807A",
+            "hal_prop": 557875322,
+            "hal_hex": "0x2140807A",
+            "payload_offset": "0x48",
+            "array_pair_index": 569
+          },
+          "native_property": {
+            "index": 2478,
+            "prop": 557875322,
+            "hex": "0x2140807A",
+            "configString": "CB_Power_ResetSettings",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1db890",
+              "prop_access_store_va": "0xd9234",
+              "source_string_va": "0x14cb66",
+              "constructor_call_va": "0xd929c"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32890,
+        "sdk_hex": "0x807A",
+        "hal_prop": 557875322,
+        "hal_hex": "0x2140807A",
+        "payload_offset": "0x48",
+        "array_pair_index": 569
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowerrestart",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32892,
+      "id_hex": "0x0000807C",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowerrestart",
+        "descriptor": "I",
+        "value": 32892,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x0000807C"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_Restart",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32892"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32892,
+            "sdk_hex": "0x807C",
+            "hal_prop": 557875324,
+            "hal_hex": "0x2140807C",
+            "payload_offset": "0x48",
+            "array_pair_index": 571
+          },
+          "native_property": {
+            "index": 2480,
+            "prop": 557875324,
+            "hex": "0x2140807C",
+            "configString": "CB_Power_Restart",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1db9f0",
+              "prop_access_store_va": "0xd94dc",
+              "source_string_va": "0x14cb8f",
+              "constructor_call_va": "0xd9544"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32892,
+        "sdk_hex": "0x807C",
+        "hal_prop": 557875324,
+        "hal_hex": "0x2140807C",
+        "payload_offset": "0x48",
+        "array_pair_index": 571
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowersoftkey",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32899,
+      "id_hex": "0x00008083",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowersoftkey",
+        "descriptor": "I",
+        "value": 32899,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008083"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_Softkey",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [
+            "Lecarx/car/hardware/annotation/PowerSoftKey;"
+          ],
+          "property_operations": [
+            {
+              "offset": 28,
+              "op": "invoke-virtual",
+              "args": "v1, v2, v3, v5, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 20,
+              "op": "const",
+              "args": "v2, 32899"
+            },
+            {
+              "offset": 26,
+              "op": "const/4",
+              "args": "v3, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32899,
+            "sdk_hex": "0x8083",
+            "hal_prop": 557875331,
+            "hal_hex": "0x21408083",
+            "payload_offset": "0x48",
+            "array_pair_index": 578
+          },
+          "native_property": {
+            "index": 2487,
+            "prop": 557875331,
+            "hex": "0x21408083",
+            "configString": "CB_Power_Softkey",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1dbec0",
+              "prop_access_store_va": "0xd9e28",
+              "source_string_va": "0x14cc0e",
+              "constructor_call_va": "0xd9e90"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32899,
+        "sdk_hex": "0x8083",
+        "hal_prop": 557875331,
+        "hal_hex": "0x21408083",
+        "payload_offset": "0x48",
+        "array_pair_index": 578
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbpowertimeoutvalue",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 32888,
+      "id_hex": "0x00008078",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_cbpowertimeoutvalue",
+        "descriptor": "I",
+        "value": 32888,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/com.ecarx.dimmenu/base.apk",
+            "sha256": "214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820",
+            "dex_entry": "classes2.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x00008078"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_Power_TimeoutValue",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, v4, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 32888"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 32888,
+            "sdk_hex": "0x8078",
+            "hal_prop": 557875320,
+            "hal_hex": "0x21408078",
+            "payload_offset": "0x48",
+            "array_pair_index": 567
+          },
+          "native_property": {
+            "index": 2476,
+            "prop": 557875320,
+            "hex": "0x21408078",
+            "configString": "CB_Power_TimeoutValue",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1db730",
+              "prop_access_store_va": "0xd8f8c",
+              "source_string_va": "0x14cb39",
+              "constructor_call_va": "0xd8ff4"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 32888,
+        "sdk_hex": "0x8078",
+        "hal_prop": 557875320,
+        "hal_hex": "0x21408078",
+        "payload_offset": "0x48",
+        "array_pair_index": 567
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_papowerres",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "id": 33456,
+      "id_hex": "0x000082B0",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+        "name": "ManagerId_papowerres",
+        "descriptor": "I",
+        "value": 33456,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000082B0"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_Power_Res",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_Power_Res;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33456"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33456,
+            "sdk_hex": "0x82B0",
+            "hal_prop": 561021616,
+            "hal_hex": "0x217082B0",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2077
+          },
+          "native_property": {
+            "index": 3044,
+            "prop": 561021616,
+            "hex": "0x217082B0",
+            "configString": "PA_Power_Res",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": [
+                8,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1,
+                16,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1,
+                24,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1,
+                32,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1,
+                40,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1,
+                48,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1,
+                56,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1,
+                64,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1,
+                72,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1,
+                80,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                255,
+                1
+              ]
+            },
+            "evidence": {
+              "config_va": "0x1f3db0",
+              "prop_access_store_va": "0x10815c",
+              "source_string_va": "0x14fdba",
+              "constructor_call_va": "0x1081c4"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33456,
+        "sdk_hex": "0x82B0",
+        "hal_prop": 561021616,
+        "hal_hex": "0x217082B0",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2077
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_papowersoftkeybrightness",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSystemsettingManager;",
+      "id": 33480,
+      "id_hex": "0x000082C8",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarSystemsettingManager;",
+        "name": "ManagerId_papowersoftkeybrightness",
+        "descriptor": "I",
+        "value": 33480,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000082C8"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_PowerSoftKeyBrightness",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_PowerSoftKeyBrightness;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33480"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33480,
+            "sdk_hex": "0x82C8",
+            "hal_prop": 561021640,
+            "hal_hex": "0x217082C8",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2101
+          },
+          "native_property": {
+            "index": 3068,
+            "prop": 561021640,
+            "hex": "0x217082C8",
+            "configString": "PA_PowerSoftKeyBrightness",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1f4e30",
+              "prop_access_store_va": "0x10a184",
+              "source_string_va": "0x14ff4a",
+              "constructor_call_va": "0x10a1ec"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33480,
+        "sdk_hex": "0x82C8",
+        "hal_prop": 561021640,
+        "hal_hex": "0x217082C8",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2101
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_papowersoftkeyswitch",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarSystemsettingManager;",
+      "id": 33479,
+      "id_hex": "0x000082C7",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarSystemsettingManager;",
+        "name": "ManagerId_papowersoftkeyswitch",
+        "descriptor": "I",
+        "value": 33479,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000082C7"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_PowerSoftKeySwitch",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_PowerSoftKeySwitch;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33479"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33479,
+            "sdk_hex": "0x82C7",
+            "hal_prop": 561021639,
+            "hal_hex": "0x217082C7",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2100
+          },
+          "native_property": {
+            "index": 3067,
+            "prop": 561021639,
+            "hex": "0x217082C7",
+            "configString": "PA_PowerSoftKeySwitch",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1f4d80",
+              "prop_access_store_va": "0x10a030",
+              "source_string_va": "0x14ff34",
+              "constructor_call_va": "0x10a098"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33479,
+        "sdk_hex": "0x82C7",
+        "hal_prop": 561021639,
+        "hal_hex": "0x217082C7",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2100
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_cbusbboxpower",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmisc2Manager;",
+      "id": 33201,
+      "id_hex": "0x000081B1",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmisc2Manager;",
+        "name": "ManagerId_cbusbboxpower",
+        "descriptor": "I",
+        "value": 33201,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000081B1"
+      },
+      "sdk_access": [
+        "write"
+      ],
+      "methods": [
+        {
+          "name": "CB_UsbBox_Power",
+          "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+          "validators": [
+            "Lecarx/car/hardware/annotation/OnOff1;"
+          ],
+          "property_operations": [
+            {
+              "offset": 28,
+              "op": "invoke-virtual",
+              "args": "v1, v2, v3, v5, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 20,
+              "op": "const",
+              "args": "v2, 33201"
+            },
+            {
+              "offset": 26,
+              "op": "const/4",
+              "args": "v3, 1"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "write",
+          "sdk_to_hal": {
+            "sdk_id": 33201,
+            "sdk_hex": "0x81B1",
+            "hal_prop": 557875633,
+            "hal_hex": "0x214081B1",
+            "payload_offset": "0x48",
+            "array_pair_index": 880
+          },
+          "native_property": {
+            "index": 2789,
+            "prop": 557875633,
+            "hex": "0x214081B1",
+            "configString": "CB_UsbBox_Power",
+            "type": "INT32",
+            "type_mask_hex": "0x00400000",
+            "area_category": "GLOBAL",
+            "access": "READ_WRITE",
+            "access_raw": 3,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1e8e60",
+              "prop_access_store_va": "0xf2f08",
+              "source_string_va": "0x14e972",
+              "constructor_call_va": "0xf2f70"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33201,
+        "sdk_hex": "0x81B1",
+        "hal_prop": 557875633,
+        "hal_hex": "0x214081B1",
+        "payload_offset": "0x48",
+        "array_pair_index": 880
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_papowerflow",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmiscManager;",
+      "id": 33660,
+      "id_hex": "0x0000837C",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmiscManager;",
+        "name": "ManagerId_papowerflow",
+        "descriptor": "I",
+        "value": 33660,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x0000837C"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_PowerFlow",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_PowerFlow;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33660"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33660,
+            "sdk_hex": "0x837C",
+            "hal_prop": 561021820,
+            "hal_hex": "0x2170837C",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2281
+          },
+          "native_property": {
+            "index": 3248,
+            "prop": 561021820,
+            "hex": "0x2170837C",
+            "configString": "PA_PowerFlow",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1fc9f0",
+              "prop_access_store_va": "0x119070",
+              "source_string_va": "0x151090",
+              "constructor_call_va": "0x1190d8"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33660,
+        "sdk_hex": "0x837C",
+        "hal_prop": 561021820,
+        "hal_hex": "0x2170837C",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2281
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_papowerflowhev",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmiscManager;",
+      "id": 33696,
+      "id_hex": "0x000083A0",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmiscManager;",
+        "name": "ManagerId_papowerflowhev",
+        "descriptor": "I",
+        "value": 33696,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000083A0"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_PowerFlow_HEV",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_PowerFlow_HEV;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33696"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33696,
+            "sdk_hex": "0x83A0",
+            "hal_prop": 561021856,
+            "hal_hex": "0x217083A0",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2317
+          },
+          "native_property": {
+            "index": 3284,
+            "prop": 561021856,
+            "hex": "0x217083A0",
+            "configString": "PA_PowerFlow_HEV",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1fe2b0",
+              "prop_access_store_va": "0x11c038",
+              "source_string_va": "0x15134e",
+              "constructor_call_va": "0x11c0a0"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33696,
+        "sdk_hex": "0x83A0",
+        "hal_prop": 561021856,
+        "hal_hex": "0x217083A0",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2317
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_papowerflowmhev",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmiscManager;",
+      "id": 33661,
+      "id_hex": "0x0000837D",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarVfmiscManager;",
+        "name": "ManagerId_papowerflowmhev",
+        "descriptor": "I",
+        "value": 33661,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x0000837D"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_PowerFlow_MHEV",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_PowerFlow_MHEV;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33661"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33661,
+            "sdk_hex": "0x837D",
+            "hal_prop": 561021821,
+            "hal_hex": "0x2170837D",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2282
+          },
+          "native_property": {
+            "index": 3249,
+            "prop": 561021821,
+            "hex": "0x2170837D",
+            "configString": "PA_PowerFlow_MHEV",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1fcaa0",
+              "prop_access_store_va": "0x1191c4",
+              "source_string_va": "0x15109d",
+              "constructor_call_va": "0x11922c"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33661,
+        "sdk_hex": "0x837D",
+        "hal_prop": 561021821,
+        "hal_hex": "0x2170837D",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2282
+      }
+    },
+    {
+      "namespace": "ecarx.car.manager",
+      "name": "ManagerId_pavpversion",
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVpversionManager;",
+      "id": 33483,
+      "id_hex": "0x000082CB",
+      "declaration": {
+        "class": "Lecarx/car/hardware/vehicle/ECarXCarVpversionManager;",
+        "name": "ManagerId_pavpversion",
+        "descriptor": "I",
+        "value": 33483,
+        "flags": "public static final",
+        "value_provenance": "dex_encoded_static_value",
+        "sources": [
+          {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ecarx.car.jar",
+            "sha256": "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "framework/system_framework/ts-carplay-adapter.jar",
+            "sha256": "d2ce4c7cf0c35a12622f52342cbd33d5a6ae123c837a66a0dfff5c4e15364279",
+            "dex_entry": "classes.dex"
+          },
+          {
+            "member": "packages/ecarx.settings/base.apk",
+            "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+            "dex_entry": "classes2.dex"
+          }
+        ],
+        "hex": "0x000082CB"
+      },
+      "sdk_access": [
+        "read"
+      ],
+      "methods": [
+        {
+          "name": "getPA_VP_Version",
+          "descriptor": "()Lecarx/car/hardware/vehicle/PATypes$PA_VP_Version;",
+          "validators": [],
+          "property_operations": [
+            {
+              "offset": 12,
+              "op": "invoke-virtual",
+              "args": "v0, v1, v2, Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->getBytesProperty(I I)[B"
+            }
+          ],
+          "literal_instructions": [
+            {
+              "offset": 4,
+              "op": "const",
+              "args": "v1, 33483"
+            },
+            {
+              "offset": 10,
+              "op": "const/4",
+              "args": "v2, 1"
+            },
+            {
+              "offset": 20,
+              "op": "const/4",
+              "args": "v1, 0"
+            }
+          ],
+          "source": {
+            "member": "framework/system_framework/ecarx.adaptapi.jar",
+            "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+            "dex_entry": "classes.dex"
+          }
+        }
+      ],
+      "runtime_support": "unverified",
+      "native_routes": [
+        {
+          "direction": "read",
+          "sdk_to_hal": {
+            "sdk_id": 33483,
+            "sdk_hex": "0x82CB",
+            "hal_prop": 561021643,
+            "hal_hex": "0x217082CB",
+            "payload_offset": "0x1E80",
+            "array_pair_index": 2104
+          },
+          "native_property": {
+            "index": 3071,
+            "prop": 561021643,
+            "hex": "0x217082CB",
+            "configString": "PA_VP_Version",
+            "type": "BYTES",
+            "type_mask_hex": "0x00700000",
+            "area_category": "GLOBAL",
+            "access": "READ",
+            "access_raw": 1,
+            "changeMode": "ON_CHANGE",
+            "changeMode_raw": 1,
+            "areaConfigs": [],
+            "configArray": [],
+            "minSampleRate": 0.0,
+            "maxSampleRate": 0.0,
+            "initialValue": {
+              "int32Values": [],
+              "int64Values": [],
+              "floatValues": [],
+              "bytes": []
+            },
+            "evidence": {
+              "config_va": "0x1f5040",
+              "prop_access_store_va": "0x10a580",
+              "source_string_va": "0x14ff83",
+              "constructor_call_va": "0x10a5e8"
+            }
+          },
+          "runtime_application": "unverified"
+        }
+      ],
+      "exact_static_mapping": {
+        "sdk_id": 33483,
+        "sdk_hex": "0x82CB",
+        "hal_prop": 561021643,
+        "hal_hex": "0x217082CB",
+        "payload_offset": "0x1E80",
+        "array_pair_index": 2104
+      }
+    }
+  ],
+  "routes": [
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_APStatus",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32891,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_APUpdate",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32893,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_BG",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32895,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_IPLMInfo",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32897,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_InstallStatus",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32889,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_OTAUpdate",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32898,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_PSDStatus",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32901,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_PhotoView",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32896,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_PlayPausePress",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32894,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_Reboot",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32900,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_ResetSettings",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32890,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_Restart",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32892,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_Softkey",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32899,
+            1,
+            "v5"
+          ]
+        }
+      ],
+      "validators": [
+        "Lecarx/car/hardware/annotation/PowerSoftKey;"
+      ]
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarPowerManager;",
+      "method": "CB_Power_TimeoutValue",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32888,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    },
+    {
+      "class": "Lecarx/car/hardware/vehicle/ECarXCarVpversionManager;",
+      "method": "CB_VP_Reboot",
+      "descriptor": "(I)Lecarx/car/hardware/annotation/ApiResult;",
+      "writes": [
+        {
+          "callee": "Lecarx/car/hardware/property/ECarXCarPropertyManagerBase;->setIntProperty(I I I)Lecarx/car/hardware/annotation/ApiResult;",
+          "arguments": [
+            32920,
+            1,
+            "v4"
+          ]
+        }
+      ],
+      "validators": []
+    }
+  ]
+}

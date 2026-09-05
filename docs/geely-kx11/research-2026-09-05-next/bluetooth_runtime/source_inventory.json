@@ -1,0 +1,2953 @@
+[
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "._KX11_Bluetooth_Collect_20260814-210122_61118",
+    "size": 220,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/README_PRIVATE.txt",
+    "size": 751,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/local_files.sha256",
+    "size": 7108,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/data_data_com.ts.dm.service_databases.ls-laZ.txt",
+    "size": 498,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/system_etc_bluetooth.ls-laZ.txt",
+    "size": 685,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/data_user_0_com.ts.dm.service_databases.remote-sha256.txt",
+    "size": 374,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/data_misc_bluedroid.recursive-ls-laZ.txt",
+    "size": 591,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/data_user_0_com.ts.dm.service_databases.ls-laZ.txt",
+    "size": 498,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/data_misc_bluedroid.remote-sha256.txt",
+    "size": 393,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/system_etc_bluetooth.remote-sha256.txt",
+    "size": 607,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/data_user_0_com.ts.dm.service_databases.recursive-ls-laZ.txt",
+    "size": 557,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/data_data_com.ts.dm.service_databases.remote-sha256.txt",
+    "size": 368,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/system_etc_bluetooth.recursive-ls-laZ.txt",
+    "size": 725,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/data_misc_bluedroid.ls-laZ.txt",
+    "size": 599,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/MANIFESTS/data_data_com.ts.dm.service_databases.recursive-ls-laZ.txt",
+    "size": 549,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/data/._com.ts.dm.service",
+    "size": 168,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/data/com.ts.dm.service/databases/DB_DMDEVICE.db-shm",
+    "size": 32768,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/data/com.ts.dm.service/databases/DB_DMDEVICE.db-wal",
+    "size": 424392,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/data/com.ts.dm.service/databases/DB_DMDEVICE.db",
+    "size": 20480,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/user/0/._com.ts.dm.service",
+    "size": 168,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/user/0/com.ts.dm.service/databases/DB_DMDEVICE.db-shm",
+    "size": 32768,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/user/0/com.ts.dm.service/databases/DB_DMDEVICE.db-wal",
+    "size": 424392,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/user/0/com.ts.dm.service/databases/DB_DMDEVICE.db",
+    "size": 20480,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+    "size": 3510476,
+    "inspection": "HCI record framing and whitelisted lifecycle metadata only; ACL/SCO/key/notification payload skipped",
+    "member_sha256": "b04d0bae850741d896d97f65cd1d649b12a7e389f15487a8abf76eeeade5d9aa",
+    "local_path": "/workspace/scratch/ed09f1994860/audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/misc/bluedroid/bt_config.conf",
+    "size": 1000,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/misc/bluedroid/256.key",
+    "size": 32,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/misc/bluedroid/bt_config.bak",
+    "size": 1000,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/data/misc/bluedroid/192.key",
+    "size": 32,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/lib/libbluetooth-binder.so",
+    "size": 41412,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_4ble_20260726_172533.bak",
+    "size": 4911,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/etc/bluetooth/bt_did.conf",
+    "size": 2618,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+    "size": 4911,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/etc/bluetooth/nForeBluetooth.properties"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/etc/bluetooth/bt_stack.conf",
+    "size": 1952,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/etc/bluetooth/bt_stack.conf"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_ble_20260725_174644.bak",
+    "size": 4892,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/framework/ts-dm-foundation-lib.jar",
+    "size": 91154,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/framework/ecarx-theme-launcher-service.jar",
+    "size": 1579,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/framework/ts-platform-library.jar",
+    "size": 200835,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/framework/ecarx.adaptapi.jar",
+    "size": 1135817,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/app/Bluetooth/Bluetooth.apk",
+    "size": 2840323,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/FILES/system/app/XCBTPhone3/XCBTPhone3.apk",
+    "size": 9144989,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+    "size": 79185,
+    "inspection": "selected adapter history/profile names/GATT registry fields only; subscriber/contact/call fields excluded from outputs",
+    "member_sha256": "6592a380f915da85bd70828d79af7a4e4713e79adffb66127484be549ffd7f94",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_bluetooth_manager.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+    "size": 325448,
+    "inspection": "all text lines scanned with strict lifecycle/negative-pattern projection; arbitrary personal messages not semantically inspected",
+    "member_sha256": "9c2ef5ecbae8c3b9ec633aeb438a465bb914d86abd0962ab5621cc4b78d2819c",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/logcat_bluetooth_slice.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt",
+    "size": 61478,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "4107e67a676b717c7fc5da1e516484dfed4c204f56d6bb41dddc24765d9600a5",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/overlay_list.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/overlay_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/service_list.txt",
+    "size": 8062,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "235085eca8a6ed309e60ac4ef2c6af145900baf2b96f6e711ec78cd9f9838f07",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/service_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_bluetooth.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_services.txt",
+    "size": 2318,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "5f8782ae9fb443665495541ca5a7e2cd28cfd37966ab5528d4febb687101b2fa",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_services.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+    "size": 25672,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "746987940c62cf845905cb32904c11e8fcaae8fd12faabefbc94a566db3677c6",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/LOGS/adb_pull.log",
+    "size": 1196,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/LOGS/adb_root.log",
+    "size": 24,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/LOGS/collector.log",
+    "size": 707,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "89676ab3d2bde07e11b99fd3b2cd4f0c15afcddf48c4985edcbdd7c89f0bede0",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/LOGS/collector.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/LOGS/nonfatal_errors.log",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/LOGS/nonfatal_errors.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/META/build_fingerprint.txt",
+    "size": 71,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260814-210122_61118/META/build_fingerprint.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/META/bluetooth_android_settings.txt",
+    "size": 4953,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/META/bluetooth_properties.txt",
+    "size": 797,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/META/getprop.txt",
+    "size": 30111,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/META/device_identity.txt",
+    "size": 330,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/selected_bluetooth_vendor_packages.txt",
+    "size": 176,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/private_btsnoop_files.txt",
+    "size": 89,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/public_btsnoop_files.txt",
+    "size": 0,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/packages_full_paths.txt",
+    "size": 11454,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/nfore_files.txt",
+    "size": 207,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/com.android.bluetooth_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/selected_package_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/discovered_bluetooth_vendor_apks.txt",
+    "size": 399,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/discovered_bluetooth_vendor_jars.txt",
+    "size": 403,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+    "archive_sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+    "member": "KX11_Bluetooth_Collect_20260814-210122_61118/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+    "size": 366,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "._KX11_Bluetooth_Collect_20260815-090005_64290",
+    "size": 220,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/README_PRIVATE.txt",
+    "size": 751,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/local_files.sha256",
+    "size": 7108,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/data_data_com.ts.dm.service_databases.ls-laZ.txt",
+    "size": 498,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/system_etc_bluetooth.ls-laZ.txt",
+    "size": 685,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/data_user_0_com.ts.dm.service_databases.remote-sha256.txt",
+    "size": 374,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/data_misc_bluedroid.recursive-ls-laZ.txt",
+    "size": 589,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/data_user_0_com.ts.dm.service_databases.ls-laZ.txt",
+    "size": 498,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/data_misc_bluedroid.remote-sha256.txt",
+    "size": 393,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/system_etc_bluetooth.remote-sha256.txt",
+    "size": 607,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/data_user_0_com.ts.dm.service_databases.recursive-ls-laZ.txt",
+    "size": 557,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/data_data_com.ts.dm.service_databases.remote-sha256.txt",
+    "size": 368,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/system_etc_bluetooth.recursive-ls-laZ.txt",
+    "size": 725,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/data_misc_bluedroid.ls-laZ.txt",
+    "size": 599,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/MANIFESTS/data_data_com.ts.dm.service_databases.recursive-ls-laZ.txt",
+    "size": 549,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/data/._com.ts.dm.service",
+    "size": 168,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/data/com.ts.dm.service/databases/DB_DMDEVICE.db-shm",
+    "size": 32768,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/data/com.ts.dm.service/databases/DB_DMDEVICE.db-wal",
+    "size": 424392,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/data/com.ts.dm.service/databases/DB_DMDEVICE.db",
+    "size": 20480,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/user/0/._com.ts.dm.service",
+    "size": 168,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/user/0/com.ts.dm.service/databases/DB_DMDEVICE.db-shm",
+    "size": 32768,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/user/0/com.ts.dm.service/databases/DB_DMDEVICE.db-wal",
+    "size": 424392,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/user/0/com.ts.dm.service/databases/DB_DMDEVICE.db",
+    "size": 20480,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+    "size": 1853052,
+    "inspection": "HCI record framing and whitelisted lifecycle metadata only; ACL/SCO/key/notification payload skipped",
+    "member_sha256": "70b34c55c8234ff5e459121b968b50cdac9f3e665a222576f3448e28dbb84a0e",
+    "local_path": "/workspace/scratch/ed09f1994860/audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/misc/bluedroid/bt_config.conf",
+    "size": 995,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/misc/bluedroid/256.key",
+    "size": 32,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/misc/bluedroid/bt_config.bak",
+    "size": 995,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/data/misc/bluedroid/192.key",
+    "size": 32,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/lib/libbluetooth-binder.so",
+    "size": 41412,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_4ble_20260726_172533.bak",
+    "size": 4911,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/etc/bluetooth/bt_did.conf",
+    "size": 2618,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+    "size": 4911,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/etc/bluetooth/nForeBluetooth.properties"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/etc/bluetooth/bt_stack.conf",
+    "size": 1952,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/etc/bluetooth/bt_stack.conf"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_ble_20260725_174644.bak",
+    "size": 4892,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/framework/ts-dm-foundation-lib.jar",
+    "size": 91154,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/framework/ecarx-theme-launcher-service.jar",
+    "size": 1579,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/framework/ts-platform-library.jar",
+    "size": 200835,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/framework/ecarx.adaptapi.jar",
+    "size": 1135817,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/app/Bluetooth/Bluetooth.apk",
+    "size": 2840323,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/FILES/system/app/XCBTPhone3/XCBTPhone3.apk",
+    "size": 9144989,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+    "size": 167193,
+    "inspection": "selected adapter history/profile names/GATT registry fields only; subscriber/contact/call fields excluded from outputs",
+    "member_sha256": "52f5f34b2ce667c5c64f0e869b5b0497318a28b16b13be82f1e2d2ae26f07df5",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_bluetooth_manager.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+    "size": 8085750,
+    "inspection": "all text lines scanned with strict lifecycle/negative-pattern projection; arbitrary personal messages not semantically inspected",
+    "member_sha256": "8f64e420a0443680a25cf6bf15c43a1d3e517a19501ffe89cd209602850b436a",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/logcat_bluetooth_slice.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt",
+    "size": 60882,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e86074fc6a5d2927bd7744dda2e21454cb4db38458a52e37ad2afc1cad692e7c",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/overlay_list.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/overlay_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/service_list.txt",
+    "size": 8062,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "2e500ec9a8c779b35654d6c09ddd05d51fd9ee15f3dc0af1f69b493d4f00409a",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/service_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_bluetooth.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_services.txt",
+    "size": 2318,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "5f8782ae9fb443665495541ca5a7e2cd28cfd37966ab5528d4febb687101b2fa",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_services.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+    "size": 25520,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "4ffc0dc1b5a874a87e6c202cf14ebef9f8a58f1130c26e990f55fbe10c814003",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/LOGS/adb_pull.log",
+    "size": 1196,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/LOGS/adb_root.log",
+    "size": 32,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/LOGS/._collector.log",
+    "size": 188,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "bd77febefaadd4eb4ac86e1d8f366c68391e372a514cead1f217a1c49bdc7ac7",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/LOGS/._collector.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/LOGS/collector.log",
+    "size": 707,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "89676ab3d2bde07e11b99fd3b2cd4f0c15afcddf48c4985edcbdd7c89f0bede0",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/LOGS/collector.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/LOGS/nonfatal_errors.log",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/LOGS/nonfatal_errors.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/META/build_fingerprint.txt",
+    "size": 71,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-090005_64290/META/build_fingerprint.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/META/bluetooth_android_settings.txt",
+    "size": 5357,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/META/bluetooth_properties.txt",
+    "size": 797,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/META/getprop.txt",
+    "size": 30079,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/META/device_identity.txt",
+    "size": 330,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/selected_bluetooth_vendor_packages.txt",
+    "size": 176,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/private_btsnoop_files.txt",
+    "size": 89,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/public_btsnoop_files.txt",
+    "size": 0,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/packages_full_paths.txt",
+    "size": 11454,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/nfore_files.txt",
+    "size": 207,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/com.android.bluetooth_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/selected_package_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/discovered_bluetooth_vendor_apks.txt",
+    "size": 399,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/discovered_bluetooth_vendor_jars.txt",
+    "size": 403,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+    "archive_sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+    "member": "KX11_Bluetooth_Collect_20260815-090005_64290/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+    "size": 366,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/README_PRIVATE.txt",
+    "size": 770,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/MANIFESTS/local_files.sha256",
+    "size": 6000,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/MANIFESTS/system_etc_bluetooth.ls-laZ.txt",
+    "size": 685,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/MANIFESTS/system_etc_bluetooth.remote-sha256.txt",
+    "size": 607,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/MANIFESTS/system_etc_bluetooth.recursive-ls-laZ.txt",
+    "size": 725,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/lib/libbluetooth-binder.so",
+    "size": 41412,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_4ble_20260726_172533.bak",
+    "size": 4911,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/etc/bluetooth/bt_did.conf",
+    "size": 2618,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+    "size": 4911,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/etc/bluetooth/nForeBluetooth.properties"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/etc/bluetooth/bt_stack.conf",
+    "size": 1952,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/etc/bluetooth/bt_stack.conf"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_ble_20260725_174644.bak",
+    "size": 4892,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/priv-app/SystemUI/SystemUI.apk",
+    "size": 11100644,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/priv-app/XCSystemUIPlugin/XCSystemUIPlugin.apk",
+    "size": 9044275,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/framework/ts-dm-foundation-lib.jar",
+    "size": 91154,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/framework/framework-res.apk",
+    "size": 14346276,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/framework/ecarx-theme-launcher-service.jar",
+    "size": 1579,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/framework/ts-platform-library.jar",
+    "size": 200835,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/framework/ecarx.adaptapi.jar",
+    "size": 1135817,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/app/Bluetooth/Bluetooth.apk",
+    "size": 2840323,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/app/XCBTPhone3/XCBTPhone3.apk",
+    "size": 9144989,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/FILES/system/app/XCSettings2/XCSettings2.apk",
+    "size": 305412090,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+    "size": 145020,
+    "inspection": "selected adapter history/profile names/GATT registry fields only; subscriber/contact/call fields excluded from outputs",
+    "member_sha256": "756615e16394415b655111908d04c9ccd9de896e705737be55705e5758c18240",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth_manager.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_statusbar.txt",
+    "size": 282,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e989867ca008e6bdad18c37c1113b734335514924154d79c46ad6fa37257d4d8",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_statusbar.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.ecarx.settings.txt",
+    "size": 161,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "739b5b15d53180781165b6d79bf3b86633e593ac11bfdd4db363a2b4d58026a4",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.ecarx.settings.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_window_windows.txt",
+    "size": 87868,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "5ec81740801a48ed912490f2d55513904b964039e41a75496932ea887cac6dbc",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_window_windows.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+    "size": 5531961,
+    "inspection": "all text lines scanned with strict lifecycle/negative-pattern projection; arbitrary personal messages not semantically inspected",
+    "member_sha256": "8a6a1ad281ee12a3762ac07058909990b3111ba2c3fc507b2605e1c9bfdad120",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/logcat_bluetooth_slice.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/statusbar_help.txt",
+    "size": 641,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "877320bc12bedb180777dd56b9bd5d43194257b3c4f075b42e47f2227cddaf49",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/statusbar_help.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.ecarx.systemui.plugin.txt",
+    "size": 18282,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "cba293f0c69720379410a679256f736c45456eecf2ebddb41bfa23cadabf3a26",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.ecarx.systemui.plugin.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt",
+    "size": 61484,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "c8da7d17dd55856d03323d70cf6d4963b18a80b57cc9073da7380b856393c916",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/overlay_list.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/overlay_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/service_list.txt",
+    "size": 8062,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e918caf18efe3d789c686ef47b994fd8cfb17dc14bb3ee1819fa7ba45bd080aa",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/service_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.android.systemui.txt",
+    "size": 25765,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "7d51acd39b40f0d5a5c7356cfefd7b28c046d976cd92858389fcc26d4fdf9d79",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.android.systemui.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_services.txt",
+    "size": 2318,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "5f8782ae9fb443665495541ca5a7e2cd28cfd37966ab5528d4febb687101b2fa",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_services.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/statusbar_icons.txt",
+    "size": 257,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "b26cb14e91715f201d5790f14cb46b0ceefed86a5c9e5ecee631bc04d2195034",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/statusbar_icons.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+    "size": 25671,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "56982dc4b8c0b0e0f01b0cca5c770070e4a7a55da565a30f0a3d9c806902cce0",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/systemui_uiautomator.xml",
+    "size": 33,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "c2147cc54c0d6fa195fb43b9e2471e4f714db73de8a0d3771f9be22b921e58ed",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/DIAGNOSTICS/systemui_uiautomator.xml"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/LOGS/adb_pull.log",
+    "size": 1222,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/LOGS/._collector.log",
+    "size": 188,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "b7c1ff741dada058ceeb68910d9cd45455aa50af1ca75faa20829284f1c27805",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/LOGS/._collector.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/LOGS/collector.log",
+    "size": 539,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "8784970a0d9c22027346ecc3f38dbf5ae6193839b4fda55c8a11046f17d51653",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/LOGS/collector.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/LOGS/nonfatal_errors.log",
+    "size": 42,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "1f0d9affeaaebd1dabdff3903ac1db3205dca42dd54df80588b6c9a62706d228",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/LOGS/nonfatal_errors.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/META/build_fingerprint.txt",
+    "size": 71,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-104207_69107/META/build_fingerprint.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/META/bluetooth_android_settings.txt",
+    "size": 5635,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/META/bluetooth_properties.txt",
+    "size": 797,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/META/systemui_icon_blacklist.txt",
+    "size": 284,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/META/getprop.txt",
+    "size": 30052,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/META/device_identity.txt",
+    "size": 345,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/selected_bluetooth_vendor_packages.txt",
+    "size": 242,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/public_btsnoop_files.txt",
+    "size": 0,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/packages_full_paths.txt",
+    "size": 11546,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/nfore_files.txt",
+    "size": 207,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/com.android.bluetooth_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/selected_package_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/discovered_bluetooth_vendor_apks.txt",
+    "size": 399,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/discovered_bluetooth_vendor_jars.txt",
+    "size": 403,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+    "size": 366,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+    "archive_sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+    "member": "KX11_Bluetooth_Collect_20260815-104207_69107/DISCOVERY/protected_data_not_collected.txt",
+    "size": 132,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/README_PRIVATE.txt",
+    "size": 770,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/MANIFESTS/local_files.sha256",
+    "size": 6000,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/MANIFESTS/system_etc_bluetooth.ls-laZ.txt",
+    "size": 685,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/MANIFESTS/system_etc_bluetooth.remote-sha256.txt",
+    "size": 607,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/MANIFESTS/system_etc_bluetooth.recursive-ls-laZ.txt",
+    "size": 725,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/lib/libbluetooth-binder.so",
+    "size": 41412,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_4ble_20260726_172533.bak",
+    "size": 4911,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/etc/bluetooth/bt_did.conf",
+    "size": 2618,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+    "size": 4911,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/etc/bluetooth/nForeBluetooth.properties"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/etc/bluetooth/bt_stack.conf",
+    "size": 1952,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/etc/bluetooth/bt_stack.conf"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_ble_20260725_174644.bak",
+    "size": 4892,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/priv-app/SystemUI/SystemUI.apk",
+    "size": 11100644,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/priv-app/XCSystemUIPlugin/XCSystemUIPlugin.apk",
+    "size": 9044275,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/framework/ts-dm-foundation-lib.jar",
+    "size": 91154,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/framework/framework-res.apk",
+    "size": 14346276,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/framework/ecarx-theme-launcher-service.jar",
+    "size": 1579,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/framework/ts-platform-library.jar",
+    "size": 200835,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/framework/ecarx.adaptapi.jar",
+    "size": 1135817,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/app/Bluetooth/Bluetooth.apk",
+    "size": 2840323,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/app/XCBTPhone3/XCBTPhone3.apk",
+    "size": 9144989,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/FILES/system/app/XCSettings2/XCSettings2.apk",
+    "size": 305412090,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+    "size": 105211,
+    "inspection": "selected adapter history/profile names/GATT registry fields only; subscriber/contact/call fields excluded from outputs",
+    "member_sha256": "53b2974cd4069aa18a168e0d76d37962a77f5224c3ca3da98aa34eb7a1bd3d03",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_bluetooth_manager.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_statusbar.txt",
+    "size": 190,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "787fef4589d6e34cb3caf1050a456ed82791b7491957901db6dbae5477b51cc4",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_statusbar.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.ecarx.settings.txt",
+    "size": 161,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "739b5b15d53180781165b6d79bf3b86633e593ac11bfdd4db363a2b4d58026a4",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.ecarx.settings.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_window_windows.txt",
+    "size": 81860,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "66addc59735b7229c11b11cd94433554b4ec6bd41dbb3fa6b31a17d955c5fc2c",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_window_windows.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+    "size": 1918419,
+    "inspection": "all text lines scanned with strict lifecycle/negative-pattern projection; arbitrary personal messages not semantically inspected",
+    "member_sha256": "4c3a5240662c15e09da0826e7a16199df50ad70bf6b600f74f68c0bf8c72ef15",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/logcat_bluetooth_slice.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/statusbar_help.txt",
+    "size": 641,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "877320bc12bedb180777dd56b9bd5d43194257b3c4f075b42e47f2227cddaf49",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/statusbar_help.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.ecarx.systemui.plugin.txt",
+    "size": 18279,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "af9fbf84ebe7d1083dae7da0aba3f92de9474de2498f7eab24e2d8bebc503fe0",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.ecarx.systemui.plugin.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt",
+    "size": 61430,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "47cc773cb1b70ca524f99a19643637cf2558da32fb4b2422d5dccca3edb2793c",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/overlay_list.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/overlay_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/service_list.txt",
+    "size": 8062,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "5625a2cf8e1a4b2f489ea262598e1ae8b73f3d0d30bc83d80b134b506096b020",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/service_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.android.systemui.txt",
+    "size": 25764,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "551f3b200ae9c4c5d64e59b9e50ea8ac15bf0821fa440350c489aeb1314f0af1",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.android.systemui.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_bluetooth.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_services.txt",
+    "size": 2318,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "5f8782ae9fb443665495541ca5a7e2cd28cfd37966ab5528d4febb687101b2fa",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_services.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/statusbar_icons.txt",
+    "size": 257,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "b26cb14e91715f201d5790f14cb46b0ceefed86a5c9e5ecee631bc04d2195034",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/statusbar_icons.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+    "size": 25672,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "3d23a6049f0e2245e97912a9f27a36ca5e91a9f701fb5614c2e5edfd9afff741",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/systemui_uiautomator.xml",
+    "size": 33,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "c2147cc54c0d6fa195fb43b9e2471e4f714db73de8a0d3771f9be22b921e58ed",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/DIAGNOSTICS/systemui_uiautomator.xml"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/LOGS/adb_pull.log",
+    "size": 1223,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/LOGS/collector.log",
+    "size": 539,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "8784970a0d9c22027346ecc3f38dbf5ae6193839b4fda55c8a11046f17d51653",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/LOGS/collector.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/LOGS/nonfatal_errors.log",
+    "size": 42,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "1f0d9affeaaebd1dabdff3903ac1db3205dca42dd54df80588b6c9a62706d228",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/LOGS/nonfatal_errors.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/META/build_fingerprint.txt",
+    "size": 71,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-114556_71773/META/build_fingerprint.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/META/bluetooth_android_settings.txt",
+    "size": 5635,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/META/bluetooth_properties.txt",
+    "size": 797,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/META/systemui_icon_blacklist.txt",
+    "size": 284,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/META/getprop.txt",
+    "size": 30058,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/META/device_identity.txt",
+    "size": 345,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/selected_bluetooth_vendor_packages.txt",
+    "size": 242,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/public_btsnoop_files.txt",
+    "size": 0,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/packages_full_paths.txt",
+    "size": 11546,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/nfore_files.txt",
+    "size": 207,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/com.android.bluetooth_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/selected_package_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/discovered_bluetooth_vendor_apks.txt",
+    "size": 399,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/discovered_bluetooth_vendor_jars.txt",
+    "size": 403,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+    "size": 366,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+    "archive_sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+    "member": "KX11_Bluetooth_Collect_20260815-114556_71773/DISCOVERY/protected_data_not_collected.txt",
+    "size": 132,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "._KX11_Bluetooth_Collect_20260815-132904_74834",
+    "size": 220,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/README_PRIVATE.txt",
+    "size": 770,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/MANIFESTS/local_files.sha256",
+    "size": 6000,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/MANIFESTS/system_etc_bluetooth.ls-laZ.txt",
+    "size": 685,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/MANIFESTS/system_etc_bluetooth.remote-sha256.txt",
+    "size": 607,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/MANIFESTS/system_etc_bluetooth.recursive-ls-laZ.txt",
+    "size": 725,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/lib/libbluetooth-binder.so",
+    "size": 41412,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_4ble_20260726_172533.bak",
+    "size": 4911,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/etc/bluetooth/bt_did.conf",
+    "size": 2618,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+    "size": 4911,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/etc/bluetooth/nForeBluetooth.properties"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/etc/bluetooth/bt_stack.conf",
+    "size": 1952,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/etc/bluetooth/bt_stack.conf"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_ble_20260725_174644.bak",
+    "size": 4892,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/priv-app/SystemUI/SystemUI.apk",
+    "size": 11100644,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/priv-app/XCSystemUIPlugin/XCSystemUIPlugin.apk",
+    "size": 9044275,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/framework/ts-dm-foundation-lib.jar",
+    "size": 91154,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/framework/framework-res.apk",
+    "size": 14346276,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/framework/ecarx-theme-launcher-service.jar",
+    "size": 1579,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/framework/ts-platform-library.jar",
+    "size": 200835,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/framework/ecarx.adaptapi.jar",
+    "size": 1135817,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/app/Bluetooth/Bluetooth.apk",
+    "size": 2840323,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/app/XCBTPhone3/XCBTPhone3.apk",
+    "size": 9144989,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/FILES/system/app/XCSettings2/XCSettings2.apk",
+    "size": 305412090,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+    "size": 128081,
+    "inspection": "selected adapter history/profile names/GATT registry fields only; subscriber/contact/call fields excluded from outputs",
+    "member_sha256": "2e4947745aefe28f7ed9caf4a415f50255fdfc1545d47198e95dfea3df55f7b0",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_bluetooth_manager.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_statusbar.txt",
+    "size": 88,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "8375ed6e92aaf46a2e4d7e4bb4fa15877e8a12d027c5fc86b43ac71f299d1038",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_statusbar.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.ecarx.settings.txt",
+    "size": 161,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "739b5b15d53180781165b6d79bf3b86633e593ac11bfdd4db363a2b4d58026a4",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.ecarx.settings.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_window_windows.txt",
+    "size": 85123,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "d541563fced010de09078329caec03b3d553473b8dbfec344f248b64877ee6ec",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_window_windows.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+    "size": 8434912,
+    "inspection": "all text lines scanned with strict lifecycle/negative-pattern projection; arbitrary personal messages not semantically inspected",
+    "member_sha256": "c28459882fe4c20bf9c8d4e7f22fab29470586e04971fcc14cf68e43c1e54ea0",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/logcat_bluetooth_slice.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/statusbar_help.txt",
+    "size": 641,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "877320bc12bedb180777dd56b9bd5d43194257b3c4f075b42e47f2227cddaf49",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/statusbar_help.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.ecarx.systemui.plugin.txt",
+    "size": 18282,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "9d51844c325902c2c4c9728a8baf0aba68d5c9a8907ff392f68eae13b62619f8",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.ecarx.systemui.plugin.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt",
+    "size": 61476,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "9773a87dc3af31556424e5c1fd201f5d0dd17e0ab4e016aa917ad43b788ff5cf",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/overlay_list.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/overlay_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/service_list.txt",
+    "size": 8062,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "3123e17b169af92ab0f28ffd4176e6471a9de3309ec087ce0d11ff4d4decfcbf",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/service_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.android.systemui.txt",
+    "size": 25764,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "af9170c691c967c68cdef5da615ce5bb03c9e8c116fd5bec207b0a5e99558b34",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.android.systemui.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_bluetooth.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_services.txt",
+    "size": 2318,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "5f8782ae9fb443665495541ca5a7e2cd28cfd37966ab5528d4febb687101b2fa",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_services.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/statusbar_icons.txt",
+    "size": 257,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "b26cb14e91715f201d5790f14cb46b0ceefed86a5c9e5ecee631bc04d2195034",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/statusbar_icons.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+    "size": 25670,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "4d0b8d325244a2162e2bbc93c720d4883a5829f578792df7524fa87689f0d7ff",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/systemui_uiautomator.xml",
+    "size": 33,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "c2147cc54c0d6fa195fb43b9e2471e4f714db73de8a0d3771f9be22b921e58ed",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/DIAGNOSTICS/systemui_uiautomator.xml"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/LOGS/adb_pull.log",
+    "size": 1222,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/LOGS/collector.log",
+    "size": 539,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "8784970a0d9c22027346ecc3f38dbf5ae6193839b4fda55c8a11046f17d51653",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/LOGS/collector.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/LOGS/nonfatal_errors.log",
+    "size": 42,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "1f0d9affeaaebd1dabdff3903ac1db3205dca42dd54df80588b6c9a62706d228",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/LOGS/nonfatal_errors.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/META/build_fingerprint.txt",
+    "size": 71,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-132904_74834/META/build_fingerprint.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/META/bluetooth_android_settings.txt",
+    "size": 5635,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/META/bluetooth_properties.txt",
+    "size": 797,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/META/systemui_icon_blacklist.txt",
+    "size": 284,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/META/getprop.txt",
+    "size": 30061,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/META/device_identity.txt",
+    "size": 345,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/selected_bluetooth_vendor_packages.txt",
+    "size": 242,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/public_btsnoop_files.txt",
+    "size": 0,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/packages_full_paths.txt",
+    "size": 11454,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/nfore_files.txt",
+    "size": 207,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/com.android.bluetooth_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/selected_package_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/discovered_bluetooth_vendor_apks.txt",
+    "size": 399,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/discovered_bluetooth_vendor_jars.txt",
+    "size": 403,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+    "size": 366,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+    "archive_sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+    "member": "KX11_Bluetooth_Collect_20260815-132904_74834/DISCOVERY/protected_data_not_collected.txt",
+    "size": 132,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/README_PRIVATE.txt",
+    "size": 770,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/local_files.sha256",
+    "size": 8550,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/data_data_com.ts.dm.service_databases.ls-laZ.txt",
+    "size": 498,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/system_etc_bluetooth.ls-laZ.txt",
+    "size": 685,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/data_user_0_com.ts.dm.service_databases.remote-sha256.txt",
+    "size": 374,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/data_misc_bluedroid.recursive-ls-laZ.txt",
+    "size": 591,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/data_user_0_com.ts.dm.service_databases.ls-laZ.txt",
+    "size": 498,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/data_misc_bluedroid.remote-sha256.txt",
+    "size": 393,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/system_etc_bluetooth.remote-sha256.txt",
+    "size": 607,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/data_user_0_com.ts.dm.service_databases.recursive-ls-laZ.txt",
+    "size": 557,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/data_data_com.ts.dm.service_databases.remote-sha256.txt",
+    "size": 368,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/system_etc_bluetooth.recursive-ls-laZ.txt",
+    "size": 725,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/data_misc_bluedroid.ls-laZ.txt",
+    "size": 599,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/MANIFESTS/data_data_com.ts.dm.service_databases.recursive-ls-laZ.txt",
+    "size": 549,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/data/._com.ts.dm.service",
+    "size": 168,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/data/com.ts.dm.service/databases/DB_DMDEVICE.db-shm",
+    "size": 32768,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/data/com.ts.dm.service/databases/DB_DMDEVICE.db-wal",
+    "size": 424392,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/data/com.ts.dm.service/databases/DB_DMDEVICE.db",
+    "size": 20480,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/user/0/._com.ts.dm.service",
+    "size": 168,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/user/0/com.ts.dm.service/databases/DB_DMDEVICE.db-shm",
+    "size": 32768,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/user/0/com.ts.dm.service/databases/DB_DMDEVICE.db-wal",
+    "size": 424392,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/user/0/com.ts.dm.service/databases/DB_DMDEVICE.db",
+    "size": 20480,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last",
+    "size": 4478548,
+    "inspection": "HCI record framing and whitelisted lifecycle metadata only; ACL/SCO/key/notification payload skipped",
+    "member_sha256": "0316fd1a333585254ed4b2ef729e6b9908c089ce946c9652baab1139ca99991a",
+    "local_path": "/workspace/scratch/ed09f1994860/audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/misc/bluetooth/logs/btsnoop_hci.log.last"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/misc/bluedroid/bt_config.conf",
+    "size": 1200,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/misc/bluedroid/256.key",
+    "size": 32,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/misc/bluedroid/bt_config.bak",
+    "size": 1200,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/data/misc/bluedroid/192.key",
+    "size": 32,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/lib/libbluetooth-binder.so",
+    "size": 41412,
+    "inspection": "selected static method bodies/config/ELF metadata; see static/evidence.json",
+    "member_sha256": "8a29b5544aea6004ef3f8ca42a8007140112e1d21c650d0937243cb5c5afe764"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_4ble_20260726_172533.bak",
+    "size": 4911,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/bt_did.conf",
+    "size": 2618,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+    "size": 4911,
+    "inspection": "selected static method bodies/config/ELF metadata; see static/evidence.json",
+    "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/nForeBluetooth.properties"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/bt_stack.conf",
+    "size": 1952,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/bt_stack.conf"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/nForeBluetooth.properties.before_ble_20260725_174644.bak",
+    "size": 4892,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/priv-app/SystemUI/SystemUI.apk",
+    "size": 11100644,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/priv-app/XCSystemUIPlugin/XCSystemUIPlugin.apk",
+    "size": 9044275,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/ts-dm-foundation-lib.jar",
+    "size": 91154,
+    "inspection": "selected static method bodies/config/ELF metadata; see static/evidence.json",
+    "member_sha256": "0d16660234e6eab5ed615155fafeb087dabb6618d87ba6fe8922826f5c338617"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/framework-res.apk",
+    "size": 14346276,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/ecarx-theme-launcher-service.jar",
+    "size": 1579,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/ts-platform-library.jar",
+    "size": 200835,
+    "inspection": "selected static method bodies/config/ELF metadata; see static/evidence.json",
+    "member_sha256": "ff410df2b6eb7825c31f5b3220fcb86bf495cfee9eab112c67d8c4feac3f6722"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/ecarx.adaptapi.jar",
+    "size": 1135817,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/app/Bluetooth/Bluetooth.apk",
+    "size": 2840323,
+    "inspection": "selected static method bodies/config/ELF metadata; see static/evidence.json",
+    "member_sha256": "e16dd214f4967d8870d54d08c6d8b483cbf68286dcbbb695605ccce6faf93f95"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/app/XCBTPhone3/XCBTPhone3.apk",
+    "size": 9144989,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/app/XCSettings2/XCSettings2.apk",
+    "size": 305412090,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_bluetooth_manager.txt",
+    "size": 127002,
+    "inspection": "selected adapter history/profile names/GATT registry fields only; subscriber/contact/call fields excluded from outputs",
+    "member_sha256": "2a6df18ecfbb42fc3057c98a4180710aeac69caea02011ac3919f55a86b34ef8",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_bluetooth_manager.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_statusbar.txt",
+    "size": 88,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "8375ed6e92aaf46a2e4d7e4bb4fa15877e8a12d027c5fc86b43ac71f299d1038",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_statusbar.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.ecarx.settings.txt",
+    "size": 161,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "739b5b15d53180781165b6d79bf3b86633e593ac11bfdd4db363a2b4d58026a4",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.ecarx.settings.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_window_windows.txt",
+    "size": 85102,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "7b03cf9282288c7d5182260e222a06d2a8661dc897eba09eef363cb4a61dd7d0",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_window_windows.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/logcat_bluetooth_slice.txt",
+    "size": 999188,
+    "inspection": "all text lines scanned with strict lifecycle/negative-pattern projection; arbitrary personal messages not semantically inspected",
+    "member_sha256": "8b588cdd8f0dac3b12658d17a77aa9c98b529f3b8a8c5a005582b172f58fc5a3",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/logcat_bluetooth_slice.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/statusbar_help.txt",
+    "size": 641,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "877320bc12bedb180777dd56b9bd5d43194257b3c4f075b42e47f2227cddaf49",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/statusbar_help.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.ecarx.systemui.plugin.txt",
+    "size": 18282,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "9d51844c325902c2c4c9728a8baf0aba68d5c9a8907ff392f68eae13b62619f8",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.ecarx.systemui.plugin.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt",
+    "size": 61476,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "9773a87dc3af31556424e5c1fd201f5d0dd17e0ab4e016aa917ad43b788ff5cf",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.android.bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/overlay_list.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/overlay_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/service_list.txt",
+    "size": 8062,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "3123e17b169af92ab0f28ffd4176e6471a9de3309ec087ce0d11ff4d4decfcbf",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/service_list.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.android.systemui.txt",
+    "size": 25764,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "af9170c691c967c68cdef5da615ce5bb03c9e8c116fd5bec207b0a5e99558b34",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.android.systemui.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_bluetooth.txt",
+    "size": 0,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_bluetooth.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_services.txt",
+    "size": 2318,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "5f8782ae9fb443665495541ca5a7e2cd28cfd37966ab5528d4febb687101b2fa",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_services.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/statusbar_icons.txt",
+    "size": 257,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "b26cb14e91715f201d5790f14cb46b0ceefed86a5c9e5ecee631bc04d2195034",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/statusbar_icons.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+    "size": 25670,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "4d0b8d325244a2162e2bbc93c720d4883a5829f578792df7524fa87689f0d7ff",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/systemui_uiautomator.xml",
+    "size": 33,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "c2147cc54c0d6fa195fb43b9e2471e4f714db73de8a0d3771f9be22b921e58ed",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/systemui_uiautomator.xml"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/LOGS/adb_pull.log",
+    "size": 1623,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/LOGS/adb_root.log",
+    "size": 24,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/LOGS/._collector.log",
+    "size": 188,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "7dbd119a6e56d2151d0985a09adc446d40587aa0a48a6a799d6debee99032dc8",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/LOGS/._collector.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/LOGS/collector.log",
+    "size": 707,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "89676ab3d2bde07e11b99fd3b2cd4f0c15afcddf48c4985edcbdd7c89f0bede0",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/LOGS/collector.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/LOGS/nonfatal_errors.log",
+    "size": 42,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "1f0d9affeaaebd1dabdff3903ac1db3205dca42dd54df80588b6c9a62706d228",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/LOGS/nonfatal_errors.log"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/META/build_fingerprint.txt",
+    "size": 71,
+    "inspection": "extracted_private; only specifically referenced fields analyzed",
+    "member_sha256": "ed2187b7cea3850e884804fc873b7cdc13caffcefd0271b163f840e4fd9dd341",
+    "local_path": "audit-work/next-analysis/bluetooth_runtime/private/KX11_Bluetooth_Collect_20260815-134614_76337/META/build_fingerprint.txt"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/META/bluetooth_android_settings.txt",
+    "size": 5635,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/META/bluetooth_properties.txt",
+    "size": 797,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/META/systemui_icon_blacklist.txt",
+    "size": 284,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/META/getprop.txt",
+    "size": 30085,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/META/device_identity.txt",
+    "size": 330,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/selected_bluetooth_vendor_packages.txt",
+    "size": 242,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/private_btsnoop_files.txt",
+    "size": 89,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/public_btsnoop_files.txt",
+    "size": 0,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/packages_full_paths.txt",
+    "size": 11454,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/nfore_files.txt",
+    "size": 207,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/com.android.bluetooth_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/selected_package_paths.txt",
+    "size": 44,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_apks.txt",
+    "size": 399,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_jars.txt",
+    "size": 403,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DISCOVERY/discovered_bluetooth_vendor_native_libs.txt",
+    "size": 366,
+    "inspection": "inventory_only"
+  },
+  {
+    "archive": "KX11-Cruise-Trace-20260809-001402.zip",
+    "member": "KX11-Cruise-Trace-20260809-001402/packages/com_ts_dm_service/ts-dm-service.apk",
+    "bytes": 641997,
+    "basename": "ts-dm-service.apk",
+    "archive_sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+    "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+    "inspection": "full DEX method inventory plus targeted actual service-side arbitration/timeout bodies",
+    "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48"
+  },
+  {
+    "archive": "KX11-Cruise-Trace-20260809-085503.zip",
+    "member": "KX11-Cruise-Trace-20260809-085503/packages/com_ts_dm_service/ts-dm-service.apk",
+    "bytes": 641997,
+    "basename": "ts-dm-service.apk",
+    "archive_sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+    "member_sha256": "b42926770416f0e05778a04aaa69b0b69c5dd9f1572babe88813a253df7aa8c1",
+    "inspection": "full DEX method inventory plus targeted actual service-side arbitration/timeout bodies",
+    "dex_sha256": "74be843db65ee4ab2c936811c975e9e93e3946379eea70aec919ecafc3b29e48"
+  }
+]

@@ -1,0 +1,954 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-05",
+  "scope": "Offline static selected bodies in captured APK/JAR plus ELF metadata, no vehicle interactions.",
+  "sources": {
+    "bt": {
+      "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/app/Bluetooth/Bluetooth.apk",
+      "member_size": 2840323,
+      "member_sha256": "e16dd214f4967d8870d54d08c6d8b483cbf68286dcbbb695605ccce6faf93f95",
+      "dex": "classes.dex",
+      "dex_sha256": "0b41edcd8b4a38c98a465fb8d0d1cbcd06b7ffe562bb669c4a29b7dd58c9b097"
+    },
+    "dm": {
+      "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/ts-dm-foundation-lib.jar",
+      "member_size": 91154,
+      "member_sha256": "0d16660234e6eab5ed615155fafeb087dabb6618d87ba6fe8922826f5c338617",
+      "dex": "classes.dex",
+      "dex_sha256": "15cbcf8598acf478a900506b0ce8c54f29e77cda913f7442adf62f2b64a66291"
+    },
+    "platform": {
+      "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/ts-platform-library.jar",
+      "member_size": 200835,
+      "member_sha256": "ff410df2b6eb7825c31f5b3220fcb86bf495cfee9eab112c67d8c4feac3f6722",
+      "dex": "classes.dex",
+      "dex_sha256": "d7c1343752e3918af1560d7107036f0da69f805b618bccb01bedbf4a896fd7a3"
+    },
+    "config": {
+      "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+      "member_size": 4911,
+      "member_sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32"
+    },
+    "binder32": {
+      "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/lib/libbluetooth-binder.so",
+      "member_size": 41412,
+      "member_sha256": "8a29b5544aea6004ef3f8ca42a8007140112e1d21c650d0937243cb5c5afe764"
+    }
+  },
+  "offset_convention": "DEX code_item_offset is file byte offset; first instruction starts at code_item_offset+16. Relative instruction offsets are bytes, not 16-bit code units. ELF locations separately labelled.",
+  "facts": [
+    {
+      "id": "BT-ST-001",
+      "status": "static_body_verified",
+      "claim_ru": "BluetoothConnectManager получает стандартные Android BluetoothManager/Adapter и подписывается на adapter/bond/name/HFPclient/A2DP-sink broadcasts. DeviceBluetoothProfileManager создаёт ровно Profile.A2dp и Profile.Headset; реальные коды proxy 11 и 16.",
+      "references": [
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/BluetoothConnectManager;",
+          "method": "<init>",
+          "descriptor": "(Landroid/content/Context;)V",
+          "code_item_offset": 72912,
+          "code_item_offset_hex": "0x11cd0",
+          "instruction_offset_relative_bytes": [
+            60,
+            74,
+            86
+          ],
+          "instruction_offset_absolute_bytes": [
+            72988,
+            73002,
+            73014
+          ]
+        },
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/profile/DeviceBluetoothProfileManager;",
+          "method": "initProfiles",
+          "descriptor": "(Landroid/content/Context; Lcom/ts/car/dm/fsdk/bluetooth/api/profile/OnProxyBindedListener;)V",
+          "code_item_offset": 76064,
+          "code_item_offset_hex": "0x12920"
+        },
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/profile/Profile;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "code_item_offset": 76372,
+          "code_item_offset_hex": "0x12a54"
+        },
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/profile/BluetoothA2dpProfile;",
+          "method": "getProfileCode",
+          "descriptor": "()I",
+          "code_item_offset": 75268,
+          "code_item_offset_hex": "0x12604"
+        },
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/profile/BluetoothHeadsetProfile;",
+          "method": "getProfileCode",
+          "descriptor": "()I",
+          "code_item_offset": 75340,
+          "code_item_offset_hex": "0x1264c"
+        }
+      ],
+      "limit_ru": "Это клиентский уровень классических профилей. BLE/GATT/ANCS profile в данном enum и initProfiles отсутствует; отсутствие здесь не означает отсутствие BLE в автомобиле."
+    },
+    {
+      "id": "BT-ST-002",
+      "status": "static_body_verified",
+      "claim_ru": "BaseBluetoothProfileImpl создаёт Android profile proxy через getProfileProxy. При connect, после собственной проверки готовности, выставляет device priority=100 и вызывает connect отражённого Android proxy. Общий connect DeviceBluetoothProfileManager проходит по доступным профилям, без выбора победившего телефона в этом теле.",
+      "references": [
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/profile/BaseBluetoothProfileImpl;",
+          "method": "<init>",
+          "descriptor": "(Landroid/content/Context; Lcom/ts/car/dm/fsdk/bluetooth/api/profile/OnProxyBindedListener;)V",
+          "code_item_offset": 74816,
+          "code_item_offset_hex": "0x12440",
+          "instruction_offset_relative_bytes": [
+            128
+          ],
+          "instruction_offset_absolute_bytes": [
+            74960
+          ]
+        },
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/profile/BaseBluetoothProfileImpl;",
+          "method": "connect",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)Z",
+          "code_item_offset": 74192,
+          "code_item_offset_hex": "0x121d0",
+          "instruction_offset_relative_bytes": [
+            64,
+            68,
+            78
+          ],
+          "instruction_offset_absolute_bytes": [
+            74272,
+            74276,
+            74286
+          ]
+        },
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/profile/BaseBluetoothProfileImpl$BluetoothProfileReflect;",
+          "method": "connect",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)Z",
+          "code_item_offset": 73368,
+          "code_item_offset_hex": "0x11e98",
+          "instruction_offset_relative_bytes": [
+            28
+          ],
+          "instruction_offset_absolute_bytes": [
+            73412
+          ]
+        },
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/profile/DeviceBluetoothProfileManager;",
+          "method": "connect",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)V",
+          "code_item_offset": 75992,
+          "code_item_offset_hex": "0x128d8"
+        }
+      ],
+      "limit_ru": "priority=100 — аргумент программного profile API, не физический приоритет радиоканала. Итоговая арбитрация находится ниже/в вызывающем сервисе."
+    },
+    {
+      "id": "BT-ST-003",
+      "status": "static_body_verified",
+      "claim_ru": "onProxyBinded перебирает bonded devices, читает getProfileConnectionState и сообщает callback состояние; connect/reconnect не вызывает. getProfileConnectionState возвращает -1 при отсутствующем profile object.",
+      "references": [
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/BluetoothConnectManager;",
+          "method": "onProxyBinded",
+          "descriptor": "(Lcom/ts/car/dm/fsdk/bluetooth/api/profile/Profile;)V",
+          "code_item_offset": 73152,
+          "code_item_offset_hex": "0x11dc0",
+          "instruction_offset_relative_bytes": [
+            58,
+            138
+          ],
+          "instruction_offset_absolute_bytes": [
+            73226,
+            73306
+          ]
+        },
+        {
+          "source_id": "dm",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/dm/fsdk/bluetooth/api/BluetoothConnectManager;",
+          "method": "getProfileConnectionState",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice; Lcom/ts/car/dm/fsdk/bluetooth/api/profile/Profile;)I",
+          "code_item_offset": 72460,
+          "code_item_offset_hex": "0x11b0c",
+          "instruction_offset_relative_bytes": [
+            60,
+            64
+          ],
+          "instruction_offset_absolute_bytes": [
+            72536,
+            72540
+          ]
+        }
+      ],
+      "limit_ru": "Proxy bind callback сам по себе не является новым Bluetooth соединением или причиной переподключения ANCS."
+    },
+    {
+      "id": "BT-ST-004",
+      "status": "static_body_verified",
+      "claim_ru": "A2dpSinkService.start вызывает loadProperties; loadProperties читает MaxAvpNum в MAX_DEVICE_NUMBER. connect вызывает isAnotherDeviceInConnect, которая считает state!=0 и блокирует новую попытку при достижении MAX_DEVICE_NUMBER. getStateMachine повторяет проверку лимита при создании новой state machine.",
+      "references": [
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/a2dpsink/A2dpSinkService;",
+          "method": "start",
+          "descriptor": "()Z",
+          "code_item_offset": 1651496,
+          "code_item_offset_hex": "0x193328",
+          "instruction_offset_relative_bytes": [
+            130
+          ],
+          "instruction_offset_absolute_bytes": [
+            1651642
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/a2dpsink/A2dpSinkService;",
+          "method": "loadProperties",
+          "descriptor": "()Z",
+          "code_item_offset": 1650756,
+          "code_item_offset_hex": "0x193044",
+          "instruction_offset_relative_bytes": [
+            76,
+            80,
+            164
+          ],
+          "instruction_offset_absolute_bytes": [
+            1650848,
+            1650852,
+            1650936
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/a2dpsink/A2dpSinkService;",
+          "method": "connect",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)Z",
+          "code_item_offset": 1649816,
+          "code_item_offset_hex": "0x192c98",
+          "instruction_offset_relative_bytes": [
+            80,
+            108
+          ],
+          "instruction_offset_absolute_bytes": [
+            1649912,
+            1649940
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/a2dpsink/A2dpSinkService;",
+          "method": "isAnotherDeviceInConnect",
+          "descriptor": "()Z",
+          "code_item_offset": 1650504,
+          "code_item_offset_hex": "0x192f48",
+          "instruction_offset_relative_bytes": [
+            94,
+            102,
+            106,
+            154,
+            158
+          ],
+          "instruction_offset_absolute_bytes": [
+            1650614,
+            1650622,
+            1650626,
+            1650674,
+            1650678
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/a2dpsink/A2dpSinkService;",
+          "method": "getStateMachine",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)Lcom/android/bluetooth/a2dpsink/A2dpSinkStateMachine;",
+          "code_item_offset": 1651944,
+          "code_item_offset_hex": "0x1934e8"
+        },
+        {
+          "source_id": "config",
+          "lines": [
+            38
+          ],
+          "values": {
+            "MaxAvpNum": 2
+          }
+        }
+      ],
+      "limit_ru": "Подтверждена связь collected config с Java-ограничителем AVP/A2DP-sink. Значение config=2 не доказывает две физически успешные одновременные сессии; state!=0 включает любые ненулевые состояния, а не только connected."
+    },
+    {
+      "id": "BT-ST-005",
+      "status": "static_body_verified",
+      "claim_ru": "HeadsetClientService аналогично читает MaxHfpNum, ограничивает новую попытку через isAnotherDeviceInConnect и создание новой state machine. Captured MaxHfpNum=2. Отдельные защитные MAX_STATE_MACHINES_POSSIBLE=100 у A2DP-sink и 200 у HFPclient относятся к размеру карт объектов, не к числу допустимых телефонных соединений.",
+      "references": [
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/hfpclient/HeadsetClientService;",
+          "method": "start",
+          "descriptor": "()Z",
+          "code_item_offset": 1995764,
+          "code_item_offset_hex": "0x1e73f4",
+          "instruction_offset_relative_bytes": [
+            276
+          ],
+          "instruction_offset_absolute_bytes": [
+            1996056
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/hfpclient/HeadsetClientService;",
+          "method": "loadProperties",
+          "descriptor": "()Z",
+          "code_item_offset": 1994132,
+          "code_item_offset_hex": "0x1e6d94",
+          "instruction_offset_relative_bytes": [
+            76,
+            80,
+            144
+          ],
+          "instruction_offset_absolute_bytes": [
+            1994224,
+            1994228,
+            1994292
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/hfpclient/HeadsetClientService;",
+          "method": "connect",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)Z",
+          "code_item_offset": 1992064,
+          "code_item_offset_hex": "0x1e6580",
+          "instruction_offset_relative_bytes": [
+            58,
+            88
+          ],
+          "instruction_offset_absolute_bytes": [
+            1992138,
+            1992168
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/hfpclient/HeadsetClientService;",
+          "method": "isAnotherDeviceInConnect",
+          "descriptor": "()Z",
+          "code_item_offset": 1993656,
+          "code_item_offset_hex": "0x1e6bb8",
+          "instruction_offset_relative_bytes": [
+            94,
+            102,
+            106,
+            154,
+            158
+          ],
+          "instruction_offset_absolute_bytes": [
+            1993766,
+            1993774,
+            1993778,
+            1993826,
+            1993830
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/hfpclient/HeadsetClientService;",
+          "method": "getStateMachine",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)Lcom/android/bluetooth/hfpclient/HeadsetClientStateMachine;",
+          "code_item_offset": 1997412,
+          "code_item_offset_hex": "0x1e7a64",
+          "instruction_offset_relative_bytes": [
+            120,
+            124
+          ],
+          "instruction_offset_absolute_bytes": [
+            1997548,
+            1997552
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/a2dpsink/A2dpSinkService;",
+          "method": "getStateMachine",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)Lcom/android/bluetooth/a2dpsink/A2dpSinkStateMachine;",
+          "code_item_offset": 1651944,
+          "code_item_offset_hex": "0x1934e8",
+          "instruction_offset_relative_bytes": [
+            120,
+            124
+          ],
+          "instruction_offset_absolute_bytes": [
+            1652080,
+            1652084
+          ]
+        },
+        {
+          "source_id": "config",
+          "lines": [
+            32
+          ],
+          "values": {
+            "MaxHfpNum": 2
+          }
+        }
+      ],
+      "limit_ru": "Это ограничитель классического hands-free client. Не переносить значения 2/100/200 на BLE clientIf или ANCS."
+    },
+    {
+      "id": "BT-ST-006",
+      "status": "static_body_verified",
+      "claim_ru": "nFore интегрирован в Android Bluetooth.apk: AdapterService.onCreate вызывает loadProperties; тот читает /etc/bluetooth/nForeBluetooth.properties. getNforeStackVersion возвращает строку v0.0.58D. A2DP-sink/HFPclient читают тот же файл; это не два независимых Java-стека, выводимых лишь из названий nFore и Android.",
+      "references": [
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/AdapterService;",
+          "method": "onCreate",
+          "descriptor": "()V",
+          "code_item_offset": 1835636,
+          "code_item_offset_hex": "0x1c0274",
+          "instruction_offset_relative_bytes": [
+            406
+          ],
+          "instruction_offset_absolute_bytes": [
+            1836058
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/AdapterService;",
+          "method": "loadProperties",
+          "descriptor": "()Z",
+          "code_item_offset": 1826984,
+          "code_item_offset_hex": "0x1be0a8",
+          "instruction_offset_relative_bytes": [
+            34,
+            76,
+            80
+          ],
+          "instruction_offset_absolute_bytes": [
+            1827034,
+            1827076,
+            1827080
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/AdapterService;",
+          "method": "getNforeStackVersion",
+          "descriptor": "()Ljava/lang/String;",
+          "code_item_offset": 1832168,
+          "code_item_offset_hex": "0x1bf4e8"
+        }
+      ],
+      "limit_ru": "Строка версии — локальный APK API result. Она не устанавливает версию controller firmware или реализацию отсутствующего native backend."
+    },
+    {
+      "id": "BT-ST-007",
+      "status": "static_body_verified",
+      "claim_ru": "setLEScanEnable использует отдельное состояние 0=disabled,1=enable pending,2=enabled,3=disable pending; в pending отклоняет новый вызов. Getter даёт false для 0/1 и true для 2/3. Callback переводит 1→2 или3→0 и передаёт native status в SET_LE_SCAN_ENABLE_STATUS broadcast. Его тело не проверяет status перед сменой внутреннего state.",
+      "references": [
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/AdapterService;",
+          "method": "setLEScanEnable",
+          "descriptor": "(Z)Z",
+          "code_item_offset": 1828412,
+          "code_item_offset_hex": "0x1be63c",
+          "instruction_offset_relative_bytes": [
+            88,
+            96,
+            182,
+            190,
+            198
+          ],
+          "instruction_offset_absolute_bytes": [
+            1828516,
+            1828524,
+            1828610,
+            1828618,
+            1828626
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/AdapterService;",
+          "method": "getLEScanEnable",
+          "descriptor": "()Z",
+          "code_item_offset": 1826044,
+          "code_item_offset_hex": "0x1bdcfc",
+          "instruction_offset_relative_bytes": [
+            70,
+            80,
+            92,
+            102
+          ],
+          "instruction_offset_absolute_bytes": [
+            1826130,
+            1826140,
+            1826152,
+            1826162
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/AdapterService;",
+          "method": "setLeScanEnableCallback",
+          "descriptor": "(I)V",
+          "code_item_offset": 1837220,
+          "code_item_offset_hex": "0x1c08a4",
+          "instruction_offset_relative_bytes": [
+            70,
+            76,
+            88,
+            94,
+            168,
+            178,
+            182
+          ],
+          "instruction_offset_absolute_bytes": [
+            1837306,
+            1837312,
+            1837324,
+            1837330,
+            1837404,
+            1837414,
+            1837418
+          ]
+        },
+        {
+          "source_id": "config",
+          "lines": [
+            201
+          ],
+          "values": {
+            "LeScanEnable": true
+          }
+        }
+      ],
+      "limit_ru": "Статический внутренний state не доказывает подтверждённое сканирование controller. false из setter также означает уже достигнутое состояние, поэтому его нельзя всегда называть ошибкой."
+    },
+    {
+      "id": "BT-ST-008",
+      "status": "static_body_verified",
+      "claim_ru": "AdapterApp загружает bluetooth_jni; AdapterService.bringUpBle запускает GattService, GattService.start вызывает initializeNative. GATT Binder делегирует registerClient/clientConnect в GattService; сервис ведёт ClientMap и вызывает native методы gattClientRegisterAppNative и gattClientConnectNative.",
+      "references": [
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/AdapterApp;",
+          "method": "<clinit>",
+          "descriptor": "()V",
+          "code_item_offset": 1808488,
+          "code_item_offset_hex": "0x1b9868",
+          "instruction_offset_relative_bytes": [
+            6,
+            10
+          ],
+          "instruction_offset_absolute_bytes": [
+            1808510,
+            1808514
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/AdapterService;",
+          "method": "bringUpBle",
+          "descriptor": "()V",
+          "code_item_offset": 1832812,
+          "code_item_offset_hex": "0x1bf76c",
+          "instruction_offset_relative_bytes": [
+            184,
+            192
+          ],
+          "instruction_offset_absolute_bytes": [
+            1833012,
+            1833020
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/gatt/GattService;",
+          "method": "start",
+          "descriptor": "()Z",
+          "code_item_offset": 1879876,
+          "code_item_offset_hex": "0x1caf44",
+          "instruction_offset_relative_bytes": [
+            14
+          ],
+          "instruction_offset_absolute_bytes": [
+            1879906
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/gatt/GattService$BluetoothGattBinder;",
+          "method": "registerClient",
+          "descriptor": "(Landroid/os/ParcelUuid; Landroid/bluetooth/IBluetoothGattCallback;)V",
+          "code_item_offset": 1876824,
+          "code_item_offset_hex": "0x1ca358"
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/gatt/GattService$BluetoothGattBinder;",
+          "method": "clientConnect",
+          "descriptor": "(I Ljava/lang/String; Z I Z I)V",
+          "code_item_offset": 1875988,
+          "code_item_offset_hex": "0x1ca014"
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/gatt/GattService;",
+          "method": "registerClient",
+          "descriptor": "(Ljava/util/UUID; Landroid/bluetooth/IBluetoothGattCallback;)V",
+          "code_item_offset": 1894888,
+          "code_item_offset_hex": "0x1ce9e8",
+          "instruction_offset_relative_bytes": [
+            72,
+            94
+          ],
+          "instruction_offset_absolute_bytes": [
+            1894976,
+            1894998
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/gatt/GattService;",
+          "method": "clientConnect",
+          "descriptor": "(I Ljava/lang/String; Z I Z I)V",
+          "code_item_offset": 1883432,
+          "code_item_offset_hex": "0x1cbd28",
+          "instruction_offset_relative_bytes": [
+            106
+          ],
+          "instruction_offset_absolute_bytes": [
+            1883554
+          ]
+        }
+      ],
+      "limit_ru": "Эта цепь подтверждена до JNI boundary. Четыре ACL из конфигурации не превращаются здесь в доказательство четырёх ANCS-сессий."
+    },
+    {
+      "id": "BT-ST-009",
+      "status": "static_body_verified",
+      "claim_ru": "GattService.onDisconnected(clientIf,connId,status,address) удаляет connection из ClientMap и передаёт native status без преобразования в IBluetoothGattCallback.onClientConnectionState(status,clientIf,false,address). В выбранных Java телах и поиске именованных Bluetooth fields нет установленной расшифровки disconnect 0x0028/0x0100.",
+      "references": [
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/gatt/GattService;",
+          "method": "onDisconnected",
+          "descriptor": "(I I I Ljava/lang/String;)V",
+          "code_item_offset": 1888320,
+          "code_item_offset_hex": "0x1cd040",
+          "instruction_offset_relative_bytes": [
+            80,
+            110,
+            112
+          ],
+          "instruction_offset_absolute_bytes": [
+            1888416,
+            1888446,
+            1888448
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/gatt/GattService;",
+          "method": "onConnected",
+          "descriptor": "(I I I Ljava/lang/String;)V",
+          "code_item_offset": 1888172,
+          "code_item_offset_hex": "0x1ccfac",
+          "instruction_offset_relative_bytes": [
+            76,
+            84,
+            124
+          ],
+          "instruction_offset_absolute_bytes": [
+            1888264,
+            1888272,
+            1888312
+          ]
+        }
+      ],
+      "limit_ru": "0x28,0x100, local-send reason и controller event reason сохранять с исходным namespace; не переименовывать по памяти/универсальной таблице HCI. Нужны native бинарники и места генерации этих кодов."
+    },
+    {
+      "id": "BT-ST-010",
+      "status": "static_body_verified",
+      "claim_ru": "Входящие уведомления GATT требуют существующей пары clientIf/address (connId) и permissionCheck; только после этих условий registerForNotification вызывает gattClientRegisterForNotificationsNative.",
+      "references": [
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/gatt/GattService;",
+          "method": "registerForNotification",
+          "descriptor": "(I Ljava/lang/String; I Z)V",
+          "code_item_offset": 1895008,
+          "code_item_offset_hex": "0x1cea60",
+          "instruction_offset_relative_bytes": [
+            78,
+            154,
+            182
+          ],
+          "instruction_offset_absolute_bytes": [
+            1895102,
+            1895178,
+            1895206
+          ]
+        }
+      ],
+      "limit_ru": "Статическая возможность GATT notification registration не доказывает найденный ANCS service/CCCD или доставку уведомления. Payload не читался."
+    },
+    {
+      "id": "BT-ST-011",
+      "status": "static_body_verified",
+      "claim_ru": "PhonePolicy.autoConnectA2dp/autoConnectHeadset обращаются к A2dpService/HeadsetService; ActiveDeviceManager setters тоже используют эти source/AG сервисы. Они не являются доказательством arbitration HFPclient/A2DP-sink автомобиля.",
+      "references": [
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/PhonePolicy;",
+          "method": "autoConnectA2dp",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)V",
+          "code_item_offset": 1850364,
+          "code_item_offset_hex": "0x1c3bfc",
+          "instruction_offset_relative_bytes": [
+            4,
+            114
+          ],
+          "instruction_offset_absolute_bytes": [
+            1850384,
+            1850494
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/PhonePolicy;",
+          "method": "autoConnectHeadset",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)V",
+          "code_item_offset": 1850560,
+          "code_item_offset_hex": "0x1c3cc0",
+          "instruction_offset_relative_bytes": [
+            4,
+            114
+          ],
+          "instruction_offset_absolute_bytes": [
+            1850580,
+            1850690
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/ActiveDeviceManager;",
+          "method": "setA2dpActiveDevice",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)V",
+          "code_item_offset": 1807924,
+          "code_item_offset_hex": "0x1b9634",
+          "instruction_offset_relative_bytes": [
+            58,
+            72
+          ],
+          "instruction_offset_absolute_bytes": [
+            1807998,
+            1808012
+          ]
+        },
+        {
+          "source_id": "bt",
+          "dex": "classes.dex",
+          "class": "Lcom/android/bluetooth/btservice/ActiveDeviceManager;",
+          "method": "setHfpActiveDevice",
+          "descriptor": "(Landroid/bluetooth/BluetoothDevice;)V",
+          "code_item_offset": 1808140,
+          "code_item_offset_hex": "0x1b970c",
+          "instruction_offset_relative_bytes": [
+            58,
+            72
+          ],
+          "instruction_offset_absolute_bytes": [
+            1808214,
+            1808228
+          ]
+        }
+      ],
+      "limit_ru": "Наличие stock Android классов и создание объекта PhonePolicy не означают, что он управляет фактически активными клиентскими профилями на этой прошивке."
+    },
+    {
+      "id": "BT-ST-012",
+      "status": "static_body_verified",
+      "claim_ru": "ts-platform-library содержит отдельные projection wrappers: PlatformDeviceManagerService.connect переводит public request и вызывает IDeviceManagementService.connectByRequest; PlatformDeviceConnectionManager.connectProjection вызывает IConnectionManagementService.connectProjection, а setAutoProjectionConnectCapability вызывает setAlwaysProjection.",
+      "references": [
+        {
+          "source_id": "platform",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/sdk/dm/PlatformDeviceManagerService;",
+          "method": "connect",
+          "descriptor": "(Lts/car/service/dm/data/ConnectRequest;)I",
+          "code_item_offset": 177600,
+          "code_item_offset_hex": "0x2b5c0",
+          "instruction_offset_relative_bytes": [
+            140
+          ],
+          "instruction_offset_absolute_bytes": [
+            177756
+          ]
+        },
+        {
+          "source_id": "platform",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/sdk/dm/PlatformDeviceManagerService;",
+          "method": "serviceName",
+          "descriptor": "()Ljava/lang/String;",
+          "code_item_offset": 178068,
+          "code_item_offset_hex": "0x2b794"
+        },
+        {
+          "source_id": "platform",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/sdk/dcm/PlatformDeviceConnectionManager;",
+          "method": "connectProjection",
+          "descriptor": "(Lts/car/service/dcm/data/Device; Lts/car/service/dcm/data/ProjectionLinkParameter;)I",
+          "code_item_offset": 172840,
+          "code_item_offset_hex": "0x2a328",
+          "instruction_offset_relative_bytes": [
+            112
+          ],
+          "instruction_offset_absolute_bytes": [
+            172968
+          ]
+        },
+        {
+          "source_id": "platform",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/sdk/dcm/PlatformDeviceConnectionManager;",
+          "method": "setAutoProjectionConnectCapability",
+          "descriptor": "(Lts/car/service/dcm/data/Device; I Z)Z",
+          "code_item_offset": 172344,
+          "code_item_offset_hex": "0x2a138",
+          "instruction_offset_relative_bytes": [
+            124
+          ],
+          "instruction_offset_absolute_bytes": [
+            172484
+          ]
+        },
+        {
+          "source_id": "platform",
+          "dex": "classes.dex",
+          "class": "Lcom/ts/car/sdk/dcm/PlatformDeviceConnectionManager;",
+          "method": "serviceName",
+          "descriptor": "()Ljava/lang/String;",
+          "code_item_offset": 173124,
+          "code_item_offset_hex": "0x2a444"
+        }
+      ],
+      "limit_ru": "Строки serviceName TS-DmService4.5.0.0/TS-DcmService_4.5.0.0 сами по себе не доказывают живую Binder publication. Server-side выбор телефона/проекции в этих wrapper телах отсутствует."
+    },
+    {
+      "id": "BT-ST-013",
+      "status": "static_body_verified",
+      "claim_ru": "Единственный captured native libbluetooth-binder.so — ELF32 ARM socket Binder glue: экспортирует IBluetoothSocketManager/BpBluetoothSocketManager connectSocket/createSocketChannel/requestMaximumTxDataLength и Bn onTransact; GATT backend этим файлом не восстановлен.",
+      "references": [
+        {
+          "source_id": "binder32",
+          "format": "ELF32 ARM",
+          "locations": [
+            {
+              "symbol": "android::bluetooth::BpBluetoothSocketManager::connectSocket",
+              "elf_symbol_value_hex": "0x4d11",
+              "size_bytes": 236
+            },
+            {
+              "symbol": "android::bluetooth::BpBluetoothSocketManager::createSocketChannel",
+              "elf_symbol_value_hex": "0x4ea9",
+              "size_bytes": 236
+            },
+            {
+              "symbol": "android::bluetooth::BpBluetoothSocketManager::requestMaximumTxDataLength",
+              "elf_symbol_value_hex": "0x4f95",
+              "size_bytes": 172
+            },
+            {
+              "symbol": "android::bluetooth::BnBluetoothSocketManager::onTransact",
+              "elf_symbol_value_hex": "0x5041",
+              "size_bytes": 616
+            }
+          ]
+        }
+      ],
+      "limit_ru": "Для ARM Thumb symbol value сохраняет ISA bit; это значение ELF symbol, не DEX offset. Основные /system/lib64/libbluetooth_jni.so и libbluetooth.so отсутствуют в inventory, но их существование известно по discovery."
+    }
+  ],
+  "limits": [
+    "No APK build/run/install, no car commands, settings changes or connection attempts.",
+    "No HCI payload, pairing material, application DB, contacts, call history or notification text inspected.",
+    "Collected nForeBluetooth.properties is the captured current config, not asserted pristine factory config; backup filenames in archive indicate configuration history.",
+    "This subtask does not attribute runtime clientIf identifiers to an app, prove real simultaneous ANCS capacity, or decode native disconnect codes without their source.",
+    "Full original bytes and disassembly remain private; public artifact contains interpreted facts and short provenance references only."
+  ]
+}

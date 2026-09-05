@@ -1,0 +1,72 @@
+name: Build Natro 2.7.7 parking visibility candidate
+
+on:
+  push:
+    branches: ['fix/parking-window-visibility']
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'PROJECT_REQUIREMENTS_RU.md'
+      - 'tools/sign_natro_candidate.py'
+      - '.github/workflows/verify-parking-window-visibility.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: '2.7.7'
+      VERSION_CODE: '208021310'
+      ALLOW_UNSIGNED_RELEASE: 'true'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install Android compilation dependencies
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Test and assemble the authorized Natro release
+        run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon
+      - name: Prepare exact offline signing candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          OUT="$RUNNER_TEMP/natro-2.7.7-candidate"
+          mkdir -p "$OUT/tools/lib"
+          mapfile -t APK_FILES < <(find app/build/outputs/apk/geely/release -name '*.apk')
+          test "${#APK_FILES[@]}" = 1
+          cp "${APK_FILES[0]}" "$OUT/Natro-2.7.7-unsigned.apk"
+          "$TOOLS/aapt" dump badging "$OUT/Natro-2.7.7-unsigned.apk" \
+            > "$OUT/badging.txt"
+          grep -F "package: name='ru.natro.statuswidget' versionCode='208021310' versionName='2.7.7'" \
+            "$OUT/badging.txt"
+          if "$TOOLS/apksigner" verify "$OUT/Natro-2.7.7-unsigned.apk" >/dev/null 2>&1; then
+            echo 'Candidate unexpectedly signed' >&2
+            exit 1
+          fi
+          cp "$TOOLS/aapt" "$TOOLS/apksigner" "$TOOLS/zipalign" "$OUT/tools/"
+          cp "$TOOLS/lib/apksigner.jar" "$OUT/tools/lib/"
+          cp -a "$TOOLS/lib64" "$OUT/tools/"
+          chmod 755 "$OUT/tools/"*
+          jq -n --arg commit "$GITHUB_SHA" --arg tree "$(git rev-parse HEAD^{tree})" \
+            --arg run "$GITHUB_RUN_ID" \
+            --arg sha "$(sha256sum "$OUT/Natro-2.7.7-unsigned.apk" | cut -d ' ' -f 1)" \
+            '{versionName:"2.7.7", versionCode:208021310, package:"ru.natro.statuswidget",
+              sourceCommit:$commit, sourceTree:$tree, ciRunId:$run, unsignedSha256:$sha}' \
+            > "$OUT/candidate.json"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+      - name: Upload candidate and exact signing tools
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-2.7.7-candidate-${{ github.run_number }}
+          path: ${{ steps.candidate.outputs.path }}/*
+          if-no-files-found: error
+          retention-days: 7

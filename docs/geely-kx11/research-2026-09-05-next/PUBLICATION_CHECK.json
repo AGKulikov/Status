@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-05",
+  "base_commit": "6001183ef36d0aeb7b2a0c9602419b5a7b3c8af2",
+  "source_tests": "49 offline tests PASS; real Mac/KX11 not performed",
+  "preserved_requirement_rows": 260,
+  "new_requirement_ids": [
+    "KNOW-005",
+    "GATE-049"
+  ],
+  "total_requirement_rows": 262,
+  "question_ids": 50,
+  "public_domain_manifests_verified": 3,
+  "mac_zip_extraction_and_cli_plan": "PASS",
+  "mac_bundle_sha256": "e8691638e44722ca41489d6a6af60d2a6ceea0e889a51c229ab50d43806ad271",
+  "raw_inputs_and_full_foreign_method_bodies_published": false,
+  "apk_build_or_vehicle_actions": false,
+  "source_sha1_anomalies": "75 original DEX header signatures remain explicitly recorded",
+  "gates_open": [
+    "GATE-046",
+    "GATE-048",
+    "GATE-049"
+  ]
+}

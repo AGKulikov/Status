@@ -1,0 +1,134 @@
+{
+  "runId": "31299459991",
+  "runAttempt": "1",
+  "safeSourceSha": "ce8094c29aadc972ee79200004e6aa60c56a3ba3",
+  "result": "success",
+  "jobs": [
+    {
+      "id": 93209785927,
+      "name": "Sign and publish HA1196",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/AGKulikov/Status/actions/runs/31299459991/job/93209785927",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Mask bootstrap values",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Persist stable signer in Actions Secrets",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Checkout safe release source",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Set up Android SDK",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Install Android SDK 36",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Decode verified stable keystore",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Test, build, sign, and verify",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Upload verified matched pair",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Create GitHub Release",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Post Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Post Checkout safe release source",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 93210389250,
+      "name": "Record bootstrap result",
+      "status": "in_progress",
+      "conclusion": null,
+      "html_url": "https://github.com/AGKulikov/Status/actions/runs/31299459991/job/93210389250",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Checkout release branch",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "number": 3,
+          "name": "Record result",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "number": 6,
+          "name": "Post Checkout release branch",
+          "status": "pending",
+          "conclusion": null
+        }
+      ]
+    }
+  ]
+}

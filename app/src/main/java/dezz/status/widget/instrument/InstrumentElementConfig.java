@@ -1,0 +1,285 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+package dezz.status.widget.instrument;
+
+import androidx.annotation.NonNull;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+/** Mutable editor model for one dashboard element. */
+public final class InstrumentElementConfig {
+    @NonNull public String id;
+    @NonNull public InstrumentElementType type;
+    @NonNull public InstrumentStyleFamily style;
+    public int x;
+    public int y;
+    public int width;
+    public int height;
+    public int zIndex;
+    public boolean enabled = true;
+    public int responseMillis = 65;
+    public int opacityPercent = 100;
+    @NonNull public JSONObject options = new JSONObject();
+
+    public InstrumentElementConfig(@NonNull String id, @NonNull InstrumentElementType type,
+                                   @NonNull InstrumentStyleFamily style) {
+        this.id = safeId(id);
+        this.type = type;
+        this.style = style;
+        width = type.defaultWidth;
+        height = type.defaultHeight;
+        if (type == InstrumentElementType.TRAFFIC_JAM) applyTrafficJamDefaults();
+        if (type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
+            applyRouteSummaryDefaults();
+        }
+    }
+
+    @NonNull
+    public InstrumentElementConfig copy() {
+        InstrumentElementConfig value = new InstrumentElementConfig(id, type, style);
+        value.x = x;
+        value.y = y;
+        value.width = width;
+        value.height = height;
+        value.zIndex = zIndex;
+        value.enabled = enabled;
+        value.responseMillis = responseMillis;
+        value.opacityPercent = opacityPercent;
+        try {
+            value.options = new JSONObject(options.toString());
+        } catch (JSONException ignored) {
+            value.options = new JSONObject();
+        }
+        return value;
+    }
+
+    public void normalize(int columns, int rows) {
+        id = safeId(id);
+        width = clamp(width, 2, columns);
+        height = clamp(height, 2, rows);
+        x = clamp(x, 0, Math.max(0, columns - width));
+        y = clamp(y, 0, Math.max(0, rows - height));
+        zIndex = clamp(zIndex, -10_000, 10_000);
+        responseMillis = clamp(responseMillis, 0, 500);
+        opacityPercent = clamp(opacityPercent, 10, 100);
+        if (options == null || options.toString().length() > 32_768) options = new JSONObject();
+        if (type == InstrumentElementType.NAVIGATION_INFO
+                || type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
+            normalizeNavigationInfoOptions();
+        }
+        if (type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
+            normalizeRouteSummaryOptions();
+        }
+        if (type == InstrumentElementType.TRAFFIC_JAM) normalizeTrafficJamOptions();
+    }
+
+    private void applyTrafficJamDefaults() {
+        try {
+            options.put("showFace", true);
+            options.put("faceColor", "#F21B1F24");
+            options.put("faceOpacityPercent", 100);
+            options.put("faceCornerRadiusPx", 16);
+            options.put("faceBorderColor", "#00000000");
+            options.put("faceBorderWidthPx", 0);
+            options.put("contentPaddingLeftPx", 12);
+            options.put("contentPaddingTopPx", 5);
+            options.put("contentPaddingRightPx", 12);
+            options.put("contentPaddingBottomPx", 5);
+            options.put("textSizeSp", 30);
+            options.put("textColor", "#FFFFFFFF");
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void applyRouteSummaryDefaults() {
+        try {
+            options.put("showFace", true);
+            options.put("showDistance", true);
+            options.put("showEta", true);
+            options.put("showDuration", true);
+            options.put("showRouteProgress", true);
+            options.put("showManeuverIcon", false);
+            options.put("reserveManeuverIconSpace", false);
+            options.put("showManeuverDetails", false);
+            options.put("contentPaddingLeftPx", 14);
+            options.put("contentPaddingTopPx", 9);
+            options.put("contentPaddingRightPx", 14);
+            options.put("contentPaddingBottomPx", 9);
+            options.put("metricGapPx", 10);
+            options.put("distanceTextSizeSp", 25);
+            options.put("arrivalTextSizeSp", 25);
+            options.put("durationTextSizeSp", 25);
+            options.put("metricsVerticalPercent", 46);
+            options.put("progressBarHeightPx", 8);
+            options.put("progressBarTopGapPx", 7);
+            options.put("progressBarCornerRadiusPx", 4);
+            options.put("progressMarkerScalePercent", 100);
+            options.put("faceColor", "#F21B1F24");
+            options.put("faceOpacityPercent", 100);
+            options.put("faceCornerRadiusPx", 18);
+            options.put("faceBorderColor", "#00000000");
+            options.put("faceBorderWidthPx", 0);
+            options.put("freeColor", "#FF72E300");
+            options.put("lightColor", "#FFFFCC00");
+            options.put("hardColor", "#FFFF3B30");
+            options.put("veryHardColor", "#FFB00020");
+            options.put("blockedColor", "#FF7A1FA2");
+            options.put("unknownColor", "#FF8E8E93");
+            options.put("markerColor", "#FFFFC400");
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void normalizeTrafficJamOptions() {
+        try {
+            options.put("faceOpacityPercent", clamp(
+                    options.optInt("faceOpacityPercent", 100), 0, 100));
+            options.put("faceCornerRadiusPx", clamp(
+                    options.optInt("faceCornerRadiusPx", 16), 0, 160));
+            options.put("faceBorderWidthPx", clamp(
+                    options.optInt("faceBorderWidthPx", 0), 0, 24));
+            options.put("textSizeSp", clamp(options.optInt("textSizeSp", 30), 8, 120));
+            for (String key : new String[]{"contentPaddingLeftPx", "contentPaddingTopPx",
+                    "contentPaddingRightPx", "contentPaddingBottomPx"}) {
+                options.put(key, clamp(options.optInt(key,
+                        key.endsWith("LeftPx") || key.endsWith("RightPx") ? 12 : 5),
+                        0, 160));
+            }
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void normalizeNavigationInfoOptions() {
+        try {
+            String[] paddingKeys = {"contentPaddingLeftPx", "contentPaddingTopPx",
+                    "contentPaddingRightPx", "contentPaddingBottomPx",
+                    "maneuverIconPaddingLeftPx", "maneuverIconPaddingTopPx",
+                    "maneuverIconPaddingRightPx", "maneuverIconPaddingBottomPx"};
+            for (String key : paddingKeys) {
+                int fallback = key.startsWith("content")
+                        ? (key.endsWith("LeftPx") || key.endsWith("RightPx") ? 14 : 10)
+                        : 5;
+                options.put(key, clamp(options.optInt(key, fallback), 0, 160));
+            }
+            options.put("maneuverIconAreaPercent", clamp(
+                    options.optInt("maneuverIconAreaPercent", 15), 5, 40));
+            options.put("maneuverIconScalePercent", clamp(
+                    options.optInt("maneuverIconScalePercent", 100), 25, 250));
+            options.put("maneuverIconGapPx", clamp(
+                    options.optInt("maneuverIconGapPx", 10), 0, 100));
+            options.put("maneuverIconBackgroundOpacityPercent", clamp(
+                    options.optInt("maneuverIconBackgroundOpacityPercent", 100), 0, 100));
+            options.put("maneuverIconCornerRadiusPx", clamp(
+                    options.optInt("maneuverIconCornerRadiusPx", 12), 0, 100));
+            options.put("maneuverDetailsHeightPercent", clamp(
+                    options.optInt("maneuverDetailsHeightPercent", 42), 20, 65));
+            options.put("maneuverDetailsGapPx", clamp(
+                    options.optInt("maneuverDetailsGapPx", 4), 0, 100));
+            options.put("maneuverDetailRowGapPx", clamp(
+                    options.optInt("maneuverDetailRowGapPx", 2), 0, 100));
+            options.put("maneuverDetailTextSizeSp", clamp(
+                    options.optInt("maneuverDetailTextSizeSp", 18), 8, 120));
+            options.put("maneuverAuxiliaryTextSizeSp", clamp(
+                    options.optInt("maneuverAuxiliaryTextSizeSp", 14), 8, 120));
+            options.put("metricGapPx", clamp(options.optInt("metricGapPx", 10), 0, 100));
+            options.put("distanceTextSizeSp", clamp(
+                    options.optInt("distanceTextSizeSp", 25), 8, 120));
+            options.put("arrivalTextSizeSp", clamp(
+                    options.optInt("arrivalTextSizeSp", 25), 8, 120));
+            options.put("durationTextSizeSp", clamp(
+                    options.optInt("durationTextSizeSp", 25), 8, 120));
+            options.put("metricsVerticalPercent", clamp(
+                    options.optInt("metricsVerticalPercent", 44), 0, 100));
+            options.put("progressBarHeightPx", clamp(
+                    options.optInt("progressBarHeightPx", 14), 2, 80));
+            options.put("progressBarTopGapPx", clamp(
+                    options.optInt("progressBarTopGapPx", 9), 0, 100));
+            options.put("progressBarCornerRadiusPx", clamp(
+                    options.optInt("progressBarCornerRadiusPx", 7), 0, 60));
+            options.put("progressMarkerScalePercent", clamp(
+                    options.optInt("progressMarkerScalePercent", 100), 25, 250));
+            options.put("faceOpacityPercent", clamp(
+                    options.optInt("faceOpacityPercent", 93), 0, 100));
+            options.put("faceCornerRadiusPx", clamp(
+                    options.optInt("faceCornerRadiusPx", 18), 0, 160));
+            options.put("faceBorderWidthPx", clamp(
+                    options.optInt("faceBorderWidthPx", 0), 0, 24));
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private void normalizeRouteSummaryOptions() {
+        try {
+            options.put("showManeuverIcon", false);
+            options.put("reserveManeuverIconSpace", false);
+            options.put("showManeuverDetails", false);
+            String[][] colors = new String[][]{
+                    {"freeColor", "#FF72E300"},
+                    {"lightColor", "#FFFFCC00"},
+                    {"hardColor", "#FFFF3B30"},
+                    {"veryHardColor", "#FFB00020"},
+                    {"blockedColor", "#FF7A1FA2"},
+                    {"unknownColor", "#FF8E8E93"},
+                    {"markerColor", "#FFFFC400"}
+            };
+            for (String[] color : colors) {
+                String value = options.optString(color[0], color[1]).trim();
+                options.put(color[0], value.length() <= 32 ? value : color[1]);
+            }
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    @NonNull
+    public JSONObject toJson() throws JSONException {
+        return new JSONObject()
+                .put("id", id)
+                .put("type", type.name())
+                .put("style", style.name())
+                .put("x", x).put("y", y)
+                .put("width", width).put("height", height)
+                .put("zIndex", zIndex)
+                .put("enabled", enabled)
+                .put("responseMillis", responseMillis)
+                .put("opacityPercent", opacityPercent)
+                .put("options", options);
+    }
+
+    @NonNull
+    public static InstrumentElementConfig fromJson(@NonNull JSONObject json,
+                                                   int columns, int rows) {
+        InstrumentElementType type = InstrumentElementType.fromName(json.optString("type"));
+        if (type == null) type = InstrumentElementType.DIGITAL_SPEEDOMETER;
+        InstrumentElementConfig value = new InstrumentElementConfig(
+                json.optString("id", "instrument_" + type.name().toLowerCase()), type,
+                InstrumentStyleFamily.fromName(json.optString("style")));
+        value.x = json.optInt("x", 0);
+        value.y = json.optInt("y", 0);
+        value.width = json.optInt("width", type.defaultWidth);
+        value.height = json.optInt("height", type.defaultHeight);
+        value.zIndex = json.optInt("zIndex", 0);
+        value.enabled = json.optBoolean("enabled", true);
+        value.responseMillis = json.optInt("responseMillis", 65);
+        value.opacityPercent = json.optInt("opacityPercent", 100);
+        JSONObject options = json.optJSONObject("options");
+        value.options = options == null ? new JSONObject() : options;
+        value.normalize(columns, rows);
+        return value;
+    }
+
+    @NonNull
+    private static String safeId(@NonNull String raw) {
+        String cleaned = raw.trim().replaceAll("[^A-Za-z0-9_.-]", "_");
+        return cleaned.isEmpty() ? "instrument_element" : cleaned.substring(
+                0, Math.min(96, cleaned.length()));
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+}

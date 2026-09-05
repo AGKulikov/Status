@@ -1,0 +1,12 @@
+{
+  "schema": "geely-implicit-zero-validation-v1",
+  "candidate_count": 305,
+  "confirmed_static_default_count": 303,
+  "explicit_bytecode_assignment_count": 2,
+  "all_assigned_fields_effective_value_null": true,
+  "OnOff2_On_default_zero_verified": true,
+  "frozen_entry_index_hash_unchanged": true,
+  "no_bytecode_scan_errors": true,
+  "source_jar_sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+  "result_sha256": "9809832bb75338099f80ca50b6e8afb5d7804d89a2025ac81fd5fef53a1ac221"
+}

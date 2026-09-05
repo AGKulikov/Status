@@ -1,0 +1,505 @@
+{
+  "schema": "geely-entity-register-v1",
+  "date": "2026-09-05",
+  "physical_ecu_diagnostic_identity_records_in_this_audit": 0,
+  "not_a_claim_no_ecus_exist": true,
+  "rule": "Count physical ECU only with explicit evidence tying diagnostic identity or hardware identifier to this vehicle; SDK types, groups, files and processes are separately typed.",
+  "entities": [
+    {
+      "id": "DOMAIN-AP",
+      "name": "Android/AP",
+      "entity_kind": "software_domain",
+      "status": "confirmed_observed",
+      "evidence_ids": [
+        "AD-E02",
+        "AD-E05"
+      ],
+      "limitation": "Separate physical ECU identity not established."
+    },
+    {
+      "id": "DOMAIN-QNX",
+      "name": "QNX host",
+      "entity_kind": "software_domain",
+      "status": "confirmed_observed_and_configured",
+      "evidence_ids": [
+        "AD-E01",
+        "AD-E18"
+      ],
+      "limitation": "Software host and physical ECU inventory are different layers."
+    },
+    {
+      "id": "GUEST-LA-LV",
+      "name": "LA/LV alternatives",
+      "entity_kind": "guest_configuration",
+      "status": "confirmed_alternatives",
+      "evidence_ids": [
+        "AD-E01",
+        "AD-E02",
+        "AD-E03"
+      ],
+      "limitation": "Both system la, same peer; not two simultaneously active ECU records."
+    },
+    {
+      "id": "PEER-VP",
+      "name": "VP .34.1",
+      "entity_kind": "network_endpoint",
+      "status": "observed_identity_unknown",
+      "evidence_ids": [
+        "AD-E04",
+        "AD-E05",
+        "AD-E26"
+      ],
+      "limitation": "UDP peer and stock name do not identify MCU model or current image."
+    },
+    {
+      "id": "MCU-RELAY",
+      "name": "MCU log producer",
+      "entity_kind": "logical_runtime_source",
+      "status": "observed_version",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "20.24.10.23024.41141 relayed; hardware/address not yet bound."
+    },
+    {
+      "id": "FILE-MPC",
+      "name": "mpc5746c firmware",
+      "entity_kind": "image_file",
+      "status": "file_confirmed_runtime_unconfirmed",
+      "evidence_ids": [
+        "AD-E06"
+      ],
+      "limitation": "Reference board support image; not confirmed flashed into production ECU."
+    },
+    {
+      "id": "SDK-ECU-IHU",
+      "name": "IHU",
+      "entity_kind": "sdk_ecu_type",
+      "status": "declared_physical_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E21",
+        "AD-E22"
+      ],
+      "limitation": "SDK IECU enum only; no diagnostic hardware/software identity response established here."
+    },
+    {
+      "id": "SDK-ECU-CSD",
+      "name": "CSD",
+      "entity_kind": "sdk_ecu_type",
+      "status": "declared_physical_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E21",
+        "AD-E22"
+      ],
+      "limitation": "SDK IECU enum only; no diagnostic hardware/software identity response established here."
+    },
+    {
+      "id": "SDK-ECU-WPC",
+      "name": "WPC",
+      "entity_kind": "sdk_ecu_type",
+      "status": "declared_physical_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E21",
+        "AD-E22"
+      ],
+      "limitation": "SDK IECU enum only; no diagnostic hardware/software identity response established here."
+    },
+    {
+      "id": "SDK-ECU-CCSM",
+      "name": "CCSM",
+      "entity_kind": "sdk_ecu_type",
+      "status": "declared_physical_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E21",
+        "AD-E22"
+      ],
+      "limitation": "SDK IECU enum only; no diagnostic hardware/software identity response established here."
+    },
+    {
+      "id": "SDK-ECU-AUD",
+      "name": "AUD",
+      "entity_kind": "sdk_ecu_type",
+      "status": "declared_physical_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E21",
+        "AD-E22"
+      ],
+      "limitation": "SDK IECU enum only; no diagnostic hardware/software identity response established here."
+    },
+    {
+      "id": "SDK-ECU-TEM2",
+      "name": "TEM2",
+      "entity_kind": "sdk_ecu_type",
+      "status": "declared_physical_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E21",
+        "AD-E22"
+      ],
+      "limitation": "SDK IECU enum only; no diagnostic hardware/software identity response established here."
+    },
+    {
+      "id": "SDK-ECU-VCM",
+      "name": "VCM",
+      "entity_kind": "sdk_ecu_type",
+      "status": "declared_physical_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E21",
+        "AD-E22"
+      ],
+      "limitation": "SDK IECU enum only; no diagnostic hardware/software identity response established here."
+    },
+    {
+      "id": "SDK-ECU-PAC",
+      "name": "PAC",
+      "entity_kind": "sdk_ecu_type",
+      "status": "declared_physical_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E21",
+        "AD-E22"
+      ],
+      "limitation": "SDK IECU enum only; no diagnostic hardware/software identity response established here."
+    },
+    {
+      "id": "NET-ASDM",
+      "name": "ASDM .36.1",
+      "entity_kind": "configured_network_target",
+      "status": "route_confirmed_ecu_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E04",
+        "AD-E05"
+      ],
+      "limitation": "Named route is not diagnostic ECU identification."
+    },
+    {
+      "id": "NET-TCAM",
+      "name": "TCAM .32.17",
+      "entity_kind": "configured_network_target",
+      "status": "route_confirmed_ecu_identity_unconfirmed",
+      "evidence_ids": [
+        "AD-E04",
+        "AD-E05"
+      ],
+      "limitation": "Gateway config does not establish complete TCAM identity."
+    },
+    {
+      "id": "LOG-A2B",
+      "name": "A2B",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-AS",
+      "name": "AS",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-AUDIOAPP",
+      "name": "AUDIOAPP",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-AUDIOSTM",
+      "name": "AUDIOSTM",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-CC",
+      "name": "CC",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-CL",
+      "name": "CL",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-DIAG",
+      "name": "DIAG",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-DM",
+      "name": "DM",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-DSP",
+      "name": "DSP",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-EXTAMP",
+      "name": "EXTAMP",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-HUD",
+      "name": "HUD",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-IOHARDWARE",
+      "name": "IOHARDWARE",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-IPC",
+      "name": "IPC",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-PROFILE",
+      "name": "PROFILE",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-PROTR",
+      "name": "PROTR",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-PWR",
+      "name": "PWR",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-SC",
+      "name": "SC",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-SH",
+      "name": "SH",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-SS",
+      "name": "SS",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-VC",
+      "name": "VC",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-VF",
+      "name": "VF",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-VFC",
+      "name": "VFC",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "LOG-WPC",
+      "name": "WPC",
+      "entity_kind": "software_log_group",
+      "status": "observed_log_group",
+      "evidence_ids": [
+        "AD-E28",
+        "AD-E29"
+      ],
+      "limitation": "Log group, not a separate physical ECU; acronym not expanded without production source."
+    },
+    {
+      "id": "PROCESS-DiagServices",
+      "name": "DiagServices",
+      "entity_kind": "process_or_configured_service",
+      "status": "software_component",
+      "evidence_ids": [
+        "AD-E01",
+        "AD-E13"
+      ],
+      "limitation": "A program/service is not automatically a separate ECU."
+    },
+    {
+      "id": "PROCESS-UDS_SOMEIP_Gateway",
+      "name": "UDS_SOMEIP_Gateway",
+      "entity_kind": "process_or_configured_service",
+      "status": "software_component",
+      "evidence_ids": [
+        "AD-E01",
+        "AD-E13"
+      ],
+      "limitation": "A program/service is not automatically a separate ECU."
+    },
+    {
+      "id": "PROCESS-SwVersionService",
+      "name": "SwVersionService",
+      "entity_kind": "process_or_configured_service",
+      "status": "software_component",
+      "evidence_ids": [
+        "AD-E01",
+        "AD-E13"
+      ],
+      "limitation": "A program/service is not automatically a separate ECU."
+    },
+    {
+      "id": "PROCESS-sc_qnx_vip_proxy",
+      "name": "sc_qnx_vip_proxy",
+      "entity_kind": "process_or_configured_service",
+      "status": "software_component",
+      "evidence_ids": [
+        "AD-E01",
+        "AD-E13"
+      ],
+      "limitation": "A program/service is not automatically a separate ECU."
+    },
+    {
+      "id": "PROCESS-vmm_service",
+      "name": "vmm_service",
+      "entity_kind": "process_or_configured_service",
+      "status": "software_component",
+      "evidence_ids": [
+        "AD-E01",
+        "AD-E13"
+      ],
+      "limitation": "A program/service is not automatically a separate ECU."
+    },
+    {
+      "id": "PROCESS-vmm_lifecycle",
+      "name": "vmm_lifecycle",
+      "entity_kind": "process_or_configured_service",
+      "status": "software_component",
+      "evidence_ids": [
+        "AD-E01",
+        "AD-E13"
+      ],
+      "limitation": "A program/service is not automatically a separate ECU."
+    }
+  ]
+}

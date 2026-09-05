@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-05",
+  "scope": "Eight explicit continuation areas; preserve prior evidence and expose remaining gaps.",
+  "systems": [
+    {
+      "id": "BASE-CAMERA",
+      "title": "Камера 360 / AVM",
+      "known": [
+        "Статическая внешняя ветвь и PAC callback разобраны; в прежнем корпусе config154=3, активный raw29021=1…5; значение3 — только частный наблюдавшийся случай."
+      ],
+      "not_known": [
+        "Физический смысл каждого режима, поддержка комплектации, окончание переходов и независимая видимость."
+      ],
+      "evidence": [
+        {
+          "repository": "AGKulikov/Status",
+          "git_commit": "3e5f2182c261c66010c7cdf718a5b2e4b989a9e6",
+          "path": "GEELY_KX11_KNOWLEDGE_RU.md",
+          "sha256": "945b10a00f09eca28ad0db5924f98278d73d3be827b51ae12992a2a1f03c2dc5",
+          "scope": "Historical baseline or current 2.7.7 parking policy; additional platform facts have their own source record."
+        },
+        {
+          "file": "controls/camera_route.json",
+          "path_base": "docs/geely-kx11"
+        }
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Сопоставить имеющиеся PAC watchers, 29021/29043 и оконные события с временными метками.",
+      "physical_result_verified": null
+    },
+    {
+      "id": "BASE-PAS",
+      "title": "Парковочные датчики, окно PAS и приоритет уведомлений",
+      "known": [
+        "Текущая политика Natro2.7.7: окно com.ecarx.parking на основном дисплее, два свежих снимка закрытия, без TTL; камера независима. GATE-046 открыт."
+      ],
+      "not_known": [
+        "Соответствие свежих окон фактической графике; восстановление при Binder failure, зажигании и холодном старте."
+      ],
+      "evidence": [
+        {
+          "repository": "AGKulikov/Status",
+          "git_commit": "3e5f2182c261c66010c7cdf718a5b2e4b989a9e6",
+          "path": "GEELY_KX11_KNOWLEDGE_RU.md",
+          "sha256": "945b10a00f09eca28ad0db5924f98278d73d3be827b51ae12992a2a1f03c2dc5",
+          "scope": "Historical baseline or current 2.7.7 parking policy; additional platform facts have their own source record."
+        },
+        {
+          "file": "controls/report.md",
+          "path_base": "docs/geely-kx11"
+        }
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Сохранить NOTIF-009; проверить имеющиеся снимки, затем только недостающий синхронный опыт по GATE-046.",
+      "physical_result_verified": null
+    },
+    {
+      "id": "BASE-HUD",
+      "title": "HUD: профили, PEN, маски содержимого",
+      "known": [
+        "В прежних опытах CB accepted/echo сочетались с invalid feedback; отдельный HUD PA оставался IntellDrv."
+      ],
+      "not_known": [
+        "Активный профиль, смысл PEN, причина invalid и независимый физический эффект."
+      ],
+      "evidence": [
+        {
+          "repository": "AGKulikov/Status",
+          "git_commit": "3e5f2182c261c66010c7cdf718a5b2e4b989a9e6",
+          "path": "GEELY_KX11_KNOWLEDGE_RU.md",
+          "sha256": "945b10a00f09eca28ad0db5924f98278d73d3be827b51ae12992a2a1f03c2dc5",
+          "scope": "Historical baseline or current 2.7.7 parking policy; additional platform facts have their own source record."
+        },
+        {
+          "file": "display/report.md",
+          "path_base": "docs/geely-kx11"
+        }
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Разобрать текущий профиль и валидность; не подставлять15 и не повторять перебор enum.",
+      "physical_result_verified": null
+    },
+    {
+      "id": "BASE-DIM",
+      "title": "Приборка DIM: крылья, машинка и владельцы графики",
+      "known": [
+        "Предыдущая отметка тестаI сделана после восстановления dimmenu; новый runtime подтверждает логические дисплеи и overlay, не владельца всех пикселей."
+      ],
+      "not_known": [
+        "Связь Android surface, QNX/LVDS и физических областей; независимый владелец каждого элемента."
+      ],
+      "evidence": [
+        {
+          "repository": "AGKulikov/Status",
+          "git_commit": "3e5f2182c261c66010c7cdf718a5b2e4b989a9e6",
+          "path": "GEELY_KX11_KNOWLEDGE_RU.md",
+          "sha256": "945b10a00f09eca28ad0db5924f98278d73d3be827b51ae12992a2a1f03c2dc5",
+          "scope": "Historical baseline or current 2.7.7 parking policy; additional platform facts have their own source record."
+        },
+        {
+          "file": "display/report.md",
+          "path_base": "docs/geely-kx11"
+        }
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Свести старые timeline и слой/процесс; следующий физический опыт требует метки до восстановления.",
+      "physical_result_verified": null
+    },
+    {
+      "id": "BASE-NAV",
+      "title": "Навигация: маршрут, HUD/DIM и координаты",
+      "known": [
+        "Есть отдельный GNSS/location тракт и NAVI display API; NAVI ID сам по себе не является выключателем штатной навигации."
+      ],
+      "not_known": [
+        "Владелец guidance, контракт манёвров/полос, источник координат и приоритет двух навигаций."
+      ],
+      "evidence": [
+        {
+          "repository": "AGKulikov/Status",
+          "git_commit": "3e5f2182c261c66010c7cdf718a5b2e4b989a9e6",
+          "path": "GEELY_KX11_KNOWLEDGE_RU.md",
+          "sha256": "945b10a00f09eca28ad0db5924f98278d73d3be827b51ae12992a2a1f03c2dc5",
+          "scope": "Historical baseline or current 2.7.7 parking policy; additional platform facts have their own source record."
+        },
+        {
+          "file": "display/report.md",
+          "path_base": "docs/geely-kx11"
+        }
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Продолжить с PLAT_LOCATION/PLAT_CARPLAY и штатными consumer навигации; различать измерение координат и маршрут.",
+      "physical_result_verified": null
+    },
+    {
+      "id": "BASE-MEDIAKEY",
+      "title": "Кнопки руля, события ввода и управление медиа",
+      "known": [
+        "Прежний журнал содержит три блокировки main thread дольше8секунд; timestamp внутри callback не измеряет полную задержку нажатия."
+      ],
+      "not_known": [
+        "Нажатие→callback→dispatch→player→audio, eventTime/downTime, повторы и long-press."
+      ],
+      "evidence": [
+        {
+          "repository": "AGKulikov/Status",
+          "git_commit": "3e5f2182c261c66010c7cdf718a5b2e4b989a9e6",
+          "path": "GEELY_KX11_KNOWLEDGE_RU.md",
+          "sha256": "945b10a00f09eca28ad0db5924f98278d73d3be827b51ae12992a2a1f03c2dc5",
+          "scope": "Historical baseline or current 2.7.7 parking policy; additional platform facts have their own source record."
+        },
+        {
+          "file": "display/report.md",
+          "path_base": "docs/geely-kx11"
+        }
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Сопоставить сохранённые input/media traces; отделить торможениеUI от транспорта автомобиля.",
+      "physical_result_verified": null
+    },
+    {
+      "id": "BASE-ANCS",
+      "title": "ANCS/BLE уведомления и восстановление соединений",
+      "known": [
+        "Новый разбор установил штатные Bluetooth профили и владельца power lifecycle; конфигурационные лимиты nFore не доказывают число одновременных ANCS соединений."
+      ],
+      "not_known": [
+        "Владелец BLE-сеанса, подписки и reconnect, арбитрация с телефонией/CarPlay, причина конкретных сбоев."
+      ],
+      "evidence": [
+        {
+          "repository": "AGKulikov/Status",
+          "git_commit": "3e5f2182c261c66010c7cdf718a5b2e4b989a9e6",
+          "path": "GEELY_KX11_KNOWLEDGE_RU.md",
+          "sha256": "945b10a00f09eca28ad0db5924f98278d73d3be827b51ae12992a2a1f03c2dc5",
+          "scope": "Historical baseline or current 2.7.7 parking policy; additional platform facts have their own source record."
+        },
+        {
+          "file": "research-2026-09-05/android_platform/report.md",
+          "path_base": "docs/geely-kx11"
+        }
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Сначала разобрать уже найденные Bluetooth логи с привязкой к PowerSomeIP; личные тексты уведомлений для этого не нужны.",
+      "physical_result_verified": null
+    },
+    {
+      "id": "BASE-VOICE",
+      "title": "Голосовое управление, микрофон и голосовые предупреждения",
+      "known": [
+        "Аудиоинтерфейсы содержат VR/eCall/HFT mix; наличие этих обозначений не раскрывает штатный voice assistant."
+      ],
+      "not_known": [
+        "Пакет и сервис распознавания, языки, push-to-talk/wake-word, маршрутизация микрофона и права клиента."
+      ],
+      "evidence": [
+        {
+          "repository": "AGKulikov/Status",
+          "git_commit": "3e5f2182c261c66010c7cdf718a5b2e4b989a9e6",
+          "path": "GEELY_KX11_KNOWLEDGE_RU.md",
+          "sha256": "945b10a00f09eca28ad0db5924f98278d73d3be827b51ae12992a2a1f03c2dc5",
+          "scope": "Historical baseline or current 2.7.7 parking policy; additional platform facts have their own source record."
+        },
+        {
+          "file": "research-2026-09-05/android_platform/report.md",
+          "path_base": "docs/geely-kx11"
+        }
+      ],
+      "hardware_presence": "Область исследования; присутствие каждого оборудования/опции и физическое исполнение этим дополнением не проверены.",
+      "control_route_status": "См. точные ограничения исторического исследования и связанных карточек; полный исполнительный контракт не установлен.",
+      "needed_artifact": "Сначала существующие источники по указанному следующему шагу; затем конкретное недостающее наблюдение.",
+      "next_offline_step": "Найти штатный manifest/consumer VR в существующем системном архиве и связь с audio focus; отметить отсутствующие материалы.",
+      "physical_result_verified": null
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Microsoft Fluent UI System Icons 1.1.328 (send, filled 24px); MIT. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@android:color/white"
+        android:pathData="m12.81 12.2-7.53 1.25a.5.5 0 0 0-.38.32l-2.6 6.96a.75.75 0 0 0 1.03.94l18-9a.75.75 0 0 0 0-1.34l-18-9a.75.75 0 0 0-1.03.94l2.6 6.96a.5.5 0 0 0 .38.32l7.53 1.25a.2.2 0 0 1 0 .4Z" />
+</vector>

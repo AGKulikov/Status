@@ -1,0 +1,877 @@
+{
+  "schema": "geely-system-coverage-rows-v1",
+  "date": "2026-09-05",
+  "scope": "Architecture domains only; not exhaustive vehicle matrix. Static declarations and runtime observations kept distinct.",
+  "systems": [
+    {
+      "id": "ARCH-001",
+      "title": "Android / AP и штатные сервисы IHU",
+      "known": [
+        "Наблюдён Android endpoint 198.18.34.15 и штатный route; normal LA config загружает Android guest."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E02",
+          "pointer": "KX11-Update-Package-Evidence.zip!KX11-Update-Package-Evidence/qnx/files/etc/linux-la.config",
+          "sha256": "78ec50fdbf5ed785dd019307fa9e1b9b9a70247891edb3d2d67be3c821bccbce"
+        },
+        {
+          "id": "AD-E04",
+          "pointer": "KX11-Cruise-Trace-20260810-070156.zip!KX11-Cruise-Trace-20260810-070156/discovery-files/vendor_bin_init.ecarx.route.sh",
+          "sha256": "ff793ed637472de1a09f41c5710b35150b3dca68eb2325ac7311837419c97bc0"
+        },
+        {
+          "id": "AD-E05",
+          "pointer": "KX11-VP-QNX-Live-Window-Evidence-20260815-174011.zip!KX11-VP-QNX-Live-Window-Evidence-20260815-174011/android/network.txt",
+          "sha256": "40da413ddd93da26eb5f1d2e6493bcdc8bd731eb6c2397406cef6388ac6faa1f"
+        }
+      ],
+      "not_known": [
+        "Полная цепочка текущих process→shared library→firmware version для всех сервисов.",
+        "Отдельность Android как физического ECU не установлена."
+      ],
+      "control_route_status": "software_domain_and_network_observed",
+      "hardware_presence": "software_domain_confirmed",
+      "needed_artifact": [
+        "Имеющиеся HU-Route proc maps/native maps и identity-build-power."
+      ],
+      "next_offline_step": "Сопоставить SHA загруженных библиотек, build props и exact SDK classloader с уже извлечённой картой; не подменять версию firmware версией Natro."
+    },
+    {
+      "id": "ARCH-002",
+      "title": "QNX host и гипервизор",
+      "known": [
+        "startup запускает VMM/lifecycle, создаёт guest peer; vsomeip unicast .34.2."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E01",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/scripts/startup.sh",
+          "sha256": "db9d3c055ed19c240546bdeebaadf7a07c291c201707b46ca4c396dd35dfb729"
+        },
+        {
+          "id": "AD-E18",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/vsomeip.json",
+          "sha256": "459d45f5f8395d32e5c3f7079df28e47f0790516afef8c078171ded28d19d315"
+        }
+      ],
+      "not_known": [
+        "Все границы виртуальных устройств, изоляции и рестарта доменов.",
+        "Текущее исполнение каждой условной ветви startup."
+      ],
+      "control_route_status": "host_and_guest_configuration_confirmed",
+      "hardware_presence": "software_domain_confirmed",
+      "needed_artifact": [
+        "QNX startup/SLM, linux configs, старые DIM Slog и boot window уже доступны."
+      ],
+      "next_offline_step": "Соединить VMM events из существующих логов с выбранным config и состояниями QNX/Android MCU relay."
+    },
+    {
+      "id": "ARCH-003",
+      "title": "LA / LV: обычная работа и Failsafe guest",
+      "known": [
+        "Оба config объявляют system la и один la_to_host; LV Failsafe, переключение GPIO154."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E01",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/scripts/startup.sh",
+          "sha256": "db9d3c055ed19c240546bdeebaadf7a07c291c201707b46ca4c396dd35dfb729"
+        },
+        {
+          "id": "AD-E02",
+          "pointer": "KX11-Update-Package-Evidence.zip!KX11-Update-Package-Evidence/qnx/files/etc/linux-la.config",
+          "sha256": "78ec50fdbf5ed785dd019307fa9e1b9b9a70247891edb3d2d67be3c821bccbce"
+        },
+        {
+          "id": "AD-E03",
+          "pointer": "KX11-Update-Package-Evidence.zip!KX11-Update-Package-Evidence/qnx/files/etc/linux-lv.config",
+          "sha256": "1541fc05b071f5a6939373e5514ed3223f7616ebd02be4df70a75cbe443c9e2d"
+        },
+        {
+          "id": "AD-E14",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/slm_ecarx_linux.xml",
+          "sha256": "1e44bce25c3e5b5f7094ed001a6a2f76eb39a0bc228325a5236f1757c4804c43"
+        }
+      ],
+      "not_known": [
+        "Все условия перехода/восстановления LV и фактическая boot epoch каждого снимка."
+      ],
+      "control_route_status": "alternative_guest_configs_confirmed",
+      "hardware_presence": "alternative_guest_configs_not_evidence_of_two_ecus",
+      "needed_artifact": [
+        "Имеющиеся boot window / update archive."
+      ],
+      "next_offline_step": "Привязать маркеры upgrade mode и fs_update_client к logs; исключить ошибочный поиск production VP внутри LV только по имени."
+    },
+    {
+      "id": "ARCH-004",
+      "title": "VP peer 198.18.34.1:50500",
+      "known": [
+        "Штатный route называет .1 VP; двусторонний UDP подтверждён старым PCAP; живой сосед наблюдался."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E04",
+          "pointer": "KX11-Cruise-Trace-20260810-070156.zip!KX11-Cruise-Trace-20260810-070156/discovery-files/vendor_bin_init.ecarx.route.sh",
+          "sha256": "ff793ed637472de1a09f41c5710b35150b3dca68eb2325ac7311837419c97bc0"
+        },
+        {
+          "id": "AD-E05",
+          "pointer": "KX11-VP-QNX-Live-Window-Evidence-20260815-174011.zip!KX11-VP-QNX-Live-Window-Evidence-20260815-174011/android/network.txt",
+          "sha256": "40da413ddd93da26eb5f1d2e6493bcdc8bd731eb6c2397406cef6388ac6faa1f"
+        },
+        {
+          "id": "AD-E26",
+          "pointer": "Geely_KX11_Knowledge_v1.0!cruise/pcap_reanalysis.json",
+          "sha256": "b7f9b5ee6f01576ecdbff28b99befc3e9dc74c2726683b29545f5943c020b821"
+        },
+        {
+          "id": "AD-E28",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+          "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd"
+        }
+      ],
+      "not_known": [
+        "Физический чип/плата, активный образ, процесс-получатель и firmware ownership.",
+        "Полный набор доступных из AP штатных команд."
+      ],
+      "control_route_status": "network_peer_observed_receiver_identity_unknown",
+      "hardware_presence": "peer_observed_identity_unknown",
+      "needed_artifact": [
+        "Имеющиеся locator/update manifests, PA_McuLog путь и version interfaces."
+      ],
+      "next_offline_step": "Проследить incoming PA_McuLog и PA_VP_Version до IPCP group/method и сравнить наблюдённую MCU версию с имеющимися образами."
+    },
+    {
+      "id": "ARCH-005",
+      "title": "Сетевой мост QNX и виртуальный Ethernet",
+      "known": [
+        "vp0 связан с guest la; bridge добавляет vp0 и emac0."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E01",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/scripts/startup.sh",
+          "sha256": "db9d3c055ed19c240546bdeebaadf7a07c291c201707b46ca4c396dd35dfb729"
+        },
+        {
+          "id": "AD-E02",
+          "pointer": "KX11-Update-Package-Evidence.zip!KX11-Update-Package-Evidence/qnx/files/etc/linux-la.config",
+          "sha256": "78ec50fdbf5ed785dd019307fa9e1b9b9a70247891edb3d2d67be3c821bccbce"
+        },
+        {
+          "id": "AD-E05",
+          "pointer": "KX11-VP-QNX-Live-Window-Evidence-20260815-174011.zip!KX11-VP-QNX-Live-Window-Evidence-20260815-174011/android/network.txt",
+          "sha256": "40da413ddd93da26eb5f1d2e6493bcdc8bd731eb6c2397406cef6388ac6faa1f"
+        }
+      ],
+      "not_known": [
+        "Все аппаратные порты/VLAN и конкретный switch peer за emac0."
+      ],
+      "control_route_status": "configured_bridge_plus_android_routes",
+      "hardware_presence": "virtual_interfaces_confirmed",
+      "needed_artifact": [
+        "Имеющиеся DTB, network dumps, HU-Route sysfs."
+      ],
+      "next_offline_step": "Восстановить таблицу physical/virtual interfaces и VLAN из DTB/sysfs; не называть vp0 физическим VP."
+    },
+    {
+      "id": "ARCH-006",
+      "title": "Маршрут ASDM и автомобильные VLAN",
+      "known": [
+        "Route ASDM .36.1→eth0.5, vehicle /16→eth0.11; живые route совпадают."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E04",
+          "pointer": "KX11-Cruise-Trace-20260810-070156.zip!KX11-Cruise-Trace-20260810-070156/discovery-files/vendor_bin_init.ecarx.route.sh",
+          "sha256": "ff793ed637472de1a09f41c5710b35150b3dca68eb2325ac7311837419c97bc0"
+        },
+        {
+          "id": "AD-E05",
+          "pointer": "KX11-VP-QNX-Live-Window-Evidence-20260815-174011.zip!KX11-VP-QNX-Live-Window-Evidence-20260815-174011/android/network.txt",
+          "sha256": "40da413ddd93da26eb5f1d2e6493bcdc8bd731eb6c2397406cef6388ac6faa1f"
+        },
+        {
+          "id": "AD-E26",
+          "pointer": "Geely_KX11_Knowledge_v1.0!cruise/pcap_reanalysis.json",
+          "sha256": "b7f9b5ee6f01576ecdbff28b99befc3e9dc74c2726683b29545f5943c020b821"
+        }
+      ],
+      "not_known": [
+        "Физический ASDM identity и соответствие прямого адреса software group ASDM в VP потоке."
+      ],
+      "control_route_status": "route_observed_no_control_proven",
+      "hardware_presence": "configured_endpoint_not_ecu_identity",
+      "needed_artifact": [
+        "Существующие Ethernet PCAP; source/switch mapping."
+      ],
+      "next_offline_step": "Сопоставить трафик каждого VLAN с source/destination и штатными config, сохраняя distinction между прямым ECU и пересылаемой группой."
+    },
+    {
+      "id": "ARCH-007",
+      "title": "TCAM и маршрут внешней связи",
+      "known": [
+        "Stock config называет .32.17 TCAM и задаёт запасной gateway."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E04",
+          "pointer": "KX11-Cruise-Trace-20260810-070156.zip!KX11-Cruise-Trace-20260810-070156/discovery-files/vendor_bin_init.ecarx.route.sh",
+          "sha256": "ff793ed637472de1a09f41c5710b35150b3dca68eb2325ac7311837419c97bc0"
+        },
+        {
+          "id": "AD-E05",
+          "pointer": "KX11-VP-QNX-Live-Window-Evidence-20260815-174011.zip!KX11-VP-QNX-Live-Window-Evidence-20260815-174011/android/network.txt",
+          "sha256": "40da413ddd93da26eb5f1d2e6493bcdc8bd731eb6c2397406cef6388ac6faa1f"
+        }
+      ],
+      "not_known": [
+        "Версия, hardware identity, режимы связи/сна и command consumers TCAM."
+      ],
+      "control_route_status": "configured_route_only",
+      "hardware_presence": "hardware_identity_unconfirmed",
+      "needed_artifact": [
+        "Имеющиеся native TCAM service/SDK и network snapshots."
+      ],
+      "next_offline_step": "Разобрать TCAM штатный клиент и различить route existence, modem state и фактическую сеть; не считать PERMANENT ARP живым ответом ECU."
+    },
+    {
+      "id": "ARCH-008",
+      "title": "MCU / VIP firmware на диске",
+      "known": [
+        "MPC5746C ELF: 86 DWARF units, FreeRTOS/CAN/SPI/board power, несколько reference board вариантов."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E06",
+          "pointer": "KX11-QNX-CAN-Inventory.zip!KX11-QNX-CAN-Inventory/qnx/files/etc/firmware/mpc5746c_firmware.elf",
+          "sha256": "04f1ab0f659e147b715de6cbdbdd4edcaf738621b8eb78246df1637a88c0d832"
+        },
+        {
+          "id": "AD-E08",
+          "pointer": "KX11-QNX-CAN-Inventory.zip!KX11-QNX-CAN-Inventory/qnx/files/bin/canflasher",
+          "sha256": "04a2868b7d01075b4110e21be0ecbcd8a92074d610436880f63cf99d9188fd41"
+        },
+        {
+          "id": "AD-E28",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+          "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd"
+        },
+        {
+          "id": "AD-E29",
+          "pointer": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip!KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+          "sha256": "77be2e03401681dede19835fbb41696a4f330796c101ca531e41d0bca511580e"
+        }
+      ],
+      "not_known": [
+        "Загружен ли именно этот image на автомобильный MCU.",
+        "Совпадает ли он с production MCU_Version 20.24.10.23024.41141."
+      ],
+      "control_route_status": "binary_contents_proven_runtime_not_proven",
+      "hardware_presence": "firmware_file_only",
+      "needed_artifact": [
+        "Уже имеющиеся updater/manifest, загрузочные версии и version handler."
+      ],
+      "next_offline_step": "Офлайн разобрать process_get_fw_version и цепочку выбора image в flasher/updater; сравнить с MCU relay, не запускать flasher."
+    },
+    {
+      "id": "ARCH-009",
+      "title": "QNX CAN resource manager через SPI9",
+      "known": [
+        "can_driver связывает SPI client с CAN device; canflasher содержит reference targets."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E07",
+          "pointer": "KX11-QNX-CAN-Inventory.zip!KX11-QNX-CAN-Inventory/qnx/files/bin/can_driver",
+          "sha256": "d60ba7ab0bb07119cf24425ebc817a6e6bc41ab737944bab0d5dd737cfeeb28d"
+        },
+        {
+          "id": "AD-E08",
+          "pointer": "KX11-QNX-CAN-Inventory.zip!KX11-QNX-CAN-Inventory/qnx/files/bin/canflasher",
+          "sha256": "04a2868b7d01075b4110e21be0ecbcd8a92074d610436880f63cf99d9188fd41"
+        },
+        {
+          "id": "AD-E01",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/scripts/startup.sh",
+          "sha256": "db9d3c055ed19c240546bdeebaadf7a07c291c201707b46ca4c396dd35dfb729"
+        },
+        {
+          "id": "AD-E13",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/slm_ecarx_android.xml",
+          "sha256": "1c7a3ef6170da67896eea3c5cb343f387e69c68ad3b66b16ddbf38ae6096fd02"
+        }
+      ],
+      "not_known": [
+        "Запуск can_driver в production и физическая шина за ним."
+      ],
+      "control_route_status": "static_driver_only",
+      "hardware_presence": "device_file_not_runtime_hardware_proof",
+      "needed_artifact": [
+        "Имеющиеся startup/SLM и QNX process/device inventory."
+      ],
+      "next_offline_step": "По всем имеющимся процессным/загрузочным логам найти исполнение driver и аргументы; не выводить наличие канала по файлу."
+    },
+    {
+      "id": "ARCH-010",
+      "title": "Android SocketCAN / FlexRay доступность",
+      "known": [
+        "Generic init.qti.can conditional script существует; два Bus-Capture не содержат raw bus или action windows."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E19",
+          "pointer": "KX11-Cruise-Trace-20260810-070156.zip!KX11-Cruise-Trace-20260810-070156/discovery-files/vendor_bin_init.qti.can.sh",
+          "sha256": "4671905799e3d40771cde55d1db08fd01e652d5122bc26fb299ac4f35e0c44ac"
+        },
+        {
+          "id": "AD-E30",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/actions/actions.csv",
+          "sha256": "413e03b3ab374d6d6cde6516f65ed28adfbc6719689d6b095f62992b87cacdb7"
+        },
+        {
+          "id": "AD-E31",
+          "pointer": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip!KX11-Bus-Capture-20260810-065954-28002-1234567/actions/actions.csv",
+          "sha256": "413e03b3ab374d6d6cde6516f65ed28adfbc6719689d6b095f62992b87cacdb7"
+        }
+      ],
+      "not_known": [
+        "Реальные физические контроллеры/доступ к Chassis CAN из AP."
+      ],
+      "control_route_status": "no_raw_bus_route_proven",
+      "hardware_presence": "unsupported_by_these_capture_artifacts",
+      "needed_artifact": [
+        "Bus-Capture devices-sysfs-devicetree/network-can-flexray уже доступны."
+      ],
+      "next_offline_step": "Сопоставить raw sysfs/kernel/netdev evidence и conditional script; не принимать вывод collector о распиновке как доказательство."
+    },
+    {
+      "id": "ARCH-011",
+      "title": "IPCL SPI4 обмен IHU",
+      "known": [
+        "Ранее подтверждены payload125/89fields и ограниченный исходящий OA; startup запускает cluster_controller."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E01",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/scripts/startup.sh",
+          "sha256": "db9d3c055ed19c240546bdeebaadf7a07c291c201707b46ca4c396dd35dfb729"
+        },
+        {
+          "id": "AD-E25",
+          "pointer": "Geely_KX11_Knowledge_v1.0!cruise/cluster_structures.json",
+          "sha256": "a1a6836e7ee700774f6e76a1565563fc94371a0c782bbd2543db6a5f45b86c77"
+        }
+      ],
+      "not_known": [
+        "Аппаратный peer SPI4 и связь с SPI9/MCU image.",
+        "Все transitions/frame lifecycle вне разобранных сообщений."
+      ],
+      "control_route_status": "specific_status_and_limited_output_route",
+      "hardware_presence": "software_route_confirmed_peer_hardware_unknown",
+      "needed_artifact": [
+        "Имеющиеся cluster ELF/DWARF и MCU image."
+      ],
+      "next_offline_step": "Проверить frame signatures и роли peer, не отождествлять два SPI по общей теме vehicle data."
+    },
+    {
+      "id": "ARCH-012",
+      "title": "Общий диагностический ECU inventory",
+      "known": [
+        "SDK ECU_TYPE и DoIP targets доступны как статические декларации."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E09",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/gateway_doip.ini",
+          "sha256": "21dd8bc8c767a0d5f58b30edc40bf2b5e328570937e5ab9c44fe16568703bbb4"
+        },
+        {
+          "id": "AD-E10",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/gateway_uds.ini",
+          "sha256": "86d612afdd085c3ad1c8b87467c6eb075aab3d1bcec9624d7f65955eae117b3d"
+        },
+        {
+          "id": "AD-E21",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/methods.json",
+          "sha256": "edecd61811cd2a2e3b75175e5d4da47aeb461c13a02592963ad8dca8a9bfbd32"
+        },
+        {
+          "id": "AD-E22",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/mapping/constants_by_value.json",
+          "sha256": "c6d16f9e38a9bd7b789880f90453177d98866731cd14adff86931b69429440b1"
+        }
+      ],
+      "not_known": [
+        "Полный список физических ECU с diagnostic address/HW/SW/version."
+      ],
+      "control_route_status": "no_vehicle_wide_inventory",
+      "hardware_presence": "physical_inventory_incomplete",
+      "needed_artifact": [
+        "Сначала результаты IPartInfos/diagnostic services в старых логах; ECU identity report только если отсутствует."
+      ],
+      "next_offline_step": "По существующим архивам искать прямые идентификационные ответы; хранить отдельно от списка процессов и software groups."
+    },
+    {
+      "id": "ARCH-013",
+      "title": "QNX DoIP / UDS gateways",
+      "known": [
+        "DoIP config имеет physical0xE000+6functional; UDS core иной функциональный subset; SLM запускает UDS_SOMEIP_Gateway."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E09",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/gateway_doip.ini",
+          "sha256": "21dd8bc8c767a0d5f58b30edc40bf2b5e328570937e5ab9c44fe16568703bbb4"
+        },
+        {
+          "id": "AD-E10",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/gateway_uds.ini",
+          "sha256": "86d612afdd085c3ad1c8b87467c6eb075aab3d1bcec9624d7f65955eae117b3d"
+        },
+        {
+          "id": "AD-E13",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/slm_ecarx_android.xml",
+          "sha256": "1c7a3ef6170da67896eea3c5cb343f387e69c68ad3b66b16ddbf38ae6096fd02"
+        }
+      ],
+      "not_known": [
+        "Полная routing/allowlist, active protocol branch и доступ к другим ECU."
+      ],
+      "control_route_status": "configured_gateway_not_verified_vehicle_control",
+      "hardware_presence": "software_components_confirmed",
+      "needed_artifact": [
+        "Реальные gateway ELF, ini, vsomeip и старые logs уже имеются."
+      ],
+      "next_offline_step": "Статически проследить config parser→target dispatcher и runtime init evidence; не считать functional address отдельным ECU."
+    },
+    {
+      "id": "ARCH-014",
+      "title": "Информация о деталях и сборках IHU",
+      "known": [
+        "IPartInfos объявляет core/delivery, AP/VP module/local config, post build numbers."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E21",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/methods.json",
+          "sha256": "edecd61811cd2a2e3b75175e5d4da47aeb461c13a02592963ad8dca8a9bfbd32"
+        },
+        {
+          "id": "AD-E22",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/mapping/constants_by_value.json",
+          "sha256": "c6d16f9e38a9bd7b789880f90453177d98866731cd14adff86931b69429440b1"
+        }
+      ],
+      "not_known": [
+        "Реализация источника каждого поля и непустые текущие ответы."
+      ],
+      "control_route_status": "sdk_interface_only",
+      "hardware_presence": "not_a_physical_inventory",
+      "needed_artifact": [
+        "Exact adaptapi implementation и старые service dumps."
+      ],
+      "next_offline_step": "Разобрать PartInfos.getPartInfoString до caller/provider; искать уже полученные значения перед новым запросом."
+    },
+    {
+      "id": "ARCH-015",
+      "title": "DTC / diagnostic monitor",
+      "known": [
+        "SDK IDtcManager/monitor, QNX DiagServices и диагностические OA существуют."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E13",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/slm_ecarx_android.xml",
+          "sha256": "1c7a3ef6170da67896eea3c5cb343f387e69c68ad3b66b16ddbf38ae6096fd02"
+        },
+        {
+          "id": "AD-E21",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/methods.json",
+          "sha256": "edecd61811cd2a2e3b75175e5d4da47aeb461c13a02592963ad8dca8a9bfbd32"
+        },
+        {
+          "id": "AD-E25",
+          "pointer": "Geely_KX11_Knowledge_v1.0!cruise/cluster_structures.json",
+          "sha256": "a1a6836e7ee700774f6e76a1565563fc94371a0c782bbd2543db6a5f45b86c77"
+        }
+      ],
+      "not_known": [
+        "Какие физические домены покрывает каждый список DTC, code mapping/status/time и очистка."
+      ],
+      "control_route_status": "several_partial_diagnostic_paths",
+      "hardware_presence": "diagnostic_software_present",
+      "needed_artifact": [
+        "Имеющиеся DtcManager implementation, QNX ELF и MCU DIAG relay."
+      ],
+      "next_offline_step": "Составить владельцев DTC и read/clear semantics; не объединять разные списки как весь автомобиль."
+    },
+    {
+      "id": "ARCH-016",
+      "title": "Идентичность версий AP/VP/QNX/MCU",
+      "known": [
+        "QNX version text есть; AP_Version.properties пуст; dump VpVersion использует PA_ErrorReport; MCU relay version повторена дважды."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E11",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/sw-version-info.txt",
+          "sha256": "2062fc7816f3978028cf37f3f073d3b68ee6042c81322a459c06d7a93ef8f2e5"
+        },
+        {
+          "id": "AD-E12",
+          "pointer": "KX11-VP-Firmware-Evidence.zip!KX11-VP-Firmware-Evidence/android/files/lcfg/AP_Version.properties",
+          "sha256": "b9d6bf7271cb7f4036497175029cef51fc4b74cb111ac7dc4cdbc9e24c1457d1"
+        },
+        {
+          "id": "AD-E20",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/service_evidence/CarSignalService.disasm.txt",
+          "sha256": "ec60ffba6ddb9f32f1802dc176274d5d58a4f894c00cbb43a7d996d75c21c1b5"
+        },
+        {
+          "id": "AD-E28",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+          "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd"
+        },
+        {
+          "id": "AD-E29",
+          "pointer": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip!KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+          "sha256": "77be2e03401681dede19835fbb41696a4f330796c101ca531e41d0bca511580e"
+        },
+        {
+          "id": "AD-E32",
+          "pointer": "KX11-HU-Route-20260810-070911-29994-1234567.zip!KX11-HU-Route-20260810-070911-29994-1234567/android/car-service-dumps.txt",
+          "sha256": "58ab362c92dba543d5a68351d671fb7a0b6713b7e866528cc6df8f6fac93d73e"
+        }
+      ],
+      "not_known": [
+        "Полная схема version fields и их физические owners."
+      ],
+      "control_route_status": "mixed_sources_need_normalization",
+      "hardware_presence": "multiple_software_versions_observed",
+      "needed_artifact": [
+        "Все перечисленные источники уже в архиве."
+      ],
+      "next_offline_step": "Нормализовать отдельные поля и provenance; не выбирать случайный VpVersion label как версию ECU."
+    },
+    {
+      "id": "ARCH-017",
+      "title": "Питание IHU / режимы AP, IM, EM",
+      "known": [
+        "Power SDK задаёт раздельные states; MCU relay показывает AP0→1→2, IM, EM."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E21",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/methods.json",
+          "sha256": "edecd61811cd2a2e3b75175e5d4da47aeb461c13a02592963ad8dca8a9bfbd32"
+        },
+        {
+          "id": "AD-E22",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/mapping/constants_by_value.json",
+          "sha256": "c6d16f9e38a9bd7b789880f90453177d98866731cd14adff86931b69429440b1"
+        },
+        {
+          "id": "AD-E23",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/cb_command_routes.json",
+          "sha256": "e783ef5950e10ef28339721c4ae196d639c9ffdaf543cb00b3a75c501e19dee2"
+        },
+        {
+          "id": "AD-E28",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+          "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd"
+        },
+        {
+          "id": "AD-E29",
+          "pointer": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip!KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+          "sha256": "77be2e03401681dede19835fbb41696a4f330796c101ca531e41d0bca511580e"
+        }
+      ],
+      "not_known": [
+        "Все причины/guard transitions, отключение по энергии и связь с automotive use mode."
+      ],
+      "control_route_status": "observed_startup_states_static_command_wrappers",
+      "hardware_presence": "live_logical_states_observed",
+      "needed_artifact": [
+        "Реальные PowerSomeIPService/proxy implementation и уже сохранённые startup logs."
+      ],
+      "next_offline_step": "Восстановить state machines по handler/enum; сопоставить два boot histories и их embedded counters."
+    },
+    {
+      "id": "ARCH-018",
+      "title": "Сон, пробуждение и сохранение контекста",
+      "known": [
+        "QNX/Android readiness раздельно логируется; SDK содержит partial/welcome/modem sleep статусы."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E21",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/methods.json",
+          "sha256": "edecd61811cd2a2e3b75175e5d4da47aeb461c13a02592963ad8dca8a9bfbd32"
+        },
+        {
+          "id": "AD-E22",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/mapping/constants_by_value.json",
+          "sha256": "c6d16f9e38a9bd7b789880f90453177d98866731cd14adff86931b69429440b1"
+        },
+        {
+          "id": "AD-E28",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+          "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd"
+        },
+        {
+          "id": "AD-E29",
+          "pointer": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip!KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+          "sha256": "77be2e03401681dede19835fbb41696a4f330796c101ca531e41d0bca511580e"
+        }
+      ],
+      "not_known": [
+        "Полный сон→wake цикл, причины wake, отложенная выгрузка логов и сохранность подписок/данных."
+      ],
+      "control_route_status": "startup_subset_only",
+      "hardware_presence": "sleep_capability_not_fully_observed",
+      "needed_artifact": [
+        "Сначала boot/live window и DLT архивы; новый цикл только если нужный переход не записан."
+      ],
+      "next_offline_step": "Классифицировать уже имеющиеся epochs как cold boot/wake/reconnect по реальным markers; не делать вывод по одному ignition."
+    },
+    {
+      "id": "ARCH-019",
+      "title": "Перезапуски, watchdog и восстановление сервисов",
+      "known": [
+        "VMM lifecycle, Binder/VHAL reconnect и QNX health components существуют."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E01",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/scripts/startup.sh",
+          "sha256": "db9d3c055ed19c240546bdeebaadf7a07c291c201707b46ca4c396dd35dfb729"
+        },
+        {
+          "id": "AD-E13",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/slm_ecarx_android.xml",
+          "sha256": "1c7a3ef6170da67896eea3c5cb343f387e69c68ad3b66b16ddbf38ae6096fd02"
+        },
+        {
+          "id": "AD-E24",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/service_evidence/IECarXCarImpl.disasm.txt",
+          "sha256": "09c706fa67159e3a214c9bde20fd642382bcf3715bac6581a0218c4e164ed047"
+        }
+      ],
+      "not_known": [
+        "Полная причина→граница reset→восстановление подписок/экранов/сети."
+      ],
+      "control_route_status": "software_recovery_hooks_found",
+      "hardware_presence": "software_lifecycle_confirmed",
+      "needed_artifact": [
+        "Существующие crash/boot/MCU logs."
+      ],
+      "next_offline_step": "Связать watchdog/reconnect события в пределах единой эпохи; различать рестарт APK, Android guest, QNX и MCU."
+    },
+    {
+      "id": "ARCH-020",
+      "title": "Обновления / разделы / rollback",
+      "known": [
+        "23 image manifest записи; LA/LV alternative; update script не проверяет swdl exit перед echo success."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E03",
+          "pointer": "KX11-Update-Package-Evidence.zip!KX11-Update-Package-Evidence/qnx/files/etc/linux-lv.config",
+          "sha256": "1541fc05b071f5a6939373e5514ed3223f7616ebd02be4df70a75cbe443c9e2d"
+        },
+        {
+          "id": "AD-E14",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/slm_ecarx_linux.xml",
+          "sha256": "1e44bce25c3e5b5f7094ed001a6a2f76eb39a0bc228325a5236f1757c4804c43"
+        },
+        {
+          "id": "AD-E15",
+          "pointer": "KX11-Update-Package-Evidence.zip!KX11-Update-Package-Evidence/qnx/files/etc/manifest.xml",
+          "sha256": "380a745133acb029f612f1c1224ff94600e353e1c2674bb8406095c8549267b8"
+        },
+        {
+          "id": "AD-E16",
+          "pointer": "KX11-Update-Package-Evidence.zip!KX11-Update-Package-Evidence/qnx/files/bin/update_from_usb.sh",
+          "sha256": "008414881adb88fd384e6cf4fc07036cd180d98a58eb2fc1fc25a23d6ab59d1b"
+        }
+      ],
+      "not_known": [
+        "Production updater chain, фактические active banks, подпись/rollback/recovery outcome."
+      ],
+      "control_route_status": "update_mechanism_static_partial",
+      "hardware_presence": "partition_artifacts_not_ecus",
+      "needed_artifact": [
+        "Имеющиеся update package evidence, client binaries, manifest, postboot versions."
+      ],
+      "next_offline_step": "Сравнить consumer manifest и result status/active slot; не использовать generic script как инструкцию обновления."
+    },
+    {
+      "id": "ARCH-021",
+      "title": "Android permissions / Binder / VHAL access",
+      "known": [
+        "setCarServiceHelper проверяет UID1000; VHAL access и static write route отдельны."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E24",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/service_evidence/IECarXCarImpl.disasm.txt",
+          "sha256": "09c706fa67159e3a214c9bde20fd642382bcf3715bac6581a0218c4e164ed047"
+        },
+        {
+          "id": "AD-E23",
+          "pointer": "Geely_KX11_Knowledge_v1.0!firmware/cb_command_routes.json",
+          "sha256": "e783ef5950e10ef28339721c4ae196d639c9ffdaf543cb00b3a75c501e19dee2"
+        }
+      ],
+      "not_known": [
+        "Разрешения каждого конечного API и доступ Natro в конкретной runtime configuration."
+      ],
+      "control_route_status": "one_check_proven_full_chain_unknown",
+      "hardware_presence": "software_policy_layer",
+      "needed_artifact": [
+        "Exact manifests, service bytecode, package dumps уже имеются."
+      ],
+      "next_offline_step": "Составить permission цепочку по конкретному API, не объявлять все методы открытыми или закрытыми по одному check."
+    },
+    {
+      "id": "ARCH-022",
+      "title": "QNX policy / виртуальная изоляция / диагностический доступ",
+      "known": [
+        "Startup и VM config имеют security/ASLR/virtual device branches; gateway config задаёт собственные параметры."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E01",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/scripts/startup.sh",
+          "sha256": "db9d3c055ed19c240546bdeebaadf7a07c291c201707b46ca4c396dd35dfb729"
+        },
+        {
+          "id": "AD-E02",
+          "pointer": "KX11-Update-Package-Evidence.zip!KX11-Update-Package-Evidence/qnx/files/etc/linux-la.config",
+          "sha256": "78ec50fdbf5ed785dd019307fa9e1b9b9a70247891edb3d2d67be3c821bccbce"
+        },
+        {
+          "id": "AD-E09",
+          "pointer": "KX11-QNX-Deep-Evidence.zip!KX11-QNX-Deep-Evidence/qnx/files/etc/gateway_doip.ini",
+          "sha256": "21dd8bc8c767a0d5f58b30edc40bf2b5e328570937e5ab9c44fe16568703bbb4"
+        }
+      ],
+      "not_known": [
+        "Какая policy активна на каждой epoch и какие проверки реально применяет конечный handler."
+      ],
+      "control_route_status": "configuration_only_not_access_bypass",
+      "hardware_presence": "software_policy_layer",
+      "needed_artifact": [
+        "Имеющиеся platform variables, QNX policy manifests и runtime logs."
+      ],
+      "next_offline_step": "Связать branch conditions с live state и service permissions; не выполнять изменение policy или security routines."
+    },
+    {
+      "id": "ARCH-023",
+      "title": "MCU relay: происхождение, семантика и время",
+      "known": [
+        "1307 строк PA_McuLog, одна версия в двух boot histories, 23 software log groups."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E28",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+          "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd"
+        },
+        {
+          "id": "AD-E29",
+          "pointer": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip!KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+          "sha256": "77be2e03401681dede19835fbb41696a4f330796c101ca531e41d0bca511580e"
+        },
+        {
+          "file": "../mcu_log_route/report.md",
+          "sha256": "83c70028f72dbaefdc0270ca00cbc7b47a193aa30f148d2e973aed8a72b87c91",
+          "scope": "Fresh independent45-message PCAP analysis closes the incoming UDP→Java portion."
+        }
+      ],
+      "not_known": [
+        "Источник до peer .1 и его hardware owner; связь конкретных 1307 строк двух boot history с восстановленным UDP→Java трактом; единицы embedded counter; фильтры/потеря сообщений."
+      ],
+      "control_route_status": "live_relay_observed_origin_mapping_pending",
+      "hardware_presence": "logical_mcu_source_observed",
+      "needed_artifact": [
+        "VHAL incoming converter и PA_McuLog service implementation уже доступны."
+      ],
+      "next_offline_step": "Проследить property→wire→peer; разделить embedded timestamp/counter и Android receipt; не считать McuLog_Panic всеобщим crash signal."
+    },
+    {
+      "id": "ARCH-024",
+      "title": "Network management CAN / FlexRay / LIN",
+      "known": [
+        "MCU DIAG relay показывает ComM/NM и FrMod/CanMod/LinMod состояния."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E28",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+          "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd"
+        },
+        {
+          "id": "AD-E29",
+          "pointer": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip!KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+          "sha256": "77be2e03401681dede19835fbb41696a4f330796c101ca531e41d0bca511580e"
+        }
+      ],
+      "not_known": [
+        "Физическая топология, каждый controller/channel, state enum meanings и доступ из AP."
+      ],
+      "control_route_status": "network_management_status_only",
+      "hardware_presence": "physical_bus_assignment_unknown",
+      "needed_artifact": [
+        "Имеющиеся MCU relays и конфиги; по каждому bus затем production firmware mapping."
+      ],
+      "next_offline_step": "Построить наблюдённые значения/переходы и связать с callback источником; не выводить CAN IDs, распиновку или активные каналы из имён."
+    },
+    {
+      "id": "ARCH-025",
+      "title": "Наблюдаемость и полнота корпуса",
+      "known": [
+        "Дополнительные HU-Route/Bus-Capture несут version/boot data, хотя raw bus нет; прежние 64 источника не исчерпывают все материалы."
+      ],
+      "evidence": [
+        {
+          "id": "AD-E28",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/android/logcat-before.txt",
+          "sha256": "652de857cd8d87eeeb34874dc5e1015b9be744fda1199244e865fe8bbb1cf1fd"
+        },
+        {
+          "id": "AD-E29",
+          "pointer": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip!KX11-Bus-Capture-20260810-065954-28002-1234567/android/logcat-before.txt",
+          "sha256": "77be2e03401681dede19835fbb41696a4f330796c101ca531e41d0bca511580e"
+        },
+        {
+          "id": "AD-E30",
+          "pointer": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip!KX11-Bus-Capture-20260810-005510-27602-1234567/actions/actions.csv",
+          "sha256": "413e03b3ab374d6d6cde6516f65ed28adfbc6719689d6b095f62992b87cacdb7"
+        },
+        {
+          "id": "AD-E31",
+          "pointer": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip!KX11-Bus-Capture-20260810-065954-28002-1234567/actions/actions.csv",
+          "sha256": "413e03b3ab374d6d6cde6516f65ed28adfbc6719689d6b095f62992b87cacdb7"
+        },
+        {
+          "id": "AD-E32",
+          "pointer": "KX11-HU-Route-20260810-070911-29994-1234567.zip!KX11-HU-Route-20260810-070911-29994-1234567/android/car-service-dumps.txt",
+          "sha256": "58ab362c92dba543d5a68351d671fb7a0b6713b7e866528cc6df8f6fac93d73e"
+        }
+      ],
+      "not_known": [
+        "Окончательный полный inventory всех Library/прошлых исследовательских архивов."
+      ],
+      "control_route_status": "evidence_inventory_expanded",
+      "hardware_presence": "not_applicable",
+      "needed_artifact": [
+        "Уже материализованные дополнительные архивы и дальнейшая точная инвентаризация."
+      ],
+      "next_offline_step": "Не просить повторный замер до учёта содержимого уже сохранённых вложений; хранить глубину разбора по каждому архиву."
+    }
+  ]
+}

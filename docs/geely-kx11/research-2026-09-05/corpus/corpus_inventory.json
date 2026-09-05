@@ -1,0 +1,1629 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-05",
+  "scope": {
+    "filename_screening_complete_for_list_snapshot": true,
+    "matched_filename_items": 339,
+    "discovery_limit": "Name-based discovery is not content review and can miss generically named archives. No claim that every Library item or vehicle ECU was semantically analyzed.",
+    "prior_corpus_sources": 64,
+    "materialized_files_this_pass": 33,
+    "category_counts": {
+      "other_project_artifact": 178,
+      "firmware_or_runtime_evidence": 88,
+      "protected_excluded": 3,
+      "reference_application": 6,
+      "research_tool_or_prior_procedure": 62,
+      "visual_asset": 2
+    }
+  },
+  "sources": [
+    {
+      "name": "status-action-session(6).json",
+      "bytes": 2221056,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_0456d26e15588191883a1ceade92b819",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "9dadc540d660629c36ef222f0f158a533afeeb738ae6ae5e5952203f56ab4a71",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "MConfig+_v45(4).apk",
+      "bytes": 1263915,
+      "category": "reference_application",
+      "source_id": "libfile_0f4791608b3c8191b558382bf9829a29",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "status-action-session(5).json",
+      "bytes": 4411179,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_d71f7c24ea6c8191b41c79fee3ff32f3",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "665708a5647519a1c8c2b37abf4957499398356ef4e7f78b7f93f6626622efc8",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "MConfig+_v45(3).apk",
+      "bytes": 1263915,
+      "category": "reference_application",
+      "source_id": "libfile_fe3c2571dbb08191bb7d347f89d5a667",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "status-action-session(4).json",
+      "bytes": 2444076,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_ca9127b6e9c88191a6bf8e71889a17d6",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "c0bc92fdab7b8a98e80a8d60c828d9fc90a75d73c414960b2948ec4685dd82e2",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "status-action-session(3).json",
+      "bytes": 3270347,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_8b7d7ec4564c8191b225b645280ab7a7",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "ffc08cfcfa3982a505560225b3ca2c450e8b171320d22163b911399c45bb1980",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "status-action-session(2).json",
+      "bytes": 2196324,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_5098a5e28a6081919694f53ca0c9ca0f",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "4c0c9e26c7ff33b6dc4fc108b2c6781593035259dc6cf84064d8bc834d554308",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_Mac.zip",
+      "bytes": 7357,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_2b07a944404c8191a17efe3acc537a61",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(4).sh",
+      "bytes": 23690,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_e87f0108156481918022d7528aea3249",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(3).sh",
+      "bytes": 23690,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_b5ef457919448191b1e0992326813680",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(2).sh",
+      "bytes": 23690,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_cc1a0828d9408191a5eb263b46438429",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-VP-Firmware-Locator-Evidence-20260815-191452_84144.zip",
+      "bytes": 201007,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_d7f8f7de4ce881919c36b6190b02d4a2",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "81f1064f48f252fd90f368862d327e6874a311cf82b9a58844f2560c0824eadd",
+      "outer_member_count": 11
+    },
+    {
+      "name": "KX11-VP-Action-Evidence-20260815-190324_83890.zip",
+      "bytes": 816248,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_cf3aba0816b48191ba45851d83be5a83",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "770a60c64e3730f3718ff3783cb8d86ec016f4856751a137678eed7fb66427c6",
+      "prior_depth": "Selected QNX/VP files, hashes, binary disassembly or inventory; exact depth in cruise/sources.json and report",
+      "outer_member_count": 10
+    },
+    {
+      "name": "KX11-QNX-Gap-Evidence-20260815-185143.zip",
+      "bytes": 915041,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_919ddf9c9dec81919fab221097aa2e91",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "fc3ccc07151a6b33de8c51ad3b6d630febff29749e4961c4ba086f608d1ed174",
+      "prior_depth": "Selected QNX/VP files, hashes, binary disassembly or inventory; exact depth in cruise/sources.json and report",
+      "outer_member_count": 117
+    },
+    {
+      "name": "KX11-VP-QNX-Live-Window-Evidence-20260815-174011.zip",
+      "bytes": 1274123,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_94d0ad529f488191afa2e877b3588316",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "dda269c6fb96209da39499d825f1688b0805f9206190883598f8e09f7390042c",
+      "outer_member_count": 20
+    },
+    {
+      "name": "KX11-VP-QNX-Live-Window-Evidence-20260815-173650.zip",
+      "bytes": 3898,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_ddb21334f13081918b9a0255bb468dfc",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-VP-QNX-Boot-Window-Evidence-20260815-171623.zip",
+      "bytes": 1249916,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_a2cafabebda481918b73c9aa39e7a36e",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "7d5544e1dce45a8a2e2c85a428cbe60c80b0fee23145978c32331ccc12326b7d",
+      "outer_member_count": 17
+    },
+    {
+      "name": "KX11-Update-Package-Evidence(1).zip",
+      "bytes": 308854,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_22a51e3ca8dc81919142d2657b2cb40e",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Update-Package-Evidence.zip",
+      "bytes": 308854,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_5a43406fef7c8191b7278d10d9e849f0",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "b434c6c25d763de3649e22a57c0e0e1e6bf6e0b7df372b8072b96be3aedaeebc",
+      "outer_member_count": 54
+    },
+    {
+      "name": "KX11-VP-Firmware-Evidence.zip",
+      "bytes": 336541820,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_e33152b298548191adcdb6e6d4f6cb65",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "22b2540fc8aeb3c57ba1d43255c0d2fdbbe31fd88eaca4cb72e9ca6cb14828b8",
+      "prior_depth": "Selected QNX/VP files, hashes, binary disassembly or inventory; exact depth in cruise/sources.json and report",
+      "outer_member_count": 472
+    },
+    {
+      "name": "KX11-Raw-Ethernet-Evidence-20260815-135547_77986.zip",
+      "bytes": 16641999,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_999487eb59748191be7f3510305591f8",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "6245b558d3d3c20f062d42aee486ed1aca165342a8503b057c57e32c1eec87e3",
+      "prior_depth": "Selected QNX/VP files, hashes, binary disassembly or inventory; exact depth in cruise/sources.json and report"
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+      "bytes": 288046319,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_71efba693354819181c78cb043fea0f2",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+      "outer_member_count": 80
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-132904_74834.tar.gz",
+      "bytes": 286965379,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_d9c687a46da4819186b7d811a9449f16",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "0fd0b7187a2a7c7db7891fa28201e2874302aa76f60fc71b2220c360130a214c",
+      "outer_member_count": 57
+    },
+    {
+      "name": "KX11-BOOT-FAILURE.txt.zip",
+      "bytes": 938293,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_7bac3e18403c8191a99130dbfe0dc98f",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "b7d4557d797feac9ba488408f6dc55aedc0e9f2d73cc79ca103f339bbea89dd4",
+      "outer_member_count": 1
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-114556_71773.tar.gz",
+      "bytes": 286662499,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_2a9c905914dc819194fa75cb0250fdda",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "18f7cb1764025f33e45479e43738943a39045d1c918edd45ccc1b5bdb6cac586",
+      "outer_member_count": 56
+    },
+    {
+      "name": "KX11-QNX-CAN-Inventory.zip",
+      "bytes": 1031759,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_3b504aaebb9c8191b3d0c3276b0882dc",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "42a23161cb9b79aa2a9a532fe3a8f949313c7db7b98949c93457caaac110ea70",
+      "prior_depth": "Selected QNX/VP files, hashes, binary disassembly or inventory; exact depth in cruise/sources.json and report",
+      "outer_member_count": 53
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-104207_69107.tar.gz",
+      "bytes": 286907347,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_66059037089c81918d8059ee1bc751b6",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "89f105dc90ec7e5800bb06b6b141209730093de274c8580e32791fc0d3c03e85",
+      "outer_member_count": 57
+    },
+    {
+      "name": "KX11-QNX-Window-Evidence.zip",
+      "bytes": 1016227,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_fbdf5518c5088191a738804b5652e5af",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "b20438bbc2f0a23d3f4e18ccaf89d738aaf61668b2a511d89e8a1cf549c6ffe9",
+      "outer_member_count": 1111
+    },
+    {
+      "name": "KX11-QNX-Deep-Evidence.zip",
+      "bytes": 16876539,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_22b42d800b608191942d5b7081e88b52",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b",
+      "prior_depth": "Selected QNX/VP files, hashes, binary disassembly or inventory; exact depth in cruise/sources.json and report",
+      "outer_member_count": 834
+    },
+    {
+      "name": "KX11-QNX-Live-Discovery.zip",
+      "bytes": 1168144,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_cac22ead7d348191b1de3b9b9971e069",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "b2742d3106182f8e12fb4dc57a81cc5b5b2081fb73d8b46168d1f95861bf09a8",
+      "outer_member_count": 36
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260815-090005_64290.tar.gz",
+      "bytes": 12634312,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_80c2610056f88191bcb4f77208ba1e46",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "7d0bc8aba72789a2a0a2c8513c751f9ec4fdcee68fa4b8a49660dfb2ddeaa105",
+      "outer_member_count": 68
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(1).sh",
+      "bytes": 23690,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_d1aef280e5cc8191a7aef03d619808d8",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-QNX-IPCP-Evidence 2.zip",
+      "bytes": 291864186,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_fd4d5428682c8191b19b93add3df1045",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "f5e69a2deeadc09f2c3d053437da2d0bd216d4f2088e3f637e01a7f2d6fbb706",
+      "prior_depth": "Selected QNX/VP files, hashes, binary disassembly or inventory; exact depth in cruise/sources.json and report"
+    },
+    {
+      "name": "KX11_Bluetooth_Collect_20260814-210122_61118.tar.gz",
+      "bytes": 12502905,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_161a37bfc0c48191b50bd069e3ec15bb",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "8bc68a5f8cc03e59b9eec5eb19690b82b6bc6063ede527e1f75167bc3bf24e10",
+      "outer_member_count": 67
+    },
+    {
+      "name": "KX11-QNX-IPCP-Collector-v1.0.0.zip",
+      "bytes": 50310,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_27d2410c61f0819195615977d9c1ba92",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11_Bluetooth_Collect.sh",
+      "bytes": 23690,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_0d2ea754779c819199253f9b847fcd1e",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11_Bluetooth_Collect(1).command",
+      "bytes": 23695,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_f828fa4640a8819196d715f6379ac5c9",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11_Bluetooth_Collect.command",
+      "bytes": 23695,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_de06e5edb79881919037e550c656d9e0",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Bluetooth-Collector-macOS-v2.zip",
+      "bytes": 9682,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_b10995ccff3481919d00e034cb231a27",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.6-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_a2af4c4e641c8191bc3966d6099f1dc0",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.6-Update.zip",
+      "bytes": 450268,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_5a56bc6242dc8191a1e09ead6c0ec816",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "7fd1847b8eba2aa73fdf8c5547a9bc8617118024851ee4f027089829024adaa9",
+      "prior_depth": "Selected QNX/VP files, hashes, binary disassembly or inventory; exact depth in cruise/sources.json and report"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.5-Update.zip",
+      "bytes": 449494,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_665ecdcee1ac8191b060960d9232e726",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.5-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_53396e8511c481919f54998f33264eed",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.4-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_6766d0d8e4688191a8d40b3479a8319c",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.4-Update.zip",
+      "bytes": 444647,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_a6de1985d7848191818a45989806ba15",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Bluetooth-Collector-v1.zip",
+      "bytes": 6938,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_e6c620ce49888191b4fa2db0a4a358dc",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.3-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_7afba82dae1881918fac486681835249",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.3-Update.zip",
+      "bytes": 446548,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_cb870d0ebe9c8191bc2495b24a913802",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.2-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_6b8946564f988191bc22520bd13edea2",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.2-Update.zip",
+      "bytes": 445914,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_1e0b0ec6b2f48191bdf59f9fc400c602",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.1-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_c778ef814548819191d2ccfe10692c31",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.1-Update.zip",
+      "bytes": 443338,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_cbfac66af1d48191953cfb96a66635ae",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.0-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_e184999a1afc8191b309b8578df83ee7",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.5.0-Update.zip",
+      "bytes": 439175,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_2a165da546448191bd5760f186b573c2",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.4-Update.zip",
+      "bytes": 384368,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_d05b78d6e608819182468910a0bec111",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.4-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_a8111eb6f0c88191a340b2597e6b213a",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.3-Update.zip",
+      "bytes": 383857,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_6f3a550f81388191a4ce5307335cf0ae",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.3-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_487b3edbd5d08191b6ac3f48b4a94af4",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.2-Update.zip",
+      "bytes": 375773,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_87f59ead7360819191475f95456fb810",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.2-Update.zip.sha256",
+      "bytes": 149,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_91d0257809ac8191957ee7ec2fdbe79a",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.1-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_c61fcadf75508191b322b5df3d11ed3e",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.1-Update.zip",
+      "bytes": 374265,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_00cb9e69c36c8191b6b7d1d3cac00a44",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Agent-Review-20260811-190042-458bb6453ca6d7be.zip",
+      "bytes": 4142129,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_1895a6a26c048191a73212963005360e",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "d690e56dee9613c094b6fbd8d2dc8d9b19d3b6e73e59e4cd2fdef8545caf3209",
+      "outer_member_count": 976
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.0-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_9e9cf03ea9b88191a205006def8f4f46",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.4.0-Update.zip",
+      "bytes": 370720,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_f16b4dd245a88191af1b492e739f3b17",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.3.0-Update.zip",
+      "bytes": 282783,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_a2e367df3a688191876f3c7885316c42",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.2.0-Update.zip",
+      "bytes": 230133,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_d9dc905479a8819190be9a01693ffce4",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.2.0-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_12d28f500cac81918f516661cbaad8db",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.10-Update.zip",
+      "bytes": 190448,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_320fdec405fc81919452e8d4d781e4ec",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.10-Update.zip.sha256",
+      "bytes": 105,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_becb71a30a54819188a4f93e92cf4ee2",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "kx11_hu_route_collect(1).sh",
+      "bytes": 23205,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_29606d10bd008191b402d45e77c3c4f1",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.9-Update.zip",
+      "bytes": 6399699,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_90da640ef4448191bf5b41d34e593d85",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.9-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_3055f12a46988191b745f4786e3f843c",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.8-Update.zip.sha256",
+      "bytes": 104,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_59c6e88e3cc4819195442b4b8cde3770",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.8-Update.zip",
+      "bytes": 6396713,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_0346bc4e596081919b8d296888bf0b61",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Agent-Review-20260811-001810-8e906dcfc821f2f9.zip",
+      "bytes": 2643778,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_a2bddd5a0d04819184a68bd5c8e07231",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "7fd0c6a3f8051568f0bb4a89e9e74328bad8f3421e5b4029e527318f20a4a373",
+      "outer_member_count": 150
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.7.zip.sha256",
+      "bytes": 97,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_903e725b6cfc819196e0f3132a7c9ac6",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.7.zip",
+      "bytes": 6380881,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_e1cdf865bfd0819186ea9bcfd4d4e74e",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.5.zip",
+      "bytes": 165220,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_e2c13478080481919f8d09369c4a7efb",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Agent-Review-20260810-221412-3c0c34ee92bfae61.zip",
+      "bytes": 2497134,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_aee9fa3ea08081919885cff497407977",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "b2551f4b511d1cf58f500efd4224b58b109f19c1345e1a8c2c7b03048742750d",
+      "outer_member_count": 121
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.4.zip",
+      "bytes": 155054,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_22c6697173948191b3aade38440c24d6",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.3.zip",
+      "bytes": 139908,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_0633c2e033688191afa2b91e4ac0915e",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.2.zip",
+      "bytes": 139878,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_7754c2922b4c8191aa7314ffbb3935e1",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.1.zip",
+      "bytes": 139837,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_4ad77cd222e08191a88508c777a29ea5",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.1.0.zip",
+      "bytes": 135226,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_c499397fada48191a854766a07da20d2",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Research-Agent-v1.0.0.zip",
+      "bytes": 84736,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_c6e021f6ead88191a7cf599c6c9dff3c",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "kx11_qnx_readonly_collect.sh",
+      "bytes": 26583,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_432f06e37a6c819192934eac73742644",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-HU-Route-20260810-070911-29994-1234567.zip",
+      "bytes": 42556311,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_932d1c1735588191a99673a53ac0d05f",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "e797f93892e2369b33248de620aa1c1bf907434a6334376cbf568127f12475b5",
+      "outer_member_count": 370
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260810-070156.zip",
+      "bytes": 11577550,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_42fc584baf8081918e1c3faeebcf018b",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "af378011351abbd3c3b96bb405dde444d7c90458e75d6e752cdbab11d5416c4f",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed",
+      "outer_member_count": 123
+    },
+    {
+      "name": "KX11-Bus-Capture-20260810-065954-28002-1234567.zip",
+      "bytes": 2514985,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_14fd1938e8e8819198af80c81d09f0a1",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "e32dcf2f2f8ae9140dd4d595e56190286520e62f036e47272c7b8ed754362fdc",
+      "outer_member_count": 24
+    },
+    {
+      "name": "kx11_hu_route_collect.sh",
+      "bytes": 23205,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_58db0faa53448191a4d5dc5d41ed8b00",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Bus-Capture-20260810-005510-27602-1234567.zip",
+      "bytes": 2548361,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_0ac5b9590e7481918ac7f31f6e8a65d8",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "6f67719476170e2d19ff6f7de2810374a77c5b4078b9c5993986d76d913bfb33",
+      "outer_member_count": 24
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260810-003840.zip",
+      "bytes": 31825,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_2c766a08d9c0819199d34900e55902d3",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "dbdcaa87af90c5d39226e16102cd41b9a5ee2aa52850295623f50e083ae331ef",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260810-004256.zip",
+      "bytes": 31495,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_698515dad95c81918748f40916d7006e",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "5cba6de2924434911c300ccf72a2a053c029362e91bd7e2d9a841fc8e1f2bd2a",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-233657-487.zip",
+      "bytes": 50944,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_c4a5493ad16c81918145672c247b787c",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "e3cd6f90aeb24c6191097325924d6af7d4194530039f0fe13881c6045d9af031",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "kx11_bus_capture.sh",
+      "bytes": 29122,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_6fc22a9c477c81919e68e421092779f7",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-165024.zip",
+      "bytes": 30219,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_4fb5e8f21980819187a90a6afddc60d4",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "321c9561edf77bdb5f2f52fe621ae808aed2d2acf66496e104827cf4cbd6f1d5",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-160754(1).zip",
+      "bytes": 28710,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_5e26a772b0348191ba336602943cf23c",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-160754.zip",
+      "bytes": 28710,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_59b33398798c8191a506737107c9c5a1",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "c5f48d9b37504505c2d082461c6af47fce04086ff05d4034238556b720c5370f",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-152225.zip",
+      "bytes": 11334359,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_ece0bd7923c48191a8bb674ea8a8ed43",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "2663dd80589102d9ccd6fe48a97065304ee0a728082421b4d709f6636f0ed868",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-150147.zip",
+      "bytes": 69821607,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_699c59e5e5508191bbee615252ba8965",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "f1faab66e9ca5b17bc7207ac5b1ddd4bc4d48c145d7ce31f2045b5af4e16b77b",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-150248.zip",
+      "bytes": 6163024,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_1c9b1cbf992c8191b727518dde0e3460",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "b7232b45706ade81db65d0aa3f4349a2a0ec2105c21ae83ffdb6f981f5094922",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-135239.zip",
+      "bytes": 75163870,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_31769eb1c894819186ed54438844b7e3",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "4f257e5d1d5cc443d7285b617e80359d12619da707feed85457e86f0e7d9e10c",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-133652.zip",
+      "bytes": 170842,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_f8b06ebc7a308191925398ba2be214cf",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "e610d154f98d3be3d4ba5258027c954306e6e6b2a5af6d289fb86294bfd291ec",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-125830(1).zip",
+      "bytes": 35499,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_81f20c26a1bc8191ac9d972d17765ff5",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-125830.zip",
+      "bytes": 35499,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_8c2aad41a4f081918bb70855c2f1c698",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "f99878e9f78908da4751b8ccbd5559580cdd3f1854150da74f270715fc3ba018",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-123506.zip",
+      "bytes": 974470,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_42ad8c8f32988191977137c0faa1de58",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "091f5e154d1d84067c48cd206daad856286a3794c5d489eabdbe15c980fb300a",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-121015.zip",
+      "bytes": 27009,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_af7dfa53907c81918da368347d745986",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "d72760c8c33e86652eb09c3d2283f12afd7f8585a5a39ba40ea961b8a0fd1e38",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-113750.zip",
+      "bytes": 3800258,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_8b78e9d11f6c8191a8e705952093d925",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "bab7a18fa621db6e2a1492014f1bf3c9c3e722fdbf5046016a67e72d79e55962",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-112301.zip",
+      "bytes": 636649,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_6705771415208191ba58af59521c03a4",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "71a2cd56e16a6bd4674b46c5beaf6914f1ffa8a96093faa0997dce607a4b8e01",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-110616.zip",
+      "bytes": 12054827,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_5143d640fdf88191905f3c72fdbf2dce",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "ab1e4d3db74e28489bd19789574195e37913c250ccbb92a7fb730dbeb1f14a6f",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-101433.zip",
+      "bytes": 1846440,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_62fd236817c8819182f21417f5026f16",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "4cf60f5dd0c979616649fe8fc09d0ea739d8deb3414d57c290fefa74e4174f6f",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-093747.zip",
+      "bytes": 2633210,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_bb78b6a638508191bde0d6b30101a350",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "58fe89e812b33780d7eeab05c7b63a90927b4d3e1a090ddbe2f4d37a71880d8f",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-092722.zip",
+      "bytes": 47504,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_9a81f514e7148191a63840b7b7f44b3d",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "cbfc23a22969c65400ed8ab3f1d57e139971c4dd2adbbbce554970ca1f542691",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-092756.zip",
+      "bytes": 47487,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_029967c1a7d08191a5e1fae4ce237791",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "6b7f9bc743067a6adc562e6ccb799816f89897c090325cce1161faabfe37db34",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-092740.zip",
+      "bytes": 47600,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_960fd40d0958819191338b5c0f0e6421",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "dec146d2b13bdfe27391663e433a6576dea9fec69c392b3fa854840ca3acb1e4",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-092642.zip",
+      "bytes": 47614,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_8764c5201e68819192f5d150a6439025",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "66cdcd1941227d961271a080c03adb4753d73a0625251afd7cdddd011186a556",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-085503.zip",
+      "bytes": 360218725,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_dab842d38d9481919e0a632e966368cf",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "35c459e6c9fde0bc39239a93e42db20af5579dbbb73aab730646d0e1f9090373",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "status-action-session(6).txt",
+      "bytes": 6551970,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_66c44bda676481918cec25d1f64be143",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "a18a7b22fd31e23b2de8d113f41e26ea5d615ee69e9fbdeeb90ad5eb7d331edb",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-083512.zip",
+      "bytes": 4653590,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_6721f75ed3ec8191b1da72f141d657c0",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "817509be15b88bd481b5942ca948c58e28e478445f29ef6371ce07a9afff683c",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-001402.zip",
+      "bytes": 324549107,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_9ba4d0877f2c8191902885eeb8b83a1d",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-001443(1).zip",
+      "bytes": 980042,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_421bf20b27608191b3e270b78bf72cba",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-Cruise-Trace-20260809-001443.zip",
+      "bytes": 980042,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_8597c27b5928819198c5d88c27b1bc4c",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "425d64d6229c8cdf07c81f8c80138d751f04cb87cca19a9c25685cb80326db4d",
+      "prior_depth": "Outer file inventory/text scan; selected DIM/DLT/PCAP evidence checked. Full semantic decoding not claimed"
+    },
+    {
+      "name": "kx11_cruise_trace.sh",
+      "bytes": 262208,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_2cad731c7e848191be1722d165e16d06",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "status-action-session(5).txt",
+      "bytes": 958226,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_f66bf80a7660819194552490fe34c2d7",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "5298aaabdef2b396115e0926f05abddff21c12673371db8370dfc946f0c6cd40",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "status-action-session(4).txt",
+      "bytes": 1024874,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_fe50f5a142f881918ee79f8e22719724",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "cf7fa0f36c603b100de15b9e583ba61d71d5810b03895490d06e55c8d38d0af1",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "status-action-session(3).txt",
+      "bytes": 1240802,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_81a543c44f7c81918d68b9ffcfab3564",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "f3965e2d3bf897161e7e0d1f661a69f1d675b2011a33650699dd68a8957365b6",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "status-action-session(2).txt",
+      "bytes": 1211525,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_91c48874491c8191b8e33cb441840e80",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "daf32c69da7cb7f4a2454679b18fc13f8f5ac638166282b0ea091bb17398bb40",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "status-action-session(1).txt",
+      "bytes": 117689,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_4dbe022692748191a529c31360abd0a8",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "695a493896ebda0441d404a41125bd9e5a3d9c5095e302acdf9249a09fd14360",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "status-action-session.txt",
+      "bytes": 170919,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_ce7710010f4c819181550c34f26eec04",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "e92f2883a5ef274cc201a63d7615e47a87ac567f825fb7a92c6314a3e5fe934f",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "status-action-session(1).json",
+      "bytes": 502520,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_c202403bdf3081919c163d2dcc8694c4",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "ab93daca404cb8696e79e7ab910a6a02ba6e1732fb079ce27d5f4c9e2d6b0f77",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "status-action-session.json",
+      "bytes": 197787,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_394ed6934de88191b790634006d864b1",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "66a96e767e326e4eef9fc2dad5a19836f8bb8dd73d0b387bbbc054fde5bf335c",
+      "prior_depth": "Complete export parsed, all numeric baseline/change events extracted"
+    },
+    {
+      "name": "MConfig+_v45(2).apk",
+      "bytes": 1263915,
+      "category": "reference_application",
+      "source_id": "libfile_579fc3db39fc81918f1f89b5187f1ab0",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11-stock-launcher-phone-20260807-160844.zip",
+      "bytes": 31425693,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_3367036b25dc8191ab704900edcd16f7",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "9a6be424d3d4f01d6c9172c6c943022e8f9872f1e5e8a787bd900717fd261e59",
+      "outer_member_count": 17
+    },
+    {
+      "name": "KX11-stock-launcher-phone-20260807-1605954.zip",
+      "bytes": 31425696,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_fb23044e1b508191a60f4f10ba9798ff",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "d396b01f2f5396a2d06decff6acac7ed1dd5abd5a9b39fd4f364955941e1cbd5",
+      "outer_member_count": 17
+    },
+    {
+      "name": "hudlab-cluster-20260730-224443.txt",
+      "bytes": 513830,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_c2e30ae8b4548191b8012254a5b159c5",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "586448bf21ed797182a6e5075081921612e451a53f62c793ed59aa2877b9d408",
+      "prior_depth": "Full original obtained, critical test/lifecycle/layout ranges verified"
+    },
+    {
+      "name": "hudlab-cluster-20260730-222702.txt",
+      "bytes": 734257,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_cba00cfb49a88191891109760967ecc2",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "d9a9d201ba32f8fe0bc4668c3c93560e4d9c494b5c593bbdf0625a42bb0f7244",
+      "prior_depth": "Full original obtained, critical test/lifecycle/layout ranges verified"
+    },
+    {
+      "name": "Monjaro HUD log(1).txt",
+      "bytes": 9806,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_4cd46998412881918fd244521479b2bf",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "16e2a32a96d8efe8d2427267cb7dbfc78262aaa19f13626c430221f68c5b941a",
+      "outer_member_count": 0
+    },
+    {
+      "name": "hudlab-cluster-20260730-220151.txt",
+      "bytes": 692490,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_6d589d3b9fa481919ccc08b83aabd0c9",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "d69c8db9e427cb0d2c536bd599e9bce4c7f6105e4734a352c66418deb9618cc6",
+      "prior_depth": "Full original obtained, critical test/lifecycle/layout ranges verified"
+    },
+    {
+      "name": "Monjaro HUD log.txt",
+      "bytes": 20631,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_d736956a8fec81919879c091f6bb5c59",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "f58a18712b68e4f28861c0c508f63d0bca10e9e5c78d60116adbc20f4956834a",
+      "outer_member_count": 0
+    },
+    {
+      "name": "hudlab-cluster-20260730-213051.txt",
+      "bytes": 610696,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_78feca63b5e4819189ed1db47e9feedc",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "4cca9d29a944400a9944a1e694543da0c2966c4d7d6ec60b69e0860990ad765d",
+      "prior_depth": "Full original obtained, critical test/lifecycle/layout ranges verified"
+    },
+    {
+      "name": "hudlab-cluster-20260730-191421.txt",
+      "bytes": 382414,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_26995d3e8fb881919e56b3710d1fb001",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "c018af82b3457efc92868680bfd68e5394ebb8fe0a4b47c74209ca16e5a17425",
+      "prior_depth": "Full original obtained, critical test/lifecycle/layout ranges verified"
+    },
+    {
+      "name": "MConfig+_v45(1).apk",
+      "bytes": 1263915,
+      "category": "reference_application",
+      "source_id": "libfile_dea18d73098481919808d6fb89eb895a",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "hudlab-cluster-20260730-182106.txt",
+      "bytes": 194125,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_d3ea86189f748191aa57fddb6f0df722",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "b06020b5a11c0c5efbf7678ea2f20de51e197b8a2c39965ffb79211e23d880e8",
+      "prior_depth": "Full original obtained, critical test/lifecycle/layout ranges verified"
+    },
+    {
+      "name": "hudlab-cluster-20260730-180831.txt",
+      "bytes": 192870,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_474c1d21cde48191a64b1cf8367580eb",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "c244c15f4625a7d8c2645df6403502ab5f5529a8c98bf88d1a8ee37e0313973b",
+      "prior_depth": "Full original obtained, critical test/lifecycle/layout ranges verified"
+    },
+    {
+      "name": "hudlab-cluster-20260730-075353.txt",
+      "bytes": 526168,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_cdaf72b6246c819191987346882420bc",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "f3e3f58fa3edf1a7acdb545c1bed80ed1df3242b6a61f69c21a35edde8734587",
+      "prior_depth": "Full original obtained, critical test/lifecycle/layout ranges verified"
+    },
+    {
+      "name": "ecarx-hud-system-20260727-010640.zip",
+      "bytes": 300729150,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_3b0b6b2b0f4c8191923f0514ffcf074f",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+      "prior_depth": "All member bytes hashed; latest static SDK/native analyzed, prior shared members compared",
+      "outer_member_count": 181
+    },
+    {
+      "name": "ecarx-hud-system-20260726-225221.zip",
+      "bytes": 289535031,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_2b8ad134fc048191aa4c2d6a01dd3297",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "b129b060112e57fa794b9bb41cb6a898f27997c42d5db8dbea6b2558856e2f32",
+      "prior_depth": "All member bytes hashed; latest static SDK/native analyzed, prior shared members compared"
+    },
+    {
+      "name": "ecarx-hud-system-20260726-172826.zip",
+      "bytes": 286769962,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_90ac404c5b9c8191ab27ca0ddce8219a",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "92f9e9687535b0a5f818c2523a20f843b6b12115e18a20d1eb24149a9af8079a",
+      "prior_depth": "All member bytes hashed; latest static SDK/native analyzed, prior shared members compared"
+    },
+    {
+      "name": "KX11_4BLE_patch.zip",
+      "bytes": 4826,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_6298e85ccb74819190eb006b997983fb",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "ecarx-hud-dump.tar",
+      "bytes": 740864,
+      "category": "firmware_or_runtime_evidence",
+      "source_id": "libfile_e225809aa2c88191888c6f21a1cbd8fc",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "8cd4ba254b93759bbf3c0224d84d5660def82f2ad96fb9da99efab712b35f1ec",
+      "outer_member_count": 10
+    },
+    {
+      "name": "MConfig+_v45.apk",
+      "bytes": 1263915,
+      "category": "reference_application",
+      "source_id": "libfile_a039901bbbf881918b5eb4540a5287c5",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "f217534230cada7def4c522c5ca4add694eb9c6936a069ad22a1a61d68baf5b6",
+      "prior_depth": "Reference source or APK; exact analysis scope in subsystem reports"
+    },
+    {
+      "name": "ecarx_hud_dump_mconfig.txt",
+      "bytes": 1893,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_4dc1edcabef4819191428c2264973eba",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": true,
+      "current_depth": "outer_archive_inventory_or_text_available",
+      "sha256": "c1d20ed2f0233f3e85ff44c2c38757bdcf2c6c576398ff9bde23b6302d624bdc",
+      "outer_member_count": 0
+    },
+    {
+      "name": "KX11_BLE_patch.zip",
+      "bytes": 3362,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_ad145c6babfc81919a03dc636f4f07f8",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "KX11_BLE_Activation_ADB.txt",
+      "bytes": 3573,
+      "category": "research_tool_or_prior_procedure",
+      "source_id": "libfile_1d47e48cd1fc8191b6be335b5357205e",
+      "prior_v1_0_corpus": false,
+      "available_locally_this_pass": false,
+      "current_depth": "metadata_only"
+    },
+    {
+      "name": "MConfig_0.103_src.zip",
+      "bytes": 136705326,
+      "category": "reference_application",
+      "source_id": "libfile_fccaee2956348191950644ce4b237734",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "current_depth": "prior_analysis_retained",
+      "sha256": "7ca75727f64d3a1bdfb28f33965a98285a0f85fc7c0c04fb027703d018da9d8a",
+      "prior_depth": "Reference source or APK; exact analysis scope in subsystem reports"
+    },
+    {
+      "name": "KNOWN_FINDINGS.txt",
+      "bytes": 23617,
+      "category": "prior_baseline_reference",
+      "source_id": "libfile_08f5b178269c8191ba04db882b39818d",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "sha256": "5e9ecc447174aeca49f5d7ad8a834d8b9805600541bb51e5198ca22fe05a94d4",
+      "current_depth": "prior_analysis_retained",
+      "prior_depth": "Reference source or APK; exact analysis scope in subsystem reports"
+    },
+    {
+      "name": "Natro-2.7.6-signed.apk",
+      "bytes": 28212590,
+      "category": "prior_baseline_reference",
+      "source_id": "libfile_37a8a74c4b8c81919c3fbcb4e5eecdab",
+      "prior_v1_0_corpus": true,
+      "available_locally_this_pass": false,
+      "sha256": "34bcf7a40350a7f4cc620cb90a8a7316882d4a954a53e1babc134889d7df625f",
+      "current_depth": "prior_analysis_retained",
+      "prior_depth": "Reference source or APK; exact analysis scope in subsystem reports"
+    }
+  ],
+  "same_sha256_groups": []
+}

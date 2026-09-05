@@ -1,0 +1,789 @@
+{
+  "schema": "ble-role-switch/v2",
+  "timeUnit": "milliseconds",
+  "sequenceEncoding": "unbounded unsigned decimal string",
+  "roles": {
+    "A": "HELPER_PERIPHERAL_ANDROID_CENTRAL",
+    "B": "HELPER_CENTRAL_ANDROID_PERIPHERAL"
+  },
+  "rules": {
+    "stopDeadlineInclusive": true,
+    "drainDeadlineInclusive": true,
+    "conflictingRequest": "REJECTED_CONFLICT",
+    "radioLossProvesLocalOwnersZero": false,
+    "zeroOwnerEvidenceIsMonotonic": true,
+    "wireCommitmentPrecedesLocalStop": true,
+    "wireAckMeaning": "peer persisted and froze the committed switch, not physical owner closure",
+    "controlTransmitCompletion": "asynchronous exact frame/token/attempt callback",
+    "retryDeadline": "unchanged original inclusive stop deadline",
+    "physicalCloseOrder": "current GATT client first; server waits exact disconnect"
+  },
+  "vectors": [
+    {
+      "name": "confirmed_ack_happy_path",
+      "initial": {
+        "kind": "active",
+        "role": "A",
+        "lastEpoch": "0",
+        "generation": "1"
+      },
+      "steps": [
+        {
+          "event": "requestSwitch",
+          "target": "B",
+          "now": 1000,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "epoch": "1",
+            "sourceGeneration": "1",
+            "targetGeneration": "2",
+            "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+          }
+        },
+        {
+          "event": "onIngressFrozen",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 1001,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "controlFrame": "CLOSE_REQUEST",
+            "controlAttempt": "1",
+            "effects": ["REQUEST_REMOTE_STOP"]
+          }
+        },
+        {
+          "event": "onControlTransmitResult",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "frame": "CLOSE_REQUEST",
+          "attempt": "1",
+          "result": "ACCEPTED",
+          "now": 1002,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "localStopRequested": false,
+            "effects": []
+          }
+        },
+        {
+          "event": "onRemoteClosedEvidence",
+          "epoch": "1",
+          "generation": "1",
+          "stoppedRole": "A",
+          "evidence": "CONFIRMED_ACK",
+          "now": 1003,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_LOCAL_TERMINAL",
+            "localStopRequested": true,
+            "effects": ["STOP_LOCAL_SOURCE"]
+          }
+        },
+        {
+          "event": "onLocalTerminal",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 1004,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_LOCAL_TERMINAL",
+            "effects": ["VERIFY_LOCAL_OWNERS"]
+          }
+        },
+        {
+          "event": "onLocalOwnerCount",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "ownerCount": 0,
+          "now": 1005,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "DRAINING",
+            "drainDeadline": 1025,
+            "effects": ["CANCEL_STOP_TIMEOUT", "ARM_DRAIN_DEADLINE"]
+          }
+        },
+        {
+          "event": "onDrainDeadline",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 1024,
+          "expect": {
+            "outcome": "NOT_DUE",
+            "phase": "DRAINING",
+            "effects": []
+          }
+        },
+        {
+          "event": "onDrainDeadline",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 1025,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "QUIESCENT",
+            "effects": ["CANCEL_DRAIN_DEADLINE", "QUIESCENT_REACHED"]
+          }
+        },
+        {
+          "event": "beginTargetStart",
+          "epoch": "1",
+          "generation": "2",
+          "role": "B",
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "STARTING",
+            "effects": ["START_TARGET"]
+          }
+        },
+        {
+          "event": "onTargetActive",
+          "epoch": "1",
+          "generation": "2",
+          "role": "B",
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "ACTIVE",
+            "activeRole": "B",
+            "desiredRole": "B",
+            "effects": ["TARGET_ACTIVE"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "radio_loss_requires_separate_zero_owner_proof",
+      "initial": {
+        "kind": "active",
+        "role": "A",
+        "lastEpoch": "0",
+        "generation": "1"
+      },
+      "steps": [
+        {
+          "event": "requestSwitch",
+          "target": "B",
+          "now": 1000,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+          }
+        },
+        {
+          "event": "onRadioOrPowerLoss",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 1001,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "localTerminal": true,
+            "localOwnersZero": false,
+            "remoteEvidence": "RADIO_OR_POWER_LOSS",
+            "effects": ["VERIFY_LOCAL_OWNERS"]
+          }
+        },
+        {
+          "event": "onIngressFrozen",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 1002,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_LOCAL_TERMINAL",
+            "effects": []
+          }
+        },
+        {
+          "event": "onLocalOwnerCount",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "ownerCount": 0,
+          "now": 1003,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "DRAINING",
+            "drainDeadline": 1023,
+            "effects": ["CANCEL_STOP_TIMEOUT", "ARM_DRAIN_DEADLINE"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "deadline_wins_callback_race",
+      "initial": {
+        "kind": "active",
+        "role": "A",
+        "lastEpoch": "0",
+        "generation": "1"
+      },
+      "steps": [
+        {
+          "event": "requestSwitch",
+          "target": "B",
+          "now": 1000,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+          }
+        },
+        {
+          "event": "onIngressFrozen",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 1100,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FAILED",
+            "failure": "STOP_TIMEOUT",
+            "effects": ["FAIL_CLOSED"]
+          }
+        },
+        {
+          "event": "beginTargetStart",
+          "epoch": "1",
+          "generation": "2",
+          "role": "B",
+          "expect": {
+            "outcome": "STALE_CALLBACK",
+            "phase": "FAILED",
+            "effects": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "same_target_coalesces_conflict_rejected",
+      "initial": {
+        "kind": "active",
+        "role": "A",
+        "lastEpoch": "8",
+        "generation": "9"
+      },
+      "steps": [
+        {
+          "event": "requestSwitch",
+          "target": "B",
+          "now": 2000,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "epoch": "9",
+            "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+          }
+        },
+        {
+          "event": "requestSwitch",
+          "target": "B",
+          "now": 2001,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "COALESCED",
+            "phase": "FREEZING",
+            "epoch": "9",
+            "effects": []
+          }
+        },
+        {
+          "event": "requestSwitch",
+          "target": "A",
+          "now": 2002,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "REJECTED_CONFLICT",
+            "phase": "FREEZING",
+            "epoch": "9",
+            "effects": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "wrong_epoch_is_noop_wrong_role_is_contradiction",
+      "initial": {
+        "kind": "active",
+        "role": "A",
+        "lastEpoch": "0",
+        "generation": "1"
+      },
+      "steps": [
+        {
+          "event": "requestSwitch",
+          "target": "B",
+          "now": 1000,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+          }
+        },
+        {
+          "event": "onRemoteClosedEvidence",
+          "epoch": "2",
+          "generation": "1",
+          "stoppedRole": "B",
+          "evidence": "CONFIRMED_ACK",
+          "now": 1001,
+          "expect": {
+            "outcome": "STALE_CALLBACK",
+            "phase": "FREEZING",
+            "effects": []
+          }
+        },
+        {
+          "event": "onRemoteClosedEvidence",
+          "epoch": "1",
+          "generation": "1",
+          "stoppedRole": "B",
+          "evidence": "CONFIRMED_ACK",
+          "now": 1002,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FAILED",
+            "failure": "CONTRADICTORY_REMOTE_EVIDENCE",
+            "effects": ["FAIL_CLOSED"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "zero_owner_then_exact_one_fails_closed",
+      "initial": {
+        "kind": "active",
+        "role": "A",
+        "lastEpoch": "0",
+        "generation": "1"
+      },
+      "steps": [
+        {
+          "event": "requestSwitch",
+          "target": "B",
+          "now": 1000,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+          }
+        },
+        {
+          "event": "onIngressFrozen",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 1001,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "effects": ["REQUEST_REMOTE_STOP"]
+          }
+        },
+        {
+          "event": "onLocalTerminal",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 1002,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "effects": ["VERIFY_LOCAL_OWNERS"]
+          }
+        },
+        {
+          "event": "onLocalOwnerCount",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "ownerCount": 0,
+          "now": 1003,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "effects": []
+          }
+        },
+        {
+          "event": "onRemoteClosedEvidence",
+          "epoch": "1",
+          "generation": "1",
+          "stoppedRole": "A",
+          "evidence": "CONFIRMED_ACK",
+          "now": 1004,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "DRAINING",
+            "effects": ["CANCEL_STOP_TIMEOUT", "ARM_DRAIN_DEADLINE"]
+          }
+        },
+        {
+          "event": "onLocalOwnerCount",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "ownerCount": 1,
+          "now": 1005,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FAILED",
+            "failure": "CONTRADICTORY_LOCAL_OWNER_EVIDENCE",
+            "effects": ["FAIL_CLOSED"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "remote_c_waits_for_async_ack_acceptance_before_local_stop",
+      "initial": {
+        "kind": "active",
+        "role": "A",
+        "lastEpoch": "0",
+        "generation": "1"
+      },
+      "steps": [
+        {
+          "event": "requestSwitchFromRemoteIntent",
+          "target": "B",
+          "now": 4000,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "remoteEvidence": "PEER_COMMITTED_INTENT",
+            "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+          }
+        },
+        {
+          "event": "onIngressFrozen",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 4001,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "controlFrame": "CLOSE_ACK",
+            "controlAttempt": "1",
+            "effects": ["ACKNOWLEDGE_REMOTE_STOP"]
+          }
+        },
+        {
+          "event": "onControlTransmitResult",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "frame": "CLOSE_ACK",
+          "attempt": "1",
+          "result": "ACCEPTED",
+          "now": 4002,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_LOCAL_TERMINAL",
+            "localStopRequested": true,
+            "effects": ["STOP_LOCAL_SOURCE"]
+          }
+        },
+        {
+          "event": "onLocalTerminal",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 4003,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_LOCAL_TERMINAL",
+            "effects": ["VERIFY_LOCAL_OWNERS"]
+          }
+        },
+        {
+          "event": "onLocalOwnerCount",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "ownerCount": 0,
+          "now": 4004,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "DRAINING",
+            "drainDeadline": 4024,
+            "effects": ["CANCEL_STOP_TIMEOUT", "ARM_DRAIN_DEADLINE"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "retry_uses_exact_next_attempt_and_original_deadline",
+      "initial": {
+        "kind": "active",
+        "role": "A",
+        "lastEpoch": "0",
+        "generation": "1"
+      },
+      "steps": [
+        {
+          "event": "requestSwitchFromRemoteIntent",
+          "target": "B",
+          "now": 5000,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "stopDeadline": 5100,
+            "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+          }
+        },
+        {
+          "event": "onIngressFrozen",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 5001,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "controlAttempt": "1",
+            "effects": ["ACKNOWLEDGE_REMOTE_STOP"]
+          }
+        },
+        {
+          "event": "onControlTransmitResult",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "frame": "CLOSE_ACK",
+          "attempt": "1",
+          "result": "RETRYABLE_FAILURE",
+          "now": 5002,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "controlAttempt": "2",
+            "stopDeadline": 5100,
+            "effects": ["SCHEDULE_CONTROL_RETRY"]
+          }
+        },
+        {
+          "event": "onControlTransmitResult",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "frame": "CLOSE_ACK",
+          "attempt": "1",
+          "result": "ACCEPTED",
+          "now": 5003,
+          "expect": {
+            "outcome": "STALE_CALLBACK",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "effects": []
+          }
+        },
+        {
+          "event": "onControlTransmitRetry",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "frame": "CLOSE_ACK",
+          "attempt": "2",
+          "now": 5004,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "stopDeadline": 5100,
+            "effects": ["ACKNOWLEDGE_REMOTE_STOP"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "duplicate_exact_remote_c_while_a_in_flight_coalesces",
+      "initial": {
+        "kind": "active",
+        "role": "A",
+        "lastEpoch": "0",
+        "generation": "1"
+      },
+      "steps": [
+        {
+          "event": "requestSwitchFromRemoteIntent",
+          "target": "B",
+          "wireToken": "0102030405060708090a0b0c0d0e0f10",
+          "now": 6000,
+          "stopTimeout": 100,
+          "drainDuration": 20,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+          }
+        },
+        {
+          "event": "onIngressFrozen",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 6001,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "controlAttempt": "1",
+            "effects": ["ACKNOWLEDGE_REMOTE_STOP"]
+          }
+        },
+        {
+          "event": "duplicateRemoteIntent",
+          "target": "B",
+          "wireToken": "0102030405060708090a0b0c0d0e0f10",
+          "epoch": "1",
+          "generation": "1",
+          "role": "A",
+          "now": 6002,
+          "expect": {
+            "outcome": "COALESCED",
+            "phase": "WAITING_CONTROL_HANDSHAKE",
+            "controlAttempt": "1",
+            "effects": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "starting_restore_is_same_role_local_only",
+      "initial": {
+        "kind": "restoreTargetLocalOnly",
+        "crashedPhase": "STARTING",
+        "sourceRole": "B",
+        "desiredRole": "B",
+        "epoch": "42",
+        "sourceGeneration": "8",
+        "targetGeneration": "9",
+        "now": 7000,
+        "stopTimeout": 100,
+        "drainDuration": 20,
+        "expect": {
+          "outcome": "APPLIED",
+          "phase": "FREEZING",
+          "origin": "LOCAL_ONLY_RESTORE",
+          "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+        }
+      },
+      "steps": [
+        {
+          "event": "onIngressFrozen",
+          "epoch": "42",
+          "generation": "8",
+          "role": "B",
+          "now": 7001,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "WAITING_LOCAL_TERMINAL",
+            "effects": ["STOP_LOCAL_SOURCE"],
+            "forbiddenEffects": ["REQUEST_REMOTE_STOP", "ACKNOWLEDGE_REMOTE_STOP"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "restoration_is_drain_only",
+      "initial": {
+        "kind": "restoreDrain",
+        "sourceRole": "A",
+        "desiredRole": "B",
+        "epoch": "41",
+        "sourceGeneration": "7",
+        "targetGeneration": "8",
+        "now": 3000,
+        "stopTimeout": 100,
+        "drainDuration": 20,
+        "expect": {
+          "outcome": "APPLIED",
+          "phase": "FREEZING",
+          "effects": ["FREEZE_SOURCE_INGRESS", "ARM_STOP_TIMEOUT"]
+        }
+      },
+      "steps": [
+        {
+          "event": "onRemoteClosedEvidence",
+          "epoch": "41",
+          "generation": "7",
+          "stoppedRole": "A",
+          "evidence": "NO_REMOTE_OWNER",
+          "now": 3001,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "effects": []
+          }
+        },
+        {
+          "event": "onLocalOwnerCount",
+          "epoch": "41",
+          "generation": "7",
+          "role": "A",
+          "ownerCount": 0,
+          "now": 3002,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "effects": []
+          }
+        },
+        {
+          "event": "onLocalTerminal",
+          "epoch": "41",
+          "generation": "7",
+          "role": "A",
+          "now": 3003,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "FREEZING",
+            "effects": []
+          }
+        },
+        {
+          "event": "onIngressFrozen",
+          "epoch": "41",
+          "generation": "7",
+          "role": "A",
+          "now": 3004,
+          "expect": {
+            "outcome": "APPLIED",
+            "phase": "DRAINING",
+            "drainDeadline": 3024,
+            "effects": ["CANCEL_STOP_TIMEOUT", "ARM_DRAIN_DEADLINE"]
+          }
+        }
+      ]
+    }
+  ]
+}

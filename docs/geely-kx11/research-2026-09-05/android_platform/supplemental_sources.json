@@ -1,0 +1,86 @@
+[
+  {
+    "archive": "KX11-stock-launcher-phone-20260807-160844.zip",
+    "archive_sha256": "9a6be424d3d4f01d6c9172c6c943022e8f9872f1e5e8a787bd900717fd261e59",
+    "member": "packages/com.ecarx.btphone/package-components.txt",
+    "sha256": "6d5ee23b9f060f2d7a1d066753b834a6c61c6fb3fc3cb7bcefc00d10a11d0a5c",
+    "size": 11247
+  },
+  {
+    "archive": "KX11-stock-launcher-phone-20260807-160844.zip",
+    "archive_sha256": "9a6be424d3d4f01d6c9172c6c943022e8f9872f1e5e8a787bd900717fd261e59",
+    "member": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "size": 9144989
+  },
+  {
+    "archive": "KX11-stock-launcher-phone-20260807-160844.zip",
+    "archive_sha256": "9a6be424d3d4f01d6c9172c6c943022e8f9872f1e5e8a787bd900717fd261e59",
+    "member": "packages/ecarx.launcher3/package-components.txt",
+    "sha256": "5c4401c0220cca05b7bf8ac60de12d5dbd4363059c70efbf91826dfd68adab63",
+    "size": 39491
+  },
+  {
+    "archive": "KX11-stock-launcher-phone-20260807-1605954.zip",
+    "archive_sha256": "d396b01f2f5396a2d06decff6acac7ed1dd5abd5a9b39fd4f364955941e1cbd5",
+    "member": "packages/com.ecarx.btphone/package-components.txt",
+    "sha256": "6d5ee23b9f060f2d7a1d066753b834a6c61c6fb3fc3cb7bcefc00d10a11d0a5c",
+    "size": 11247
+  },
+  {
+    "archive": "KX11-stock-launcher-phone-20260807-1605954.zip",
+    "archive_sha256": "d396b01f2f5396a2d06decff6acac7ed1dd5abd5a9b39fd4f364955941e1cbd5",
+    "member": "packages/com.ecarx.btphone/apk/00-XCBTPhone3.apk",
+    "sha256": "b25b256bd73ab328fe67da1a8062e402dc88c20fa38d2733780a5aeacc56a427",
+    "size": 9144989
+  },
+  {
+    "archive": "KX11-stock-launcher-phone-20260807-1605954.zip",
+    "archive_sha256": "d396b01f2f5396a2d06decff6acac7ed1dd5abd5a9b39fd4f364955941e1cbd5",
+    "member": "packages/ecarx.launcher3/package-components.txt",
+    "sha256": "5c4401c0220cca05b7bf8ac60de12d5dbd4363059c70efbf91826dfd68adab63",
+    "size": 39491
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/nForeBluetooth.properties",
+    "sha256": "6d36296125b206d603860a0afeba5a6dcee74b5f4a7db84faa8b8c3083160f32",
+    "size": 4911
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/etc/bluetooth/bt_stack.conf",
+    "sha256": "0c9b6052b7a7076c3c56f0d54f14e2e0f96f1a209d3666b2d29932a533de8b85",
+    "size": 1952
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/ts-dm-foundation-lib.jar",
+    "sha256": "0d16660234e6eab5ed615155fafeb087dabb6618d87ba6fe8922826f5c338617",
+    "size": 91154
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/framework/ts-platform-library.jar",
+    "sha256": "ff410df2b6eb7825c31f5b3220fcb86bf495cfee9eab112c67d8c4feac3f6722",
+    "size": 200835
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/FILES/system/app/Bluetooth/Bluetooth.apk",
+    "sha256": "e16dd214f4967d8870d54d08c6d8b483cbf68286dcbbb695605ccce6faf93f95",
+    "size": 2840323
+  },
+  {
+    "archive": "KX11_Bluetooth_Collect_20260815-134614_76337.tar.gz",
+    "archive_sha256": "3039f0adb2b3e50d40a7dde70f0de5e9e0bcc9e391ec3cccc9e3cb04277ac05a",
+    "member": "KX11_Bluetooth_Collect_20260815-134614_76337/DIAGNOSTICS/dumpsys_package_com.ts.dm.service.txt",
+    "sha256": "4d0b8d325244a2162e2bbc93c720d4883a5829f578792df7524fa87689f0d7ff",
+    "size": 25670
+  }
+]

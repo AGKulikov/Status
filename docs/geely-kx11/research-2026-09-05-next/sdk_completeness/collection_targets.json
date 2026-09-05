@@ -1,0 +1,189 @@
+{
+  "schema": "sdk-targeted-collection-gaps-v1",
+  "runtime_origin_warning": "pm path, APK/JAR hashes, package version, requested shared libraries and process maps are disk/loading candidates. They do not identify the defining classloader for a specific Java Class.",
+  "static_targets": [
+    {
+      "target_id": "SDK-CURRENT-ADAPT",
+      "android_path": "/system/framework/ecarx.adaptapi.jar",
+      "known_sha256": [
+        "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0"
+      ],
+      "purpose": "Compare currently available system SDK with archived static baseline; skip known identical hash."
+    },
+    {
+      "target_id": "SDK-CURRENT-CAR",
+      "android_path": "/system/framework/ecarx.car.jar",
+      "known_sha256": [
+        "57cb33a0af67c925cab0d1020dbdc9a226504455f46b8022b42313588a86a38b"
+      ],
+      "purpose": "Same declaration and method source pairing."
+    }
+  ],
+  "package_targets": [
+    {
+      "package": "com.ecarx.dimmenu",
+      "operation": "pm path then hash code APK/splits and retrieve only absent hashes",
+      "purpose": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "private_data_requested": false,
+      "presence_status": "archived_package_manager_observation",
+      "absence_interpretation": "A candidate presence probe that finds no package is not a missing-APK error.",
+      "presence_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "lines": [
+          62
+        ],
+        "literal": "PACKAGE com.ecarx.dimmenu",
+        "scope": "PackageManager snapshot from July27; current installation must still be checked."
+      }
+    },
+    {
+      "package": "ecarx.settings",
+      "operation": "pm path then hash code APK/splits and retrieve only absent hashes",
+      "purpose": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "private_data_requested": false,
+      "presence_status": "archived_package_manager_observation",
+      "absence_interpretation": "A candidate presence probe that finds no package is not a missing-APK error.",
+      "presence_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "lines": [
+          335
+        ],
+        "literal": "PACKAGE ecarx.settings",
+        "scope": "PackageManager snapshot from July27; current installation must still be checked."
+      }
+    },
+    {
+      "package": "com.ecarx.settings",
+      "operation": "pm path then hash code APK/splits and retrieve only absent hashes",
+      "purpose": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "private_data_requested": false,
+      "presence_status": "candidate_package_presence_probe",
+      "absence_interpretation": "A candidate presence probe that finds no package is not a missing-APK error."
+    },
+    {
+      "package": "ecarx.adaptapi.platform",
+      "operation": "pm path then hash code APK/splits and retrieve only absent hashes",
+      "purpose": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "private_data_requested": false,
+      "presence_status": "archived_package_manager_observation",
+      "absence_interpretation": "A candidate presence probe that finds no package is not a missing-APK error.",
+      "presence_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "lines": [
+          223
+        ],
+        "literal": "PACKAGE ecarx.adaptapi.platform",
+        "scope": "PackageManager snapshot from July27; current installation must still be checked."
+      }
+    },
+    {
+      "package": "ecarx.geea.platform.api.signal",
+      "operation": "pm path then hash code APK/splits and retrieve only absent hashes",
+      "purpose": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "private_data_requested": false,
+      "presence_status": "archived_package_manager_observation",
+      "absence_interpretation": "A candidate presence probe that finds no package is not a missing-APK error.",
+      "presence_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "lines": [
+          241
+        ],
+        "literal": "PACKAGE ecarx.geea.platform.api.signal",
+        "scope": "PackageManager snapshot from July27; current installation must still be checked."
+      }
+    },
+    {
+      "package": "ecarx.geea.platform.api.vf",
+      "operation": "pm path then hash code APK/splits and retrieve only absent hashes",
+      "purpose": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "private_data_requested": false,
+      "presence_status": "archived_package_manager_observation",
+      "absence_interpretation": "A candidate presence probe that finds no package is not a missing-APK error.",
+      "presence_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "lines": [
+          260
+        ],
+        "literal": "PACKAGE ecarx.geea.platform.api.vf",
+        "scope": "PackageManager snapshot from July27; current installation must still be checked."
+      }
+    },
+    {
+      "package": "com.ecarx.sdk.openapi",
+      "operation": "pm path then hash code APK/splits and retrieve only absent hashes",
+      "purpose": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "private_data_requested": false,
+      "presence_status": "archived_package_manager_observation",
+      "absence_interpretation": "A candidate presence probe that finds no package is not a missing-APK error.",
+      "presence_evidence": {
+        "archive": "ecarx-hud-system-20260727-010640.zip",
+        "archive_sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd",
+        "member": "report.txt",
+        "member_sha256": "67e5bb0b4326cdada0437644fbd83870c2f638343dfa3a381a0dc0b435dda3e4",
+        "lines": [
+          124
+        ],
+        "literal": "PACKAGE com.ecarx.sdk.openapi",
+        "scope": "PackageManager snapshot from July27; current installation must still be checked."
+      }
+    },
+    {
+      "package": "ru.monjaro.mconfig",
+      "operation": "pm path then hash code APK/splits and retrieve only absent hashes",
+      "purpose": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "private_data_requested": false,
+      "presence_status": "candidate_package_presence_probe",
+      "absence_interpretation": "A candidate presence probe that finds no package is not a missing-APK error."
+    },
+    {
+      "package": "ru.natro.statuswidget",
+      "operation": "pm path then hash code APK/splits and retrieve only absent hashes",
+      "purpose": "Current packaged SDK candidate and consumer version; do not infer runtime class origin",
+      "private_data_requested": false,
+      "presence_status": "candidate_package_presence_probe",
+      "absence_interpretation": "A candidate presence probe that finds no package is not a missing-APK error."
+    }
+  ],
+  "runtime_targets": [
+    {
+      "target_id": "SDK-RUNTIME-DEFINING-LOADER",
+      "status": "requires an existing in-process runtime diagnostic; no APK build, injection or class initialization requested",
+      "classes": [
+        "com.ecarx.xui.adaptapi.AdaptAPI",
+        "com.ecarx.xui.adaptapi.car.base.CarInfo",
+        "com.ecarx.xui.adaptapi.car.diagnostics.DtcManager",
+        "com.ecarx.xui.adaptapi.car.sensor.Sensor",
+        "ecarx.car.hardware.vehicle.ECarXCarActivesafetyManager"
+      ],
+      "required_evidence": [
+        "application package, version and process identity",
+        "actual Class.getClassLoader result for the already loaded target class",
+        "defining dex/container path and exact digest if available from the existing diagnostic",
+        "classloader parent/delegation context; no constant read that newly initializes classes",
+        "method/field values observed in that exact process remain separate from disk constants"
+      ],
+      "never_substitute": [
+        "disk path alone",
+        "BOOTCLASSPATH alone",
+        "same class name",
+        "process maps alone",
+        "different package embedded SDK"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "date": "2026-09-05",
+  "repository": "AGKulikov/Status",
+  "branch": "feature/navigation-hud-v2",
+  "base_commit": "6001183ef36d0aeb7b2a0c9602419b5a7b3c8af2",
+  "requirements": [
+    "REL-007",
+    "REL-008",
+    "KNOW-005",
+    "GATE-049"
+  ],
+  "files": [
+    {
+      "path": "collect_missing.py",
+      "sha256": "36b22947f87ae2391fa387d42474bdf54e9949c7aa6902034b4a36f8a3f68a3b",
+      "bytes": 24096
+    },
+    {
+      "path": "Collect-KX11.command",
+      "sha256": "5cc017985d34ac9faa3869bde94d632f754c7aa4deb0274c0cd57eb2ce8a79b1",
+      "bytes": 1285
+    },
+    {
+      "path": "collection_plan.json",
+      "sha256": "408ed74c15850fcd6865bac4551ff3140ac27339fa0347d63866a3a10a9bf64e",
+      "bytes": 33101
+    },
+    {
+      "path": "known_files.json.gz",
+      "sha256": "5dfaf2a9099f87661b5bcd49ab48f3759e7aa91f35db8e2383c8d987727747cd",
+      "bytes": 714160
+    },
+    {
+      "path": "lib/qconn_native.py",
+      "sha256": "9cf3dfade347adadbea436bb78fa1374a34d84d31189f931a2587e48236364c7",
+      "bytes": 32902
+    },
+    {
+      "path": "lib/qnx_acquire.py",
+      "sha256": "b825d86c83f58f6ccc49eb4d1e109d0a243ec794ad2d9e7c808981e639ce7daf",
+      "bytes": 18795
+    },
+    {
+      "path": "lib/bt_projection.py",
+      "sha256": "d7616f61f65f1d683f8c72f790e3574b8f52bf66f8fe5a90c7549fe135ee5544",
+      "bytes": 13258
+    }
+  ],
+  "qconn_source": {
+    "archive": "KX11-Research-Agent-v1.5.6-Update.zip",
+    "module": "qconn_native.py",
+    "sha256": "9cf3dfade347adadbea436bb78fa1374a34d84d31189f931a2587e48236364c7",
+    "byte_identical": true,
+    "transport": "Existing ADB shell -T toybox nc to 198.18.34.2:8000; pinned successful nfogh file-read dialect",
+    "member": "KX11-Research-Agent-v1.5.6-Update/script_mac/kx11_agent/qconn_native.py"
+  },
+  "scope": "Own collector and derived catalogs; original firmware is absent from the distribution.",
+  "physical_mac_kx11_execution": false
+}

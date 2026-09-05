@@ -1,0 +1,28 @@
+{
+  "schema": "geely-interface-pages-validation-v1",
+  "primary_entries": 4440,
+  "page_count": 30,
+  "maximum_page_bytes": 299970,
+  "all_entries_preserved_with_original_order_and_values": true,
+  "keys_preserved": true,
+  "all_page_hashes_verified": true,
+  "byte_identical_clean_regeneration": true,
+  "lookup_tests": [
+    {
+      "query": "PAC_ACTIVATION",
+      "match_count": 1,
+      "entry_key": "adaptapi:531",
+      "id": 587399424,
+      "id_hex": "0x23030100"
+    },
+    {
+      "query": "EpbSoftSwtCtrlSt",
+      "match_count": 1,
+      "entry_key": "car_signals:585",
+      "id": 29325,
+      "vhal_hex": "0x2140728D"
+    }
+  ],
+  "source_index_sha256": "cd2d0823c33072015977b2fef236f29fcc843194a792d25e3d0e8ca736cc9964",
+  "vehicle_contact_performed": false
+}

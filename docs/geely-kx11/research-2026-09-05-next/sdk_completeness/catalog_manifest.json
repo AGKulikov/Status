@@ -1,0 +1,124 @@
+{
+  "schema": "typed-ecarx-catalog-manifest-v2",
+  "counts": {
+    "classes": {
+      "source_records": 61855,
+      "unique_declaration_keys": 15928,
+      "variants": 16942,
+      "source_records_by_category": {
+        "other_ecarx_application_or_library": 6840,
+        "android_car": 4430,
+        "build_configuration_declaration": 52,
+        "android_resource_declaration": 594,
+        "adaptapi": 16143,
+        "ts_wrapper_or_application": 717,
+        "ecarx_car": 28689,
+        "ecarx_sdk": 2488,
+        "vendor_ecarx": 1902
+      }
+    },
+    "fields": {
+      "source_records": 359668,
+      "unique_declaration_keys": 170965,
+      "variants": 185382,
+      "source_records_by_category": {
+        "other_ecarx_application_or_library": 28933,
+        "android_car": 16678,
+        "build_configuration_declaration": 350,
+        "android_resource_declaration": 124739,
+        "adaptapi": 60067,
+        "ecarx_car": 104807,
+        "ecarx_sdk": 8214,
+        "ts_wrapper_or_application": 2682,
+        "vendor_ecarx": 13198
+      }
+    },
+    "methods": {
+      "source_records": 267069,
+      "unique_declaration_keys": 85945,
+      "variants": 99483,
+      "source_records_by_category": {
+        "other_ecarx_application_or_library": 48652,
+        "android_car": 21885,
+        "build_configuration_declaration": 64,
+        "android_resource_declaration": 694,
+        "adaptapi": 57670,
+        "ts_wrapper_or_application": 4811,
+        "ecarx_car": 100926,
+        "ecarx_sdk": 15240,
+        "vendor_ecarx": 17127
+      }
+    }
+  },
+  "files": [
+    {
+      "path": "catalog/classes.jsonl.gz",
+      "size": 396853,
+      "sha256": "c30cbc63fbe56eb1d045ba15687bc495fb276e16f8a94155f153460132ccef20",
+      "records": 15928
+    },
+    {
+      "path": "catalog/fields.jsonl.gz",
+      "size": 5983331,
+      "sha256": "7f185ac7451d2004ca10c1b8ee95164876bda84b6a192536ea63e14bd65816d4",
+      "records": 170965
+    },
+    {
+      "path": "catalog/methods.jsonl.gz",
+      "size": 1789250,
+      "sha256": "035d72e76dddc922cb2a6f7c6bf14ba770cba0ade02e278b2ebd93ab0009e452",
+      "records": 85945
+    },
+    {
+      "path": "catalog/static_writes.jsonl.gz",
+      "size": 313812,
+      "sha256": "a3b144126d9aa920e6c44ce2a2f8fed2b074bd653652b66b70234765440459b7",
+      "records": 12496
+    },
+    {
+      "path": "catalog/family_calls.jsonl.gz",
+      "size": 112088,
+      "sha256": "cbb1531eec81a64808f953ccb3545ecc4c0c8991bcad0185f20ef244390121e2",
+      "records": 9706
+    },
+    {
+      "path": "catalog/inheritance.jsonl.gz",
+      "size": 531589,
+      "sha256": "49c064e327e08ff4fd6bb13d2f42b0417f1effbe6e9e4de7e1cb2f3b394f70f3",
+      "records": 93271
+    },
+    {
+      "path": "catalog/typed_initializer_corrections.jsonl.gz",
+      "size": 45507,
+      "sha256": "7318e9944ac7fba338ed3a87f3db85761a28219bf83a82a08f0ae92d2032aaf7",
+      "records": 1280
+    },
+    {
+      "path": "catalog/value_conflicts.jsonl.gz",
+      "size": 175642,
+      "sha256": "675e0a73a0f349910e92eab1af0d5288e54dee6551429f055e5826a14c7b66f9",
+      "records": 6145
+    }
+  ],
+  "source_table": "catalog/sources.json",
+  "occurrence_layout": {
+    "classes": [
+      "source_index",
+      "class_idx"
+    ],
+    "methods": [
+      "source_index",
+      "method_idx"
+    ],
+    "fields": [
+      "source_index",
+      "field_idx",
+      "encoded_initializer_offset_or_null",
+      "class_initializer_method_idx_or_null"
+    ]
+  },
+  "variants": "Each variant v is shared declaration/scan metadata; p lists every exact DEX occurrence. No first-copy selection. Equal metadata is not proof of equal implementation; method bodies/hashes stay private and source_id + method_idx is the public exact locator. Resource and application declarations remain explicit categories.",
+  "runtime_class_origin_verified": false,
+  "effective_runtime_values_computed": false,
+  "private_lossless_page_manifest": "private/declaration_pages_manifest.json"
+}

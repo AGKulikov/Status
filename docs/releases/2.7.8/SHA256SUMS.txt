@@ -1,0 +1,2 @@
+6c189c4c93dcbbe6a8bc17c66a30cbe89dcadde5e3b42efe13fb352bc688895d  Natro-2.7.8-signed.apk
+19fdba821d64b0613bc05b47ee8fcb0490443966f6cf2c00a038650ddf0620b9  Navigator-30.3.0-Natro-2.7.8-signed.apk

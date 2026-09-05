@@ -1,0 +1,103 @@
+name: Authorize exact HA1232 Natro signed prerelease
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: authorize-ha1232-natro-v2.2.0
+  cancel-in-progress: false
+
+jobs:
+  create-exact-tag:
+    name: Create one immutable Natro 2.2.0 release tag
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      source_sha: ${{ steps.tag.outputs.source_sha }}
+
+    steps:
+      - name: Checkout exact release-intent commit without persisted credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify exact one-shot release intent
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = 'AGKulikov/Status'
+          test "$GITHUB_REF" = 'refs/heads/agent/natro-helper-car-control-2.2.0'
+          test "$GITHUB_SHA" = "$(git rev-parse 'HEAD^{commit}')"
+          test -z "$(git status --short --ignore-submodules=none)"
+          REMOTE_BRANCH_SHA=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/heads/agent/natro-helper-car-control-2.2.0" \
+            --jq '.object.sha')
+          test "$REMOTE_BRANCH_SHA" = "$GITHUB_SHA"
+          jq -e \
+            '.schema == "natro-release-intent/v1"
+              and .appName == "Natro"
+              and .tag == "natro-v2.2.0"
+              and .versionName == "2.2.0"
+              and .versionCode == 208021232
+              and .helperVersion == "53.0"
+              and .helperBuild == 53
+              and .publication == "signed-prerelease"
+              and .certificateSha256 == "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"' \
+            release-manifests/HA1232.publish.json >/dev/null
+          grep -Fq "return '2.2.0'" build.gradle
+          grep -Fq 'return 208021232' build.gradle
+          test "$(sed -n 's/.*<string name="app_name">\(.*\)<\/string>.*/\1/p' \
+            app/src/main/res/values/strings.xml)" = 'Natro'
+          test "$(sed -n 's/.*<string name="app_name">\(.*\)<\/string>.*/\1/p' \
+            app/src/main/res/values-ru/strings.xml)" = 'Natro'
+          HELPER_TREE=$(git rev-parse \
+            "${GITHUB_SHA}:ios/KX11-iPhone-ANCS-Helper-v53")
+          test "$HELPER_TREE" = '6e38ebfbee71f080374609a11391a9ae1d288621'
+
+      - name: Create exact tag without moving or overwriting anything
+        id: tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG='natro-v2.2.0'
+          TAG_API="repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}"
+          if EXISTING=$(gh api "$TAG_API" 2>/dev/null); then
+            test "$(jq -r '.object.type' <<<"$EXISTING")" = commit
+            test "$(jq -r '.object.sha' <<<"$EXISTING")" = "$GITHUB_SHA" || {
+              echo "Existing $TAG points to another commit; refusing to move it" >&2
+              exit 1
+            }
+          else
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "A release already exists without the expected exact tag" >&2
+              exit 1
+            fi
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${TAG}" \
+              -f sha="$GITHUB_SHA" >/dev/null
+          fi
+          VERIFIED=$(gh api "$TAG_API")
+          test "$(jq -r '.object.type' <<<"$VERIFIED")" = commit
+          test "$(jq -r '.object.sha' <<<"$VERIFIED")" = "$GITHUB_SHA"
+          echo "source_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+  sign-and-publish:
+    name: Build, sign, verify and publish exact Natro bytes
+    needs: create-exact-tag
+    uses: ./.github/workflows/release-ha1232.yml
+    with:
+      release_ref: ${{ needs.create-exact-tag.outputs.source_sha }}
+    secrets: inherit

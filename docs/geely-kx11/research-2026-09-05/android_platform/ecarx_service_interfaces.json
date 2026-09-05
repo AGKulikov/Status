@@ -1,0 +1,4077 @@
+[
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/bluetooth/IEcarxBluetoothServiceExtension;",
+    "methods": [
+      {
+        "name": "getConnectedPhoneNumber",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 0
+      },
+      {
+        "name": "getHfpAutoRejectConnStatus",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "getPhoneBookContactsCount",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getSyncPhonebookStatus",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "registerPbapListener",
+        "descriptor": "(Lecarx/bluetooth/IRemotePbapListener;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setBluetoothAutoConnect",
+        "descriptor": "(Ljava/lang/String; I Z)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setBluetoothPassiveConnect",
+        "descriptor": "(Ljava/lang/String; Z I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setHfpAutoRejectConnStatus",
+        "descriptor": "(Z)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "syncPhonebook",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "unregisterPbapListener",
+        "descriptor": "(Lecarx/bluetooth/IRemotePbapListener;)Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/bluetooth/IRemotePbapListener;",
+    "methods": [
+      {
+        "name": "onRemoteSyncPhonebookStatusChanged",
+        "descriptor": "(I I)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/csd/CsdManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 43364
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/csd/CsdManager;)Landroid/os/IBinder;",
+        "code_offset": 42156
+      },
+      {
+        "name": "access$002",
+        "descriptor": "(Lecarx/csd/CsdManager; Landroid/os/IBinder;)Landroid/os/IBinder;",
+        "code_offset": 42180
+      },
+      {
+        "name": "access$102",
+        "descriptor": "(Lecarx/csd/CsdManager; Lecarx/csd/ICsdService;)Lecarx/csd/ICsdService;",
+        "code_offset": 43240
+      },
+      {
+        "name": "access$202",
+        "descriptor": "(Lecarx/csd/CsdManager; Z)Z",
+        "code_offset": 42204
+      },
+      {
+        "name": "access$300",
+        "descriptor": "(Lecarx/csd/CsdManager;)V",
+        "code_offset": 43468
+      },
+      {
+        "name": "access$400",
+        "descriptor": "(Lecarx/csd/CsdManager;)Z",
+        "code_offset": 42228
+      },
+      {
+        "name": "ensureServiceAvailable",
+        "descriptor": "()V",
+        "code_offset": 43568
+      },
+      {
+        "name": "getIdForCallback",
+        "descriptor": "(Lecarx/csd/ICsdServiceCallback;)Ljava/lang/String;",
+        "code_offset": 43264
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/csd/CsdManager;",
+        "code_offset": 43132
+      },
+      {
+        "name": "getService",
+        "descriptor": "()Z",
+        "code_offset": 42256
+      },
+      {
+        "name": "reRegisterCallback",
+        "descriptor": "()V",
+        "code_offset": 43772
+      },
+      {
+        "name": "demo",
+        "descriptor": "([B [B)V",
+        "code_offset": 43492
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Lecarx/csd/ICsdServiceCallback;)Z",
+        "code_offset": 42764
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Lecarx/csd/ICsdServiceCallback;)Z",
+        "code_offset": 42960
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/csd/ICsdService;",
+    "methods": [
+      {
+        "name": "demo",
+        "descriptor": "([B [B)V",
+        "code_offset": 0
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/csd/ICsdServiceCallback;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/csd/ICsdServiceCallback;)Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/csd/ICsdServiceCallback;",
+    "methods": [
+      {
+        "name": "demo",
+        "descriptor": "()V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/csdm/CsdmManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 45828
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/csdm/CsdmManager;)Landroid/os/IBinder;",
+        "code_offset": 45196
+      },
+      {
+        "name": "access$002",
+        "descriptor": "(Lecarx/csdm/CsdmManager; Landroid/os/IBinder;)Landroid/os/IBinder;",
+        "code_offset": 45220
+      },
+      {
+        "name": "access$102",
+        "descriptor": "(Lecarx/csdm/CsdmManager; Lecarx/csdm/ICsdmService;)Lecarx/csdm/ICsdmService;",
+        "code_offset": 45804
+      },
+      {
+        "name": "ensureServiceAvailable",
+        "descriptor": "()V",
+        "code_offset": 45904
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/csdm/CsdmManager;",
+        "code_offset": 45684
+      },
+      {
+        "name": "getService",
+        "descriptor": "()V",
+        "code_offset": 46108
+      },
+      {
+        "name": "notifyCsdmVibrate",
+        "descriptor": "()Z",
+        "code_offset": 45244
+      },
+      {
+        "name": "set6inchScrSleepTime",
+        "descriptor": "(I)Z",
+        "code_offset": 45324
+      },
+      {
+        "name": "setAirQuality",
+        "descriptor": "(I)V",
+        "code_offset": 46348
+      },
+      {
+        "name": "setCsdmVibrateLevel",
+        "descriptor": "(I)Z",
+        "code_offset": 45424
+      },
+      {
+        "name": "setOutpm25",
+        "descriptor": "(I)Z",
+        "code_offset": 45512
+      },
+      {
+        "name": "setWeatherInfo",
+        "descriptor": "(I)Z",
+        "code_offset": 45592
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/csdm/ICsdmService;",
+    "methods": [
+      {
+        "name": "notifyCsdmVibrate",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "set6inchScrSleepTime",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setCsdmVibrateLevel",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setOutAirQuality",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "setOutpm25",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setWeatherInfo",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/dimprotocol/DIMProtocolManager;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 49528
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 49552
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/dimprotocol/DIMProtocolManager;)Lecarx/dimprotocol/IDIMProtocolServiceCallback;",
+        "code_offset": 49216
+      },
+      {
+        "name": "access$100",
+        "descriptor": "(Lecarx/dimprotocol/DIMProtocolManager;)Landroid/os/IBinder;",
+        "code_offset": 47944
+      },
+      {
+        "name": "access$102",
+        "descriptor": "(Lecarx/dimprotocol/DIMProtocolManager; Landroid/os/IBinder;)Landroid/os/IBinder;",
+        "code_offset": 47968
+      },
+      {
+        "name": "access$202",
+        "descriptor": "(Lecarx/dimprotocol/DIMProtocolManager; Lecarx/dimprotocol/IDIMProtocolService;)Lecarx/dimprotocol/IDIMProtocolService;",
+        "code_offset": 49192
+      },
+      {
+        "name": "access$302",
+        "descriptor": "(Lecarx/dimprotocol/DIMProtocolManager; Z)Z",
+        "code_offset": 47992
+      },
+      {
+        "name": "access$400",
+        "descriptor": "(Lecarx/dimprotocol/DIMProtocolManager;)Z",
+        "code_offset": 48016
+      },
+      {
+        "name": "access$500",
+        "descriptor": "(Lecarx/dimprotocol/DIMProtocolManager;)V",
+        "code_offset": 49664
+      },
+      {
+        "name": "ensureServiceAvailable",
+        "descriptor": "()Z",
+        "code_offset": 48044
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/dimprotocol/DIMProtocolManager;",
+        "code_offset": 49088
+      },
+      {
+        "name": "getService",
+        "descriptor": "()Z",
+        "code_offset": 48256
+      },
+      {
+        "name": "reRegisterCallback",
+        "descriptor": "()V",
+        "code_offset": 49744
+      },
+      {
+        "name": "getFestivalPaperValue",
+        "descriptor": "()I",
+        "code_offset": 49240
+      },
+      {
+        "name": "getHUDMode",
+        "descriptor": "()I",
+        "code_offset": 49316
+      },
+      {
+        "name": "getNaviMode",
+        "descriptor": "()I",
+        "code_offset": 49376
+      },
+      {
+        "name": "getWallPaperValue",
+        "descriptor": "()I",
+        "code_offset": 49452
+      },
+      {
+        "name": "onChangeNaviMode",
+        "descriptor": "(I)V",
+        "code_offset": 49688
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Lecarx/dimprotocol/IDIMProtocolServiceCallback;)Z",
+        "code_offset": 48644
+      },
+      {
+        "name": "registerNaviFunctionCallback",
+        "descriptor": "(Lecarx/dimprotocol/INaviFunctionCallback;)Z",
+        "code_offset": 48772
+      },
+      {
+        "name": "sendMessageToDIM",
+        "descriptor": "(B B B [B)V",
+        "code_offset": 49800
+      },
+      {
+        "name": "setFestivalPaperValue",
+        "descriptor": "(I)V",
+        "code_offset": 49960
+      },
+      {
+        "name": "setNaviMode",
+        "descriptor": "(I)V",
+        "code_offset": 50060
+      },
+      {
+        "name": "setWallPaperValue",
+        "descriptor": "(I)V",
+        "code_offset": 50160
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Lecarx/dimprotocol/IDIMProtocolServiceCallback;)Z",
+        "code_offset": 48896
+      },
+      {
+        "name": "unregisterNaviFunctionCallback",
+        "descriptor": "(Lecarx/dimprotocol/INaviFunctionCallback;)Z",
+        "code_offset": 49028
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/dimprotocol/IDIMProtocolService;",
+    "methods": [
+      {
+        "name": "getFestivalPaperValue",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getHUDMode",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getNaviMode",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getWallPaperValue",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "onChangeNaviMode",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "registerDIMServiceCallback",
+        "descriptor": "(Lecarx/dimprotocol/IDIMProtocolServiceCallback;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "registerNaviFunctionCallback",
+        "descriptor": "(Lecarx/dimprotocol/INaviFunctionCallback;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "sendMessageToDIM",
+        "descriptor": "(B B B B)V",
+        "code_offset": 0
+      },
+      {
+        "name": "setFestivalPaperValue",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "setNaviMode",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "setWallPaperValue",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "unregisterDIMServiceCallback",
+        "descriptor": "(Lecarx/dimprotocol/IDIMProtocolServiceCallback;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "unregisterNaviFunctionCallback",
+        "descriptor": "(Lecarx/dimprotocol/INaviFunctionCallback;)Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/dimprotocol/IDIMProtocolServiceCallback;",
+    "methods": [
+      {
+        "name": "onAck",
+        "descriptor": "(B)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onError",
+        "descriptor": "(B)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onFestivalPaperStatusChanged",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "onReceived",
+        "descriptor": "(B B)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onWallPaperStatusChanged",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/dimprotocol/INaviFunctionCallback;",
+    "methods": [
+      {
+        "name": "onChangeNaviMode",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/dtcnl/DtcnlManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 55080
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/dtcnl/DtcnlManager;)Landroid/os/IBinder;",
+        "code_offset": 54264
+      },
+      {
+        "name": "access$002",
+        "descriptor": "(Lecarx/dtcnl/DtcnlManager; Landroid/os/IBinder;)Landroid/os/IBinder;",
+        "code_offset": 54288
+      },
+      {
+        "name": "access$102",
+        "descriptor": "(Lecarx/dtcnl/DtcnlManager; Lecarx/dtcnl/IDtcnlService;)Lecarx/dtcnl/IDtcnlService;",
+        "code_offset": 54988
+      },
+      {
+        "name": "access$200",
+        "descriptor": "(Lecarx/dtcnl/DtcnlManager;)V",
+        "code_offset": 55168
+      },
+      {
+        "name": "ensureServiceAvailable",
+        "descriptor": "()V",
+        "code_offset": 55192
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/dtcnl/DtcnlManager;",
+        "code_offset": 54880
+      },
+      {
+        "name": "reConnectDtcnl",
+        "descriptor": "()V",
+        "code_offset": 55396
+      },
+      {
+        "name": "getDtcCodeStatus",
+        "descriptor": "(I)I",
+        "code_offset": 55012
+      },
+      {
+        "name": "getService",
+        "descriptor": "()Z",
+        "code_offset": 54312
+      },
+      {
+        "name": "setDtcCode",
+        "descriptor": "(I I)Z",
+        "code_offset": 54756
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/dtcnl/IDtcnlService;",
+    "methods": [
+      {
+        "name": "getDtcCodeStatus",
+        "descriptor": "(I)I",
+        "code_offset": 0
+      },
+      {
+        "name": "setDtcCode",
+        "descriptor": "(I I)Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/multidisplay/EcarxMultidisplayManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 57420
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/multidisplay/EcarxMultidisplayManager;)Lecarx/multidisplay/EcarxMultidisplayManager$MultidisplayServiceDeathRecipient;",
+        "code_offset": 57240
+      },
+      {
+        "name": "access$100",
+        "descriptor": "(Lecarx/multidisplay/EcarxMultidisplayManager;)Landroid/os/IBinder;",
+        "code_offset": 56364
+      },
+      {
+        "name": "access$102",
+        "descriptor": "(Lecarx/multidisplay/EcarxMultidisplayManager; Landroid/os/IBinder;)Landroid/os/IBinder;",
+        "code_offset": 56388
+      },
+      {
+        "name": "access$202",
+        "descriptor": "(Lecarx/multidisplay/EcarxMultidisplayManager; Lecarx/multidisplay/IEcarxMultidisplay;)Lecarx/multidisplay/IEcarxMultidisplay;",
+        "code_offset": 57264
+      },
+      {
+        "name": "access$300",
+        "descriptor": "(Lecarx/multidisplay/EcarxMultidisplayManager;)V",
+        "code_offset": 57496
+      },
+      {
+        "name": "access$400",
+        "descriptor": "(Lecarx/multidisplay/EcarxMultidisplayManager;)Lecarx/multidisplay/IEcarxMultidisplayCallback;",
+        "code_offset": 57288
+      },
+      {
+        "name": "connectMultidisplayService",
+        "descriptor": "()V",
+        "code_offset": 57520
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/multidisplay/EcarxMultidisplayManager;",
+        "code_offset": 57160
+      },
+      {
+        "name": "registerCallbackInner",
+        "descriptor": "(Ljava/lang/String; Lecarx/multidisplay/IEcarxMultidisplayCallback;)Z",
+        "code_offset": 56412
+      },
+      {
+        "name": "unregisterCallbackInner",
+        "descriptor": "(Ljava/lang/String; Lecarx/multidisplay/IEcarxMultidisplayCallback;)Z",
+        "code_offset": 56900
+      },
+      {
+        "name": "getPsdDisplayOnAndOff",
+        "descriptor": "()I",
+        "code_offset": 57312
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Lecarx/multidisplay/IEcarxMultidisplayCallback;)V",
+        "code_offset": 57716
+      },
+      {
+        "name": "setPsdDisplayOnAndOff",
+        "descriptor": "(I)Z",
+        "code_offset": 56672
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Lecarx/multidisplay/IEcarxMultidisplayCallback;)V",
+        "code_offset": 57860
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/multidisplay/IEcarxMultidisplay;",
+    "methods": [
+      {
+        "name": "getPsdDisplayOnAndOff",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/multidisplay/IEcarxMultidisplayCallback;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setPsdDisplayOnAndOff",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/multidisplay/IEcarxMultidisplayCallback;)Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/multidisplay/IEcarxMultidisplayCallback;",
+    "methods": [
+      {
+        "name": "updatePsdDisplayOnAndOff",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/notify/EcarxNotifyManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 59816
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/notify/EcarxNotifyManager;)Landroid/os/IBinder;",
+        "code_offset": 59536
+      },
+      {
+        "name": "access$002",
+        "descriptor": "(Lecarx/notify/EcarxNotifyManager; Landroid/os/IBinder;)Landroid/os/IBinder;",
+        "code_offset": 59560
+      },
+      {
+        "name": "access$102",
+        "descriptor": "(Lecarx/notify/EcarxNotifyManager; Lecarx/notify/IEcarxNotifyService;)Lecarx/notify/IEcarxNotifyService;",
+        "code_offset": 59792
+      },
+      {
+        "name": "ensureServiceAvailable",
+        "descriptor": "()Z",
+        "code_offset": 59584
+      },
+      {
+        "name": "initService",
+        "descriptor": "()V",
+        "code_offset": 60056
+      },
+      {
+        "name": "cancleNotify",
+        "descriptor": "(I)V",
+        "code_offset": 59892
+      },
+      {
+        "name": "sendNotify",
+        "descriptor": "(I Lecarx/notify/IEcarxNotifyCallBack;)V",
+        "code_offset": 60552
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/notify/IEcarxNotifyCallBack;",
+    "methods": [
+      {
+        "name": "notifyStatusChange",
+        "descriptor": "(I I I)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/notify/IEcarxNotifyService;",
+    "methods": [
+      {
+        "name": "cancleNotify",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "sendNotify",
+        "descriptor": "(I Lecarx/notify/IEcarxNotifyCallBack;)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/os/AbsConfig;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 62152
+      },
+      {
+        "name": "getBoolean",
+        "descriptor": "(Ljava/lang/Object;)Z",
+        "code_offset": 61824
+      },
+      {
+        "name": "getFloat",
+        "descriptor": "(Ljava/lang/Object;)F",
+        "code_offset": 61916
+      },
+      {
+        "name": "getInt",
+        "descriptor": "(Ljava/lang/Object;)I",
+        "code_offset": 61960
+      },
+      {
+        "name": "getLong",
+        "descriptor": "(Ljava/lang/Object;)J",
+        "code_offset": 62108
+      },
+      {
+        "name": "getString",
+        "descriptor": "(Ljava/lang/Object;)Ljava/lang/String;",
+        "code_offset": 62072
+      },
+      {
+        "name": "getValue",
+        "descriptor": "(Ljava/lang/Object;)Ljava/lang/Object;",
+        "code_offset": 62004
+      },
+      {
+        "name": "getValue",
+        "descriptor": "(Ljava/lang/Object; Ljava/lang/Object;)Ljava/lang/Object;",
+        "code_offset": 62036
+      },
+      {
+        "name": "reload",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "reset",
+        "descriptor": "()Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/os/Environment;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 62608
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 62728
+      },
+      {
+        "name": "getDirectory",
+        "descriptor": "(Ljava/lang/String; Ljava/lang/String;)Ljava/io/File;",
+        "code_offset": 62196
+      },
+      {
+        "name": "getExternalUDisk1Directory",
+        "descriptor": "()Ljava/io/File;",
+        "code_offset": 62276
+      },
+      {
+        "name": "getExternalUDisk1StorageState",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 62436
+      },
+      {
+        "name": "getExternalUDisk2Directory",
+        "descriptor": "()Ljava/io/File;",
+        "code_offset": 62320
+      },
+      {
+        "name": "getExternalUDisk2StorageState",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 62468
+      },
+      {
+        "name": "getLocalConfigDirectory",
+        "descriptor": "()Ljava/io/File;",
+        "code_offset": 62364
+      },
+      {
+        "name": "getLocalConfigDirectoryState",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 62500
+      },
+      {
+        "name": "getMediaState",
+        "descriptor": "(Ljava/io/File;)Ljava/lang/String;",
+        "code_offset": 62532
+      },
+      {
+        "name": "getPrivateGKUIDirectory",
+        "descriptor": "()Ljava/io/File;",
+        "code_offset": 62388
+      },
+      {
+        "name": "getVrResourceDirectory",
+        "descriptor": "()Ljava/io/File;",
+        "code_offset": 62412
+      },
+      {
+        "name": "getVrResourceDirectoryState",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 62576
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/os/PartNumber;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 67084
+      },
+      {
+        "name": "convertGeelyPN",
+        "descriptor": "(Ljava/lang/String;)[B",
+        "code_offset": 64484
+      },
+      {
+        "name": "convertSerialNum",
+        "descriptor": "(Ljava/lang/String;)[B",
+        "code_offset": 64536
+      },
+      {
+        "name": "convertVolvoPN",
+        "descriptor": "(Ljava/lang/String;)[B",
+        "code_offset": 64584
+      },
+      {
+        "name": "getDUGeely",
+        "descriptor": "()[B",
+        "code_offset": 64636
+      },
+      {
+        "name": "getDUGeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66316
+      },
+      {
+        "name": "getDUVolvo",
+        "descriptor": "()[B",
+        "code_offset": 64716
+      },
+      {
+        "name": "getDUVolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66348
+      },
+      {
+        "name": "getHWSD_HWKNGeely",
+        "descriptor": "()[B",
+        "code_offset": 64796
+      },
+      {
+        "name": "getHWSD_HWKNGeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66380
+      },
+      {
+        "name": "getHWSD_HWKNVolvo",
+        "descriptor": "()[B",
+        "code_offset": 64876
+      },
+      {
+        "name": "getHWSD_HWKNVolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66412
+      },
+      {
+        "name": "getProduct_Serial_Number",
+        "descriptor": "()[B",
+        "code_offset": 64956
+      },
+      {
+        "name": "getProduct_Serial_NumberProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66444
+      },
+      {
+        "name": "getSWK1Geely",
+        "descriptor": "()[B",
+        "code_offset": 65036
+      },
+      {
+        "name": "getSWK1GeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66476
+      },
+      {
+        "name": "getSWK1Volvo",
+        "descriptor": "()[B",
+        "code_offset": 65116
+      },
+      {
+        "name": "getSWK1VolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66508
+      },
+      {
+        "name": "getSWK2Geely",
+        "descriptor": "()[B",
+        "code_offset": 65196
+      },
+      {
+        "name": "getSWK2GeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66540
+      },
+      {
+        "name": "getSWK2Volvo",
+        "descriptor": "()[B",
+        "code_offset": 65276
+      },
+      {
+        "name": "getSWK2VolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66572
+      },
+      {
+        "name": "getSWL2Geely",
+        "descriptor": "()[B",
+        "code_offset": 65356
+      },
+      {
+        "name": "getSWL2GeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66604
+      },
+      {
+        "name": "getSWL2Volvo",
+        "descriptor": "()[B",
+        "code_offset": 65436
+      },
+      {
+        "name": "getSWL2VolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66636
+      },
+      {
+        "name": "getSWL3Geely",
+        "descriptor": "()[B",
+        "code_offset": 65516
+      },
+      {
+        "name": "getSWL3GeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66668
+      },
+      {
+        "name": "getSWL3Volvo",
+        "descriptor": "()[B",
+        "code_offset": 65596
+      },
+      {
+        "name": "getSWL3VolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66708
+      },
+      {
+        "name": "getSWL4Geely",
+        "descriptor": "()[B",
+        "code_offset": 65676
+      },
+      {
+        "name": "getSWL4GeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66748
+      },
+      {
+        "name": "getSWL4Volvo",
+        "descriptor": "()[B",
+        "code_offset": 65756
+      },
+      {
+        "name": "getSWL4VolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66788
+      },
+      {
+        "name": "getSWLMGeely",
+        "descriptor": "()[B",
+        "code_offset": 65836
+      },
+      {
+        "name": "getSWLMGeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66828
+      },
+      {
+        "name": "getSWLMVolvo",
+        "descriptor": "()[B",
+        "code_offset": 65916
+      },
+      {
+        "name": "getSWLMVolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66868
+      },
+      {
+        "name": "getSWP1Geely",
+        "descriptor": "()[B",
+        "code_offset": 65996
+      },
+      {
+        "name": "getSWP1GeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66908
+      },
+      {
+        "name": "getSWP1Volvo",
+        "descriptor": "()[B",
+        "code_offset": 66076
+      },
+      {
+        "name": "getSWP1VolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 66956
+      },
+      {
+        "name": "getSXDI_SWLMGeely",
+        "descriptor": "()[B",
+        "code_offset": 66156
+      },
+      {
+        "name": "getSXDI_SWLMGeelyProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 67004
+      },
+      {
+        "name": "getSXDI_SWLMVolvo",
+        "descriptor": "()[B",
+        "code_offset": 66236
+      },
+      {
+        "name": "getSXDI_SWLMVolvoProp",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 67044
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/IOtaService;",
+    "methods": [
+      {
+        "name": "buildInstallationConsentTest",
+        "descriptor": "(Ljava/lang/String; I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "buildOTAAppInsConsentTest",
+        "descriptor": "(Lecarx/ota/OpOTAAppInsConsentParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "buildOTAConnectivityStsTest",
+        "descriptor": "(Lecarx/ota/OpOTAConnectivityStsParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "buildOTAHMILanguageSettingsTest",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "buildOTAPacketTest",
+        "descriptor": "(Lecarx/ota/OpOTAAssignmentParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "buildOTASyncSchInstallTimeTest",
+        "descriptor": "(Lecarx/ota/OpOTASyncSchInstallTimeParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "buildOTATCAMPacketTest",
+        "descriptor": "(Lecarx/ota/OpOTATCAMAssignmentParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "checkServiceAvailable",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/ota/IOtaServiceCallback;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "requestOTAAssignment",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "requestResourceGroupWithPriority",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "requestSyncSchInstallTime",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "setDownloadConsent",
+        "descriptor": "(Ljava/lang/String; Z)V",
+        "code_offset": 0
+      },
+      {
+        "name": "setInstallationConsent",
+        "descriptor": "(Ljava/lang/String; I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "setOTAHMILanguageSettings",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/ota/IOtaServiceCallback;)Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/IOtaServiceCallback;",
+    "methods": [
+      {
+        "name": "onConnectivityStsInfo",
+        "descriptor": "(Lecarx/ota/OpOTAConnectivityStsParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onOTAAppInsConsentInfo",
+        "descriptor": "(Lecarx/ota/OpOTAAppInsConsentParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onOTAAssignmentSyncErrorInfo",
+        "descriptor": "(I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onOTAAssignmentSyncInfo",
+        "descriptor": "(Lecarx/ota/OpOTAAssignmentParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onOTADownloadProgressErrorInfo",
+        "descriptor": "(I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onOTADownloadProgressInfo",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onOTASyncSchInstallTimeInfo",
+        "descriptor": "(Lecarx/ota/OpOTASyncSchInstallTimeParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onOTATCAMAssignmentErrorInfo",
+        "descriptor": "(I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onOTATCAMAssignmentInfo",
+        "descriptor": "(Lecarx/ota/OpOTATCAMAssignmentParam;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onServiceUnavailableError",
+        "descriptor": "()V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/OpBSSIDDisplayedVersionSyncParam;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 71968
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 72000
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Lecarx/ota/OpBSSIDDisplayedVersionSyncParam;)V",
+        "code_offset": 72036
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 71948
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 72080
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/OpOTAAppInsConsentParam;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 72308
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 72340
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Lecarx/ota/OpOTAAppInsConsentParam;)V",
+        "code_offset": 72384
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 72288
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 72432
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/OpOTAAssignmentParam;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 72780
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 72812
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Lecarx/ota/OpOTAAssignmentParam;)V",
+        "code_offset": 72896
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 72760
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 73024
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/OpOTAConnectivityStsParam;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 73316
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 73348
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Lecarx/ota/OpOTAConnectivityStsParam;)V",
+        "code_offset": 73380
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 73296
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 73416
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/OpOTAInstallationRegretTimeOutParam;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 73644
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 73676
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Lecarx/ota/OpOTAInstallationRegretTimeOutParam;)V",
+        "code_offset": 73720
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 73624
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 73780
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/OpOTASyncSchInstallTimeParam;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 74004
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 74036
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Lecarx/ota/OpOTASyncSchInstallTimeParam;)V",
+        "code_offset": 74068
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 73984
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 74104
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/OpOTATCAMAssignmentParam;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 74332
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 74364
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Lecarx/ota/OpOTATCAMAssignmentParam;)V",
+        "code_offset": 74408
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 74312
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 74468
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/OtaManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 76004
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/ota/OtaManager;)Lecarx/ota/IOtaServiceCallback;",
+        "code_offset": 75848
+      },
+      {
+        "name": "access$100",
+        "descriptor": "(Lecarx/ota/OtaManager;)Ljava/lang/String;",
+        "code_offset": 75980
+      },
+      {
+        "name": "access$200",
+        "descriptor": "(Lecarx/ota/OtaManager;)Landroid/os/IBinder;",
+        "code_offset": 74800
+      },
+      {
+        "name": "access$202",
+        "descriptor": "(Lecarx/ota/OtaManager; Landroid/os/IBinder;)Landroid/os/IBinder;",
+        "code_offset": 74824
+      },
+      {
+        "name": "access$302",
+        "descriptor": "(Lecarx/ota/OtaManager; Lecarx/ota/IOtaService;)Lecarx/ota/IOtaService;",
+        "code_offset": 75824
+      },
+      {
+        "name": "access$402",
+        "descriptor": "(Lecarx/ota/OtaManager; Z)Z",
+        "code_offset": 74848
+      },
+      {
+        "name": "access$500",
+        "descriptor": "(Lecarx/ota/OtaManager;)Z",
+        "code_offset": 74872
+      },
+      {
+        "name": "access$600",
+        "descriptor": "(Lecarx/ota/OtaManager;)V",
+        "code_offset": 76072
+      },
+      {
+        "name": "ensureServiceAvailable",
+        "descriptor": "()Z",
+        "code_offset": 74976
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/ota/OtaManager;",
+        "code_offset": 75872
+      },
+      {
+        "name": "getService",
+        "descriptor": "()Z",
+        "code_offset": 75188
+      },
+      {
+        "name": "reRegisterCallback",
+        "descriptor": "()V",
+        "code_offset": 76600
+      },
+      {
+        "name": "buildInstallationConsentTest",
+        "descriptor": "(Ljava/lang/String; I I)V",
+        "code_offset": 76096
+      },
+      {
+        "name": "buildOTAAppInsConsentTest",
+        "descriptor": "(Lecarx/ota/OpOTAAppInsConsentParam;)V",
+        "code_offset": 76168
+      },
+      {
+        "name": "buildOTAConnectivityStsTest",
+        "descriptor": "(Lecarx/ota/OpOTAConnectivityStsParam;)V",
+        "code_offset": 76240
+      },
+      {
+        "name": "buildOTAHMILanguageSettingsTest",
+        "descriptor": "(I)V",
+        "code_offset": 76312
+      },
+      {
+        "name": "buildOTAPacketTest",
+        "descriptor": "(Lecarx/ota/OpOTAAssignmentParam;)V",
+        "code_offset": 76384
+      },
+      {
+        "name": "buildOTASyncSchInstallTimeTest",
+        "descriptor": "(Lecarx/ota/OpOTASyncSchInstallTimeParam;)V",
+        "code_offset": 76456
+      },
+      {
+        "name": "buildOTATCAMPacketTest",
+        "descriptor": "(Lecarx/ota/OpOTATCAMAssignmentParam;)V",
+        "code_offset": 76528
+      },
+      {
+        "name": "checkServiceAvailable",
+        "descriptor": "()Z",
+        "code_offset": 74900
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/ota/IOtaServiceCallback;)Z",
+        "code_offset": 75560
+      },
+      {
+        "name": "requestOTAAssignment",
+        "descriptor": "()V",
+        "code_offset": 76656
+      },
+      {
+        "name": "requestResourceGroupWithPriority",
+        "descriptor": "()V",
+        "code_offset": 76728
+      },
+      {
+        "name": "requestSyncSchInstallTime",
+        "descriptor": "()V",
+        "code_offset": 76800
+      },
+      {
+        "name": "setDownloadConsent",
+        "descriptor": "(Ljava/lang/String; Z)V",
+        "code_offset": 76872
+      },
+      {
+        "name": "setInstallationConsent",
+        "descriptor": "(Ljava/lang/String; I I)V",
+        "code_offset": 76944
+      },
+      {
+        "name": "setOTAHMILanguageSettings",
+        "descriptor": "(I)V",
+        "code_offset": 77016
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/ota/IOtaServiceCallback;)Z",
+        "code_offset": 75692
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/Purpose;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 77500
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 77532
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Lecarx/ota/Purpose;)V",
+        "code_offset": 77572
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 77480
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 77624
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/pas/IPasService;",
+    "methods": [
+      {
+        "name": "notifyEcallStart",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "notifyEcallStartTimeout",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "notifyEcallStop",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "registerPasServiceCallBack",
+        "descriptor": "(Lecarx/pas/IPasServiceCallBack;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "setAvmManufacturingTestMode",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "startOrStopAvm",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/pas/IPasServiceCallBack;",
+    "methods": [
+      {
+        "name": "updateAVMState",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/power/BrightnessManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 82084
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/power/BrightnessManager;)Ljava/util/ArrayList;",
+        "code_offset": 82060
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/power/BrightnessManager;",
+        "code_offset": 79324
+      },
+      {
+        "name": "getService",
+        "descriptor": "()V",
+        "code_offset": 82160
+      },
+      {
+        "name": "getAutoDayNightMode",
+        "descriptor": "()I",
+        "code_offset": 79760
+      },
+      {
+        "name": "getBrightnessDayNightMode",
+        "descriptor": "()I",
+        "code_offset": 79924
+      },
+      {
+        "name": "getBrightnessMode",
+        "descriptor": "()I",
+        "code_offset": 80088
+      },
+      {
+        "name": "getCSDBrightness",
+        "descriptor": "()I",
+        "code_offset": 80252
+      },
+      {
+        "name": "getCSDDayBrightness",
+        "descriptor": "()I",
+        "code_offset": 80416
+      },
+      {
+        "name": "getCSDNightBrightness",
+        "descriptor": "()I",
+        "code_offset": 80580
+      },
+      {
+        "name": "getCustomDayTime",
+        "descriptor": "()F",
+        "code_offset": 79432
+      },
+      {
+        "name": "getCustomNightTime",
+        "descriptor": "()F",
+        "code_offset": 79596
+      },
+      {
+        "name": "getPSDBrightness",
+        "descriptor": "()I",
+        "code_offset": 80744
+      },
+      {
+        "name": "getPSDDayBrightness",
+        "descriptor": "()I",
+        "code_offset": 80908
+      },
+      {
+        "name": "getPSDNightBrightness",
+        "descriptor": "()I",
+        "code_offset": 81072
+      },
+      {
+        "name": "getRealDayNightMode",
+        "descriptor": "()I",
+        "code_offset": 81236
+      },
+      {
+        "name": "getScreenSaverName",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 81892
+      },
+      {
+        "name": "getScreenSaverStyle",
+        "descriptor": "()I",
+        "code_offset": 81400
+      },
+      {
+        "name": "getThemeDayNightMode",
+        "descriptor": "()I",
+        "code_offset": 81564
+      },
+      {
+        "name": "getVehicleBrightness",
+        "descriptor": "()I",
+        "code_offset": 81728
+      },
+      {
+        "name": "onPowerSoftKeyEvent",
+        "descriptor": "(I)V",
+        "code_offset": 82276
+      },
+      {
+        "name": "registerCallBack",
+        "descriptor": "(Landroid/os/IPowerStatusListener;)V",
+        "code_offset": 82380
+      },
+      {
+        "name": "setBrightnessDayNightMode",
+        "descriptor": "(I)V",
+        "code_offset": 82532
+      },
+      {
+        "name": "setBrightnessMode",
+        "descriptor": "(I)V",
+        "code_offset": 82692
+      },
+      {
+        "name": "setCSDBrightness",
+        "descriptor": "(I I)V",
+        "code_offset": 82852
+      },
+      {
+        "name": "setCustomDayTime",
+        "descriptor": "(F)V",
+        "code_offset": 83012
+      },
+      {
+        "name": "setCustomNightTime",
+        "descriptor": "(F)V",
+        "code_offset": 83172
+      },
+      {
+        "name": "setPSDBrightness",
+        "descriptor": "(I I)V",
+        "code_offset": 83332
+      },
+      {
+        "name": "setScreenSaverName",
+        "descriptor": "(Ljava/lang/String;)V",
+        "code_offset": 83492
+      },
+      {
+        "name": "setScreenSaverStyle",
+        "descriptor": "(I)V",
+        "code_offset": 83652
+      },
+      {
+        "name": "setThemeDayNightMode",
+        "descriptor": "(I)V",
+        "code_offset": 83812
+      },
+      {
+        "name": "setVehicleBrightness",
+        "descriptor": "(I)V",
+        "code_offset": 83972
+      },
+      {
+        "name": "unregisterCallBack",
+        "descriptor": "(Landroid/os/IPowerStatusListener;)V",
+        "code_offset": 84132
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/provider/BaseColumns;",
+    "methods": []
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/provider/EcarxSettings;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 91820
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 91844
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/provider/Settings;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 93156
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/psd/Device;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 94084
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 94140
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/os/Parcel;)V",
+        "code_offset": 94180
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 93608
+      },
+      {
+        "name": "equals",
+        "descriptor": "(Ljava/lang/Object;)Z",
+        "code_offset": 93336
+      },
+      {
+        "name": "getA2dpConnectStatus",
+        "descriptor": "()I",
+        "code_offset": 93628
+      },
+      {
+        "name": "getAvrcpConnectStatus",
+        "descriptor": "()I",
+        "code_offset": 93652
+      },
+      {
+        "name": "getBluetoothClass",
+        "descriptor": "()Landroid/bluetooth/BluetoothClass;",
+        "code_offset": 93312
+      },
+      {
+        "name": "getBtPower",
+        "descriptor": "()I",
+        "code_offset": 93676
+      },
+      {
+        "name": "getConnectStatus",
+        "descriptor": "()I",
+        "code_offset": 93700
+      },
+      {
+        "name": "getMacAddress",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 93852
+      },
+      {
+        "name": "getName",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 93876
+      },
+      {
+        "name": "getVolume",
+        "descriptor": "()I",
+        "code_offset": 93796
+      },
+      {
+        "name": "hashCode",
+        "descriptor": "()I",
+        "code_offset": 93820
+      },
+      {
+        "name": "isAvrcpConnected",
+        "descriptor": "()Z",
+        "code_offset": 93392
+      },
+      {
+        "name": "isBounded",
+        "descriptor": "()Z",
+        "code_offset": 93432
+      },
+      {
+        "name": "isConnected",
+        "descriptor": "()Z",
+        "code_offset": 93456
+      },
+      {
+        "name": "isDisConnected",
+        "descriptor": "()Z",
+        "code_offset": 93496
+      },
+      {
+        "name": "isSameMacAddress",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 93536
+      },
+      {
+        "name": "isSupportVolumeCtrl",
+        "descriptor": "()Z",
+        "code_offset": 93584
+      },
+      {
+        "name": "setA2dpConnectStatus",
+        "descriptor": "(I)V",
+        "code_offset": 94344
+      },
+      {
+        "name": "setAvrcpConnectStatus",
+        "descriptor": "(I)V",
+        "code_offset": 94368
+      },
+      {
+        "name": "setBluetoothClass",
+        "descriptor": "(Landroid/bluetooth/BluetoothClass;)V",
+        "code_offset": 94392
+      },
+      {
+        "name": "setBounded",
+        "descriptor": "(Z)V",
+        "code_offset": 94416
+      },
+      {
+        "name": "setBtPower",
+        "descriptor": "(I)V",
+        "code_offset": 94440
+      },
+      {
+        "name": "setMacAddress",
+        "descriptor": "(Ljava/lang/String;)V",
+        "code_offset": 94464
+      },
+      {
+        "name": "setName",
+        "descriptor": "(Ljava/lang/String;)V",
+        "code_offset": 94488
+      },
+      {
+        "name": "setSupportVolumeCtrl",
+        "descriptor": "(Z)V",
+        "code_offset": 94512
+      },
+      {
+        "name": "setVolume",
+        "descriptor": "(I)V",
+        "code_offset": 94536
+      },
+      {
+        "name": "toString",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 93900
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 94560
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/psd/IPsdService;",
+    "methods": [
+      {
+        "name": "cancelDiscovery",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "getBondedInfoList",
+        "descriptor": "()Ljava/util/List;",
+        "code_offset": 0
+      },
+      {
+        "name": "getBtInfoConnecting",
+        "descriptor": "()Lecarx/psd/Device;",
+        "code_offset": 0
+      },
+      {
+        "name": "getBtStatus",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getLocalBtInfo",
+        "descriptor": "()Lecarx/psd/PSDBluetooth;",
+        "code_offset": 0
+      },
+      {
+        "name": "getVolumeThreshold",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "isBtEnable",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "isDiscovery",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "mute",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "pause",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "play",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "psdGotosleep",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/psd/IPsdServiceCallback;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "reqDisConnect",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "reqUnBoundPair",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "requestConnect",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "requestToGetBondedDeviceInfo",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "requestToGetLocalInfo",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "setBtEnable",
+        "descriptor": "(Z)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setBtName",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setScanModel",
+        "descriptor": "(I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "setVolume",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "startDiscovery",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "stop",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "unmute",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/psd/IPsdServiceCallback;)Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/psd/IPsdServiceCallback;",
+    "methods": [
+      {
+        "name": "onBtBondedStatusUpdate",
+        "descriptor": "(Lecarx/psd/Device; Z)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onBtOperateCallback",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onFoundNearBtDeviceInfo",
+        "descriptor": "(Lecarx/psd/Device;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onHeadsetPowerChanged",
+        "descriptor": "(Lecarx/psd/Device; I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onLocalBtInfoCallback",
+        "descriptor": "(Lecarx/psd/PSDBluetooth;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onPairedDevices",
+        "descriptor": "(Ljava/util/List;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onProfileConnectionChanged",
+        "descriptor": "(Ljava/lang/String; I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onPsdBtNameChanged",
+        "descriptor": "(Ljava/lang/String;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onPsdBtStateChanged",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onScanOver",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/psd/PSDBluetooth;",
+    "methods": [
+      {
+        "name": "<clinit>",
+        "descriptor": "()V",
+        "code_offset": 104924
+      },
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 104956
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/os/Parcel;)V",
+        "code_offset": 104988
+      },
+      {
+        "name": "describeContents",
+        "descriptor": "()I",
+        "code_offset": 104808
+      },
+      {
+        "name": "getEnableStatus",
+        "descriptor": "()I",
+        "code_offset": 104828
+      },
+      {
+        "name": "getMacAddress",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 104876
+      },
+      {
+        "name": "getName",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 104900
+      },
+      {
+        "name": "getProfile",
+        "descriptor": "()I",
+        "code_offset": 104852
+      },
+      {
+        "name": "isDiscovery",
+        "descriptor": "()Z",
+        "code_offset": 104752
+      },
+      {
+        "name": "isEnable",
+        "descriptor": "()Z",
+        "code_offset": 104776
+      },
+      {
+        "name": "setDiscovery",
+        "descriptor": "(Z)V",
+        "code_offset": 105080
+      },
+      {
+        "name": "setEnableStatus",
+        "descriptor": "(I)V",
+        "code_offset": 105104
+      },
+      {
+        "name": "setMacAddress",
+        "descriptor": "(Ljava/lang/String;)V",
+        "code_offset": 105128
+      },
+      {
+        "name": "setName",
+        "descriptor": "(Ljava/lang/String;)V",
+        "code_offset": 105152
+      },
+      {
+        "name": "setProfile",
+        "descriptor": "(I)V",
+        "code_offset": 105176
+      },
+      {
+        "name": "writeToParcel",
+        "descriptor": "(Landroid/os/Parcel; I)V",
+        "code_offset": 105200
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/psd/PSDBluetoothManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 103972
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/psd/PSDBluetoothManager;)Landroid/os/IBinder;",
+        "code_offset": 101224
+      },
+      {
+        "name": "access$002",
+        "descriptor": "(Lecarx/psd/PSDBluetoothManager; Landroid/os/IBinder;)Landroid/os/IBinder;",
+        "code_offset": 101248
+      },
+      {
+        "name": "access$102",
+        "descriptor": "(Lecarx/psd/PSDBluetoothManager; Lecarx/psd/IPsdService;)Lecarx/psd/IPsdService;",
+        "code_offset": 103424
+      },
+      {
+        "name": "access$202",
+        "descriptor": "(Lecarx/psd/PSDBluetoothManager; Z)Z",
+        "code_offset": 101272
+      },
+      {
+        "name": "access$300",
+        "descriptor": "(Lecarx/psd/PSDBluetoothManager;)V",
+        "code_offset": 104076
+      },
+      {
+        "name": "access$400",
+        "descriptor": "(Lecarx/psd/PSDBluetoothManager;)Z",
+        "code_offset": 101296
+      },
+      {
+        "name": "ensureServiceAvailable",
+        "descriptor": "()V",
+        "code_offset": 104100
+      },
+      {
+        "name": "getIdForCallback",
+        "descriptor": "(Lecarx/psd/IPsdServiceCallback;)Ljava/lang/String;",
+        "code_offset": 103804
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/psd/PSDBluetoothManager;",
+        "code_offset": 103528
+      },
+      {
+        "name": "getService",
+        "descriptor": "()Z",
+        "code_offset": 101484
+      },
+      {
+        "name": "reRegisterCallback",
+        "descriptor": "()V",
+        "code_offset": 104384
+      },
+      {
+        "name": "btToSleep",
+        "descriptor": "()Z",
+        "code_offset": 101324
+      },
+      {
+        "name": "cancelDiscovery",
+        "descriptor": "()Z",
+        "code_offset": 101404
+      },
+      {
+        "name": "getBondedInfoList",
+        "descriptor": "()Ljava/util/List;",
+        "code_offset": 103884
+      },
+      {
+        "name": "getBtInfoConnecting",
+        "descriptor": "()Lecarx/psd/Device;",
+        "code_offset": 103344
+      },
+      {
+        "name": "getLocalBtInfo",
+        "descriptor": "()Lecarx/psd/PSDBluetooth;",
+        "code_offset": 103448
+      },
+      {
+        "name": "getPsdBluetoothStatus",
+        "descriptor": "()I",
+        "code_offset": 103636
+      },
+      {
+        "name": "getVolumeThreshold",
+        "descriptor": "()I",
+        "code_offset": 103716
+      },
+      {
+        "name": "isDiscovery",
+        "descriptor": "()Z",
+        "code_offset": 101992
+      },
+      {
+        "name": "isPsdBluetoothEnable",
+        "descriptor": "()Z",
+        "code_offset": 102072
+      },
+      {
+        "name": "mute",
+        "descriptor": "()V",
+        "code_offset": 104304
+      },
+      {
+        "name": "pause",
+        "descriptor": "()Z",
+        "code_offset": 102152
+      },
+      {
+        "name": "play",
+        "descriptor": "()Z",
+        "code_offset": 102236
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Lecarx/psd/IPsdServiceCallback;)Z",
+        "code_offset": 102320
+      },
+      {
+        "name": "requestBtLocalInfo",
+        "descriptor": "()V",
+        "code_offset": 104444
+      },
+      {
+        "name": "requestConnect",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 102516
+      },
+      {
+        "name": "requestDisConnect",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 102600
+      },
+      {
+        "name": "requestToGetBondedDeviceInfo",
+        "descriptor": "()V",
+        "code_offset": 104520
+      },
+      {
+        "name": "requestUnboundPair",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 102684
+      },
+      {
+        "name": "setBtEnable",
+        "descriptor": "(Z)Z",
+        "code_offset": 102768
+      },
+      {
+        "name": "setBtName",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 102848
+      },
+      {
+        "name": "setScanModel",
+        "descriptor": "(I I)V",
+        "code_offset": 104596
+      },
+      {
+        "name": "setVolume",
+        "descriptor": "(I)Z",
+        "code_offset": 102928
+      },
+      {
+        "name": "startDiscovery",
+        "descriptor": "()Z",
+        "code_offset": 103008
+      },
+      {
+        "name": "stop",
+        "descriptor": "()Z",
+        "code_offset": 103088
+      },
+      {
+        "name": "unmute",
+        "descriptor": "()V",
+        "code_offset": 104672
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Lecarx/psd/IPsdServiceCallback;)Z",
+        "code_offset": 103172
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/splitscreen/EcarxSplitScreenManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 106532
+      },
+      {
+        "name": "getActivityManager",
+        "descriptor": "()Z",
+        "code_offset": 105736
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/splitscreen/EcarxSplitScreenManager;",
+        "code_offset": 106108
+      },
+      {
+        "name": "dismissSplitScreenMode",
+        "descriptor": "()V",
+        "code_offset": 106568
+      },
+      {
+        "name": "dismissSplitScreenMode",
+        "descriptor": "(Z)V",
+        "code_offset": 106680
+      },
+      {
+        "name": "enterSplitPrimaryStackFullScreen",
+        "descriptor": "(Landroid/content/Intent;)Z",
+        "code_offset": 105492
+      },
+      {
+        "name": "getPrimaryScreenStackPackageName",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 106188
+      },
+      {
+        "name": "getSecondaryScreenStackPackageName",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 106360
+      },
+      {
+        "name": "isInSplitScreenWindowingMode",
+        "descriptor": "()Z",
+        "code_offset": 105788
+      },
+      {
+        "name": "isTopSupportsSplitScreenWindowingMode",
+        "descriptor": "()Z",
+        "code_offset": 105948
+      },
+      {
+        "name": "swapDockedAndFullscreenStack",
+        "descriptor": "()V",
+        "code_offset": 106788
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/splitscreen/IEcarxSplitScreen;",
+    "methods": [
+      {
+        "name": "dismissSplitScreenMode",
+        "descriptor": "(Z)V",
+        "code_offset": 0
+      },
+      {
+        "name": "getTopScreenPackageName",
+        "descriptor": "(Z)Ljava/lang/String;",
+        "code_offset": 0
+      },
+      {
+        "name": "isInSplitScreenWindowingMode",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "isTopSupportsSplitScreenWindowingMode",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "swapDockedAndFullscreenStack",
+        "descriptor": "()V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/splitscreen/ISplitScreen;",
+    "methods": [
+      {
+        "name": "dismissSplitScreenMode",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "dismissSplitScreenMode",
+        "descriptor": "(Z)V",
+        "code_offset": 0
+      },
+      {
+        "name": "enterSplitPrimaryStackFullScreen",
+        "descriptor": "(Landroid/content/Intent;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "getSecondaryScreenStackPackageName",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 0
+      },
+      {
+        "name": "isInSplitScreenWindowingMode",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "isTopSupportsSplitScreenWindowingMode",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "swapDockedAndFullscreenStack",
+        "descriptor": "()V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/tcam/ITcamService;",
+    "methods": [
+      {
+        "name": "cancelLightShowMode",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "closePrivateLockStatus",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "getCallDuration",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getCallbackRemainTime",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getChargingStartTime",
+        "descriptor": "()J",
+        "code_offset": 0
+      },
+      {
+        "name": "getChargingStopTime",
+        "descriptor": "()J",
+        "code_offset": 0
+      },
+      {
+        "name": "getChargingSwitchStatus",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getCurrentRVDC",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getDataCollection",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getETATimeHour",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getETATimeMinute",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getETATimeSecond",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getExternalTcamIp",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getIHUMicState",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getLightShowMode",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getLightingShowError",
+        "descriptor": "()[I",
+        "code_offset": 0
+      },
+      {
+        "name": "getLightingShowState",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getLightingShowType",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getMasterTcamExtIp",
+        "descriptor": "()[I",
+        "code_offset": 0
+      },
+      {
+        "name": "getPoiLatitude",
+        "descriptor": "()J",
+        "code_offset": 0
+      },
+      {
+        "name": "getPoiLongitude",
+        "descriptor": "()J",
+        "code_offset": 0
+      },
+      {
+        "name": "getPoiName",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 0
+      },
+      {
+        "name": "getPrivateLockStatus",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getRVDCStatus",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getRemoteDiagnostics",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getSlaveTcamExtIp",
+        "descriptor": "()[I",
+        "code_offset": 0
+      },
+      {
+        "name": "getStartCause",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getTcamResetReq",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getVehicleIpTable",
+        "descriptor": "(I)[Ljava/lang/String;",
+        "code_offset": 0
+      },
+      {
+        "name": "getXCallState",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "getXCallType",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "isCallbackMode",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "isCarLocatorEnabled",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "isCarLocatorSupported",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "isIncomingCall",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "isLightingShowEnabled",
+        "descriptor": "()I",
+        "code_offset": 0
+      },
+      {
+        "name": "isMuteStatus",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "isOnCallSupported",
+        "descriptor": "(I)I",
+        "code_offset": 0
+      },
+      {
+        "name": "isSupportedTcamReset",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/tcam/ITcamServiceCallback;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "requestCallStatus",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "requestETAInfo",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "requestRVDCAuthorizationStatus",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "requestStartCall",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "requestStopCall",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "requestUseTcamMicSpeaker",
+        "descriptor": "()V",
+        "code_offset": 0
+      },
+      {
+        "name": "sendIpMessage",
+        "descriptor": "(I Ljava/lang/String;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "sendLightingShowSource",
+        "descriptor": "([B)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "sendLightingShowSourceEnd",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "sendLightingShowSourceStart",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setCarLocatorEnable",
+        "descriptor": "(Z)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setChargingInfo",
+        "descriptor": "(I J J)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setChargingSwitchClose",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setGIDProfIDLnk",
+        "descriptor": "(Ljava/lang/String; I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setLightShowMode",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setLightingShowType",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setPrivateLockPassword",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setRequestRVDCAuthorizationStatusUserUpdate",
+        "descriptor": "(I I I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setSystemLanguage",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "setTcamResetReq",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "startLightingShow",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "stopLightingShow",
+        "descriptor": "()Z",
+        "code_offset": 0
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Ljava/lang/String; Lecarx/tcam/ITcamServiceCallback;)Z",
+        "code_offset": 0
+      },
+      {
+        "name": "xcallSubscribed",
+        "descriptor": "(I)Z",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/tcam/ITcamServiceCallback;",
+    "methods": [
+      {
+        "name": "onCallbackModeCallEvent",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onCarLocatorEnabled",
+        "descriptor": "(Z)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onChargingInfo",
+        "descriptor": "(I J J)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onETAInfoNotification",
+        "descriptor": "(I I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onExternalTcamIpNotify",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onLightingShowEnableChanged",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onLightingShowError",
+        "descriptor": "([I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onLightingShowStateChanged",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onMasterTcamExtIpNotifyCyclic",
+        "descriptor": "([I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onPOIInfo",
+        "descriptor": "(Ljava/lang/String; J J Ljava/lang/String; Ljava/lang/String; Ljava/lang/String; Ljava/lang/String; Ljava/lang/String; Ljava/lang/String;)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onPrivateLockRespResult",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onRVDCAuthorizationStatusNotification",
+        "descriptor": "(I I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onRVDCAuthorizationStatusResponse",
+        "descriptor": "(I I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onRVDCAuthorizationStatusUserUpdateResponse",
+        "descriptor": "(I I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onSlaveTcamExtIpNotifyCyclic",
+        "descriptor": "([I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onTcamMuteStatusChange",
+        "descriptor": "(Z)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onTcamResetRespResult",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onXCallInfoChanged",
+        "descriptor": "(I I I)V",
+        "code_offset": 0
+      },
+      {
+        "name": "onXcallFailedUnsubscribed",
+        "descriptor": "(I)V",
+        "code_offset": 0
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/tcam/TcamManager;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 129272
+      },
+      {
+        "name": "access$000",
+        "descriptor": "(Lecarx/tcam/TcamManager;)Landroid/os/IBinder;",
+        "code_offset": 121940
+      },
+      {
+        "name": "access$002",
+        "descriptor": "(Lecarx/tcam/TcamManager; Landroid/os/IBinder;)Landroid/os/IBinder;",
+        "code_offset": 121964
+      },
+      {
+        "name": "access$102",
+        "descriptor": "(Lecarx/tcam/TcamManager; Lecarx/tcam/ITcamService;)Lecarx/tcam/ITcamService;",
+        "code_offset": 125792
+      },
+      {
+        "name": "access$202",
+        "descriptor": "(Lecarx/tcam/TcamManager; Z)Z",
+        "code_offset": 121988
+      },
+      {
+        "name": "access$300",
+        "descriptor": "(Lecarx/tcam/TcamManager;)Z",
+        "code_offset": 122012
+      },
+      {
+        "name": "access$400",
+        "descriptor": "(Lecarx/tcam/TcamManager;)V",
+        "code_offset": 129368
+      },
+      {
+        "name": "callStateToPhoneCallState",
+        "descriptor": "(I)I",
+        "code_offset": 125924
+      },
+      {
+        "name": "callStatusToString",
+        "descriptor": "(I)Ljava/lang/String;",
+        "code_offset": 127972
+      },
+      {
+        "name": "callTypeToString",
+        "descriptor": "(I)Ljava/lang/String;",
+        "code_offset": 128412
+      },
+      {
+        "name": "checkIsValidCallType",
+        "descriptor": "(I)Z",
+        "code_offset": 122100
+      },
+      {
+        "name": "ensureServiceAvailable",
+        "descriptor": "()Z",
+        "code_offset": 122232
+      },
+      {
+        "name": "getIdForCallback",
+        "descriptor": "(Lecarx/tcam/ITcamServiceCallback;)Ljava/lang/String;",
+        "code_offset": 128684
+      },
+      {
+        "name": "getInstance",
+        "descriptor": "(Landroid/content/Context;)Lecarx/tcam/TcamManager;",
+        "code_offset": 125816
+      },
+      {
+        "name": "getService",
+        "descriptor": "()Z",
+        "code_offset": 122444
+      },
+      {
+        "name": "reRegisterCallback",
+        "descriptor": "()V",
+        "code_offset": 129392
+      },
+      {
+        "name": "requestStartCall",
+        "descriptor": "(I)Z",
+        "code_offset": 124032
+      },
+      {
+        "name": "cancelLightShowMode",
+        "descriptor": "()Z",
+        "code_offset": 122040
+      },
+      {
+        "name": "closePrivateLockStatus",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 122152
+      },
+      {
+        "name": "getCallDuration",
+        "descriptor": "()I",
+        "code_offset": 126008
+      },
+      {
+        "name": "getCallbackRemainTime",
+        "descriptor": "()I",
+        "code_offset": 126092
+      },
+      {
+        "name": "getChargingStartTime",
+        "descriptor": "()J",
+        "code_offset": 128936
+      },
+      {
+        "name": "getChargingStopTime",
+        "descriptor": "()J",
+        "code_offset": 129016
+      },
+      {
+        "name": "getChargingSwitchStatus",
+        "descriptor": "()I",
+        "code_offset": 126176
+      },
+      {
+        "name": "getCurrentRVDC",
+        "descriptor": "()I",
+        "code_offset": 126256
+      },
+      {
+        "name": "getDataCollection",
+        "descriptor": "()I",
+        "code_offset": 126340
+      },
+      {
+        "name": "getETATimeHour",
+        "descriptor": "()I",
+        "code_offset": 126424
+      },
+      {
+        "name": "getETATimeMinute",
+        "descriptor": "()I",
+        "code_offset": 126508
+      },
+      {
+        "name": "getETATimeSecond",
+        "descriptor": "()I",
+        "code_offset": 126592
+      },
+      {
+        "name": "getExternalTcamIp",
+        "descriptor": "()I",
+        "code_offset": 126676
+      },
+      {
+        "name": "getIHUMicState",
+        "descriptor": "()I",
+        "code_offset": 126736
+      },
+      {
+        "name": "getLightShowMode",
+        "descriptor": "()I",
+        "code_offset": 126816
+      },
+      {
+        "name": "getLightingShowError",
+        "descriptor": "()[I",
+        "code_offset": 127760
+      },
+      {
+        "name": "getLightingShowState",
+        "descriptor": "()I",
+        "code_offset": 126876
+      },
+      {
+        "name": "getLightingShowType",
+        "descriptor": "()I",
+        "code_offset": 126960
+      },
+      {
+        "name": "getMasterTcamExtIp",
+        "descriptor": "()[I",
+        "code_offset": 127844
+      },
+      {
+        "name": "getPoiLatitude",
+        "descriptor": "()J",
+        "code_offset": 129096
+      },
+      {
+        "name": "getPoiLongitude",
+        "descriptor": "()J",
+        "code_offset": 129184
+      },
+      {
+        "name": "getPoiName",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 128784
+      },
+      {
+        "name": "getPrivateLockStatus",
+        "descriptor": "()I",
+        "code_offset": 127020
+      },
+      {
+        "name": "getRVDCStatus",
+        "descriptor": "()I",
+        "code_offset": 127080
+      },
+      {
+        "name": "getRemoteDiagnostics",
+        "descriptor": "()I",
+        "code_offset": 127164
+      },
+      {
+        "name": "getSlaveTcamExtIp",
+        "descriptor": "()[I",
+        "code_offset": 127908
+      },
+      {
+        "name": "getStartCause",
+        "descriptor": "()I",
+        "code_offset": 127248
+      },
+      {
+        "name": "getTcamResetReq",
+        "descriptor": "()I",
+        "code_offset": 127332
+      },
+      {
+        "name": "getVehicleIpTable",
+        "descriptor": "(I)[Ljava/lang/String;",
+        "code_offset": 128872
+      },
+      {
+        "name": "getXCallState",
+        "descriptor": "()I",
+        "code_offset": 127416
+      },
+      {
+        "name": "getXCallType",
+        "descriptor": "()I",
+        "code_offset": 127504
+      },
+      {
+        "name": "hangupBCall",
+        "descriptor": "()Z",
+        "code_offset": 122960
+      },
+      {
+        "name": "hangupECall",
+        "descriptor": "()Z",
+        "code_offset": 122988
+      },
+      {
+        "name": "hangupICall",
+        "descriptor": "()Z",
+        "code_offset": 123016
+      },
+      {
+        "name": "isCallbackMode",
+        "descriptor": "()Z",
+        "code_offset": 123044
+      },
+      {
+        "name": "isCarLocatorEnabled",
+        "descriptor": "()Z",
+        "code_offset": 123128
+      },
+      {
+        "name": "isCarLocatorSupported",
+        "descriptor": "()Z",
+        "code_offset": 123208
+      },
+      {
+        "name": "isIncomingCall",
+        "descriptor": "()Z",
+        "code_offset": 123292
+      },
+      {
+        "name": "isMuteStatus",
+        "descriptor": "()Z",
+        "code_offset": 123376
+      },
+      {
+        "name": "isOnCallSupported",
+        "descriptor": "(I)I",
+        "code_offset": 127592
+      },
+      {
+        "name": "isSupportedTcamReset",
+        "descriptor": "()Z",
+        "code_offset": 123460
+      },
+      {
+        "name": "islightingshowenabled",
+        "descriptor": "()I",
+        "code_offset": 127676
+      },
+      {
+        "name": "registerCallback",
+        "descriptor": "(Lecarx/tcam/ITcamServiceCallback;)Z",
+        "code_offset": 123544
+      },
+      {
+        "name": "requestCallStatus",
+        "descriptor": "()Z",
+        "code_offset": 123780
+      },
+      {
+        "name": "requestETAInfo",
+        "descriptor": "()Z",
+        "code_offset": 123864
+      },
+      {
+        "name": "requestRVDCAuthorizationStatus",
+        "descriptor": "()Z",
+        "code_offset": 123948
+      },
+      {
+        "name": "requestStopCall",
+        "descriptor": "(I)Z",
+        "code_offset": 124116
+      },
+      {
+        "name": "requestUseTcamMicSpeaker",
+        "descriptor": "()V",
+        "code_offset": 129452
+      },
+      {
+        "name": "sendIpMessage",
+        "descriptor": "(I Ljava/lang/String;)Z",
+        "code_offset": 124200
+      },
+      {
+        "name": "sendLightingShowSource",
+        "descriptor": "([B)Z",
+        "code_offset": 124260
+      },
+      {
+        "name": "sendLightingShowSourceEnd",
+        "descriptor": "()Z",
+        "code_offset": 124344
+      },
+      {
+        "name": "sendLightingShowSourceStart",
+        "descriptor": "()Z",
+        "code_offset": 124428
+      },
+      {
+        "name": "setCarLocatorEnable",
+        "descriptor": "(Z)Z",
+        "code_offset": 124512
+      },
+      {
+        "name": "setChargingInfo",
+        "descriptor": "(I J J)Z",
+        "code_offset": 124592
+      },
+      {
+        "name": "setChargingSwitchClose",
+        "descriptor": "()Z",
+        "code_offset": 124684
+      },
+      {
+        "name": "setGIDProfIDLnk",
+        "descriptor": "(Ljava/lang/String; I)Z",
+        "code_offset": 124768
+      },
+      {
+        "name": "setLightShowMode",
+        "descriptor": "(I)Z",
+        "code_offset": 124852
+      },
+      {
+        "name": "setLightingShowType",
+        "descriptor": "(I)Z",
+        "code_offset": 124912
+      },
+      {
+        "name": "setPrivateLockPassword",
+        "descriptor": "(Ljava/lang/String;)Z",
+        "code_offset": 124972
+      },
+      {
+        "name": "setRequestRVDCAuthorizationStatusUserUpdate",
+        "descriptor": "(I I I)Z",
+        "code_offset": 125052
+      },
+      {
+        "name": "setSystemLanguage",
+        "descriptor": "(I)Z",
+        "code_offset": 125136
+      },
+      {
+        "name": "setTcamResetReq",
+        "descriptor": "()Z",
+        "code_offset": 125220
+      },
+      {
+        "name": "startBCall",
+        "descriptor": "()Z",
+        "code_offset": 125304
+      },
+      {
+        "name": "startECall",
+        "descriptor": "()Z",
+        "code_offset": 125332
+      },
+      {
+        "name": "startICall",
+        "descriptor": "()Z",
+        "code_offset": 125360
+      },
+      {
+        "name": "startLightingShow",
+        "descriptor": "()Z",
+        "code_offset": 125388
+      },
+      {
+        "name": "stopLightingShow",
+        "descriptor": "()Z",
+        "code_offset": 125472
+      },
+      {
+        "name": "unregisterCallback",
+        "descriptor": "(Lecarx/tcam/ITcamServiceCallback;)Z",
+        "code_offset": 125556
+      },
+      {
+        "name": "xcallSubscribed",
+        "descriptor": "(I)Z",
+        "code_offset": 125712
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/util/Utils;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 132244
+      },
+      {
+        "name": "addBytes",
+        "descriptor": "([B [B)[B",
+        "code_offset": 130112
+      },
+      {
+        "name": "bcd2Str",
+        "descriptor": "([B)Ljava/lang/String;",
+        "code_offset": 131364
+      },
+      {
+        "name": "getProperties",
+        "descriptor": "(Ljava/lang/String; Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;",
+        "code_offset": 131548
+      },
+      {
+        "name": "pnParcelableByteList2String",
+        "descriptor": "([B Lecarx/util/Utils$PN_TYPE;)Ljava/lang/String;",
+        "code_offset": 131820
+      },
+      {
+        "name": "pnString2ParcelableByteList",
+        "descriptor": "(Ljava/lang/String; Lecarx/util/Utils$PN_TYPE;)[B",
+        "code_offset": 130160
+      },
+      {
+        "name": "serialNum2ParcelableByteList",
+        "descriptor": "(Ljava/lang/String;)[B",
+        "code_offset": 130808
+      },
+      {
+        "name": "setProperties",
+        "descriptor": "(Ljava/lang/String; Ljava/lang/String; Ljava/lang/String;)V",
+        "code_offset": 132268
+      },
+      {
+        "name": "str2Bcd",
+        "descriptor": "(Ljava/lang/String;)[B",
+        "code_offset": 130996
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/os/LocalConfig;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 64436
+      },
+      {
+        "name": "<init>",
+        "descriptor": "(Lecarx/os/LocalConfig$1;)V",
+        "code_offset": 64460
+      },
+      {
+        "name": "get",
+        "descriptor": "()Lecarx/os/LocalConfig;",
+        "code_offset": 64408
+      },
+      {
+        "name": "reload",
+        "descriptor": "()Z",
+        "code_offset": 64044
+      },
+      {
+        "name": "reset",
+        "descriptor": "()Z",
+        "code_offset": 64388
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/splitscreen/EcarxSplitScreen;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "(Landroid/content/Context;)V",
+        "code_offset": 107024
+      },
+      {
+        "name": "dismissSplitScreenMode",
+        "descriptor": "()V",
+        "code_offset": 107064
+      },
+      {
+        "name": "dismissSplitScreenMode",
+        "descriptor": "(Z)V",
+        "code_offset": 107092
+      },
+      {
+        "name": "enterSplitPrimaryStackFullScreen",
+        "descriptor": "(Landroid/content/Intent;)Z",
+        "code_offset": 106896
+      },
+      {
+        "name": "getSecondaryScreenStackPackageName",
+        "descriptor": "()Ljava/lang/String;",
+        "code_offset": 106992
+      },
+      {
+        "name": "isInSplitScreenWindowingMode",
+        "descriptor": "()Z",
+        "code_offset": 106928
+      },
+      {
+        "name": "isTopSupportsSplitScreenWindowingMode",
+        "descriptor": "()Z",
+        "code_offset": 106960
+      },
+      {
+        "name": "swapDockedAndFullscreenStack",
+        "descriptor": "()V",
+        "code_offset": 107120
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/csd/CsdServiceCallbackImp;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 43832
+      },
+      {
+        "name": "demo",
+        "descriptor": "()V",
+        "code_offset": 43856
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/ota/OtaServiceCallbackImpl;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 77088
+      },
+      {
+        "name": "onConnectivityStsInfo",
+        "descriptor": "(Lecarx/ota/OpOTAConnectivityStsParam;)V",
+        "code_offset": 77112
+      },
+      {
+        "name": "onOTAAppInsConsentInfo",
+        "descriptor": "(Lecarx/ota/OpOTAAppInsConsentParam;)V",
+        "code_offset": 77132
+      },
+      {
+        "name": "onOTAAssignmentSyncErrorInfo",
+        "descriptor": "(I I)V",
+        "code_offset": 77152
+      },
+      {
+        "name": "onOTAAssignmentSyncInfo",
+        "descriptor": "(Lecarx/ota/OpOTAAssignmentParam;)V",
+        "code_offset": 77172
+      },
+      {
+        "name": "onOTADownloadProgressErrorInfo",
+        "descriptor": "(I I)V",
+        "code_offset": 77192
+      },
+      {
+        "name": "onOTADownloadProgressInfo",
+        "descriptor": "(I)V",
+        "code_offset": 77212
+      },
+      {
+        "name": "onOTASyncSchInstallTimeInfo",
+        "descriptor": "(Lecarx/ota/OpOTASyncSchInstallTimeParam;)V",
+        "code_offset": 77232
+      },
+      {
+        "name": "onOTATCAMAssignmentErrorInfo",
+        "descriptor": "(I I)V",
+        "code_offset": 77252
+      },
+      {
+        "name": "onOTATCAMAssignmentInfo",
+        "descriptor": "(Lecarx/ota/OpOTATCAMAssignmentParam;)V",
+        "code_offset": 77272
+      },
+      {
+        "name": "onServiceUnavailableError",
+        "descriptor": "()V",
+        "code_offset": 77292
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/psd/PsdServiceCallbackImp;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 105268
+      },
+      {
+        "name": "onBtBondedStatusUpdate",
+        "descriptor": "(Lecarx/psd/Device; Z)V",
+        "code_offset": 105292
+      },
+      {
+        "name": "onBtOperateCallback",
+        "descriptor": "(I)V",
+        "code_offset": 105312
+      },
+      {
+        "name": "onFoundNearBtDeviceInfo",
+        "descriptor": "(Lecarx/psd/Device;)V",
+        "code_offset": 105332
+      },
+      {
+        "name": "onHeadsetPowerChanged",
+        "descriptor": "(Lecarx/psd/Device; I)V",
+        "code_offset": 105352
+      },
+      {
+        "name": "onLocalBtInfoCallback",
+        "descriptor": "(Lecarx/psd/PSDBluetooth;)V",
+        "code_offset": 105372
+      },
+      {
+        "name": "onPairedDevices",
+        "descriptor": "(Ljava/util/List;)V",
+        "code_offset": 105392
+      },
+      {
+        "name": "onProfileConnectionChanged",
+        "descriptor": "(Ljava/lang/String; I)V",
+        "code_offset": 105412
+      },
+      {
+        "name": "onPsdBtNameChanged",
+        "descriptor": "(Ljava/lang/String;)V",
+        "code_offset": 105432
+      },
+      {
+        "name": "onPsdBtStateChanged",
+        "descriptor": "(I)V",
+        "code_offset": 105452
+      },
+      {
+        "name": "onScanOver",
+        "descriptor": "(I)V",
+        "code_offset": 105472
+      }
+    ]
+  },
+  {
+    "source": "framework/system_framework/ecarx.jar",
+    "sha256": "126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7",
+    "dex": "classes.dex",
+    "class": "Lecarx/tcam/TcamServiceCallbackImpl;",
+    "methods": [
+      {
+        "name": "<init>",
+        "descriptor": "()V",
+        "code_offset": 129528
+      },
+      {
+        "name": "onCallbackModeCallEvent",
+        "descriptor": "(I)V",
+        "code_offset": 129552
+      },
+      {
+        "name": "onCarLocatorEnabled",
+        "descriptor": "(Z)V",
+        "code_offset": 129572
+      },
+      {
+        "name": "onChargingInfo",
+        "descriptor": "(I J J)V",
+        "code_offset": 129592
+      },
+      {
+        "name": "onETAInfoNotification",
+        "descriptor": "(I I I)V",
+        "code_offset": 129612
+      },
+      {
+        "name": "onExternalTcamIpNotify",
+        "descriptor": "(I)V",
+        "code_offset": 129632
+      },
+      {
+        "name": "onLightingShowEnableChanged",
+        "descriptor": "(I)V",
+        "code_offset": 129652
+      },
+      {
+        "name": "onLightingShowError",
+        "descriptor": "([I)V",
+        "code_offset": 129672
+      },
+      {
+        "name": "onLightingShowStateChanged",
+        "descriptor": "(I)V",
+        "code_offset": 129692
+      },
+      {
+        "name": "onMasterTcamExtIpNotifyCyclic",
+        "descriptor": "([I)V",
+        "code_offset": 129712
+      },
+      {
+        "name": "onPOIInfo",
+        "descriptor": "(Ljava/lang/String; J J Ljava/lang/String; Ljava/lang/String; Ljava/lang/String; Ljava/lang/String; Ljava/lang/String; Ljava/lang/String;)V",
+        "code_offset": 129732
+      },
+      {
+        "name": "onPrivateLockRespResult",
+        "descriptor": "(I)V",
+        "code_offset": 129752
+      },
+      {
+        "name": "onRVDCAuthorizationStatusNotification",
+        "descriptor": "(I I I)V",
+        "code_offset": 129772
+      },
+      {
+        "name": "onRVDCAuthorizationStatusResponse",
+        "descriptor": "(I I I)V",
+        "code_offset": 129792
+      },
+      {
+        "name": "onRVDCAuthorizationStatusUserUpdateResponse",
+        "descriptor": "(I I I)V",
+        "code_offset": 129812
+      },
+      {
+        "name": "onSlaveTcamExtIpNotifyCyclic",
+        "descriptor": "([I)V",
+        "code_offset": 129832
+      },
+      {
+        "name": "onTcamMuteStatusChange",
+        "descriptor": "(Z)V",
+        "code_offset": 129852
+      },
+      {
+        "name": "onTcamResetRespResult",
+        "descriptor": "(I)V",
+        "code_offset": 129872
+      },
+      {
+        "name": "onXCallInfoChanged",
+        "descriptor": "(I I I)V",
+        "code_offset": 129892
+      },
+      {
+        "name": "onXcallFailedUnsubscribed",
+        "descriptor": "(I)V",
+        "code_offset": 129912
+      }
+    ]
+  }
+]
