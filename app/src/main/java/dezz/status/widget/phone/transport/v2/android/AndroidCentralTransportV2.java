@@ -858,7 +858,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 clearTelemetrySubscription();
                 clearCarRemoteChannel();
                 closeAncsSession();
-                resetRoutineAuthState();
+                resetRoutineConnectionState();
                 if (pendingGatt == null
                         || pendingGatt.type != RawOperation.WRITE_ROUTE_CONTROL) {
                     pendingGatt = null;
@@ -2660,6 +2660,16 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void resetRoutineAuthState() {
+        resetRoutineConnectionState();
+        enrollmentRecord = null;
+        pendingEnrollmentRecord = null;
+        activeEnrollmentRecord = null;
+        enrollmentRecordPending = false;
+        clearStalePendingAfterActiveProof = false;
+    }
+
+    /** A GATT retry ends the handshake, not the validated enrollment snapshot for this epoch. */
+    private void resetRoutineConnectionState() {
         if (routineSession != null) routineSession.destroy();
         routineSession = null;
         routineHello = null;
@@ -2668,10 +2678,6 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         routineStage = RoutineStage.NONE;
         pendingMtuDiscoveryToken = null;
         routineMtuReady = false;
-        enrollmentRecord = null;
-        pendingEnrollmentRecord = null;
-        activeEnrollmentRecord = null;
-        enrollmentRecordPending = false;
         clearStalePendingAfterActiveProof = false;
     }
 

@@ -753,7 +753,7 @@ public final class AndroidCentralRoute {
         BleRouteToken reconnect = nextOperation(token);
         if (reconnect == null) return counterExhausted(state, token, "operation");
         int reassertions = state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
-                ? Math.min(Integer.MAX_VALUE, state.sameOwnerReassertions + 1)
+                ? incrementReassertions(state.sameOwnerReassertions)
                 : state.sameOwnerReassertions;
         State connecting = copyWithReassertions(state, Phase.CONNECTING, reconnect,
                 token.ownerId, state.nextOwnerId, state.consecutiveFailures, reassertions,
@@ -785,8 +785,12 @@ public final class AndroidCentralRoute {
         }
         BleRouteToken reconnect = nextOperation(token);
         if (reconnect == null) return counterExhausted(state, token, "operation");
-        State connecting = copy(state, Phase.CONNECTING, reconnect, token.ownerId,
+        // Presence frequently arrives before the recovery timer on KX11. It performs the same
+        // public connect() attempt and must consume the same budget; otherwise advertisements
+        // keep a proven registered-but-silent wrapper below its retirement threshold forever.
+        State connecting = copyWithReassertions(state, Phase.CONNECTING, reconnect, token.ownerId,
                 state.nextOwnerId, state.consecutiveFailures,
+                incrementReassertions(state.sameOwnerReassertions),
                 "stack-resolved enrolled advertisement; reassert sole wrapper");
         return BleRouteTransition.accepted(connecting,
                 op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
@@ -816,8 +820,9 @@ public final class AndroidCentralRoute {
         BleRouteToken previous = state.expected;
         BleRouteToken reconnect = nextOperation(previous);
         if (reconnect == null) return counterExhausted(state, previous, "operation");
-        State connecting = copy(state, Phase.CONNECTING, reconnect, previous.ownerId,
+        State connecting = copyWithReassertions(state, Phase.CONNECTING, reconnect, previous.ownerId,
                 state.nextOwnerId, state.consecutiveFailures,
+                incrementReassertions(state.sameOwnerReassertions),
                 "exact Classic presence; same public BluetoothGatt.connect() prompt");
         List<BleRouteEffect> effects = new ArrayList<>();
         effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, previous,
@@ -831,6 +836,10 @@ public final class AndroidCentralRoute {
                 "liveness only; retain sole wrapper and exact enrolled identity"));
         effects.add(BleRouteEffect.deadline(reconnect, CONNECT_TIMEOUT_MS));
         return new BleRouteTransition<>(connecting, effects, true);
+    }
+
+    private static int incrementReassertions(int count) {
+        return count == Integer.MAX_VALUE ? count : count + 1;
     }
 
     public static BleRouteTransition<State> retryElapsed(State state, BleRouteToken token,
