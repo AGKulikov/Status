@@ -1206,7 +1206,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             commandCardRenderer().draw(canvas, commandCard, bounds, element.options,
                     getResources().getDisplayMetrics().scaledDensity,
                     element.options.optInt("maneuverDetailTextSizeSp", 18), 600,
-                    withAlpha(textColor, alpha));
+                    withAlpha(textColor, alpha), withAlpha(textColor, alpha));
             return;
         }
         RectF primary = new RectF(bounds);

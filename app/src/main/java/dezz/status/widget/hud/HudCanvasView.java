@@ -731,7 +731,7 @@ public final class HudCanvasView extends View {
         HudNavigationState nav = data.navigation();
         if (nav != null && nav.stockCard.enabled) {
             commandCardRenderer().draw(canvas, nav.stockCard, content, item.options, scale,
-                    item.fontSizeSp, item.fontWeight, color);
+                    item.fontSizeSp, item.fontWeight, color, unitColor);
             return;
         }
         String auxiliary = nav == null ? "" : stockManeuverAuxiliaryText(nav);

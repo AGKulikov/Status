@@ -112,6 +112,7 @@ public final class StockManeuverCommands {
                 View view = entry.getKey();
                 State value = entry.getValue();
                 if (view != null && belongs(view, root)
+                        && Boolean.TRUE.equals(call(view, "getCanBeVisible"))
                         && value.presenter.get() == call(view, "getPresenter")
                         && (selected == null || value.revision > selected.revision)) {
                     owner = view; selected = value;
@@ -120,7 +121,7 @@ public final class StockManeuverCommands {
             if (selected == null || !selected.valid || !selected.maneuverReceived
                     || !Boolean.TRUE.equals(field(owner, "isViewContentVisible"))
                     || !Boolean.TRUE.equals(call(owner, "getCanBeVisible"))
-                    || owner.getVisibility() != View.VISIBLE) return hidden(routeEpoch);
+                    || owner.getVisibility() != View.VISIBLE || owner.getAlpha() <= .01f) return hidden(routeEpoch);
             JSONObject result = new JSONObject().put("schema", 1).put("routeEpoch", epoch)
                     .put("generation", selected.generation).put("revision", selected.revision)
                     .put("visible", true).put("package", "ru.yandex.yandexnavi")

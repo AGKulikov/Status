@@ -28,6 +28,10 @@ jobs:
           python3 tools/tests/test_verify_navigation_mod_baseline.py
           python3 tools/tests/test_navigation_mod_tools.py
           python3 tools/tests/test_navigation_maneuver_patch.py
+          JSON_JAR=$(find "$HOME/.gradle/caches" -path "*/org.json/json/20240303/*/*.jar" -print -quit)
+          test -f "$JSON_JAR"
+          export JSON_JAR
+          python3 tools/tests/test_stock_maneuver_commands.py
           python3 tools/tests/test_navigation_position_policy.py
           python3 tools/tests/test_navigation_layer_order.py
           python3 tools/tests/test_navigation_event_visibility.py

@@ -32,9 +32,10 @@ public final class StockManeuverCardRenderer {
         }
     }
     public void draw(Canvas canvas, StockManeuverCardState state, RectF bounds,
-                     JSONObject options, float scale, int fontSize, int weight, int color) {
+                     JSONObject options, float scale, int fontSize, int weight, int color, int detailColor) {
         if (!available(state) || bounds.isEmpty()) return;
         int alpha = Color.alpha(color);
+        color |= 0xFF000000;
         boolean road = !state.nextRoad.isEmpty() && options.optBoolean("showDirection", true);
         boolean signs = !state.signs.isEmpty() && options.optBoolean("showRoadBadge", true);
         boolean following = !state.followingSigns.isEmpty() && options.optBoolean("showRoadBadge", true);
@@ -60,7 +61,7 @@ public final class StockManeuverCardRenderer {
         float factor = clamp(options.optInt("sourceIconScalePercent", 100), 25, 250) / 100f;
         float w = icon.width() * factor, h = icon.height() * factor;
         icon.set(icon.centerX() - w / 2, icon.centerY() - h / 2, icon.centerX() + w / 2, icon.centerY() + h / 2);
-        icon.intersect(main);
+        if (!icon.intersect(main)) icon.setEmpty();
         int saved = canvas.save();
         try {
             canvas.clipRect(bounds);
@@ -70,7 +71,7 @@ public final class StockManeuverCardRenderer {
             float y = main.bottom + gap;
             if (road) {
                 RectF row = new RectF(bounds.left, y, bounds.right, y + detailHeight);
-                label(canvas, state.nextRoad, inset(row, options, "text", 0, scale), color, alpha,
+                label(canvas, state.nextRoad, inset(row, options, "text", 0, scale), detailColor, 255,
                         options.optInt("directionFontSizeSp", Math.max(8, fontSize / 2)) * scale,
                         weight, 2, Layout.Alignment.ALIGN_NORMAL);
                 y += detailHeight + gap;
@@ -82,7 +83,7 @@ public final class StockManeuverCardRenderer {
             if (auxiliary) {
                 RectF row = new RectF(bounds.left, y, bounds.right, y + detailHeight);
                 paint.setStyle(Paint.Style.FILL);
-                int background = options.optInt("auxiliaryColor", 0xE60B4DB5);
+                int background = optionColor(options, "auxiliaryColor", 0xE60B4DB5);
                 paint.setColor((background & 0xFFFFFF) | Math.round(Color.alpha(background) * alpha / 255f) << 24);
                 canvas.drawRoundRect(row, Math.min(7 * scale, row.height() / 4), Math.min(7 * scale, row.height() / 4), paint);
                 RectF content = inset(row, options, "text", 0, scale);
@@ -125,7 +126,10 @@ public final class StockManeuverCardRenderer {
         if (value.isEmpty() || bounds.width() < 1 || bounds.height() < 1) return;
         text.setTypeface(Typeface.create(Typeface.create("sans-serif", Typeface.NORMAL), clamp(weight, 100, 900), false));
         text.setColor((color & 0xFFFFFF) | Math.round(Color.alpha(color) * alpha / 255f) << 24);
-        text.setTextSize(Math.max(1, Math.min(size, bounds.height() * (lines > 1 ? .45f : .72f))));
+        text.setTextSize(Math.max(1, Math.min(size, bounds.height() * .72f)));
+        if (lines > 1 && text.measureText(value) > bounds.width())
+            text.setTextSize(Math.max(1, Math.min(text.getTextSize(), bounds.height() * .45f)));
+        else lines = 1;
         if (lines == 1 && text.measureText(value) > bounds.width()) text.setTextSize(Math.max(1, text.getTextSize() * bounds.width() / text.measureText(value)));
         StaticLayout layout = StaticLayout.Builder.obtain(value, 0, value.length(), text, Math.max(1, (int) bounds.width()))
                 .setAlignment(alignment).setIncludePad(false).setMaxLines(lines).build();
@@ -138,6 +142,12 @@ public final class StockManeuverCardRenderer {
                 bounds.top + Math.max(0, options.optInt(prefix + "PaddingTopPx", fallback)) * scale,
                 bounds.right - Math.max(0, options.optInt(prefix + "PaddingRightPx", fallback)) * scale,
                 bounds.bottom - Math.max(0, options.optInt(prefix + "PaddingBottomPx", fallback)) * scale);
+    }
+    private static int optionColor(JSONObject options, String key, int fallback) {
+        Object value = options.opt(key);
+        if (value instanceof Number) return ((Number) value).intValue();
+        try { return value instanceof String ? Color.parseColor((String) value) : fallback; }
+        catch (IllegalArgumentException invalid) { return fallback; }
     }
     private static int clamp(int value, int min, int max) { return Math.max(min, Math.min(max, value)); }
 }
