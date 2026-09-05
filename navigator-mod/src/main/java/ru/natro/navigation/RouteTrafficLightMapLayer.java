@@ -34,7 +34,7 @@ final class RouteTrafficLightMapLayer {
     private boolean enabled;
     private boolean night;
     private int scalePercent = 100;
-    private float zIndex = NavigationMapProfile.layerZ(68);
+    private float zIndex = NavigationMapProfile.layerZ(20);
     private long routeEpoch = Long.MIN_VALUE;
     private Object activeRoute;
     private List<RouteLight> routeLights = Collections.emptyList();

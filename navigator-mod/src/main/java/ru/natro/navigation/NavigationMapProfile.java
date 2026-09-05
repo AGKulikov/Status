@@ -81,7 +81,7 @@ final class NavigationMapProfile {
     int routeLayerPriority = 50;
     int destinationLayerPriority = 90;
     int trafficLightLayerPriority = 70;
-    int routeTrafficLightLayerPriority = 68;
+    int routeTrafficLightLayerPriority = 20;
     int speedBumpLayerPriority = 55;
     /** Legacy transport key. Native polyline arrows always inherit routeLayerPriority. */
     int routeTurnLayerPriority = 50;
@@ -216,7 +216,7 @@ final class NavigationMapProfile {
             result.trafficLightLayerPriority = clamp(
                     source.optInt("trafficLightLayerPriority", 70), 0, 100);
             result.routeTrafficLightLayerPriority = clamp(
-                    source.optInt("routeTrafficLightLayerPriority", 68), 0, 100);
+                    source.optInt("routeTrafficLightLayerPriority", 20), 0, 100);
             result.speedBumpLayerPriority = clamp(
                     source.optInt("speedBumpLayerPriority", 55), 0, 100);
             result.routeTurnLayerPriority = clamp(
@@ -225,13 +225,16 @@ final class NavigationMapProfile {
                     source.optInt("laneGuidanceLayerPriority", 80), 0, 100);
             result.cursorLayerPriority = clamp(
                     source.optInt("cursorLayerPriority", 60), 0, 100);
+            if (hasPreviousDefaultRouteLightPriority(result)) {
+                result.routeTrafficLightLayerPriority = 20;
+            }
             if (hasLegacyDefaultLayerPriorities(result)) {
                 result.cameraDirectionLayerPriority = 30;
                 result.roadEventLayerPriority = 40;
                 result.routeLayerPriority = 50;
                 result.destinationLayerPriority = 90;
                 result.trafficLightLayerPriority = 70;
-                result.routeTrafficLightLayerPriority = 68;
+                result.routeTrafficLightLayerPriority = 20;
                 result.laneGuidanceLayerPriority = 80;
                 result.cursorLayerPriority = 60;
             }
@@ -330,7 +333,7 @@ final class NavigationMapProfile {
     }
 
     int effectiveRouteTrafficLightPriority() {
-        return manualLayerPrioritiesEnabled ? routeTrafficLightLayerPriority : 68;
+        return manualLayerPrioritiesEnabled ? routeTrafficLightLayerPriority : 20;
     }
 
     int effectiveSpeedBumpPriority() {
@@ -430,6 +433,15 @@ final class NavigationMapProfile {
     /** One shared numeric range makes the order comparable across separate collections. */
     static float layerZ(int priority) {
         return 50f + clamp(priority, 0, 100);
+    }
+
+    /** 2.7.8's exact standard tuple; ordinary route pins now precede other placemarks. */
+    private static boolean hasPreviousDefaultRouteLightPriority(NavigationMapProfile value) {
+        return value.cameraDirectionLayerPriority == 30 && value.roadEventLayerPriority == 40
+                && value.routeLayerPriority == 50 && value.destinationLayerPriority == 90
+                && value.trafficLightLayerPriority == 70 && value.routeTrafficLightLayerPriority == 68
+                && value.speedBumpLayerPriority == 55 && value.routeTurnLayerPriority == 50
+                && value.laneGuidanceLayerPriority == 80 && value.cursorLayerPriority == 60;
     }
 
     /** Migrates the exact 2.6.8 preset; any user-edited tuple is preserved. */

@@ -241,7 +241,7 @@ public final class NavigationIntegrationConfig {
         public int routeLayerPriority = 50;
         public int destinationLayerPriority = 90;
         public int trafficLightLayerPriority = 70;
-        public int routeTrafficLightLayerPriority = 68;
+        public int routeTrafficLightLayerPriority = 20;
         public int speedBumpLayerPriority = 55;
         /** Legacy JSON key; native polyline arrows always inherit routeLayerPriority. */
         public int routeTurnLayerPriority = 50;
@@ -501,13 +501,16 @@ public final class NavigationIntegrationConfig {
                     "laneGuidanceLayerPriority", result.laneGuidanceLayerPriority);
             result.cursorLayerPriority = source.optInt(
                     "cursorLayerPriority", result.cursorLayerPriority);
+            if (hasPreviousDefaultRouteLightPriority(result)) {
+                result.routeTrafficLightLayerPriority = 20;
+            }
             if (hasLegacyDefaultLayerPriorities(result)) {
                 result.cameraDirectionLayerPriority = 30;
                 result.roadEventLayerPriority = 40;
                 result.routeLayerPriority = 50;
                 result.destinationLayerPriority = 90;
                 result.trafficLightLayerPriority = 70;
-                result.routeTrafficLightLayerPriority = 68;
+                result.routeTrafficLightLayerPriority = 20;
                 result.laneGuidanceLayerPriority = 80;
                 result.cursorLayerPriority = 60;
             }
@@ -569,6 +572,15 @@ public final class NavigationIntegrationConfig {
         }
 
         /** Migrates only the untouched 2.6.8 preset; user-edited priority tuples stay intact. */
+        /** 2.7.8's exact standard tuple; ordinary route pins now precede other placemarks. */
+        private static boolean hasPreviousDefaultRouteLightPriority(MapProfile value) {
+            return value.cameraDirectionLayerPriority == 30 && value.roadEventLayerPriority == 40
+                    && value.routeLayerPriority == 50 && value.destinationLayerPriority == 90
+                    && value.trafficLightLayerPriority == 70 && value.routeTrafficLightLayerPriority == 68
+                    && value.speedBumpLayerPriority == 55 && value.routeTurnLayerPriority == 50
+                    && value.laneGuidanceLayerPriority == 80 && value.cursorLayerPriority == 60;
+        }
+
         private static boolean hasLegacyDefaultLayerPriorities(MapProfile value) {
             return value.cameraDirectionLayerPriority == 20
                     && value.roadEventLayerPriority == 30

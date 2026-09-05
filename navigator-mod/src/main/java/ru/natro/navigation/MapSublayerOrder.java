@@ -100,15 +100,17 @@ final class MapSublayerOrder {
     }
 
     /**
-     * Mirrors the relevant stock order: events, route pins, user cursor, guidance, destination.
+     * Ordinary route lights sit just above route/labels, below events and guidance (MAP-051).
+     * Live signal/countdown balloons keep their separate guidance slot.
      * Missing stock layers are normal on an independent MapWindow and are skipped.
      */
     private static void applyAutomaticPlacemarks(Object manager, String mapBase, String traffic,
                                                   String roadEvents, String routePins,
                                                   String userLocation) throws Exception {
-        LayerRef base = firstExisting(manager,
-                ref(traffic, PLACEMARKS), ref(mapBase, PLACEMARKS));
-        LayerRef events = firstExisting(manager, ref(roadEvents, PLACEMARKS), base);
+        LayerRef base = placemarkFloor(manager, mapBase, traffic);
+        placeAfter(manager, ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), base);
+        LayerRef events = firstExisting(manager, ref(roadEvents, PLACEMARKS),
+                ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), base);
         placeAfter(manager, ref(CAMERA_SIGNS, PLACEMARKS), events);
 
         LayerRef routePinsAnchor = firstExisting(manager,
@@ -118,13 +120,11 @@ final class MapSublayerOrder {
                 events);
         ArrayList<LayerRef> routePinsFeatures = new ArrayList<>();
         routePinsFeatures.add(ref(SPEED_BUMPS, PLACEMARKS));
-        routePinsFeatures.add(ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS));
         LayerRef lastRoutePin = placeSequence(manager, routePinsFeatures,
                 routePinsAnchor, null);
 
         LayerRef cursorAnchor = firstExisting(manager,
-                lastRoutePin, ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS),
-                ref(SPEED_BUMPS, PLACEMARKS), routePinsAnchor);
+                lastRoutePin, ref(SPEED_BUMPS, PLACEMARKS), routePinsAnchor);
         placeAfter(manager, ref(CURSOR, PLACEMARKS), cursorAnchor);
 
         LayerRef guidanceAnchor = firstExisting(manager,
@@ -151,12 +151,12 @@ final class MapSublayerOrder {
                                                String roadEvents,
                                                NavigationMapProfile profile) throws Exception {
         ArrayList<LayerRef> custom = new ArrayList<>();
+        custom.add(new LayerRef(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS,
+                profile.effectiveRouteTrafficLightPriority(), -1));
         custom.add(new LayerRef(CAMERA_SIGNS, PLACEMARKS,
                 profile.effectiveCameraPriority(), 0));
         custom.add(new LayerRef(SPEED_BUMPS, PLACEMARKS,
                 profile.effectiveSpeedBumpPriority(), 1));
-        custom.add(new LayerRef(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS,
-                profile.effectiveRouteTrafficLightPriority(), 2));
         custom.add(new LayerRef(CURSOR, PLACEMARKS,
                 profile.effectiveCursorPriority(), 3));
         custom.add(new LayerRef(TRAFFIC_LIGHTS, PLACEMARKS,
@@ -167,8 +167,7 @@ final class MapSublayerOrder {
                 profile.effectiveDestinationPriority(), 6));
         sort(custom);
 
-        LayerRef base = firstExisting(manager,
-                ref(traffic, PLACEMARKS), ref(mapBase, PLACEMARKS));
+        LayerRef base = placemarkFloor(manager, mapBase, traffic);
         LayerRef eventLayer = existing(manager, ref(roadEvents, PLACEMARKS));
         if (eventLayer == null) {
             placeSequence(manager, custom, base, null);
@@ -244,6 +243,22 @@ final class MapSublayerOrder {
             if (value != null) return value;
         }
         return null;
+    }
+
+    /** The actual uppermost route/label layer, not whichever optional label ID exists first. */
+    private static LayerRef placemarkFloor(Object manager, String mapBase, String traffic)
+            throws Exception {
+        LayerRef highest = null;
+        int highestIndex = -1;
+        for (LayerRef candidate : new LayerRef[]{ref(mapBase, GROUND), ref(ROUTE, GROUND),
+                ref(mapBase, PLACEMARKS), ref(traffic, PLACEMARKS)}) {
+            Integer value = index(manager, candidate);
+            if (value != null && value > highestIndex) {
+                highest = candidate;
+                highestIndex = value;
+            }
+        }
+        return highest;
     }
 
     private static LayerRef existing(Object manager, LayerRef layer) throws Exception {

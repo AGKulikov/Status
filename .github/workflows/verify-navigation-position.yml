@@ -41,6 +41,7 @@ jobs:
           python3 tools/tests/test_verify_navigation_mod_baseline.py
           python3 tools/tests/test_navigation_mod_tools.py
           python3 tools/tests/test_navigation_position_policy.py
+          python3 tools/tests/test_navigation_layer_order.py
       - name: Fetch pinned Apktool
         shell: bash
         run: |

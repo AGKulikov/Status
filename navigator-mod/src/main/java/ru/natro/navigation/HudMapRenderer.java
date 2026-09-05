@@ -680,6 +680,7 @@ final class HudMapRenderer {
             fingerprint = fingerprint * 131L + profile.effectiveDestinationPriority();
             fingerprint = fingerprint * 131L + profile.effectiveSpeedBumpPriority();
             fingerprint = fingerprint * 131L + profile.effectiveTrafficLightPriority();
+            fingerprint = fingerprint * 131L + profile.effectiveRouteTrafficLightPriority();
             fingerprint = fingerprint * 131L + profile.effectiveLanePriority();
             fingerprint = fingerprint * 131L + profile.effectiveCursorPriority();
             long now = android.os.SystemClock.elapsedRealtime();
