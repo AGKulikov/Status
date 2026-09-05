@@ -1535,7 +1535,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("navigation.mainFloatingWindow"));
         assertTrue(settings.contains("Только дороги — прозрачный фон"));
         assertTrue(settings.contains("Дорожные события — выбрать типы и режимы"));
-        assertTrue(settings.contains("Только с маршрутом"));
+        assertTrue(settings.contains("Только на маршруте"));
         assertTrue(settings.contains("Скорость, тип и направление камер берутся только из"));
         assertTrue(settings.contains("Ручной порядок слоёв"));
         assertTrue(settings.contains("SliderField cameraDirectionLayerPriority = slider"));
