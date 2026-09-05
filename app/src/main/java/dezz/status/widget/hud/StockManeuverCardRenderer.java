@@ -87,8 +87,18 @@ public final class StockManeuverCardRenderer {
                 paint.setColor((background & 0xFFFFFF) | Math.round(Color.alpha(background) * alpha / 255f) << 24);
                 canvas.drawRoundRect(row, Math.min(7 * scale, row.height() / 4), Math.min(7 * scale, row.height() / 4), paint);
                 RectF content = inset(row, options, "text", 0, scale);
-                if (!state.auxiliaryLanes.isEmpty()) resources.drawLanes(canvas, state.auxiliaryLanes, content, alpha);
-                else {
+                if (!state.auxiliaryLanes.isEmpty()) {
+                    if (!state.auxiliaryText.isEmpty()) {
+                        float prefixWidth = content.width() * .28f;
+                        RectF prefix = new RectF(content.left, content.top,
+                                content.left + prefixWidth, content.bottom);
+                        label(canvas, state.auxiliaryText, prefix, color, alpha,
+                                options.optInt("auxiliaryFontSizeSp", Math.max(8, fontSize / 2))
+                                        * scale, weight, 1, Layout.Alignment.ALIGN_NORMAL);
+                        content.left = Math.min(content.right, prefix.right + gap);
+                    }
+                    resources.drawLanes(canvas, state.auxiliaryLanes, content, alpha);
+                } else {
                     if (!state.auxiliaryImage.isEmpty()) {
                         float side = Math.min(content.height(), content.width() * .3f);
                         resources.draw(canvas, state.auxiliaryImage, new RectF(content.left, content.top, content.left + side, content.bottom), alpha);

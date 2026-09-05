@@ -52,6 +52,22 @@ public final class StockManeuverCardStateTest {
         assertEquals(8, state.lanes.get(0).right);
         try { state.lanes.clear(); fail(); } catch (UnsupportedOperationException expected) {}
     }
+    @Test public void followingLanePrefixIsOwnedByTheSameAuxiliaryFrame() throws Exception {
+        JSONObject frame = frame();
+        frame.put("auxiliary", new JSONObject().put("kind", "NEXT_UPCOMING_LANES")
+                .put("prefix", "Далее").put("lanes", new JSONArray().put(new JSONObject()
+                        .put("secondary", new JSONArray()).put("highlighted", "lane_highlight")
+                        .put("width", 32).put("height", 48).put("left", 0).put("right", 0))));
+        StockManeuverCardState before = parse(frame);
+        assertEquals("Далее", before.auxiliaryText);
+        assertEquals(1, before.auxiliaryLanes.size());
+        frame.put("auxiliary", new JSONObject());
+        StockManeuverCardState cleared = parse(frame);
+        assertEquals("", cleared.auxiliaryText);
+        assertTrue(cleared.auxiliaryLanes.isEmpty());
+        assertFalse(cleared.hasAuxiliary());
+        assertEquals("Далее", before.auxiliaryText);
+    }
     @Test public void oversizeAndMalformedResourcesHideWholeCard() throws Exception {
         JSONObject frame = frame(); frame.getJSONObject("main").put("image", "../other");
         assertFalse(parse(frame).visible);
