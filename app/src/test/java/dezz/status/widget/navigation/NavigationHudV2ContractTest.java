@@ -1556,8 +1556,8 @@ public final class NavigationHudV2ContractTest {
         assertFalse(settings.contains("Названия улиц только на маршруте"));
         assertTrue(settings.contains("profile.roadsOnly = roadsOnly.isChecked()"));
         assertTrue(settings.contains("Цвет рекомендуемой полосы"));
-        assertTrue(settings.contains("Красный сигнал ARGB"));
-        assertTrue(settings.contains("Тяжёлая пробка ARGB"));
+        assertTrue(settings.contains("Красный сигнал"));
+        assertTrue(settings.contains("Тяжёлая пробка"));
         assertTrue(settings.contains("SeekBar control = new SeekBar(this)"));
         assertTrue(settings.contains("SliderField fontSize = slider"));
         assertTrue(settings.contains("SliderField brightness = slider"));
