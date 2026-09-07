@@ -76,6 +76,14 @@ public final class StockManeuverResources {
         return draw(canvas, name, bounds, alpha, null, true);
     }
     public boolean draw(Canvas canvas, String name, RectF bounds, int alpha, Integer tint, boolean fit) {
+        return drawColor(canvas, name, bounds, alpha, tint, fit, PorterDuff.Mode.SRC_ATOP);
+    }
+    public boolean drawTinted(Canvas canvas, String name, RectF bounds, int alpha,
+                              Integer tint, boolean fit) {
+        return drawColor(canvas, name, bounds, alpha, tint, fit, PorterDuff.Mode.SRC_IN);
+    }
+    private boolean drawColor(Canvas canvas, String name, RectF bounds, int alpha,
+                              Integer tint, boolean fit, PorterDuff.Mode mode) {
         Drawable value = get(name);
         if (value == null || bounds.isEmpty()) return false;
         RectF target = new RectF(bounds);
@@ -90,7 +98,7 @@ public final class StockManeuverResources {
             canvas.clipRect(bounds);
             value.setAlpha(Math.max(0, Math.min(255, alpha)));
             if (tint == null) value.clearColorFilter();
-            else value.setColorFilter(tint, PorterDuff.Mode.SRC_ATOP);
+            else value.setColorFilter(tint, mode);
             value.setBounds(Math.round(target.left), Math.round(target.top), Math.round(target.right), Math.round(target.bottom));
             value.draw(canvas);
             return true;
@@ -98,6 +106,10 @@ public final class StockManeuverResources {
     }
     /** Composition of original vector layers; geometry comes from the original lane containers. */
     public void drawLanes(Canvas canvas, List<StockManeuverCardState.Lane> lanes, RectF bounds, int alpha) {
+        drawLanes(canvas, lanes, bounds, alpha, null);
+    }
+    public void drawLanes(Canvas canvas, List<StockManeuverCardState.Lane> lanes, RectF bounds,
+                          int alpha, Integer tint) {
         if (lanes.isEmpty() || bounds.isEmpty() || !availableLanes(lanes)) return;
         float width = 0, height = 0;
         for (StockManeuverCardState.Lane lane : lanes) {
@@ -115,10 +127,10 @@ public final class StockManeuverResources {
                         x + lane.width * scale, bounds.centerY() + lane.height * scale / 2);
                 int save = canvas.saveLayer(box, null);
                 try {
-                    for (String resource : lane.secondary) draw(canvas, resource, box, 255, null, false);
+                    for (String resource : lane.secondary) drawTinted(canvas, resource, box, 255, tint, false);
                     canvas.clipRect(box);
                     canvas.drawColor(0x66FFFFFF, PorterDuff.Mode.MULTIPLY);
-                    if (!lane.highlighted.isEmpty()) draw(canvas, lane.highlighted, box, 255, null, false);
+                    if (!lane.highlighted.isEmpty()) drawTinted(canvas, lane.highlighted, box, 255, tint, false);
                     if (!lane.kind.isEmpty()) {
                         if (!lane.crop.isEmpty()) {
                             Paint erase = new Paint();
@@ -128,8 +140,8 @@ public final class StockManeuverResources {
                             canvas.restoreToCount(mask);
                         }
                         // Stock inactive lane kind is white at 40% alpha (SRC_IN).
-                        draw(canvas, lane.kind, box, lane.highlighted.isEmpty() ? 102 : 255,
-                                lane.highlighted.isEmpty() ? 0xFFFFFFFF : null, false);
+                        drawTinted(canvas, lane.kind, box, lane.highlighted.isEmpty() ? 102 : 255,
+                                tint != null ? tint : lane.highlighted.isEmpty() ? 0xFFFFFFFF : null, false);
                     }
                 } finally { canvas.restoreToCount(save); }
                 x += (lane.width + lane.right) * scale;

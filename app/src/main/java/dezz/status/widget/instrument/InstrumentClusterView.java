@@ -1201,6 +1201,24 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                                                 int alpha) {
         if (bounds.isEmpty()) return;
         if (commandCard.enabled) {
+            float radius = Math.max(0, Math.min(element.options.optInt("maneuverCardCornerRadiusPx", 0),
+                    Math.min(bounds.width(), bounds.height()) / 2));
+            paint.setStyle(Paint.Style.FILL);
+            int background = navigationColor(element.options.optString("maneuverCardColor", "#00000000"), 0);
+            paint.setColor(withAlpha(background, Math.round(Color.alpha(background) * alpha / 255f)));
+            canvas.drawRoundRect(bounds, radius, radius, paint);
+            float border = Math.min(Math.max(0, element.options.optInt("maneuverCardBorderWidthPx", 0)),
+                    Math.min(bounds.width(), bounds.height()) / 4);
+            if (border > 0) {
+                int borderColor = navigationColor(element.options.optString("maneuverCardBorderColor", "#00000000"), 0);
+                paint.setColor(withAlpha(borderColor, Math.round(Color.alpha(borderColor) * alpha / 255f)));
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(border);
+                RectF outline = new RectF(bounds);
+                outline.inset(border / 2, border / 2);
+                canvas.drawRoundRect(outline, Math.max(0, radius - border / 2), Math.max(0, radius - border / 2), paint);
+                paint.setStyle(Paint.Style.FILL);
+            }
             int textColor = navigationColor(element.options.optString(
                     "maneuverDetailTextColor", "#FFFFFFFF"), Color.WHITE);
             commandCardRenderer().draw(canvas, commandCard, bounds, element.options,

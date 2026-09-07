@@ -19,6 +19,15 @@ import java.nio.file.Paths;
 /** Source contract ensuring settings do not drift back to unrelated HEX/list pickers. */
 public final class AppleColorPickerIntegrationContractTest {
     private static final String[] COLOR_SCREENS = {
+            "HudPanelSettingsActivity.java",
+            "InstrumentPanelSettingsActivity.java",
+            "DriverPanelSettingsActivity.java",
+            "DriverFavoritesSettingsActivity.java",
+            "PhoneConnectorSettingsActivity.java",
+            "PhoneNotificationAutomationSettingsActivity.java",
+            "PhoneNotificationLayoutEditorActivity.java",
+            "DimMenuPanelSettingsActivity.java",
+            "NavigatorWindowSettingsActivity.java",
             "MediaPanelSettingsActivity.java",
             "ClimatePanelSettingsActivity.java",
             "VehicleInfoPanelSettingsActivity.java",
@@ -42,6 +51,14 @@ public final class AppleColorPickerIntegrationContractTest {
             assertFalse(screen + " must not expose a raw custom-color list item",
                     source.contains("Свой цвет…"));
         }
+    }
+
+    @Test
+    public void hudColorsCannotRegressToCodeOnlyFields() throws IOException {
+        String hud = source("dezz/status/widget/HudPanelSettingsActivity.java");
+        assertFalse(hud.matches("(?s).*EditText\\s+(?:textColor|unitColor|borderColor|globalColor|globalUnit)\\s*=.*"));
+        assertFalse(hud.contains("controls.put(\"color:\" + key, field("));
+        assertFalse(hud.contains("\"Цвет подложки\", item.backgroundColor, false"));
     }
 
     @Test

@@ -23,17 +23,23 @@ public final class StockManeuverCardRenderer {
     public StockManeuverCardRenderer(Context context) { resources = new StockManeuverResources(context); }
     public boolean available(StockManeuverCardState state) { return state.hasMain() && resources.available(state); }
     public void drawMain(Canvas canvas, StockManeuverCardState state, RectF bounds, int alpha) {
+        drawMain(canvas, state, bounds, alpha, null, null);
+    }
+    private void drawMain(Canvas canvas, StockManeuverCardState state, RectF bounds,
+                          int alpha, Integer signColor, Integer textColor) {
         if (!available(state)) return;
-        if (!state.lanes.isEmpty()) resources.drawLanes(canvas, state.lanes, bounds, alpha);
+        if (!state.lanes.isEmpty()) resources.drawLanes(canvas, state.lanes, bounds, alpha, signColor);
         else if (state.imageVisible) {
-            resources.draw(canvas, state.image, bounds, alpha);
-            if (!state.via.isEmpty()) label(canvas, state.via, bounds, Color.WHITE,
+            resources.drawTinted(canvas, state.image, bounds, alpha, signColor, true);
+            if (!state.via.isEmpty()) label(canvas, state.via, bounds, textColor == null ? Color.WHITE : textColor,
                     alpha, bounds.height() * .36f, 600, 1, Layout.Alignment.ALIGN_CENTER);
         }
     }
     public void draw(Canvas canvas, StockManeuverCardState state, RectF bounds,
                      JSONObject options, float scale, int fontSize, int weight, int color, int detailColor) {
         if (!available(state) || bounds.isEmpty()) return;
+        Integer signTint = optionalColor(options, "sourceSignColor");
+        Integer textTint = optionalColor(options, "sourceTextColor");
         int alpha = Color.alpha(color);
         color |= 0xFF000000;
         boolean road = !state.nextRoad.isEmpty() && options.optBoolean("showDirection", true);
@@ -65,7 +71,7 @@ public final class StockManeuverCardRenderer {
         int saved = canvas.save();
         try {
             canvas.clipRect(bounds);
-            drawMain(canvas, state, icon, alpha);
+            drawMain(canvas, state, icon, alpha, signTint, textTint);
             label(canvas, state.distance, inset(distance, options, "text", 0, scale), color, alpha,
                     options.optInt("distanceFontSizeSp", fontSize) * scale, Math.max(600, weight), 1, Layout.Alignment.ALIGN_NORMAL);
             float y = main.bottom + gap;
@@ -83,7 +89,8 @@ public final class StockManeuverCardRenderer {
             if (auxiliary) {
                 RectF row = new RectF(bounds.left, y, bounds.right, y + detailHeight);
                 paint.setStyle(Paint.Style.FILL);
-                int background = optionColor(options, "auxiliaryColor", 0xE60B4DB5);
+                int background = optionColor(options, "auxiliaryColor",
+                        optionColor(options, "maneuverAuxiliaryColor", 0xE60B4DB5));
                 paint.setColor((background & 0xFFFFFF) | Math.round(Color.alpha(background) * alpha / 255f) << 24);
                 canvas.drawRoundRect(row, Math.min(7 * scale, row.height() / 4), Math.min(7 * scale, row.height() / 4), paint);
                 RectF content = inset(row, options, "text", 0, scale);
@@ -97,11 +104,11 @@ public final class StockManeuverCardRenderer {
                                         * scale, weight, 1, Layout.Alignment.ALIGN_NORMAL);
                         content.left = Math.min(content.right, prefix.right + gap);
                     }
-                    resources.drawLanes(canvas, state.auxiliaryLanes, content, alpha);
+                    resources.drawLanes(canvas, state.auxiliaryLanes, content, alpha, signTint);
                 } else {
                     if (!state.auxiliaryImage.isEmpty()) {
                         float side = Math.min(content.height(), content.width() * .3f);
-                        resources.draw(canvas, state.auxiliaryImage, new RectF(content.left, content.top, content.left + side, content.bottom), alpha);
+                        resources.drawTinted(canvas, state.auxiliaryImage, new RectF(content.left, content.top, content.left + side, content.bottom), alpha, signTint, true);
                         content.left += side + gap;
                     }
                     label(canvas, state.auxiliaryText, content, color, alpha,
@@ -122,12 +129,18 @@ public final class StockManeuverCardRenderer {
         float factor = Math.min(1, Math.max(0, bounds.width() - gap * (signs.size() - 1)) / Math.max(1, total));
         float x = bounds.left;
         for (StockManeuverCardState.Sign sign : signs) {
+            int background = optionColor(options, "sourceBadgeColor", sign.background);
+            int textColor = optionColor(options, "sourceTextColor", sign.color);
+            Integer signColor = optionalColor(options, "sourceSignColor");
             float width = (sign.image.isEmpty() ? text.measureText(sign.text) + font : bounds.height()) * factor;
             RectF box = new RectF(x, bounds.top, x + width, bounds.bottom);
-            paint.setColor((sign.background & 0xFFFFFF) | Math.round(Color.alpha(sign.background) * alpha / 255f) << 24);
+            paint.setColor((background & 0xFFFFFF) | Math.round(Color.alpha(background) * alpha / 255f) << 24);
             canvas.drawRoundRect(box, Math.min(5 * scale, bounds.height() / 5), Math.min(5 * scale, bounds.height() / 5), paint);
-            if (!sign.image.isEmpty()) resources.draw(canvas, sign.image, box, alpha, sign.color, true);
-            else label(canvas, sign.text, box, sign.color, alpha, font * factor, weight, 1, Layout.Alignment.ALIGN_CENTER);
+            if (!sign.image.isEmpty()) {
+                if (signColor == null) resources.draw(canvas, sign.image, box, alpha, sign.color, true);
+                else resources.drawTinted(canvas, sign.image, box, alpha, signColor, true);
+            }
+            else label(canvas, sign.text, box, textColor, alpha, font * factor, weight, 1, Layout.Alignment.ALIGN_CENTER);
             x += width + gap;
         }
     }
@@ -152,6 +165,13 @@ public final class StockManeuverCardRenderer {
                 bounds.top + Math.max(0, options.optInt(prefix + "PaddingTopPx", fallback)) * scale,
                 bounds.right - Math.max(0, options.optInt(prefix + "PaddingRightPx", fallback)) * scale,
                 bounds.bottom - Math.max(0, options.optInt(prefix + "PaddingBottomPx", fallback)) * scale);
+    }
+    private static Integer optionalColor(JSONObject options, String key) {
+        if (!options.has(key) || options.isNull(key)) return null;
+        Object value = options.opt(key);
+        if (value instanceof Number) return ((Number) value).intValue();
+        try { return value instanceof String ? Color.parseColor((String) value) : null; }
+        catch (IllegalArgumentException invalid) { return null; }
     }
     private static int optionColor(JSONObject options, String key, int fallback) {
         Object value = options.opt(key);

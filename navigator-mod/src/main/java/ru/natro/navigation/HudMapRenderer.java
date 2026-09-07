@@ -422,7 +422,7 @@ final class HudMapRenderer {
         laneGuidanceMapLayer.apply(profile.showLaneGuidance,
                 profile.laneGuidanceScalePercent, night,
                 profile.focusXPercent <= 55,
-                profile.effectiveLanePriority());
+                profile.effectiveLanePriority(), profile);
         routeTurnMapLayer.apply(profile.showRouteTurns,
                 profile.routeTurnLengthPercent,
                 profile.routeTurnHeadSizePercent,

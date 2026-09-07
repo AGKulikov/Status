@@ -32,6 +32,8 @@ final class LaneGuidanceMapLayer {
     private int iconWidth;
     private int iconHeight;
     private boolean enabled;
+    private LaneGuidanceAppearance appearance = new LaneGuidanceAppearance(new NavigationMapProfile());
+    private LaneGuidanceAppearance renderedAppearance = appearance;
     private boolean nightMode;
     private boolean placeOnRight = true;
     private int scalePercent = 100;
@@ -90,13 +92,16 @@ final class LaneGuidanceMapLayer {
     }
 
     void apply(boolean nextEnabled, int nextScalePercent, boolean nextNightMode,
-               boolean nextPlaceOnRight, int layerPriority) {
+               boolean nextPlaceOnRight, int layerPriority, NavigationMapProfile profile) {
+        LaneGuidanceAppearance nextAppearance = new LaneGuidanceAppearance(profile);
         int nextScale = Math.max(50, Math.min(250, nextScalePercent));
         float nextZ = NavigationMapProfile.layerZ(layerPriority);
         boolean presentationChanged = scalePercent != nextScale || nightMode != nextNightMode
-                || placeOnRight != nextPlaceOnRight || zIndex != nextZ;
+                || placeOnRight != nextPlaceOnRight || zIndex != nextZ
+                || !appearance.same(nextAppearance);
         boolean enabledChanged = enabled != nextEnabled;
         if (!presentationChanged && !enabledChanged) return;
+        appearance = nextAppearance;
         enabled = nextEnabled;
         scalePercent = nextScale;
         nightMode = nextNightMode;
@@ -261,9 +266,20 @@ final class LaneGuidanceMapLayer {
                         + "LaneSignBalloonTextureFactory");
         Object factory = factoryClass.getConstructor(Context.class, colorsClass)
                 .newInstance(context, null);
-        Object texture = factoryClass
-                .getMethod("createTexture", balloonClass, boolean.class, float.class)
-                .invoke(factory, balloon, nightMode, scalePercent / 100f);
+        Object texture;
+        renderedAppearance = appearance;
+        try {
+            appearance.configureFactory(factory);
+            texture = factoryClass.getMethod("createTexture", balloonClass, boolean.class, float.class)
+                    .invoke(factory, balloon, nightMode, scalePercent / 100f);
+            appearance.configureTexture(factory);
+        } catch (Exception unsupportedStyle) {
+            Log.w(TAG, "Lane styling unavailable; restoring original renderer", unsupportedStyle);
+            factory = factoryClass.getConstructor(Context.class, colorsClass).newInstance(context, null);
+            texture = factoryClass.getMethod("createTexture", balloonClass, boolean.class, float.class)
+                    .invoke(factory, balloon, nightMode, scalePercent / 100f);
+            renderedAppearance = new LaneGuidanceAppearance(new NavigationMapProfile());
+        }
         List<MapOverlayPlacementCoordinator.Footprint> footprints =
                 measureBalloonFootprints(texture);
         int measuredWidth = 1;
@@ -297,8 +313,7 @@ final class LaneGuidanceMapLayer {
             iconStyle = style;
         }
         Object exactAnchor = balloonAnchor(nextPlacement.legName);
-        Object provider = invoke(texture, "create",
-                new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
+        Object provider = renderedAppearance.createImage(texture, exactAnchor, scalePercent / 100f);
         Object geometry = invoke(texture, "getBalloonGeometry",
                 new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
         PointF imageAnchor = (PointF) invoke(geometry, "getImageAnchor", new Class<?>[0]);
@@ -327,8 +342,7 @@ final class LaneGuidanceMapLayer {
                 || currentPlacemark == null) return;
         if (placement != null && placement.sameSlot(next)) return;
         Object exactAnchor = balloonAnchor(next.legName);
-        provider = invoke(texture, "create",
-                new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
+        provider = renderedAppearance.createImage(texture, exactAnchor, scalePercent / 100f);
         Object geometry = invoke(texture, "getBalloonGeometry",
                 new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
         PointF imageAnchor = (PointF) invoke(geometry, "getImageAnchor", new Class<?>[0]);

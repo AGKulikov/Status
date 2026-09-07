@@ -47,6 +47,7 @@ import dezz.status.widget.instrument.InstrumentStyleFamily;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
 import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.OptionalColorButton;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Live editor for the native 1920x720 driver instrument panel. */
@@ -697,6 +698,23 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField laneGuidanceScale = slider(content,
                 "Размер знаков движения по полосам",
                 map.laneGuidanceScalePercent, 50, 250, 5, " %");
+        content.addView(section("Оформление знака полос"), marginTop(12));
+        OptionalColorButton laneCardColor = new OptionalColorButton(this, content,
+                "Цвет таблички", map.laneGuidanceCardColor);
+        OptionalColorButton laneSignsColor = new OptionalColorButton(this, content,
+                "Цвет стрелок", map.laneGuidanceSignsColor);
+        OptionalColorButton laneBorderColor = new OptionalColorButton(this, content,
+                "Цвет обводки", map.laneGuidanceBorderColor);
+        SliderField laneBorderWidth = slider(content, "Толщина обводки",
+                map.laneGuidanceBorderWidthPx, 0, 24, 1, " px");
+        Switch laneStockCorners = switchView("Штатное скругление знака",
+                map.laneGuidanceCornerRadiusPx < 0);
+        content.addView(laneStockCorners);
+        SliderField laneCorners = slider(content, "Скругление знака",
+                Math.max(0, map.laneGuidanceCornerRadiusPx), 0, 80, 1, " px");
+        laneCorners.setEnabled(!laneStockCorners.isChecked());
+        laneStockCorners.setOnCheckedChangeListener((button, checked) -> laneCorners.setEnabled(!checked));
+        content.addView(section("Остальные объекты карты"), marginTop(12));
         SliderField cameraScale = slider(content,
                 "Размер единых знаков камер",
                 map.cameraScalePercent, 50, 250, 5, " %");
@@ -888,6 +906,11 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.roadsOnly = roadsOnly.isChecked();
                     map.cursorScalePercent = cursorScale.intValue();
                     map.laneGuidanceScalePercent = laneGuidanceScale.intValue();
+                    map.laneGuidanceCardColor = laneCardColor.value();
+                    map.laneGuidanceSignsColor = laneSignsColor.value();
+                    map.laneGuidanceBorderColor = laneBorderColor.value();
+                    map.laneGuidanceBorderWidthPx = laneBorderWidth.intValue();
+                    map.laneGuidanceCornerRadiusPx = laneStockCorners.isChecked() ? -1 : laneCorners.intValue();
                     map.cameraScalePercent = cameraScale.intValue();
                     map.cameraDirectionLengthPercent = cameraDirectionLength.intValue();
                     map.cameraDirectionWidthPercent = cameraDirectionWidth.intValue();
@@ -1095,6 +1118,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         private Switch showIcon;
         private Switch reserveIconSpace;
         private Switch showManeuverDetails;
+        private OptionalColorButton sourceSignColor, sourceTextColor, sourceBadgeColor;
 
         NavigationInfoControls(@NonNull LinearLayout parent,
                                @NonNull InstrumentElementConfig source) {
@@ -1125,6 +1149,18 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                         100, 0, 100, 1, " %");
                 number("maneuverIconCornerRadiusPx", "Скругление фона знака",
                         12, 0, 100, 1, " px");
+
+                parent.addView(section("Табличка манёвра"), marginTop(12));
+                color("maneuverCardColor", "Цвет таблички", "#00000000");
+                color("maneuverCardBorderColor", "Цвет обводки", "#00000000");
+                number("maneuverCardBorderWidthPx", "Толщина обводки", 0, 0, 24, 1, " px");
+                number("maneuverCardCornerRadiusPx", "Скругление таблички", 0, 0, 80, 1, " px");
+                sourceSignColor = new OptionalColorButton(InstrumentPanelSettingsActivity.this, parent,
+                        "Цвет исходных знаков и стрелок", source.options.optString("sourceSignColor", null));
+                sourceTextColor = new OptionalColorButton(InstrumentPanelSettingsActivity.this, parent,
+                        "Цвет текста указателей", source.options.optString("sourceTextColor", null));
+                sourceBadgeColor = new OptionalColorButton(InstrumentPanelSettingsActivity.this, parent,
+                        "Фон исходных указателей", source.options.optString("sourceBadgeColor", null));
 
                 parent.addView(section("Данные ближайшего манёвра"), marginTop(12));
                 showManeuverDetails = switchView(
@@ -1218,6 +1254,11 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         }
 
         void apply(@NonNull InstrumentElementConfig target) {
+            if (sourceSignColor != null) {
+                setOption(target, "sourceSignColor", sourceSignColor.value());
+                setOption(target, "sourceTextColor", sourceTextColor.value());
+                setOption(target, "sourceBadgeColor", sourceBadgeColor.value());
+            }
             if (showIcon != null) {
                 setOption(target, "showManeuverIcon", showIcon.isChecked());
             }
@@ -1316,7 +1357,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
     }
 
     private static void setOption(@NonNull InstrumentElementConfig element,
-                                  @NonNull String key, @NonNull String value) {
+                                  @NonNull String key, @Nullable String value) {
         try {
             element.options.put(key, value);
         } catch (JSONException impossible) {

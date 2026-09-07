@@ -708,8 +708,9 @@ public final class HudCanvasView extends View {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(withAlpha(card, alpha));
             canvas.drawRoundRect(bounds, radius, radius, paint);
-            float borderWidth = Math.max(0f,
-                    item.options.optInt("cardBorderWidthPx", 0) * scale);
+            float borderWidth = Math.min(Math.max(0f,
+                    item.options.optInt("cardBorderWidthPx", 0) * scale),
+                    Math.min(bounds.width(), bounds.height()) / 4f);
             if (borderWidth > 0f) {
                 int border = optionColor(item, "cardBorderColor", 0x00000000);
                 RectF borderBounds = inset(bounds, borderWidth * .5f);
@@ -717,7 +718,8 @@ public final class HudCanvasView extends View {
                 paint.setStrokeWidth(borderWidth);
                 paint.setColor(withAlpha(border, Math.round(
                         Color.alpha(border) * item.brightness / 100f)));
-                canvas.drawRoundRect(borderBounds, radius, radius, paint);
+                canvas.drawRoundRect(borderBounds, Math.max(0, radius - borderWidth / 2),
+                        Math.max(0, radius - borderWidth / 2), paint);
                 paint.setStyle(Paint.Style.FILL);
             }
         }

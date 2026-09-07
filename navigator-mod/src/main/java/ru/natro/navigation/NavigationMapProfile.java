@@ -55,6 +55,11 @@ final class NavigationMapProfile {
     boolean showLaneGuidance = true;
     boolean showHudSpeedCameras = true;
     int laneGuidanceScalePercent = 100;
+    String laneGuidanceCardColor;
+    String laneGuidanceSignsColor;
+    String laneGuidanceBorderColor;
+    int laneGuidanceBorderWidthPx;
+    int laneGuidanceCornerRadiusPx = -1;
     int cameraScalePercent = 100;
     int cameraDirectionLengthPercent = 100;
     int cameraDirectionWidthPercent = 100;
@@ -165,6 +170,11 @@ final class NavigationMapProfile {
             result.showHudSpeedCameras = source.optBoolean("showHudSpeedCameras", true);
             result.laneGuidanceScalePercent = clamp(
                     source.optInt("laneGuidanceScalePercent", 100), 50, 250);
+            result.laneGuidanceCardColor = optionalColor(source, "laneGuidanceCardColor");
+            result.laneGuidanceSignsColor = optionalColor(source, "laneGuidanceSignsColor");
+            result.laneGuidanceBorderColor = optionalColor(source, "laneGuidanceBorderColor");
+            result.laneGuidanceBorderWidthPx = clamp(source.optInt("laneGuidanceBorderWidthPx", 0), 0, 24);
+            result.laneGuidanceCornerRadiusPx = clamp(source.optInt("laneGuidanceCornerRadiusPx", -1), -1, 80);
             result.cameraScalePercent = clamp(
                     source.optInt("cameraScalePercent", 100), 50, 250);
             int legacyCameraDirectionScale = source.optInt(

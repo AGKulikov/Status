@@ -58,6 +58,7 @@ import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.OptionalColorButton;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /**
@@ -348,8 +349,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 item.telemetryMetricId, false);
         EditText format = field(form, "Формат (%s или %.1f)", item.textFormat, false);
         EditText unit = field(form, "Единица", item.unit, false);
-        EditText textColor = field(form, "Цвет текста", item.textColor, false);
-        EditText unitColor = field(form, "Цвет единицы", item.unitColor, false);
+        ColorField textColor = colorField(form, "Цвет текста", item.textColor);
+        ColorField unitColor = colorField(form, "Цвет единицы", item.unitColor);
         SliderField fontSize = slider(form, "Размер текста",
                 item.fontSizeSp, 8, 96, 1, " sp");
         SliderField fontWeight = slider(form, "Насыщенность шрифта",
@@ -419,8 +420,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.telemetryMetricId = value(metric);
                         item.textFormat = value(format);
                         item.unit = value(unit);
-                        item.textColor = value(textColor);
-                        item.unitColor = value(unitColor);
+                        item.textColor = textColor.value;
+                        item.unitColor = unitColor.value;
                         item.backgroundColor = "#00000000";
                         item.fontSizeSp = fontSize.intValue();
                         item.fontWeight = fontWeight.intValue();
@@ -590,6 +591,23 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField laneGuidanceScale = slider(form,
                 "Размер знаков движения по полосам",
                 profile.laneGuidanceScalePercent, 50, 250, 5, " %");
+        form.addView(section("Оформление знака полос"), marginTop(12));
+        OptionalColorButton laneCardColor = new OptionalColorButton(this, form,
+                "Цвет таблички", profile.laneGuidanceCardColor);
+        OptionalColorButton laneSignsColor = new OptionalColorButton(this, form,
+                "Цвет стрелок", profile.laneGuidanceSignsColor);
+        OptionalColorButton laneBorderColor = new OptionalColorButton(this, form,
+                "Цвет обводки", profile.laneGuidanceBorderColor);
+        SliderField laneBorderWidth = slider(form, "Толщина обводки",
+                profile.laneGuidanceBorderWidthPx, 0, 24, 1, " px");
+        Switch laneStockCorners = switchView("Штатное скругление знака",
+                profile.laneGuidanceCornerRadiusPx < 0);
+        form.addView(laneStockCorners);
+        SliderField laneCorners = slider(form, "Скругление знака",
+                Math.max(0, profile.laneGuidanceCornerRadiusPx), 0, 80, 1, " px");
+        laneCorners.setEnabled(!laneStockCorners.isChecked());
+        laneStockCorners.setOnCheckedChangeListener((button, checked) -> laneCorners.setEnabled(!checked));
+        form.addView(section("Остальные объекты карты"), marginTop(12));
         SliderField cameraScale = slider(form,
                 "Размер единых знаков камер",
                 profile.cameraScalePercent, 50, 250, 5, " %");
@@ -799,6 +817,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.roadsOnly = roadsOnly.isChecked();
                         profile.cursorScalePercent = cursorScale.intValue();
                         profile.laneGuidanceScalePercent = laneGuidanceScale.intValue();
+                        profile.laneGuidanceCardColor = laneCardColor.value();
+                        profile.laneGuidanceSignsColor = laneSignsColor.value();
+                        profile.laneGuidanceBorderColor = laneBorderColor.value();
+                        profile.laneGuidanceBorderWidthPx = laneBorderWidth.intValue();
+                        profile.laneGuidanceCornerRadiusPx = laneStockCorners.isChecked() ? -1 : laneCorners.intValue();
                         profile.cameraScalePercent = cameraScale.intValue();
                         profile.cameraDirectionLengthPercent =
                                 cameraDirectionLength.intValue();
@@ -1167,6 +1190,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.options.optString("arrowLayout", "LEFT"));
                 break;
             case NAV_COMBINED:
+                controls.put("optionalColor:sourceSignColor", new OptionalColorButton(this, form,
+                        "Цвет исходных знаков и стрелок", item.options.optString("sourceSignColor", null)));
+                controls.put("optionalColor:sourceTextColor", new OptionalColorButton(this, form,
+                        "Цвет текста указателей", item.options.optString("sourceTextColor", null)));
+                controls.put("optionalColor:sourceBadgeColor", new OptionalColorButton(this, form,
+                        "Фон исходных указателей", item.options.optString("sourceBadgeColor", null)));
                 form.addView(text("Знак передаётся из Яндекс Навигатора как есть. "
                         + "Собственная стрелка для этой карточки не рисуется.",
                         12, 0xFF95A0AF), marginTop(5));
@@ -1183,9 +1212,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         "Название дороги / направление",
                         item.options.optBoolean("showDirection", true));
                 visualColor(form, controls, item, "cardColor",
-                        "Цвет карточки ARGB", "#FF0758E8");
+                        "Цвет карточки", "#FF0758E8");
                 visualColor(form, controls, item, "roadBadgeColor",
-                        "Цвет номера дороги ARGB", "#FF16A34A");
+                        "Цвет номера дороги", "#FF16A34A");
                 controls.put("int:cardOpacityPercent", slider(form,
                         "Непрозрачность карточки",
                         item.options.optInt("cardOpacityPercent", 94),
@@ -1195,7 +1224,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.options.optInt("cardCornerRadiusPx", 18),
                         0, 80, 1, " px"));
                 visualColor(form, controls, item, "cardBorderColor",
-                        "Цвет рамки карточки ARGB", "#00000000");
+                        "Цвет рамки карточки", "#00000000");
                 controls.put("int:cardBorderWidthPx", slider(form,
                         "Толщина рамки карточки",
                         item.options.optInt("cardBorderWidthPx", 0),
@@ -1314,20 +1343,20 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         "Анимация стрелки",
                         item.options.optBoolean("arrowAnimation", true));
                 visualColor(form, controls, item, "redColor",
-                        "Красный сигнал ARGB", "#FFFF3B30");
+                        "Красный сигнал", "#FFFF3B30");
                 visualColor(form, controls, item, "yellowColor",
-                        "Жёлтый сигнал ARGB", "#FFFFCC00");
+                        "Жёлтый сигнал", "#FFFFCC00");
                 visualColor(form, controls, item, "greenColor",
-                        "Зелёный сигнал ARGB", "#FF34C759");
+                        "Зелёный сигнал", "#FF34C759");
                 visualColor(form, controls, item, "unknownColor",
-                        "Нет данных ARGB", "#FF6B7280");
+                        "Нет данных", "#FF6B7280");
                 break;
             case NAV_TRAFFIC_JAM:
                 visualSwitch(form, controls, "bool:showCardBackground",
                         "Фон плашки",
                         item.options.optBoolean("showCardBackground", true));
                 visualColor(form, controls, item, "cardColor",
-                        "Цвет плашки ARGB", "#F21B1F24");
+                        "Цвет плашки", "#F21B1F24");
                 controls.put("int:cardOpacityPercent", slider(form,
                         "Непрозрачность плашки",
                         item.options.optInt("cardOpacityPercent", 100),
@@ -1337,7 +1366,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.options.optInt("cardCornerRadiusPx", 16),
                         0, 160, 1, " px"));
                 visualColor(form, controls, item, "cardBorderColor",
-                        "Цвет рамки ARGB", "#00000000");
+                        "Цвет рамки", "#00000000");
                 controls.put("int:cardBorderWidthPx", slider(form,
                         "Толщина рамки",
                         item.options.optInt("cardBorderWidthPx", 0),
@@ -1353,7 +1382,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         "Фон карточки",
                         item.options.optBoolean("showCardBackground", true));
                 visualColor(form, controls, item, "cardColor",
-                        "Цвет карточки ARGB", "#F21B1F24");
+                        "Цвет карточки", "#F21B1F24");
                 controls.put("int:cardOpacityPercent", slider(form,
                         "Непрозрачность карточки",
                         item.options.optInt("cardOpacityPercent", 100),
@@ -1363,7 +1392,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.options.optInt("cardCornerRadiusPx", 18),
                         0, 160, 1, " px"));
                 visualColor(form, controls, item, "cardBorderColor",
-                        "Цвет рамки ARGB", "#00000000");
+                        "Цвет рамки", "#00000000");
                 controls.put("int:cardBorderWidthPx", slider(form,
                         "Толщина рамки",
                         item.options.optInt("cardBorderWidthPx", 0),
@@ -1385,9 +1414,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 form.addView(section("Цвета линии маршрута"), marginTop(12));
                 addTrafficPaletteOptions(form, controls, item);
                 visualColor(form, controls, item, "completedColor",
-                        "Пройденная часть ARGB", "#FF858A93");
+                        "Пройденная часть", "#FF858A93");
                 visualColor(form, controls, item, "markerColor",
-                        "Маркер положения ARGB", "#FFFFC400");
+                        "Маркер положения", "#FFFFC400");
                 break;
             case NAV_TRIP_PROGRESS:
                 visualSpinner(form, controls, "string:progressMode", "Данные прогресса",
@@ -1440,18 +1469,18 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
 
     private void visualColor(LinearLayout form, Map<String, Object> controls,
             HudElementConfig item, String key, String title, String fallback) {
-        controls.put("color:" + key, field(form, title,
-                optionColorText(item, key, fallback), false));
+        controls.put("color:" + key, colorField(form, title,
+                optionColorText(item, key, fallback)));
     }
 
     private void addTrafficPaletteOptions(LinearLayout form, Map<String, Object> controls,
             HudElementConfig item) {
-        visualColor(form, controls, item, "freeColor", "Свободно ARGB", "#FF34C759");
-        visualColor(form, controls, item, "lightColor", "Небольшая пробка ARGB", "#FFFFCC00");
-        visualColor(form, controls, item, "hardColor", "Затруднение ARGB", "#FFFF3B30");
-        visualColor(form, controls, item, "veryHardColor", "Тяжёлая пробка ARGB", "#FFB00020");
-        visualColor(form, controls, item, "blockedColor", "Перекрыто ARGB", "#FF7A1FA2");
-        visualColor(form, controls, item, "unknownColor", "Нет данных ARGB", "#FF8E8E93");
+        visualColor(form, controls, item, "freeColor", "Свободно", "#FF34C759");
+        visualColor(form, controls, item, "lightColor", "Небольшая пробка", "#FFFFCC00");
+        visualColor(form, controls, item, "hardColor", "Затруднение", "#FFFF3B30");
+        visualColor(form, controls, item, "veryHardColor", "Тяжёлая пробка", "#FFB00020");
+        visualColor(form, controls, item, "blockedColor", "Перекрыто", "#FF7A1FA2");
+        visualColor(form, controls, item, "unknownColor", "Нет данных", "#FF8E8E93");
     }
 
     @NonNull
@@ -1485,10 +1514,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 output.put(key, ((Switch) control).isChecked());
             } else if ("int".equals(kind) && control instanceof SliderField) {
                 output.put(key, ((SliderField) control).intValue());
-            } else if ("color".equals(kind) && control instanceof EditText) {
-                String color = value((EditText) control);
+            } else if ("color".equals(kind) && control instanceof ColorField) {
+                String color = ((ColorField) control).value;
                 Color.parseColor(color);
                 output.put(key, color);
+            } else if ("optionalColor".equals(kind) && control instanceof OptionalColorButton) {
+                output.put(key, ((OptionalColorButton) control).value());
             } else if ("string".equals(kind) && control instanceof Spinner) {
                 output.put(key, String.valueOf(((Spinner) control).getSelectedItem()));
             }
@@ -1742,12 +1773,12 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField height = slider(form, "Высота", item.height,
                 1, Math.max(1, config.gridRows), 1, " яч.");
 
-        EditText color = field(form, "Цвет подложки", item.backgroundColor, false);
+        ColorField color = colorField(form, "Цвет подложки", item.backgroundColor);
         SliderField opacity = slider(form, "Непрозрачность заливки",
                 item.backgroundOpacityPercent, 0, 100, 1, " %");
         SliderField corner = slider(form, "Скругление",
                 item.cornerRadiusPx, 0, 80, 1, " px");
-        EditText borderColor = field(form, "Цвет рамки", item.borderColor, false);
+        ColorField borderColor = colorField(form, "Цвет рамки", item.borderColor);
         SliderField borderOpacity = slider(form, "Непрозрачность рамки",
                 item.borderOpacityPercent, 0, 100, 1, " %");
         SliderField borderWidth = slider(form, "Толщина рамки",
@@ -1771,10 +1802,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     item.y = y.intValue();
                     item.width = width.intValue();
                     item.height = height.intValue();
-                    item.backgroundColor = value(color);
+                    item.backgroundColor = color.value;
                     item.backgroundOpacityPercent = opacity.intValue();
                     item.cornerRadiusPx = corner.intValue();
-                    item.borderColor = value(borderColor);
+                    item.borderColor = borderColor.value;
                     item.borderOpacityPercent = borderOpacity.intValue();
                     item.borderWidthPx = borderWidth.intValue();
                     item.enabled = itemEnabled.isChecked();
@@ -1926,8 +1957,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 12, 0xFFB8C0CC), marginTop(10));
         SliderField brightness = slider(form, "Общая яркость",
                 config.globalBrightness, 0, 100, 1, " %");
-        EditText globalColor = field(form, "Общий цвет текста", config.globalTextColor, false);
-        EditText globalUnit = field(form, "Общий цвет единиц", config.globalUnitColor, false);
+        ColorField globalColor = colorField(form, "Общий цвет текста", config.globalTextColor);
+        ColorField globalUnit = colorField(form, "Общий цвет единиц", config.globalUnitColor);
         SliderField fontWeight = slider(form, "Общая насыщенность шрифта",
                 config.globalFontWeight, 100, 900, 100, "");
         EditText fontUri = field(form, "URI пользовательского шрифта",
@@ -1984,8 +2015,8 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     config.gridRows = rows.intValue();
                     config.backgroundMode = "TRANSPARENT";
                     config.globalBrightness = brightness.intValue();
-                    config.globalTextColor = value(globalColor);
-                    config.globalUnitColor = value(globalUnit);
+                    config.globalTextColor = globalColor.value;
+                    config.globalUnitColor = globalUnit.value;
                     config.globalFontWeight = fontWeight.intValue();
                     config.customFontUri = value(fontUri);
                     config.navigationDisplayThresholdMeters = navThreshold.intValue();

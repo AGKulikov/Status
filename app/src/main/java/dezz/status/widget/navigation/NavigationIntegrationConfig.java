@@ -199,6 +199,12 @@ public final class NavigationIntegrationConfig {
         public boolean showHudSpeedCameras = true;
         /** Scale of Yandex's original lane-sign view; 100 keeps the stock MapKit size. */
         public int laneGuidanceScalePercent = 100;
+        @Nullable public String laneGuidanceCardColor;
+        @Nullable public String laneGuidanceSignsColor;
+        @Nullable public String laneGuidanceBorderColor;
+        public int laneGuidanceBorderWidthPx;
+        /** -1 preserves Navigator's original corner radius. */
+        public int laneGuidanceCornerRadiusPx = -1;
         /** Scale of the one compact source-independent camera/speed sign. */
         public int cameraScalePercent = 100;
         /** Longitudinal length of the source-backed camera direction triangle. */
@@ -334,6 +340,11 @@ public final class NavigationIntegrationConfig {
                     .put("showLaneGuidance", showLaneGuidance)
                     .put("showHudSpeedCameras", showHudSpeedCameras)
                     .put("laneGuidanceScalePercent", laneGuidanceScalePercent)
+                    .put("laneGuidanceCardColor", laneGuidanceCardColor == null ? JSONObject.NULL : laneGuidanceCardColor)
+                    .put("laneGuidanceSignsColor", laneGuidanceSignsColor == null ? JSONObject.NULL : laneGuidanceSignsColor)
+                    .put("laneGuidanceBorderColor", laneGuidanceBorderColor == null ? JSONObject.NULL : laneGuidanceBorderColor)
+                    .put("laneGuidanceBorderWidthPx", laneGuidanceBorderWidthPx)
+                    .put("laneGuidanceCornerRadiusPx", laneGuidanceCornerRadiusPx)
                     .put("cameraScalePercent", cameraScalePercent)
                     .put("cameraDirectionLengthPercent", cameraDirectionLengthPercent)
                     .put("cameraDirectionWidthPercent", cameraDirectionWidthPercent)
@@ -439,6 +450,11 @@ public final class NavigationIntegrationConfig {
                     "showHudSpeedCameras", result.showHudSpeedCameras);
             result.laneGuidanceScalePercent = source.optInt(
                     "laneGuidanceScalePercent", result.laneGuidanceScalePercent);
+            result.laneGuidanceCardColor = optionalColor(source, "laneGuidanceCardColor", null);
+            result.laneGuidanceSignsColor = optionalColor(source, "laneGuidanceSignsColor", null);
+            result.laneGuidanceBorderColor = optionalColor(source, "laneGuidanceBorderColor", null);
+            result.laneGuidanceBorderWidthPx = source.optInt("laneGuidanceBorderWidthPx", 0);
+            result.laneGuidanceCornerRadiusPx = source.optInt("laneGuidanceCornerRadiusPx", -1);
             result.cameraScalePercent = source.optInt(
                     "cameraScalePercent", result.cameraScalePercent);
             // The former single scale changed both dimensions. Use it only as a migration
@@ -603,6 +619,11 @@ public final class NavigationIntegrationConfig {
             mapScalePercent = clamp(mapScalePercent, 50, 300);
             cursorScalePercent = clamp(cursorScalePercent, 25, 300);
             laneGuidanceScalePercent = clamp(laneGuidanceScalePercent, 50, 250);
+            laneGuidanceCardColor = optionalColor(laneGuidanceCardColor);
+            laneGuidanceSignsColor = optionalColor(laneGuidanceSignsColor);
+            laneGuidanceBorderColor = optionalColor(laneGuidanceBorderColor);
+            laneGuidanceBorderWidthPx = clamp(laneGuidanceBorderWidthPx, 0, 24);
+            laneGuidanceCornerRadiusPx = clamp(laneGuidanceCornerRadiusPx, -1, 80);
             cameraScalePercent = clamp(cameraScalePercent, 50, 250);
             cameraDirectionLengthPercent = clamp(cameraDirectionLengthPercent, 10, 300);
             cameraDirectionWidthPercent = clamp(cameraDirectionWidthPercent, 10, 300);
