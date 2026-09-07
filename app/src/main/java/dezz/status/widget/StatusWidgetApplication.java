@@ -64,7 +64,7 @@ public class StatusWidgetApplication extends Application {
         StartupPerformanceTrace.beginProcess(AppProcessPolicy.currentProcessLabel());
         // Keep Application.onCreate minimal. Preferences, recorder recovery and vendor status-bar
         // calls begin from the first-surface event instead of delaying startup with a timer.
-        DiagnosticJournal.initialize(this, false);
+        DiagnosticJournal.initializeEarly(this);
         installCrashHandler(hudProcess);
         // The main process is the sole coordinator writer. MODE_MULTI_PROCESS is read-through
         // compatibility for :hud, not a transactional cross-process state machine.

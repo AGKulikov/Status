@@ -3035,7 +3035,7 @@ public class WidgetService extends Service {
     private void reconcileAutomaticInstrumentPanel() {
         if (destroyed || prefs == null) return;
         runIntegrationStep("automatic instrument panel reconcile",
-                () -> InstrumentDisplayLauncher.reconcileAutomatic(this));
+                () -> InstrumentDisplayLauncher.reconcileAutomatic(this, "integration-host"));
     }
 
     /**

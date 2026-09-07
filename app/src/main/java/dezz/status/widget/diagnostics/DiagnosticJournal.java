@@ -24,6 +24,7 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -85,14 +86,52 @@ public final class DiagnosticJournal {
 
     @Nullable private static Context appContext;
     private static volatile boolean enabled;
+    private static final int MAX_EARLY_ENTRIES = 64;
+    private static final ArrayDeque<Entry> earlyEntries = new ArrayDeque<>();
+    private static boolean initialPreferencesRead;
 
     private DiagnosticJournal() {
+    }
+
+    /** Installs the crash destination without preferences, disk reads or early journal writes. */
+    public static void initializeEarly(@NonNull Context context) {
+        synchronized (LOCK) {
+            appContext = context.getApplicationContext();
+        }
+    }
+
+    /** Small startup events survive deferred diagnostics; disabled debug never persists them. */
+    public static void recordEarly(@NonNull Level level, @NonNull String component,
+                                   @NonNull String message) {
+        synchronized (LOCK) {
+            if (enabled) {
+                appendLocked(level, component, message);
+            } else if (!initialPreferencesRead) {
+                if (earlyEntries.size() == MAX_EARLY_ENTRIES) earlyEntries.removeFirst();
+                String safe = sanitize(message);
+                if (safe.length() > 1_000) safe = safe.substring(0, 1_000);
+                earlyEntries.addLast(new Entry(System.currentTimeMillis(),
+                        SystemClock.elapsedRealtime(), level, sanitize(component), safe));
+            }
+        }
+    }
+
+    private static void finishEarlyEntriesLocked() {
+        initialPreferencesRead = true;
+        if (enabled) {
+            for (Entry entry : earlyEntries) {
+                appendLocked(entry.level, entry.component, entry.message,
+                        entry.timestamp, entry.uptimeMs);
+            }
+        }
+        earlyEntries.clear();
     }
 
     public static void initialize(@NonNull Context context, boolean initiallyEnabled) {
         synchronized (LOCK) {
             appContext = context.getApplicationContext();
             enabled = initiallyEnabled;
+            finishEarlyEntriesLocked();
             if (enabled) {
                 appendLocked(Level.INFO, "runtime",
                         "journal enabled; " + environmentLocked());
@@ -103,8 +142,9 @@ public final class DiagnosticJournal {
     public static void setEnabled(@NonNull Context context, boolean value) {
         synchronized (LOCK) {
             appContext = context.getApplicationContext();
-            if (enabled == value) return;
+            if (enabled == value && initialPreferencesRead) return;
             enabled = value;
+            finishEarlyEntriesLocked();
             if (value) {
                 appendLocked(Level.INFO, "runtime",
                         "journal enabled; " + environmentLocked());
@@ -226,11 +266,17 @@ public final class DiagnosticJournal {
 
     private static void appendLocked(@NonNull Level level, @NonNull String component,
                                      @NonNull String rawMessage) {
+        appendLocked(level, component, rawMessage,
+                System.currentTimeMillis(), SystemClock.elapsedRealtime());
+    }
+
+    private static void appendLocked(@NonNull Level level, @NonNull String component,
+                                     @NonNull String rawMessage, long timestamp, long uptimeMs) {
         File file = journalFileLocked();
         if (file == null) return;
         rotateLocked(file);
         String message = sanitize(rawMessage);
-        String line = System.currentTimeMillis() + "\t" + SystemClock.elapsedRealtime()
+        String line = timestamp + "\t" + uptimeMs
                 + "\t" + level.name() + "\t" + sanitize(component)
                 + "\t" + message.replace("\r", "")
                 .replace("\n", "\\n").replace("\t", " ") + "\n";

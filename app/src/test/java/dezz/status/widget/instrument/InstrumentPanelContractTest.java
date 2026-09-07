@@ -208,13 +208,9 @@ public final class InstrumentPanelContractTest {
         assertTrue(endpoint.contains("MAX_CLUSTER_SURFACE_RECOVERY_ATTEMPTS = 6"));
         assertTrue(endpoint.contains("++nextSurfaceGeneration"));
         assertTrue(endpoint.contains("resetClusterSurfaceRecovery(next.generation)"));
-        assertTrue(launcher.contains("launchCold(app);"));
-        String coldLaunch = launcher.substring(
-                launcher.indexOf("private static void launchCold"),
-                launcher.indexOf("public static void apply"));
-        assertTrue(coldLaunch.contains("postStart(app, 0, DIM_WAKE_TO_TASK_RESET_MS)"));
-        assertFalse(coldLaunch.contains("postExternalLaunch"));
-        assertFalse(coldLaunch.contains("FORCE_STOP_COMMAND"));
+        assertFalse(launcher.contains("am force-stop"));
+        assertFalse(launcher.contains("prepareInstrumentPanelLaunch("));
+        assertTrue(launcher.contains("coordinator.request(automatic, reassertDim, reason)"));
         assertFalse(panel.contains("Bitmap.createBitmap"));
         assertTrue(renderer.contains("staticLayerDirty"));
         assertTrue(renderer.contains("Choreographer.FrameCallback"));
@@ -335,7 +331,7 @@ public final class InstrumentPanelContractTest {
         assertTrue(preset.contains("maneuverIconPaddingLeftPx"));
     }
 
-    @Test public void launcherMirrorsVerifiedDimSequenceAndAutostarts() throws Exception {
+    @Test public void launcherUsesDedicatedDimTaskAndAutostarts() throws Exception {
         Path root = projectRoot();
         String launcher = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
                 + "InstrumentDisplayLauncher.java"));
@@ -355,24 +351,18 @@ public final class InstrumentPanelContractTest {
         assertTrue(launcher.contains("DIM_NAVIGATION_MODE = 3"));
         assertTrue(launcher.contains("switchNaviMode"));
         assertTrue(launcher.contains("(byte) 2, (byte) 8, (byte) 8"));
-        assertTrue(launcher.contains("setLaunchDisplayId(config.displayId)"));
+        assertTrue(launcher.contains("setLaunchDisplayId(displayId)"));
         assertTrue(launcher.contains("setAction(Intent.ACTION_MAIN)"));
         assertTrue(launcher.contains("android.activity.windowingMode"));
         assertTrue(launcher.contains("android.activity.SplitScreenShownPosition"));
         assertTrue(launcher.contains("DIM_WAKE_TO_TASK_RESET_MS = 200L"));
         assertTrue(launcher.contains("finishStalePanelTask"));
-        assertTrue(launcher.contains("prepareInstrumentPanelLaunch"));
         assertTrue(launcher.contains("ensureClusterEndpointStarted(app)"));
-        assertTrue(launcher.contains("MAX_NAVIGATOR_READY_RETRIES = 60"));
-        assertTrue(launcher.contains("NAVIGATOR_READY_RETRY_MS = 500L"));
-        assertTrue(launcher.contains("onExternalLaunchPrepared("));
-        assertTrue(launcher.contains("waiting for Navigator DIM launcher"));
-        assertTrue(launcher.contains(
-                "Navigator external launcher unavailable after bounded readiness wait"));
-        assertTrue(launcher.indexOf("ensureClusterEndpointStarted(app)")
-                < launcher.indexOf("LAUNCH_PENDING.compareAndSet(false, true)"));
-        assertTrue(launcher.contains("FORCE_STOP_COMMAND"));
-        assertTrue(launcher.contains("PrivilegedShell.get(app)"));
+        assertFalse(launcher.contains("prepareInstrumentPanelLaunch"));
+        assertFalse(launcher.contains("am force-stop"));
+        assertFalse(launcher.contains("PrivilegedShell"));
+        assertTrue(launcher.contains("InstrumentPanelActivity.windowState()"));
+        assertTrue(launcher.contains("allowed.getAsBoolean()"));
         assertTrue(endpoint.contains("CAP_EXTERNAL_INSTRUMENT_LAUNCHER"));
         assertTrue(endpoint.contains("MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH"));
         assertTrue(client.contains("CAP_EXTERNAL_INSTRUMENT_LAUNCHER"));
@@ -384,7 +374,7 @@ public final class InstrumentPanelContractTest {
         assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_CLEAR_TOP"));
         assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_SINGLE_TOP"));
         assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_NO_ANIMATION"));
-        assertTrue(launcher.contains("MAX_DISPLAY_RETRIES"));
+        assertTrue(launcher.contains("DisplayManager.DisplayListener"));
         assertTrue(bootstrap.contains("InstrumentDisplayLauncher.reconcileAutomatic"));
         assertTrue(boot.contains("InstrumentDisplayLauncher.reconcileAutomatic"));
         assertTrue(manifest.contains(".instrument.InstrumentPanelActivity"));
@@ -395,7 +385,8 @@ public final class InstrumentPanelContractTest {
         assertTrue(store.contains("issueLaunchToken"));
         assertTrue(store.contains("consumeLaunchToken"));
         assertTrue(store.contains(".commit()"));
-        assertTrue(activity.contains("store.consumeLaunchToken("));
+        assertTrue(activity.contains("InstrumentDisplayLauncher.authorize("));
+        assertFalse(activity.contains("store.consumeLaunchToken("));
         assertTrue(activity.contains("StatusWidgetApplication.notifyFirstUsefulSurface"));
     }
 

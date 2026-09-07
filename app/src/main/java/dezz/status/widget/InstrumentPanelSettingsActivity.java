@@ -135,6 +135,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         autostart.setOnCheckedChangeListener((button, checked) -> {
             store.setAutostart(checked);
             if (checked && enabled.isChecked()) InstrumentDisplayLauncher.launch(this);
+            else InstrumentDisplayLauncher.reconcileAutomatic(this, "autostart-setting");
         });
         row.addView(autostart);
 

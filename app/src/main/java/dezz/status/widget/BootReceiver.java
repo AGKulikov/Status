@@ -205,7 +205,7 @@ public class BootReceiver extends BroadcastReceiver {
             Log.e(TAG, "Could not restore autostart HUD at lifecycle boundary", failure);
         }
         try {
-            InstrumentDisplayLauncher.reconcileAutomatic(context);
+            InstrumentDisplayLauncher.reconcileAutomatic(context, "boot:" + action);
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not restore instrument panel at lifecycle boundary", failure);
         }

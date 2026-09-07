@@ -28,6 +28,8 @@ public final class InstrumentPanelStore {
     private static final String KEY_LAUNCH_TOKEN = "launch_token";
     private static final String KEY_LAUNCH_TOKEN_EXPIRES_AT = "launch_token_expires_at";
     private static final long LAUNCH_TOKEN_LIFETIME_MS = 15_000L;
+    /** Launcher and Activity use different Store instances in the same process. */
+    private static final Object LAUNCH_TOKEN_LOCK = new Object();
 
     @NonNull private final SharedPreferences preferences;
 
@@ -121,28 +123,41 @@ public final class InstrumentPanelStore {
     /** One durable capability authorizes exactly one fresh exported DIM Activity start. */
     @NonNull
     public String issueLaunchToken() {
-        String token = UUID.randomUUID().toString();
-        boolean stored = preferences.edit()
-                .putString(KEY_LAUNCH_TOKEN, token)
-                .putLong(KEY_LAUNCH_TOKEN_EXPIRES_AT,
-                        System.currentTimeMillis() + LAUNCH_TOKEN_LIFETIME_MS)
-                .commit();
-        if (!stored) throw new IllegalStateException("Could not persist instrument launch token");
-        return token;
+        synchronized (LAUNCH_TOKEN_LOCK) {
+            String token = UUID.randomUUID().toString();
+            boolean stored = preferences.edit()
+                    .putString(KEY_LAUNCH_TOKEN, token)
+                    .putLong(KEY_LAUNCH_TOKEN_EXPIRES_AT,
+                            System.currentTimeMillis() + LAUNCH_TOKEN_LIFETIME_MS)
+                    .commit();
+            if (!stored) throw new IllegalStateException("Could not persist instrument launch token");
+            return token;
+        }
     }
 
     /** Validates and consumes the capability before any driver-display content is created. */
-    public synchronized boolean consumeLaunchToken(String candidate) {
-        if (candidate == null || candidate.length() < 16 || candidate.length() > 128) return false;
-        String expected = preferences.getString(KEY_LAUNCH_TOKEN, "");
-        long expiresAt = preferences.getLong(KEY_LAUNCH_TOKEN_EXPIRES_AT, 0L);
-        boolean valid = candidate.equals(expected) && System.currentTimeMillis() <= expiresAt;
-        if (valid || (expiresAt > 0L && System.currentTimeMillis() > expiresAt)) {
-            if (!preferences.edit()
-                    .remove(KEY_LAUNCH_TOKEN)
-                    .remove(KEY_LAUNCH_TOKEN_EXPIRES_AT)
-                    .commit()) return false;
+    public boolean consumeLaunchToken(String candidate) {
+        synchronized (LAUNCH_TOKEN_LOCK) {
+            if (candidate == null || candidate.length() < 16 || candidate.length() > 128) return false;
+            String expected = preferences.getString(KEY_LAUNCH_TOKEN, "");
+            long expiresAt = preferences.getLong(KEY_LAUNCH_TOKEN_EXPIRES_AT, 0L);
+            boolean valid = candidate.equals(expected) && System.currentTimeMillis() <= expiresAt;
+            if (valid || (expiresAt > 0L && System.currentTimeMillis() > expiresAt)) {
+                if (!preferences.edit()
+                        .remove(KEY_LAUNCH_TOKEN)
+                        .remove(KEY_LAUNCH_TOKEN_EXPIRES_AT)
+                        .commit()) return false;
+            }
+            return valid;
         }
-        return valid;
+    }
+
+    public void revokeLaunchToken() {
+        synchronized (LAUNCH_TOKEN_LOCK) {
+            if (!preferences.edit().remove(KEY_LAUNCH_TOKEN)
+                    .remove(KEY_LAUNCH_TOKEN_EXPIRES_AT).commit()) {
+                throw new IllegalStateException("Could not revoke instrument launch token");
+            }
+        }
     }
 }

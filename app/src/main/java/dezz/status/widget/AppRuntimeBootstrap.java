@@ -108,7 +108,7 @@ public final class AppRuntimeBootstrap {
         }
 
         try {
-            InstrumentDisplayLauncher.reconcileAutomatic(appContext);
+            InstrumentDisplayLauncher.reconcileAutomatic(appContext, "ui-bootstrap");
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not reconcile instrument-panel activity", error);
         }
