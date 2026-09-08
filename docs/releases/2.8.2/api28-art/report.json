@@ -1,0 +1,51 @@
+{
+  "scope": "exact released DEX files, API 28 emulator ART verifier",
+  "apkBuilt": false,
+  "apkInstalled": false,
+  "kx11InstallOverVerified": false,
+  "releases": {
+    "2.8.1": {
+      "bytes": 269132,
+      "sha256": "b2a1ef4c28f47ac04986a39a7077c2019bae37f784c0f82a299ed8de9f76140a",
+      "emulatorSha256Verified": true,
+      "dex2oatFlags": [
+        "--dex-file=/data/local/tmp/natro-release-dex-check/2.8.1.dex",
+        "--oat-file=/data/local/tmp/natro-release-dex-check/2.8.1.odex",
+        "--instruction-set=x86_64",
+        "--compiler-filter=verify",
+        "--abort-on-hard-verifier-error",
+        "--runtime-arg",
+        "-Xnorelocate"
+      ],
+      "dex2oatExitCode": 0,
+      "oatdumpExitCode": 0,
+      "verifiedOatProduced": true,
+      "passed": true
+    },
+    "2.8.2": {
+      "bytes": 272968,
+      "sha256": "7c4071a47f9313b2a59afe357d1447a7572d0df6f84152a4e1f83327aee76206",
+      "emulatorSha256Verified": true,
+      "dex2oatFlags": [
+        "--dex-file=/data/local/tmp/natro-release-dex-check/2.8.2.dex",
+        "--oat-file=/data/local/tmp/natro-release-dex-check/2.8.2.odex",
+        "--instruction-set=x86_64",
+        "--compiler-filter=verify",
+        "--abort-on-hard-verifier-error",
+        "--runtime-arg",
+        "-Xnorelocate"
+      ],
+      "dex2oatExitCode": 0,
+      "oatdumpExitCode": 0,
+      "verifiedOatProduced": true,
+      "passed": true
+    }
+  },
+  "success": true,
+  "emulator": {
+    "ro.kernel.qemu": "1",
+    "ro.build.version.sdk": "28",
+    "ro.build.fingerprint": "google/sdk_gphone_x86_64/generic_x86_64:9/PSR1.180720.122/6736742:userdebug/dev-keys",
+    "ro.product.cpu.abilist": "x86_64,x86"
+  }
+}

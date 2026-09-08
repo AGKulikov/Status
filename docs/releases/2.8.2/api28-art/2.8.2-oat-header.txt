@@ -1,0 +1,97 @@
+MAGIC:
+oat
+138
+
+LOCATION:
+/data/local/tmp/natro-release-dex-check/2.8.2.odex
+
+CHECKSUM:
+0x90db6abc
+
+INSTRUCTION SET:
+X86_64
+
+INSTRUCTION SET FEATURES:
+-ssse3,-sse4.1,-sse4.2,-avx,-avx2,-popcnt
+
+DEX FILE COUNT:
+1
+
+EXECUTABLE OFFSET:
+0x00001000
+
+INTERPRETER TO INTERPRETER BRIDGE OFFSET:
+0x00000000
+
+INTERPRETER TO COMPILED CODE BRIDGE OFFSET:
+0x00000000
+
+JNI DLSYM LOOKUP OFFSET:
+0x00000000
+
+QUICK GENERIC JNI TRAMPOLINE OFFSET:
+0x00000000
+
+QUICK IMT CONFLICT TRAMPOLINE OFFSET:
+0x00000000
+
+QUICK RESOLUTION TRAMPOLINE OFFSET:
+0x00000000
+
+QUICK TO INTERPRETER BRIDGE OFFSET:
+0x00000000
+
+IMAGE PATCH DELTA:
+11833344 (0x00b49000)
+
+IMAGE FILE LOCATION OAT CHECKSUM:
+0xa915b790
+
+IMAGE FILE LOCATION OAT BEGIN:
+0x71d88000
+
+KEY VALUE STORE:
+classpath = PCL[]
+compiler-filter = verify
+concurrent-copying = true
+debuggable = false
+dex2oat-cmdline = /system/bin/dex2oat --dex-file=/data/local/tmp/natro-release-dex-check/2.8.2.dex --oat-file=/data/local/tmp/natro-release-dex-check/2.8.2.odex --instruction-set=x86_64 --compiler-filter=verify --abort-on-hard-verifier-error --runtime-arg -Xnorelocate
+dex2oat-host = X86
+image-location = /data/dalvik-cache/x86_64/system@framework@boot.art:/data/dalvik-cache/x86_64/system@framework@boot-core-libart.art:/data/dalvik-cache/x86_64/system@framework@boot-conscrypt.art:/data/dalvik-cache/x86_64/system@framework@boot-okhttp.art:/data/dalvik-cache/x86_64/system@framework@boot-bouncycastle.art:/data/dalvik-cache/x86_64/system@framework@boot-apache-xml.art:/data/dalvik-cache/x86_64/system@framework@boot-ext.art:/data/dalvik-cache/x86_64/system@framework@boot-framework.art:/data/dalvik-cache/x86_64/system@framework@boot-telephony-common.art:/data/dalvik-cache/x86_64/system@framework@boot-voip-common.art:/data/dalvik-cache/x86_64/system@framework@boot-ims-common.art:/data/dalvik-cache/x86_64/system@framework@boot-android.hidl.base-V1.0-java.art:/data/dalvik-cache/x86_64/system@framework@boot-android.hidl.manager-V1.0-java.art:/data/dalvik-cache/x86_64/system@framework@boot-framework-oahl-backward-compatibility.art:/data/dalvik-cache/x86_64/system@framework@boot-android.test.base.art
+native-debuggable = false
+pic = false
+
+SIZE:
+4096
+
+Dex file data for /data/local/tmp/natro-release-dex-check/2.8.2.dex
+Num string ids: 3031
+Num method ids: 1431
+Num field ids: 1080
+Num type ids: 280
+Num class defs: 125
+Unique strings loaded from dex code: 977
+Total strings loaded from dex code: 1651
+Number of unique dex code items: 866
+Total number of dex code bytes: 111462
+
+Layout data
+SectionTypeCode:LayoutTypeHot(0-0) LayoutTypeSometimesUsed(0-0) LayoutTypeStartupOnly(0-0) LayoutTypeUsedOnce(0-0) LayoutTypeUnused(0-0)
+SectionTypeStrings:LayoutTypeHot(0-0) LayoutTypeSometimesUsed(0-0) LayoutTypeStartupOnly(0-0) LayoutTypeUsedOnce(0-0) LayoutTypeUnused(0-0)
+
+.bss mapping for ArtMethod: empty.
+.bss mapping for Class: empty.
+.bss mapping for String: empty.
+Cumulative dex file data
+Num string ids: 3031
+Num method ids: 1431
+Num field ids: 1080
+Num type ids: 280
+Num class defs: 125
+Unique strings loaded from dex code: 977
+Total strings loaded from dex code: 1651
+Number of unique dex code items: 866
+Total number of dex code bytes: 111462
+
+OAT FILE STATS:
+Dumping cumulative use of 0 accounted bytes

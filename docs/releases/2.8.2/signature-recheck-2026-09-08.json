@@ -88,7 +88,7 @@
     "signatureVerifiedForApi28": true
   },
   "navigatorMatchesPreviousReleasePackageVersionCertificate": true,
-  "actualInstalledNavigatorIdentity": "unknown",
+  "actualInstalledNavigatorIdentity": "release 2.8.1 according to user; installed bytes and certificate not independently read",
   "userReportedNavigatorInstallFailure": true,
   "installerError": "Приложение не установлено",
   "cause": "not established",
@@ -100,5 +100,11 @@
     "actualFileSelectedOnHeadUnit": "main APK, confirmed by user"
   },
   "userReportedInstalledNavigatorRelease": "2.8.1",
-  "installedNavigatorCertificateIndependentlyRead": false
+  "installedNavigatorCertificateIndependentlyRead": false,
+  "api28DexVerification": {
+    "runId": 34197630741,
+    "result": "success for both exact released DEX files",
+    "report": "api28-art/report.json",
+    "fullApkInstalled": false
+  }
 }

@@ -1,0 +1,20 @@
+{
+  "ciRunId": 34197630741,
+  "ciJobId": 101968800004,
+  "commit": "9c029d433b31b552b6dfd9d94fbd82b6dc100dff",
+  "tree": "eb7f6e226abde1bd08f6b265c0fa61a3a56ad192",
+  "artifactId": 10044565675,
+  "artifactBytes": 5670,
+  "artifactSha256": "11e0e892a3d5e20b6b2393347cd3356bbc95eb64c448da562463efdc0c6276d7",
+  "files": {
+    "report.json": "1f50b0a0f93f163174dd366d5fff72933d9e7d6ecb15a08b564dd41c2bd73e13",
+    "2.8.1-oat-header.txt": "0e490853c3e1d08957f0eee9ea2ab408a5b4e73920b47b5e4eee27b5eb4ebe9a",
+    "2.8.2-oat-header.txt": "b41bf7f6c811de78813a3c1b6dbca1e1173f867cf7f3efbe0129ccc72c09de1f"
+  },
+  "originalArtifactFileSha256": {
+    "report.json": "1f50b0a0f93f163174dd366d5fff72933d9e7d6ecb15a08b564dd41c2bd73e13",
+    "2.8.1-oat-header.txt": "a917390f55b660d543ef401df81754e0b0eaaf78d8e2ea7a24c04b537eb98906",
+    "2.8.2-oat-header.txt": "d6800e9b7c6a32f3c592ea1e15e678c2e61a98dd1f0e00daadfed845948b18d2"
+  },
+  "textNormalization": "Trailing whitespace removed from OAT headers only; report.json unchanged"
+}
