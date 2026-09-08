@@ -1,0 +1,18 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=Status Widget HA Update, O=Status Widget HA, C=RU
+Signer #1 certificate SHA-256 digest: 6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75
+Signer #1 certificate SHA-1 digest: 758ae89cc08a1f12418df71e236135c27301a1a7
+Signer #1 certificate MD5 digest: f545b35a49f7875130264976dac19eda
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 2048
+Signer #1 public key SHA-256 digest: 2e65689cb623b9fe6ccf332857bd22a363fa4932f33b9c10e86c9209d15b6518
+Signer #1 public key SHA-1 digest: 15988dc5f7c9c52ea43128865c3a2066673f0dac
+Signer #1 public key MD5 digest: f950433c1fc5bf2d292352192c604ea6
+WARNING: APK Signature Scheme v2 signer #1: APK Signature Scheme v2 signer: 0 references unknown APK signature scheme ID: 3
