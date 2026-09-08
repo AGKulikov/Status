@@ -57,5 +57,26 @@
     "sameInBoth": true
   },
   "installFailureCause": "not established",
-  "userConstraint": "no ADB or computer required from user"
+  "userConstraint": "no ADB or computer required from user",
+  "byteComparedEntries": 17227,
+  "timestampDifferences": [],
+  "newExternalMethodReferences": [
+    "Landroid/graphics/Canvas;->clipPath(Landroid/graphics/Path;)Z",
+    "Landroid/graphics/Canvas;->scale(FF)V",
+    "Landroid/graphics/Path;-><init>(Landroid/graphics/Path;)V",
+    "Landroid/graphics/Path;->op(Landroid/graphics/Path;Landroid/graphics/Path$Op;)Z",
+    "Landroid/graphics/PointF;-><init>()V",
+    "Landroid/graphics/drawable/Drawable;->mutate()Landroid/graphics/drawable/Drawable;",
+    "Landroid/graphics/drawable/Drawable;->setAlpha(I)V",
+    "Ljava/lang/Class;->getSuperclass()Ljava/lang/Class;",
+    "Ljava/lang/NoSuchFieldException;-><init>(Ljava/lang/String;)V",
+    "Ljava/lang/NoSuchMethodException;-><init>(Ljava/lang/String;)V",
+    "Ljava/lang/reflect/Field;->getType()Ljava/lang/Class;",
+    "Ljava/lang/reflect/Field;->set(Ljava/lang/Object;Ljava/lang/Object;)V"
+  ],
+  "distributionParts": {
+    "count": 37,
+    "combinedBytes": 155133347,
+    "combinedSha256": "7f6b95c73104f8d4c0c2a0f519f3eb84f71dc7441a82e7349aaff4612e21ed16"
+  }
 }

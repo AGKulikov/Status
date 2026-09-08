@@ -23,6 +23,11 @@ android {
     compileSdkVersion 36
     buildToolsVersion "36.0.0"
 
+    // Compile-time release identity keeps ANCS boot logging free of PackageManager IPC.
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         // Keep the historical HA fork package unchanged: together with the stable signing key
         // this allows every build to install as an in-place update over HA1058 and newer builds.
