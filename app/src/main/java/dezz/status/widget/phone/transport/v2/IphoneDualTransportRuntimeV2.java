@@ -235,8 +235,10 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                 if (coordinator.state().phase() == Phase.STARTING && slot == null) {
                     startTarget(coordinator.targetOwner());
                 } else if (!config.externallyManagedRecovery
-                        && coordinator.state().phase() == Phase.ACTIVE
-                        && (slot == null || slot.terminalObserved)) {
+                        && ((coordinator.state().phase() == Phase.ACTIVE
+                                && (slot == null || slot.terminalObserved))
+                            || (coordinator.state().phase() == Phase.FAILED
+                                && coordinator.canRetryFailed()))) {
                     requestSameModeRecoveryOnSerialized();
                 }
             }
@@ -838,7 +840,19 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                 if (!isCurrentSlot(bound) || mode != bound.transport.mode()
                         || !routeEpoch(bound.routeOwner).equals(epoch)) return;
                 bound.terminalObserved = true;
-                if (coordinator != null && coordinator.state().phase() == Phase.ACTIVE
+                if (coordinator != null && coordinator.state().phase() == Phase.STARTING) {
+                    // WAIT_RADIO is terminal for an adapter activation even though its lifecycle
+                    // is neither FAILED nor STOPPED. STARTING owns the target, not sourceOwner().
+                    // Leaving that dead slot attached strands both radio-on and manual recovery.
+                    // Use the existing failed-target path; retry still verifies owner=0 and
+                    // drains a fresh epoch before another platform connection can start.
+                    bound.targetFailureDetail = "route terminated before READY"
+                            + (bound.status == null ? "" : ": " + bound.status.detail);
+                    failBoundTarget(bound);
+                    if (!config.externallyManagedRecovery && config.radioEnabled) {
+                        requestSameModeRecoveryOnSerialized();
+                    }
+                } else if (coordinator != null && coordinator.state().phase() == Phase.ACTIVE
                         && !config.externallyManagedRecovery) {
                     requestSameModeRecoveryOnSerialized();
                 } else if (coordinator == null

@@ -12,6 +12,8 @@ import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 
+import dezz.status.widget.BuildConfig;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -84,6 +86,7 @@ public final class PhoneConnectionJournal {
         // Persistent history is loaded only when the user opens or exports diagnostics. Reading
         // 1,600 lines from cold flash here delayed both the boot receiver and ANCS by seconds.
         if (opened) append("session", "новый процесс Natro; Android=" + Build.VERSION.SDK_INT
+                + "; version=" + BuildConfig.VERSION_NAME + "; versionCode=" + BuildConfig.VERSION_CODE
                 + "; журнал сохраняет каждую смену reducer/effect");
     }
 

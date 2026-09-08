@@ -394,6 +394,93 @@ public final class IphoneDualTransportRuntimeV2Test {
         assertEquals(1, active.closeCount);
     }
 
+    @Test public void radioLossDuringAuthenticationAllowsControllerRecoveryAfterFreshDrain() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.startProduction();
+        fixture.factory.nextStartLifecycle = IphoneTransportLifecycle.AUTHENTICATING;
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport interrupted = fixture.factory.created.get(1);
+        assertEquals(Phase.STARTING, fixture.listener.lastDual.switchPhase);
+
+        fixture.runtime.radioChanged(false);
+        fixture.scheduler.drain();
+        assertTrue(interrupted.terminalDelivered);
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        assertTrue(fixture.listener.lastDual.detail.contains("terminated before READY"));
+        assertEquals(2, fixture.factory.created.size());
+
+        // Production recovery is commanded by the controller's bounded policy. Even a command
+        // while radio is off must cross restoration/owner=0/drain and wait before starting GATT.
+        fixture.runtime.requestSameModeRecovery();
+        fixture.scheduler.drain();
+        FakeTransport drain = fixture.factory.created.get(2);
+        assertTrue(drain.preparedRestoration);
+        assertEquals(0, drain.startCount);
+        fixture.scheduler.advanceBy(10L);
+        assertEquals(3, fixture.factory.created.size());
+
+        fixture.runtime.radioChanged(true);
+        fixture.scheduler.drain();
+        FakeTransport replacement = fixture.factory.created.get(3);
+        assertEquals(1, replacement.startCount);
+        assertFalse(interrupted.startRequest.epoch.equals(replacement.startRequest.epoch));
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+        assertEquals(1, interrupted.closeCount);
+
+        // A late status or terminal callback from the retired epoch cannot affect its successor.
+        interrupted.deliverOrdinaryTerminal();
+        interrupted.deliverFailedStatus("late prior epoch");
+        fixture.runtime.radioChanged(true);
+        fixture.scheduler.drain();
+        assertEquals(4, fixture.factory.created.size());
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+    }
+
+    @Test public void radioOnBeforeDelayedStartupTerminalStillAllowsManualRecovery() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.startProduction();
+        fixture.factory.nextStartLifecycle = IphoneTransportLifecycle.SUBSCRIBING;
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport interrupted = fixture.factory.created.get(1);
+        interrupted.deferRadioTerminal = true;
+
+        fixture.runtime.radioChanged(false);
+        fixture.runtime.radioChanged(true);
+        fixture.scheduler.drain();
+        assertEquals(Phase.STARTING, fixture.listener.lastDual.switchPhase);
+        assertEquals(2, fixture.factory.created.size());
+        interrupted.deliverOrdinaryTerminal();
+        fixture.scheduler.drain();
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+
+        fixture.runtime.requestSameModeRecovery();
+        fixture.runtime.requestSameModeRecovery();
+        fixture.scheduler.drain();
+        assertTrue(fixture.factory.created.get(2).preparedRestoration);
+        assertEquals(3, fixture.factory.created.size());
+        fixture.scheduler.advanceBy(10L);
+        assertEquals(4, fixture.factory.created.size());
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+    }
+
+    @Test public void autonomousRuntimeRecoversStartupTerminalOnRadioReturn() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        fixture.factory.nextStartLifecycle = IphoneTransportLifecycle.CONNECTING;
+        fixture.scheduler.advanceBy(10L);
+
+        fixture.runtime.radioChanged(false);
+        fixture.scheduler.drain();
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        assertEquals(2, fixture.factory.created.size());
+        fixture.runtime.radioChanged(true);
+        fixture.scheduler.drain();
+        assertTrue(fixture.factory.created.get(2).preparedRestoration);
+        fixture.scheduler.advanceBy(10L);
+        assertEquals(4, fixture.factory.created.size());
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+    }
+
     @Test public void permanentCloseIsAnExplicitDurableTombstone() {
         Fixture fixture = new Fixture(false, "");
         fixture.start(IphoneBleMode.ANDROID_CENTRAL);
@@ -759,6 +846,7 @@ public final class IphoneDualTransportRuntimeV2Test {
         boolean errorNextStart;
         boolean throwNextCreate;
         boolean throwNextStart;
+        IphoneTransportLifecycle nextStartLifecycle = IphoneTransportLifecycle.READY;
 
         FakeFactory(FakeScheduler scheduler) { this.scheduler = scheduler; }
 
@@ -773,6 +861,8 @@ public final class IphoneDualTransportRuntimeV2Test {
             transport.failOnStart = failNextStart;
             transport.errorOnStart = errorNextStart;
             transport.throwOnStart = throwNextStart;
+            transport.startLifecycle = nextStartLifecycle;
+            nextStartLifecycle = IphoneTransportLifecycle.READY;
             failNextStart = false;
             errorNextStart = false;
             throwNextStart = false;
@@ -799,6 +889,8 @@ public final class IphoneDualTransportRuntimeV2Test {
         boolean failOnStart;
         boolean errorOnStart;
         boolean throwOnStart;
+        boolean deferRadioTerminal;
+        IphoneTransportLifecycle startLifecycle = IphoneTransportLifecycle.READY;
         Integer forcedOwnerCount;
         FreezeResult freezeResultOverride;
         int freezeCount;
@@ -814,7 +906,11 @@ public final class IphoneDualTransportRuntimeV2Test {
         @Override public void selectedPhonePresent() { selectedPhonePresentCount++; }
         @Override public void radioOff(BleRouteEpoch epoch) {
             if (startRequest != null && startRequest.epoch.equals(epoch)) {
-                deliverOrdinaryTerminal();
+                scheduler.execute(() -> listener.onStatus(new IphoneTransportStatusV2(
+                        mode, epoch, IphoneTransportLifecycle.WAIT_RADIO,
+                        startRequest.selectedSystemBondAddress, startRequest.helperInstallationId,
+                        "fresh epoch required after radio on", 0)));
+                if (!deferRadioTerminal) deliverOrdinaryTerminal();
             }
         }
         @Override public void start(IphoneTransportStartRequest request,
@@ -837,7 +933,7 @@ public final class IphoneDualTransportRuntimeV2Test {
                 listener.onStatus(new IphoneTransportStatusV2(
                         mode, request.epoch,
                         failOnStart ? IphoneTransportLifecycle.FAILED
-                                : IphoneTransportLifecycle.READY,
+                                : startLifecycle,
                         request.selectedSystemBondAddress, request.helperInstallationId,
                         failOnStart ? "start failed" : "ready", 0));
             });

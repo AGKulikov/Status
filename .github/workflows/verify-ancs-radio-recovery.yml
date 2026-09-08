@@ -1,0 +1,29 @@
+name: Verify ANCS radio recovery sources (no APK)
+on:
+  push:
+    branches: ['fix/ancs-radio-recovery-20260908']
+    paths: ['app/**', 'tools/**', '.github/workflows/verify-ancs-radio-recovery.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install compilation dependencies
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Compile Natro and test recovery boundaries
+        run: ./gradlew testGeelyDebugUnitTest --no-daemon
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ancs-radio-recovery-test-results
+          path: app/build/test-results/testGeelyDebugUnitTest/
+          retention-days: 7

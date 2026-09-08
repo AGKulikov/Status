@@ -90,6 +90,7 @@
   "navigatorMatchesPreviousReleasePackageVersionCertificate": true,
   "actualInstalledNavigatorIdentity": "unknown",
   "userReportedNavigatorInstallFailure": true,
-  "installerError": "not provided",
-  "cause": "not established"
+  "installerError": "Приложение не установлено",
+  "cause": "not established",
+  "packageManagerErrorCode": "not provided"
 }

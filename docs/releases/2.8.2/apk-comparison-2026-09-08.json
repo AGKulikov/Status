@@ -1,0 +1,61 @@
+{
+  "content": [
+    {
+      "file": "classes19.dex",
+      "oldBytes": 269132,
+      "newBytes": 272968,
+      "oldSha256": "b2a1ef4c28f47ac04986a39a7077c2019bae37f784c0f82a299ed8de9f76140a",
+      "newSha256": "7c4071a47f9313b2a59afe357d1447a7572d0df6f84152a4e1f83327aee76206"
+    }
+  ],
+  "metadata": [],
+  "orderSame": true,
+  "previousApkSha256": "a0dac58a1799a718fdf3bfdd9374745c55c9e7a1990b9beca6d72fc753ffdbce",
+  "currentApkSha256": "7f6b95c73104f8d4c0c2a0f519f3eb84f71dc7441a82e7349aaff4612e21ed16",
+  "previousApkBytes": 155129251,
+  "currentApkBytes": 155133347,
+  "entriesPerApk": 17227,
+  "newClass": "Lru/natro/navigation/LaneGuidanceAppearance;",
+  "apkClassCounts": [
+    203558,
+    203559
+  ],
+  "duplicateClasses": [
+    0,
+    0
+  ],
+  "zipCrcValid": [
+    true,
+    true
+  ],
+  "dexMagic": [
+    "dex\\n039\\0",
+    "dex\\n039\\0"
+  ],
+  "dexChecksumValid": [
+    true,
+    true
+  ],
+  "dexSha1Valid": [
+    true,
+    true
+  ],
+  "zip64": [
+    false,
+    false
+  ],
+  "signature": {
+    "blocks": [
+      "0xf05368c0",
+      "0x42726577"
+    ],
+    "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+    "minSdk": 24,
+    "maxSdk": 2147483647,
+    "algorithm": "0x103",
+    "rotationAttributes": [],
+    "sameInBoth": true
+  },
+  "installFailureCause": "not established",
+  "userConstraint": "no ADB or computer required from user"
+}
