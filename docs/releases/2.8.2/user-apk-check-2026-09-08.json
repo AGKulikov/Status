@@ -1,0 +1,52 @@
+{
+  "checkedOn": "2026-09-08",
+  "input": {
+    "file": "Navigator-30.3.0-Natro-2.8.2-signed.apk.zip",
+    "bytes": 151475704,
+    "sha256": "2cf9e2fd4f92565517cd982bb90e22449d976de7d926a2905bf26cc2e986ba37",
+    "zipEntries": 2,
+    "zipCrcValid": true
+  },
+  "mainApk": {
+    "entry": "Navigator-30.3.0-Natro-2.8.2-signed.apk",
+    "bytes": 155133347,
+    "sha256": "7f6b95c73104f8d4c0c2a0f519f3eb84f71dc7441a82e7349aaff4612e21ed16",
+    "byteIdenticalToReleased282": true,
+    "zipEntries": 17227,
+    "zipCrcValid": true,
+    "containsMacOsSidecars": false,
+    "signatureVerifiedApiRange": [28, 28],
+    "signatureVerifierExitCode": 0,
+    "verifiedScheme": "v3",
+    "signerCount": 1,
+    "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+    "certificateMatchesSaved281": true,
+    "package": "ru.yandex.yandexnavi",
+    "versionName": "30.3.0",
+    "versionCode": 739564630,
+    "minSdk": 26,
+    "targetSdk": 29,
+    "nativeAbis": ["arm64-v8a"],
+    "zipalignCheckArguments": ["-c", "-p", "4"],
+    "zipalignExitCode": 0
+  },
+  "sidecar": {
+    "entry": "__MACOSX/._Navigator-30.3.0-Natro-2.8.2-signed.apk",
+    "bytes": 316,
+    "sha256": "41fd5ce3dec82504f971fdb1273977d2c87e3304950bf14ace8363752cff894d",
+    "type": "AppleDouble",
+    "magic": "0x00051607",
+    "version": "0x00020000",
+    "isApk": false,
+    "wasSelectedForInstallation": "unknown"
+  },
+  "downloadCorruptionOfSubmittedMainApk": false,
+  "actualFileSelectedOnHeadUnit": "unknown",
+  "actualInstalledNavigatorIdentity": "unknown",
+  "installerError": "Приложение не установлено",
+  "packageManagerErrorCode": "not provided",
+  "installFailureCause": "not established",
+  "hardwareInstallOverVerified": false,
+  "userConstraint": "no ADB or computer required from user",
+  "newApkBuilt": false
+}

@@ -92,5 +92,11 @@
   "userReportedNavigatorInstallFailure": true,
   "installerError": "Приложение не установлено",
   "cause": "not established",
-  "packageManagerErrorCode": "not provided"
+  "packageManagerErrorCode": "not provided",
+  "userSubmittedApkCheck": {
+    "report": "user-apk-check-2026-09-08.json",
+    "byteIdenticalToReleased282": true,
+    "signatureVerifiedForApi28": true,
+    "actualFileSelectedOnHeadUnit": "unknown"
+  }
 }
