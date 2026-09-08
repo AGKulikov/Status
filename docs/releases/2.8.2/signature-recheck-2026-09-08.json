@@ -1,0 +1,95 @@
+{
+  "checkedOn": "2026-09-08",
+  "current": [
+    {
+      "file": "Navigator-30.3.0-Natro-2.8.2-signed.apk",
+      "signatureExitCode": 0,
+      "certificates": [
+        "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+      ],
+      "package": "ru.yandex.yandexnavi",
+      "versionCode": 739564630,
+      "versionName": "30.3.0",
+      "minSdk": "26",
+      "targetSdk": "29",
+      "verifiedApiRange": [
+        28,
+        28
+      ],
+      "verifiedSchemesForApi28": [
+        [
+          "v1 scheme (JAR signing)",
+          "false"
+        ],
+        [
+          "v2 scheme (APK Signature Scheme v2)",
+          "false"
+        ],
+        [
+          "v3 scheme (APK Signature Scheme v3)",
+          "true"
+        ],
+        [
+          "v3.1 scheme (APK Signature Scheme v3.1)",
+          "false"
+        ],
+        [
+          "v4 scheme (APK Signature Scheme v4)",
+          "false"
+        ]
+      ]
+    },
+    {
+      "file": "Natro-2.8.2-signed.apk",
+      "signatureExitCode": 0,
+      "certificates": [
+        "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+      ],
+      "package": "ru.natro.statuswidget",
+      "versionCode": 208021315,
+      "versionName": "2.8.2",
+      "minSdk": "28",
+      "targetSdk": "28",
+      "verifiedApiRange": [
+        28,
+        28
+      ],
+      "verifiedSchemesForApi28": [
+        [
+          "v1 scheme (JAR signing)",
+          "false"
+        ],
+        [
+          "v2 scheme (APK Signature Scheme v2)",
+          "false"
+        ],
+        [
+          "v3 scheme (APK Signature Scheme v3)",
+          "true"
+        ],
+        [
+          "v3.1 scheme (APK Signature Scheme v3.1)",
+          "false"
+        ],
+        [
+          "v4 scheme (APK Signature Scheme v4)",
+          "false"
+        ]
+      ]
+    }
+  ],
+  "previousNavigator": {
+    "file": "Navigator-30.3.0-Natro-2.8.1-signed.apk",
+    "sha256": "a0dac58a1799a718fdf3bfdd9374745c55c9e7a1990b9beca6d72fc753ffdbce",
+    "package": "ru.yandex.yandexnavi",
+    "versionCode": 739564630,
+    "versionName": "30.3.0",
+    "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+    "signatureVerifiedForApi28": true
+  },
+  "navigatorMatchesPreviousReleasePackageVersionCertificate": true,
+  "actualInstalledNavigatorIdentity": "unknown",
+  "userReportedNavigatorInstallFailure": true,
+  "installerError": "not provided",
+  "cause": "not established"
+}
