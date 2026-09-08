@@ -97,6 +97,8 @@
     "report": "user-apk-check-2026-09-08.json",
     "byteIdenticalToReleased282": true,
     "signatureVerifiedForApi28": true,
-    "actualFileSelectedOnHeadUnit": "unknown"
-  }
+    "actualFileSelectedOnHeadUnit": "main APK, confirmed by user"
+  },
+  "userReportedInstalledNavigatorRelease": "2.8.1",
+  "installedNavigatorCertificateIndependentlyRead": false
 }

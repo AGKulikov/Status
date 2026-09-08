@@ -15,7 +15,10 @@
     "zipEntries": 17227,
     "zipCrcValid": true,
     "containsMacOsSidecars": false,
-    "signatureVerifiedApiRange": [28, 28],
+    "signatureVerifiedApiRange": [
+      28,
+      28
+    ],
     "signatureVerifierExitCode": 0,
     "verifiedScheme": "v3",
     "signerCount": 1,
@@ -26,8 +29,14 @@
     "versionCode": 739564630,
     "minSdk": 26,
     "targetSdk": 29,
-    "nativeAbis": ["arm64-v8a"],
-    "zipalignCheckArguments": ["-c", "-p", "4"],
+    "nativeAbis": [
+      "arm64-v8a"
+    ],
+    "zipalignCheckArguments": [
+      "-c",
+      "-p",
+      "4"
+    ],
     "zipalignExitCode": 0
   },
   "sidecar": {
@@ -38,15 +47,20 @@
     "magic": "0x00051607",
     "version": "0x00020000",
     "isApk": false,
-    "wasSelectedForInstallation": "unknown"
+    "wasSelectedForInstallation": false,
+    "selectionEvidence": "user confirmed opening the main APK on the head unit"
   },
   "downloadCorruptionOfSubmittedMainApk": false,
-  "actualFileSelectedOnHeadUnit": "unknown",
+  "actualFileSelectedOnHeadUnit": "main APK, confirmed by user",
+  "headUnitFileIndependentlyRead": false,
+  "currentNatroExportCapturesInstallerFailureReliably": false,
   "actualInstalledNavigatorIdentity": "unknown",
   "installerError": "Приложение не установлено",
   "packageManagerErrorCode": "not provided",
   "installFailureCause": "not established",
   "hardwareInstallOverVerified": false,
   "userConstraint": "no ADB or computer required from user",
-  "newApkBuilt": false
+  "newApkBuilt": false,
+  "userReportedInstalledNavigatorRelease": "2.8.1",
+  "installedNavigatorCertificateIndependentlyRead": false
 }
