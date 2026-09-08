@@ -38,7 +38,7 @@ mkdir -p "$(dirname "$OUTPUT_APK")"
   --ks-pass env:KEY_PASSWORD \
   --key-pass env:KEY_PASSWORD \
   --v1-signing-enabled false \
-  --v2-signing-enabled false \
+  --v2-signing-enabled true \
   --v3-signing-enabled true \
   --v4-signing-enabled false \
   --out "$OUTPUT_APK" \
@@ -49,4 +49,10 @@ python3 "$SCRIPT_DIR/verify_navigation_mod_baseline.py" \
   --candidate "$OUTPUT_APK" \
   --mode release \
   --apksigner "$APKSIGNER"
+# Keep v3 for Android 9 and provide v2 for the APK's declared Android 8 minimum.
+# Check each platform range explicitly; a v3 result alone does not verify v2.
+"$APKSIGNER" verify --verbose --min-sdk-version 26 --max-sdk-version 27 \
+  "$OUTPUT_APK" >/dev/null
+"$APKSIGNER" verify --verbose --min-sdk-version 28 --max-sdk-version 28 \
+  "$OUTPUT_APK" >/dev/null
 printf 'Signed and verified Navigator 30.3.0: %s\n' "$OUTPUT_APK"

@@ -254,6 +254,10 @@ int getVersionCode() {
     if (version == '2.8.2') {
         return 208021315
     }
+    // Recover a terminal ANCS startup target after Bluetooth returns.
+    if (version == '2.8.3') {
+        return 208021316
+    }
     if (version == '2.3.0') {
         return 208021254
     }
