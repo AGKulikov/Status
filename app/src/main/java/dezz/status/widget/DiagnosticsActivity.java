@@ -104,6 +104,11 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         header.addView(heading("Отладка и регистратор действий", 24), weighted());
         page.addView(header, matchWrap());
 
+        Button navigatorInstall = button("Проверить установку Навигатора");
+        navigatorInstall.setOnClickListener(view -> startActivity(
+                new Intent(this, NavigatorInstallDiagnosticsActivity.class)));
+        page.addView(navigatorInstall, topMargin(12));
+
         page.addView(label("Подробный журнал выключен по умолчанию. При включении он циклически "
                 + "сохраняет действия приложения, предупреждения, ошибки, зависания главного "
                 + "потока и полный стек аварии. Токены, пароли и MAC-адреса скрываются."),
