@@ -12,10 +12,71 @@
 [манифесте публикации](docs/geely-kx11/PUBLICATION_MANIFEST.json).
 
 
-Версия 1.2 • расширенный разбор 5 сентября 2026 года • автомобиль и прошивка из переданных пользователем материалов. Исходные разделы и публичный ZIP 1.0 сохраняют результаты 4 сентября.
-Дополнение после сборки Natro 2.7.7: парковочная политика и её аппаратные ограничения актуализированы ниже; исходный публичный ZIP 1.0 сохраняется как снимок исследования до этого дополнения.
+Версия 1.3 • дополнение 9 сентября 2026 года • автомобиль и прошивка из переданных пользователем материалов. Исходные разделы и публичный ZIP 1.0 сохраняют результаты 4 сентября, редакция 1.2 — расширенный разбор 5 сентября.
+Дополнения после сборки Natro 2.7.7 и исходные изменения 09.09 актуализированы ниже; это не означает аппаратную приёмку ещё не выпущенного кода.
 
 Назначение: постоянная инструкция для дальнейшей разработки Natro и разбора неизвестных функций автомобиля. Документ объединяет схемы интерфейсов, подтверждённые наблюдения, реальные вызовы приложений, отрицательные результаты опытов и задачи, которые остаются открытыми. Это не эксплуатационная инструкция водителя и не исполнитель команд.
+
+## Дополнение 09.09.2026: текущая поездка, off приборки и кнопки MConfig
+
+### Текущая поездка ECARX
+
+В поставляемом с проектом `app/libs/geely/ecarx-adaptapi.jar`, SHA-256
+`33d0c62851e834dbf443f969627973dbc6e00eec3dd1e8fb6fc9dfe5af78e886`, статически
+подтверждён публичный маршрут чтения `ICar.getHevManager()` → `IHev.getTripData()` →
+`ITripData.registerTripListener(ITripListener)` → `onDrivingInfoUpdate(IDrivingInfo)`.
+`IDrivingInfo` предоставляет `getTripDistance(): int` и `getTripDuration(): long`.
+В реализации `TripData$1` сигналы `PA_TS_CurTripDis` и `PA_TS_CurTripTime` записываются в
+этот объект непосредственно, без преобразования; метаданные единиц в публичный объект не
+переносятся. `TRIP_DC_AVERAGE_SPEED=612369922` объявлен, но в этой реализации
+`getLatestTripInfo(...)` всегда возвращает `null`, а `getTripInfo(...)` — пустой массив, поэтому
+это не подтверждённый источник текущей средней скорости.
+
+Важная граница свежести: `TripData` заранее создаёт zero-filled `DrivingInfo`, а
+`getLatestDrivingInfo()` возвращает его и до первого PA-события. Новый код Natro поэтому не
+публикует initial object и принимает пробег/время, включая настоящий сброс в ноль, только после
+`onDrivingInfoUpdate`. Средняя скорость вычисляется из пробега и длительности одного callback;
+деление raw distance на 10 и трактовка raw time как минут пока являются гипотезами по форме
+штатного экрана `IMG_8327.jpeg`, а не установленными единицами. Нужен парный raw/API/экранный
+замер на KX11; до него `NATRO-021/GATE-065` не закрыты.
+
+Одинаковое повторное значение callback тоже является свидетельством свежести. HUD и приборка
+сбрасывают все три зависимых trip-поля в unavailable одновременно через 10 минут без нового
+`onDrivingInfoUpdate`; таймер использует monotonic clock и не подменяет stale-значение нулём.
+
+### Включение и выключение Android-приборки
+
+Для переноса на водительский экран подтверждены прежние звенья mNavi/MConfig: DIM mode 3,
+`DIMProtocolManager.sendMessageToDIM(2,8,8,[1])`, внешний `START/RESTART` через
+`ru.monjaro.helper` и `displayId=2`. Для возврата подтверждён отдельный вызов DIM mode 1;
+закрытие Activity само по себе режим DIM не возвращает. Доступные материалы не доказывают
+полную внутреннюю последовательность выключения каждой версии mNavi, поэтому неопределённый
+self-force-stop не копируется как обязательный шаг.
+
+Текущая исходная реализация Natro сохраняет `enabled=false` до off, отменяет launcher/retry,
+закрывает admission generation cluster Surface, очищает lease и отправляет detach, завершает
+только Activity/task панели, затем вызывает mode 1 и пишет readback. Повторный вызов запуска
+ещё раз читает durable enabled, поэтому поздний layout/recovery callback старого окна не может
+самостоятельно включить endpoint. Процесс Natro, HUD, ANCS и медиаканал не останавливаются.
+Это проверка архитектуры исходника; симметрия физического экрана относительно mNavi требует
+десяти циклов и гонок из `GATE-066` на автомобиле.
+
+### Изоляция мультимедийных кнопок MConfig
+
+После application-visible границы `AccessibilityService.onKeyEvent` код теперь фиксирует
+`KeyEvent.eventTime`, `downTime`, время входа callback, постановки, начала/окончания
+`TransportControls` и первые playback/metadata callbacks. Выбор MediaSession и её callbacks
+выполняются на `steering-media-route`, единственный Binder-вызов команды — на отдельном
+`steering-media-command`, запись журнала — на bounded `steering-media-journal`. Очередь команд
+ограничена четырьмя ожидающими элементами, сроком 750 мс и поколением выбранной session; старое
+поколение и очередь очищаются при close/смене session. Таким образом карта, HUD, приборка, ANCS,
+сканирование session и файловый журнал больше не делят исполнительную очередь с уже принятым
+нажатием.
+
+Гарантия «никогда не будет задержки» недоказуема только этим изменением: путь до
+Accessibility callback принадлежит MConfig/Android, а сам Binder выбранного проигрывателя и
+физическое начало звука принадлежат внешним компонентам. Их отделяет аппаратный замер
+`GATE-067`; исходная изоляция предотвращает накопление задержек внутри Natro после callback.
 
 ## Дополнение 05.09.2026: позиция Navigator вне маршрута
 
@@ -74,8 +135,9 @@ NOT_ON_ROUTE и ROUTE_LOST. Выбор позиции в моде 2.7.9 учит
   с вариантами источников и исправлением signed/floating initializers. Отдельно сохранена
   аномалия внутренних SHA1 75 исходных DEX. Это не аппаратная приёмка API.
 
-Читать новые отчёты до исторических чисел/вопросов ниже. Старые версии и 50 постоянных ID
-вопросов сохранены; закрытые статические звенья заменены конкретными остаточными вопросами.
+Читать новые отчёты до исторических чисел/вопросов ниже. Старые версии и 50 прежних постоянных
+ID вопросов сохранены; 09.09 добавлен отдельный `CURRENT_TRIP_DATA`, закрытые статические звенья
+заменены конкретными остаточными вопросами.
 Сборщик имеет hash-baseline, отчёт каждого отказа и офлайн-проверки; реальный запуск Mac/KX11
 ещё нужен. `GATE-046`, `GATE-048` и `GATE-049` остаются открытыми.
 
@@ -1020,9 +1082,9 @@ Profile/PEN противоречие: UI показывал `Active profile / PE
 
 `WidgetAccessibilityService.onKeyEvent` поддерживает MEDIA_NEXT, MEDIA_PREVIOUS, MEDIA_PLAY, MEDIA_PAUSE, MEDIA_PLAY_PAUSE, HEADSETHOOK. На первом ACTION_DOWN передаёт команду cached `SteeringMediaKeyRouter`, повторные DOWN не повторяют команду, соответствующий UP поглощается только если DOWN был обработан. Если маршрут не готов или возник RuntimeException — возвращает false/штатная обработка, не делает широкую рассылку самостоятельно.
 
-Маршрутизатор заранее выбирает MediaController с учётом закреплённого package, слушает active sessions, хранит volatile route. Отдельный `steering-media-route` looper используется для выбора. Сам dispatch вызывает один TransportControls: skipToNext/skipToPrevious/play/pause. Вызов без исключения записывается как `accepted`; Android TransportControls не даёт здесь подтверждения начала звука. OnPlaybackStateChanged и OnMetadataChanged — отдельные callbacks на **main** Handler. Частоты этих callbacks не считать скоростью исполнения команды руля.
+Маршрутизатор заранее выбирает MediaController с учётом закреплённого package, слушает active sessions, хранит volatile route. Отдельный `steering-media-route` looper обслуживает выбор и callbacks session, `steering-media-command` — только bounded очередь и один TransportControls: skipToNext/skipToPrevious/play/pause, `steering-media-journal` — файловую диагностику. Вызов без исключения записывается как `accepted`; Android TransportControls не даёт здесь подтверждения начала звука. OnPlaybackStateChanged и OnMetadataChanged больше не проходят через main Handler, но их частоты всё равно нельзя считать скоростью исполнения команды руля.
 
-Дополнительный риск из исходника: callback состояния плеера и AccessibilityService работают через main. Даже если Binder dispatch не ищет сессию и не ждёт запуска приложений, блокировка main задерживает вход в обработчик и обновление cached playbackState. Это может влиять и на toggle play/pause.
+AccessibilityService по контракту Android всё ещё принимает KeyEvent на main. Поэтому блокировка main до входа в callback остаётся внешней для выделенного command looper и измеряется разницей `eventTime→callbackEntry`. После callback выбор session, журнал, HUD/карта/приборка/ANCS не должны задерживать команду; задержка Binder самого MediaController проверяется отдельно.
 
 ### Доказанные зависания и пределы измерений
 
@@ -1036,7 +1098,7 @@ Latest source log `status-widget-debug(20260904-172755).txt`:
 
 У третьего события steering-media-route находится в MessageQueue.nativePollOnce; это не свидетельство забитой очереди resolver. Фоновый поток ожидания не исправляет main, на который придёт Accessibility callback.
 
-В просмотренном журнале есть selected/destroyed/playback_callback/metadata_callback для ru.yandex.music, но отсутствуют строки dispatch с input/key. Следовательно, нельзя вычислить p95 задержки или доказать, что эти stalls совпали с конкретным нажатием кнопки. Текущее `inputUptimeMs` формируется вызовом SystemClock.uptimeMillis внутри onKeyEvent; требуется дополнительно записывать event.getEventTime(), getDownTime(), callback-entry uptime, dispatch begin/end, event action/repeat, session token/package и first matching playback/metadata callback. Не хранить один timestamp под названием «время кнопки» для всех границ.
+В просмотренном старом журнале есть selected/destroyed/playback_callback/metadata_callback для ru.yandex.music, но отсутствуют строки dispatch с input/key. Следовательно, по нему нельзя вычислить p95 задержки или доказать, что эти stalls совпали с конкретным нажатием кнопки. Исходная правка 09.09 уже разделяет `event.getEventTime()`, `getDownTime()`, callback-entry, queue, dispatch begin/end, session token/package и первые playback/metadata callbacks. До нового журнала KX11 эта полнота существует только в коде; физическое начало звука Android callback не сообщает.
 
 ## Неизвестные функции: конкретный следующий шаг
 
@@ -1047,8 +1109,9 @@ Latest source log `status-widget-debug(20260904-172755).txt`:
 | HUD ProfileTransfer0..3 | CB accepted/data echo | Независимый валидный статус, физическое изображение, сохранение после sleep/boot |
 | PEN/profile masks | Есть signal30816 и protobuf fields; reader PEN=-1 | Валидный активный профиль и декодирование profile exchange; не подставлять15 |
 | Selective HUD content | SDK symbols существуют, runtime notavailable | Поддержка в точной прошивке/другой штатный call path; до этого не показывать как рабочие переключатели |
-| Высокая задержка руля | Cached direct dispatch есть; UI stalls доказаны | Сопоставить hardware event time→callback→Binder→player→audio; измерить p50/p95 и maxima |
+| Высокая задержка руля | После callback route/command/journal изолированы; старые UI stalls доказаны | Сопоставить hardware event time→callback→command lane→Binder→player→audio; измерить p50/p95/maxima и владельца каждого интервала |
 | Быстрота телеметрии | Есть realtime callbacks и demand-union | Межприходовые интервалы, единицы/raw/scale, end-to-end latency, число активных vendor subscriptions |
+| Текущая поездка | Public ITripData callback и raw-поля подтверждены статически; pre-callback object ложносвежий | Парный raw/API/штатный экран для единиц distance/time, reset и ignition; до этого не объявлять `/10` и минуты доказанными |
 | Системная шторка | В слоях CSD.ShadeBg, PSD.ShadeBg и CarNavigationBar | Владельцы IPC/gesture trigger и OEM suppress API; имён Surface недостаточно для безопасной замены |
 
 ## Где искать доказательства
@@ -1110,10 +1173,11 @@ raw=-1 сохранён буквально. Его значение, едини�
 | PAS_PAUSE | Пауза и возобновление уведомлений | Совпадение снимков окна 2.7.7 с реальной графикой и восстановление на KX11 | GATE-046: синхронные видео/окна/пауза при включённых датчиках, камера, Binder, холодный старт; без TTL |
 | CLUSTER_WINGS | Владелец крыльев и штатной машинки | Синхронная привязка к владельцу surface и физическим пикселям | Повторить один изолированный вариант с меткой до восстановления и отдельным наблюдением DIM/HUD |
 | HUD_PROFILE | Режимы HUD, PEN и маски содержимого | Валидный active profile/PEN и независимый физический эффект | Сначала установить причину invalid PA и неизвестного профиля; не подставлять 15 и не повторять перебор enum |
-| MEDIA_LATENCY | Полная задержка кнопок руля | Нажатие → callback → dispatch → player → audio на общей временной шкале | Исправить блокировки UI отдельной задачей; добавить eventTime, downTime и время callback; не считать текущую метрику полной задержкой |
+| MEDIA_LATENCY | Полная задержка кнопок руля | Нажатие → callback → отдельная command lane → player → audio на общей временной шкале | На KX11 снять новый журнал с уже добавленными eventTime/downTime/callback/queue/dispatch/callback метками и синхронным звуком; отделить задержку MConfig/Android до callback от Binder плеера |
 | SHADE_OWNER | Штатная шторка и жест открытия | Конкретный component/gesture owner и надёжное восстановление | Изучить component и IPC перед адресным изменением; не отключать SystemUI целиком |
 | WINDOW_SEAT | Остановка окон и движения сидений | Таймаут и stop при потере фокуса/Binder; runtime support комплектации | Подтвердить цикл в штатном клиенте и физический feedback; не приписывать единицы миллиметров команде направления |
 | TELEMETRY_SCALE | Единицы и свежесть телеметрии | Шкалы, качество и timestamps для нужных метрик | Выбирать точный typed decoder и callback; не трактовать initialValue как измерение |
+| CURRENT_TRIP_DATA | Единицы и reset текущей поездки | Raw `PA_TS_CurTripDis/Time`, публичный callback и штатные 0.1 км / hh:mm на одной временной шкале | `GATE-065`: записать paired raw/API/экран в начале, движении, остановке и после ignition; проверить гипотезы `/10` и «минуты», не использовать pre-callback zero object |
 | BODY_SUPPORT | Оснащение: подсветка, задние сиденья, ароматизация | Поддержка каждой зоны и enum на комплектации пользователя | Запрашивать support и allowed values, затем независимый feedback; наличие enum не доказывает наличие оборудования |
 | CAN_OWNERSHIP | Роль MPC5746/CAN и другие SPI-каналы | Связь образа с работающей прошивкой и исполнительным доменом | Продолжить офлайн-анализ ownership/config; исключить чтение reset_stats; не выполнять прошивку и перебор команд |
 

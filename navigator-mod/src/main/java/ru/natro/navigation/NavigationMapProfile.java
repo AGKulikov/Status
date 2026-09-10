@@ -41,6 +41,20 @@ final class NavigationMapProfile {
     boolean showWater = true;
     boolean showModels;
     boolean showRoute = true;
+    boolean showAlternativeRoutes;
+    String alternativeRouteColor = "#FFE950D5";
+    double alternativeRouteWidth = 6d;
+    int alternativeCalloutScalePercent = 100;
+    String alternativeCalloutBackgroundColor = "#FF343A32";
+    int alternativeCalloutOpacityPercent = 92;
+    String alternativeCalloutTextColor = "#FFFFFFFF";
+    String alternativeCalloutBorderColor = "#99FFFFFF";
+    double alternativeCalloutBorderWidthDp = 1d;
+    double alternativeCalloutTextSizeSp = 16d;
+    double alternativeCalloutCornerRadiusDp = 10d;
+    double alternativeCalloutHorizontalPaddingDp = 10d;
+    double alternativeCalloutVerticalPaddingDp = 7d;
+    double alternativeCalloutLeaderLengthDp = 14d;
     boolean showDestination = true;
     boolean showRouteTraffic = true;
     boolean showTraffic = true;
@@ -83,7 +97,9 @@ final class NavigationMapProfile {
     boolean manualLayerPrioritiesEnabled;
     int cameraDirectionLayerPriority = 30;
     int roadEventLayerPriority = 40;
+    int alternativeRouteLayerPriority = 45;
     int routeLayerPriority = 50;
+    int alternativeCalloutLayerPriority = 65;
     int destinationLayerPriority = 90;
     int trafficLightLayerPriority = 70;
     int routeTrafficLightLayerPriority = 20;
@@ -93,6 +109,7 @@ final class NavigationMapProfile {
     int laneGuidanceLayerPriority = 80;
     int cursorLayerPriority = 60;
     boolean showCursor = true;
+    boolean routeStreetLabelsOnly;
     boolean roadsOnly;
     String cameraMode = "FOLLOW_ROUTE";
     boolean fixedZoomEnabled;
@@ -143,18 +160,46 @@ final class NavigationMapProfile {
             result.nightMode = source.optBoolean("nightMode", false);
             result.showPois = source.optBoolean("showPois", false);
             result.showLabels = source.optBoolean("showLabels", true);
-            // 2.5.7-2.6.4 stored a request for a hand-drawn route-only label layer. Native
-            // substrate labels cannot be filtered by active-route membership through public
-            // MapKit. Migrate that old opt-in to visible stock Yandex road labels so an update
-            // never makes the street names disappear.
-            if (source.optBoolean("routeStreetLabelsOnly", false)) {
-                result.showLabels = true;
-            }
+            result.routeStreetLabelsOnly = source.optBoolean(
+                    "routeStreetLabelsOnly", false);
             result.showBuildings = source.optBoolean("showBuildings", true);
             result.showParks = source.optBoolean("showParks", true);
             result.showWater = source.optBoolean("showWater", true);
             result.showModels = source.optBoolean("showModels", false);
             result.showRoute = source.optBoolean("showRoute", true);
+            result.showAlternativeRoutes = source.optBoolean(
+                    "showAlternativeRoutes", false);
+            result.alternativeRouteColor = color(source.optString(
+                    "alternativeRouteColor", result.alternativeRouteColor),
+                    result.alternativeRouteColor);
+            result.alternativeRouteWidth = clamp(source.optDouble(
+                    "alternativeRouteWidth", result.alternativeRouteWidth), 1d, 40d, 6d);
+            result.alternativeCalloutScalePercent = clamp(source.optInt(
+                    "alternativeCalloutScalePercent", 100), 50, 250);
+            result.alternativeCalloutBackgroundColor = color(source.optString(
+                    "alternativeCalloutBackgroundColor",
+                    result.alternativeCalloutBackgroundColor),
+                    result.alternativeCalloutBackgroundColor);
+            result.alternativeCalloutOpacityPercent = clamp(source.optInt(
+                    "alternativeCalloutOpacityPercent", 92), 0, 100);
+            result.alternativeCalloutTextColor = color(source.optString(
+                    "alternativeCalloutTextColor", result.alternativeCalloutTextColor),
+                    result.alternativeCalloutTextColor);
+            result.alternativeCalloutBorderColor = color(source.optString(
+                    "alternativeCalloutBorderColor", result.alternativeCalloutBorderColor),
+                    result.alternativeCalloutBorderColor);
+            result.alternativeCalloutBorderWidthDp = clamp(source.optDouble(
+                    "alternativeCalloutBorderWidthDp", 1d), 0d, 12d, 1d);
+            result.alternativeCalloutTextSizeSp = clamp(source.optDouble(
+                    "alternativeCalloutTextSizeSp", 16d), 10d, 36d, 16d);
+            result.alternativeCalloutCornerRadiusDp = clamp(source.optDouble(
+                    "alternativeCalloutCornerRadiusDp", 10d), 0d, 40d, 10d);
+            result.alternativeCalloutHorizontalPaddingDp = clamp(source.optDouble(
+                    "alternativeCalloutHorizontalPaddingDp", 10d), 0d, 40d, 10d);
+            result.alternativeCalloutVerticalPaddingDp = clamp(source.optDouble(
+                    "alternativeCalloutVerticalPaddingDp", 7d), 0d, 30d, 7d);
+            result.alternativeCalloutLeaderLengthDp = clamp(source.optDouble(
+                    "alternativeCalloutLeaderLengthDp", 14d), 4d, 60d, 14d);
             result.showDestination = source.optBoolean("showDestination", true);
             result.showTraffic = source.optBoolean("showTraffic", true);
             // Old configurations had one switch for both layers. Preserve that behaviour until
@@ -219,8 +264,12 @@ final class NavigationMapProfile {
                     source.optInt("cameraDirectionLayerPriority", 30), 0, 100);
             result.roadEventLayerPriority = clamp(
                     source.optInt("roadEventLayerPriority", 40), 0, 100);
+            result.alternativeRouteLayerPriority = clamp(
+                    source.optInt("alternativeRouteLayerPriority", 45), 0, 100);
             result.routeLayerPriority = clamp(
                     source.optInt("routeLayerPriority", 50), 0, 100);
+            result.alternativeCalloutLayerPriority = clamp(
+                    source.optInt("alternativeCalloutLayerPriority", 65), 0, 100);
             result.destinationLayerPriority = clamp(
                     source.optInt("destinationLayerPriority", 90), 0, 100);
             result.trafficLightLayerPriority = clamp(
@@ -330,8 +379,16 @@ final class NavigationMapProfile {
         return manualLayerPrioritiesEnabled ? roadEventLayerPriority : 40;
     }
 
+    int effectiveAlternativeRoutePriority() {
+        return manualLayerPrioritiesEnabled ? alternativeRouteLayerPriority : 45;
+    }
+
     int effectiveRoutePriority() {
         return manualLayerPrioritiesEnabled ? routeLayerPriority : 50;
+    }
+
+    int effectiveAlternativeCalloutPriority() {
+        return manualLayerPrioritiesEnabled ? alternativeCalloutLayerPriority : 65;
     }
 
     int effectiveDestinationPriority() {
@@ -385,7 +442,7 @@ final class NavigationMapProfile {
                     "{\"tags\":{\"any\":" + ROAD_TAGS_JSON + "},"
                             + "\"elements\":\"geometry\",\"stylers\":" + stylers + "}");
         }
-        if (!showLabels) {
+        if (!showLabels || routeStreetLabelsOnly) {
             needsComma = appendRule(rules, needsComma,
                     "{\"elements\":\"label\",\"stylers\":{\"visibility\":\"off\"}}");
         } else if (routeLabelScalePercent != 100) {

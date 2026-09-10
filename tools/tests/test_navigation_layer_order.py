@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run production MapSublayerOrder against a mutable, feature-aware MapKit manager fixture."""
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -28,7 +29,9 @@ final class NavigationMapProfile {
     int routeLight = 20;
     int effectiveCameraPriority() { return 30; }
     int effectiveRoadEventPriority() { return 40; }
+    int effectiveAlternativeRoutePriority() { return 45; }
     int effectiveRoutePriority() { return 50; }
+    int effectiveAlternativeCalloutPriority() { return 65; }
     int effectiveDestinationPriority() { return 90; }
     int effectiveTrafficLightPriority() { return 70; }
     int effectiveRouteTrafficLightPriority() { return routeLight; }
@@ -74,7 +77,10 @@ public final class LayerOrderReplay {
                 MapSublayerOrder.LANE_GUIDANCE + P, MapSublayerOrder.TRAFFIC_LIGHTS + P,
                 MapSublayerOrder.CURSOR + P, MapSublayerOrder.ROUTE_TRAFFIC_LIGHTS + P,
                 MapSublayerOrder.SPEED_BUMPS + P, MapSublayerOrder.CAMERA_SIGNS + P,
-                MapSublayerOrder.ROUTE + G, MapSublayerOrder.CAMERA_SECTORS + G);
+                MapSublayerOrder.ROUTE_STREET_LABELS + P,
+                MapSublayerOrder.ALTERNATIVE_CALLOUTS + P,
+                MapSublayerOrder.ROUTE + G, MapSublayerOrder.ALTERNATIVE_ROUTES + G,
+                MapSublayerOrder.CAMERA_SECTORS + G);
         return map;
     }
 
@@ -98,14 +104,21 @@ public final class LayerOrderReplay {
         }
         for (String name : new String[]{MapSublayerOrder.CAMERA_SIGNS, MapSublayerOrder.SPEED_BUMPS,
                 MapSublayerOrder.CURSOR, MapSublayerOrder.TRAFFIC_LIGHTS,
-                MapSublayerOrder.LANE_GUIDANCE, MapSublayerOrder.DESTINATION}) {
+                MapSublayerOrder.ALTERNATIVE_CALLOUTS, MapSublayerOrder.LANE_GUIDANCE,
+                MapSublayerOrder.DESTINATION}) {
             below(map, ordinary, name + P);
         }
         int label = Math.max(map.manager.layers.indexOf("map" + P),
                 map.manager.layers.indexOf("jams" + P));
         if (label >= 0 && map.manager.layers.indexOf(ordinary) != label + 1) {
-            throw new AssertionError("Ordinary lights are not immediately above labels");
+            if (map.manager.layers.indexOf(MapSublayerOrder.ROUTE_STREET_LABELS + P)
+                    + 1 != map.manager.layers.indexOf(ordinary)) {
+                throw new AssertionError("Ordinary lights are not immediately above route labels");
+            }
         }
+        below(map, MapSublayerOrder.CAMERA_SECTORS + G,
+                MapSublayerOrder.ALTERNATIVE_ROUTES + G);
+        below(map, MapSublayerOrder.ALTERNATIVE_ROUTES + G, MapSublayerOrder.ROUTE + G);
     }
     static void applyAndCheck(MapFixture map, NavigationMapProfile profile) throws Exception {
         List<String> originalStock = stock(map);
@@ -185,7 +198,15 @@ class NavigationLayerOrderTest(unittest.TestCase):
             files.append(str(path))
         production = ROOT / "navigator-mod/src/main/java/ru/natro/navigation"
         files.extend(str(production / name) for name in ("MapSublayerOrder.java", "ReflectMethods.java"))
-        subprocess.run(["javac", "-d", str(cls.directory), *files], check=True)
+        javac = shutil.which("javac")
+        java = shutil.which("java")
+        if javac is not None:
+            compiler = [javac]
+        elif java is not None:
+            compiler = [java, "com.sun.tools.javac.Main"]
+        else:
+            raise unittest.SkipTest("JDK is unavailable locally")
+        subprocess.run([*compiler, "-d", str(cls.directory), *files], check=True)
 
     @classmethod
     def tearDownClass(cls):

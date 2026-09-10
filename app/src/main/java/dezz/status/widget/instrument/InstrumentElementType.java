@@ -6,6 +6,8 @@ import androidx.annotation.Nullable;
 
 import java.util.Locale;
 
+import dezz.status.widget.car.CurrentTripMetrics;
+
 /** Elements available to the 1920x720 instrument-panel editor. */
 public enum InstrumentElementType {
     ANALOG_SPEEDOMETER("Спидометр · стрелка", "Аналоговые", "ISensor.speed", 12, 12),
@@ -30,6 +32,12 @@ public enum InstrumentElementType {
             "ISensor.avg_fuel_consumption", 9, 3),
     TRIP_CONSUMPTION("Расход поездки · цифры", "Цифровые",
             "ISensor.avg_fuel_consumption_ignition", 9, 3),
+    CURRENT_TRIP_DISTANCE("Текущая поездка · пробег", "Цифровые",
+            CurrentTripMetrics.DISTANCE_ID, 9, 3),
+    CURRENT_TRIP_DURATION("Текущая поездка · время", "Цифровые",
+            CurrentTripMetrics.DURATION_ID, 9, 3),
+    CURRENT_TRIP_AVERAGE_SPEED("Текущая поездка · средняя скорость", "Цифровые",
+            CurrentTripMetrics.AVERAGE_SPEED_ID, 9, 3),
 
     GEAR("Передача", "Основное", "ISensor.gear", 5, 5),
     ODOMETER("Одометр", "Основное", "ISensor.odometer", 8, 3),
@@ -39,8 +47,26 @@ public enum InstrumentElementType {
     CLOCK("Часы", "Основное", "", 7, 3),
     INFO_BLOCK("Информационный блок", "Основное", "", 10, 8),
     NAVIGATION_INFO("Маршрутный блок", "Навигация", "", 12, 7),
+    NAV_MANEUVER_ARROW("Стрелка манёвра", "Навигация", "", 9, 10),
+    NAV_MANEUVER_TITLE("Описание манёвра", "Навигация", "", 14, 3),
+    NAV_MANEUVER_SUBTEXT("Подсказка манёвра", "Навигация", "", 14, 3),
+    NAV_STREET("Улица", "Навигация", "", 16, 3),
+    NAV_DESTINATION("Пункт назначения", "Навигация", "", 16, 3),
+    NAV_TURN_DISTANCE("Расстояние до поворота", "Навигация", "", 9, 3),
+    NAV_DISTANCE_LEFT("Осталось расстояния", "Навигация", "", 10, 3),
+    NAV_TIME_LEFT("Осталось времени", "Навигация", "", 9, 3),
+    NAV_ARRIVAL_TIME("Время прибытия", "Навигация", "", 9, 3),
+    NAV_SPEED("Скорость навигации", "Навигация", "", 7, 4),
+    NAV_LANES("Полосы движения", "Навигация", "", 14, 5),
+    NAV_LANE_DISTANCE("Расстояние до полос", "Навигация", "", 8, 2),
+    NAV_MANEUVER_CARD("Карточка ближайшего манёвра", "Навигация", "", 18, 10),
     NAVIGATION_ROUTE_SUMMARY("Сводка маршрута · как в Навигаторе", "Навигация", "", 22, 5),
+    NAV_TRIP_PROGRESS("Прогресс поездки", "Навигация", "", 16, 2),
+    NAV_SPEED_LIMIT("Ограничение скорости", "Навигация", "", 6, 6),
+    NAV_TRAFFIC_LIGHTS("Светофоры", "Навигация", "", 9, 10),
     TRAFFIC_JAM("Пробка впереди", "Навигация", "", 14, 3),
+    NAV_JAM_PROGRESS("Пробки / прогресс", "Навигация", "", 16, 2),
+    NAV_ROUTE_GRAPHIC("Графика маршрута", "Навигация", "", 16, 4),
     NAV_MAP("Независимая карта", "Навигация", "", 22, 14);
 
     @NonNull public final String label;
@@ -83,6 +109,9 @@ public enum InstrumentElementType {
             case INSTANT_CONSUMPTION:
             case AVERAGE_CONSUMPTION:
             case TRIP_CONSUMPTION:
+            case CURRENT_TRIP_DISTANCE:
+            case CURRENT_TRIP_DURATION:
+            case CURRENT_TRIP_AVERAGE_SPEED:
                 return true;
             default:
                 return false;
@@ -94,8 +123,32 @@ public enum InstrumentElementType {
     }
 
     public boolean usesNavigationState() {
-        return this == NAVIGATION_INFO || this == NAVIGATION_ROUTE_SUMMARY
-                || this == TRAFFIC_JAM;
+        switch (this) {
+            case NAVIGATION_INFO:
+            case NAV_MANEUVER_ARROW:
+            case NAV_MANEUVER_TITLE:
+            case NAV_MANEUVER_SUBTEXT:
+            case NAV_STREET:
+            case NAV_DESTINATION:
+            case NAV_TURN_DISTANCE:
+            case NAV_DISTANCE_LEFT:
+            case NAV_TIME_LEFT:
+            case NAV_ARRIVAL_TIME:
+            case NAV_SPEED:
+            case NAV_LANES:
+            case NAV_LANE_DISTANCE:
+            case NAV_MANEUVER_CARD:
+            case NAVIGATION_ROUTE_SUMMARY:
+            case NAV_TRIP_PROGRESS:
+            case NAV_SPEED_LIMIT:
+            case NAV_TRAFFIC_LIGHTS:
+            case TRAFFIC_JAM:
+            case NAV_JAM_PROGRESS:
+            case NAV_ROUTE_GRAPHIC:
+                return true;
+            default:
+                return false;
+        }
     }
 
     @Nullable

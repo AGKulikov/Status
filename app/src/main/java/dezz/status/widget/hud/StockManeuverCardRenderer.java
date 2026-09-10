@@ -10,6 +10,7 @@ import android.graphics.Typeface;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
+import android.text.TextUtils;
 import org.json.JSONObject;
 import java.util.List;
 import dezz.status.widget.navigation.StockManeuverCardState;
@@ -77,7 +78,7 @@ public final class StockManeuverCardRenderer {
             float y = main.bottom + gap;
             if (road) {
                 RectF row = new RectF(bounds.left, y, bounds.right, y + detailHeight);
-                label(canvas, state.nextRoad, inset(row, options, "text", 0, scale), detailColor, 255,
+                labelFixed(canvas, state.nextRoad, inset(row, options, "text", 0, scale), detailColor, 255,
                         options.optInt("directionFontSizeSp", Math.max(8, fontSize / 2)) * scale,
                         weight, 2, Layout.Alignment.ALIGN_NORMAL);
                 y += detailHeight + gap;
@@ -91,6 +92,8 @@ public final class StockManeuverCardRenderer {
                 paint.setStyle(Paint.Style.FILL);
                 int background = optionColor(options, "auxiliaryColor",
                         optionColor(options, "maneuverAuxiliaryColor", 0xE60B4DB5));
+                int auxiliaryTextColor = optionColor(options, "auxiliaryTextColor",
+                        optionColor(options, "maneuverAuxiliaryTextColor", color));
                 paint.setColor((background & 0xFFFFFF) | Math.round(Color.alpha(background) * alpha / 255f) << 24);
                 canvas.drawRoundRect(row, Math.min(7 * scale, row.height() / 4), Math.min(7 * scale, row.height() / 4), paint);
                 RectF content = inset(row, options, "text", 0, scale);
@@ -99,7 +102,7 @@ public final class StockManeuverCardRenderer {
                         float prefixWidth = content.width() * .28f;
                         RectF prefix = new RectF(content.left, content.top,
                                 content.left + prefixWidth, content.bottom);
-                        label(canvas, state.auxiliaryText, prefix, color, alpha,
+                        labelFixed(canvas, state.auxiliaryText, prefix, auxiliaryTextColor, alpha,
                                 options.optInt("auxiliaryFontSizeSp", Math.max(8, fontSize / 2))
                                         * scale, weight, 1, Layout.Alignment.ALIGN_NORMAL);
                         content.left = Math.min(content.right, prefix.right + gap);
@@ -111,7 +114,7 @@ public final class StockManeuverCardRenderer {
                         resources.drawTinted(canvas, state.auxiliaryImage, new RectF(content.left, content.top, content.left + side, content.bottom), alpha, signTint, true);
                         content.left += side + gap;
                     }
-                    label(canvas, state.auxiliaryText, content, color, alpha,
+                    labelFixed(canvas, state.auxiliaryText, content, auxiliaryTextColor, alpha,
                             options.optInt("auxiliaryFontSizeSp", Math.max(8, fontSize / 2)) * scale, weight, 1, Layout.Alignment.ALIGN_NORMAL);
                 }
                 y += detailHeight + gap;
@@ -122,17 +125,21 @@ public final class StockManeuverCardRenderer {
     private void drawSigns(Canvas canvas, List<StockManeuverCardState.Sign> signs, RectF bounds,
                            JSONObject options, float scale, int size, int weight, int alpha) {
         if (bounds.isEmpty()) return;
-        float font = Math.min(options.optInt("roadBadgeFontSizeSp", Math.max(8, size / 2)) * scale, bounds.height() * .62f);
+        float font = options.optInt("roadBadgeFontSizeSp", Math.max(8, size / 2)) * scale;
         text.setTextSize(font);
+        float padding = Math.max(0, options.optInt("roadBadgePaddingHorizontalPx", 5)) * scale;
         float total = 0, gap = Math.min(3 * scale, bounds.width() / Math.max(1, signs.size() * 4));
-        for (StockManeuverCardState.Sign sign : signs) total += sign.image.isEmpty() ? text.measureText(sign.text) + font : bounds.height();
+        for (StockManeuverCardState.Sign sign : signs) total += sign.image.isEmpty()
+                ? text.measureText(sign.text) + padding * 2 : bounds.height();
+        if (total + gap * Math.max(0, signs.size() - 1) > bounds.width()) gap = 0;
         float factor = Math.min(1, Math.max(0, bounds.width() - gap * (signs.size() - 1)) / Math.max(1, total));
         float x = bounds.left;
         for (StockManeuverCardState.Sign sign : signs) {
             int background = optionColor(options, "sourceBadgeColor", sign.background);
             int textColor = optionColor(options, "sourceTextColor", sign.color);
             Integer signColor = optionalColor(options, "sourceSignColor");
-            float width = (sign.image.isEmpty() ? text.measureText(sign.text) + font : bounds.height()) * factor;
+            float width = (sign.image.isEmpty() ? text.measureText(sign.text) + padding * 2
+                    : bounds.height()) * factor;
             RectF box = new RectF(x, bounds.top, x + width, bounds.bottom);
             paint.setColor((background & 0xFFFFFF) | Math.round(Color.alpha(background) * alpha / 255f) << 24);
             canvas.drawRoundRect(box, Math.min(5 * scale, bounds.height() / 5), Math.min(5 * scale, bounds.height() / 5), paint);
@@ -140,7 +147,10 @@ public final class StockManeuverCardRenderer {
                 if (signColor == null) resources.draw(canvas, sign.image, box, alpha, sign.color, true);
                 else resources.drawTinted(canvas, sign.image, box, alpha, signColor, true);
             }
-            else label(canvas, sign.text, box, textColor, alpha, font * factor, weight, 1, Layout.Alignment.ALIGN_CENTER);
+            else labelFixed(canvas, sign.text,
+                    new RectF(box.left + Math.min(padding, box.width() / 3), box.top,
+                            box.right - Math.min(padding, box.width() / 3), box.bottom),
+                    textColor, alpha, font, weight, 1, Layout.Alignment.ALIGN_CENTER);
             x += width + gap;
         }
     }
@@ -159,6 +169,36 @@ public final class StockManeuverCardRenderer {
         int save = canvas.save();
         canvas.clipRect(bounds); canvas.translate(bounds.left, bounds.centerY() - layout.getHeight() / 2f);
         layout.draw(canvas); canvas.restoreToCount(save);
+    }
+
+    /** Keeps the configured font size; constrained cards clip/ellipsize instead of shrinking text. */
+    private void labelFixed(Canvas canvas, String value, RectF bounds, int color, int alpha,
+                            float size, int weight, int lines, Layout.Alignment alignment) {
+        if (value.isEmpty() || bounds.width() < 1 || bounds.height() < 1) return;
+        text.setTypeface(Typeface.create(Typeface.create("sans-serif", Typeface.NORMAL),
+                clamp(weight, 100, 900), false));
+        text.setColor((color & 0xFFFFFF)
+                | Math.round(Color.alpha(color) * alpha / 255f) << 24);
+        text.setTextSize(Math.max(1, size));
+        int width = Math.max(1, (int) bounds.width());
+        int maxLines = Math.max(1, lines);
+        CharSequence displayed = value;
+        if (maxLines == 1) {
+            displayed = TextUtils.ellipsize(value, text, width, TextUtils.TruncateAt.END);
+        }
+        StaticLayout layout = StaticLayout.Builder.obtain(displayed, 0, displayed.length(),
+                        text, width)
+                .setAlignment(alignment)
+                .setIncludePad(false)
+                .setMaxLines(maxLines)
+                .setEllipsize(TextUtils.TruncateAt.END)
+                .setEllipsizedWidth(width)
+                .build();
+        int save = canvas.save();
+        canvas.clipRect(bounds);
+        canvas.translate(bounds.left, bounds.centerY() - layout.getHeight() / 2f);
+        layout.draw(canvas);
+        canvas.restoreToCount(save);
     }
     private static RectF inset(RectF bounds, JSONObject options, String prefix, int fallback, float scale) {
         return new RectF(bounds.left + Math.max(0, options.optInt(prefix + "PaddingLeftPx", fallback)) * scale,

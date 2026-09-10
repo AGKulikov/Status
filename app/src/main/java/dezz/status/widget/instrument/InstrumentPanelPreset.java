@@ -250,8 +250,14 @@ public enum InstrumentPanelPreset {
         option(result, "maneuverDetailRowGapPx", 2);
         option(result, "maneuverDetailTextSizeSp", 18);
         option(result, "maneuverAuxiliaryTextSizeSp", 14);
+        option(result, "directionFontSizeSp", 18);
+        option(result, "roadBadgeFontSizeSp", 18);
+        option(result, "auxiliaryFontSizeSp", 14);
         option(result, "maneuverDetailTextColor", "#FFFFFFFF");
         option(result, "maneuverAuxiliaryColor", "#E60B4DB5");
+        option(result, "auxiliaryColor", "#E60B4DB5");
+        option(result, "maneuverAuxiliaryTextColor", "#FFFFFFFF");
+        option(result, "auxiliaryTextColor", "#FFFFFFFF");
         option(result, "metricGapPx", 10);
         option(result, "distanceTextSizeSp", 25);
         option(result, "arrivalTextSizeSp", 25);

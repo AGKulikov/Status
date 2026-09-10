@@ -6,6 +6,8 @@ import androidx.annotation.Nullable;
 
 import java.util.Locale;
 
+import dezz.status.widget.car.CurrentTripMetrics;
+
 /** Selectable rows for the modular auxiliary information block. */
 public enum InstrumentInfoMetric {
     RANGE("Запас хода", "ISensor.range_total", "ISensor.range_fuel", "км", 0),
@@ -19,6 +21,12 @@ public enum InstrumentInfoMetric {
             "л/100", 1),
     TRIP_CONSUMPTION("Расход поездки", "ISensor.avg_fuel_consumption_ignition", "",
             "л/100", 1),
+    CURRENT_TRIP_DISTANCE("Пробег поездки", CurrentTripMetrics.DISTANCE_ID, "",
+            "км", 1),
+    CURRENT_TRIP_DURATION("Время поездки", CurrentTripMetrics.DURATION_ID, "",
+            "ч", 0),
+    CURRENT_TRIP_AVERAGE_SPEED("Средняя скорость поездки",
+            CurrentTripMetrics.AVERAGE_SPEED_ID, "", "км/ч", 0),
     ODOMETER("Пробег", "ISensor.odometer", "", "км", 0),
     RPM("Обороты", "ISensor.rpm", "", "об/мин", 0),
     SPEED("Скорость", "ISensor.speed", "", "км/ч", 0),

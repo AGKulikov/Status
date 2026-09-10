@@ -38,6 +38,7 @@ import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.automation.AutomationStateStore;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.car.CurrentTripMetrics;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
@@ -81,12 +82,21 @@ public final class HudRuntimeData {
     @Nullable private LauncherMediaController.Snapshot media;
     private final HudVolumeVisibility volumeVisibility = new HudVolumeVisibility();
     private final Runnable volumeExpiry = this::notifyChanged;
+    private boolean started;
+    /** All three fields originate in one ECARX driving-info callback and expire together. */
+    private final Runnable currentTripExpiry = () -> {
+        if (!started) return;
+        boolean changed = false;
+        changed |= telemetry.remove(CurrentTripMetrics.DISTANCE_ID) != null;
+        changed |= telemetry.remove(CurrentTripMetrics.DURATION_ID) != null;
+        changed |= telemetry.remove(CurrentTripMetrics.AVERAGE_SPEED_ID) != null;
+        if (changed) notifyChanged();
+    };
     private boolean mediaTimelineVisible;
     @Nullable private WidgetService attachedHost;
     @Nullable private String cachedAppVersion;
     private final boolean isolatedHudProcess;
     private volatile boolean navigationDataNeeded;
-    private boolean started;
     private boolean navigationReceiverRegistered;
     private long navigationFreshUntilElapsedMs;
     private long navigationScheduledExpiryElapsedMs;
@@ -94,6 +104,10 @@ public final class HudRuntimeData {
     private final CarIntegration.TelemetryListener telemetryListener = value -> runOnMain(() -> {
         if (!started) return;
         telemetry.put(value.id, value);
+        if (CurrentTripMetrics.isMetricId(value.id)) {
+            main.removeCallbacks(currentTripExpiry);
+            main.postDelayed(currentTripExpiry, CurrentTripMetrics.STALE_AFTER_MILLIS);
+        }
         notifyChanged();
     });
     private final ConnectorValueRegistry.Listener connectorListener = changed -> {
@@ -202,6 +216,7 @@ public final class HudRuntimeData {
         if (!started) return;
         started = false;
         main.removeCallbacks(volumeExpiry);
+        main.removeCallbacks(currentTripExpiry);
         volumeVisibility.reset();
         navigationDataNeeded = false;
         main.removeCallbacks(hostProbe);
@@ -549,6 +564,10 @@ public final class HudRuntimeData {
                     item.unit.isEmpty() ? "л" : item.unit);
         }
         if (value == null) return "—";
+        if (item.type == HudElementType.CURRENT_TRIP_DURATION) {
+            return currentTripDuration(value.value,
+                    item.unit.isEmpty() ? "ч" : item.unit);
+        }
         double number = normalizedVehicleValue(item, value.value);
         if (item.type == HudElementType.FUEL_LEVEL && !Double.isFinite(number)) return "—";
         if (item.type == HudElementType.GEAR) return gear(number, item);
@@ -593,8 +612,20 @@ public final class HudRuntimeData {
             case RPM: return item.options.optBoolean("divideByThousand", false) ? "×1000" : "об/мин";
             case ODOMETER: return sourceUnit.isEmpty() || "raw".equals(sourceUnit)
                     ? "км" : sourceUnit;
+            case CURRENT_TRIP_DISTANCE: return "км";
+            case CURRENT_TRIP_AVERAGE_SPEED: return "км/ч";
+            case CURRENT_TRIP_DURATION: return "ч";
             default: return "raw".equals(sourceUnit) ? "" : sourceUnit;
         }
+    }
+
+    @NonNull
+    private static String currentTripDuration(double minutesValue, @NonNull String unit) {
+        if (!Double.isFinite(minutesValue) || minutesValue < 0d) return "—";
+        long minutes = Math.round(minutesValue);
+        String value = String.format(Locale.getDefault(), "%02d:%02d",
+                minutes / 60L, minutes % 60L);
+        return unit.trim().isEmpty() ? value : value + " " + unit.trim();
     }
 
     @NonNull

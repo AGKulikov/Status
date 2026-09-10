@@ -2,6 +2,7 @@
 package dezz.status.widget.instrument;
 
 import android.content.Context;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 
@@ -14,6 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.car.CurrentTripMetrics;
 
 /**
  * Process-wide, one-subscription telemetry store for the instrument editor and projected panel.
@@ -49,6 +51,11 @@ public final class InstrumentTelemetryRepository {
     private volatile float instantConsumption = Float.NaN;
     private volatile float averageConsumption = Float.NaN;
     private volatile float tripConsumption = Float.NaN;
+    private volatile float currentTripDistance = Float.NaN;
+    private volatile float currentTripDurationMinutes = Float.NaN;
+    private volatile float currentTripAverageSpeed = Float.NaN;
+    /** Monotonic freshness shared by values emitted from one IDrivingInfo callback. */
+    private volatile long currentTripObservedAtElapsedNanos;
     @NonNull private final AtomicLong generation = new AtomicLong();
     private volatile long newestSampleElapsedNanos;
 
@@ -169,6 +176,21 @@ public final class InstrumentTelemetryRepository {
             case "ISensor.avg_fuel_consumption_ignition":
                 changed = InstrumentValuePolicy.differs(tripConsumption, normalized);
                 tripConsumption = normalized; break;
+            case "Trip.current_distance_km":
+                currentTripDistance = normalized;
+                currentTripObservedAtElapsedNanos = observedAtElapsedNanos;
+                changed = true;
+                break;
+            case "Trip.current_duration_minutes":
+                currentTripDurationMinutes = normalized;
+                currentTripObservedAtElapsedNanos = observedAtElapsedNanos;
+                changed = true;
+                break;
+            case "Derived.current_trip_average_speed":
+                currentTripAverageSpeed = normalized;
+                currentTripObservedAtElapsedNanos = observedAtElapsedNanos;
+                changed = true;
+                break;
             default: return;
         }
         newestSampleElapsedNanos = observedAtElapsedNanos;
@@ -209,6 +231,10 @@ public final class InstrumentTelemetryRepository {
         int attempt = 0;
         do {
             before = generation.get();
+            long tripObservedAt = currentTripObservedAtElapsedNanos;
+            long tripAge = SystemClock.elapsedRealtimeNanos() - tripObservedAt;
+            boolean tripFresh = tripObservedAt > 0L
+                    && tripAge >= 0L && tripAge <= CurrentTripMetrics.STALE_AFTER_NANOS;
             out.speed = speed;
             out.rpm = rpm;
             out.gear = gear;
@@ -223,6 +249,13 @@ public final class InstrumentTelemetryRepository {
             out.instantConsumption = instantConsumption;
             out.averageConsumption = averageConsumption;
             out.tripConsumption = tripConsumption;
+            out.currentTripDistance = tripFresh ? currentTripDistance : Float.NaN;
+            out.currentTripDurationMinutes = tripFresh
+                    ? currentTripDurationMinutes : Float.NaN;
+            out.currentTripAverageSpeed = tripFresh
+                    ? currentTripAverageSpeed : Float.NaN;
+            out.currentTripFreshUntilElapsedNanos = tripFresh
+                    ? tripObservedAt + CurrentTripMetrics.STALE_AFTER_NANOS : 0L;
             out.newestSampleElapsedNanos = newestSampleElapsedNanos;
             after = generation.get();
         } while (before != after && attempt++ == 0);
@@ -245,6 +278,10 @@ public final class InstrumentTelemetryRepository {
         public float instantConsumption;
         public float averageConsumption;
         public float tripConsumption;
+        public float currentTripDistance;
+        public float currentTripDurationMinutes;
+        public float currentTripAverageSpeed;
+        public long currentTripFreshUntilElapsedNanos;
         public long generation;
         public long newestSampleElapsedNanos;
     }

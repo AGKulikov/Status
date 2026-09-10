@@ -350,6 +350,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
      * Android's stock path unchanged.
      */
     @Override protected boolean onKeyEvent(@NonNull KeyEvent event) {
+        final long callbackEntryUptimeMs = SystemClock.uptimeMillis();
         int keyCode = event.getKeyCode();
         if (!SteeringMediaKeyRouter.isSupportedKey(keyCode)) {
             return super.onKeyEvent(event);
@@ -358,7 +359,8 @@ public class WidgetAccessibilityService extends AccessibilityService {
             if (event.getRepeatCount() > 0) return consumedMediaKeys.get(keyCode, false);
             SteeringMediaKeyRouter mediaRouter = steeringMediaKeyRouter;
             boolean handled = mediaRouter != null
-                    && mediaRouter.dispatch(keyCode, SystemClock.uptimeMillis());
+                    && mediaRouter.dispatch(keyCode, event.getEventTime(), event.getDownTime(),
+                    callbackEntryUptimeMs);
             consumedMediaKeys.put(keyCode, handled);
             return handled || super.onKeyEvent(event);
         }

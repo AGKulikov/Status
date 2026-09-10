@@ -19,7 +19,10 @@ import java.util.List;
 final class MapSublayerOrder {
     static final String CAMERA_SECTORS = "ru.natro.navigation.camera_sectors";
     static final String CAMERA_SIGNS = "ru.natro.navigation.camera_signs";
+    static final String ALTERNATIVE_ROUTES = "ru.natro.navigation.alternative_routes";
     static final String ROUTE = "ru.natro.navigation.route";
+    static final String ROUTE_STREET_LABELS = "ru.natro.navigation.route_street_labels";
+    static final String ALTERNATIVE_CALLOUTS = "ru.natro.navigation.alternative_callouts";
     static final String DESTINATION = "ru.natro.navigation.destination";
     static final String SPEED_BUMPS = "ru.natro.navigation.speed_bumps";
     static final String ROUTE_TRAFFIC_LIGHTS = "ru.natro.navigation.route_traffic_lights";
@@ -67,7 +70,8 @@ final class MapSublayerOrder {
             throws Exception {
         ArrayList<LayerRef> layers = new ArrayList<>();
         layers.add(new LayerRef(CAMERA_SECTORS, GROUND, 0, 0));
-        layers.add(new LayerRef(ROUTE, GROUND, 0, 1));
+        layers.add(new LayerRef(ALTERNATIVE_ROUTES, GROUND, 0, 1));
+        layers.add(new LayerRef(ROUTE, GROUND, 0, 2));
         placeSequence(manager, layers,
                 firstExisting(manager,
                         ref(STOCK_ROUTE_POLYLINE, GROUND),
@@ -85,8 +89,10 @@ final class MapSublayerOrder {
         ArrayList<LayerRef> layers = new ArrayList<>();
         layers.add(new LayerRef(CAMERA_SECTORS, GROUND,
                 profile.effectiveCameraPriority(), 0));
+        layers.add(new LayerRef(ALTERNATIVE_ROUTES, GROUND,
+                profile.effectiveAlternativeRoutePriority(), 1));
         layers.add(new LayerRef(ROUTE, GROUND,
-                profile.effectiveRoutePriority(), 1));
+                profile.effectiveRoutePriority(), 2));
         sort(layers);
         placeSequence(manager, layers,
                 firstExisting(manager,
@@ -108,7 +114,10 @@ final class MapSublayerOrder {
                                                   String roadEvents, String routePins,
                                                   String userLocation) throws Exception {
         LayerRef base = placemarkFloor(manager, mapBase, traffic);
-        placeAfter(manager, ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), base);
+        placeAfter(manager, ref(ROUTE_STREET_LABELS, PLACEMARKS), base);
+        LayerRef routeLabels = firstExisting(manager,
+                ref(ROUTE_STREET_LABELS, PLACEMARKS), base);
+        placeAfter(manager, ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), routeLabels);
         LayerRef events = firstExisting(manager, ref(roadEvents, PLACEMARKS),
                 ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), base);
         placeAfter(manager, ref(CAMERA_SIGNS, PLACEMARKS), events);
@@ -134,6 +143,7 @@ final class MapSublayerOrder {
                 ref(CURSOR, PLACEMARKS),
                 cursorAnchor);
         ArrayList<LayerRef> guidance = new ArrayList<>();
+        guidance.add(ref(ALTERNATIVE_CALLOUTS, PLACEMARKS));
         guidance.add(ref(TRAFFIC_LIGHTS, PLACEMARKS));
         guidance.add(ref(LANE_GUIDANCE, PLACEMARKS));
         LayerRef lastGuidance = placeSequence(manager, guidance, guidanceAnchor, null);
@@ -151,6 +161,8 @@ final class MapSublayerOrder {
                                                String roadEvents,
                                                NavigationMapProfile profile) throws Exception {
         ArrayList<LayerRef> custom = new ArrayList<>();
+        custom.add(new LayerRef(ROUTE_STREET_LABELS, PLACEMARKS,
+                profile.effectiveRoutePriority(), -2));
         custom.add(new LayerRef(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS,
                 profile.effectiveRouteTrafficLightPriority(), -1));
         custom.add(new LayerRef(CAMERA_SIGNS, PLACEMARKS,
@@ -159,12 +171,14 @@ final class MapSublayerOrder {
                 profile.effectiveSpeedBumpPriority(), 1));
         custom.add(new LayerRef(CURSOR, PLACEMARKS,
                 profile.effectiveCursorPriority(), 3));
+        custom.add(new LayerRef(ALTERNATIVE_CALLOUTS, PLACEMARKS,
+                profile.effectiveAlternativeCalloutPriority(), 4));
         custom.add(new LayerRef(TRAFFIC_LIGHTS, PLACEMARKS,
-                profile.effectiveTrafficLightPriority(), 4));
+                profile.effectiveTrafficLightPriority(), 5));
         custom.add(new LayerRef(LANE_GUIDANCE, PLACEMARKS,
-                profile.effectiveLanePriority(), 5));
+                profile.effectiveLanePriority(), 6));
         custom.add(new LayerRef(DESTINATION, PLACEMARKS,
-                profile.effectiveDestinationPriority(), 6));
+                profile.effectiveDestinationPriority(), 7));
         sort(custom);
 
         LayerRef base = placemarkFloor(manager, mapBase, traffic);
@@ -251,6 +265,7 @@ final class MapSublayerOrder {
         LayerRef highest = null;
         int highestIndex = -1;
         for (LayerRef candidate : new LayerRef[]{ref(mapBase, GROUND), ref(ROUTE, GROUND),
+                ref(ALTERNATIVE_ROUTES, GROUND),
                 ref(mapBase, PLACEMARKS), ref(traffic, PLACEMARKS)}) {
             Integer value = index(manager, candidate);
             if (value != null && value > highestIndex) {

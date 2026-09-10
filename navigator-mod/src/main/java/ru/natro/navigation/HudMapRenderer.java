@@ -47,6 +47,9 @@ final class HudMapRenderer {
     private final SpeedBumpMapLayer speedBumpMapLayer;
     private final LaneGuidanceMapLayer laneGuidanceMapLayer;
     private final RouteTurnMapLayer routeTurnMapLayer;
+    private final AlternativeRouteMapLayer alternativeRouteMapLayer;
+    private final RouteStreetLabelMapLayer routeStreetLabelMapLayer;
+    private final RoadEventRouteSynchronizer roadEventRouteSynchronizer;
     private final String profileSection;
     private final String displayName;
     private final boolean adaptiveFrameRate;
@@ -115,6 +118,10 @@ final class HudMapRenderer {
         speedBumpMapLayer = new SpeedBumpMapLayer(this.context, overlayPlacement);
         laneGuidanceMapLayer = new LaneGuidanceMapLayer(this.context, overlayPlacement);
         routeTurnMapLayer = new RouteTurnMapLayer(this.context);
+        alternativeRouteMapLayer = new AlternativeRouteMapLayer(this.context,
+                overlayPlacement);
+        routeStreetLabelMapLayer = new RouteStreetLabelMapLayer();
+        roadEventRouteSynchronizer = new RoadEventRouteSynchronizer();
     }
 
     void applyConfiguration(String raw) {
@@ -195,6 +202,15 @@ final class HudMapRenderer {
             speedBumpMapLayer.clearData();
             laneGuidanceMapLayer.clearData();
             routeTurnMapLayer.clearData();
+            alternativeRouteMapLayer.clearData();
+            routeStreetLabelMapLayer.clearData();
+            roadEventRouteSynchronizer.clearData();
+            activeRoute = null;
+            activeJamFingerprint = 0L;
+            activeJamStyle = RoutePolylineStyler.JamStyle.EMPTY;
+            overlayPlacement.updateRoute(activeRouteEpoch, null);
+            applyTrafficPresentation();
+            rebuildRoute();
             applyRoadEventVisibility();
             applyCamera(false);
         }
@@ -278,10 +294,22 @@ final class HudMapRenderer {
     /** Receives the publisher-owned jam palette so two maps never scan it separately. */
     void updateRoute(long routeEpoch, Object drivingRoute, long jamFingerprint,
                      RoutePolylineStyler.JamStyle jamStyle) {
+        updateRoute(routeEpoch, drivingRoute, jamFingerprint, jamStyle,
+                Collections.emptyList(), Collections.emptyList(), 0L);
+    }
+
+    /** Receives retained in-process alternatives and exact active-route road-event membership. */
+    void updateRoute(long routeEpoch, Object drivingRoute, long jamFingerprint,
+                     RoutePolylineStyler.JamStyle jamStyle, List<?> alternatives,
+                     List<?> routeEvents, long routeEventsFingerprint) {
         if (routeEpoch < activeRouteEpoch) return;
         overlayPlacement.updateRoute(routeEpoch, drivingRoute);
         routeTrafficLightMapLayer.updateRoute(routeEpoch, drivingRoute);
         speedBumpMapLayer.updateRoute(routeEpoch, drivingRoute);
+        alternativeRouteMapLayer.update(routeEpoch, drivingRoute, alternatives);
+        routeStreetLabelMapLayer.update(routeEpoch, drivingRoute);
+        roadEventRouteSynchronizer.update(
+                routeEpoch, routeEventsFingerprint, routeEvents);
         // MapKit may hand out a new Java wrapper for the same DrivingRoute on every Guidance
         // callback. Object identity is therefore not a route identity; routeEpoch is.
         boolean changed = routeEpoch != activeRouteEpoch
@@ -356,6 +384,8 @@ final class HudMapRenderer {
             cameraDirectionMapLayer.attach(map);
             speedBumpMapLayer.attach(map);
             laneGuidanceMapLayer.attach(map);
+            alternativeRouteMapLayer.attach(map);
+            routeStreetLabelMapLayer.attach(map);
             cursorStyler.attach(map);
 
             Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
@@ -429,6 +459,11 @@ final class HudMapRenderer {
                 profile.routeTurnFillColor,
                 profile.routeTurnOutlineColor,
                 profile.routeTurnOutlineWidth);
+        alternativeRouteMapLayer.apply(profile);
+        routeStreetLabelMapLayer.apply(
+                profile.routeStreetLabelsOnly,
+                profile.routeLabelScalePercent, night,
+                profile.effectiveRoutePriority());
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -590,6 +625,7 @@ final class HudMapRenderer {
             scaledRoadEventStyleProvider = scaledProvider;
             roadEventsManager = manager;
             roadEventsLayer = layer;
+            roadEventRouteSynchronizer.attach(layer);
             applyRoadEventVisibility();
             Log.i(TAG, "Standalone Yandex road-events layer attached to " + displayName);
             NavigationBridgeClient.reportDiagnostic(
@@ -603,6 +639,7 @@ final class HudMapRenderer {
             scaledRoadEventStyleProvider = null;
             roadEventsManager = null;
             roadEventsLayer = null;
+            roadEventRouteSynchronizer.detach();
             Log.w(TAG, "HUD road-events layer unavailable: " + shortMessage(failure));
             NavigationBridgeClient.reportDiagnostic(
                     "HUD road-events layer unavailable: " + shortMessage(failure));
@@ -682,7 +719,9 @@ final class HudMapRenderer {
                     + (profile.manualLayerPrioritiesEnabled ? 1L : 0L);
             fingerprint = fingerprint * 131L + profile.effectiveCameraPriority();
             fingerprint = fingerprint * 131L + profile.effectiveRoadEventPriority();
+            fingerprint = fingerprint * 131L + profile.effectiveAlternativeRoutePriority();
             fingerprint = fingerprint * 131L + profile.effectiveRoutePriority();
+            fingerprint = fingerprint * 131L + profile.effectiveAlternativeCalloutPriority();
             fingerprint = fingerprint * 131L + profile.effectiveDestinationPriority();
             fingerprint = fingerprint * 131L + profile.effectiveSpeedBumpPriority();
             fingerprint = fingerprint * 131L + profile.effectiveTrafficLightPriority();
@@ -1045,6 +1084,7 @@ final class HudMapRenderer {
         appliedMaximumFps = -1;
         appliedLayerOrderFingerprint = Long.MIN_VALUE;
         lastLayerOrderApplyElapsedMs = 0L;
+        roadEventRouteSynchronizer.detach();
         map = null;
         trafficLayer = null;
         roadEventsLayer = null;
@@ -1057,6 +1097,8 @@ final class HudMapRenderer {
         cameraDirectionMapLayer.detachMap();
         speedBumpMapLayer.detachMap();
         laneGuidanceMapLayer.detachMap();
+        alternativeRouteMapLayer.detachMap();
+        routeStreetLabelMapLayer.detachMap();
         overlayPlacement.detach();
         routeTurnMapLayer.detachMap();
         routeCollection = null;
@@ -1093,6 +1135,9 @@ final class HudMapRenderer {
         routeTrafficLightMapLayer.relayout();
         laneGuidanceMapLayer.relayout();
         trafficLightMapLayer.relayout();
+        // Alternatives are optional context. They are placed last and disappear if every stock
+        // leg is occupied by the cursor, required guidance or a safety sign.
+        alternativeRouteMapLayer.relayout();
     }
 
     /** Keeps cursor protection in the same physical pixel space as MapCursorStyler. */

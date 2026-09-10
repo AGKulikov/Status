@@ -51,7 +51,9 @@ final class NavigatorStatePublisher {
         void onNavigationState(String snapshotJson, String routeJson, Object drivingRoute,
                                long routeEpoch, long jamFingerprint,
                                RoutePolylineStyler.JamStyle jamStyle,
-                               NavigationFrame navigationFrame);
+                               NavigationFrame navigationFrame,
+                               List<?> alternatives, List<?> routeEvents,
+                               long routeEventsFingerprint);
 
         /** Exact visible stock artwork; emitted only when its keyed maneuver changes. */
         void onManeuverArtwork(long sequence, String maneuverIdentity, Bitmap artwork);
@@ -363,6 +365,10 @@ final class NavigatorStatePublisher {
     private static final long TRAFFIC_LIGHT_INTERVAL_MS = 500L;
     /** Upcoming manoeuvres change slowly; one verified route scan per second is sufficient. */
     private static final long ROUTE_TURN_INTERVAL_MS = 1_000L;
+    /** Alternatives and route-event membership are human-facing and condition-driven. */
+    private static final long ROUTE_AUXILIARY_INTERVAL_MS = 500L;
+    private static final long ALTERNATIVE_PALETTE_DISCOVERY_INTERVAL_MS = 500L;
+    private static final long ALTERNATIVE_PALETTE_REFRESH_INTERVAL_MS = 5_000L;
     /** MapKit defaults vary by host; request enough upcoming lights for both independent maps. */
     private static final int MAX_UPCOMING_TRAFFIC_LIGHTS = 16;
     /** Windshield returns only cameras which are active for the current route direction. */
@@ -419,8 +425,15 @@ final class NavigatorStatePublisher {
     private long activeLaneSampleElapsedMs;
     private List<RouteTurnFrame> activeRouteTurns = Collections.emptyList();
     private long activeRouteTurnsSampleElapsedMs;
+    private List<?> activeAlternatives = Collections.emptyList();
+    private List<?> activeRouteEvents = Collections.emptyList();
+    private long activeRouteEventsFingerprint;
     private long lastRouteTurnsReadElapsedMs;
     private long lastTrafficLightsReadElapsedMs;
+    private long lastRouteAuxiliaryReadElapsedMs;
+    private long lastAlternativePaletteCaptureElapsedMs;
+    private boolean completeAlternativePaletteObserved;
+    private int alternativePaletteCaptureMisses;
     private final NavigationPositionPolicy navigationPositionPolicy = new NavigationPositionPolicy();
     private String lastPositionDiagnostic = "";
     private Object activeRoutePolylineIndex;
@@ -666,6 +679,37 @@ final class NavigatorStatePublisher {
             }
             SnapshotInputs inputs = readSnapshotInputs(currentGuidance, activeRoute, routeStatus);
             long elapsedNow = SystemClock.elapsedRealtime();
+            boolean routeAuxiliaryDue = routeChanged || forceRoute
+                    || elapsedNow - lastRouteAuxiliaryReadElapsedMs
+                    >= ROUTE_AUXILIARY_INTERVAL_MS;
+            if (activeRoute == null) {
+                activeAlternatives = Collections.emptyList();
+                activeRouteEvents = Collections.emptyList();
+                activeRouteEventsFingerprint = 0L;
+                lastRouteAuxiliaryReadElapsedMs = elapsedNow;
+            } else if (routeAuxiliaryDue) {
+                activeAlternatives = immutableCopy(readOptionalList(
+                        currentGuidance, "getAlternatives"));
+                activeRouteEvents = immutableCopy(readOptionalList(
+                        activeRoute, "getEvents"));
+                activeRouteEventsFingerprint = routeEventsFingerprint(activeRouteEvents);
+                lastRouteAuxiliaryReadElapsedMs = elapsedNow;
+                if (!activeAlternatives.isEmpty()) {
+                    if (routeChanged) alternativePaletteCaptureMisses = 0;
+                    long paletteInterval = completeAlternativePaletteObserved
+                            || alternativePaletteCaptureMisses >= 6
+                            ? ALTERNATIVE_PALETTE_REFRESH_INTERVAL_MS
+                            : ALTERNATIVE_PALETTE_DISCOVERY_INTERVAL_MS;
+                    if (routeChanged || elapsedNow - lastAlternativePaletteCaptureElapsedMs
+                            >= paletteInterval) {
+                        completeAlternativePaletteObserved = StockAlternativePalette.capture(
+                                activityReference.get());
+                        alternativePaletteCaptureMisses = completeAlternativePaletteObserved
+                                ? 0 : alternativePaletteCaptureMisses + 1;
+                        lastAlternativePaletteCaptureElapsedMs = elapsedNow;
+                    }
+                }
+            }
             boolean snapshotDue = forceSnapshot || routeChanged || forceRoute
                     || elapsedNow - lastSnapshotDispatchElapsedMs >= SNAPSHOT_INTERVAL_MS;
             if (snapshotDue) {
@@ -725,7 +769,8 @@ final class NavigatorStatePublisher {
             if (snapshotDue) lastSnapshotDispatchElapsedMs = elapsedNow;
             String route = routeChanged || forceRoute ? buildRoutePayload().toString() : null;
             sink.onNavigationState(snapshot, route, activeRoute, routeEpoch,
-                    activeJamFingerprint, activeJamStyle, navigationFrame);
+                    activeJamFingerprint, activeJamStyle, navigationFrame,
+                    activeAlternatives, activeRouteEvents, activeRouteEventsFingerprint);
             if (snapshotDue) dispatchManeuverArtwork();
             lastStateDispatchElapsedMs = elapsedNow;
         } catch (Throwable failure) {
@@ -739,8 +784,15 @@ final class NavigatorStatePublisher {
             activeLaneSampleElapsedMs = 0L;
             activeRouteTurns = Collections.emptyList();
             activeRouteTurnsSampleElapsedMs = 0L;
+            activeAlternatives = Collections.emptyList();
+            activeRouteEvents = Collections.emptyList();
+            activeRouteEventsFingerprint = 0L;
             lastRouteTurnsReadElapsedMs = 0L;
             lastTrafficLightsReadElapsedMs = 0L;
+            lastRouteAuxiliaryReadElapsedMs = 0L;
+            lastAlternativePaletteCaptureElapsedMs = 0L;
+            completeAlternativePaletteObserved = false;
+            alternativePaletteCaptureMisses = 0;
             naviKitGuidance = null;
             if (navigation != null) sink.onNavigationRuntime(null);
             navigation = null;
@@ -793,6 +845,41 @@ final class NavigatorStatePublisher {
         } catch (Throwable unavailable) {
             return "UNKNOWN";
         }
+    }
+
+    private static List<?> readOptionalList(Object source, String method) {
+        if (source == null) return Collections.emptyList();
+        try {
+            return invokeList(source, method);
+        } catch (Throwable unavailable) {
+            return Collections.emptyList();
+        }
+    }
+
+    private static List<?> immutableCopy(List<?> source) {
+        return source == null || source.isEmpty() ? Collections.emptyList()
+                : Collections.unmodifiableList(new ArrayList<>(source));
+    }
+
+    private static long routeEventsFingerprint(List<?> events) {
+        long result = events == null ? 0L : events.size();
+        if (events == null) return result;
+        for (Object event : events) {
+            try {
+                result = result * 1_000_003L
+                        + text(invoke(event, "getEventId")).hashCode();
+                Object position = invoke(event, "getPolylinePosition");
+                result = result * 1_000_003L
+                        + ((Number) invoke(position, "getSegmentIndex")).intValue();
+                result = result * 1_000_003L + Double.doubleToLongBits(
+                        number(invoke(position, "getSegmentPosition"), 0d));
+                result = result * 1_000_003L
+                        + invokeList(event, "getTags").hashCode();
+            } catch (Throwable malformed) {
+                result = result * 1_000_003L + System.identityHashCode(event);
+            }
+        }
+        return result;
     }
 
     private boolean updateRoute(Object nextRoute, boolean routeMayHaveChanged) throws Exception {
@@ -2195,8 +2282,15 @@ final class NavigatorStatePublisher {
         activeLaneSampleElapsedMs = 0L;
         activeRouteTurns = Collections.emptyList();
         activeRouteTurnsSampleElapsedMs = 0L;
+        activeAlternatives = Collections.emptyList();
+        activeRouteEvents = Collections.emptyList();
+        activeRouteEventsFingerprint = 0L;
         lastRouteTurnsReadElapsedMs = 0L;
         lastTrafficLightsReadElapsedMs = 0L;
+        lastRouteAuxiliaryReadElapsedMs = 0L;
+        lastAlternativePaletteCaptureElapsedMs = 0L;
+        completeAlternativePaletteObserved = false;
+        alternativePaletteCaptureMisses = 0;
         clearRouteMatchedPosition();
         activeRoutePolylineIndex = null;
         activeRoutePolylineIndexEpoch = Long.MIN_VALUE;

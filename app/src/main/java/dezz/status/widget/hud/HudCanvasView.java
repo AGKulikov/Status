@@ -859,9 +859,8 @@ public final class HudCanvasView extends View {
         if (rows.nextRoad != null) {
             RectF road = stockCardTextRect(rows.nextRoad, item, scale);
             if (!road.isEmpty()) {
-                float size = Math.min(item.options.optInt("directionFontSizeSp",
-                        Math.max(8, Math.round(item.fontSizeSp * .52f))) * scale,
-                        road.height() * .72f);
+                float size = item.options.optInt("directionFontSizeSp",
+                        Math.max(8, Math.round(item.fontSizeSp * .52f))) * scale;
                 drawStyledText(canvas, rows.roadText, road, unitColor, size,
                         Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
             }
@@ -869,9 +868,8 @@ public final class HudCanvasView extends View {
         if (rows.signs != null) {
             RectF signs = stockCardTextRect(rows.signs, item, scale);
             if (!signs.isEmpty()) {
-                float size = Math.min(item.options.optInt("roadBadgeFontSizeSp",
-                        Math.max(8, Math.round(item.fontSizeSp * .50f))) * scale,
-                        signs.height() * .62f);
+                float size = item.options.optInt("roadBadgeFontSizeSp",
+                        Math.max(8, Math.round(item.fontSizeSp * .50f))) * scale;
                 drawStockDirectionSigns(canvas, item, nav.maneuverDirectionSigns,
                         signs, color, size, scale);
             }
@@ -880,6 +878,7 @@ public final class HudCanvasView extends View {
             RectF auxiliaryBounds = stockCardRect(rows.auxiliary);
             if (auxiliaryBounds.isEmpty()) return;
             int auxiliaryColor = optionColor(item, "auxiliaryColor", 0xE60B4DB5);
+            int auxiliaryTextColor = optionColor(item, "auxiliaryTextColor", Color.WHITE);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(withAlpha(auxiliaryColor, Math.round(
                     Color.alpha(auxiliaryColor) * Color.alpha(color) / 255f)));
@@ -889,10 +888,11 @@ public final class HudCanvasView extends View {
             text = insetSides(text, Math.max(3f, 6f * scale), 0f,
                     Math.max(3f, 6f * scale), 0f);
             if (!text.isEmpty()) {
-                float size = Math.min(item.options.optInt("auxiliaryFontSizeSp",
-                        Math.max(8, Math.round(item.fontSizeSp * .46f))) * scale,
-                        text.height() * .62f);
-                drawStyledText(canvas, auxiliary, text, color, size,
+                float size = item.options.optInt("auxiliaryFontSizeSp",
+                        Math.max(8, Math.round(item.fontSizeSp * .46f))) * scale;
+                drawStyledText(canvas, auxiliary, text,
+                        withAlpha(auxiliaryTextColor, Math.round(
+                                Color.alpha(auxiliaryTextColor) * Color.alpha(color) / 255f)), size,
                         Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
             }
         }
@@ -1000,14 +1000,10 @@ public final class HudCanvasView extends View {
         float distanceSize = Math.max(8f, Math.min(
                 item.options.optInt("distanceFontSizeSp", item.fontSizeSp) * scale,
                 distanceBounds.height() * .72f));
-        float directionSize = Math.max(8f, Math.min(
-                item.options.optInt("directionFontSizeSp",
-                        Math.max(8, Math.round(item.fontSizeSp * .52f))) * scale,
-                detailBounds.height() * .62f));
-        float badgeSize = Math.max(8f, Math.min(
-                item.options.optInt("roadBadgeFontSizeSp",
-                        Math.max(8, Math.round(item.fontSizeSp * .50f))) * scale,
-                detailBounds.height() * .62f));
+        float directionSize = Math.max(8f, item.options.optInt("directionFontSizeSp",
+                Math.max(8, Math.round(item.fontSizeSp * .52f))) * scale);
+        float badgeSize = Math.max(8f, item.options.optInt("roadBadgeFontSizeSp",
+                Math.max(8, Math.round(item.fontSizeSp * .50f))) * scale);
         drawStyledText(canvas, distance, distanceBounds, color, distanceSize,
                 Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
 
@@ -1062,19 +1058,20 @@ public final class HudCanvasView extends View {
         }
         if (auxiliaryBounds != null) {
             int auxiliaryColor = optionColor(item, "auxiliaryColor", 0xE60B4DB5);
+            int auxiliaryTextColor = optionColor(item, "auxiliaryTextColor", Color.WHITE);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(withAlpha(auxiliaryColor, Math.round(
                     Color.alpha(auxiliaryColor) * Color.alpha(color) / 255f)));
             float radius = Math.max(2f, Math.min(auxiliaryBounds.height() * .28f, 7f * scale));
             canvas.drawRoundRect(auxiliaryBounds, radius, radius, paint);
-            float auxiliarySize = Math.max(8f, Math.min(
-                    item.options.optInt("auxiliaryFontSizeSp",
-                            Math.max(8, Math.round(item.fontSizeSp * .46f))) * scale,
-                    auxiliaryBounds.height() * .62f));
+            float auxiliarySize = Math.max(8f, item.options.optInt("auxiliaryFontSizeSp",
+                    Math.max(8, Math.round(item.fontSizeSp * .46f))) * scale);
             drawStyledText(canvas, auxiliary,
                     insetSides(auxiliaryBounds, Math.max(3f, 6f * scale), 0f,
                             Math.max(3f, 6f * scale), 0f),
-                    color, auxiliarySize, Layout.Alignment.ALIGN_NORMAL, false,
+                    withAlpha(auxiliaryTextColor, Math.round(
+                            Color.alpha(auxiliaryTextColor) * Color.alpha(color) / 255f)),
+                    auxiliarySize, Layout.Alignment.ALIGN_NORMAL, false,
                     Math.max(600, item.fontWeight));
         }
     }

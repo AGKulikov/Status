@@ -6,6 +6,8 @@ import androidx.annotation.Nullable;
 
 import java.util.Locale;
 
+import dezz.status.widget.car.CurrentTripMetrics;
+
 /**
  * Complete HUD element catalog.
  *
@@ -69,6 +71,12 @@ public enum HudElementType {
             "ISensor.avg_fuel_consumption", 9, 3),
     FUEL_CONSUMPTION_TRIP("Расход за поездку", "Автомобиль",
             "ISensor.avg_fuel_consumption_ignition", 9, 3),
+    CURRENT_TRIP_DISTANCE("Текущая поездка · пробег", "Автомобиль",
+            CurrentTripMetrics.DISTANCE_ID, 9, 3),
+    CURRENT_TRIP_DURATION("Текущая поездка · время", "Автомобиль",
+            CurrentTripMetrics.DURATION_ID, 9, 3),
+    CURRENT_TRIP_AVERAGE_SPEED("Текущая поездка · средняя скорость", "Автомобиль",
+            CurrentTripMetrics.AVERAGE_SPEED_ID, 9, 3),
     GEAR("Передача", "Автомобиль", "ISensor.gear", 5, 4),
     ODOMETER("Одометр", "Автомобиль", "ISensor.odometer", 8, 3),
     COOLANT_TEMPERATURE("Температура ОЖ", "Автомобиль",

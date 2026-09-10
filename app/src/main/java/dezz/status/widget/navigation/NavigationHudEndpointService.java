@@ -24,6 +24,7 @@ import org.json.JSONException;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
+import dezz.status.widget.instrument.InstrumentPanelStore;
 import dezz.status.widget.launcher.NavigationDataRepository;
 
 /**
@@ -51,6 +52,8 @@ public final class NavigationHudEndpointService extends Service {
     @Nullable private static volatile NavigationHudEndpointService instance;
     @Nullable private static SurfaceLease publishedSurface;
     @Nullable private static SurfaceLease publishedClusterSurface;
+    /** Explicit admission generation: a late TextureView/recovery callback cannot undo panel off. */
+    private static volatile boolean clusterProjectionEnabled;
     @Nullable private static volatile String publishedConfigurationJson;
     private static long nextSurfaceGeneration;
     private static final long HOST_CAPABILITIES =
@@ -117,6 +120,14 @@ public final class NavigationHudEndpointService extends Service {
     public static void ensureClusterEndpointStarted(@NonNull Context context) {
         Context app = context.getApplicationContext();
         Context target = app == null ? context : app;
+        // Every normal caller runs on MAIN, just like the explicit off boundary. Re-read the
+        // durable admission bit here as well as in InstrumentPanelView so a layout/retry already
+        // queued by the retiring Activity cannot turn projection back on after the user switch.
+        if (!new InstrumentPanelStore(target).isEnabled()) {
+            clusterProjectionEnabled = false;
+            return;
+        }
+        clusterProjectionEnabled = true;
         Intent command = new Intent(target, NavigationHudEndpointService.class)
                 .setAction(ACTION_KEEP_CLUSTER_ENDPOINT);
         try {
@@ -124,6 +135,27 @@ public final class NavigationHudEndpointService extends Service {
         } catch (RuntimeException unavailable) {
             Log.w(TAG, "Could not start cold cluster-map endpoint", unavailable);
         }
+    }
+
+    /**
+     * Symmetric instrument-panel off boundary. The lease disappears before Activity/task teardown,
+     * so a delayed MapKit recovery or TextureView callback cannot keep an invisible cluster map.
+     */
+    public static void disableClusterProjection() {
+        final SurfaceLease revoked;
+        clusterProjectionEnabled = false;
+        synchronized (SURFACE_LOCK) {
+            revoked = publishedClusterSurface;
+            publishedClusterSurface = null;
+        }
+        NavigationHudEndpointService current = instance;
+        if (current == null) return;
+        current.handler.removeCallbacks(current.sendLatestClusterSurface);
+        current.handler.post(() -> {
+            current.clusterSurfaceRecoveryAttempts = 0;
+            if (revoked != null) current.sendClusterSurfaceDetach(revoked.generation);
+            current.stopClusterEndpointIfIdle();
+        });
     }
 
     /**
@@ -243,11 +275,13 @@ public final class NavigationHudEndpointService extends Service {
     /** Called by the instrument-panel TextureView; this lease is independent from the HUD. */
     public static long publishClusterSurface(@NonNull Surface surface,
                                              int width, int height, int dpi) {
-        if (!surface.isValid() || width <= 0 || height <= 0) return -1L;
+        if (!clusterProjectionEnabled || !surface.isValid()
+                || width <= 0 || height <= 0) return -1L;
         int safeDpi = Math.max(1, dpi);
         final SurfaceLease next;
         final boolean resizedExistingSurface;
         synchronized (SURFACE_LOCK) {
+            if (!clusterProjectionEnabled) return -1L;
             SurfaceLease current = publishedClusterSurface;
             if (current != null && current.surface == surface) {
                 if (current.width == width && current.height == height
@@ -378,7 +412,8 @@ public final class NavigationHudEndpointService extends Service {
             handler.postDelayed(finishOptionalHudSpeedBootstrap,
                     OPTIONAL_HUD_SPEED_BOOTSTRAP_MS);
         } else if (intent != null && ACTION_KEEP_CLUSTER_ENDPOINT.equals(intent.getAction())) {
-            clusterEndpointStartId = startId;
+            if (clusterProjectionEnabled) clusterEndpointStartId = startId;
+            else stopSelfResult(startId);
         } else {
             stopSelfResult(startId);
         }
@@ -744,12 +779,13 @@ public final class NavigationHudEndpointService extends Service {
      * MapKit implementation from creating an endless Binder/rebuild loop.
      */
     private void recoverClusterSurface(long failedGeneration) {
-        if (failedGeneration < 0L
+        if (!clusterProjectionEnabled || failedGeneration < 0L
                 || clusterSurfaceRecoveryAttempts >= MAX_CLUSTER_SURFACE_RECOVERY_ATTEMPTS) {
             return;
         }
         final SurfaceLease recovered;
         synchronized (SURFACE_LOCK) {
+            if (!clusterProjectionEnabled) return;
             SurfaceLease current = publishedClusterSurface;
             if (current == null || current.generation != failedGeneration
                     || !current.surface.isValid()) return;

@@ -198,6 +198,48 @@ final class MapOverlayPlacementCoordinator {
         return placement(best, bestFootprint);
     }
 
+    /**
+     * Reserves only a completely free stock leg. Optional alternative-route callouts use this
+     * stricter contract so required guidance, safety signs and the cursor always win a contested
+     * screen slot. If projection is unavailable, or all eight legs leave the safe viewport or
+     * overlap an existing reservation, the caller must hide the callout while keeping its route
+     * polyline visible.
+     */
+    Placement reserveIfClear(String owner, String key, double latitude, double longitude,
+                             int bitmapWidth, int bitmapHeight, boolean preferRight,
+                             int routeSegmentIndex, double routeSegmentPosition,
+                             Placement previous, List<Footprint> footprints) {
+        float[] screen = projectOrNull(latitude, longitude);
+        if (screen == null) return null;
+        int safeWidth = Math.max(1, bitmapWidth);
+        int safeHeight = Math.max(1, bitmapHeight);
+        Candidate best = null;
+        Footprint bestFootprint = null;
+        RectF bestRect = null;
+        double bestScore = Double.POSITIVE_INFINITY;
+        Candidate[] candidates = candidates(preferRight);
+        for (int index = 0; index < candidates.length; index++) {
+            Candidate candidate = candidates[index];
+            Footprint footprint = footprintFor(footprints, candidate.legName);
+            RectF bounds = rect(screen[0], screen[1], safeWidth, safeHeight,
+                    candidate, footprint);
+            if (!insideSafeViewport(bounds) || overlapsReservation(bounds)) continue;
+            double score = score(bounds, candidate, index, previous, screen,
+                    latitude, longitude, routeSegmentIndex, routeSegmentPosition);
+            if (score < bestScore) {
+                best = candidate;
+                bestFootprint = footprint;
+                bestRect = bounds;
+                bestScore = score;
+            }
+        }
+        if (best == null || bestRect == null) return null;
+        RectF occupied = new RectF(bestRect);
+        occupied.inset(-ITEM_MARGIN_PX, -ITEM_MARGIN_PX);
+        reservations.add(new Reservation(owner, key, occupied));
+        return placement(best, bestFootprint);
+    }
+
     /** Reserves an immovable placemark whose visual centre must remain on its map coordinate. */
     Placement reserveCentered(String owner, String key, double latitude, double longitude,
                               int bitmapWidth, int bitmapHeight) {
@@ -466,6 +508,20 @@ final class MapOverlayPlacementCoordinator {
         float width = Math.min(first.right, second.right) - Math.max(first.left, second.left);
         float height = Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top);
         return width > 0f && height > 0f ? (double) width * height : 0d;
+    }
+
+    private boolean insideSafeViewport(RectF bounds) {
+        return bounds.left >= VIEWPORT_MARGIN_PX
+                && bounds.top >= VIEWPORT_MARGIN_PX
+                && bounds.right <= viewportWidth - VIEWPORT_MARGIN_PX
+                && bounds.bottom <= viewportHeight - VIEWPORT_MARGIN_PX;
+    }
+
+    private boolean overlapsReservation(RectF bounds) {
+        for (Reservation reservation : reservations) {
+            if (overlapArea(bounds, reservation.bounds) > 0d) return true;
+        }
+        return false;
     }
 
     private static RectF rect(float x, float y, int width, int height, Candidate candidate) {

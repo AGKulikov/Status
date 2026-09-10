@@ -1,9 +1,9 @@
 {
-  "version": "1.2",
-  "date": "2026-09-05",
+  "version": "1.3",
+  "date": "2026-09-09",
   "note": "Рабочая очередь приоритетных вопросов, а не исчерпывающий перечень и не расписание автоматических действий. Подробные неизвестные, аппаратные ограничения, необходимые артефакты и следующие шаги остаются в 94 связанных карточках. Сначала используются уже собранные исходники и архивы; новые наблюдения запрашиваются только для конкретного остаточного пробела.",
   "coverage": {
-    "question_count": 50,
+    "question_count": 51,
     "system_card_count": 94,
     "system_card_sources": [
       "research-2026-09-05/architecture_domains/systems.json",
@@ -225,9 +225,9 @@
       "priority": "P1",
       "function": "Полная задержка кнопок руля",
       "status": "PARTLY_RESOLVED",
-      "known": "Три остановки main thread дольше 8 секунд; timestamp начинается внутри callback",
-      "missing_evidence": "Нажатие → callback → dispatch → player → audio на общей временной шкале",
-      "next_step": "Разобрать уже собранные input/media traces и места блокировки UI; восстановить eventTime/downTime/callback/dispatch/audio timeline, повторы и long-press. Отдельно отметить отсутствующую аппаратную метку нажатия.",
+      "known": "В прежних логах подтверждены три остановки main thread дольше 8 секунд. В текущем исходнике Natro обработчик клавиши только помещает команду в ограниченную очередь; выбор MediaSession, Binder-команда плееру и запись журнала разнесены по трём независимым HandlerThread. Очередь ограничена четырьмя командами, ожидающая команда старше 750 мс не исполняется, а смена session аннулирует прежнее поколение. Для next/previous в исследованной ветви MConfig отдельная задержка SRC 900/1400 мс не применяется.",
+      "missing_evidence": "Аппаратное нажатие → MConfig → Android KeyEvent → callback → command lane → Binder → player callback → слышимое аудио на одной шкале времени; поведение установленного MConfig и выбранного плеера при зависшем Binder. Изоляция Natro не доказывает отсутствие задержки до callback или внутри плеера.",
+      "next_step": "На KX11 записать парные трассы с eventTime/downTime/callback/queued/dispatch/completed и метками player callback/audio для одиночных, быстрых повторных и long-press нажатий. Разнести p50/p95/max по MConfig, Android delivery, очереди Natro и MediaSession; не увеличивать очередь и не воспроизводить просроченные команды.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/continuation/systems.json",
@@ -236,6 +236,14 @@
       "coverage_ids": [
         "BASE-MEDIAKEY",
         "PLAT_AUDIO"
+      ],
+      "history": [
+        {
+          "version": "1.2",
+          "known": "Три остановки main thread дольше 8 секунд; timestamp начинается внутри callback",
+          "missing_evidence": "Нажатие → callback → dispatch → player → audio на общей временной шкале",
+          "next_step": "Разобрать уже собранные input/media traces и места блокировки UI; восстановить eventTime/downTime/callback/dispatch/audio timeline, повторы и long-press. Отдельно отметить отсутствующую аппаратную метку нажатия."
+        }
       ]
     },
     {
@@ -302,6 +310,25 @@
         "CH-STEERING",
         "CH-TPMS",
         "ADAS-PERCEPTION"
+      ]
+    },
+    {
+      "id": "CURRENT_TRIP_DATA",
+      "priority": "P1",
+      "function": "Пробег, время и средняя скорость текущей поездки на DIM/HUD",
+      "status": "PARTLY_RESOLVED",
+      "known": "В сохранённом ecarx.adaptapi.jar SHA-256 33d0c62851e834dbf443f969627973dbc6e00eec3dd1e8fb6fc9dfe5af78e886 подтверждён путь ICar.getHevManager() → IHev.getTripData(); ITripData.IDrivingInfo выдаёт getTripDistance(): int и getTripDuration(): long через onDrivingInfoUpdate. Реализация заранее создаёт нулевой DrivingInfo и getLatestDrivingInfo() возвращает его до первого PA callback, поэтому Natro не публикует этот предварительный snapshot и принимает ноль только из реального callback. Публичная константа TRIP_DC_AVERAGE_SPEED существует, но рабочий generic getter в исследованном JAR не подтверждён; средняя скорость пока выводится как distance/time одного callback-снимка. Одинаковый callback продлевает monotonic freshness, а через 10 минут без callback HUD и DIM одновременно скрывают trip distance/time/derived speed вместо удержания старых чисел.",
+      "missing_evidence": "Единицы raw distance/duration, связь с отображаемой штатной «Поездкой 1/2», момент сброса, частота callback, признаки stale/invalid и официальный доступ к средней скорости на установленной версии. Деление distance на 10 и трактовка duration как минут остаются гипотезами до синхронной пары raw/API/штатный экран.",
+      "next_step": "На KX11 выполнить только чтение: одновременно записать raw значения onDrivingInfoUpdate, elapsedRealtime и фото/видео штатного экрана до движения, после известного расстояния и после штатного сброса поездки. Сопоставить масштаб и reset semantics; отдельно проверить наличие рабочего API средней скорости, не отправляя управляющих команд.",
+      "sources": [
+        "../../GEELY_KX11_KNOWLEDGE_RU.md",
+        "../../app/src/geely/java/dezz/status/widget/car/GeelyCarIntegration.java",
+        "../../app/src/main/java/dezz/status/widget/car/CurrentTripMetrics.java"
+      ],
+      "coverage_ids": [
+        "PT-FUEL",
+        "BASE-HUD",
+        "PLAT_DISPLAY"
       ]
     },
     {

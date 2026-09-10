@@ -29,6 +29,7 @@ public final class InstrumentPanelView extends FrameLayout
     private static final long COLD_LEASE_SLOW_RETRY_MS = 1_000L;
     private static final int COLD_LEASE_FAST_RETRY_COUNT = 40;
     @NonNull private InstrumentPanelConfig config;
+    @NonNull private final InstrumentPanelStore panelStore;
     @NonNull private final Preferences navigationPreferences;
     @NonNull private final InstrumentClusterView instruments;
     @NonNull private final View mapView;
@@ -55,6 +56,7 @@ public final class InstrumentPanelView extends FrameLayout
         super(context);
         setWillNotDraw(false);
         this.config = config;
+        panelStore = new InstrumentPanelStore(context);
         navigationPreferences = new Preferences(context);
         if (editorMode) {
             mapTexture = null;
@@ -208,8 +210,16 @@ public final class InstrumentPanelView extends FrameLayout
     }
 
     private void publishLeaseIfReady(boolean replace) {
-        if (mapTexture == null || (!replace && leasePublished)
-                || !attached || mapView.getVisibility() != VISIBLE || !clusterMapEnabled) return;
+        if (mapTexture == null || !attached
+                || mapView.getVisibility() != VISIBLE || !clusterMapEnabled) return;
+        // Settings persists enabled=false before calling the launcher off boundary. Reject every
+        // late layout/Surface retry from the old Activity even if it was already in the UI queue.
+        if (!panelStore.isEnabled()) {
+            revokeLease();
+            removeCallbacks(coldLeaseRetry);
+            return;
+        }
+        if (!replace && leasePublished) return;
         // Android 9 on KX11 can make TextureView.isAvailable() true without delivering the first
         // SurfaceTextureListener callback after a cold multi-display launch. The old retry loop
         // only checked mapSurface and therefore retried a permanently null value until some

@@ -537,6 +537,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         form.addView(label("Оформление день / ночь"), marginTop(8));
         form.addView(dayNight);
         Switch showRoute = switchView("Маршрут", profile.showRoute);
+        Switch showAlternativeRoutes = switchView(
+                "Дополнительные варианты маршрута — отдельный слой",
+                profile.showAlternativeRoutes);
         Switch destination = switchView(
                 "Конечная точка маршрута", profile.showDestination);
         Switch showRouteTraffic = switchView(
@@ -557,6 +560,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Камеры из HUD Speed — отдельный знак", profile.showHudSpeedCameras);
         Switch showLabels = switchView(
                 "Штатные названия улиц Яндекса", profile.showLabels);
+        Switch routeStreetLabelsOnly = switchView(
+                "Названия улиц только на линии активного маршрута",
+                profile.routeStreetLabelsOnly);
         Switch showPois = switchView("Полезные места", profile.showPois);
         Switch showBuildings = switchView("Здания", profile.showBuildings);
         Switch showParks = switchView("Парки", profile.showParks);
@@ -565,18 +571,19 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showCursor = switchView("Курсор автомобиля", profile.showCursor);
         Switch roadsOnly = switchView(
                 "Только дороги — прозрачный фон", profile.roadsOnly);
-        for (Switch control : new Switch[]{showRoute, destination,
+        for (Switch control : new Switch[]{showRoute, showAlternativeRoutes, destination,
                 showRouteTraffic, showTraffic, showTrafficLights,
                 showRouteTrafficLights,
                 showSpeedBumps,
                 showRouteTurns, showLaneGuidance, showHudSpeedCameras,
-                showLabels, showPois, showBuildings,
+                showLabels, routeStreetLabelsOnly, showPois, showBuildings,
                 showParks, showWater,
                 showModels, showCursor, roadsOnly}) {
             form.addView(control, marginTop(4));
         }
-        form.addView(text("Названия, шрифт, контур и изгиб текста рисует сам слой карты "
-                + "Яндекса. Отдельных нарисованных плашек Natro больше нет.",
+        form.addView(text("В обычном режиме используются все штатные подписи Яндекса. В режиме "
+                + "«только на маршруте» фоновые подписи скрываются, а названия берутся только "
+                + "из секций DrivingRoute и ставятся штатным текстом MapKit прямо на полилинию.",
                 12, 0xFF95A0AF), marginTop(4));
         Button roadEvents = button("Дорожные события — выбрать типы и режимы");
         roadEvents.setOnClickListener(view -> editHudRoadEvents(navigation, profile));
@@ -607,6 +614,50 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 Math.max(0, profile.laneGuidanceCornerRadiusPx), 0, 80, 1, " px");
         laneCorners.setEnabled(!laneStockCorners.isChecked());
         laneStockCorners.setOnCheckedChangeListener((button, checked) -> laneCorners.setEnabled(!checked));
+        form.addView(section("Дополнительные маршруты и выносной знак"), marginTop(16));
+        ColorField alternativeRouteColor = navigationColorField(form,
+                "Цвет дополнительной полилинии", profile.alternativeRouteColor,
+                navigation, value -> profile.alternativeRouteColor = value);
+        SliderField alternativeRouteWidth = slider(form,
+                "Толщина дополнительной полилинии",
+                profile.alternativeRouteWidth, 1, 40, 0.5, " px");
+        SliderField alternativeCalloutScale = slider(form,
+                "Общий размер выносного знака",
+                profile.alternativeCalloutScalePercent, 50, 250, 5, " %");
+        SliderField alternativeCalloutTextSize = slider(form,
+                "Размер текста выносного знака",
+                profile.alternativeCalloutTextSizeSp, 10, 36, 0.5, " sp");
+        ColorField alternativeCalloutBackground = navigationColorField(form,
+                "Цвет фона выносного знака", profile.alternativeCalloutBackgroundColor,
+                navigation, value -> profile.alternativeCalloutBackgroundColor = value);
+        SliderField alternativeCalloutOpacity = slider(form,
+                "Прозрачность фона выносного знака",
+                profile.alternativeCalloutOpacityPercent, 0, 100, 5, " %");
+        ColorField alternativeCalloutText = navigationColorField(form,
+                "Основной цвет текста выносного знака", profile.alternativeCalloutTextColor,
+                navigation, value -> profile.alternativeCalloutTextColor = value);
+        ColorField alternativeCalloutBorder = navigationColorField(form,
+                "Цвет обводки выносного знака", profile.alternativeCalloutBorderColor,
+                navigation, value -> profile.alternativeCalloutBorderColor = value);
+        SliderField alternativeCalloutBorderWidth = slider(form,
+                "Толщина обводки выносного знака",
+                profile.alternativeCalloutBorderWidthDp, 0, 12, 0.5, " dp");
+        SliderField alternativeCalloutCorners = slider(form,
+                "Скругление выносного знака",
+                profile.alternativeCalloutCornerRadiusDp, 0, 40, 1, " dp");
+        SliderField alternativeCalloutHorizontalPadding = slider(form,
+                "Горизонтальный отступ внутри знака",
+                profile.alternativeCalloutHorizontalPaddingDp, 0, 40, 1, " dp");
+        SliderField alternativeCalloutVerticalPadding = slider(form,
+                "Вертикальный отступ внутри знака",
+                profile.alternativeCalloutVerticalPaddingDp, 0, 30, 1, " dp");
+        SliderField alternativeCalloutLeader = slider(form,
+                "Длина хвостика выносного знака",
+                profile.alternativeCalloutLeaderLengthDp, 4, 60, 1, " dp");
+        form.addView(text("Цвета выигрыша и проигрыша времени/расстояния берутся с живой "
+                + "плашки самого Навигатора. Выносной знак размещается после обязательных "
+                + "знаков и скрывается, если свободной позиции нет; полилиния остаётся.",
+                12, 0xFF95A0AF), marginTop(4));
         form.addView(section("Остальные объекты карты"), marginTop(12));
         SliderField cameraScale = slider(form,
                 "Размер единых знаков камер",
@@ -659,7 +710,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 + "тело стрелки, а размер треугольного наконечника настраивается отдельно.",
                 12, 0xFF95A0AF), marginTop(4));
         SliderField routeLabelScale = slider(form,
-                "Размер штатных названий улиц",
+                "Размер названий улиц",
                 profile.routeLabelScalePercent, 50, 250, 5, " %");
         SliderField roadEventScale = slider(form,
                 "Размер остальных дорожных событий",
@@ -703,8 +754,14 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         SliderField roadEventLayerPriority = slider(form,
                 "Остальные дорожные события", profile.roadEventLayerPriority,
                 0, 100, 1, "");
+        SliderField alternativeRouteLayerPriority = slider(form,
+                "Дополнительные полилинии", profile.alternativeRouteLayerPriority,
+                0, 100, 1, "");
         SliderField routeLayerPriority = slider(form,
                 "Маршрут", profile.routeLayerPriority, 0, 100, 1, "");
+        SliderField alternativeCalloutLayerPriority = slider(form,
+                "Выносные знаки дополнительных маршрутов",
+                profile.alternativeCalloutLayerPriority, 0, 100, 1, "");
         SliderField speedBumpLayerPriority = slider(form,
                 "Искусственные неровности", profile.speedBumpLayerPriority,
                 0, 100, 1, "");
@@ -724,7 +781,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Курсор автомобиля", profile.cursorLayerPriority,
                 0, 100, 1, "");
         SliderField[] layerPriorityControls = new SliderField[]{
-                cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
+                cameraDirectionLayerPriority, roadEventLayerPriority,
+                alternativeRouteLayerPriority, routeLayerPriority,
+                alternativeCalloutLayerPriority,
                 speedBumpLayerPriority,
                 destinationLayerPriority, routeTrafficLightLayerPriority,
                 trafficLightLayerPriority,
@@ -797,6 +856,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.maximumFps = maximumFps.intValue();
                         applyDayNight(dayNight, profile);
                         profile.showRoute = showRoute.isChecked();
+                        profile.showAlternativeRoutes = showAlternativeRoutes.isChecked();
                         profile.showDestination = destination.isChecked();
                         profile.showRouteTraffic = showRouteTraffic.isChecked();
                         profile.showTraffic = showTraffic.isChecked();
@@ -807,6 +867,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showRouteTurns = showRouteTurns.isChecked();
                         profile.showLaneGuidance = showLaneGuidance.isChecked();
                         profile.showHudSpeedCameras = showHudSpeedCameras.isChecked();
+                        profile.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked();
                         profile.showLabels = showLabels.isChecked();
                         profile.showPois = showPois.isChecked();
                         profile.showBuildings = showBuildings.isChecked();
@@ -822,6 +883,28 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.laneGuidanceBorderColor = laneBorderColor.value();
                         profile.laneGuidanceBorderWidthPx = laneBorderWidth.intValue();
                         profile.laneGuidanceCornerRadiusPx = laneStockCorners.isChecked() ? -1 : laneCorners.intValue();
+                        profile.alternativeRouteColor = alternativeRouteColor.value;
+                        profile.alternativeRouteWidth = alternativeRouteWidth.value();
+                        profile.alternativeCalloutScalePercent =
+                                alternativeCalloutScale.intValue();
+                        profile.alternativeCalloutTextSizeSp =
+                                alternativeCalloutTextSize.value();
+                        profile.alternativeCalloutBackgroundColor =
+                                alternativeCalloutBackground.value;
+                        profile.alternativeCalloutOpacityPercent =
+                                alternativeCalloutOpacity.intValue();
+                        profile.alternativeCalloutTextColor = alternativeCalloutText.value;
+                        profile.alternativeCalloutBorderColor = alternativeCalloutBorder.value;
+                        profile.alternativeCalloutBorderWidthDp =
+                                alternativeCalloutBorderWidth.value();
+                        profile.alternativeCalloutCornerRadiusDp =
+                                alternativeCalloutCorners.value();
+                        profile.alternativeCalloutHorizontalPaddingDp =
+                                alternativeCalloutHorizontalPadding.value();
+                        profile.alternativeCalloutVerticalPaddingDp =
+                                alternativeCalloutVerticalPadding.value();
+                        profile.alternativeCalloutLeaderLengthDp =
+                                alternativeCalloutLeader.value();
                         profile.cameraScalePercent = cameraScale.intValue();
                         profile.cameraDirectionLengthPercent =
                                 cameraDirectionLength.intValue();
@@ -856,7 +939,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.cameraDirectionLayerPriority =
                                 cameraDirectionLayerPriority.intValue();
                         profile.roadEventLayerPriority = roadEventLayerPriority.intValue();
+                        profile.alternativeRouteLayerPriority =
+                                alternativeRouteLayerPriority.intValue();
                         profile.routeLayerPriority = routeLayerPriority.intValue();
+                        profile.alternativeCalloutLayerPriority =
+                                alternativeCalloutLayerPriority.intValue();
                         profile.speedBumpLayerPriority =
                                 speedBumpLayerPriority.intValue();
                         profile.destinationLayerPriority =
@@ -1215,6 +1302,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         "Цвет карточки", "#FF0758E8");
                 visualColor(form, controls, item, "roadBadgeColor",
                         "Цвет номера дороги", "#FF16A34A");
+                visualColor(form, controls, item, "auxiliaryColor",
+                        "Фон дополнительной информации", "#E60B4DB5");
+                visualColor(form, controls, item, "auxiliaryTextColor",
+                        "Текст дополнительной информации", "#FFFFFFFF");
                 controls.put("int:cardOpacityPercent", slider(form,
                         "Непрозрачность карточки",
                         item.options.optInt("cardOpacityPercent", 94),
@@ -1273,12 +1364,16 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.options.optInt("distanceFontSizeSp", item.fontSizeSp),
                         8, 160, 1, " sp"));
                 controls.put("int:roadBadgeFontSizeSp", slider(form,
-                        "Размер шрифта номера дороги",
+                        "Размер шрифта номера съезда / указателя",
                         item.options.optInt("roadBadgeFontSizeSp", 17),
                         8, 120, 1, " sp"));
                 controls.put("int:directionFontSizeSp", slider(form,
                         "Размер шрифта улицы / направления",
                         item.options.optInt("directionFontSizeSp", 18),
+                        8, 120, 1, " sp"));
+                controls.put("int:auxiliaryFontSizeSp", slider(form,
+                        "Размер шрифта дополнительной информации",
+                        item.options.optInt("auxiliaryFontSizeSp", 14),
                         8, 120, 1, " sp"));
                 controls.put("int:distanceAreaPercent", slider(form,
                         "Высота строки расстояния",

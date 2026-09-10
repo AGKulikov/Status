@@ -32,6 +32,9 @@ public final class InstrumentElementConfig {
         if (type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
             applyRouteSummaryDefaults();
         }
+        if (type == InstrumentElementType.NAV_MANEUVER_CARD) {
+            applyManeuverCardDefaults();
+        }
     }
 
     @NonNull
@@ -64,7 +67,8 @@ public final class InstrumentElementConfig {
         opacityPercent = clamp(opacityPercent, 10, 100);
         if (options == null || options.toString().length() > 32_768) options = new JSONObject();
         if (type == InstrumentElementType.NAVIGATION_INFO
-                || type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
+                || type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY
+                || type == InstrumentElementType.NAV_MANEUVER_CARD) {
             normalizeNavigationInfoOptions();
         }
         if (type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
@@ -132,6 +136,42 @@ public final class InstrumentElementConfig {
         }
     }
 
+    private void applyManeuverCardDefaults() {
+        try {
+            options.put("showManeuverDetails", true);
+            options.put("showDirection", true);
+            options.put("showRoadBadge", true);
+            options.put("sourceImageOnly", true);
+            options.put("arrowLayout", "LEFT");
+            options.put("arrowAreaPercent", 38);
+            options.put("sourceIconScalePercent", 100);
+            options.put("arrowTextGapPx", 6);
+            options.put("distanceAreaPercent", 56);
+            options.put("textRowGapPx", 2);
+            options.put("distanceFontSizeSp", 34);
+            options.put("directionFontSizeSp", 18);
+            options.put("roadBadgeFontSizeSp", 18);
+            options.put("auxiliaryFontSizeSp", 14);
+            options.put("maneuverDetailTextSizeSp", 18);
+            options.put("maneuverAuxiliaryTextSizeSp", 14);
+            options.put("maneuverCardColor", "#FF0758E8");
+            options.put("maneuverCardBorderColor", "#00000000");
+            options.put("maneuverCardBorderWidthPx", 0);
+            options.put("maneuverCardCornerRadiusPx", 18);
+            options.put("maneuverDetailTextColor", "#FFFFFFFF");
+            options.put("auxiliaryColor", "#E60B4DB5");
+            options.put("maneuverAuxiliaryColor", "#E60B4DB5");
+            options.put("auxiliaryTextColor", "#FFFFFFFF");
+            options.put("maneuverAuxiliaryTextColor", "#FFFFFFFF");
+            for (String key : new String[]{"arrowPaddingLeftPx", "arrowPaddingTopPx",
+                    "arrowPaddingRightPx", "arrowPaddingBottomPx"}) options.put(key, 3);
+            for (String key : new String[]{"textPaddingLeftPx", "textPaddingTopPx",
+                    "textPaddingRightPx", "textPaddingBottomPx"}) options.put(key, 0);
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
     private void normalizeTrafficJamOptions() {
         try {
             options.put("faceOpacityPercent", clamp(
@@ -184,6 +224,41 @@ public final class InstrumentElementConfig {
                     options.optInt("maneuverDetailTextSizeSp", 18), 8, 120));
             options.put("maneuverAuxiliaryTextSizeSp", clamp(
                     options.optInt("maneuverAuxiliaryTextSizeSp", 14), 8, 120));
+            options.put("directionFontSizeSp", clamp(options.optInt("directionFontSizeSp",
+                    options.optInt("maneuverDetailTextSizeSp", 18)), 8, 120));
+            options.put("roadBadgeFontSizeSp", clamp(options.optInt("roadBadgeFontSizeSp",
+                    options.optInt("maneuverDetailTextSizeSp", 18)), 8, 120));
+            options.put("auxiliaryFontSizeSp", clamp(options.optInt("auxiliaryFontSizeSp",
+                    options.optInt("maneuverAuxiliaryTextSizeSp", 14)), 8, 120));
+            String auxiliaryColor = options.optString("auxiliaryColor",
+                    options.optString("maneuverAuxiliaryColor", "#E60B4DB5")).trim();
+            String auxiliaryTextColor = options.optString("auxiliaryTextColor",
+                    options.optString("maneuverAuxiliaryTextColor", "#FFFFFFFF")).trim();
+            if (auxiliaryColor.length() > 32) auxiliaryColor = "#E60B4DB5";
+            if (auxiliaryTextColor.length() > 32) auxiliaryTextColor = "#FFFFFFFF";
+            // Canonical keys are shared by HUD and cluster. Keep the legacy aliases synchronized
+            // so an older renderer from a compatible release pair still receives the edit.
+            options.put("auxiliaryColor", auxiliaryColor);
+            options.put("maneuverAuxiliaryColor", auxiliaryColor);
+            options.put("auxiliaryTextColor", auxiliaryTextColor);
+            options.put("maneuverAuxiliaryTextColor", auxiliaryTextColor);
+            options.put("distanceFontSizeSp", clamp(options.optInt("distanceFontSizeSp", 34),
+                    8, 160));
+            options.put("arrowAreaPercent", clamp(options.optInt("arrowAreaPercent", 38),
+                    10, 75));
+            options.put("sourceIconScalePercent", clamp(
+                    options.optInt("sourceIconScalePercent", 100), 25, 250));
+            options.put("arrowTextGapPx", clamp(options.optInt("arrowTextGapPx", 6),
+                    0, 80));
+            options.put("distanceAreaPercent", clamp(
+                    options.optInt("distanceAreaPercent", 56), 20, 80));
+            options.put("textRowGapPx", clamp(options.optInt("textRowGapPx", 2), 0, 60));
+            for (String key : new String[]{"arrowPaddingLeftPx", "arrowPaddingTopPx",
+                    "arrowPaddingRightPx", "arrowPaddingBottomPx", "textPaddingLeftPx",
+                    "textPaddingTopPx", "textPaddingRightPx", "textPaddingBottomPx"}) {
+                options.put(key, clamp(options.optInt(key,
+                        key.startsWith("arrowPadding") ? 3 : 0), 0, 120));
+            }
             options.put("metricGapPx", clamp(options.optInt("metricGapPx", 10), 0, 100));
             options.put("distanceTextSizeSp", clamp(
                     options.optInt("distanceTextSizeSp", 25), 8, 120));

@@ -155,6 +155,9 @@ public final class HudElementConfig {
                     options.put("distanceFontSizeSp", 34);
                     options.put("directionFontSizeSp", 18);
                     options.put("roadBadgeFontSizeSp", 17);
+                    options.put("auxiliaryFontSizeSp", 14);
+                    options.put("auxiliaryColor", "#E60B4DB5");
+                    options.put("auxiliaryTextColor", "#FFFFFFFF");
                     options.put("distanceAreaPercent", 56);
                     options.put("textRowGapPx", 2);
                     options.put("roadBadgePaddingHorizontalPx", 5);
@@ -403,6 +406,8 @@ public final class HudElementConfig {
                     options.optInt("directionFontSizeSp", 18), 8, 120));
             options.put("roadBadgeFontSizeSp", clamp(
                     options.optInt("roadBadgeFontSizeSp", 17), 8, 120));
+            options.put("auxiliaryFontSizeSp", clamp(
+                    options.optInt("auxiliaryFontSizeSp", 14), 8, 120));
             options.put("distanceAreaPercent", clamp(
                     options.optInt("distanceAreaPercent", 56), 20, 80));
             options.put("textRowGapPx", clamp(
@@ -415,6 +420,16 @@ public final class HudElementConfig {
                     options.optString("cardColor", "#FF0758E8"), 32, "#FF0758E8"));
             options.put("roadBadgeColor", bounded(
                     options.optString("roadBadgeColor", "#FF16A34A"), 32, "#FF16A34A"));
+            String auxiliaryColor = bounded(options.optString("auxiliaryColor",
+                    options.optString("maneuverAuxiliaryColor", "#E60B4DB5")),
+                    32, "#E60B4DB5");
+            String auxiliaryTextColor = bounded(options.optString("auxiliaryTextColor",
+                    options.optString("maneuverAuxiliaryTextColor", "#FFFFFFFF")),
+                    32, "#FFFFFFFF");
+            options.put("auxiliaryColor", auxiliaryColor);
+            options.put("maneuverAuxiliaryColor", auxiliaryColor);
+            options.put("auxiliaryTextColor", auxiliaryTextColor);
+            options.put("maneuverAuxiliaryTextColor", auxiliaryTextColor);
             options.put("cardBorderColor", bounded(
                     options.optString("cardBorderColor", "#00000000"),
                     32, "#00000000"));

@@ -14,11 +14,11 @@ fi
 
 ANDROID_JAR=""
 while IFS= read -r candidate; do ANDROID_JAR="$candidate"; done < <(
-  find "$SDK_ROOT/platforms" -mindepth 2 -maxdepth 2 -name android.jar -type f | sort -V
+  find -L "$SDK_ROOT/platforms" -mindepth 2 -maxdepth 2 -name android.jar -type f | sort -V
 )
 D8=""
 while IFS= read -r candidate; do D8="$candidate"; done < <(
-  find "$SDK_ROOT/build-tools" -mindepth 2 -maxdepth 2 -name d8 -type f | sort -V
+  find -L "$SDK_ROOT/build-tools" -mindepth 2 -maxdepth 2 -name d8 -type f | sort -V
 )
 if [ -z "$ANDROID_JAR" ] || [ -z "$D8" ]; then
   printf 'Android platform jar or d8 was not found under %s\n' "$SDK_ROOT" >&2

@@ -732,6 +732,16 @@ public final class MapOverlayPlacementHarness {
         label_path = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                       / "ru" / "natro" / "navigation"
                       / "RouteStreetLabelMapLayer.java")
+        labels = label_path.read_text()
+        alternative = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                       / "ru" / "natro" / "navigation"
+                       / "AlternativeRouteMapLayer.java").read_text()
+        alternative_palette = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                               / "ru" / "natro" / "navigation"
+                               / "StockAlternativePalette.java").read_text()
+        event_sync = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
+                      / "ru" / "natro" / "navigation"
+                      / "RoadEventRouteSynchronizer.java").read_text()
         profile = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                    / "ru" / "natro" / "navigation"
                    / "NavigationMapProfile.java").read_text()
@@ -984,12 +994,58 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("Subpolyline", renderer)
         self.assertIn('invoke(line, "hide"', renderer)
         self.assertNotIn('invoke(line, "setGeometry"', renderer)
-        self.assertFalse(label_path.exists())
-        self.assertNotIn("routeStreetLabelMapLayer", renderer)
+        self.assertTrue(label_path.exists())
+        self.assertIn("routeStreetLabelMapLayer", renderer)
         self.assertNotIn("readRouteStreetLabels", publisher)
+        self.assertIn('invoke(annotation, "getToponym"', labels)
+        self.assertIn('invoke(drivingRoute, "getGeometry"', labels)
+        self.assertIn('invoke(collection, "addPlacemark"', labels)
+        self.assertIn('invoke(placemark, "setText"', labels)
+        self.assertIn("MapObjectLayerFactory.MINOR", labels)
+        self.assertNotIn("Canvas", labels)
+        self.assertIn("routeStreetLabelsOnly", profile)
+        self.assertIn("if (!showLabels || routeStreetLabelsOnly)", profile)
+        self.assertIn('{\\"elements\\":\\"label\\"', profile)
+        self.assertIn("ROUTE_STREET_LABELS", layer_order)
+        self.assertIn("roadEventRouteSynchronizer.update", renderer)
+        self.assertIn('invoke(currentLayer, "setRoadEventsOnRoute"', event_sync)
+        self.assertIn('invoke(event, "getEventId"', event_sync)
+        self.assertIn('invoke(event, "getLocation"', event_sync)
+        self.assertIn('invoke(event, "getTags"', event_sync)
+        self.assertIn("Collections.emptyList()", event_sync)
+        self.assertIn("alternativeRouteMapLayer.update", renderer)
+        self.assertIn('invoke(alternative, "getAlternative"', alternative)
+        self.assertIn('invoke(line, "setStrokeWidth"', alternative)
+        self.assertIn("MapObjectLayerFactory.IGNORE", alternative)
+        self.assertIn("MapObjectLayerFactory.MINOR", alternative)
+        self.assertIn("reserveIfClear", alternative)
+        self.assertIn("StockAlternativePalette.negativeColor()", alternative)
+        self.assertIn("StockAlternativePalette.positiveColor()", alternative)
+        self.assertIn("ForegroundColorSpan", alternative_palette)
+        self.assertIn("ALTERNATIVE_ROUTES", layer_order)
+        self.assertIn("ALTERNATIVE_CALLOUTS", layer_order)
+        for key in ("showAlternativeRoutes", "alternativeRouteColor",
+                    "alternativeRouteWidth", "alternativeCalloutScalePercent",
+                    "alternativeCalloutBackgroundColor", "alternativeCalloutOpacityPercent",
+                    "alternativeCalloutTextColor", "alternativeCalloutBorderColor",
+                    "alternativeCalloutBorderWidthDp", "alternativeCalloutTextSizeSp",
+                    "alternativeCalloutCornerRadiusDp", "alternativeCalloutLeaderLengthDp",
+                    "routeStreetLabelsOnly"):
+            self.assertIn(key, integration_config)
+            self.assertIn(key, profile)
+        for settings in (hud_settings, cluster_settings):
+            self.assertIn("Дополнительные варианты маршрута — отдельный слой", settings)
+            self.assertIn("Цвет дополнительной полилинии", settings)
+            self.assertIn("Цвет фона выносного знака", settings)
+            self.assertIn("Цвет обводки выносного знака", settings)
+            self.assertIn("Названия улиц только на линии активного маршрута", settings)
         self.assertIn("MapObjectLayerFactory.MINOR", renderer)
         self.assertIn(r'\"elements\":\"label.text\"', profile)
-        self.assertIn('source.optBoolean("routeStreetLabelsOnly", false)', profile)
+        self.assertRegex(profile,
+                         r'source\.optBoolean\(\s*"routeStreetLabelsOnly",\s*false\)')
+        self.assertIn("routeStreetLabelMapLayer.apply(\n"
+                      "                profile.routeStreetLabelsOnly", renderer)
+        self.assertNotIn("profile.showLabels && profile.routeStreetLabelsOnly", renderer)
         self.assertIn("positionOnRoute", publisher)
         self.assertIn("onMapTouch(Activity activity, MotionEvent event)", entry)
         self.assertIn("ensureControlLayerAttached", controller)

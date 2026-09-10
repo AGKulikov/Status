@@ -258,6 +258,11 @@ int getVersionCode() {
     if (version == '2.8.3') {
         return 208021316
     }
+    // Navigation-card typography, alternative routes, route-only labels/events, cluster parity,
+    // current-trip telemetry and isolated MConfig media-key routing follow published 2.8.3.
+    if (version == '2.8.4') {
+        return 208021317
+    }
     if (version == '2.3.0') {
         return 208021254
     }

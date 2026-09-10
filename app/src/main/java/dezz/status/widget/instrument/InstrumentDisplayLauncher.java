@@ -102,8 +102,13 @@ public final class InstrumentDisplayLauncher {
     public static void close(@NonNull Context context) {
         Context app = applicationContext(context);
         onMain(() -> {
+            owner = app;
             if (coordinator != null) coordinator.cancel("closed");
             stopDisplayWatch();
+            // Revoke the producer generation first. Activity callbacks already queued on MAIN can
+            // no longer republish it because enabled=false is persisted before this entry point.
+            NavigationHudEndpointService.disableClusterProjection();
+            InstrumentPanelActivity.finishForExplicitClose();
             Intent close = new Intent(InstrumentPanelStore.ACTION_CLOSE)
                     .setPackage(app.getPackageName());
             try { app.sendBroadcast(close); } catch (RuntimeException failure) {
@@ -114,7 +119,14 @@ public final class InstrumentDisplayLauncher {
                 catch (RuntimeException failure) {
                     trace("token revoke failed=" + failure.getClass().getSimpleName());
                 }
-                switchDimMode(app, DIM_STOCK_MODE);
+                // The close receiver is registered only after authorization. Remove a pending or
+                // otherwise stale task as well, without ever stopping the Natro package.
+                finishStalePanelTask(app, -1);
+                boolean switched = switchDimMode(app, DIM_STOCK_MODE);
+                Integer actual = readDimMode(app);
+                MAIN.post(() -> trace("panel closed dim accepted=" + switched
+                        + " readback=" + actual + " "
+                        + InstrumentPanelActivity.windowState()));
             }, () -> trace("close worker unavailable"));
         });
     }
@@ -227,8 +239,12 @@ public final class InstrumentDisplayLauncher {
 
     /** Keep a live task on its correct display. Reset only a dead, detached or misplaced panel. */
     private static void finishStalePanelTask(Context app, int displayId) {
-        InstrumentPanelLaunchCoordinator.WindowState state = InstrumentPanelActivity.windowState();
-        if (state.alive && state.started && state.attached && state.displayId == displayId) return;
+        if (displayId >= 0) {
+            InstrumentPanelLaunchCoordinator.WindowState state =
+                    InstrumentPanelActivity.windowState();
+            if (state.alive && state.started && state.attached
+                    && state.displayId == displayId) return;
+        }
         ActivityManager manager = app.getSystemService(ActivityManager.class);
         if (manager == null) return;
         try {

@@ -68,6 +68,12 @@ public final class InstrumentPanelActivity extends Activity {
         if (value != null && !value.isFinishing()) value.finishPanel("display-lifecycle-restore");
     }
 
+    /** Explicit user off is independent from the best-effort in-process close broadcast. */
+    static void finishForExplicitClose() {
+        InstrumentPanelActivity value = active.get();
+        if (value != null && !value.isFinishing()) value.finishPanel("panel-disabled");
+    }
+
     static InstrumentPanelLaunchCoordinator.WindowState windowState() {
         InstrumentPanelActivity value = active.get();
         if (value == null || value.destroyed || value.isFinishing() || !value.authorized

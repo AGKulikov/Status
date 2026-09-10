@@ -14,6 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import dezz.status.widget.hud.HudElementConfig;
+import dezz.status.widget.hud.HudElementType;
+
 public final class NavigationHudV2ContractTest {
     @Test public void mainAndHudProfilesAreIndependentAndRoundTrip() throws Exception {
         NavigationIntegrationConfig config = new NavigationIntegrationConfig();
@@ -227,16 +230,36 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FFABCDEF", restored.mainFloatingWindow.borderColor);
     }
 
-    @Test public void legacyRouteOnlyLabelsMigrateToStockYandexLabels() {
+    @Test public void routeOnlyLabelsPreserveTheIndependentBackgroundLabelChoice() {
         NavigationIntegrationConfig restored = NavigationIntegrationConfig.fromJson(
                 "{\"hudMap\":{\"showLabels\":false,\"routeStreetLabelsOnly\":true},"
                         + "\"clusterMap\":{\"showLabels\":false,"
                         + "\"routeStreetLabelsOnly\":true}}");
 
-        assertTrue(restored.hudMap.showLabels);
-        assertTrue(restored.clusterMap.showLabels);
+        assertFalse(restored.hudMap.showLabels);
+        assertFalse(restored.clusterMap.showLabels);
+        assertTrue(restored.hudMap.routeStreetLabelsOnly);
+        assertTrue(restored.clusterMap.routeStreetLabelsOnly);
         assertNull(restored.hudMap.trafficLightCardColor);
         assertNull(restored.clusterMap.trafficLightCardColor);
+    }
+
+    @Test public void legacyManeuverAuxiliaryColorsMigrateWithoutReturningToBlue()
+            throws Exception {
+        HudElementConfig restored = HudElementConfig.fromJson(
+                new org.json.JSONObject()
+                        .put("id", "legacy_card")
+                        .put("type", HudElementType.NAV_COMBINED.name())
+                        .put("options", new org.json.JSONObject()
+                                .put("maneuverAuxiliaryColor", "#FF123456")
+                                .put("maneuverAuxiliaryTextColor", "#FFABCDEF")),
+                48, 18);
+
+        assertEquals("#FF123456", restored.options.optString("auxiliaryColor"));
+        assertEquals("#FFABCDEF", restored.options.optString("auxiliaryTextColor"));
+        assertEquals("#FF123456", restored.options.optString("maneuverAuxiliaryColor"));
+        assertEquals("#FFABCDEF",
+                restored.options.optString("maneuverAuxiliaryTextColor"));
     }
 
     @Test public void legacyLayerPresetMigratesAndPolylineArrowsFollowRoutePriority() {
@@ -505,6 +528,8 @@ public final class NavigationHudV2ContractTest {
         String speedBumps = read(navigator.resolve("SpeedBumpMapLayer.java"));
         String laneSigns = read(navigator.resolve("LaneGuidanceMapLayer.java"));
         String routeTurns = read(navigator.resolve("RouteTurnMapLayer.java"));
+        String routeStreetLabels = read(
+                navigator.resolve("RouteStreetLabelMapLayer.java"));
         String sublayerOrder = read(navigator.resolve("MapSublayerOrder.java"));
         String hudSettings = read(projectRoot().resolve(
                 "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
@@ -534,7 +559,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(speedBumps.contains("MapObjectLayerFactory.IGNORE"));
         assertTrue(laneSigns.contains("MapObjectLayerFactory.MAJOR"));
         assertTrue(renderer.contains("MapObjectLayerFactory.MINOR"));
-        assertFalse(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
+        assertTrue(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
+        assertTrue(routeStreetLabels.contains("MapObjectLayerFactory.MINOR"));
+        assertTrue(routeStreetLabels.contains("getToponym"));
         assertFalse(routeTurns.contains("MapObjectLayerFactory"));
         assertTrue(routeTurns.contains("applyManeuverStyle"));
         assertTrue(renderer.contains("applySublayerOrder()"));
@@ -686,6 +713,8 @@ public final class NavigationHudV2ContractTest {
         String overlayPlacement = read(
                 patchRoot.resolve("MapOverlayPlacementCoordinator.java"));
         String routeTurns = read(patchRoot.resolve("RouteTurnMapLayer.java"));
+        String routeStreetLabels = read(
+                patchRoot.resolve("RouteStreetLabelMapLayer.java"));
         String backgroundLease = read(patchRoot.resolve("BackgroundMapLease.java"));
         String mapViewPatch = read(projectRoot().resolve(
                 "tools/patch_navigation_map_view.py"));
@@ -1153,8 +1182,11 @@ public final class NavigationHudV2ContractTest {
         assertFalse(routeTurns.contains("Canvas"));
         assertFalse(routeTurns.contains("createArrowBitmap"));
         assertTrue(renderer.contains("routeTurnMapLayer.attachRoute"));
-        assertFalse(Files.exists(patchRoot.resolve("RouteStreetLabelMapLayer.java")));
-        assertFalse(renderer.contains("routeStreetLabelMapLayer"));
+        assertTrue(Files.exists(patchRoot.resolve("RouteStreetLabelMapLayer.java")));
+        assertTrue(renderer.contains("routeStreetLabelMapLayer"));
+        assertTrue(routeStreetLabels.contains("invoke(annotation, \"getToponym\""));
+        assertTrue(routeStreetLabels.contains("invoke(placemark, \"setText\""));
+        assertFalse(routeStreetLabels.contains("Canvas"));
         assertTrue(renderer.contains("MapObjectLayerFactory.MINOR"));
         assertFalse(renderer.contains("drivingRoute != activeRoute"));
         assertFalse(routeStyler.contains("Double.doubleToLongBits"));
@@ -1440,6 +1472,21 @@ public final class NavigationHudV2ContractTest {
         assertTrue(canvas.contains("showRoadBadge"));
         assertTrue(canvas.contains("maneuverDirectionSigns"));
         assertTrue(canvas.contains("maneuverAuxiliaryText"));
+        String cardRenderer = read(root.resolve("hud/StockManeuverCardRenderer.java"));
+        String hudSettings = read(sourceRoot().resolve(
+                "HudPanelSettingsActivity.java"));
+        String clusterSettings = read(sourceRoot().resolve(
+                "InstrumentPanelSettingsActivity.java"));
+        assertTrue(cardRenderer.contains("private void labelFixed"));
+        assertTrue(cardRenderer.contains("TextUtils.ellipsize"));
+        assertTrue(cardRenderer.contains("options.optInt(\"directionFontSizeSp\""));
+        assertTrue(cardRenderer.contains("options.optInt(\"roadBadgeFontSizeSp\""));
+        assertTrue(cardRenderer.contains("options.optInt(\"auxiliaryFontSizeSp\""));
+        assertTrue(cardRenderer.contains("\"auxiliaryTextColor\""));
+        assertTrue(hudSettings.contains("Фон дополнительной информации"));
+        assertTrue(hudSettings.contains("Текст дополнительной информации"));
+        assertTrue(clusterSettings.contains("Фон дополнительной информации"));
+        assertTrue(clusterSettings.contains("Текст дополнительной информации"));
         assertTrue(cluster.contains("parseManeuverDirectionSigns"));
         assertTrue(cluster.contains("drawNavigationManeuverDetails"));
         assertTrue(cluster.contains("value.maneuverDirectionSignsJson"));
@@ -1552,8 +1599,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("SliderField laneGuidanceLayerPriority = slider"));
         assertTrue(settings.contains("SliderField cursorLayerPriority = slider"));
         assertTrue(settings.contains("Штатные названия улиц Яндекса"));
-        assertTrue(settings.contains("рисует сам слой карты"));
-        assertFalse(settings.contains("Названия улиц только на маршруте"));
+        assertTrue(settings.contains("Названия улиц только на линии активного маршрута"));
+        assertTrue(settings.contains("из секций DrivingRoute"));
         assertTrue(settings.contains("profile.roadsOnly = roadsOnly.isChecked()"));
         assertTrue(settings.contains("Цвет рекомендуемой полосы"));
         assertTrue(settings.contains("Красный сигнал"));
@@ -1590,9 +1637,10 @@ public final class NavigationHudV2ContractTest {
         String publisher = read(navigator.resolve("NavigatorStatePublisher.java"));
         String renderer = read(navigator.resolve("HudMapRenderer.java"));
         String profile = read(navigator.resolve("NavigationMapProfile.java"));
+        String routeStreetLabels = read(
+                navigator.resolve("RouteStreetLabelMapLayer.java"));
 
-        assertFalse(profile.contains("boolean routeStreetLabelsOnly"));
-        assertTrue(profile.contains("routeStreetLabelsOnly"));
+        assertTrue(profile.contains("boolean routeStreetLabelsOnly"));
         assertTrue(profile.contains("roadColor"));
         assertTrue(profile.contains("MapKit styles require #RRGGBBAA"));
         assertTrue(profile.contains("\\\"elements\\\":\\\"label\\\""));
@@ -1613,9 +1661,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.indexOf("positionOnRoute")
                 < publisher.indexOf("polylinePosition = invoke(route, \"getPosition\")"));
         assertTrue(renderer.contains("MapObjectLayerFactory.MINOR"));
-        assertFalse(renderer.contains("routeStreetLabelMapLayer"));
+        assertTrue(renderer.contains("routeStreetLabelMapLayer"));
         assertFalse(publisher.contains("readRouteStreetLabels"));
-        assertFalse(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
+        assertTrue(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
+        assertTrue(routeStreetLabels.contains("getSections"));
+        assertTrue(routeStreetLabels.contains("getToponym"));
+        assertTrue(routeStreetLabels.contains("MapObjectLayerFactory.MINOR"));
+        assertFalse(routeStreetLabels.contains("Canvas"));
     }
 
     @Test public void routeProgressIsReversibleWithoutRecreatingGeometry() throws Exception {

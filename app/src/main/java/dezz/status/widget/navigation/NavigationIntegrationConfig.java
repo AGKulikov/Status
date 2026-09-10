@@ -180,6 +180,21 @@ public final class NavigationIntegrationConfig {
         public boolean automaticDayNight = true;
         public boolean nightMode;
         public boolean showRoute = true;
+        /** Draw every current Guidance alternative without changing the selected route. */
+        public boolean showAlternativeRoutes;
+        @NonNull public String alternativeRouteColor = "#FFE950D5";
+        public double alternativeRouteWidth = 6d;
+        public int alternativeCalloutScalePercent = 100;
+        @NonNull public String alternativeCalloutBackgroundColor = "#FF343A32";
+        public int alternativeCalloutOpacityPercent = 92;
+        @NonNull public String alternativeCalloutTextColor = "#FFFFFFFF";
+        @NonNull public String alternativeCalloutBorderColor = "#99FFFFFF";
+        public double alternativeCalloutBorderWidthDp = 1d;
+        public double alternativeCalloutTextSizeSp = 16d;
+        public double alternativeCalloutCornerRadiusDp = 10d;
+        public double alternativeCalloutHorizontalPaddingDp = 10d;
+        public double alternativeCalloutVerticalPaddingDp = 7d;
+        public double alternativeCalloutLeaderLengthDp = 14d;
         /** Final point of the active route, anchored to the last route geometry point. */
         public boolean showDestination = true;
         /** Colour the active route by congestion independently from the background traffic layer. */
@@ -244,7 +259,9 @@ public final class NavigationIntegrationConfig {
         /** Larger values are drawn above smaller ones inside a compatible MapKit feature group. */
         public int cameraDirectionLayerPriority = 30;
         public int roadEventLayerPriority = 40;
+        public int alternativeRouteLayerPriority = 45;
         public int routeLayerPriority = 50;
+        public int alternativeCalloutLayerPriority = 65;
         public int destinationLayerPriority = 90;
         public int trafficLightLayerPriority = 70;
         public int routeTrafficLightLayerPriority = 20;
@@ -254,6 +271,8 @@ public final class NavigationIntegrationConfig {
         public int laneGuidanceLayerPriority = 80;
         public int cursorLayerPriority = 60;
         public boolean showLabels = true;
+        /** Replaces substrate labels with names read only from active DrivingRoute sections. */
+        public boolean routeStreetLabelsOnly;
         public boolean showPois = true;
         public boolean showBuildings = true;
         public boolean showParks = true;
@@ -330,6 +349,27 @@ public final class NavigationIntegrationConfig {
                     .put("automaticDayNight", automaticDayNight)
                     .put("nightMode", nightMode)
                     .put("showRoute", showRoute)
+                    .put("showAlternativeRoutes", showAlternativeRoutes)
+                    .put("alternativeRouteColor", alternativeRouteColor)
+                    .put("alternativeRouteWidth", alternativeRouteWidth)
+                    .put("alternativeCalloutScalePercent", alternativeCalloutScalePercent)
+                    .put("alternativeCalloutBackgroundColor",
+                            alternativeCalloutBackgroundColor)
+                    .put("alternativeCalloutOpacityPercent",
+                            alternativeCalloutOpacityPercent)
+                    .put("alternativeCalloutTextColor", alternativeCalloutTextColor)
+                    .put("alternativeCalloutBorderColor", alternativeCalloutBorderColor)
+                    .put("alternativeCalloutBorderWidthDp",
+                            alternativeCalloutBorderWidthDp)
+                    .put("alternativeCalloutTextSizeSp", alternativeCalloutTextSizeSp)
+                    .put("alternativeCalloutCornerRadiusDp",
+                            alternativeCalloutCornerRadiusDp)
+                    .put("alternativeCalloutHorizontalPaddingDp",
+                            alternativeCalloutHorizontalPaddingDp)
+                    .put("alternativeCalloutVerticalPaddingDp",
+                            alternativeCalloutVerticalPaddingDp)
+                    .put("alternativeCalloutLeaderLengthDp",
+                            alternativeCalloutLeaderLengthDp)
                     .put("showDestination", showDestination)
                     .put("showRouteTraffic", showRouteTraffic)
                     .put("showTraffic", showTraffic)
@@ -371,7 +411,10 @@ public final class NavigationIntegrationConfig {
                     .put("manualLayerPrioritiesEnabled", manualLayerPrioritiesEnabled)
                     .put("cameraDirectionLayerPriority", cameraDirectionLayerPriority)
                     .put("roadEventLayerPriority", roadEventLayerPriority)
+                    .put("alternativeRouteLayerPriority", alternativeRouteLayerPriority)
                     .put("routeLayerPriority", routeLayerPriority)
+                    .put("alternativeCalloutLayerPriority",
+                            alternativeCalloutLayerPriority)
                     .put("destinationLayerPriority", destinationLayerPriority)
                     .put("trafficLightLayerPriority", trafficLightLayerPriority)
                     .put("routeTrafficLightLayerPriority", routeTrafficLightLayerPriority)
@@ -381,6 +424,7 @@ public final class NavigationIntegrationConfig {
                     .put("laneGuidanceLayerPriority", laneGuidanceLayerPriority)
                     .put("cursorLayerPriority", cursorLayerPriority)
                     .put("showLabels", showLabels)
+                    .put("routeStreetLabelsOnly", routeStreetLabelsOnly)
                     .put("showPois", showPois)
                     .put("showBuildings", showBuildings)
                     .put("showParks", showParks)
@@ -431,6 +475,42 @@ public final class NavigationIntegrationConfig {
                     "automaticDayNight", result.automaticDayNight);
             result.nightMode = source.optBoolean("nightMode", result.nightMode);
             result.showRoute = source.optBoolean("showRoute", result.showRoute);
+            result.showAlternativeRoutes = source.optBoolean(
+                    "showAlternativeRoutes", result.showAlternativeRoutes);
+            result.alternativeRouteColor = source.optString(
+                    "alternativeRouteColor", result.alternativeRouteColor);
+            result.alternativeRouteWidth = source.optDouble(
+                    "alternativeRouteWidth", result.alternativeRouteWidth);
+            result.alternativeCalloutScalePercent = source.optInt(
+                    "alternativeCalloutScalePercent",
+                    result.alternativeCalloutScalePercent);
+            result.alternativeCalloutBackgroundColor = source.optString(
+                    "alternativeCalloutBackgroundColor",
+                    result.alternativeCalloutBackgroundColor);
+            result.alternativeCalloutOpacityPercent = source.optInt(
+                    "alternativeCalloutOpacityPercent",
+                    result.alternativeCalloutOpacityPercent);
+            result.alternativeCalloutTextColor = source.optString(
+                    "alternativeCalloutTextColor", result.alternativeCalloutTextColor);
+            result.alternativeCalloutBorderColor = source.optString(
+                    "alternativeCalloutBorderColor", result.alternativeCalloutBorderColor);
+            result.alternativeCalloutBorderWidthDp = source.optDouble(
+                    "alternativeCalloutBorderWidthDp",
+                    result.alternativeCalloutBorderWidthDp);
+            result.alternativeCalloutTextSizeSp = source.optDouble(
+                    "alternativeCalloutTextSizeSp", result.alternativeCalloutTextSizeSp);
+            result.alternativeCalloutCornerRadiusDp = source.optDouble(
+                    "alternativeCalloutCornerRadiusDp",
+                    result.alternativeCalloutCornerRadiusDp);
+            result.alternativeCalloutHorizontalPaddingDp = source.optDouble(
+                    "alternativeCalloutHorizontalPaddingDp",
+                    result.alternativeCalloutHorizontalPaddingDp);
+            result.alternativeCalloutVerticalPaddingDp = source.optDouble(
+                    "alternativeCalloutVerticalPaddingDp",
+                    result.alternativeCalloutVerticalPaddingDp);
+            result.alternativeCalloutLeaderLengthDp = source.optDouble(
+                    "alternativeCalloutLeaderLengthDp",
+                    result.alternativeCalloutLeaderLengthDp);
             result.showDestination = source.optBoolean(
                     "showDestination", result.showDestination);
             result.showTraffic = source.optBoolean("showTraffic", result.showTraffic);
@@ -501,8 +581,13 @@ public final class NavigationIntegrationConfig {
                     "cameraDirectionLayerPriority", result.cameraDirectionLayerPriority);
             result.roadEventLayerPriority = source.optInt(
                     "roadEventLayerPriority", result.roadEventLayerPriority);
+            result.alternativeRouteLayerPriority = source.optInt(
+                    "alternativeRouteLayerPriority", result.alternativeRouteLayerPriority);
             result.routeLayerPriority = source.optInt(
                     "routeLayerPriority", result.routeLayerPriority);
+            result.alternativeCalloutLayerPriority = source.optInt(
+                    "alternativeCalloutLayerPriority",
+                    result.alternativeCalloutLayerPriority);
             result.destinationLayerPriority = source.optInt(
                     "destinationLayerPriority", result.destinationLayerPriority);
             result.trafficLightLayerPriority = source.optInt(
@@ -531,11 +616,8 @@ public final class NavigationIntegrationConfig {
                 result.cursorLayerPriority = 60;
             }
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
-            // Migration from 2.5.7-2.6.4: the removed route-only bitmap layer becomes stock
-            // MapKit road labels. Preserve the user's opt-in even if generic labels were off.
-            if (source.optBoolean("routeStreetLabelsOnly", false)) {
-                result.showLabels = true;
-            }
+            result.routeStreetLabelsOnly = source.optBoolean(
+                    "routeStreetLabelsOnly", result.routeStreetLabelsOnly);
             result.showPois = source.optBoolean("showPois", result.showPois);
             result.showBuildings = source.optBoolean("showBuildings", result.showBuildings);
             result.showParks = source.optBoolean("showParks", result.showParks);
@@ -617,6 +699,30 @@ public final class NavigationIntegrationConfig {
             focusXPercent = clamp(focusXPercent, 0, 100);
             focusYPercent = clamp(focusYPercent, 0, 100);
             mapScalePercent = clamp(mapScalePercent, 50, 300);
+            alternativeRouteColor = color(alternativeRouteColor, "#FFE950D5");
+            alternativeRouteWidth = clamp(alternativeRouteWidth, 1d, 40d, 6d);
+            alternativeCalloutScalePercent = clamp(
+                    alternativeCalloutScalePercent, 50, 250);
+            alternativeCalloutBackgroundColor = color(
+                    alternativeCalloutBackgroundColor, "#FF343A32");
+            alternativeCalloutOpacityPercent = clamp(
+                    alternativeCalloutOpacityPercent, 0, 100);
+            alternativeCalloutTextColor = color(
+                    alternativeCalloutTextColor, "#FFFFFFFF");
+            alternativeCalloutBorderColor = color(
+                    alternativeCalloutBorderColor, "#99FFFFFF");
+            alternativeCalloutBorderWidthDp = clamp(
+                    alternativeCalloutBorderWidthDp, 0d, 12d, 1d);
+            alternativeCalloutTextSizeSp = clamp(
+                    alternativeCalloutTextSizeSp, 10d, 36d, 16d);
+            alternativeCalloutCornerRadiusDp = clamp(
+                    alternativeCalloutCornerRadiusDp, 0d, 40d, 10d);
+            alternativeCalloutHorizontalPaddingDp = clamp(
+                    alternativeCalloutHorizontalPaddingDp, 0d, 40d, 10d);
+            alternativeCalloutVerticalPaddingDp = clamp(
+                    alternativeCalloutVerticalPaddingDp, 0d, 30d, 7d);
+            alternativeCalloutLeaderLengthDp = clamp(
+                    alternativeCalloutLeaderLengthDp, 4d, 60d, 14d);
             cursorScalePercent = clamp(cursorScalePercent, 25, 300);
             laneGuidanceScalePercent = clamp(laneGuidanceScalePercent, 50, 250);
             laneGuidanceCardColor = optionalColor(laneGuidanceCardColor);
@@ -643,7 +749,10 @@ public final class NavigationIntegrationConfig {
             destinationScalePercent = clamp(destinationScalePercent, 50, 250);
             cameraDirectionLayerPriority = clamp(cameraDirectionLayerPriority, 0, 100);
             roadEventLayerPriority = clamp(roadEventLayerPriority, 0, 100);
+            alternativeRouteLayerPriority = clamp(alternativeRouteLayerPriority, 0, 100);
             routeLayerPriority = clamp(routeLayerPriority, 0, 100);
+            alternativeCalloutLayerPriority = clamp(
+                    alternativeCalloutLayerPriority, 0, 100);
             destinationLayerPriority = clamp(destinationLayerPriority, 0, 100);
             trafficLightLayerPriority = clamp(trafficLightLayerPriority, 0, 100);
             routeTrafficLightLayerPriority = clamp(routeTrafficLightLayerPriority, 0, 100);

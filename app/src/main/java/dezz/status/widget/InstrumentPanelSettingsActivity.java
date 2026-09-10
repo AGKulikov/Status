@@ -388,25 +388,29 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 content.addView(spinner);
             }
         } else if (element.type == InstrumentElementType.NAVIGATION_INFO
-                || element.type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY) {
-            showFace = switchView("Фон блока",
+                || element.type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY
+                || element.type == InstrumentElementType.NAV_MANEUVER_CARD) {
+            boolean maneuverCard = element.type == InstrumentElementType.NAV_MANEUVER_CARD;
+            showFace = maneuverCard ? null : switchView("Фон блока",
                     element.options.optBoolean("showFace", true));
-            showDistance = switchView("Оставшееся расстояние",
+            showDistance = maneuverCard ? null : switchView("Оставшееся расстояние",
                     element.options.optBoolean("showDistance", true));
-            showEta = switchView("Время прибытия",
+            showEta = maneuverCard ? null : switchView("Время прибытия",
                     element.options.optBoolean("showEta", true));
-            showDuration = switchView("Оставшееся время",
+            showDuration = maneuverCard ? null : switchView("Оставшееся время",
                     element.options.optBoolean("showDuration", true));
-            showProgress = switchView("Прогресс маршрута с пробками",
+            showProgress = maneuverCard ? null : switchView("Прогресс маршрута с пробками",
                     element.options.optBoolean("showRouteProgress", true));
             showScale = showScaleLabels = showNeedle = showValue = showUnit = null;
             showStreet = showArrival = null;
             navigationInfoControls = new NavigationInfoControls(content, element);
-            content.addView(showFace, marginTop(10));
-            content.addView(showDistance);
-            content.addView(showEta);
-            content.addView(showDuration);
-            content.addView(showProgress);
+            if (!maneuverCard) {
+                content.addView(showFace, marginTop(10));
+                content.addView(showDistance);
+                content.addView(showEta);
+                content.addView(showDuration);
+                content.addView(showProgress);
+            }
             navigationInfoControls.addViews();
         } else if (element.type == InstrumentElementType.TRAFFIC_JAM) {
             showFace = switchView("Фон плашки",
@@ -640,6 +644,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(label("Оформление день / ночь"), marginTop(6));
         content.addView(dayNight);
         Switch route = switchView("Маршрут", map.showRoute);
+        Switch alternativeRoutes = switchView(
+                "Дополнительные варианты маршрута — отдельный слой",
+                map.showAlternativeRoutes);
         Switch destination = switchView(
                 "Конечная точка маршрута", map.showDestination);
         Switch routeTraffic = switchView("Пробки на линии маршрута", map.showRouteTraffic);
@@ -659,6 +666,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 "Камеры из HUD Speed — отдельный знак", map.showHudSpeedCameras);
         Switch labels = switchView(
                 "Штатные названия улиц Яндекса", map.showLabels);
+        Switch routeStreetLabelsOnly = switchView(
+                "Названия улиц только на линии активного маршрута",
+                map.routeStreetLabelsOnly);
         Switch pois = switchView("Полезные места", map.showPois);
         Switch buildings = switchView("Здания", map.showBuildings);
         Switch parks = switchView("Парки", map.showParks);
@@ -667,6 +677,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Switch cursor = switchView("Курсор автомобиля", map.showCursor);
         Switch roadsOnly = switchView("Только дороги — прозрачный фон", map.roadsOnly);
         content.addView(route);
+        content.addView(alternativeRoutes);
         content.addView(destination);
         content.addView(traffic);
         content.addView(routeTraffic);
@@ -677,8 +688,10 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(laneGuidance);
         content.addView(hudSpeedCameras);
         content.addView(labels);
-        content.addView(text("Названия, шрифт, контур и изгиб текста рисует сам слой карты "
-                + "Яндекса. Отдельных нарисованных плашек Natro больше нет.",
+        content.addView(routeStreetLabelsOnly);
+        content.addView(text("В обычном режиме используются все штатные подписи Яндекса. В режиме "
+                + "«только на маршруте» фоновые подписи скрываются, а названия берутся только "
+                + "из секций DrivingRoute и ставятся штатным текстом MapKit прямо на полилинию.",
                 12, 0xFFB8C0CC));
         content.addView(pois);
         content.addView(buildings);
@@ -714,6 +727,52 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 Math.max(0, map.laneGuidanceCornerRadiusPx), 0, 80, 1, " px");
         laneCorners.setEnabled(!laneStockCorners.isChecked());
         laneStockCorners.setOnCheckedChangeListener((button, checked) -> laneCorners.setEnabled(!checked));
+        content.addView(section("Дополнительные маршруты и выносной знак"), marginTop(14));
+        ColorField alternativeRouteColor = navigationColorField(content,
+                "Цвет дополнительной полилинии", map.alternativeRouteColor,
+                finalNavigation, preferences, value -> map.alternativeRouteColor = value);
+        SliderField alternativeRouteWidth = slider(content,
+                "Толщина дополнительной полилинии",
+                map.alternativeRouteWidth, 1, 40, 0.5, " px");
+        SliderField alternativeCalloutScale = slider(content,
+                "Общий размер выносного знака",
+                map.alternativeCalloutScalePercent, 50, 250, 5, " %");
+        SliderField alternativeCalloutTextSize = slider(content,
+                "Размер текста выносного знака",
+                map.alternativeCalloutTextSizeSp, 10, 36, 0.5, " sp");
+        ColorField alternativeCalloutBackground = navigationColorField(content,
+                "Цвет фона выносного знака", map.alternativeCalloutBackgroundColor,
+                finalNavigation, preferences,
+                value -> map.alternativeCalloutBackgroundColor = value);
+        SliderField alternativeCalloutOpacity = slider(content,
+                "Прозрачность фона выносного знака",
+                map.alternativeCalloutOpacityPercent, 0, 100, 5, " %");
+        ColorField alternativeCalloutText = navigationColorField(content,
+                "Основной цвет текста выносного знака", map.alternativeCalloutTextColor,
+                finalNavigation, preferences, value -> map.alternativeCalloutTextColor = value);
+        ColorField alternativeCalloutBorder = navigationColorField(content,
+                "Цвет обводки выносного знака", map.alternativeCalloutBorderColor,
+                finalNavigation, preferences,
+                value -> map.alternativeCalloutBorderColor = value);
+        SliderField alternativeCalloutBorderWidth = slider(content,
+                "Толщина обводки выносного знака",
+                map.alternativeCalloutBorderWidthDp, 0, 12, 0.5, " dp");
+        SliderField alternativeCalloutCorners = slider(content,
+                "Скругление выносного знака",
+                map.alternativeCalloutCornerRadiusDp, 0, 40, 1, " dp");
+        SliderField alternativeCalloutHorizontalPadding = slider(content,
+                "Горизонтальный отступ внутри знака",
+                map.alternativeCalloutHorizontalPaddingDp, 0, 40, 1, " dp");
+        SliderField alternativeCalloutVerticalPadding = slider(content,
+                "Вертикальный отступ внутри знака",
+                map.alternativeCalloutVerticalPaddingDp, 0, 30, 1, " dp");
+        SliderField alternativeCalloutLeader = slider(content,
+                "Длина хвостика выносного знака",
+                map.alternativeCalloutLeaderLengthDp, 4, 60, 1, " dp");
+        content.addView(text("Цвета выигрыша и проигрыша времени/расстояния берутся с живой "
+                + "плашки самого Навигатора. Выносной знак размещается после обязательных "
+                + "знаков и скрывается, если свободной позиции нет; полилиния остаётся.",
+                12, 0xFFB8C0CC));
         content.addView(section("Остальные объекты карты"), marginTop(12));
         SliderField cameraScale = slider(content,
                 "Размер единых знаков камер",
@@ -766,7 +825,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 + "тело стрелки, а размер треугольного наконечника настраивается отдельно.",
                 12, 0xFFB8C0CC));
         SliderField routeLabelScale = slider(content,
-                "Размер штатных названий улиц",
+                "Размер названий улиц",
                 map.routeLabelScalePercent, 50, 250, 5, " %");
         SliderField roadEventScale = slider(content,
                 "Размер остальных дорожных событий",
@@ -813,8 +872,14 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         SliderField roadEventLayerPriority = slider(content,
                 "Остальные дорожные события", map.roadEventLayerPriority,
                 0, 100, 1, "");
+        SliderField alternativeRouteLayerPriority = slider(content,
+                "Дополнительные полилинии", map.alternativeRouteLayerPriority,
+                0, 100, 1, "");
         SliderField routeLayerPriority = slider(content,
                 "Маршрут", map.routeLayerPriority, 0, 100, 1, "");
+        SliderField alternativeCalloutLayerPriority = slider(content,
+                "Выносные знаки дополнительных маршрутов",
+                map.alternativeCalloutLayerPriority, 0, 100, 1, "");
         SliderField speedBumpLayerPriority = slider(content,
                 "Искусственные неровности", map.speedBumpLayerPriority,
                 0, 100, 1, "");
@@ -834,7 +899,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 "Курсор автомобиля", map.cursorLayerPriority,
                 0, 100, 1, "");
         SliderField[] layerPriorityControls = new SliderField[]{
-                cameraDirectionLayerPriority, roadEventLayerPriority, routeLayerPriority,
+                cameraDirectionLayerPriority, roadEventLayerPriority,
+                alternativeRouteLayerPriority, routeLayerPriority,
+                alternativeCalloutLayerPriority,
                 speedBumpLayerPriority,
                 destinationLayerPriority, routeTrafficLightLayerPriority,
                 trafficLightLayerPriority,
@@ -887,6 +954,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.maximumFps = maximumFps.intValue();
                     applyDayNight(dayNight, map);
                     map.showRoute = route.isChecked();
+                    map.showAlternativeRoutes = alternativeRoutes.isChecked();
                     map.showDestination = destination.isChecked();
                     map.showTraffic = traffic.isChecked();
                     map.showRouteTraffic = routeTraffic.isChecked();
@@ -898,6 +966,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showHudSpeedCameras = hudSpeedCameras.isChecked();
                     map.showPois = pois.isChecked();
                     map.showBuildings = buildings.isChecked();
+                    map.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked();
                     map.showLabels = labels.isChecked();
                     map.showParks = parks.isChecked();
                     map.showWater = water.isChecked();
@@ -911,6 +980,22 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.laneGuidanceBorderColor = laneBorderColor.value();
                     map.laneGuidanceBorderWidthPx = laneBorderWidth.intValue();
                     map.laneGuidanceCornerRadiusPx = laneStockCorners.isChecked() ? -1 : laneCorners.intValue();
+                    map.alternativeRouteColor = alternativeRouteColor.value;
+                    map.alternativeRouteWidth = alternativeRouteWidth.value();
+                    map.alternativeCalloutScalePercent = alternativeCalloutScale.intValue();
+                    map.alternativeCalloutTextSizeSp = alternativeCalloutTextSize.value();
+                    map.alternativeCalloutBackgroundColor = alternativeCalloutBackground.value;
+                    map.alternativeCalloutOpacityPercent = alternativeCalloutOpacity.intValue();
+                    map.alternativeCalloutTextColor = alternativeCalloutText.value;
+                    map.alternativeCalloutBorderColor = alternativeCalloutBorder.value;
+                    map.alternativeCalloutBorderWidthDp =
+                            alternativeCalloutBorderWidth.value();
+                    map.alternativeCalloutCornerRadiusDp = alternativeCalloutCorners.value();
+                    map.alternativeCalloutHorizontalPaddingDp =
+                            alternativeCalloutHorizontalPadding.value();
+                    map.alternativeCalloutVerticalPaddingDp =
+                            alternativeCalloutVerticalPadding.value();
+                    map.alternativeCalloutLeaderLengthDp = alternativeCalloutLeader.value();
                     map.cameraScalePercent = cameraScale.intValue();
                     map.cameraDirectionLengthPercent = cameraDirectionLength.intValue();
                     map.cameraDirectionWidthPercent = cameraDirectionWidth.intValue();
@@ -941,7 +1026,11 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.cameraDirectionLayerPriority =
                             cameraDirectionLayerPriority.intValue();
                     map.roadEventLayerPriority = roadEventLayerPriority.intValue();
+                    map.alternativeRouteLayerPriority =
+                            alternativeRouteLayerPriority.intValue();
                     map.routeLayerPriority = routeLayerPriority.intValue();
+                    map.alternativeCalloutLayerPriority =
+                            alternativeCalloutLayerPriority.intValue();
                     map.speedBumpLayerPriority = speedBumpLayerPriority.intValue();
                     map.destinationLayerPriority = destinationLayerPriority.intValue();
                     map.trafficLightLayerPriority = trafficLightLayerPriority.intValue();
@@ -1103,6 +1192,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             case INSTANT_CONSUMPTION:
             case AVERAGE_CONSUMPTION:
             case TRIP_CONSUMPTION:
+            case CURRENT_TRIP_DISTANCE:
+            case CURRENT_TRIP_DURATION:
+            case CURRENT_TRIP_AVERAGE_SPEED:
                 return true;
             default:
                 return false;
@@ -1129,29 +1221,34 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         void addViews() {
             boolean routeSummary = source.type
                     == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY;
+            boolean standaloneCard = source.type
+                    == InstrumentElementType.NAV_MANEUVER_CARD;
             if (!routeSummary) {
-                parent.addView(section("Исходный знак Навигатора"), marginTop(12));
-                showIcon = switchView("Показывать исходный знак слева",
-                        source.options.optBoolean("showManeuverIcon", true));
-                reserveIconSpace = switchView("Сохранять место, пока знак ещё не пришёл",
-                        source.options.optBoolean("reserveManeuverIconSpace", true));
-                parent.addView(showIcon);
-                parent.addView(reserveIconSpace);
-                number("maneuverIconAreaPercent", "Ширина области знака",
-                        15, 5, 40, 1, " %");
-                number("maneuverIconScalePercent", "Размер исходного знака",
-                        100, 25, 250, 5, " %");
-                number("maneuverIconGapPx", "Расстояние от знака до данных",
-                        10, 0, 100, 1, " px");
-                color("maneuverIconBackgroundColor", "Фон области знака",
-                        "#FF2B2E35");
-                number("maneuverIconBackgroundOpacityPercent", "Непрозрачность фона знака",
-                        100, 0, 100, 1, " %");
-                number("maneuverIconCornerRadiusPx", "Скругление фона знака",
-                        12, 0, 100, 1, " px");
+                if (!standaloneCard) {
+                    parent.addView(section("Исходный знак Навигатора"), marginTop(12));
+                    showIcon = switchView("Показывать исходный знак слева",
+                            source.options.optBoolean("showManeuverIcon", true));
+                    reserveIconSpace = switchView("Сохранять место, пока знак ещё не пришёл",
+                            source.options.optBoolean("reserveManeuverIconSpace", true));
+                    parent.addView(showIcon);
+                    parent.addView(reserveIconSpace);
+                    number("maneuverIconAreaPercent", "Ширина области знака",
+                            15, 5, 40, 1, " %");
+                    number("maneuverIconScalePercent", "Размер исходного знака",
+                            100, 25, 250, 5, " %");
+                    number("maneuverIconGapPx", "Расстояние от знака до данных",
+                            10, 0, 100, 1, " px");
+                    color("maneuverIconBackgroundColor", "Фон области знака",
+                            "#FF2B2E35");
+                    number("maneuverIconBackgroundOpacityPercent", "Непрозрачность фона знака",
+                            100, 0, 100, 1, " %");
+                    number("maneuverIconCornerRadiusPx", "Скругление фона знака",
+                            12, 0, 100, 1, " px");
+                }
 
                 parent.addView(section("Табличка манёвра"), marginTop(12));
-                color("maneuverCardColor", "Цвет таблички", "#00000000");
+                color("maneuverCardColor", "Цвет таблички",
+                        standaloneCard ? "#FF0758E8" : "#00000000");
                 color("maneuverCardBorderColor", "Цвет обводки", "#00000000");
                 number("maneuverCardBorderWidthPx", "Толщина обводки", 0, 0, 24, 1, " px");
                 number("maneuverCardCornerRadiusPx", "Скругление таблички", 0, 0, 80, 1, " px");
@@ -1175,17 +1272,47 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                         2, 0, 100, 1, " px");
                 number("maneuverDetailTextSizeSp", "Размер основного текста",
                         18, 8, 120, 1, " sp");
+                number("distanceFontSizeSp", "Размер расстояния до манёвра",
+                        34, 8, 160, 1, " sp");
                 number("maneuverAuxiliaryTextSizeSp", "Размер дополнительного текста",
                         14, 8, 120, 1, " sp");
+                number("directionFontSizeSp", "Размер названия улицы / направления",
+                        18, 8, 120, 1, " sp");
+                number("roadBadgeFontSizeSp", "Размер номера съезда / указателя",
+                        18, 8, 120, 1, " sp");
+                number("auxiliaryFontSizeSp", "Размер дополнительной информации",
+                        14, 8, 120, 1, " sp");
                 color("maneuverDetailTextColor", "Цвет текста", "#FFFFFFFF");
-                color("maneuverAuxiliaryColor", "Цвет дополнительной строки", "#E60B4DB5");
+                color("auxiliaryColor", "Фон дополнительной информации",
+                        source.options.optString("maneuverAuxiliaryColor", "#E60B4DB5"));
+                color("auxiliaryTextColor", "Текст дополнительной информации",
+                        source.options.optString("maneuverAuxiliaryTextColor", "#FFFFFFFF"));
 
-                parent.addView(section("Отступы знака"), marginTop(12));
-                padding("maneuverIconPadding", 5, 5, 5, 5, 160);
+                if (standaloneCard) {
+                    parent.addView(section("Компоновка исходного знака"), marginTop(12));
+                    number("arrowAreaPercent", "Доля места для знака", 38, 10, 75, 1, " %");
+                    number("sourceIconScalePercent", "Размер исходного знака",
+                            100, 25, 250, 5, " %");
+                    number("arrowTextGapPx", "Расстояние от знака до текста",
+                            6, 0, 80, 1, " px");
+                    number("distanceAreaPercent", "Высота строки расстояния",
+                            56, 20, 80, 1, " %");
+                    number("textRowGapPx", "Интервал между строками",
+                            2, 0, 60, 1, " px");
+                    parent.addView(section("Отступы исходного знака"), marginTop(12));
+                    padding("arrowPadding", 3, 3, 3, 3, 120);
+                    parent.addView(section("Отступы текста"), marginTop(12));
+                    padding("textPadding", 0, 0, 0, 0, 120);
+                } else {
+                    parent.addView(section("Отступы знака"), marginTop(12));
+                    padding("maneuverIconPadding", 5, 5, 5, 5, 160);
+                }
             } else {
                 parent.addView(text("Отдельная сводка как в Навигаторе — без боковых "
                         + "и нижних кнопок.", 12, 0xFFB8C0CC), marginTop(6));
             }
+
+            if (standaloneCard) return;
 
             parent.addView(section("Шрифты данных"), marginTop(12));
             number("distanceTextSizeSp", "Оставшееся расстояние",

@@ -15,6 +15,9 @@ import android.graphics.PorterDuff;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.os.SystemClock;
+import android.text.TextPaint;
+import android.text.TextUtils;
 import android.view.Choreographer;
 import android.view.MotionEvent;
 import android.view.View;
@@ -33,13 +36,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import dezz.status.widget.launcher.NavigationDataRepository;
+import dezz.status.widget.car.CurrentTripMetrics;
 import dezz.status.widget.navigation.NavigationBridgeStateStore;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
 import dezz.status.widget.navigation.NavigationRouteGeometryV2;
 import dezz.status.widget.navigation.NavigationSnapshotV2;
 import dezz.status.widget.navigation.StockManeuverCardState;
+import dezz.status.widget.hud.HudNavigationState;
 import dezz.status.widget.hud.StockManeuverCardRenderer;
+import dezz.status.widget.launcher.NavigationDataRepository;
 
 /**
  * One hardware-accelerated Canvas for every non-map instrument. Static artwork is raster-cached;
@@ -64,7 +69,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @NonNull private final InstrumentTelemetryRepository telemetry;
     @NonNull private final InstrumentTelemetryRepository.Frame frame =
             new InstrumentTelemetryRepository.Frame();
-    @NonNull private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG
+    @NonNull private final TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG
             | Paint.DITHER_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
     @NonNull private final Paint clearPaint = new Paint();
     @NonNull private final RectF rect = new RectF();
@@ -88,6 +93,12 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         telemetryWakePosted.set(false);
         scheduleFrame();
     };
+    @NonNull private final Runnable currentTripExpiry = () -> {
+        if (!isRenderingActive()) return;
+        // Freshness changes without another vendor value, so force one zero-allocation snapshot.
+        lastGeneration = Long.MIN_VALUE;
+        scheduleFrame();
+    };
     @NonNull private final AtomicBoolean navigationWakePosted = new AtomicBoolean();
     @NonNull private final NavigationBridgeStateStore.Listener navigationListener =
             this::onNavigationChanged;
@@ -107,6 +118,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         navigationSnapshot = null;
         navigationGeometry = null;
         navigationManeuverImage = null;
+        independentNavigationState = null;
         commandCard = StockManeuverCardState.HIDDEN;
         invalidate();
     };
@@ -134,6 +146,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @Nullable private NavigationRouteGeometryV2 navigationGeometry;
     /** Reserved only for keyed source art; direct snapshots intentionally leave it null. */
     @Nullable private Bitmap navigationManeuverImage;
+    @Nullable private HudNavigationState independentNavigationState;
     private StockManeuverCardState commandCard = StockManeuverCardState.LEGACY;
     private StockManeuverCardRenderer commandCardRenderer;
     private StockManeuverCardRenderer commandCardRenderer() {
@@ -241,6 +254,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         if (telemetryChanged) {
             telemetry.snapshot(frame);
             lastGeneration = frame.generation;
+            scheduleCurrentTripExpiry();
         }
         float deltaSeconds = lastFrameNanos == 0L
                 ? 1f / 60f : Math.min(.1f, (frameTimeNanos - lastFrameNanos) / 1_000_000_000f);
@@ -296,6 +310,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             }
             removeCallbacks(clockWake);
             removeCallbacks(telemetryWake);
+            removeCallbacks(currentTripExpiry);
             telemetryWakePosted.set(false);
         }
         reconcileNavigationDemand();
@@ -326,7 +341,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             navigationSnapshot = null;
             navigationGeometry = null;
             navigationManeuverImage = null;
-        commandCard = StockManeuverCardState.HIDDEN;
+            independentNavigationState = null;
+            commandCard = StockManeuverCardState.HIDDEN;
             removeCallbacks(navigationWake);
             removeCallbacks(navigationExpiry);
             navigationWakePosted.set(false);
@@ -353,6 +369,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         // Artwork is joined only by the bridge store after matching this exact maneuver identity.
         navigationManeuverImage = accepted == null
                 ? null : NavigationBridgeStateStore.maneuverArtworkFor(accepted);
+        independentNavigationState = accepted == null ? null : HudNavigationState.fromBridge(
+                accepted, navigationGeometry, independentNavigationState,
+                navigationManeuverImage);
         if (accepted != null) {
             long delay = accepted.sourceTimestampMs + NAVIGATION_FRESH_MS - now;
             postDelayed(navigationExpiry, Math.max(1L, delay));
@@ -373,6 +392,15 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         if (!isRenderingActive() || frameCallbackPosted) return;
         frameCallbackPosted = true;
         Choreographer.getInstance().postFrameCallback(this);
+    }
+
+    private void scheduleCurrentTripExpiry() {
+        removeCallbacks(currentTripExpiry);
+        long freshUntil = frame.currentTripFreshUntilElapsedNanos;
+        if (!isRenderingActive() || freshUntil <= 0L) return;
+        long remainingNanos = freshUntil - SystemClock.elapsedRealtimeNanos();
+        long delayMillis = Math.max(1L, remainingNanos / 1_000_000L + 1L);
+        postDelayed(currentTripExpiry, delayMillis);
     }
 
     private void scheduleClockWake() {
@@ -468,9 +496,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     private void drawStaticElement(@NonNull Canvas canvas,
                                    @NonNull InstrumentElementConfig element,
                                    @NonNull RectF bounds) {
-        if (element.type == InstrumentElementType.NAVIGATION_INFO
-                || element.type == InstrumentElementType.NAVIGATION_ROUTE_SUMMARY
-                || element.type == InstrumentElementType.TRAFFIC_JAM) return;
+        if (element.type.usesNavigationState()) return;
         InstrumentStyleFamily style = element.style;
         int alpha = Math.round(255f * element.opacityPercent / 100f);
         if (element.type.isAnalogGauge()) {
@@ -688,11 +714,42 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             case TRIP_CONSUMPTION:
                 drawDigital(canvas, runtime, bounds, frame.tripConsumption, "л/100", 1);
                 break;
+            case CURRENT_TRIP_DISTANCE:
+                drawDigital(canvas, runtime, bounds, frame.currentTripDistance, "км", 1);
+                break;
+            case CURRENT_TRIP_DURATION:
+                drawDigitalFormatted(canvas, runtime, bounds,
+                        tripDurationText(frame.currentTripDurationMinutes), "ч", Float.NaN);
+                break;
+            case CURRENT_TRIP_AVERAGE_SPEED:
+                drawDigital(canvas, runtime, bounds, frame.currentTripAverageSpeed, "км/ч", 0);
+                break;
             case CLOCK:
                 drawStyledText(canvas, runtime, bounds, clockText, .53f);
                 break;
             case INFO_BLOCK:
                 drawInfoBlock(canvas, runtime, bounds);
+                break;
+            case NAV_MANEUVER_ARROW:
+            case NAV_MANEUVER_TITLE:
+            case NAV_MANEUVER_SUBTEXT:
+            case NAV_STREET:
+            case NAV_DESTINATION:
+            case NAV_TURN_DISTANCE:
+            case NAV_DISTANCE_LEFT:
+            case NAV_TIME_LEFT:
+            case NAV_ARRIVAL_TIME:
+            case NAV_SPEED:
+            case NAV_LANES:
+            case NAV_LANE_DISTANCE:
+            case NAV_MANEUVER_CARD:
+            case NAV_TRIP_PROGRESS:
+            case NAV_SPEED_LIMIT:
+            case NAV_TRAFFIC_LIGHTS:
+            case NAV_JAM_PROGRESS:
+            case NAV_ROUTE_GRAPHIC:
+                drawIndependentNavigationElement(canvas, runtime, bounds,
+                        navigationSnapshot, independentNavigationState);
                 break;
             case NAVIGATION_INFO:
                 drawNavigationInfo(canvas, runtime, bounds, navigationSnapshot);
@@ -779,6 +836,13 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                              int decimals) {
         String number = decimals == 0
                 ? runtime.integerText(value) : runtime.oneDecimalText(value);
+        drawDigitalFormatted(canvas, runtime, bounds, number, unit, value);
+    }
+
+    private void drawDigitalFormatted(@NonNull Canvas canvas,
+                                      @NonNull RuntimeElement runtime,
+                                      @NonNull RectF bounds, @NonNull String number,
+                                      @NonNull String unit, float progressValue) {
         InstrumentStyleFamily style = runtime.config.style;
         int alpha = Math.round(255f * runtime.config.opacityPercent / 100f);
         boolean sideBySide = style == InstrumentStyleFamily.AEROWAVE
@@ -818,7 +882,15 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 canvas.drawText(unit, bounds.centerX(), baseline + bounds.height() * .25f, paint);
             }
         }
-        drawDigitalProgress(canvas, runtime.config, bounds, value, alpha);
+        drawDigitalProgress(canvas, runtime.config, bounds, progressValue, alpha);
+    }
+
+    @NonNull
+    private static String tripDurationText(float minutesValue) {
+        if (!Float.isFinite(minutesValue) || minutesValue < 0f) return "—";
+        long minutes = Math.round(minutesValue);
+        return String.format(Locale.getDefault(), "%02d:%02d",
+                minutes / 60L, minutes % 60L);
     }
 
     private void drawStyledText(@NonNull Canvas canvas, @NonNull RuntimeElement runtime,
@@ -891,9 +963,16 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                     centerY - rowHeight * .08f, paint);
 
             float value = infoValue(metric);
-            String valueText = metric.decimals == 0
-                    ? runtime.rowIntegerText(index, value)
-                    : runtime.rowDecimalText(index, value);
+            String valueText;
+            String valueUnit = metric.unit;
+            if (metric == InstrumentInfoMetric.CURRENT_TRIP_DURATION) {
+                valueText = tripDurationText(value);
+                valueUnit = "ч";
+            } else {
+                valueText = metric.decimals == 0
+                        ? runtime.rowIntegerText(index, value)
+                        : runtime.rowDecimalText(index, value);
+            }
             paint.setTypeface(digitalTypeface(element.style, true));
             paint.setTextAlign(Paint.Align.RIGHT);
             paint.setTextSize(Math.max(10f, rowHeight * .38f));
@@ -903,7 +982,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             paint.setTypeface(digitalTypeface(element.style, false));
             paint.setTextSize(Math.max(7f, rowHeight * .20f));
             paint.setColor(withAlpha(element.style.accentColor, Math.min(alpha, 220)));
-            canvas.drawText(metric.unit, bounds.right - bounds.width() * .06f,
+            canvas.drawText(valueUnit, bounds.right - bounds.width() * .06f,
                     centerY + rowHeight * .18f, paint);
         }
     }
@@ -1037,6 +1116,173 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 bounds.width() * .03f, bounds.width() * .03f, paint);
         canvas.drawCircle(x + bounds.width() * .05f, y,
                 Math.max(3f, bounds.width() * .075f), paint);
+    }
+
+    /** Independent counterparts of the HUD navigation catalog, backed by one atomic snapshot. */
+    private void drawIndependentNavigationElement(@NonNull Canvas canvas,
+                                                   @NonNull RuntimeElement runtime,
+                                                   @NonNull RectF bounds,
+                                                   @Nullable NavigationSnapshotV2 snapshot,
+                                                   @Nullable HudNavigationState navigation) {
+        if (snapshot == null || navigation == null) return;
+        runtime.updateNavigation(snapshot, navigationGeometry);
+        InstrumentElementConfig element = runtime.config;
+        int alpha = Math.round(255f * element.opacityPercent / 100f);
+        String value = "";
+        switch (element.type) {
+            case NAV_MANEUVER_ARROW:
+                if (commandCard.enabled && commandCardRenderer().available(commandCard)) {
+                    commandCardRenderer().drawMain(canvas, commandCard, bounds, alpha);
+                } else if (navigationManeuverImage != null
+                        && !navigationManeuverImage.isRecycled()) {
+                    drawSourceBitmap(canvas, navigationManeuverImage, bounds, alpha);
+                } else if (hasManeuverAction(snapshot.maneuverType)) {
+                    drawSemanticManeuver(canvas, snapshot.maneuverType, bounds,
+                            withAlpha(element.style.primaryColor, alpha));
+                }
+                return;
+            case NAV_MANEUVER_CARD:
+                drawNavigationManeuverDetails(canvas, runtime, bounds, element, alpha);
+                return;
+            case NAV_MANEUVER_TITLE: value = navigation.maneuverTitle; break;
+            case NAV_MANEUVER_SUBTEXT: value = navigation.maneuverSubtext; break;
+            case NAV_STREET: value = navigation.street; break;
+            case NAV_DESTINATION: value = navigation.destination; break;
+            case NAV_TURN_DISTANCE: value = navigation.turnDistance; break;
+            case NAV_DISTANCE_LEFT: value = navigation.distance; break;
+            case NAV_TIME_LEFT: value = navigation.duration; break;
+            case NAV_ARRIVAL_TIME: value = navigation.arrival; break;
+            case NAV_LANE_DISTANCE: value = navigation.laneDistance; break;
+            case NAV_SPEED:
+                if (Double.isFinite(navigation.speedKmh)) {
+                    drawDigital(canvas, runtime, bounds, (float) navigation.speedKmh,
+                            "км/ч", 0);
+                }
+                return;
+            case NAV_LANES:
+                drawIndependentLanes(canvas, runtime, bounds, navigation, alpha);
+                return;
+            case NAV_SPEED_LIMIT:
+                drawIndependentSpeedLimit(canvas, runtime, bounds, snapshot.speedLimitKmh,
+                        alpha);
+                return;
+            case NAV_TRAFFIC_LIGHTS:
+                drawIndependentTrafficLights(canvas, runtime, bounds, navigation, alpha);
+                return;
+            case NAV_TRIP_PROGRESS:
+                value = joinNonEmpty(navigation.distance, navigation.duration,
+                        navigation.arrival);
+                break;
+            case NAV_JAM_PROGRESS:
+            case NAV_ROUTE_GRAPHIC:
+                drawNavigationRouteProgress(canvas, runtime, bounds, alpha, element);
+                return;
+            default:
+                return;
+        }
+        if (!value.trim().isEmpty()) drawStyledText(canvas, runtime, bounds, value, .52f);
+    }
+
+    @NonNull
+    private static String joinNonEmpty(@NonNull String first, @NonNull String second,
+                                       @NonNull String third) {
+        StringBuilder result = new StringBuilder();
+        for (String value : new String[]{first, second, third}) {
+            if (value == null || value.trim().isEmpty()) continue;
+            if (result.length() > 0) result.append(" · ");
+            result.append(value.trim());
+        }
+        return result.toString();
+    }
+
+    private void drawIndependentLanes(@NonNull Canvas canvas,
+                                      @NonNull RuntimeElement runtime,
+                                      @NonNull RectF bounds,
+                                      @NonNull HudNavigationState navigation,
+                                      int alpha) {
+        List<HudNavigationState.Lane> lanes = navigation.laneItems;
+        if (lanes.isEmpty()) return;
+        int count = Math.min(8, lanes.size());
+        float laneWidth = bounds.width() / count;
+        for (int index = 0; index < count; index++) {
+            HudNavigationState.Lane lane = lanes.get(index);
+            List<String> directions = lane.directions.isEmpty()
+                    ? Collections.singletonList("STRAIGHT_AHEAD") : lane.directions;
+            int directionCount = Math.min(3, directions.size());
+            float glyphWidth = laneWidth / directionCount;
+            for (int directionIndex = 0; directionIndex < directionCount; directionIndex++) {
+                String direction = directions.get(directionIndex);
+                boolean highlighted = direction.equals(lane.highlightedDirection)
+                        && !"UNKNOWN_DIRECTION".equals(direction);
+                int color = highlighted ? runtime.config.style.accentColor
+                        : runtime.config.style.secondaryColor;
+                RectF glyph = new RectF(bounds.left + index * laneWidth
+                        + directionIndex * glyphWidth, bounds.top,
+                        bounds.left + index * laneWidth + (directionIndex + 1) * glyphWidth,
+                        bounds.bottom);
+                drawSemanticManeuver(canvas, direction, glyph, withAlpha(color, alpha));
+            }
+        }
+    }
+
+    private void drawIndependentSpeedLimit(@NonNull Canvas canvas,
+                                           @NonNull RuntimeElement runtime,
+                                           @NonNull RectF bounds, int limit, int alpha) {
+        if (limit <= 0) return;
+        float radius = Math.min(bounds.width(), bounds.height()) * .43f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(withAlpha(Color.WHITE, alpha));
+        canvas.drawCircle(bounds.centerX(), bounds.centerY(), radius, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(3f, radius * .12f));
+        paint.setColor(withAlpha(0xFFFF3B30, alpha));
+        canvas.drawCircle(bounds.centerX(), bounds.centerY(), radius, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTypeface(digitalTypeface(runtime.config.style, true));
+        paint.setTextSize(radius * .78f);
+        paint.setColor(withAlpha(Color.BLACK, alpha));
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        canvas.drawText(Integer.toString(limit), bounds.centerX(),
+                bounds.centerY() - (metrics.ascent + metrics.descent) * .5f, paint);
+    }
+
+    private void drawIndependentTrafficLights(@NonNull Canvas canvas,
+                                              @NonNull RuntimeElement runtime,
+                                              @NonNull RectF bounds,
+                                              @NonNull HudNavigationState navigation,
+                                              int alpha) {
+        List<HudNavigationState.TrafficLight> lights = navigation.trafficLights;
+        if (lights.isEmpty()) return;
+        int count = Math.min(4, lights.size());
+        float cellHeight = bounds.height() / count;
+        for (int index = 0; index < count; index++) {
+            HudNavigationState.TrafficLight light = lights.get(index);
+            RectF cell = new RectF(bounds.left, bounds.top + index * cellHeight,
+                    bounds.right, bounds.top + (index + 1) * cellHeight);
+            float diameter = Math.min(cell.height() * .68f, cell.width() * .34f);
+            int color = trafficSignalColor(light.color);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(color, alpha));
+            canvas.drawCircle(cell.left + diameter * .65f, cell.centerY(),
+                    diameter * .42f, paint);
+            String countdown = light.countdown == null ? "" : light.countdown.trim();
+            if (!countdown.isEmpty()) {
+                RectF textBounds = new RectF(cell.left + diameter * 1.3f, cell.top,
+                        cell.right, cell.bottom);
+                drawNavigationTextFit(canvas, countdown, textBounds,
+                        runtime.config.style.primaryColor, alpha, Paint.Align.LEFT,
+                        runtime.config.style, true, 18);
+            }
+        }
+    }
+
+    private static int trafficSignalColor(@Nullable String raw) {
+        String value = raw == null ? "" : raw.toLowerCase(Locale.ROOT);
+        if (value.contains("green") || value.contains("зел")) return 0xFF34C759;
+        if (value.contains("yellow") || value.contains("жел")) return 0xFFFFCC00;
+        if (value.contains("red") || value.contains("крас")) return 0xFFFF3B30;
+        return 0xFF6B7280;
     }
 
     private void drawNavigationInfo(@NonNull Canvas canvas, @NonNull RuntimeElement runtime,
@@ -1200,25 +1446,32 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                                                 @NonNull InstrumentElementConfig element,
                                                 int alpha) {
         if (bounds.isEmpty()) return;
-        if (commandCard.enabled) {
-            float radius = Math.max(0, Math.min(element.options.optInt("maneuverCardCornerRadiusPx", 0),
-                    Math.min(bounds.width(), bounds.height()) / 2));
+        float cardRadius = Math.max(0, Math.min(
+                element.options.optInt("maneuverCardCornerRadiusPx", 0),
+                Math.min(bounds.width(), bounds.height()) / 2));
+        paint.setStyle(Paint.Style.FILL);
+        int cardBackground = navigationColor(element.options.optString(
+                "maneuverCardColor", "#00000000"), 0);
+        paint.setColor(withAlpha(cardBackground, Math.round(
+                Color.alpha(cardBackground) * alpha / 255f)));
+        canvas.drawRoundRect(bounds, cardRadius, cardRadius, paint);
+        float cardBorder = Math.min(Math.max(0,
+                        element.options.optInt("maneuverCardBorderWidthPx", 0)),
+                Math.min(bounds.width(), bounds.height()) / 4);
+        if (cardBorder > 0) {
+            int borderColor = navigationColor(element.options.optString(
+                    "maneuverCardBorderColor", "#00000000"), 0);
+            paint.setColor(withAlpha(borderColor, Math.round(
+                    Color.alpha(borderColor) * alpha / 255f)));
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(cardBorder);
+            RectF outline = new RectF(bounds);
+            outline.inset(cardBorder / 2, cardBorder / 2);
+            canvas.drawRoundRect(outline, Math.max(0, cardRadius - cardBorder / 2),
+                    Math.max(0, cardRadius - cardBorder / 2), paint);
             paint.setStyle(Paint.Style.FILL);
-            int background = navigationColor(element.options.optString("maneuverCardColor", "#00000000"), 0);
-            paint.setColor(withAlpha(background, Math.round(Color.alpha(background) * alpha / 255f)));
-            canvas.drawRoundRect(bounds, radius, radius, paint);
-            float border = Math.min(Math.max(0, element.options.optInt("maneuverCardBorderWidthPx", 0)),
-                    Math.min(bounds.width(), bounds.height()) / 4);
-            if (border > 0) {
-                int borderColor = navigationColor(element.options.optString("maneuverCardBorderColor", "#00000000"), 0);
-                paint.setColor(withAlpha(borderColor, Math.round(Color.alpha(borderColor) * alpha / 255f)));
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(border);
-                RectF outline = new RectF(bounds);
-                outline.inset(border / 2, border / 2);
-                canvas.drawRoundRect(outline, Math.max(0, radius - border / 2), Math.max(0, radius - border / 2), paint);
-                paint.setStyle(Paint.Style.FILL);
-            }
+        }
+        if (commandCard.enabled) {
             int textColor = navigationColor(element.options.optString(
                     "maneuverDetailTextColor", "#FFFFFFFF"), Color.WHITE);
             commandCardRenderer().draw(canvas, commandCard, bounds, element.options,
@@ -1244,7 +1497,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 "maneuverDetailTextSizeSp", 18) * scaledDensity);
         paint.setStyle(Paint.Style.FILL);
         paint.setTypeface(digitalTypeface(element.style, true));
-        paint.setTextSize(Math.min(requested, Math.max(7f, primary.height() * .68f)));
+        paint.setTextSize(requested);
         int primaryColor = navigationColor(element.options.optString(
                 "maneuverDetailTextColor", "#FFFFFFFF"), Color.WHITE);
 
@@ -1282,7 +1535,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             drawNavigationTextFit(canvas, sign.text,
                     insetSides(badge, horizontalPadding, 0f, horizontalPadding, 0f),
                     foreground, alpha, Paint.Align.CENTER, element.style, true,
-                    element.options.optInt("maneuverDetailTextSizeSp", 18));
+                    element.options.optInt("roadBadgeFontSizeSp",
+                            element.options.optInt("maneuverDetailTextSizeSp", 18)));
             cursor = Math.min(primary.right, badge.right + badgeGap);
         }
 
@@ -1292,12 +1546,17 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             drawNavigationTextFit(canvas, detail,
                     new RectF(cursor, primary.top, primary.right, primary.bottom),
                     primaryColor, alpha, Paint.Align.LEFT, element.style, false,
-                    element.options.optInt("maneuverDetailTextSizeSp", 18));
+                    element.options.optInt("directionFontSizeSp",
+                            element.options.optInt("maneuverDetailTextSizeSp", 18)));
         }
 
         if (auxiliary != null && !auxiliary.isEmpty()) {
             int auxiliaryColor = navigationColor(element.options.optString(
-                    "maneuverAuxiliaryColor", "#E60B4DB5"), 0xE60B4DB5);
+                    "auxiliaryColor", element.options.optString(
+                            "maneuverAuxiliaryColor", "#E60B4DB5")), 0xE60B4DB5);
+            int auxiliaryTextColor = navigationColor(element.options.optString(
+                    "auxiliaryTextColor", element.options.optString(
+                            "maneuverAuxiliaryTextColor", "#FFFFFFFF")), Color.WHITE);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(withAlpha(auxiliaryColor, Math.round(
                     Color.alpha(auxiliaryColor) * alpha / 255f)));
@@ -1306,8 +1565,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             drawNavigationTextFit(canvas, runtime.navigationAuxiliaryText,
                     insetSides(auxiliary, Math.max(3f, auxiliary.height() * .18f), 0f,
                             Math.max(3f, auxiliary.height() * .18f), 0f),
-                    primaryColor, alpha, Paint.Align.LEFT, element.style, true,
-                    element.options.optInt("maneuverAuxiliaryTextSizeSp", 14));
+                    auxiliaryTextColor, alpha, Paint.Align.LEFT, element.style, true,
+                    element.options.optInt("auxiliaryFontSizeSp",
+                            element.options.optInt("maneuverAuxiliaryTextSizeSp", 14)));
         }
     }
 
@@ -1322,18 +1582,16 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         paint.setTextAlign(align);
         float requested = Math.max(7f, requestedTextSizeSp
                 * getResources().getDisplayMetrics().scaledDensity);
-        paint.setTextSize(Math.min(requested, Math.max(7f, bounds.height() * .72f)));
-        float measured = paint.measureText(value);
-        if (measured > bounds.width() && measured > 0f) {
-            paint.setTextSize(Math.max(7f, paint.getTextSize() * bounds.width() / measured));
-        }
+        paint.setTextSize(requested);
+        CharSequence displayed = TextUtils.ellipsize(value, paint,
+                Math.max(1f, bounds.width()), TextUtils.TruncateAt.END);
         paint.setColor(withAlpha(color, Math.round(Color.alpha(color) * alpha / 255f)));
         Paint.FontMetrics metrics = paint.getFontMetrics();
         float x = align == Paint.Align.CENTER ? bounds.centerX()
                 : align == Paint.Align.RIGHT ? bounds.right : bounds.left;
         int saved = canvas.save();
         canvas.clipRect(bounds);
-        canvas.drawText(value, x,
+        canvas.drawText(displayed, 0, displayed.length(), x,
                 bounds.centerY() - (metrics.ascent + metrics.descent) * .5f, paint);
         canvas.restoreToCount(saved);
     }
@@ -1661,6 +1919,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             case INSTANT_CONSUMPTION: return frame.instantConsumption;
             case AVERAGE_CONSUMPTION: return frame.averageConsumption;
             case TRIP_CONSUMPTION: return frame.tripConsumption;
+            case CURRENT_TRIP_DISTANCE: return frame.currentTripDistance;
+            case CURRENT_TRIP_DURATION: return frame.currentTripDurationMinutes;
+            case CURRENT_TRIP_AVERAGE_SPEED: return frame.currentTripAverageSpeed;
             case ODOMETER: return frame.odometer;
             case RPM: return frame.rpm;
             case SPEED: return frame.speed;

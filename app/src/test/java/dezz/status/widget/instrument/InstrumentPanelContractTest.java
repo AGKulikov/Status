@@ -14,6 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import dezz.status.widget.car.CurrentTripMetrics;
+import dezz.status.widget.hud.HudElementType;
+
 public final class InstrumentPanelContractTest {
     @Test public void nativeDashboardRoundTripsEveryEditableField() throws Exception {
         InstrumentPanelConfig config = InstrumentPanelConfig.defaults();
@@ -50,7 +53,7 @@ public final class InstrumentPanelContractTest {
         assertEquals(5, InstrumentPanelPreset.values().length);
         assertEquals(6, java.util.Arrays.stream(InstrumentElementType.values())
                 .filter(InstrumentElementType::isAnalogGauge).count());
-        assertEquals(8, java.util.Arrays.stream(InstrumentElementType.values())
+        assertEquals(11, java.util.Arrays.stream(InstrumentElementType.values())
                 .filter(InstrumentElementType::isDigitalGauge).count());
         assertTrue(InstrumentElementType.ANALOG_FUEL_GAUGE.isAnalogGauge());
         assertTrue(InstrumentElementType.ANALOG_BATTERY_GAUGE.isAnalogGauge());
@@ -60,10 +63,92 @@ public final class InstrumentPanelContractTest {
         assertTrue(InstrumentElementType.AVERAGE_CONSUMPTION.isDigitalGauge());
         assertFalse(InstrumentElementType.GEAR.isDigitalGauge());
         assertTrue(InstrumentElementType.TRAFFIC_JAM.usesNavigationState());
+        assertTrue(InstrumentElementType.CURRENT_TRIP_DISTANCE.isDigitalGauge());
+        assertTrue(InstrumentElementType.CURRENT_TRIP_DURATION.isDigitalGauge());
+        assertTrue(InstrumentElementType.CURRENT_TRIP_AVERAGE_SPEED.isDigitalGauge());
 
         config.backgroundBottomColor = "not-a-color";
         config.normalize();
         assertEquals("#FF16283D", config.backgroundBottomColor);
+    }
+
+    @Test public void clusterCatalogMatchesHudNavigationAndExposesCurrentTrip() throws Exception {
+        for (InstrumentElementType type : new InstrumentElementType[]{
+                InstrumentElementType.NAV_MANEUVER_ARROW,
+                InstrumentElementType.NAV_MANEUVER_TITLE,
+                InstrumentElementType.NAV_MANEUVER_SUBTEXT,
+                InstrumentElementType.NAV_STREET,
+                InstrumentElementType.NAV_DESTINATION,
+                InstrumentElementType.NAV_TURN_DISTANCE,
+                InstrumentElementType.NAV_DISTANCE_LEFT,
+                InstrumentElementType.NAV_TIME_LEFT,
+                InstrumentElementType.NAV_ARRIVAL_TIME,
+                InstrumentElementType.NAV_SPEED,
+                InstrumentElementType.NAV_LANES,
+                InstrumentElementType.NAV_LANE_DISTANCE,
+                InstrumentElementType.NAV_MANEUVER_CARD,
+                InstrumentElementType.NAV_TRIP_PROGRESS,
+                InstrumentElementType.NAV_SPEED_LIMIT,
+                InstrumentElementType.NAV_TRAFFIC_LIGHTS,
+                InstrumentElementType.NAV_JAM_PROGRESS,
+                InstrumentElementType.NAV_ROUTE_GRAPHIC}) {
+            assertTrue(type.usesNavigationState());
+        }
+        assertNotNull(HudElementType.NAV_COMBINED);
+        assertEquals(CurrentTripMetrics.DISTANCE_ID,
+                InstrumentElementType.CURRENT_TRIP_DISTANCE.metricId);
+        assertEquals(CurrentTripMetrics.DURATION_ID,
+                InstrumentElementType.CURRENT_TRIP_DURATION.metricId);
+        assertEquals(CurrentTripMetrics.AVERAGE_SPEED_ID,
+                InstrumentElementType.CURRENT_TRIP_AVERAGE_SPEED.metricId);
+        assertEquals(211.5f, CurrentTripMetrics.distanceKilometres(2115), 0.001f);
+        assertEquals(156f, CurrentTripMetrics.durationMinutes(156), 0.001f);
+        assertEquals(81.346f,
+                CurrentTripMetrics.averageSpeedKmh(211.5f, 156f), 0.01f);
+        assertEquals(600_000L, CurrentTripMetrics.STALE_AFTER_MILLIS);
+
+        InstrumentElementConfig oldCard = new InstrumentElementConfig(
+                "old_card", InstrumentElementType.NAV_MANEUVER_CARD,
+                InstrumentStyleFamily.SLATE_HORIZON);
+        oldCard.options = new JSONObject()
+                .put("maneuverAuxiliaryColor", "#FF123456")
+                .put("maneuverAuxiliaryTextColor", "#FFABCDEF");
+        oldCard.normalize(48, 18);
+        assertEquals("#FF123456", oldCard.options.optString("auxiliaryColor"));
+        assertEquals("#FFABCDEF", oldCard.options.optString("auxiliaryTextColor"));
+
+        Path root = projectRoot();
+        String integration = read(root.resolve("app/src/geely/java/dezz/status/widget/car/"
+                + "GeelyCarIntegration.java"));
+        String settings = read(root.resolve("app/src/main/java/dezz/status/widget/"
+                + "InstrumentPanelSettingsActivity.java"));
+        String renderer = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentClusterView.java"));
+        String repository = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentTelemetryRepository.java"));
+        String hudRuntime = read(root.resolve("app/src/main/java/dezz/status/widget/hud/"
+                + "HudRuntimeData.java"));
+        assertTrue(integration.contains("car.getHevManager()"));
+        assertTrue(integration.contains("hev.getTripData()"));
+        assertTrue(integration.contains("source.registerTripListener(listener)"));
+        assertTrue(integration.contains("unregisterTripListener(registration.listener)"));
+        assertTrue(integration.contains("info.getTripDistance()"));
+        assertTrue(integration.contains("info.getTripDuration()"));
+        assertFalse(integration.contains("emitCurrentTrip(subscription, source.getLatestDrivingInfo())"));
+        assertFalse(integration.contains(
+                "emitRealtimeCurrentTrip(subscription, source.getLatestDrivingInfo())"));
+        assertTrue(settings.contains("NAV_MANEUVER_CARD"));
+        assertTrue(renderer.contains("case NAV_MANEUVER_CARD:"));
+        assertTrue(renderer.contains("case CURRENT_TRIP_DISTANCE:"));
+        assertTrue(renderer.contains("case CURRENT_TRIP_DURATION:"));
+        assertTrue(renderer.contains("case CURRENT_TRIP_AVERAGE_SPEED:"));
+        assertTrue(renderer.contains("tripDurationText(frame.currentTripDurationMinutes)"));
+        assertTrue(renderer.contains("scheduleCurrentTripExpiry()"));
+        assertTrue(repository.contains("currentTripFreshUntilElapsedNanos"));
+        assertTrue(repository.contains("CurrentTripMetrics.STALE_AFTER_NANOS"));
+        assertTrue(hudRuntime.contains("main.postDelayed(currentTripExpiry,"
+                + " CurrentTripMetrics.STALE_AFTER_MILLIS)"));
+        assertEquals("ч", InstrumentInfoMetric.CURRENT_TRIP_DURATION.unit);
     }
 
     @Test public void fiveApprovedPresetsAreModularAndOldSchemaMigrates() throws Exception {
@@ -208,6 +293,10 @@ public final class InstrumentPanelContractTest {
         assertTrue(endpoint.contains("MAX_CLUSTER_SURFACE_RECOVERY_ATTEMPTS = 6"));
         assertTrue(endpoint.contains("++nextSurfaceGeneration"));
         assertTrue(endpoint.contains("resetClusterSurfaceRecovery(next.generation)"));
+        assertTrue(endpoint.contains("clusterProjectionEnabled"));
+        assertTrue(endpoint.contains("disableClusterProjection()"));
+        assertTrue(endpoint.contains("new InstrumentPanelStore(target).isEnabled()"));
+        assertTrue(panel.contains("if (!panelStore.isEnabled())"));
         assertFalse(launcher.contains("am force-stop"));
         assertFalse(launcher.contains("prepareInstrumentPanelLaunch("));
         assertTrue(launcher.contains("coordinator.request(automatic, reassertDim, reason)"));
@@ -232,7 +321,7 @@ public final class InstrumentPanelContractTest {
                 + "InstrumentPanelSettingsActivity.java"));
 
         assertTrue(type.contains("NAVIGATION_ROUTE_SUMMARY(\"Сводка маршрута · как в Навигаторе\""));
-        assertTrue(type.contains("this == NAVIGATION_ROUTE_SUMMARY"));
+        assertTrue(InstrumentElementType.NAVIGATION_ROUTE_SUMMARY.usesNavigationState());
         assertTrue(config.contains("applyRouteSummaryDefaults()"));
         assertTrue(config.contains("showManeuverIcon\", false"));
         assertTrue(config.contains("showManeuverDetails\", false"));
@@ -358,6 +447,11 @@ public final class InstrumentPanelContractTest {
         assertTrue(launcher.contains("DIM_WAKE_TO_TASK_RESET_MS = 200L"));
         assertTrue(launcher.contains("finishStalePanelTask"));
         assertTrue(launcher.contains("ensureClusterEndpointStarted(app)"));
+        assertTrue(launcher.contains("disableClusterProjection()"));
+        assertTrue(launcher.contains("finishForExplicitClose()"));
+        assertTrue(launcher.contains("finishStalePanelTask(app, -1)"));
+        assertTrue(launcher.contains("switchDimMode(app, DIM_STOCK_MODE)"));
+        assertTrue(launcher.contains("panel closed dim accepted="));
         assertFalse(launcher.contains("prepareInstrumentPanelLaunch"));
         assertFalse(launcher.contains("am force-stop"));
         assertFalse(launcher.contains("PrivilegedShell"));

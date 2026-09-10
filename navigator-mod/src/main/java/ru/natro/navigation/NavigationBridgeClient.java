@@ -215,12 +215,17 @@ final class NavigationBridgeClient {
                                                      long jamFingerprint,
                                                      RoutePolylineStyler.JamStyle jamStyle,
                                                      NavigatorStatePublisher.NavigationFrame
-                                                             navigationFrame) {
+                                                             navigationFrame,
+                                                     java.util.List<?> alternatives,
+                                                     java.util.List<?> routeEvents,
+                                                     long routeEventsFingerprint) {
                 mainMapController.updateRoute(routeEpoch, drivingRoute);
                 hudMapRenderer.updateRoute(
-                        routeEpoch, drivingRoute, jamFingerprint, jamStyle);
+                        routeEpoch, drivingRoute, jamFingerprint, jamStyle,
+                        alternatives, routeEvents, routeEventsFingerprint);
                 clusterMapRenderer.updateRoute(
-                        routeEpoch, drivingRoute, jamFingerprint, jamStyle);
+                        routeEpoch, drivingRoute, jamFingerprint, jamStyle,
+                        alternatives, routeEvents, routeEventsFingerprint);
                 // Install the current DrivingRoute wrapper before applying the primitive frame so
                 // both maps trim against the exact RoutePosition read once by the publisher.
                 hudMapRenderer.updateNavigationState(navigationFrame);
@@ -391,11 +396,10 @@ final class NavigationBridgeClient {
             launchOptions.putInt("android.activity.SplitScreenShownPosition", 0);
             try {
                 context.startActivity(intent, launchOptions);
-                // InstrumentDisplayLauncher intentionally force-stops Natro before this runnable.
-                // Some Android 9 ECARX builds keep the old ServiceConnection marked as bound and
-                // therefore never run the normal exponential retry after the new panel process is
-                // alive. Revalidate the exact Binder immediately so the already-published cluster
-                // Surface does not wait for opening Natro Settings.
+                // This compatibility command is no longer used by Natro's normal launcher, which
+                // keeps its process alive. If an older paired host still requests the external
+                // hand-off, revalidate the exact Binder after Activity creation so an already
+                // published cluster Surface does not wait for an unrelated Settings transition.
                 main.postDelayed(this::reconnectAfterInstrumentLaunch,
                         INSTRUMENT_BRIDGE_RECONNECT_MS);
                 sendDiagnostic("Navigator externally launched Natro instrument panel on display "
@@ -414,8 +418,8 @@ final class NavigationBridgeClient {
         Messenger current = remote;
         IBinder binder = current == null ? null : current.getBinder();
         if (binder != null && binder.isBinderAlive() && binder.pingBinder()) {
-            // If package reset was unavailable, the existing connection is still authoritative;
-            // HELLO makes the endpoint replay the latest cluster lease without tearing MapKit down.
+            // The existing connection is still authoritative; HELLO makes a compatible old host
+            // replay its latest cluster lease without tearing the independent MapKit window down.
             sendHello();
             return;
         }
