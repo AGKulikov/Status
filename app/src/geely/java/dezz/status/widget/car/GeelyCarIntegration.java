@@ -36,8 +36,6 @@ import com.ecarx.xui.adaptapi.car.ICar;
 import com.ecarx.xui.adaptapi.car.base.ICarFunction;
 import com.ecarx.xui.adaptapi.car.base.ICarInfo;
 import com.ecarx.xui.adaptapi.car.hvac.IHvac;
-import com.ecarx.xui.adaptapi.car.hev.IHev;
-import com.ecarx.xui.adaptapi.car.hev.ITripData;
 import com.ecarx.xui.adaptapi.car.sensor.ISensor;
 import com.ecarx.xui.adaptapi.car.sensor.ISensorEvent;
 import com.ecarx.xui.adaptapi.car.vehicle.IBcm;
@@ -220,7 +218,6 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final String HIGH_BEAM_ID = "IBcm.high_beam";
     private static final String PASSENGER_OCCUPATION_ID =
             "ISensor.seat_occupation_status_passenger";
-    private static final long CURRENT_TRIP_RETRY_MS = 5_000L;
 
     private final Context appContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -288,8 +285,6 @@ final class GeelyCarIntegration implements CarIntegration {
 
     @Nullable
     private volatile ISensor sensors;
-    @Nullable
-    private volatile ITripData tripData;
     /**
      * Last successfully registered source for the visible outdoor-temperature brick.
      *
@@ -312,6 +307,7 @@ final class GeelyCarIntegration implements CarIntegration {
     private volatile ICarFunction carFunctions;
     private final EcarxSignalFallback signalFallback;
     private final EcarxHudModeAccess hudModeAccess;
+    private final EcarxTrip2Access trip2Access;
     private final Object adasRecorderLock = new Object();
     private final Map<Integer, Integer> lastRecordedAdasSignals = new HashMap<>();
     private final Map<Integer, byte[]> lastRecordedAdasBinarySignals = new HashMap<>();
@@ -426,17 +422,6 @@ final class GeelyCarIntegration implements CarIntegration {
         final ISensor.ISensorListener listener;
 
         VendorRegistration(ISensor source, ISensor.ISensorListener listener) {
-            this.source = source;
-            this.listener = listener;
-        }
-    }
-
-    /** A trip listener must be removed from the exact manager which registered it. */
-    private static final class TripRegistration {
-        final ITripData source;
-        final ITripData.ITripListener listener;
-
-        TripRegistration(ITripData source, ITripData.ITripListener listener) {
             this.source = source;
             this.listener = listener;
         }
@@ -613,8 +598,7 @@ final class GeelyCarIntegration implements CarIntegration {
         /** Accessed only by telemetryWorker. */
         final List<VendorRegistration> vendorListeners = new ArrayList<>();
         /** Accessed only by telemetryWorker. */
-        final List<TripRegistration> tripListeners = new ArrayList<>();
-        final AtomicBoolean tripRetryScheduled = new AtomicBoolean(false);
+        @Nullable EcarxTrip2Access.Listener trip2Listener;
         /** Worker-thread-only per-listener dedupe; new listeners still receive an initial state. */
         final Map<String, Integer> lastBcmValues = new HashMap<>();
         /** Guarded by this subscription; only the latest fast samples may wait for main Looper. */
@@ -642,8 +626,7 @@ final class GeelyCarIntegration implements CarIntegration {
         /** Accessed only by telemetryWorker except for vendor callback iteration. */
         final List<VendorRegistration> vendorListeners = new ArrayList<>();
         /** Accessed only by telemetryWorker. */
-        final List<TripRegistration> tripListeners = new ArrayList<>();
-        final AtomicBoolean tripRetryScheduled = new AtomicBoolean(false);
+        @Nullable EcarxTrip2Access.Listener trip2Listener;
 
         RealtimeTelemetrySubscription(RealtimeTelemetryListener listener,
                                       Set<String> metricIds) {
@@ -1127,6 +1110,7 @@ final class GeelyCarIntegration implements CarIntegration {
     GeelyCarIntegration(@NonNull Context appContext) {
         this.appContext = appContext;
         hudModeAccess = new EcarxHudModeAccess(appContext);
+        trip2Access = new EcarxTrip2Access(appContext);
         signalFallback = new EcarxSignalFallback(appContext,
                 new EcarxSignalFallback.Listener() {
                     @Override public void onGear(int adaptGear, int actualGear,
@@ -1584,24 +1568,6 @@ final class GeelyCarIntegration implements CarIntegration {
         return sensors;
     }
 
-    /** Resolve the public HEV trip manager; null during boot remains retryable. */
-    @Nullable
-    private synchronized ITripData ensureTripData() {
-        if (tripData != null) return tripData;
-        try {
-            ICar car = ensureCarApi();
-            if (car == null) return null;
-            IHev hev = car.getHevManager();
-            tripData = hev == null ? null : hev.getTripData();
-            if (tripData == null) Log.w(TAG, "eCarX trip manager is not ready; will retry");
-        } catch (Throwable error) {
-            tripData = null;
-            carApi = null;
-            Log.w(TAG, "eCarX trip manager unavailable; will retry", error);
-        }
-        return tripData;
-    }
-
     /** Resolve the generic read/write function manager used by HVAC and vehicle controls. */
     @Nullable
     private synchronized ICarFunction ensureCarFunctions() {
@@ -1644,7 +1610,6 @@ final class GeelyCarIntegration implements CarIntegration {
      */
     private synchronized void invalidateCarServices() {
         sensors = null;
-        tripData = null;
         carFunctions = null;
         carApi = null;
         // Recreating the complete car-service stack is a real sensor-source boundary. Never
@@ -1676,13 +1641,6 @@ final class GeelyCarIntegration implements CarIntegration {
         }
     }
 
-    private synchronized void invalidateTripProxy(@Nullable ITripData failed) {
-        if (failed == null || tripData == failed) {
-            tripData = null;
-            carApi = null;
-        }
-    }
-
     @Override
     public void requestDiagnostics(@NonNull DiagnosticsListener listener) {
         // Binder reads may block while the vehicle service wakes, so never run them on the UI.
@@ -1699,9 +1657,37 @@ final class GeelyCarIntegration implements CarIntegration {
                 if (s == null) addUnavailableSensor(values, TELEMETRY_SIGNALS[index]);
                 else addSensor(values, s, TELEMETRY_SIGNALS[index]);
             }
+            addTrip2Diagnostics(values);
             addTireDiagnostics(values);
             mainHandler.post(() -> listener.onDiagnostics(values));
         }, "ecarx-diagnostics").start();
+    }
+
+    private void addTrip2Diagnostics(@NonNull List<CarDiagnosticValue> out) {
+        EcarxTrip2Access.Sample sample = trip2Access.latestSample();
+        if (sample == null) {
+            out.add(new CarDiagnosticValue("PA_TS_OdometerTripMeter2",
+                    "Пробег поездки 2", "unavailable", "—",
+                    "raw PA; manager=33751; дождитесь первого активного PA callback"));
+            out.add(new CarDiagnosticValue("PA_TS_EDT_time2",
+                    "Время поездки 2", "unavailable", "—",
+                    "raw PA; manager=33749; дождитесь первого активного PA callback"));
+            return;
+        }
+        float distance = CurrentTripMetrics.distanceKilometres(
+                sample.distanceRaw);
+        float duration = CurrentTripMetrics.durationMinutes(sample.durationRaw);
+        out.add(new CarDiagnosticValue("PA_TS_OdometerTripMeter2",
+                "Пробег поездки 2", "active",
+                Integer.toString(sample.distanceRaw),
+                "raw PA; manager=33751; format=" + sample.distanceFormat
+                        + "; status=" + sample.distanceStatus,
+                Float.isFinite(distance) ? distance : null));
+        out.add(new CarDiagnosticValue("PA_TS_EDT_time2",
+                "Время поездки 2", "active", Integer.toString(sample.durationRaw),
+                "raw PA; manager=33749; format=" + sample.durationFormat
+                        + "; status=" + sample.durationStatus,
+                Float.isFinite(duration) ? duration : null));
     }
 
     private static void addUnavailableSensor(List<CarDiagnosticValue> out,
@@ -2689,172 +2675,91 @@ final class GeelyCarIntegration implements CarIntegration {
 
     private void registerRealtimeCurrentTrip(
             @NonNull RealtimeTelemetrySubscription subscription) {
-        ITripData source = ensureTripData();
-        if (source == null) {
-            requestCurrentTripRetry(subscription);
-            return;
-        }
-        ITripData.ITripListener listener = new ITripData.ITripListener() {
-            @Override public void onAvgEnergyInfoUpdate(ITripData.IAvgEnergyInfo ignored) {}
-
-            @Override public void onDrivingInfoUpdate(ITripData.IDrivingInfo info) {
-                if (!subscription.cancelled.get()) emitRealtimeCurrentTrip(subscription, info);
-            }
+        EcarxTrip2Access.Listener listener = sample -> {
+            if (!subscription.cancelled.get()) emitRealtimeCurrentTrip(subscription, sample);
         };
-        try {
-            source.registerTripListener(listener);
-            subscription.tripListeners.add(new TripRegistration(source, listener));
-            // This ECARX JAR constructs a zero-filled DrivingInfo before the first PA event and
-            // getLatestDrivingInfo() returns that mutable object unconditionally. Only the
-            // callback is positive freshness evidence; a real trip reset to zero still arrives
-            // through the same callback and is therefore preserved.
-        } catch (Throwable error) {
-            invalidateTripProxy(source);
-            Log.w(TAG, "realtime current-trip subscription failed", error);
-            requestCurrentTripRetry(subscription);
-        }
+        subscription.trip2Listener = listener;
+        trip2Access.addListener(listener);
     }
 
     private void registerCurrentTripTelemetry(@NonNull TelemetrySubscription subscription) {
-        ITripData source = ensureTripData();
-        if (source == null) {
-            requestCurrentTripRetry(subscription);
-            return;
-        }
-        ITripData.ITripListener listener = new ITripData.ITripListener() {
-            @Override public void onAvgEnergyInfoUpdate(ITripData.IAvgEnergyInfo ignored) {}
-
-            @Override public void onDrivingInfoUpdate(ITripData.IDrivingInfo info) {
-                if (!subscription.cancelled.get()) emitCurrentTrip(subscription, info);
-            }
+        EcarxTrip2Access.Listener listener = sample -> {
+            if (!subscription.cancelled.get()) emitCurrentTrip(subscription, sample);
         };
-        try {
-            source.registerTripListener(listener);
-            subscription.tripListeners.add(new TripRegistration(source, listener));
-            // Do not publish the implementation's zero-filled pre-callback cache as a real trip.
-        } catch (Throwable error) {
-            invalidateTripProxy(source);
-            Log.w(TAG, "current-trip subscription failed", error);
-            requestCurrentTripRetry(subscription);
-        }
+        subscription.trip2Listener = listener;
+        trip2Access.addListener(listener);
     }
 
     private void emitCurrentTrip(@NonNull TelemetrySubscription subscription,
-                                 @Nullable ITripData.IDrivingInfo info) {
-        if (info == null || subscription.cancelled.get()) {
-            if (info == null) requestCurrentTripRetry(subscription);
-            return;
+                                 @NonNull EcarxTrip2Access.Sample sample) {
+        if (subscription.cancelled.get()) return;
+        long ageNanos = SystemClock.elapsedRealtimeNanos()
+                - sample.observedAtElapsedNanos;
+        if (ageNanos < 0L || ageNanos > CurrentTripMetrics.STALE_AFTER_NANOS) return;
+        float distance = CurrentTripMetrics.distanceKilometres(
+                sample.distanceRaw);
+        float duration = CurrentTripMetrics.durationMinutes(sample.durationRaw);
+        float averageSpeed = CurrentTripMetrics.averageSpeedKmh(distance, duration);
+        long observedAt = Math.max(0L, System.currentTimeMillis()
+                - ageNanos / 1_000_000L);
+        if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)
+                && Float.isFinite(distance)) {
+            deliverTelemetry(subscription, new TelemetryValue(CurrentTripMetrics.DISTANCE_ID,
+                    CurrentTripMetrics.DISTANCE_LABEL, distance, "km", observedAt));
         }
-        try {
-            float distance = CurrentTripMetrics.distanceKilometres(info.getTripDistance());
-            float duration = CurrentTripMetrics.durationMinutes(info.getTripDuration());
-            float averageSpeed = CurrentTripMetrics.averageSpeedKmh(distance, duration);
-            long observedAt = System.currentTimeMillis();
-            if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)
-                    && Float.isFinite(distance)) {
-                deliverTelemetry(subscription, new TelemetryValue(CurrentTripMetrics.DISTANCE_ID,
-                        CurrentTripMetrics.DISTANCE_LABEL, distance, "km", observedAt));
-            }
-            if (subscription.metricIds.contains(CurrentTripMetrics.DURATION_ID)
-                    && Float.isFinite(duration)) {
-                deliverTelemetry(subscription, new TelemetryValue(CurrentTripMetrics.DURATION_ID,
-                        CurrentTripMetrics.DURATION_LABEL, duration, "min", observedAt));
-            }
-            if (subscription.metricIds.contains(CurrentTripMetrics.AVERAGE_SPEED_ID)
-                    && Float.isFinite(averageSpeed)) {
-                deliverTelemetry(subscription, new TelemetryValue(
-                        CurrentTripMetrics.AVERAGE_SPEED_ID,
-                        CurrentTripMetrics.AVERAGE_SPEED_LABEL, averageSpeed, "km/h", observedAt));
-            }
-        } catch (Throwable error) {
-            invalidateTripProxy(null);
-            Log.w(TAG, "current-trip callback failed", error);
-            requestCurrentTripRetry(subscription);
+        if (subscription.metricIds.contains(CurrentTripMetrics.DURATION_ID)
+                && Float.isFinite(duration)) {
+            deliverTelemetry(subscription, new TelemetryValue(CurrentTripMetrics.DURATION_ID,
+                    CurrentTripMetrics.DURATION_LABEL, duration, "min", observedAt));
+        }
+        if (subscription.metricIds.contains(CurrentTripMetrics.AVERAGE_SPEED_ID)
+                && Float.isFinite(averageSpeed)) {
+            deliverTelemetry(subscription, new TelemetryValue(
+                    CurrentTripMetrics.AVERAGE_SPEED_ID,
+                    CurrentTripMetrics.AVERAGE_SPEED_LABEL, averageSpeed, "km/h", observedAt));
         }
     }
 
     private void emitRealtimeCurrentTrip(
             @NonNull RealtimeTelemetrySubscription subscription,
-            @Nullable ITripData.IDrivingInfo info) {
-        if (info == null || subscription.cancelled.get()) {
-            if (info == null) requestCurrentTripRetry(subscription);
-            return;
+            @NonNull EcarxTrip2Access.Sample sample) {
+        if (subscription.cancelled.get()) return;
+        long ageNanos = SystemClock.elapsedRealtimeNanos()
+                - sample.observedAtElapsedNanos;
+        if (ageNanos < 0L || ageNanos > CurrentTripMetrics.STALE_AFTER_NANOS) return;
+        float distance = CurrentTripMetrics.distanceKilometres(
+                sample.distanceRaw);
+        float duration = CurrentTripMetrics.durationMinutes(sample.durationRaw);
+        float averageSpeed = CurrentTripMetrics.averageSpeedKmh(distance, duration);
+        long observedAt = sample.observedAtElapsedNanos;
+        if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)
+                && Float.isFinite(distance)) {
+            deliverRealtimeTelemetry(subscription, CurrentTripMetrics.DISTANCE_ID,
+                    distance, observedAt);
         }
-        try {
-            float distance = CurrentTripMetrics.distanceKilometres(info.getTripDistance());
-            float duration = CurrentTripMetrics.durationMinutes(info.getTripDuration());
-            float averageSpeed = CurrentTripMetrics.averageSpeedKmh(distance, duration);
-            long observedAt = SystemClock.elapsedRealtimeNanos();
-            if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)
-                    && Float.isFinite(distance)) {
-                deliverRealtimeTelemetry(subscription, CurrentTripMetrics.DISTANCE_ID,
-                        distance, observedAt);
-            }
-            if (subscription.metricIds.contains(CurrentTripMetrics.DURATION_ID)
-                    && Float.isFinite(duration)) {
-                deliverRealtimeTelemetry(subscription, CurrentTripMetrics.DURATION_ID,
-                        duration, observedAt);
-            }
-            if (subscription.metricIds.contains(CurrentTripMetrics.AVERAGE_SPEED_ID)
-                    && Float.isFinite(averageSpeed)) {
-                deliverRealtimeTelemetry(subscription, CurrentTripMetrics.AVERAGE_SPEED_ID,
-                        averageSpeed, observedAt);
-            }
-        } catch (Throwable error) {
-            invalidateTripProxy(null);
-            Log.w(TAG, "realtime current-trip callback failed", error);
-            requestCurrentTripRetry(subscription);
+        if (subscription.metricIds.contains(CurrentTripMetrics.DURATION_ID)
+                && Float.isFinite(duration)) {
+            deliverRealtimeTelemetry(subscription, CurrentTripMetrics.DURATION_ID,
+                    duration, observedAt);
+        }
+        if (subscription.metricIds.contains(CurrentTripMetrics.AVERAGE_SPEED_ID)
+                && Float.isFinite(averageSpeed)) {
+            deliverRealtimeTelemetry(subscription, CurrentTripMetrics.AVERAGE_SPEED_ID,
+                    averageSpeed, observedAt);
         }
     }
 
-    private void requestCurrentTripRetry(@NonNull TelemetrySubscription subscription) {
-        if (subscription.cancelled.get()
-                || !subscription.tripRetryScheduled.compareAndSet(false, true)) return;
-        mainHandler.postDelayed(() -> {
-            subscription.tripRetryScheduled.set(false);
-            if (subscription.cancelled.get()) return;
-            executeTelemetryTask(() -> {
-                unregisterTripListeners(subscription);
-                registerCurrentTripTelemetry(subscription);
-            });
-        }, CURRENT_TRIP_RETRY_MS);
+    private void unregisterTripListeners(@NonNull TelemetrySubscription subscription) {
+        EcarxTrip2Access.Listener listener = subscription.trip2Listener;
+        subscription.trip2Listener = null;
+        trip2Access.removeListener(listener);
     }
 
-    private void requestCurrentTripRetry(
+    private void unregisterRealtimeTripListeners(
             @NonNull RealtimeTelemetrySubscription subscription) {
-        if (subscription.cancelled.get()
-                || !subscription.tripRetryScheduled.compareAndSet(false, true)) return;
-        mainHandler.postDelayed(() -> {
-            subscription.tripRetryScheduled.set(false);
-            if (subscription.cancelled.get()) return;
-            executeTelemetryTask(() -> {
-                unregisterRealtimeTripListeners(subscription);
-                registerRealtimeCurrentTrip(subscription);
-            });
-        }, CURRENT_TRIP_RETRY_MS);
-    }
-
-    private static void unregisterTripListeners(@NonNull TelemetrySubscription subscription) {
-        for (TripRegistration registration : subscription.tripListeners) {
-            try {
-                registration.source.unregisterTripListener(registration.listener);
-            } catch (Throwable error) {
-                Log.w(TAG, "current-trip unregister failed", error);
-            }
-        }
-        subscription.tripListeners.clear();
-    }
-
-    private static void unregisterRealtimeTripListeners(
-            @NonNull RealtimeTelemetrySubscription subscription) {
-        for (TripRegistration registration : subscription.tripListeners) {
-            try {
-                registration.source.unregisterTripListener(registration.listener);
-            } catch (Throwable error) {
-                Log.w(TAG, "realtime current-trip unregister failed", error);
-            }
-        }
-        subscription.tripListeners.clear();
+        EcarxTrip2Access.Listener listener = subscription.trip2Listener;
+        subscription.trip2Listener = null;
+        trip2Access.removeListener(listener);
     }
 
     private void activateTelemetrySubscription(TelemetrySubscription subscription) {
@@ -5002,6 +4907,7 @@ final class GeelyCarIntegration implements CarIntegration {
             cancelActiveControlCommandsOnWorker("ECARX остановлен");
         });
         hudModeAccess.close();
+        trip2Access.close();
         signalFallback.shutdown();
         telemetryWorker.shutdown();
         controlWorker.shutdown();

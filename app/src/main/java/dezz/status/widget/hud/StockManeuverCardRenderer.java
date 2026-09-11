@@ -73,14 +73,17 @@ public final class StockManeuverCardRenderer {
         try {
             canvas.clipRect(bounds);
             drawMain(canvas, state, icon, alpha, signTint, textTint);
-            label(canvas, state.distance, inset(distance, options, "text", 0, scale), color, alpha,
-                    options.optInt("distanceFontSizeSp", fontSize) * scale, Math.max(600, weight), 1, Layout.Alignment.ALIGN_NORMAL);
+            labelFixed(canvas, state.distance, inset(distance, options, "text", 0, scale),
+                    color, alpha, options.optInt("distanceFontSizeSp", fontSize) * scale,
+                    Math.max(600, weight), maxLines(options, "distanceSingleLine"),
+                    Layout.Alignment.ALIGN_NORMAL);
             float y = main.bottom + gap;
             if (road) {
                 RectF row = new RectF(bounds.left, y, bounds.right, y + detailHeight);
                 labelFixed(canvas, state.nextRoad, inset(row, options, "text", 0, scale), detailColor, 255,
                         options.optInt("directionFontSizeSp", Math.max(8, fontSize / 2)) * scale,
-                        weight, 2, Layout.Alignment.ALIGN_NORMAL);
+                        weight, maxLines(options, "directionSingleLine"),
+                        Layout.Alignment.ALIGN_NORMAL);
                 y += detailHeight + gap;
             }
             if (signs) {
@@ -104,7 +107,8 @@ public final class StockManeuverCardRenderer {
                                 content.left + prefixWidth, content.bottom);
                         labelFixed(canvas, state.auxiliaryText, prefix, auxiliaryTextColor, alpha,
                                 options.optInt("auxiliaryFontSizeSp", Math.max(8, fontSize / 2))
-                                        * scale, weight, 1, Layout.Alignment.ALIGN_NORMAL);
+                                * scale, weight, maxLines(options, "auxiliarySingleLine"),
+                                Layout.Alignment.ALIGN_NORMAL);
                         content.left = Math.min(content.right, prefix.right + gap);
                     }
                     resources.drawLanes(canvas, state.auxiliaryLanes, content, alpha, signTint);
@@ -115,7 +119,10 @@ public final class StockManeuverCardRenderer {
                         content.left += side + gap;
                     }
                     labelFixed(canvas, state.auxiliaryText, content, auxiliaryTextColor, alpha,
-                            options.optInt("auxiliaryFontSizeSp", Math.max(8, fontSize / 2)) * scale, weight, 1, Layout.Alignment.ALIGN_NORMAL);
+                            options.optInt("auxiliaryFontSizeSp", Math.max(8, fontSize / 2))
+                                    * scale, weight,
+                            maxLines(options, "auxiliarySingleLine"),
+                            Layout.Alignment.ALIGN_NORMAL);
                 }
                 y += detailHeight + gap;
             }
@@ -150,7 +157,9 @@ public final class StockManeuverCardRenderer {
             else labelFixed(canvas, sign.text,
                     new RectF(box.left + Math.min(padding, box.width() / 3), box.top,
                             box.right - Math.min(padding, box.width() / 3), box.bottom),
-                    textColor, alpha, font, weight, 1, Layout.Alignment.ALIGN_CENTER);
+                    textColor, alpha, font, weight,
+                    maxLines(options, "roadBadgeSingleLine"),
+                    Layout.Alignment.ALIGN_CENTER);
             x += width + gap;
         }
     }
@@ -182,9 +191,12 @@ public final class StockManeuverCardRenderer {
         text.setTextSize(Math.max(1, size));
         int width = Math.max(1, (int) bounds.width());
         int maxLines = Math.max(1, lines);
-        CharSequence displayed = value;
+        String normalized = maxLines == 1
+                ? value.replace('\n', ' ').replace('\r', ' ') : value;
+        CharSequence displayed = normalized;
         if (maxLines == 1) {
-            displayed = TextUtils.ellipsize(value, text, width, TextUtils.TruncateAt.END);
+            displayed = TextUtils.ellipsize(
+                    normalized, text, width, TextUtils.TruncateAt.END);
         }
         StaticLayout layout = StaticLayout.Builder.obtain(displayed, 0, displayed.length(),
                         text, width)
@@ -218,6 +230,9 @@ public final class StockManeuverCardRenderer {
         if (value instanceof Number) return ((Number) value).intValue();
         try { return value instanceof String ? Color.parseColor((String) value) : fallback; }
         catch (IllegalArgumentException invalid) { return fallback; }
+    }
+    private static int maxLines(JSONObject options, String key) {
+        return options.optBoolean(key, true) ? 1 : 2;
     }
     private static int clamp(int value, int min, int max) { return Math.max(min, Math.min(max, value)); }
 }

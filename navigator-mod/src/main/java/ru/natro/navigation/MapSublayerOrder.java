@@ -21,7 +21,6 @@ final class MapSublayerOrder {
     static final String CAMERA_SIGNS = "ru.natro.navigation.camera_signs";
     static final String ALTERNATIVE_ROUTES = "ru.natro.navigation.alternative_routes";
     static final String ROUTE = "ru.natro.navigation.route";
-    static final String ROUTE_STREET_LABELS = "ru.natro.navigation.route_street_labels";
     static final String ALTERNATIVE_CALLOUTS = "ru.natro.navigation.alternative_callouts";
     static final String DESTINATION = "ru.natro.navigation.destination";
     static final String SPEED_BUMPS = "ru.natro.navigation.speed_bumps";
@@ -114,10 +113,7 @@ final class MapSublayerOrder {
                                                   String roadEvents, String routePins,
                                                   String userLocation) throws Exception {
         LayerRef base = placemarkFloor(manager, mapBase, traffic);
-        placeAfter(manager, ref(ROUTE_STREET_LABELS, PLACEMARKS), base);
-        LayerRef routeLabels = firstExisting(manager,
-                ref(ROUTE_STREET_LABELS, PLACEMARKS), base);
-        placeAfter(manager, ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), routeLabels);
+        placeAfter(manager, ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), base);
         LayerRef events = firstExisting(manager, ref(roadEvents, PLACEMARKS),
                 ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), base);
         placeAfter(manager, ref(CAMERA_SIGNS, PLACEMARKS), events);
@@ -161,8 +157,6 @@ final class MapSublayerOrder {
                                                String roadEvents,
                                                NavigationMapProfile profile) throws Exception {
         ArrayList<LayerRef> custom = new ArrayList<>();
-        custom.add(new LayerRef(ROUTE_STREET_LABELS, PLACEMARKS,
-                profile.effectiveRoutePriority(), -2));
         custom.add(new LayerRef(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS,
                 profile.effectiveRouteTrafficLightPriority(), -1));
         custom.add(new LayerRef(CAMERA_SIGNS, PLACEMARKS,

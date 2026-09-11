@@ -141,6 +141,8 @@ public final class InstrumentElementConfig {
             options.put("showManeuverDetails", true);
             options.put("showDirection", true);
             options.put("showRoadBadge", true);
+            options.put("autoWidth", false);
+            options.put("autoHeight", false);
             options.put("sourceImageOnly", true);
             options.put("arrowLayout", "LEFT");
             options.put("arrowAreaPercent", 38);
@@ -149,9 +151,13 @@ public final class InstrumentElementConfig {
             options.put("distanceAreaPercent", 56);
             options.put("textRowGapPx", 2);
             options.put("distanceFontSizeSp", 34);
+            options.put("distanceSingleLine", true);
             options.put("directionFontSizeSp", 18);
+            options.put("directionSingleLine", true);
             options.put("roadBadgeFontSizeSp", 18);
+            options.put("roadBadgeSingleLine", true);
             options.put("auxiliaryFontSizeSp", 14);
+            options.put("auxiliarySingleLine", true);
             options.put("maneuverDetailTextSizeSp", 18);
             options.put("maneuverAuxiliaryTextSizeSp", 14);
             options.put("maneuverCardColor", "#FF0758E8");
@@ -194,6 +200,10 @@ public final class InstrumentElementConfig {
 
     private void normalizeNavigationInfoOptions() {
         try {
+            if (type == InstrumentElementType.NAV_MANEUVER_CARD) {
+                options.put("autoWidth", options.optBoolean("autoWidth", false));
+                options.put("autoHeight", options.optBoolean("autoHeight", false));
+            }
             String[] paddingKeys = {"contentPaddingLeftPx", "contentPaddingTopPx",
                     "contentPaddingRightPx", "contentPaddingBottomPx",
                     "maneuverIconPaddingLeftPx", "maneuverIconPaddingTopPx",
@@ -230,6 +240,10 @@ public final class InstrumentElementConfig {
                     options.optInt("maneuverDetailTextSizeSp", 18)), 8, 120));
             options.put("auxiliaryFontSizeSp", clamp(options.optInt("auxiliaryFontSizeSp",
                     options.optInt("maneuverAuxiliaryTextSizeSp", 14)), 8, 120));
+            for (String key : new String[]{"distanceSingleLine", "directionSingleLine",
+                    "roadBadgeSingleLine", "auxiliarySingleLine"}) {
+                options.put(key, options.optBoolean(key, true));
+            }
             String auxiliaryColor = options.optString("auxiliaryColor",
                     options.optString("maneuverAuxiliaryColor", "#E60B4DB5")).trim();
             String auxiliaryTextColor = options.optString("auxiliaryTextColor",

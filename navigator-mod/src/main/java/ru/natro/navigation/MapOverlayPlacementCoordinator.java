@@ -42,6 +42,23 @@ final class MapOverlayPlacementCoordinator {
             "LEFT_CENTER", "RIGHT_CENTER", "BOTTOM_LEFT", "BOTTOM_RIGHT",
             "TOP_LEFT", "TOP_RIGHT", "BOTTOM_CENTER", "TOP_CENTER"
     };
+    private static final Candidate CENTER = new Candidate(.50f, .50f, "CENTER");
+    private static final Candidate[] RIGHT_FIRST_CANDIDATES = {
+            new Candidate(-.08f, .50f, "LEFT_CENTER"),
+            new Candidate(1.08f, .50f, "RIGHT_CENTER"),
+            new Candidate(-.05f, 1.05f, "BOTTOM_LEFT"),
+            new Candidate(1.05f, 1.05f, "BOTTOM_RIGHT"),
+            new Candidate(-.05f, -.05f, "TOP_LEFT"),
+            new Candidate(1.05f, -.05f, "TOP_RIGHT"),
+            new Candidate(.50f, 1.08f, "BOTTOM_CENTER"),
+            new Candidate(.50f, -.08f, "TOP_CENTER")
+    };
+    private static final Candidate[] LEFT_FIRST_CANDIDATES = {
+            RIGHT_FIRST_CANDIDATES[1], RIGHT_FIRST_CANDIDATES[0],
+            RIGHT_FIRST_CANDIDATES[3], RIGHT_FIRST_CANDIDATES[2],
+            RIGHT_FIRST_CANDIDATES[5], RIGHT_FIRST_CANDIDATES[4],
+            RIGHT_FIRST_CANDIDATES[6], RIGHT_FIRST_CANDIDATES[7]
+    };
 
     private final ArrayList<Reservation> reservations = new ArrayList<>();
     private final ArrayList<RoutePoint> routePoints = new ArrayList<>();
@@ -127,9 +144,8 @@ final class MapOverlayPlacementCoordinator {
         if (cursorFootprintPx <= 0 || !validCoordinate(vehicleLatitude, vehicleLongitude)) return;
         float[] screen = projectOrNull(vehicleLatitude, vehicleLongitude);
         if (screen == null) return;
-        Candidate centered = new Candidate(.50f, .50f, "CENTER");
         RectF occupied = rect(screen[0], screen[1], cursorFootprintPx,
-                cursorFootprintPx, centered);
+                cursorFootprintPx, CENTER);
         occupied.inset(-ITEM_MARGIN_PX, -ITEM_MARGIN_PX);
         reservations.add(new Reservation(OWNER_CURSOR, OWNER_CURSOR, occupied));
     }
@@ -200,10 +216,10 @@ final class MapOverlayPlacementCoordinator {
 
     /**
      * Reserves only a completely free stock leg. Optional alternative-route callouts use this
-     * stricter contract so required guidance, safety signs and the cursor always win a contested
-     * screen slot. If projection is unavailable, or all eight legs leave the safe viewport or
-     * overlap an existing reservation, the caller must hide the callout while keeping its route
-     * polyline visible.
+     * stricter contract so required guidance, safety signs and the cursor win the first placement
+     * pass. If projection is unavailable, or all eight legs leave the safe viewport or overlap an
+     * existing reservation, the caller decides whether to hide the optional object or retry with
+     * the least-conflicting scored placement.
      */
     Placement reserveIfClear(String owner, String key, double latitude, double longitude,
                              int bitmapWidth, int bitmapHeight, boolean preferRight,
@@ -246,7 +262,7 @@ final class MapOverlayPlacementCoordinator {
         float[] screen = projectOrNull(latitude, longitude);
         int safeWidth = Math.max(1, bitmapWidth);
         int safeHeight = Math.max(1, bitmapHeight);
-        Candidate centered = new Candidate(.50f, .50f, "CENTER");
+        Candidate centered = CENTER;
         if (screen == null) {
             return new Placement(centered.anchorX, centered.anchorY, centered.legName);
         }
@@ -486,18 +502,45 @@ final class MapOverlayPlacementCoordinator {
                                        float x2, float y2) {
         double dx = x2 - x1;
         double dy = y2 - y1;
-        double[] p = {-dx, dx, -dy, dy};
-        double[] q = {x1 - bounds.left, bounds.right - x1,
-                y1 - bounds.top, bounds.bottom - y1};
         double enter = 0d;
         double exit = 1d;
-        for (int index = 0; index < p.length; index++) {
-            if (Math.abs(p[index]) < 1e-9d) {
-                if (q[index] < 0d) return 0d;
-                continue;
-            }
-            double ratio = q[index] / p[index];
-            if (p[index] < 0d) enter = Math.max(enter, ratio);
+        double p = -dx;
+        double q = x1 - bounds.left;
+        if (Math.abs(p) < 1e-9d) {
+            if (q < 0d) return 0d;
+        } else {
+            double ratio = q / p;
+            if (p < 0d) enter = Math.max(enter, ratio);
+            else exit = Math.min(exit, ratio);
+            if (enter > exit) return 0d;
+        }
+        p = dx;
+        q = bounds.right - x1;
+        if (Math.abs(p) < 1e-9d) {
+            if (q < 0d) return 0d;
+        } else {
+            double ratio = q / p;
+            if (p < 0d) enter = Math.max(enter, ratio);
+            else exit = Math.min(exit, ratio);
+            if (enter > exit) return 0d;
+        }
+        p = -dy;
+        q = y1 - bounds.top;
+        if (Math.abs(p) < 1e-9d) {
+            if (q < 0d) return 0d;
+        } else {
+            double ratio = q / p;
+            if (p < 0d) enter = Math.max(enter, ratio);
+            else exit = Math.min(exit, ratio);
+            if (enter > exit) return 0d;
+        }
+        p = dy;
+        q = bounds.bottom - y1;
+        if (Math.abs(p) < 1e-9d) {
+            if (q < 0d) return 0d;
+        } else {
+            double ratio = q / p;
+            if (p < 0d) enter = Math.max(enter, ratio);
             else exit = Math.min(exit, ratio);
             if (enter > exit) return 0d;
         }
@@ -560,19 +603,7 @@ final class MapOverlayPlacementCoordinator {
 
     /** Side placements are preferred; diagonal and vertical slots resolve crowded junctions. */
     private static Candidate[] candidates(boolean preferRight) {
-        Candidate right = new Candidate(-.08f, .50f, "LEFT_CENTER");
-        Candidate left = new Candidate(1.08f, .50f, "RIGHT_CENTER");
-        Candidate upperRight = new Candidate(-.05f, 1.05f, "BOTTOM_LEFT");
-        Candidate upperLeft = new Candidate(1.05f, 1.05f, "BOTTOM_RIGHT");
-        Candidate lowerRight = new Candidate(-.05f, -.05f, "TOP_LEFT");
-        Candidate lowerLeft = new Candidate(1.05f, -.05f, "TOP_RIGHT");
-        Candidate above = new Candidate(.50f, 1.08f, "BOTTOM_CENTER");
-        Candidate below = new Candidate(.50f, -.08f, "TOP_CENTER");
-        return preferRight
-                ? new Candidate[]{right, left, upperRight, upperLeft,
-                lowerRight, lowerLeft, above, below}
-                : new Candidate[]{left, right, upperLeft, upperRight,
-                lowerLeft, lowerRight, above, below};
+        return preferRight ? RIGHT_FIRST_CANDIDATES : LEFT_FIRST_CANDIDATES;
     }
 
     private static boolean validCoordinate(double latitude, double longitude) {

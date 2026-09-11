@@ -15,8 +15,10 @@ import android.util.Log;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /** All Guidance alternatives: passive polylines plus collision-safe fork callouts. */
 final class AlternativeRouteMapLayer {
@@ -36,6 +38,10 @@ final class AlternativeRouteMapLayer {
     private long routeEpoch = Long.MIN_VALUE;
     private long dataFingerprint = Long.MIN_VALUE;
     private long appearanceFingerprint = Long.MIN_VALUE;
+    private Object lastInputAlternatives;
+    private int lastInputAlternativesSize = -1;
+    private String lastInputActiveRouteId = "";
+    private long lastInputPaletteVersion = Long.MIN_VALUE;
 
     AlternativeRouteMapLayer(Context context, MapOverlayPlacementCoordinator placement) {
         Context app = context.getApplicationContext();
@@ -76,8 +82,24 @@ final class AlternativeRouteMapLayer {
 
     void update(long nextRouteEpoch, Object nextActiveRoute, List<?> nextAlternatives) {
         if (nextRouteEpoch < routeEpoch) return;
-        List<?> safe = nextAlternatives == null
-                ? Collections.emptyList() : new ArrayList<>(nextAlternatives);
+        List<?> input = nextAlternatives == null ? Collections.emptyList() : nextAlternatives;
+        String nextActiveRouteId = routeId(nextActiveRoute);
+        long nextPaletteVersion = StockAlternativePalette.version();
+        if (nextRouteEpoch == routeEpoch
+                && input == lastInputAlternatives
+                && input.size() == lastInputAlternativesSize
+                && nextActiveRouteId.equals(lastInputActiveRouteId)
+                && nextPaletteVersion == lastInputPaletteVersion) {
+            // Guidance can repeat the same retained list on every frame. Its contents only change
+            // when the publisher replaces that list, so avoid a reflected scan and defensive copy.
+            activeRoute = nextActiveRoute;
+            return;
+        }
+        lastInputAlternatives = input;
+        lastInputAlternativesSize = input.size();
+        lastInputActiveRouteId = nextActiveRouteId;
+        lastInputPaletteVersion = nextPaletteVersion;
+        List<?> safe = input.isEmpty() ? Collections.emptyList() : new ArrayList<>(input);
         long nextFingerprint = dataFingerprint(nextRouteEpoch, nextActiveRoute, safe);
         routeEpoch = nextRouteEpoch;
         activeRoute = nextActiveRoute;
@@ -90,6 +112,10 @@ final class AlternativeRouteMapLayer {
     void clearData() {
         activeRoute = null;
         alternatives = Collections.emptyList();
+        lastInputAlternatives = null;
+        lastInputAlternativesSize = -1;
+        lastInputActiveRouteId = "";
+        lastInputPaletteVersion = Long.MIN_VALUE;
         dataFingerprint = Long.MIN_VALUE;
         render();
     }
@@ -100,20 +126,23 @@ final class AlternativeRouteMapLayer {
         if (!profile.showAlternativeRoutes || activeRoute == null || markers.isEmpty()) return;
         for (Marker marker : markers) {
             try {
-                PreparedText text = prepare(marker.model);
-                List<MapOverlayPlacementCoordinator.Footprint> footprints = footprints(text);
+                PreparedText text = preparedText(marker);
+                List<MapOverlayPlacementCoordinator.Footprint> footprints = marker.footprints;
                 MapOverlayPlacementCoordinator.Placement next = placement.reserveIfClear(
                         OWNER, marker.model.key,
                         marker.model.latitude, marker.model.longitude,
                         text.bodyWidth, text.bodyHeight, true,
                         marker.model.routeSegmentIndex, marker.model.routeSegmentPosition,
                         marker.placement, footprints);
-                if (next == null) {
-                    invoke(marker.placemark, "setVisible",
-                            new Class<?>[]{boolean.class}, false);
-                    marker.placement = null;
-                    continue;
-                }
+                // A stock alternative always keeps its information balloon. If all strictly
+                // clear legs are occupied, use the coordinator's least-conflicting stable leg
+                // rather than dropping the callout completely.
+                if (next == null) next = placement.reserve(
+                        OWNER, marker.model.key,
+                        marker.model.latitude, marker.model.longitude,
+                        text.bodyWidth, text.bodyHeight, true,
+                        marker.model.routeSegmentIndex, marker.model.routeSegmentPosition,
+                        marker.placement, footprints);
                 if (marker.placement == null || !marker.placement.sameSlot(next)
                         || marker.paletteVersion != StockAlternativePalette.version()) {
                     applyTexture(marker, text, next);
@@ -128,6 +157,16 @@ final class AlternativeRouteMapLayer {
         }
     }
 
+    private PreparedText preparedText(Marker marker) {
+        long paletteVersion = StockAlternativePalette.version();
+        if (marker.preparedText == null || marker.preparedPaletteVersion != paletteVersion) {
+            marker.preparedText = prepare(marker.model);
+            marker.footprints = footprints(marker.preparedText);
+            marker.preparedPaletteVersion = paletteVersion;
+        }
+        return marker.preparedText;
+    }
+
     private void render() {
         if (map == null) return;
         clearVisual();
@@ -137,29 +176,48 @@ final class AlternativeRouteMapLayer {
             Class<?> polylineClass = Class.forName("com.yandex.mapkit.geometry.Polyline");
             Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
             int index = 0;
+            String activeRouteId = routeId(activeRoute);
+            Set<String> renderedRouteIds = new HashSet<>();
             for (Object alternative : alternatives) {
+                int alternativeIndex = index++;
                 try {
                     Object route = invoke(alternative, "getAlternative", new Class<?>[0]);
                     if (route == null) continue;
+                    String candidateRouteId = routeId(route);
+                    if ((!candidateRouteId.isEmpty()
+                            && candidateRouteId.equals(activeRouteId))
+                            || (!candidateRouteId.isEmpty()
+                            && renderedRouteIds.contains(candidateRouteId))) continue;
+                    Object forkOnAlternative = invoke(alternative,
+                            "getForkPositionOnAlternative", new Class<?>[0]);
+                    Object forkOnCurrent = invoke(alternative,
+                            "getForkPositionOnCurrentRoute", new Class<?>[0]);
+                    if (forkOnAlternative == null || forkOnCurrent == null) continue;
+                    CalloutModel model = readCallout(
+                            route, forkOnAlternative, forkOnCurrent, alternativeIndex);
+                    if (model == null) continue;
                     Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
                     if (geometry == null) continue;
-                    Object line = invoke(polylineCollection, "addPolyline",
-                            new Class<?>[]{polylineClass}, geometry);
-                    invoke(line, "setStrokeWidth", new Class<?>[]{float.class},
-                            (float) profile.alternativeRouteWidth);
-                    invoke(line, "setStrokeColor", new Class<?>[]{int.class},
-                            Color.parseColor(profile.alternativeRouteColor));
-                    invoke(line, "setOutlineWidth", new Class<?>[]{float.class}, 0f);
-                    invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
 
-                    CalloutModel model = readCallout(alternative, route, index++);
-                    if (model == null) continue;
+                    // Build both objects hidden. Only a completely configured pair is published;
+                    // any reflected failure therefore leaves no orphan line or callout onscreen.
                     Object point = pointClass.getConstructor(double.class, double.class)
                             .newInstance(model.latitude, model.longitude);
                     Object placemark = invoke(calloutCollection, "addPlacemark",
                             new Class<?>[]{pointClass}, point);
                     invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, false);
+                    Object line = invoke(polylineCollection, "addPolyline",
+                            new Class<?>[]{polylineClass}, geometry);
+                    invoke(line, "setVisible", new Class<?>[]{boolean.class}, false);
+                    invoke(line, "setStrokeWidth", new Class<?>[]{float.class},
+                            (float) profile.alternativeRouteWidth);
+                    invoke(line, "setStrokeColor", new Class<?>[]{int.class},
+                            Color.parseColor(profile.alternativeRouteColor));
+                    invoke(line, "setOutlineWidth", new Class<?>[]{float.class}, 0f);
+                    hideSharedPrefix(line, route, forkOnAlternative);
+                    invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
                     markers.add(new Marker(placemark, model));
+                    if (!candidateRouteId.isEmpty()) renderedRouteIds.add(candidateRouteId);
                 } catch (Throwable invalidAlternative) {
                     Log.w(TAG, "One Guidance alternative was skipped", invalidAlternative);
                 }
@@ -174,8 +232,8 @@ final class AlternativeRouteMapLayer {
         if (polylineCollection == null) {
             polylineCollection = MapObjectLayerFactory.create(map,
                     MapSublayerOrder.ALTERNATIVE_ROUTES,
-                    // The contextual line must survive even when its optional callout loses a
-                    // collision. Only the callout participates as a MINOR map object below.
+                    // The contextual line survives independently of callout placement. Only the
+                    // callout participates as a MINOR map object below.
                     MapObjectLayerFactory.IGNORE,
                     NavigationMapProfile.layerZ(
                             profile.effectiveAlternativeRoutePriority()));
@@ -203,13 +261,9 @@ final class AlternativeRouteMapLayer {
         } catch (Throwable ignored) {}
     }
 
-    private CalloutModel readCallout(Object alternative, Object route, int index)
+    private CalloutModel readCallout(Object route, Object forkOnAlternative,
+                                     Object forkOnCurrent, int index)
             throws Exception {
-        Object forkOnAlternative = invoke(alternative,
-                "getForkPositionOnAlternative", new Class<?>[0]);
-        Object forkOnCurrent = invoke(alternative,
-                "getForkPositionOnCurrentRoute", new Class<?>[0]);
-        if (forkOnAlternative == null || forkOnCurrent == null) return null;
         Object point = invoke(forkOnCurrent, "getPoint", new Class<?>[0]);
         if (point == null) return null;
         double latitude = number(invoke(point, "getLatitude", new Class<?>[0]));
@@ -470,9 +524,30 @@ final class AlternativeRouteMapLayer {
     }
 
     private static String formatTimeDelta(int seconds) {
-        int absoluteMinutes = Math.max(seconds == 0 ? 0 : 1,
+        if (seconds == 0) return "то же время";
+        int absoluteMinutes = Math.max(1,
                 (int) Math.round(Math.abs(seconds) / 60d));
         return sign(seconds) + absoluteMinutes + " мин";
+    }
+
+    /** Hides the shared route prefix which previously looked like stray alternative fragments. */
+    private static void hideSharedPrefix(Object line, Object route,
+                                         Object forkOnAlternative) throws Exception {
+        RouteProgress fork = routeProgress(forkOnAlternative, route);
+        if (fork.segmentIndex < 0
+                || (fork.segmentIndex == 0 && fork.segmentPosition <= .000001d)) return;
+        Class<?> positionClass = Class.forName(
+                "com.yandex.mapkit.geometry.PolylinePosition");
+        Object begin = positionClass.getConstructor(int.class, double.class)
+                .newInstance(0, 0d);
+        Object end = positionClass.getConstructor(int.class, double.class)
+                .newInstance(fork.segmentIndex, Math.max(0d,
+                        Math.min(1d, fork.segmentPosition)));
+        Class<?> subpolylineClass = Class.forName(
+                "com.yandex.mapkit.geometry.Subpolyline");
+        Object shared = subpolylineClass.getConstructor(positionClass, positionClass)
+                .newInstance(begin, end);
+        invoke(line, "hide", new Class<?>[]{subpolylineClass}, shared);
     }
 
     private static String formatDistanceDelta(int meters) {
@@ -536,6 +611,7 @@ final class AlternativeRouteMapLayer {
         result = mix(result, routeId(route).hashCode());
         result = mix(result, StockAlternativePalette.version());
         result = mix(result, values.size());
+        int index = 0;
         for (Object alternative : values) {
             try {
                 Object candidate = invoke(alternative, "getAlternative", new Class<?>[0]);
@@ -561,8 +637,12 @@ final class AlternativeRouteMapLayer {
                 result = mix(result, Double.doubleToLongBits(number(invoke(
                         point, "getLongitude", new Class<?>[0]))));
             } catch (Throwable invalid) {
-                result = mix(result, System.identityHashCode(alternative));
+                // MapKit may return a new Java wrapper for the same temporarily-invalid entry on
+                // every callback. A stable slot sentinel avoids clearing and rebuilding all good
+                // alternatives merely because that wrapper identity changed.
+                result = mix(result, 0x4e4154524f414c54L ^ index);
             }
+            index++;
         }
         return result;
     }
@@ -608,6 +688,9 @@ final class AlternativeRouteMapLayer {
         final CalloutModel model;
         MapOverlayPlacementCoordinator.Placement placement;
         long paletteVersion = Long.MIN_VALUE;
+        long preparedPaletteVersion = Long.MIN_VALUE;
+        PreparedText preparedText;
+        List<MapOverlayPlacementCoordinator.Footprint> footprints = Collections.emptyList();
         Marker(Object placemark, CalloutModel model) {
             this.placemark = placemark;
             this.model = model;

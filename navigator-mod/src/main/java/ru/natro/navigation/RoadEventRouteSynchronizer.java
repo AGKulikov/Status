@@ -43,6 +43,7 @@ final class RoadEventRouteSynchronizer {
 
     void update(long nextRouteEpoch, long nextFingerprint, List<?> nextDrivingEvents) {
         if (nextRouteEpoch < routeEpoch) return;
+        if (nextRouteEpoch == routeEpoch && nextFingerprint == eventsFingerprint) return;
         routeEpoch = nextRouteEpoch;
         eventsFingerprint = nextFingerprint;
         drivingEvents = nextDrivingEvents == null

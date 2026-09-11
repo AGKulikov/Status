@@ -16,6 +16,8 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.os.SystemClock;
+import android.text.Layout;
+import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.Choreographer;
@@ -43,6 +45,7 @@ import dezz.status.widget.navigation.NavigationRouteGeometryV2;
 import dezz.status.widget.navigation.NavigationSnapshotV2;
 import dezz.status.widget.navigation.StockManeuverCardState;
 import dezz.status.widget.hud.HudNavigationState;
+import dezz.status.widget.hud.ManeuverCardAutoSizer;
 import dezz.status.widget.hud.StockManeuverCardRenderer;
 import dezz.status.widget.launcher.NavigationDataRepository;
 
@@ -65,6 +68,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             Typeface.MONOSPACE, Typeface.NORMAL);
     private static final Typeface MONO_BOLD = Typeface.create(
             Typeface.MONOSPACE, Typeface.BOLD);
+    private static final Object MAXIMUM_MANEUVER_PREVIEW_KEY = new Object();
 
     @NonNull private final InstrumentTelemetryRepository telemetry;
     @NonNull private final InstrumentTelemetryRepository.Frame frame =
@@ -141,6 +145,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     private long lastGeneration = Long.MIN_VALUE;
     @NonNull private String clockText = "--:--";
     @Nullable private String selectedId;
+    @Nullable private String maximumManeuverPreviewId;
     @Nullable private InstrumentElementConfig dragging;
     @Nullable private NavigationSnapshotV2 navigationSnapshot;
     @Nullable private NavigationRouteGeometryV2 navigationGeometry;
@@ -217,6 +222,98 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @Nullable
     public InstrumentElementConfig selected() {
         return find(selectedId);
+    }
+
+    /** Shows a fully populated maneuver card only while its settings dialog is open. */
+    public void setMaximumManeuverCardPreview(@Nullable String id) {
+        maximumManeuverPreviewId = id;
+        invalidate();
+    }
+
+    private boolean isMaximumManeuverPreview(@NonNull InstrumentElementConfig element) {
+        return editorMode && element.type == InstrumentElementType.NAV_MANEUVER_CARD
+                && element.id.equals(maximumManeuverPreviewId);
+    }
+
+    @NonNull
+    private RectF maneuverCardDrawBounds(@NonNull RuntimeElement runtime,
+                                        @NonNull RectF maximum) {
+        InstrumentElementConfig element = runtime.config;
+        if (!element.options.optBoolean("autoWidth", false)
+                && !element.options.optBoolean("autoHeight", false)) return maximum;
+        boolean maximumPreview = isMaximumManeuverPreview(element);
+        NavigationSnapshotV2 snapshot = navigationSnapshot;
+        boolean useCommandCard = !maximumPreview && commandCard.enabled
+                && commandCardRenderer().available(commandCard);
+        Object sizeSource = maximumPreview ? MAXIMUM_MANEUVER_PREVIEW_KEY : snapshot;
+        Typeface face = digitalTypeface(element.style, true);
+        int fallbackFontSize = element.options.optInt("maneuverDetailTextSizeSp", 18);
+        if (sizeSource != null && runtime.maneuverAutoSizeMatches(sizeSource,
+                useCommandCard ? commandCard : null, maximum, getHeight(), face,
+                fallbackFontSize)) {
+            return runtime.maneuverAutoSizeBounds;
+        }
+        if (maximumPreview) {
+            runtime.applyMaximumManeuverPreview();
+        } else if (snapshot != null) {
+            runtime.updateNavigation(snapshot, navigationGeometry);
+        } else {
+            return maximum;
+        }
+
+        ManeuverCardAutoSizer.Content content;
+        if (useCommandCard) {
+            ArrayList<List<String>> badgeRows = new ArrayList<>();
+            if (element.options.optBoolean("showRoadBadge", true)) {
+                addStockBadgeRow(badgeRows, commandCard.signs);
+                addStockBadgeRow(badgeRows, commandCard.followingSigns);
+            }
+            String direction = element.options.optBoolean("showDirection", true)
+                    ? commandCard.nextRoad : "";
+            String auxiliary = commandCard.hasAuxiliary()
+                    ? nonEmptyMeasurementText(commandCard.auxiliaryText) : "";
+            content = new ManeuverCardAutoSizer.Content(commandCard.distance,
+                    direction, badgeRows, auxiliary, true, false);
+        } else {
+            ArrayList<List<String>> badgeRows = new ArrayList<>();
+            if (element.options.optBoolean("showRoadBadge", true)
+                    && !runtime.navigationDirectionSigns.isEmpty()) {
+                ArrayList<String> badges = new ArrayList<>();
+                for (ManeuverDirectionSign sign : runtime.navigationDirectionSigns) {
+                    if (!sign.text.trim().isEmpty()) badges.add(sign.text);
+                }
+                if (!badges.isEmpty()) badgeRows.add(badges);
+            }
+            String direction = element.options.optBoolean("showDirection", true)
+                    ? runtime.navigationCardText : "";
+            if (!direction.isEmpty() && runtime.directionSignsContain(direction)) {
+                direction = "";
+            }
+            content = new ManeuverCardAutoSizer.Content(
+                    runtime.navigationTurnDistance, direction, badgeRows,
+                    runtime.navigationAuxiliaryText, false, true);
+        }
+        ManeuverCardAutoSizer.resolve(maximum, getHeight(), element.options,
+                1f, getResources().getDisplayMetrics().scaledDensity, paint,
+                face, fallbackFontSize, content, runtime.maneuverAutoSizeBounds);
+        runtime.rememberManeuverAutoSize(sizeSource, useCommandCard ? commandCard : null,
+                maximum, getHeight(), face, fallbackFontSize);
+        return runtime.maneuverAutoSizeBounds;
+    }
+
+    private static void addStockBadgeRow(@NonNull List<List<String>> rows,
+                                         @NonNull List<StockManeuverCardState.Sign> signs) {
+        if (signs.isEmpty()) return;
+        ArrayList<String> row = new ArrayList<>(signs.size());
+        for (StockManeuverCardState.Sign sign : signs) {
+            row.add(nonEmptyMeasurementText(sign.text));
+        }
+        rows.add(row);
+    }
+
+    @NonNull
+    private static String nonEmptyMeasurementText(@Nullable String value) {
+        return value == null || value.trim().isEmpty() ? "88" : value;
     }
 
     @Override protected void onAttachedToWindow() {
@@ -440,9 +537,11 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             InstrumentElementConfig element = runtime.config;
             if (!element.enabled || element.type == InstrumentElementType.NAV_MAP) continue;
             bounds(element, rect);
+            RectF drawBounds = element.type == InstrumentElementType.NAV_MANEUVER_CARD
+                    ? maneuverCardDrawBounds(runtime, rect) : rect;
             int save = canvas.save();
-            canvas.clipRect(rect);
-            drawDynamicElement(canvas, runtime, rect);
+            canvas.clipRect(drawBounds);
+            drawDynamicElement(canvas, runtime, drawBounds);
             canvas.restoreToCount(save);
         }
         if (editorMode) drawEditor(canvas);
@@ -1124,6 +1223,12 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                                                    @NonNull RectF bounds,
                                                    @Nullable NavigationSnapshotV2 snapshot,
                                                    @Nullable HudNavigationState navigation) {
+        if (isMaximumManeuverPreview(runtime.config)) {
+            runtime.applyMaximumManeuverPreview();
+            int alpha = Math.round(255f * runtime.config.opacityPercent / 100f);
+            drawNavigationManeuverDetails(canvas, runtime, bounds, runtime.config, alpha);
+            return;
+        }
         if (snapshot == null || navigation == null) return;
         runtime.updateNavigation(snapshot, navigationGeometry);
         InstrumentElementConfig element = runtime.config;
@@ -1471,7 +1576,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                     Math.max(0, cardRadius - cardBorder / 2), paint);
             paint.setStyle(Paint.Style.FILL);
         }
-        if (commandCard.enabled) {
+        if (commandCard.enabled && !isMaximumManeuverPreview(element)) {
             int textColor = navigationColor(element.options.optString(
                     "maneuverDetailTextColor", "#FFFFFFFF"), Color.WHITE);
             commandCardRenderer().draw(canvas, commandCard, bounds, element.options,
@@ -1510,7 +1615,9 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                     Math.min(primary.right, cursor + distanceWidth), primary.bottom);
             drawNavigationTextFit(canvas, runtime.navigationTurnDistance, distanceBounds,
                     primaryColor, alpha, Paint.Align.LEFT, element.style, true,
-                    element.options.optInt("maneuverDetailTextSizeSp", 18));
+                    element.options.optInt("distanceFontSizeSp",
+                            element.options.optInt("maneuverDetailTextSizeSp", 18)),
+                    element.options.optBoolean("distanceSingleLine", true));
             cursor = Math.min(primary.right, distanceBounds.right + distancePadding);
         }
 
@@ -1536,7 +1643,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                     insetSides(badge, horizontalPadding, 0f, horizontalPadding, 0f),
                     foreground, alpha, Paint.Align.CENTER, element.style, true,
                     element.options.optInt("roadBadgeFontSizeSp",
-                            element.options.optInt("maneuverDetailTextSizeSp", 18)));
+                            element.options.optInt("maneuverDetailTextSizeSp", 18)),
+                    element.options.optBoolean("roadBadgeSingleLine", true));
             cursor = Math.min(primary.right, badge.right + badgeGap);
         }
 
@@ -1547,7 +1655,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                     new RectF(cursor, primary.top, primary.right, primary.bottom),
                     primaryColor, alpha, Paint.Align.LEFT, element.style, false,
                     element.options.optInt("directionFontSizeSp",
-                            element.options.optInt("maneuverDetailTextSizeSp", 18)));
+                            element.options.optInt("maneuverDetailTextSizeSp", 18)),
+                    element.options.optBoolean("directionSingleLine", true));
         }
 
         if (auxiliary != null && !auxiliary.isEmpty()) {
@@ -1567,7 +1676,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                             Math.max(3f, auxiliary.height() * .18f), 0f),
                     auxiliaryTextColor, alpha, Paint.Align.LEFT, element.style, true,
                     element.options.optInt("auxiliaryFontSizeSp",
-                            element.options.optInt("maneuverAuxiliaryTextSizeSp", 14)));
+                            element.options.optInt("maneuverAuxiliaryTextSizeSp", 14)),
+                    element.options.optBoolean("auxiliarySingleLine", true));
         }
     }
 
@@ -1576,6 +1686,15 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                                        @NonNull Paint.Align align,
                                        @NonNull InstrumentStyleFamily style, boolean bold,
                                        int requestedTextSizeSp) {
+        drawNavigationTextFit(canvas, value, bounds, color, alpha, align, style, bold,
+                requestedTextSizeSp, true);
+    }
+
+    private void drawNavigationTextFit(@NonNull Canvas canvas, @NonNull String value,
+                                       @NonNull RectF bounds, int color, int alpha,
+                                       @NonNull Paint.Align align,
+                                       @NonNull InstrumentStyleFamily style, boolean bold,
+                                       int requestedTextSizeSp, boolean singleLine) {
         if (value.isEmpty() || bounds.isEmpty()) return;
         paint.setStyle(Paint.Style.FILL);
         paint.setTypeface(digitalTypeface(style, bold));
@@ -1583,9 +1702,33 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         float requested = Math.max(7f, requestedTextSizeSp
                 * getResources().getDisplayMetrics().scaledDensity);
         paint.setTextSize(requested);
-        CharSequence displayed = TextUtils.ellipsize(value, paint,
-                Math.max(1f, bounds.width()), TextUtils.TruncateAt.END);
         paint.setColor(withAlpha(color, Math.round(Color.alpha(color) * alpha / 255f)));
+        String normalized = singleLine
+                ? value.replace('\n', ' ').replace('\r', ' ') : value;
+        if (!singleLine) {
+            paint.setTextAlign(Paint.Align.LEFT);
+            int width = Math.max(1, Math.round(bounds.width()));
+            Layout.Alignment alignment = align == Paint.Align.CENTER
+                    ? Layout.Alignment.ALIGN_CENTER : align == Paint.Align.RIGHT
+                    ? Layout.Alignment.ALIGN_OPPOSITE : Layout.Alignment.ALIGN_NORMAL;
+            StaticLayout layout = StaticLayout.Builder.obtain(
+                            normalized, 0, normalized.length(), paint, width)
+                    .setAlignment(alignment)
+                    .setIncludePad(false)
+                    .setMaxLines(2)
+                    .setEllipsize(TextUtils.TruncateAt.END)
+                    .setEllipsizedWidth(width)
+                    .build();
+            int saved = canvas.save();
+            canvas.clipRect(bounds);
+            canvas.translate(bounds.left,
+                    bounds.centerY() - layout.getHeight() * .5f);
+            layout.draw(canvas);
+            canvas.restoreToCount(saved);
+            return;
+        }
+        CharSequence displayed = TextUtils.ellipsize(normalized, paint,
+                Math.max(1f, bounds.width()), TextUtils.TruncateAt.END);
         Paint.FontMetrics metrics = paint.getFontMetrics();
         float x = align == Paint.Align.CENTER ? bounds.centerX()
                 : align == Paint.Align.RIGHT ? bounds.right : bounds.left;
@@ -2405,6 +2548,13 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         int navigationTotalDistanceMeters = -1;
         int trafficTotalMeters;
         double navigationProgress = Double.NaN;
+        @Nullable Object maneuverAutoSizeSource;
+        @Nullable StockManeuverCardState maneuverAutoSizeCommandCard;
+        @NonNull final RectF maneuverAutoSizeMaximum = new RectF();
+        @NonNull final RectF maneuverAutoSizeBounds = new RectF();
+        int maneuverAutoSizeBottomLimit;
+        @Nullable Typeface maneuverAutoSizeTypeface;
+        int maneuverAutoSizeFontSizeSp;
 
         RuntimeElement(@NonNull InstrumentElementConfig config) {
             this.config = config;
@@ -2481,6 +2631,42 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             navigationTrafficRuns = parseRouteTrafficRuns(trafficJson);
             trafficTotalMeters = navigationTrafficRuns.isEmpty() ? 0
                     : navigationTrafficRuns.get(navigationTrafficRuns.size() - 1).toMeters;
+        }
+
+        void applyMaximumManeuverPreview() {
+            navigationTurnDistance = "350 м";
+            navigationCardText = "Ленинградское шоссе · Санкт-Петербург";
+            ArrayList<ManeuverDirectionSign> signs = new ArrayList<>();
+            signs.add(new ManeuverDirectionSign(
+                    "М-11", "#FF16A34A", "#FFFFFFFF"));
+            signs.add(new ManeuverDirectionSign(
+                    "съезд 72", "#FF1478FF", "#FFFFFFFF"));
+            navigationDirectionSigns = Collections.unmodifiableList(signs);
+            navigationAuxiliaryText = "Затем налево · 500 м";
+        }
+
+        boolean maneuverAutoSizeMatches(@NonNull Object source,
+                                        @Nullable StockManeuverCardState commandCard,
+                                        @NonNull RectF maximum, int bottomLimit,
+                                        @NonNull Typeface typeface, int fontSizeSp) {
+            return maneuverAutoSizeSource == source
+                    && maneuverAutoSizeCommandCard == commandCard
+                    && maneuverAutoSizeMaximum.equals(maximum)
+                    && maneuverAutoSizeBottomLimit == bottomLimit
+                    && maneuverAutoSizeTypeface == typeface
+                    && maneuverAutoSizeFontSizeSp == fontSizeSp;
+        }
+
+        void rememberManeuverAutoSize(@Nullable Object source,
+                                      @Nullable StockManeuverCardState commandCard,
+                                      @NonNull RectF maximum, int bottomLimit,
+                                      @NonNull Typeface typeface, int fontSizeSp) {
+            maneuverAutoSizeSource = source;
+            maneuverAutoSizeCommandCard = commandCard;
+            maneuverAutoSizeMaximum.set(maximum);
+            maneuverAutoSizeBottomLimit = bottomLimit;
+            maneuverAutoSizeTypeface = typeface;
+            maneuverAutoSizeFontSizeSp = fontSizeSp;
         }
 
         boolean hasNavigationManeuverDetails() {

@@ -48,7 +48,6 @@ final class HudMapRenderer {
     private final LaneGuidanceMapLayer laneGuidanceMapLayer;
     private final RouteTurnMapLayer routeTurnMapLayer;
     private final AlternativeRouteMapLayer alternativeRouteMapLayer;
-    private final RouteStreetLabelMapLayer routeStreetLabelMapLayer;
     private final RoadEventRouteSynchronizer roadEventRouteSynchronizer;
     private final String profileSection;
     private final String displayName;
@@ -120,7 +119,6 @@ final class HudMapRenderer {
         routeTurnMapLayer = new RouteTurnMapLayer(this.context);
         alternativeRouteMapLayer = new AlternativeRouteMapLayer(this.context,
                 overlayPlacement);
-        routeStreetLabelMapLayer = new RouteStreetLabelMapLayer();
         roadEventRouteSynchronizer = new RoadEventRouteSynchronizer();
     }
 
@@ -203,7 +201,6 @@ final class HudMapRenderer {
             laneGuidanceMapLayer.clearData();
             routeTurnMapLayer.clearData();
             alternativeRouteMapLayer.clearData();
-            routeStreetLabelMapLayer.clearData();
             roadEventRouteSynchronizer.clearData();
             activeRoute = null;
             activeJamFingerprint = 0L;
@@ -307,7 +304,6 @@ final class HudMapRenderer {
         routeTrafficLightMapLayer.updateRoute(routeEpoch, drivingRoute);
         speedBumpMapLayer.updateRoute(routeEpoch, drivingRoute);
         alternativeRouteMapLayer.update(routeEpoch, drivingRoute, alternatives);
-        routeStreetLabelMapLayer.update(routeEpoch, drivingRoute);
         roadEventRouteSynchronizer.update(
                 routeEpoch, routeEventsFingerprint, routeEvents);
         // MapKit may hand out a new Java wrapper for the same DrivingRoute on every Guidance
@@ -385,7 +381,6 @@ final class HudMapRenderer {
             speedBumpMapLayer.attach(map);
             laneGuidanceMapLayer.attach(map);
             alternativeRouteMapLayer.attach(map);
-            routeStreetLabelMapLayer.attach(map);
             cursorStyler.attach(map);
 
             Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
@@ -460,10 +455,6 @@ final class HudMapRenderer {
                 profile.routeTurnOutlineColor,
                 profile.routeTurnOutlineWidth);
         alternativeRouteMapLayer.apply(profile);
-        routeStreetLabelMapLayer.apply(
-                profile.routeStreetLabelsOnly,
-                profile.routeLabelScalePercent, night,
-                profile.effectiveRoutePriority());
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -1098,7 +1089,6 @@ final class HudMapRenderer {
         speedBumpMapLayer.detachMap();
         laneGuidanceMapLayer.detachMap();
         alternativeRouteMapLayer.detachMap();
-        routeStreetLabelMapLayer.detachMap();
         overlayPlacement.detach();
         routeTurnMapLayer.detachMap();
         routeCollection = null;
@@ -1135,8 +1125,9 @@ final class HudMapRenderer {
         routeTrafficLightMapLayer.relayout();
         laneGuidanceMapLayer.relayout();
         trafficLightMapLayer.relayout();
-        // Alternatives are optional context. They are placed last and disappear if every stock
-        // leg is occupied by the cursor, required guidance or a safety sign.
+        // Alternatives are optional context and are placed last. Their callouts first try every
+        // collision-free stock leg, then keep a stable least-conflicting leg so the stock-like
+        // route comparison is never silently lost.
         alternativeRouteMapLayer.relayout();
     }
 

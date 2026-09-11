@@ -29,6 +29,7 @@ public final class HudNavigationState {
                     return new SimpleDateFormat("HH:mm", Locale.getDefault());
                 }
             };
+    @Nullable private static HudNavigationState editorManeuverCardPreview;
     public static final class Lane {
         @NonNull public final String kind;
         @NonNull public final String highlightedDirection;
@@ -341,6 +342,29 @@ public final class HudNavigationState {
                 routeActive ? source.jamImage : null,
                 routeActive ? source.rainbowImage : null,
                 "", "", "", null, StockManeuverCardState.LEGACY);
+    }
+
+    /** Maximum-content synthetic card used only while its visual settings dialog is open. */
+    @NonNull
+    public static HudNavigationState editorManeuverCardPreview() {
+        HudNavigationState cached = editorManeuverCardPreview;
+        if (cached != null) return cached;
+        ArrayList<DirectionSignItem> signs = new ArrayList<>();
+        signs.add(new DirectionSignItem("Road", "М-11", "#FF16A34A", "#FFFFFFFF"));
+        signs.add(new DirectionSignItem("Exit", "съезд 72", "#FF1478FF", "#FFFFFFFF"));
+        cached = new HudNavigationState(false, true, "TURN_RIGHT",
+                "Поворот направо", "Поворот направо", "держитесь правее",
+                "editor-maneuver-card", "Ленинградское шоссе · Санкт-Петербург",
+                signs, "NEXT_MANEUVER", "Затем налево", "TURN_LEFT", "500 м",
+                "Ленинградское шоссе", "Санкт-Петербург", "350 м",
+                "127 км", "1 ч 42 мин", "10 мин", "12 км", true,
+                "18:45", "90", 72d, "", "650 м", 650d, false,
+                Collections.emptyList(), "", "", "", false,
+                Collections.emptyList(), Collections.emptyList(), .42d,
+                null, null, null, null, "", "", "[]", null,
+                StockManeuverCardState.LEGACY);
+        editorManeuverCardPreview = cached;
+        return cached;
     }
 
     @NonNull private static List<DirectionSignItem> parseDirectionSigns(String raw) {

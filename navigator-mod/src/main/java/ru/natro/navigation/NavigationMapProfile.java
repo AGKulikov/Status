@@ -109,7 +109,6 @@ final class NavigationMapProfile {
     int laneGuidanceLayerPriority = 80;
     int cursorLayerPriority = 60;
     boolean showCursor = true;
-    boolean routeStreetLabelsOnly;
     boolean roadsOnly;
     String cameraMode = "FOLLOW_ROUTE";
     boolean fixedZoomEnabled;
@@ -160,8 +159,9 @@ final class NavigationMapProfile {
             result.nightMode = source.optBoolean("nightMode", false);
             result.showPois = source.optBoolean("showPois", false);
             result.showLabels = source.optBoolean("showLabels", true);
-            result.routeStreetLabelsOnly = source.optBoolean(
-                    "routeStreetLabelsOnly", false);
+            if (source.optBoolean("routeStreetLabelsOnly", false)) {
+                result.showLabels = true;
+            }
             result.showBuildings = source.optBoolean("showBuildings", true);
             result.showParks = source.optBoolean("showParks", true);
             result.showWater = source.optBoolean("showWater", true);
@@ -442,7 +442,7 @@ final class NavigationMapProfile {
                     "{\"tags\":{\"any\":" + ROAD_TAGS_JSON + "},"
                             + "\"elements\":\"geometry\",\"stylers\":" + stylers + "}");
         }
-        if (!showLabels || routeStreetLabelsOnly) {
+        if (!showLabels) {
             needsComma = appendRule(rules, needsComma,
                     "{\"elements\":\"label\",\"stylers\":{\"visibility\":\"off\"}}");
         } else if (routeLabelScalePercent != 100) {

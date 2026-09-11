@@ -1,9 +1,9 @@
 {
-  "version": "1.3",
-  "date": "2026-09-09",
+  "version": "1.4",
+  "date": "2026-09-10",
   "note": "Рабочая очередь приоритетных вопросов, а не исчерпывающий перечень и не расписание автоматических действий. Подробные неизвестные, аппаратные ограничения, необходимые артефакты и следующие шаги остаются в 94 связанных карточках. Сначала используются уже собранные исходники и архивы; новые наблюдения запрашиваются только для конкретного остаточного пробела.",
   "coverage": {
-    "question_count": 51,
+    "question_count": 52,
     "system_card_count": 94,
     "system_card_sources": [
       "research-2026-09-05/architecture_domains/systems.json",
@@ -317,18 +317,40 @@
       "priority": "P1",
       "function": "Пробег, время и средняя скорость текущей поездки на DIM/HUD",
       "status": "PARTLY_RESOLVED",
-      "known": "В сохранённом ecarx.adaptapi.jar SHA-256 33d0c62851e834dbf443f969627973dbc6e00eec3dd1e8fb6fc9dfe5af78e886 подтверждён путь ICar.getHevManager() → IHev.getTripData(); ITripData.IDrivingInfo выдаёт getTripDistance(): int и getTripDuration(): long через onDrivingInfoUpdate. Реализация заранее создаёт нулевой DrivingInfo и getLatestDrivingInfo() возвращает его до первого PA callback, поэтому Natro не публикует этот предварительный snapshot и принимает ноль только из реального callback. Публичная константа TRIP_DC_AVERAGE_SPEED существует, но рабочий generic getter в исследованном JAR не подтверждён; средняя скорость пока выводится как distance/time одного callback-снимка. Одинаковый callback продлевает monotonic freshness, а через 10 минут без callback HUD и DIM одновременно скрывают trip distance/time/derived speed вместо удержания старых чисел.",
-      "missing_evidence": "Единицы raw distance/duration, связь с отображаемой штатной «Поездкой 1/2», момент сброса, частота callback, признаки stale/invalid и официальный доступ к средней скорости на установленной версии. Деление distance на 10 и трактовка duration как минут остаются гипотезами до синхронной пары raw/API/штатный экран.",
-      "next_step": "На KX11 выполнить только чтение: одновременно записать raw значения onDrivingInfoUpdate, elapsedRealtime и фото/видео штатного экрана до движения, после известного расстояния и после штатного сброса поездки. Сопоставить масштаб и reset semantics; отдельно проверить наличие рабочего API средней скорости, не отправляя управляющих команд.",
+      "known": "Аппаратная проверка подписанной Natro 2.8.4 отвергла ITripData.IDrivingInfo как источник штатной «Поездки 2»: время осталось 0, а пробег совпал с общим одометром автомобиля 37 278 км (сообщение пользователя). В комплектном ecarx.adaptapi.jar SHA-256 33d0c62851e834dbf443f969627973dbc6e00eec3dd1e8fb6fc9dfe5af78e886 подтверждены отдельные typed PA getters/callbacks PA_TS_OdometerTripMeter2 и PA_TS_EDT_time2, manager ID 33751 и 33749. Read-only обвязка компилируется против этого JAR, принимает только одновременно Active пару, перечитывает оба поля на callback любого из них и сохраняет raw, format и одну monotonic timestamp. Средняя скорость выводится только из этой пары; средний расход остаётся отдельным ignition-сигналом. Через 10 минут без нового наблюдения HUD и DIM скрывают зависимые значения.",
+      "missing_evidence": "Масштаб и единица raw PA_TS_OdometerTripMeter2, единица PA_TS_EDT_time2, совпадение reset/ignition semantics со штатным экраном «Поездка 2», частота callback и поведение после Binder reconnect. Деление distance на 10 и трактовка time как минут остаются гипотезами до синхронной пары raw/format/штатный экран/Natro.",
+      "next_step": "На KX11 выполнить только чтение по GATE-073: одновременно записать диагностические raw/format обоих Trip 2 PA-полей и фото/видео штатного экрана и Natro до движения, после известного расстояния, остановки, штатного сброса, Binder reconnect и следующего ignition. Подтвердить либо скорректировать масштаб, единицы и производную скорости; проверить, что общий одометр 37 278 км больше не попадает в поездку.",
       "sources": [
         "../../GEELY_KX11_KNOWLEDGE_RU.md",
         "../../app/src/geely/java/dezz/status/widget/car/GeelyCarIntegration.java",
+        "../../app/src/geely/java/dezz/status/widget/car/EcarxTrip2Access.java",
         "../../app/src/main/java/dezz/status/widget/car/CurrentTripMetrics.java"
       ],
       "coverage_ids": [
         "PT-FUEL",
         "BASE-HUD",
         "PLAT_DISPLAY"
+      ]
+    },
+    {
+      "id": "CPU_LOAD_2_8_5",
+      "priority": "P1",
+      "function": "CPU-нагрузка Natro, HUD, DIM и совместимого Navigator без снижения качества",
+      "status": "PARTLY_RESOLVED",
+      "known": "Статический аудит обнаружил повторные CPU/allocation hot paths измерения синей карточки, подготовки alternative-callout, reflected scan неизменных alternatives/events, массивов clipping, одинаковой HUD-телеметрии и PA Trip 2 callback без потребителя. Исходник 2.8.5 добавляет content/demand fast paths и не меняет разрешение Surface, предел FPS, AA, частоты данных либо состав слоёв.",
+      "missing_evidence": "Сравнимые process/thread CPU time, allocation/GC, frame pacing и визуальная идентичность на целевом KX11; статический аудит не устанавливает процент выигрыша и не доказывает поведение vendor MapKit/ECARX runtime.",
+      "next_step": "Выполнить GATE-075: минимум три одинаковых 10-минутных прогона 2.8.4 и 2.8.5 без маршрута, с альтернативами и с HUD+приборкой, снять Perfetto/simpleperf и подтвердить отсутствие снижения разрешения/FPS/свежести/функций.",
+      "sources": [
+        "../../PROJECT_REQUIREMENTS_RU.md",
+        "../../app/src/main/java/dezz/status/widget/hud/HudCanvasView.java",
+        "../../navigator-mod/src/main/java/ru/natro/navigation/AlternativeRouteMapLayer.java",
+        "../../navigator-mod/src/main/java/ru/natro/navigation/MapOverlayPlacementCoordinator.java",
+        "../../app/src/geely/java/dezz/status/widget/car/EcarxTrip2Access.java"
+      ],
+      "coverage_ids": [
+        "BASE-HUD",
+        "PLAT_DISPLAY",
+        "PLAT-ANR"
       ]
     },
     {

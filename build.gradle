@@ -263,6 +263,10 @@ int getVersionCode() {
     if (version == '2.8.4') {
         return 208021317
     }
+    // Post-2.8.4 map/card/Trip 2 corrections and quality-neutral CPU hot-path reductions.
+    if (version == '2.8.5') {
+        return 208021318
+    }
     if (version == '2.3.0') {
         return 208021254
     }

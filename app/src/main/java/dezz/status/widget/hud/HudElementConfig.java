@@ -131,6 +131,8 @@ public final class HudElementConfig {
                     options.put("showCardBackground", true);
                     options.put("showRoadBadge", true);
                     options.put("showDirection", true);
+                    options.put("autoWidth", false);
+                    options.put("autoHeight", false);
                     options.put("cardColor", "#FF0758E8");
                     options.put("roadBadgeColor", "#FF16A34A");
                     options.put("cardOpacityPercent", 94);
@@ -153,9 +155,13 @@ public final class HudElementConfig {
                     options.put("textPaddingRightPx", 0);
                     options.put("textPaddingBottomPx", 0);
                     options.put("distanceFontSizeSp", 34);
+                    options.put("distanceSingleLine", true);
                     options.put("directionFontSizeSp", 18);
+                    options.put("directionSingleLine", true);
                     options.put("roadBadgeFontSizeSp", 17);
+                    options.put("roadBadgeSingleLine", true);
                     options.put("auxiliaryFontSizeSp", 14);
+                    options.put("auxiliarySingleLine", true);
                     options.put("auxiliaryColor", "#E60B4DB5");
                     options.put("auxiliaryTextColor", "#FFFFFFFF");
                     options.put("distanceAreaPercent", 56);
@@ -374,6 +380,8 @@ public final class HudElementConfig {
             // The combined card is a faithful transport surface, never a guessed maneuver.
             options.put("preferSourceImage", true);
             options.put("sourceImageOnly", true);
+            options.put("autoWidth", options.optBoolean("autoWidth", false));
+            options.put("autoHeight", options.optBoolean("autoHeight", false));
             options.put("cardOpacityPercent", clamp(
                     options.optInt("cardOpacityPercent", 94), 0, 100));
             options.put("cardCornerRadiusPx", clamp(
@@ -408,6 +416,10 @@ public final class HudElementConfig {
                     options.optInt("roadBadgeFontSizeSp", 17), 8, 120));
             options.put("auxiliaryFontSizeSp", clamp(
                     options.optInt("auxiliaryFontSizeSp", 14), 8, 120));
+            for (String key : new String[]{"distanceSingleLine", "directionSingleLine",
+                    "roadBadgeSingleLine", "auxiliarySingleLine"}) {
+                options.put(key, options.optBoolean(key, true));
+            }
             options.put("distanceAreaPercent", clamp(
                     options.optInt("distanceAreaPercent", 56), 20, 80));
             options.put("textRowGapPx", clamp(

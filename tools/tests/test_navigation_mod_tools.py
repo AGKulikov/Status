@@ -732,7 +732,6 @@ public final class MapOverlayPlacementHarness {
         label_path = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                       / "ru" / "natro" / "navigation"
                       / "RouteStreetLabelMapLayer.java")
-        labels = label_path.read_text()
         alternative = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"
                        / "ru" / "natro" / "navigation"
                        / "AlternativeRouteMapLayer.java").read_text()
@@ -772,12 +771,21 @@ public final class MapOverlayPlacementHarness {
                        / "status" / "widget" / "hud" / "HudRuntimeData.java").read_text()
         hud_canvas = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
                       / "status" / "widget" / "hud" / "HudCanvasView.java").read_text()
+        auto_sizer = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                      / "status" / "widget" / "hud"
+                      / "ManeuverCardAutoSizer.java").read_text()
+        hud_element_config = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                              / "status" / "widget" / "hud"
+                              / "HudElementConfig.java").read_text()
         instrument_types = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
                             / "status" / "widget" / "instrument"
                             / "InstrumentElementType.java").read_text()
         instrument_canvas = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
                              / "status" / "widget" / "instrument"
                              / "InstrumentClusterView.java").read_text()
+        instrument_element_config = (TOOLS.parent / "app" / "src" / "main" / "java"
+                                     / "dezz" / "status" / "widget" / "instrument"
+                                     / "InstrumentElementConfig.java").read_text()
 
         self.assertNotIn("NavigationLayerFactory", renderer)
         self.assertNotIn("NavigationLayerSettings", renderer)
@@ -994,19 +1002,15 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("Subpolyline", renderer)
         self.assertIn('invoke(line, "hide"', renderer)
         self.assertNotIn('invoke(line, "setGeometry"', renderer)
-        self.assertTrue(label_path.exists())
-        self.assertIn("routeStreetLabelMapLayer", renderer)
+        self.assertFalse(label_path.exists())
+        self.assertNotIn("routeStreetLabelMapLayer", renderer)
         self.assertNotIn("readRouteStreetLabels", publisher)
-        self.assertIn('invoke(annotation, "getToponym"', labels)
-        self.assertIn('invoke(drivingRoute, "getGeometry"', labels)
-        self.assertIn('invoke(collection, "addPlacemark"', labels)
-        self.assertIn('invoke(placemark, "setText"', labels)
-        self.assertIn("MapObjectLayerFactory.MINOR", labels)
-        self.assertNotIn("Canvas", labels)
+        self.assertIn("MapObjectLayerFactory.MINOR", renderer)
+        self.assertNotIn("boolean routeStreetLabelsOnly", profile)
         self.assertIn("routeStreetLabelsOnly", profile)
-        self.assertIn("if (!showLabels || routeStreetLabelsOnly)", profile)
+        self.assertNotIn("if (!showLabels || routeStreetLabelsOnly)", profile)
         self.assertIn('{\\"elements\\":\\"label\\"', profile)
-        self.assertIn("ROUTE_STREET_LABELS", layer_order)
+        self.assertNotIn("ROUTE_STREET_LABELS", layer_order)
         self.assertIn("roadEventRouteSynchronizer.update", renderer)
         self.assertIn('invoke(currentLayer, "setRoadEventsOnRoute"', event_sync)
         self.assertIn('invoke(event, "getEventId"', event_sync)
@@ -1019,6 +1023,18 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("MapObjectLayerFactory.IGNORE", alternative)
         self.assertIn("MapObjectLayerFactory.MINOR", alternative)
         self.assertIn("reserveIfClear", alternative)
+        self.assertIn("if (next == null) next = placement.reserve", alternative)
+        self.assertIn("renderedRouteIds", alternative)
+        self.assertIn("hideSharedPrefix", alternative)
+        self.assertIn('invoke(line, "hide"', alternative)
+        self.assertIn('if (seconds == 0) return "то же время"', alternative)
+        self.assertLess(alternative.index("CalloutModel model = readCallout"),
+                        alternative.index('invoke(polylineCollection, "addPolyline"'))
+        self.assertLess(alternative.index('invoke(calloutCollection, "addPlacemark"'),
+                        alternative.index('invoke(polylineCollection, "addPolyline"'))
+        self.assertIn('invoke(line, "setVisible", new Class<?>[]{boolean.class}, false)',
+                      alternative)
+        self.assertNotIn("System.identityHashCode(alternative)", alternative)
         self.assertIn("StockAlternativePalette.negativeColor()", alternative)
         self.assertIn("StockAlternativePalette.positiveColor()", alternative)
         self.assertIn("ForegroundColorSpan", alternative_palette)
@@ -1029,8 +1045,7 @@ public final class MapOverlayPlacementHarness {
                     "alternativeCalloutBackgroundColor", "alternativeCalloutOpacityPercent",
                     "alternativeCalloutTextColor", "alternativeCalloutBorderColor",
                     "alternativeCalloutBorderWidthDp", "alternativeCalloutTextSizeSp",
-                    "alternativeCalloutCornerRadiusDp", "alternativeCalloutLeaderLengthDp",
-                    "routeStreetLabelsOnly"):
+                    "alternativeCalloutCornerRadiusDp", "alternativeCalloutLeaderLengthDp"):
             self.assertIn(key, integration_config)
             self.assertIn(key, profile)
         for settings in (hud_settings, cluster_settings):
@@ -1038,14 +1053,28 @@ public final class MapOverlayPlacementHarness {
             self.assertIn("Цвет дополнительной полилинии", settings)
             self.assertIn("Цвет фона выносного знака", settings)
             self.assertIn("Цвет обводки выносного знака", settings)
-            self.assertIn("Названия улиц только на линии активного маршрута", settings)
+            self.assertIn("Штатные названия улиц Яндекса", settings)
+            self.assertNotIn("Названия улиц только на линии активного маршрута", settings)
+            self.assertIn("Автоширина", settings)
+            self.assertIn("Автовысота", settings)
+        for config in (hud_element_config, instrument_element_config):
+            self.assertIn('options.put("autoWidth", false)', config)
+            self.assertIn('options.put("autoHeight", false)', config)
+        self.assertIn("ManeuverCardAutoSizer.resolve", hud_canvas)
+        self.assertIn("ManeuverCardAutoSizer.resolve", instrument_canvas)
+        self.assertIn('options.optBoolean("autoWidth", false)', auto_sizer)
+        self.assertIn('options.optBoolean("autoHeight", false)', auto_sizer)
+        self.assertIn("Math.min(maximumWidth", auto_sizer)
+        self.assertIn("float arrowRequired", auto_sizer)
+        self.assertIn(r"value.replace('\n', ' ').replace('\r', ' ')", auto_sizer)
+        self.assertIn("bottomLimit - maximum.top", auto_sizer)
+        self.assertIn("out.right = out.left + resolvedWidth", auto_sizer)
+        self.assertIn("out.bottom = out.top + Math.min", auto_sizer)
         self.assertIn("MapObjectLayerFactory.MINOR", renderer)
         self.assertIn(r'\"elements\":\"label.text\"', profile)
         self.assertRegex(profile,
                          r'source\.optBoolean\(\s*"routeStreetLabelsOnly",\s*false\)')
-        self.assertIn("routeStreetLabelMapLayer.apply(\n"
-                      "                profile.routeStreetLabelsOnly", renderer)
-        self.assertNotIn("profile.showLabels && profile.routeStreetLabelsOnly", renderer)
+        self.assertNotIn("routeStreetLabelMapLayer", renderer)
         self.assertIn("positionOnRoute", publisher)
         self.assertIn("onMapTouch(Activity activity, MotionEvent event)", entry)
         self.assertIn("ensureControlLayerAttached", controller)

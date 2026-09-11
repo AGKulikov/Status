@@ -77,7 +77,6 @@ public final class LayerOrderReplay {
                 MapSublayerOrder.LANE_GUIDANCE + P, MapSublayerOrder.TRAFFIC_LIGHTS + P,
                 MapSublayerOrder.CURSOR + P, MapSublayerOrder.ROUTE_TRAFFIC_LIGHTS + P,
                 MapSublayerOrder.SPEED_BUMPS + P, MapSublayerOrder.CAMERA_SIGNS + P,
-                MapSublayerOrder.ROUTE_STREET_LABELS + P,
                 MapSublayerOrder.ALTERNATIVE_CALLOUTS + P,
                 MapSublayerOrder.ROUTE + G, MapSublayerOrder.ALTERNATIVE_ROUTES + G,
                 MapSublayerOrder.CAMERA_SECTORS + G);
@@ -111,10 +110,7 @@ public final class LayerOrderReplay {
         int label = Math.max(map.manager.layers.indexOf("map" + P),
                 map.manager.layers.indexOf("jams" + P));
         if (label >= 0 && map.manager.layers.indexOf(ordinary) != label + 1) {
-            if (map.manager.layers.indexOf(MapSublayerOrder.ROUTE_STREET_LABELS + P)
-                    + 1 != map.manager.layers.indexOf(ordinary)) {
-                throw new AssertionError("Ordinary lights are not immediately above route labels");
-            }
+            throw new AssertionError("Ordinary lights are not immediately above native labels");
         }
         below(map, MapSublayerOrder.CAMERA_SECTORS + G,
                 MapSublayerOrder.ALTERNATIVE_ROUTES + G);

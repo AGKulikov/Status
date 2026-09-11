@@ -407,6 +407,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 .setPositiveButton("Применить", null)
                 .setNegativeButton("Отмена", null)
                 .create();
+        if (item.type == HudElementType.NAV_COMBINED) {
+            canvas.setMaximumManeuverCardPreview(item.id);
+            dialog.setOnDismissListener(ignored ->
+                    canvas.setMaximumManeuverCardPreview(null));
+        }
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(view -> {
                     try {
@@ -560,9 +565,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Камеры из HUD Speed — отдельный знак", profile.showHudSpeedCameras);
         Switch showLabels = switchView(
                 "Штатные названия улиц Яндекса", profile.showLabels);
-        Switch routeStreetLabelsOnly = switchView(
-                "Названия улиц только на линии активного маршрута",
-                profile.routeStreetLabelsOnly);
         Switch showPois = switchView("Полезные места", profile.showPois);
         Switch showBuildings = switchView("Здания", profile.showBuildings);
         Switch showParks = switchView("Парки", profile.showParks);
@@ -576,14 +578,13 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 showRouteTrafficLights,
                 showSpeedBumps,
                 showRouteTurns, showLaneGuidance, showHudSpeedCameras,
-                showLabels, routeStreetLabelsOnly, showPois, showBuildings,
+                showLabels, showPois, showBuildings,
                 showParks, showWater,
                 showModels, showCursor, roadsOnly}) {
             form.addView(control, marginTop(4));
         }
-        form.addView(text("В обычном режиме используются все штатные подписи Яндекса. В режиме "
-                + "«только на маршруте» фоновые подписи скрываются, а названия берутся только "
-                + "из секций DrivingRoute и ставятся штатным текстом MapKit прямо на полилинию.",
+        form.addView(text("Названия, шрифт, контур и изгиб текста рисует сам слой карты "
+                + "Яндекса. Отдельных точечных подписей Natro больше нет.",
                 12, 0xFF95A0AF), marginTop(4));
         Button roadEvents = button("Дорожные события — выбрать типы и режимы");
         roadEvents.setOnClickListener(view -> editHudRoadEvents(navigation, profile));
@@ -710,7 +711,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 + "тело стрелки, а размер треугольного наконечника настраивается отдельно.",
                 12, 0xFF95A0AF), marginTop(4));
         SliderField routeLabelScale = slider(form,
-                "Размер названий улиц",
+                "Размер штатных названий улиц",
                 profile.routeLabelScalePercent, 50, 250, 5, " %");
         SliderField roadEventScale = slider(form,
                 "Размер остальных дорожных событий",
@@ -867,7 +868,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         profile.showRouteTurns = showRouteTurns.isChecked();
                         profile.showLaneGuidance = showLaneGuidance.isChecked();
                         profile.showHudSpeedCameras = showHudSpeedCameras.isChecked();
-                        profile.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked();
                         profile.showLabels = showLabels.isChecked();
                         profile.showPois = showPois.isChecked();
                         profile.showBuildings = showBuildings.isChecked();
@@ -1322,6 +1322,13 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         0, 24, 1, " px"));
 
                 form.addView(section("Компоновка карточки"), marginTop(14));
+                visualSwitch(form, controls, "bool:autoWidth", "Автоширина",
+                        item.options.optBoolean("autoWidth", false));
+                visualSwitch(form, controls, "bool:autoHeight", "Автовысота",
+                        item.options.optBoolean("autoHeight", false));
+                form.addView(text("Левый верхний угол остаётся на месте. Автоширина растёт "
+                        + "вправо не дальше заданной ширины, автовысота — вниз по числу строк.",
+                        12, 0xFF95A0AF), marginTop(4));
                 controls.put("int:arrowAreaPercent", slider(form,
                         "Доля места для исходного знака",
                         item.options.optInt("arrowAreaPercent", 38),
@@ -1363,18 +1370,30 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         "Размер шрифта расстояния",
                         item.options.optInt("distanceFontSizeSp", item.fontSizeSp),
                         8, 160, 1, " sp"));
+                visualSwitch(form, controls, "bool:distanceSingleLine",
+                        "Расстояние: не переносить текст на новую строку",
+                        item.options.optBoolean("distanceSingleLine", true));
                 controls.put("int:roadBadgeFontSizeSp", slider(form,
                         "Размер шрифта номера съезда / указателя",
                         item.options.optInt("roadBadgeFontSizeSp", 17),
                         8, 120, 1, " sp"));
+                visualSwitch(form, controls, "bool:roadBadgeSingleLine",
+                        "Номер съезда / указатель: не переносить текст на новую строку",
+                        item.options.optBoolean("roadBadgeSingleLine", true));
                 controls.put("int:directionFontSizeSp", slider(form,
                         "Размер шрифта улицы / направления",
                         item.options.optInt("directionFontSizeSp", 18),
                         8, 120, 1, " sp"));
+                visualSwitch(form, controls, "bool:directionSingleLine",
+                        "Улица / направление: не переносить текст на новую строку",
+                        item.options.optBoolean("directionSingleLine", true));
                 controls.put("int:auxiliaryFontSizeSp", slider(form,
                         "Размер шрифта дополнительной информации",
                         item.options.optInt("auxiliaryFontSizeSp", 14),
                         8, 120, 1, " sp"));
+                visualSwitch(form, controls, "bool:auxiliarySingleLine",
+                        "Дополнительная информация: не переносить текст на новую строку",
+                        item.options.optBoolean("auxiliarySingleLine", true));
                 controls.put("int:distanceAreaPercent", slider(form,
                         "Высота строки расстояния",
                         item.options.optInt("distanceAreaPercent", 56),

@@ -38,6 +38,9 @@ final class HudCompositeView extends FrameLayout
     private int leasedWidth;
     private int leasedHeight;
     @Nullable private HudElementConfig activeMap;
+    /** Configured opacity is applied only after MapKit has submitted a real producer frame. */
+    private float desiredMapAlpha = 1f;
+    private boolean awaitingFirstMapFrame = true;
     private final MapEdgeFade mapEdgeFade = new MapEdgeFade();
     private final RectF edgeBounds = new RectF();
 
@@ -54,6 +57,7 @@ final class HudCompositeView extends FrameLayout
 
         mapTexture = new TextureView(context);
         mapTexture.setOpaque(true);
+        mapTexture.setAlpha(0f);
         // TextureView rejects every background Drawable on Android 9, including the Drawable
         // produced by setBackgroundColor(). Its opaque producer surface is already black before
         // Navigator submits the first frame, so no View background is needed here.
@@ -106,19 +110,24 @@ final class HudCompositeView extends FrameLayout
     }
 
     private void reconcileMapElement() {
+        boolean wasAbsent = activeMap == null;
         activeMap = HudDirectMapGeometry.find(config);
         if (activeMap == null) {
             revokeSurface();
+            awaitingFirstMapFrame = true;
+            mapTexture.setAlpha(0f);
             mapTexture.setVisibility(View.GONE);
             return;
         }
+        if (wasAbsent) beginFirstFrameGate();
         mapTexture.setVisibility(View.VISIBLE);
         // MapKit emits an alpha substrate in the roads-only mode. TextureView must advertise the
         // same contract or SurfaceFlinger deliberately replaces every alpha pixel with black.
         boolean transparentMap = activeMap.options.optBoolean(
                 "transparentBackground", false);
         mapTexture.setOpaque(!transparentMap);
-        mapTexture.setAlpha(activeMap.options.optInt("opacityPercent", 100) / 100f);
+        desiredMapAlpha = activeMap.options.optInt("opacityPercent", 100) / 100f;
+        if (!awaitingFirstMapFrame) mapTexture.setAlpha(desiredMapAlpha);
         int radius = activeMap.options.optInt("cornerRadiusPx", 0);
         mapTexture.setOutlineProvider(new RoundedOutline(radius));
         mapTexture.setClipToOutline(radius > 0);
@@ -160,6 +169,7 @@ final class HudCompositeView extends FrameLayout
     @Override
     public void onSurfaceTextureAvailable(@NonNull SurfaceTexture texture,
                                           int width, int height) {
+        beginFirstFrameGate();
         publishSurface(texture, width, height);
         mapTexture.post(this::publishLaidOutSurface);
     }
@@ -173,12 +183,24 @@ final class HudCompositeView extends FrameLayout
     @Override
     public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture texture) {
         revokeSurface();
+        beginFirstFrameGate();
         return true;
     }
 
     @Override
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture texture) {
-        // MapKit owns rendering cadence. Natro never reads or copies a produced frame.
+        // Android initializes an opaque TextureView buffer to white on this secondary display.
+        // Reveal it only when MapKit has actually queued its first frame. Later resizes keep the
+        // same SurfaceTexture and therefore retain the last complete frame without another gate.
+        if (awaitingFirstMapFrame && leasedTexture == texture && activeMap != null) {
+            awaitingFirstMapFrame = false;
+            mapTexture.setAlpha(desiredMapAlpha);
+        }
+    }
+
+    private void beginFirstFrameGate() {
+        awaitingFirstMapFrame = true;
+        mapTexture.setAlpha(0f);
     }
 
     private void publishSurface(@NonNull SurfaceTexture texture, int width, int height) {

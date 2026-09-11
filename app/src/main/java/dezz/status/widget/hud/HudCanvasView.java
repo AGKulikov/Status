@@ -35,6 +35,7 @@ import java.util.Map;
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.launcher.HorizontalGroupLayout;
 import dezz.status.widget.launcher.LauncherMediaController;
+import dezz.status.widget.navigation.StockManeuverCardState;
 
 /**
  * Resolution-independent renderer shared byte-for-byte by the live editor and HUD Presentation.
@@ -63,12 +64,16 @@ public final class HudCanvasView extends View {
     /** Live geometry changes only on config/size updates, never on telemetry frames. */
     @NonNull private final Map<HudElementConfig, RectF> cachedElementBounds =
             new IdentityHashMap<>();
+    /** Text measurement is content-bound, not frame-bound. Keep it off the animation path. */
+    @NonNull private final Map<HudElementConfig, ManeuverAutoSizeEntry>
+            maneuverAutoSizeCache = new IdentityHashMap<>();
     @NonNull private final HudRuntimeData data;
     private final boolean editor;
     /** True when WindowManager already cropped this View to the physical 728x190 HUD plane. */
     private final boolean localHudViewport;
     @Nullable private final EditorListener editorListener;
     @Nullable private String selectedId;
+    @Nullable private String maximumManeuverPreviewId;
     @Nullable private HudElementConfig dragging;
     private boolean resizing;
     private float downX;
@@ -121,6 +126,7 @@ public final class HudCanvasView extends View {
         directMap = HudDirectMapGeometry.find(next);
         cachedGeometry = null;
         cachedElementBounds.clear();
+        maneuverAutoSizeCache.clear();
         if (selectedId != null && find(selectedId) == null) selectedId = null;
         invalidate();
     }
@@ -129,6 +135,7 @@ public final class HudCanvasView extends View {
         super.onSizeChanged(width, height, oldWidth, oldHeight);
         cachedGeometry = null;
         cachedElementBounds.clear();
+        maneuverAutoSizeCache.clear();
     }
 
     @Override protected void onDetachedFromWindow() {
@@ -144,6 +151,108 @@ public final class HudCanvasView extends View {
 
     @Nullable public String selectedId() { return selectedId; }
     @Nullable public HudElementConfig selected() { return find(selectedId); }
+
+    /** Shows every configurable text region only while this card's settings are visible. */
+    public void setMaximumManeuverCardPreview(@Nullable String id) {
+        if (id == null ? maximumManeuverPreviewId == null
+                : id.equals(maximumManeuverPreviewId)) return;
+        maximumManeuverPreviewId = id;
+        maneuverAutoSizeCache.clear();
+        invalidate();
+    }
+
+    @Nullable
+    private HudNavigationState navigationFor(@NonNull HudElementConfig item) {
+        if (editor && item.type == HudElementType.NAV_COMBINED
+                && item.id.equals(maximumManeuverPreviewId)) {
+            return HudNavigationState.editorManeuverCardPreview();
+        }
+        return data.navigation();
+    }
+
+    @NonNull
+    private RectF maneuverCardDrawBounds(@NonNull HudElementConfig item,
+                                        @NonNull RectF maximum,
+                                        @NonNull Geometry geometry) {
+        if (!item.options.optBoolean("autoWidth", false)
+                && !item.options.optBoolean("autoHeight", false)) return maximum;
+        HudNavigationState nav = navigationFor(item);
+        Typeface face = typeface(item.fontWeight);
+        ManeuverAutoSizeEntry cached = maneuverAutoSizeCache.get(item);
+        if (cached != null && cached.matches(nav, maximum, geometry.safeClip.bottom,
+                geometry.scale, face, item.fontSizeSp)) {
+            return cached.bounds;
+        }
+        ManeuverCardAutoSizer.Content content = maneuverCardContent(item, nav);
+        RectF resolved = new RectF();
+        ManeuverCardAutoSizer.resolve(maximum, geometry.safeClip.bottom, item.options,
+                geometry.scale, geometry.scale, textPaint, face,
+                item.fontSizeSp, content, resolved);
+        maneuverAutoSizeCache.put(item, new ManeuverAutoSizeEntry(nav, maximum,
+                geometry.safeClip.bottom, geometry.scale, face, item.fontSizeSp, resolved));
+        return resolved;
+    }
+
+    @NonNull
+    private ManeuverCardAutoSizer.Content maneuverCardContent(
+            @NonNull HudElementConfig item, @Nullable HudNavigationState nav) {
+        if (nav != null && nav.stockCard.enabled
+                && commandCardRenderer().available(nav.stockCard)) {
+            ArrayList<List<String>> badgeRows = new ArrayList<>();
+            if (item.options.optBoolean("showRoadBadge", true)) {
+                addStockBadgeRow(badgeRows, nav.stockCard.signs);
+                addStockBadgeRow(badgeRows, nav.stockCard.followingSigns);
+            }
+            String direction = item.options.optBoolean("showDirection", true)
+                    ? nav.stockCard.nextRoad : "";
+            String auxiliary = nav.stockCard.hasAuxiliary()
+                    ? nonEmptyMeasurementText(nav.stockCard.auxiliaryText) : "";
+            return new ManeuverCardAutoSizer.Content(nav.stockCard.distance,
+                    direction, badgeRows, auxiliary, true, false);
+        }
+
+        String distance = nav == null ? (editor ? "350 м" : "") : nav.turnDistance;
+        String road = nav == null ? (editor ? "М2" : "")
+                : nav.direct ? nav.maneuverNextRoad
+                : firstCardText(nav.maneuverNextRoad, nav.maneuverSubtext, nav.street);
+        String direction = nav == null ? (editor ? "Тула" : "")
+                : nav.direct ? road : firstCardText(nav.maneuverTitle,
+                nav.maneuverText, road, nav.destination);
+        if (!item.options.optBoolean("showDirection", true)) direction = "";
+
+        ArrayList<List<String>> badgeRows = new ArrayList<>();
+        if (item.options.optBoolean("showRoadBadge", true)) {
+            ArrayList<String> badges = new ArrayList<>();
+            if (nav != null) {
+                for (HudNavigationState.DirectionSignItem sign
+                        : nav.maneuverDirectionSigns) {
+                    if (!sign.text.trim().isEmpty()) badges.add(sign.text);
+                }
+            } else if (editor && looksLikeRoadReference(road)) {
+                badges.add(road);
+            }
+            if (!badges.isEmpty()) badgeRows.add(badges);
+        }
+        String auxiliary = nav == null ? (editor ? "2-й съезд" : "")
+                : stockManeuverAuxiliaryText(nav);
+        return new ManeuverCardAutoSizer.Content(distance, direction,
+                badgeRows, auxiliary, true, false);
+    }
+
+    private static void addStockBadgeRow(@NonNull List<List<String>> rows,
+                                         @NonNull List<StockManeuverCardState.Sign> signs) {
+        if (signs.isEmpty()) return;
+        ArrayList<String> row = new ArrayList<>(signs.size());
+        for (StockManeuverCardState.Sign sign : signs) {
+            row.add(nonEmptyMeasurementText(sign.text));
+        }
+        rows.add(row);
+    }
+
+    @NonNull
+    private static String nonEmptyMeasurementText(@Nullable String value) {
+        return value == null || value.trim().isEmpty() ? "88" : value;
+    }
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -167,6 +276,9 @@ public final class HudCanvasView extends View {
         for (HudElementConfig item : drawingOrder) {
             if (!shouldDraw(item)) continue;
             RectF bounds = bounds(item, geometry);
+            if (item.type == HudElementType.NAV_COMBINED) {
+                bounds = maneuverCardDrawBounds(item, bounds, geometry);
+            }
             drawElement(canvas, item, bounds, geometry.scale, geometry);
             if ((item.type == HudElementType.TURN_SIGNALS
                     || item.type == HudElementType.TURN_SIGNAL_LEFT
@@ -466,7 +578,7 @@ public final class HudCanvasView extends View {
     }
 
     private void drawManeuver(Canvas canvas, HudElementConfig item, RectF bounds, int color) {
-        HudNavigationState nav = data.navigation();
+        HudNavigationState nav = navigationFor(item);
         if (nav != null && nav.stockCard.enabled) {
             commandCardRenderer().drawMain(canvas, nav.stockCard, bounds, Color.alpha(color));
             return;
@@ -693,7 +805,7 @@ public final class HudCanvasView extends View {
 
     private void drawCombinedNavigation(Canvas canvas, HudElementConfig item, RectF bounds,
                                         int color, int unitColor, float scale) {
-        HudNavigationState commandNav = data.navigation();
+        HudNavigationState commandNav = navigationFor(item);
         if (commandNav != null && commandNav.stockCard.enabled
                 && !commandCardRenderer().available(commandNav.stockCard)) return;
         if (item.options.optBoolean("showCardBackground", true)) {
@@ -730,7 +842,7 @@ public final class HudCanvasView extends View {
                 item.options.optInt("paddingRightPx", 10) * scale,
                 item.options.optInt("paddingBottomPx", 8) * scale);
         if (content.isEmpty()) return;
-        HudNavigationState nav = data.navigation();
+        HudNavigationState nav = commandNav;
         if (nav != null && nav.stockCard.enabled) {
             commandCardRenderer().draw(canvas, nav.stockCard, content, item.options, scale,
                     item.fontSizeSp, item.fontWeight, color, unitColor);
@@ -853,16 +965,20 @@ public final class HudCanvasView extends View {
         if (!distanceBounds.isEmpty()) {
             float size = Math.min(item.options.optInt("distanceFontSizeSp", item.fontSizeSp)
                     * scale, distanceBounds.height() * .72f);
-            drawStyledText(canvas, nav.turnDistance, distanceBounds, color, size,
-                    Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
+            drawManeuverText(canvas, nav.turnDistance, distanceBounds, color, size,
+                    Layout.Alignment.ALIGN_NORMAL,
+                    item.options.optBoolean("distanceSingleLine", true),
+                    Math.max(600, item.fontWeight));
         }
         if (rows.nextRoad != null) {
             RectF road = stockCardTextRect(rows.nextRoad, item, scale);
             if (!road.isEmpty()) {
                 float size = item.options.optInt("directionFontSizeSp",
                         Math.max(8, Math.round(item.fontSizeSp * .52f))) * scale;
-                drawStyledText(canvas, rows.roadText, road, unitColor, size,
-                        Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
+                drawManeuverText(canvas, rows.roadText, road, unitColor, size,
+                        Layout.Alignment.ALIGN_NORMAL,
+                        item.options.optBoolean("directionSingleLine", true),
+                        item.fontWeight);
             }
         }
         if (rows.signs != null) {
@@ -890,10 +1006,12 @@ public final class HudCanvasView extends View {
             if (!text.isEmpty()) {
                 float size = item.options.optInt("auxiliaryFontSizeSp",
                         Math.max(8, Math.round(item.fontSizeSp * .46f))) * scale;
-                drawStyledText(canvas, auxiliary, text,
+                drawManeuverText(canvas, auxiliary, text,
                         withAlpha(auxiliaryTextColor, Math.round(
                                 Color.alpha(auxiliaryTextColor) * Color.alpha(color) / 255f)), size,
-                        Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
+                        Layout.Alignment.ALIGN_NORMAL,
+                        item.options.optBoolean("auxiliarySingleLine", true),
+                        Math.max(600, item.fontWeight));
             }
         }
     }
@@ -949,7 +1067,7 @@ public final class HudCanvasView extends View {
     /** Draws Navigator's information card without coupling it to the native map Surface. */
     private void drawManeuverCardText(Canvas canvas, HudElementConfig item, RectF bounds,
                                       int color, int unitColor, float scale) {
-        HudNavigationState nav = data.navigation();
+        HudNavigationState nav = navigationFor(item);
         String distance = nav == null ? (editor ? "350 м" : "") : nav.turnDistance;
         String roadCandidate = nav == null ? (editor ? "М2" : "")
                 : nav.direct ? nav.maneuverNextRoad
@@ -1004,8 +1122,10 @@ public final class HudCanvasView extends View {
                 Math.max(8, Math.round(item.fontSizeSp * .52f))) * scale);
         float badgeSize = Math.max(8f, item.options.optInt("roadBadgeFontSizeSp",
                 Math.max(8, Math.round(item.fontSizeSp * .50f))) * scale);
-        drawStyledText(canvas, distance, distanceBounds, color, distanceSize,
-                Layout.Alignment.ALIGN_NORMAL, false, Math.max(600, item.fontWeight));
+        drawManeuverText(canvas, distance, distanceBounds, color, distanceSize,
+                Layout.Alignment.ALIGN_NORMAL,
+                item.options.optBoolean("distanceSingleLine", true),
+                Math.max(600, item.fontWeight));
 
         float detailLeft = detailBounds.left;
         if (!directionSigns.isEmpty()) {
@@ -1013,10 +1133,12 @@ public final class HudCanvasView extends View {
                     detailBounds, color, badgeSize, scale);
             if (!roadCandidate.isEmpty() && !containsDirectionSign(directionSigns, roadCandidate)
                     && detailLeft < detailBounds.right) {
-                drawStyledText(canvas, roadCandidate,
+                drawManeuverText(canvas, roadCandidate,
                         new RectF(detailLeft, detailBounds.top, detailBounds.right,
                                 detailBounds.bottom), unitColor, directionSize,
-                        Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
+                        Layout.Alignment.ALIGN_NORMAL,
+                        item.options.optBoolean("directionSingleLine", true),
+                        item.fontWeight);
                 detailLeft = detailBounds.right;
             }
         } else if (!roadBadge.isEmpty()) {
@@ -1040,10 +1162,11 @@ public final class HudCanvasView extends View {
                     Color.alpha(badgeColor) * Color.alpha(color) / 255f)));
             canvas.drawRoundRect(badge, Math.max(2f, 3f * scale),
                     Math.max(2f, 3f * scale), paint);
-            drawStyledText(canvas, roadBadge,
+            drawManeuverText(canvas, roadBadge,
                     insetSides(badge, horizontalPadding, verticalPadding,
                             horizontalPadding, verticalPadding),
-                    color, badgeSize, Layout.Alignment.ALIGN_CENTER, false,
+                    color, badgeSize, Layout.Alignment.ALIGN_CENTER,
+                    item.options.optBoolean("roadBadgeSingleLine", true),
                     Math.max(600, item.fontWeight));
             detailLeft = badge.right + Math.max(3f, 5f * scale);
         } else if ((nav == null || !nav.direct) && showDirection && !roadCandidate.isEmpty()
@@ -1051,10 +1174,12 @@ public final class HudCanvasView extends View {
             direction = direction.isEmpty() ? roadCandidate : roadCandidate + " · " + direction;
         }
         if (!direction.isEmpty() && detailLeft < detailBounds.right) {
-            drawStyledText(canvas, direction,
+            drawManeuverText(canvas, direction,
                     new RectF(detailLeft, detailBounds.top, detailBounds.right,
                             detailBounds.bottom), unitColor, directionSize,
-                    Layout.Alignment.ALIGN_NORMAL, false, item.fontWeight);
+                    Layout.Alignment.ALIGN_NORMAL,
+                    item.options.optBoolean("directionSingleLine", true),
+                    item.fontWeight);
         }
         if (auxiliaryBounds != null) {
             int auxiliaryColor = optionColor(item, "auxiliaryColor", 0xE60B4DB5);
@@ -1066,12 +1191,13 @@ public final class HudCanvasView extends View {
             canvas.drawRoundRect(auxiliaryBounds, radius, radius, paint);
             float auxiliarySize = Math.max(8f, item.options.optInt("auxiliaryFontSizeSp",
                     Math.max(8, Math.round(item.fontSizeSp * .46f))) * scale);
-            drawStyledText(canvas, auxiliary,
+            drawManeuverText(canvas, auxiliary,
                     insetSides(auxiliaryBounds, Math.max(3f, 6f * scale), 0f,
                             Math.max(3f, 6f * scale), 0f),
                     withAlpha(auxiliaryTextColor, Math.round(
                             Color.alpha(auxiliaryTextColor) * Color.alpha(color) / 255f)),
-                    auxiliarySize, Layout.Alignment.ALIGN_NORMAL, false,
+                    auxiliarySize, Layout.Alignment.ALIGN_NORMAL,
+                    item.options.optBoolean("auxiliarySingleLine", true),
                     Math.max(600, item.fontWeight));
         }
     }
@@ -1103,10 +1229,11 @@ public final class HudCanvasView extends View {
                     Color.alpha(badgeColor) * Color.alpha(color) / 255f)));
             canvas.drawRoundRect(badge, Math.max(2f, 3f * scale),
                     Math.max(2f, 3f * scale), paint);
-            drawStyledText(canvas, sign.text,
+            drawManeuverText(canvas, sign.text,
                     insetSides(badge, horizontalPadding, 0f, horizontalPadding, 0f),
                     withAlpha(badgeTextColor, Color.alpha(color)), badgeSize,
-                    Layout.Alignment.ALIGN_CENTER, false,
+                    Layout.Alignment.ALIGN_CENTER,
+                    item.options.optBoolean("roadBadgeSingleLine", true),
                     Math.max(600, item.fontWeight));
             detailLeft = badge.right + badgeGap;
         }
@@ -1705,6 +1832,91 @@ public final class HudCanvasView extends View {
                 ? Layout.Alignment.ALIGN_OPPOSITE : Layout.Alignment.ALIGN_CENTER;
         drawStyledText(canvas, value, bounds, color, size,
                 alignment, item.wrapText, item.fontWeight);
+    }
+
+    /** Fixed-size maneuver text: one ellipsized line or at most two wrapped lines. */
+    private void drawManeuverText(Canvas canvas, String value, RectF bounds, int color,
+                                  float size, Layout.Alignment alignment,
+                                  boolean singleLine, int weight) {
+        if (value == null || value.isEmpty() || bounds.isEmpty()) return;
+        textPaint.setColor(color);
+        textPaint.setTextSize(Math.max(1f, size));
+        textPaint.setTypeface(typeface(weight));
+        int width = Math.max(1, Math.round(bounds.width()));
+        String normalized = singleLine
+                ? value.replace('\n', ' ').replace('\r', ' ') : value;
+        CharSequence displayed = singleLine
+                ? android.text.TextUtils.ellipsize(normalized, textPaint, width,
+                android.text.TextUtils.TruncateAt.END) : normalized;
+        if (singleLine) {
+            float x;
+            if (alignment == Layout.Alignment.ALIGN_NORMAL) {
+                textPaint.setTextAlign(Paint.Align.LEFT);
+                x = bounds.left;
+            } else if (alignment == Layout.Alignment.ALIGN_OPPOSITE) {
+                textPaint.setTextAlign(Paint.Align.RIGHT);
+                x = bounds.right;
+            } else {
+                textPaint.setTextAlign(Paint.Align.CENTER);
+                x = bounds.centerX();
+            }
+            textPaint.getFontMetrics(textFontMetrics);
+            float baseline = bounds.centerY()
+                    - (textFontMetrics.ascent + textFontMetrics.descent) * .5f;
+            int save = canvas.save();
+            canvas.clipRect(bounds);
+            canvas.drawText(displayed, 0, displayed.length(), x, baseline, textPaint);
+            canvas.restoreToCount(save);
+            return;
+        }
+        textPaint.setTextAlign(Paint.Align.LEFT);
+        StaticLayout layout = StaticLayout.Builder.obtain(displayed, 0, displayed.length(),
+                        textPaint, width)
+                .setAlignment(alignment)
+                .setIncludePad(false)
+                .setMaxLines(2)
+                .setEllipsize(android.text.TextUtils.TruncateAt.END)
+                .setEllipsizedWidth(width)
+                .build();
+        int save = canvas.save();
+        canvas.clipRect(bounds);
+        canvas.translate(bounds.left, bounds.centerY() - layout.getHeight() * .5f);
+        layout.draw(canvas);
+        canvas.restoreToCount(save);
+    }
+
+    private static final class ManeuverAutoSizeEntry {
+        @Nullable final HudNavigationState navigation;
+        @NonNull final RectF maximum;
+        final float bottomLimit;
+        final float scale;
+        @NonNull final Typeface typeface;
+        final int fontSizeSp;
+        @NonNull final RectF bounds;
+
+        ManeuverAutoSizeEntry(@Nullable HudNavigationState navigation,
+                              @NonNull RectF maximum, float bottomLimit, float scale,
+                              @NonNull Typeface typeface, int fontSizeSp,
+                              @NonNull RectF bounds) {
+            this.navigation = navigation;
+            this.maximum = new RectF(maximum);
+            this.bottomLimit = bottomLimit;
+            this.scale = scale;
+            this.typeface = typeface;
+            this.fontSizeSp = fontSizeSp;
+            this.bounds = bounds;
+        }
+
+        boolean matches(@Nullable HudNavigationState navigation, @NonNull RectF maximum,
+                        float bottomLimit, float scale, @NonNull Typeface typeface,
+                        int fontSizeSp) {
+            return this.navigation == navigation
+                    && this.maximum.equals(maximum)
+                    && Float.compare(this.bottomLimit, bottomLimit) == 0
+                    && Float.compare(this.scale, scale) == 0
+                    && this.typeface == typeface
+                    && this.fontSizeSp == fontSizeSp;
+        }
     }
 
     private void drawStyledText(Canvas canvas, String value, RectF bounds, int color,

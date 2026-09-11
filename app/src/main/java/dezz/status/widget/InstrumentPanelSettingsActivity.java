@@ -451,7 +451,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(opacityValue);
         content.addView(opacity);
 
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Настройка элемента")
                 .setView(scroll)
                 .setPositiveButton("Применить", (dialog, which) -> {
@@ -510,7 +510,13 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     refresh(element.id, true);
                 })
                 .setNegativeButton("Отмена", null)
-                .show();
+                .create();
+        if (element.type == InstrumentElementType.NAV_MANEUVER_CARD) {
+            preview.instruments().setMaximumManeuverCardPreview(element.id);
+            dialog.setOnDismissListener(ignored ->
+                    preview.instruments().setMaximumManeuverCardPreview(null));
+        }
+        dialog.show();
     }
 
     private void duplicateSelected() {
@@ -666,9 +672,6 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 "Камеры из HUD Speed — отдельный знак", map.showHudSpeedCameras);
         Switch labels = switchView(
                 "Штатные названия улиц Яндекса", map.showLabels);
-        Switch routeStreetLabelsOnly = switchView(
-                "Названия улиц только на линии активного маршрута",
-                map.routeStreetLabelsOnly);
         Switch pois = switchView("Полезные места", map.showPois);
         Switch buildings = switchView("Здания", map.showBuildings);
         Switch parks = switchView("Парки", map.showParks);
@@ -688,10 +691,8 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         content.addView(laneGuidance);
         content.addView(hudSpeedCameras);
         content.addView(labels);
-        content.addView(routeStreetLabelsOnly);
-        content.addView(text("В обычном режиме используются все штатные подписи Яндекса. В режиме "
-                + "«только на маршруте» фоновые подписи скрываются, а названия берутся только "
-                + "из секций DrivingRoute и ставятся штатным текстом MapKit прямо на полилинию.",
+        content.addView(text("Названия, шрифт, контур и изгиб текста рисует сам слой карты "
+                + "Яндекса. Отдельных точечных подписей Natro больше нет.",
                 12, 0xFFB8C0CC));
         content.addView(pois);
         content.addView(buildings);
@@ -825,7 +826,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 + "тело стрелки, а размер треугольного наконечника настраивается отдельно.",
                 12, 0xFFB8C0CC));
         SliderField routeLabelScale = slider(content,
-                "Размер названий улиц",
+                "Размер штатных названий улиц",
                 map.routeLabelScalePercent, 50, 250, 5, " %");
         SliderField roadEventScale = slider(content,
                 "Размер остальных дорожных событий",
@@ -966,7 +967,6 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     map.showHudSpeedCameras = hudSpeedCameras.isChecked();
                     map.showPois = pois.isChecked();
                     map.showBuildings = buildings.isChecked();
-                    map.routeStreetLabelsOnly = routeStreetLabelsOnly.isChecked();
                     map.showLabels = labels.isChecked();
                     map.showParks = parks.isChecked();
                     map.showWater = water.isChecked();
@@ -1210,6 +1210,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         private Switch showIcon;
         private Switch reserveIconSpace;
         private Switch showManeuverDetails;
+        @NonNull private final Map<String, Switch> booleans = new LinkedHashMap<>();
         private OptionalColorButton sourceSignColor, sourceTextColor, sourceBadgeColor;
 
         NavigationInfoControls(@NonNull LinearLayout parent,
@@ -1258,6 +1259,13 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                         "Цвет текста указателей", source.options.optString("sourceTextColor", null));
                 sourceBadgeColor = new OptionalColorButton(InstrumentPanelSettingsActivity.this, parent,
                         "Фон исходных указателей", source.options.optString("sourceBadgeColor", null));
+                if (standaloneCard) {
+                    toggle("autoWidth", "Автоширина", false);
+                    toggle("autoHeight", "Автовысота", false);
+                    parent.addView(text("Левый верхний угол остаётся на месте. Автоширина "
+                            + "растёт вправо не дальше заданной ширины, автовысота — вниз "
+                            + "по числу строк.", 12, 0xFFB8C0CC), marginTop(6));
+                }
 
                 parent.addView(section("Данные ближайшего манёвра"), marginTop(12));
                 showManeuverDetails = switchView(
@@ -1274,14 +1282,22 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                         18, 8, 120, 1, " sp");
                 number("distanceFontSizeSp", "Размер расстояния до манёвра",
                         34, 8, 160, 1, " sp");
+                toggle("distanceSingleLine",
+                        "Расстояние: не переносить текст на новую строку", true);
                 number("maneuverAuxiliaryTextSizeSp", "Размер дополнительного текста",
                         14, 8, 120, 1, " sp");
                 number("directionFontSizeSp", "Размер названия улицы / направления",
                         18, 8, 120, 1, " sp");
+                toggle("directionSingleLine",
+                        "Улица / направление: не переносить текст на новую строку", true);
                 number("roadBadgeFontSizeSp", "Размер номера съезда / указателя",
                         18, 8, 120, 1, " sp");
+                toggle("roadBadgeSingleLine",
+                        "Номер съезда / указатель: не переносить текст на новую строку", true);
                 number("auxiliaryFontSizeSp", "Размер дополнительной информации",
                         14, 8, 120, 1, " sp");
+                toggle("auxiliarySingleLine",
+                        "Дополнительная информация: не переносить текст на новую строку", true);
                 color("maneuverDetailTextColor", "Цвет текста", "#FFFFFFFF");
                 color("auxiliaryColor", "Фон дополнительной информации",
                         source.options.optString("maneuverAuxiliaryColor", "#E60B4DB5"));
@@ -1380,6 +1396,13 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                     source.options.optString(key, fallback)));
         }
 
+        private void toggle(@NonNull String key, @NonNull String title,
+                            boolean fallback) {
+            Switch control = switchView(title, source.options.optBoolean(key, fallback));
+            booleans.put(key, control);
+            parent.addView(control);
+        }
+
         void apply(@NonNull InstrumentElementConfig target) {
             if (sourceSignColor != null) {
                 setOption(target, "sourceSignColor", sourceSignColor.value());
@@ -1400,6 +1423,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
             }
             for (Map.Entry<String, ColorField> entry : colors.entrySet()) {
                 setOption(target, entry.getKey(), entry.getValue().value);
+            }
+            for (Map.Entry<String, Switch> entry : booleans.entrySet()) {
+                setOption(target, entry.getKey(), entry.getValue().isChecked());
             }
         }
     }

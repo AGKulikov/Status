@@ -120,6 +120,8 @@ public final class InstrumentPanelContractTest {
         Path root = projectRoot();
         String integration = read(root.resolve("app/src/geely/java/dezz/status/widget/car/"
                 + "GeelyCarIntegration.java"));
+        String trip2 = read(root.resolve("app/src/geely/java/dezz/status/widget/car/"
+                + "EcarxTrip2Access.java"));
         String settings = read(root.resolve("app/src/main/java/dezz/status/widget/"
                 + "InstrumentPanelSettingsActivity.java"));
         String renderer = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
@@ -128,15 +130,17 @@ public final class InstrumentPanelContractTest {
                 + "InstrumentTelemetryRepository.java"));
         String hudRuntime = read(root.resolve("app/src/main/java/dezz/status/widget/hud/"
                 + "HudRuntimeData.java"));
-        assertTrue(integration.contains("car.getHevManager()"));
-        assertTrue(integration.contains("hev.getTripData()"));
-        assertTrue(integration.contains("source.registerTripListener(listener)"));
-        assertTrue(integration.contains("unregisterTripListener(registration.listener)"));
-        assertTrue(integration.contains("info.getTripDistance()"));
-        assertTrue(integration.contains("info.getTripDuration()"));
-        assertFalse(integration.contains("emitCurrentTrip(subscription, source.getLatestDrivingInfo())"));
-        assertFalse(integration.contains(
-                "emitRealtimeCurrentTrip(subscription, source.getLatestDrivingInfo())"));
+        assertTrue(integration.contains("trip2Access.addListener(listener)"));
+        assertTrue(integration.contains("trip2Access.removeListener(listener)"));
+        assertFalse(integration.contains("getLatestDrivingInfo"));
+        assertFalse(integration.contains("getTripData()"));
+        assertTrue(trip2.contains("ManagerId_patsodometertripmeter2"));
+        assertTrue(trip2.contains("ManagerId_patsedttime2"));
+        assertTrue(trip2.contains("getPA_TS_OdometerTripMeter2()"));
+        assertTrue(trip2.contains("getPA_TS_EDT_time2()"));
+        assertTrue(trip2.contains("AvailabilitySts.Active"));
+        assertTrue(integration.contains("PA_TS_OdometerTripMeter2"));
+        assertTrue(integration.contains("PA_TS_EDT_time2"));
         assertTrue(settings.contains("NAV_MANEUVER_CARD"));
         assertTrue(renderer.contains("case NAV_MANEUVER_CARD:"));
         assertTrue(renderer.contains("case CURRENT_TRIP_DISTANCE:"));
@@ -146,8 +150,9 @@ public final class InstrumentPanelContractTest {
         assertTrue(renderer.contains("scheduleCurrentTripExpiry()"));
         assertTrue(repository.contains("currentTripFreshUntilElapsedNanos"));
         assertTrue(repository.contains("CurrentTripMetrics.STALE_AFTER_NANOS"));
-        assertTrue(hudRuntime.contains("main.postDelayed(currentTripExpiry,"
-                + " CurrentTripMetrics.STALE_AFTER_MILLIS)"));
+        assertTrue(integration.contains("ageNanos > CurrentTripMetrics.STALE_AFTER_NANOS"));
+        assertTrue(hudRuntime.contains("remainingMillis = CurrentTripMetrics.STALE_AFTER_MILLIS"));
+        assertTrue(hudRuntime.contains("main.postDelayed(currentTripExpiry, remainingMillis)"));
         assertEquals("ч", InstrumentInfoMetric.CURRENT_TRIP_DURATION.unit);
     }
 

@@ -45,6 +45,9 @@ public final class InstrumentPanelView extends FrameLayout
     private int publishedWidth;
     private int publishedHeight;
     private int coldLeaseRetryCount;
+    /** Keeps Android's white initial TextureView buffer out of the cluster composition. */
+    private float desiredMapAlpha = 1f;
+    private boolean awaitingFirstMapFrame = true;
     @Nullable private String cachedMapProfileRaw;
     @Nullable private NavigationIntegrationConfig.MapProfile cachedMapProfile;
     @NonNull private final Runnable coldLeaseRetry = this::retryColdLease;
@@ -67,6 +70,7 @@ public final class InstrumentPanelView extends FrameLayout
             TextureView texture = new TextureView(context);
             texture.setSurfaceTextureListener(this);
             texture.setOpaque(!initialProfile.roadsOnly);
+            texture.setAlpha(0f);
             texture.addOnLayoutChangeListener((view, left, top, right, bottom,
                     oldLeft, oldTop, oldRight, oldBottom) -> {
                 int width = right - left;
@@ -117,7 +121,10 @@ public final class InstrumentPanelView extends FrameLayout
         }
         mapView.setVisibility(VISIBLE);
         mapView.setLayoutParams(mapParams(map));
-        mapView.setAlpha(map.opacityPercent / 100f);
+        desiredMapAlpha = map.opacityPercent / 100f;
+        if (mapTexture == null || !awaitingFirstMapFrame) {
+            mapView.setAlpha(desiredMapAlpha);
+        }
         mapView.invalidate();
     }
 
@@ -134,11 +141,15 @@ public final class InstrumentPanelView extends FrameLayout
         clusterMapEnabled = profile.enabled;
         if (map == null || !map.enabled || !profile.enabled) {
             mapView.setVisibility(GONE);
+            beginFirstFrameGate();
             revokeLease();
             return;
         }
         mapView.setVisibility(VISIBLE);
-        mapView.setAlpha(map.opacityPercent / 100f);
+        desiredMapAlpha = map.opacityPercent / 100f;
+        if (mapTexture == null || !awaitingFirstMapFrame) {
+            mapView.setAlpha(desiredMapAlpha);
+        }
         LayoutParams params = mapParams(map);
         mapView.setLayoutParams(params);
         if (mapTexture != null) mapTexture.setOpaque(!profile.roadsOnly);
@@ -177,6 +188,7 @@ public final class InstrumentPanelView extends FrameLayout
 
     @Override public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surfaceTexture,
                                                     int width, int height) {
+        beginFirstFrameGate();
         releaseOwnedSurface();
         mapSurface = new Surface(surfaceTexture);
         coldLeaseRetryCount = 0;
@@ -193,11 +205,22 @@ public final class InstrumentPanelView extends FrameLayout
         removeCallbacks(coldLeaseRetry);
         revokeLease();
         releaseOwnedSurface();
+        beginFirstFrameGate();
         return true;
     }
 
     @Override public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surfaceTexture) {
-        // Producer presentation is owned by Navigator; there is no per-frame work in Natro.
+        if (mapTexture != null && awaitingFirstMapFrame && leasePublished
+                && mapTexture.getSurfaceTexture() == surfaceTexture) {
+            awaitingFirstMapFrame = false;
+            mapView.setAlpha(desiredMapAlpha);
+        }
+    }
+
+    private void beginFirstFrameGate() {
+        if (mapTexture == null) return;
+        awaitingFirstMapFrame = true;
+        mapView.setAlpha(0f);
     }
 
     private void publishLeaseIfReady() {

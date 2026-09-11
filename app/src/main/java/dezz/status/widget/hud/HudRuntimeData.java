@@ -83,7 +83,7 @@ public final class HudRuntimeData {
     private final HudVolumeVisibility volumeVisibility = new HudVolumeVisibility();
     private final Runnable volumeExpiry = this::notifyChanged;
     private boolean started;
-    /** All three fields originate in one ECARX driving-info callback and expire together. */
+    /** All three fields originate in one paired Trip 2 PA sample and expire together. */
     private final Runnable currentTripExpiry = () -> {
         if (!started) return;
         boolean changed = false;
@@ -103,12 +103,21 @@ public final class HudRuntimeData {
     private boolean navigationExpiryPosted;
     private final CarIntegration.TelemetryListener telemetryListener = value -> runOnMain(() -> {
         if (!started) return;
-        telemetry.put(value.id, value);
+        CarIntegration.TelemetryValue previous = telemetry.put(value.id, value);
         if (CurrentTripMetrics.isMetricId(value.id)) {
             main.removeCallbacks(currentTripExpiry);
-            main.postDelayed(currentTripExpiry, CurrentTripMetrics.STALE_AFTER_MILLIS);
+            long ageMillis = System.currentTimeMillis() - value.observedAtMillis;
+            long remainingMillis = CurrentTripMetrics.STALE_AFTER_MILLIS
+                    - Math.max(0L, ageMillis);
+            if (remainingMillis <= 0L) {
+                currentTripExpiry.run();
+                return;
+            }
+            main.postDelayed(currentTripExpiry, remainingMillis);
         }
-        notifyChanged();
+        // Vendor callbacks often refresh an unchanged value. Keep the newer observation time for
+        // staleness, but do not rebuild the HUD Canvas when its visible value is byte-for-byte equal.
+        if (!sameTelemetryContent(previous, value)) notifyChanged();
     });
     private final ConnectorValueRegistry.Listener connectorListener = changed -> {
         List<ConnectorValue> copy = new ArrayList<>(changed);
@@ -327,6 +336,16 @@ public final class HudRuntimeData {
                 || before.volumePercent != after.volumePercent
                 || before.volumeSteps != after.volumeSteps
                 || before.volumeMaximum != after.volumeMaximum;
+    }
+
+    private static boolean sameTelemetryContent(
+            @Nullable CarIntegration.TelemetryValue before,
+            @NonNull CarIntegration.TelemetryValue after) {
+        return before != null
+                && before.id.equals(after.id)
+                && before.label.equals(after.label)
+                && Double.compare(before.value, after.value) == 0
+                && before.unit.equals(after.unit);
     }
 
     private static boolean isMediaElement(@NonNull HudElementType type) {

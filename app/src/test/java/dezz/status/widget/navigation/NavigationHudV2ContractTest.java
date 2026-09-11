@@ -230,16 +230,14 @@ public final class NavigationHudV2ContractTest {
         assertEquals("#FFABCDEF", restored.mainFloatingWindow.borderColor);
     }
 
-    @Test public void routeOnlyLabelsPreserveTheIndependentBackgroundLabelChoice() {
+    @Test public void legacyRouteOnlyLabelsMigrateToNativeYandexLabels() {
         NavigationIntegrationConfig restored = NavigationIntegrationConfig.fromJson(
                 "{\"hudMap\":{\"showLabels\":false,\"routeStreetLabelsOnly\":true},"
                         + "\"clusterMap\":{\"showLabels\":false,"
                         + "\"routeStreetLabelsOnly\":true}}");
 
-        assertFalse(restored.hudMap.showLabels);
-        assertFalse(restored.clusterMap.showLabels);
-        assertTrue(restored.hudMap.routeStreetLabelsOnly);
-        assertTrue(restored.clusterMap.routeStreetLabelsOnly);
+        assertTrue(restored.hudMap.showLabels);
+        assertTrue(restored.clusterMap.showLabels);
         assertNull(restored.hudMap.trafficLightCardColor);
         assertNull(restored.clusterMap.trafficLightCardColor);
     }
@@ -528,8 +526,6 @@ public final class NavigationHudV2ContractTest {
         String speedBumps = read(navigator.resolve("SpeedBumpMapLayer.java"));
         String laneSigns = read(navigator.resolve("LaneGuidanceMapLayer.java"));
         String routeTurns = read(navigator.resolve("RouteTurnMapLayer.java"));
-        String routeStreetLabels = read(
-                navigator.resolve("RouteStreetLabelMapLayer.java"));
         String sublayerOrder = read(navigator.resolve("MapSublayerOrder.java"));
         String hudSettings = read(projectRoot().resolve(
                 "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java"));
@@ -559,9 +555,8 @@ public final class NavigationHudV2ContractTest {
         assertTrue(speedBumps.contains("MapObjectLayerFactory.IGNORE"));
         assertTrue(laneSigns.contains("MapObjectLayerFactory.MAJOR"));
         assertTrue(renderer.contains("MapObjectLayerFactory.MINOR"));
-        assertTrue(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
-        assertTrue(routeStreetLabels.contains("MapObjectLayerFactory.MINOR"));
-        assertTrue(routeStreetLabels.contains("getToponym"));
+        assertFalse(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
+        assertFalse(renderer.contains("routeStreetLabelMapLayer"));
         assertFalse(routeTurns.contains("MapObjectLayerFactory"));
         assertTrue(routeTurns.contains("applyManeuverStyle"));
         assertTrue(renderer.contains("applySublayerOrder()"));
@@ -713,8 +708,6 @@ public final class NavigationHudV2ContractTest {
         String overlayPlacement = read(
                 patchRoot.resolve("MapOverlayPlacementCoordinator.java"));
         String routeTurns = read(patchRoot.resolve("RouteTurnMapLayer.java"));
-        String routeStreetLabels = read(
-                patchRoot.resolve("RouteStreetLabelMapLayer.java"));
         String backgroundLease = read(patchRoot.resolve("BackgroundMapLease.java"));
         String mapViewPatch = read(projectRoot().resolve(
                 "tools/patch_navigation_map_view.py"));
@@ -1182,11 +1175,8 @@ public final class NavigationHudV2ContractTest {
         assertFalse(routeTurns.contains("Canvas"));
         assertFalse(routeTurns.contains("createArrowBitmap"));
         assertTrue(renderer.contains("routeTurnMapLayer.attachRoute"));
-        assertTrue(Files.exists(patchRoot.resolve("RouteStreetLabelMapLayer.java")));
-        assertTrue(renderer.contains("routeStreetLabelMapLayer"));
-        assertTrue(routeStreetLabels.contains("invoke(annotation, \"getToponym\""));
-        assertTrue(routeStreetLabels.contains("invoke(placemark, \"setText\""));
-        assertFalse(routeStreetLabels.contains("Canvas"));
+        assertFalse(Files.exists(patchRoot.resolve("RouteStreetLabelMapLayer.java")));
+        assertFalse(renderer.contains("routeStreetLabelMapLayer"));
         assertTrue(renderer.contains("MapObjectLayerFactory.MINOR"));
         assertFalse(renderer.contains("drivingRoute != activeRoute"));
         assertFalse(routeStyler.contains("Double.doubleToLongBits"));
@@ -1434,7 +1424,10 @@ public final class NavigationHudV2ContractTest {
         String runtime = read(root.resolve("hud/HudRuntimeData.java"));
         String canvas = read(root.resolve("hud/HudCanvasView.java"));
         String state = read(root.resolve("hud/HudNavigationState.java"));
+        String elementConfig = read(root.resolve("hud/HudElementConfig.java"));
+        String autoSizer = read(root.resolve("hud/ManeuverCardAutoSizer.java"));
         String cluster = read(root.resolve("instrument/InstrumentClusterView.java"));
+        String clusterConfig = read(root.resolve("instrument/InstrumentElementConfig.java"));
         String publisher = read(navigatorModRoot().resolve("NavigatorStatePublisher.java"));
 
         assertTrue(runtime.contains("NavigationBridgeStateStore.addListener"));
@@ -1479,6 +1472,10 @@ public final class NavigationHudV2ContractTest {
                 "InstrumentPanelSettingsActivity.java"));
         assertTrue(cardRenderer.contains("private void labelFixed"));
         assertTrue(cardRenderer.contains("TextUtils.ellipsize"));
+        assertTrue(cardRenderer.contains("maxLines(options, \"distanceSingleLine\")"));
+        assertTrue(cardRenderer.contains("maxLines(options, \"directionSingleLine\")"));
+        assertTrue(cardRenderer.contains("maxLines(options, \"roadBadgeSingleLine\")"));
+        assertTrue(cardRenderer.contains("maxLines(options, \"auxiliarySingleLine\")"));
         assertTrue(cardRenderer.contains("options.optInt(\"directionFontSizeSp\""));
         assertTrue(cardRenderer.contains("options.optInt(\"roadBadgeFontSizeSp\""));
         assertTrue(cardRenderer.contains("options.optInt(\"auxiliaryFontSizeSp\""));
@@ -1487,6 +1484,40 @@ public final class NavigationHudV2ContractTest {
         assertTrue(hudSettings.contains("Текст дополнительной информации"));
         assertTrue(clusterSettings.contains("Фон дополнительной информации"));
         assertTrue(clusterSettings.contains("Текст дополнительной информации"));
+        for (String key : new String[]{"distanceSingleLine", "directionSingleLine",
+                "roadBadgeSingleLine", "auxiliarySingleLine"}) {
+            assertTrue(elementConfig.contains("options.put(\"" + key + "\", true)"));
+            assertTrue(clusterConfig.contains("options.put(\"" + key + "\", true)"));
+            assertTrue(canvas.contains("options.optBoolean(\"" + key + "\", true)"));
+            assertTrue(cluster.contains("options.optBoolean(\"" + key + "\", true)"));
+            assertTrue(hudSettings.contains("bool:" + key));
+            assertTrue(clusterSettings.contains("toggle(\"" + key + "\""));
+        }
+        assertTrue(hudSettings.contains("не переносить текст на новую строку"));
+        assertTrue(clusterSettings.contains("не переносить текст на новую строку"));
+        assertTrue(state.contains("editorManeuverCardPreview()"));
+        assertTrue(canvas.contains("setMaximumManeuverCardPreview"));
+        assertTrue(cluster.contains("setMaximumManeuverCardPreview"));
+        assertTrue(hudSettings.contains("canvas.setMaximumManeuverCardPreview(item.id)"));
+        assertTrue(clusterSettings.contains(
+                "preview.instruments().setMaximumManeuverCardPreview(element.id)"));
+        for (String key : new String[]{"autoWidth", "autoHeight"}) {
+            assertTrue(elementConfig.contains("options.put(\"" + key + "\", false)"));
+            assertTrue(clusterConfig.contains("options.put(\"" + key + "\", false)"));
+            assertTrue(hudSettings.contains("bool:" + key));
+            assertTrue(clusterSettings.contains("toggle(\"" + key + "\""));
+            assertTrue(autoSizer.contains("options.optBoolean(\"" + key + "\", false)"));
+        }
+        assertTrue(hudSettings.contains("Автоширина"));
+        assertTrue(hudSettings.contains("Автовысота"));
+        assertTrue(clusterSettings.contains("Автоширина"));
+        assertTrue(clusterSettings.contains("Автовысота"));
+        assertTrue(canvas.contains("ManeuverCardAutoSizer.resolve"));
+        assertTrue(cluster.contains("ManeuverCardAutoSizer.resolve"));
+        assertTrue(autoSizer.contains("Math.min(maximumWidth"));
+        assertTrue(autoSizer.contains("bottomLimit - maximum.top"));
+        assertTrue(autoSizer.contains("out.right = out.left + resolvedWidth"));
+        assertTrue(autoSizer.contains("out.bottom = out.top + Math.min"));
         assertTrue(cluster.contains("parseManeuverDirectionSigns"));
         assertTrue(cluster.contains("drawNavigationManeuverDetails"));
         assertTrue(cluster.contains("value.maneuverDirectionSignsJson"));
@@ -1502,6 +1533,22 @@ public final class NavigationHudV2ContractTest {
         assertTrue(canvas.contains(
                 "if (!editor && item.options.optBoolean(\"hideWhenEmpty\", false))"));
         assertTrue(canvas.contains("Paint.SUBPIXEL_TEXT_FLAG"));
+    }
+
+    @Test public void mapSurfacesStayHiddenUntilTheFirstProducerFrame() throws Exception {
+        Path root = sourceRoot();
+        String hud = read(root.resolve("hud/HudCompositeView.java"));
+        String cluster = read(root.resolve("instrument/InstrumentPanelView.java"));
+
+        for (String source : new String[]{hud, cluster}) {
+            assertTrue(source.contains("awaitingFirstMapFrame"));
+            assertTrue(source.contains("desiredMapAlpha"));
+            assertTrue(source.contains("onSurfaceTextureUpdated"));
+            assertTrue(source.contains("setAlpha(0f)"));
+            assertTrue(source.contains("setAlpha(desiredMapAlpha)"));
+        }
+        assertTrue(hud.contains("leasedTexture == texture"));
+        assertTrue(cluster.contains("leasePublished"));
     }
 
     @Test public void exactVisibleManeuverArtworkIsIdentityKeyedAndNeverGuessed()
@@ -1637,10 +1684,9 @@ public final class NavigationHudV2ContractTest {
         String publisher = read(navigator.resolve("NavigatorStatePublisher.java"));
         String renderer = read(navigator.resolve("HudMapRenderer.java"));
         String profile = read(navigator.resolve("NavigationMapProfile.java"));
-        String routeStreetLabels = read(
-                navigator.resolve("RouteStreetLabelMapLayer.java"));
 
-        assertTrue(profile.contains("boolean routeStreetLabelsOnly"));
+        assertFalse(profile.contains("boolean routeStreetLabelsOnly"));
+        assertTrue(profile.contains("source.optBoolean(\"routeStreetLabelsOnly\", false)"));
         assertTrue(profile.contains("roadColor"));
         assertTrue(profile.contains("MapKit styles require #RRGGBBAA"));
         assertTrue(profile.contains("\\\"elements\\\":\\\"label\\\""));
@@ -1661,13 +1707,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(publisher.indexOf("positionOnRoute")
                 < publisher.indexOf("polylinePosition = invoke(route, \"getPosition\")"));
         assertTrue(renderer.contains("MapObjectLayerFactory.MINOR"));
-        assertTrue(renderer.contains("routeStreetLabelMapLayer"));
+        assertFalse(renderer.contains("routeStreetLabelMapLayer"));
         assertFalse(publisher.contains("readRouteStreetLabels"));
-        assertTrue(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
-        assertTrue(routeStreetLabels.contains("getSections"));
-        assertTrue(routeStreetLabels.contains("getToponym"));
-        assertTrue(routeStreetLabels.contains("MapObjectLayerFactory.MINOR"));
-        assertFalse(routeStreetLabels.contains("Canvas"));
+        assertFalse(Files.exists(navigator.resolve("RouteStreetLabelMapLayer.java")));
     }
 
     @Test public void routeProgressIsReversibleWithoutRecreatingGeometry() throws Exception {

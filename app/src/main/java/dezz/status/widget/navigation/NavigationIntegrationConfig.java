@@ -271,8 +271,6 @@ public final class NavigationIntegrationConfig {
         public int laneGuidanceLayerPriority = 80;
         public int cursorLayerPriority = 60;
         public boolean showLabels = true;
-        /** Replaces substrate labels with names read only from active DrivingRoute sections. */
-        public boolean routeStreetLabelsOnly;
         public boolean showPois = true;
         public boolean showBuildings = true;
         public boolean showParks = true;
@@ -424,7 +422,6 @@ public final class NavigationIntegrationConfig {
                     .put("laneGuidanceLayerPriority", laneGuidanceLayerPriority)
                     .put("cursorLayerPriority", cursorLayerPriority)
                     .put("showLabels", showLabels)
-                    .put("routeStreetLabelsOnly", routeStreetLabelsOnly)
                     .put("showPois", showPois)
                     .put("showBuildings", showBuildings)
                     .put("showParks", showParks)
@@ -616,8 +613,12 @@ public final class NavigationIntegrationConfig {
                 result.cursorLayerPriority = 60;
             }
             result.showLabels = source.optBoolean("showLabels", result.showLabels);
-            result.routeStreetLabelsOnly = source.optBoolean(
-                    "routeStreetLabelsOnly", result.routeStreetLabelsOnly);
+            // 2.8.4 temporarily reintroduced point labels for this key. Public MapKit cannot
+            // filter its curved substrate labels by route, so migrate the opt-in to native road
+            // labels and never persist the obsolete request again.
+            if (source.optBoolean("routeStreetLabelsOnly", false)) {
+                result.showLabels = true;
+            }
             result.showPois = source.optBoolean("showPois", result.showPois);
             result.showBuildings = source.optBoolean("showBuildings", result.showBuildings);
             result.showParks = source.optBoolean("showParks", result.showParks);
