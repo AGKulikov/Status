@@ -14,8 +14,8 @@ OUTPUT_DIR="$4"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 EXPECTED_CERT_SHA256='6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
 EXPECTED_BASELINE_SHA256='663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f'
-EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.7.6}"
-EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021309}"
+EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.8.5}"
+EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021318}"
 KEYSTORE_FILE="${KEYSTORE_FILE:-}"
 KEY_ALIAS="${KEY_ALIAS:-status-widget-ha}"
 APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
@@ -209,8 +209,8 @@ jq -n \
       apk: $natroApk, sha256: $natroSha256, signatureSchemes: ["v2", "v3"]},
     navigator: {versionName: "30.3.0", package: "ru.yandex.yandexnavi",
       apk: $navigatorApk, sha256: $navigatorSha256,
-      baselineSha256: $navigatorBaselineSha256, signatureSchemes: ["v3"],
-      changedEntries: ["AndroidManifest.xml", "classes4.dex", "classes12.dex"],
+      baselineSha256: $navigatorBaselineSha256, signatureSchemes: ["v2", "v3"],
+      changedEntries: ["AndroidManifest.xml", "classes4.dex", "classes8.dex", "classes12.dex"],
       newEntries: ["classes19.dex"]},
     compatibility: {headUnit: "ECARX KX11", androidApi: 28,
       mainContent: {width: 1760, height: 720}, navigatorAbi: "arm64-v8a",

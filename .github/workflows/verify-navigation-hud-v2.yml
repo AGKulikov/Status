@@ -1,9 +1,10 @@
-name: Build Natro 2.7.6 and Navigator HUD v2 candidate
+name: Build Natro 2.8.5 and Navigator HUD v2 candidate
 
 on:
   push:
     branches:
       - 'feature/navigation-hud-v2'
+      - 'feature/navigation-card-alternatives-20260909'
       - 'release/natro-2.7.6*'
       - 'release/natro-2.7.5*'
       - 'release/natro-2.7.4*'
@@ -57,8 +58,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '2.7.6'
-      VERSION_CODE: '208021309'
+      VERSION_NAME: '2.8.5'
+      VERSION_CODE: '208021318'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
@@ -187,7 +188,7 @@ jobs:
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.sign_pair) ||
       (github.event_name == 'push' &&
-      github.ref == 'refs/heads/feature/navigation-hud-v2' &&
+      github.ref == 'refs/heads/feature/navigation-card-alternatives-20260909' &&
       contains(github.event.head_commit.message, '[secure-sign-pair]'))
     runs-on: ubuntu-22.04
     timeout-minutes: 35
@@ -195,10 +196,10 @@ jobs:
       actions: read
       contents: write
     env:
-      VERSION_NAME: '2.7.6'
-      VERSION_CODE: '208021309'
-      EXPECTED_NATRO_VERSION_NAME: '2.7.6'
-      EXPECTED_NATRO_VERSION_CODE: '208021309'
+      VERSION_NAME: '2.8.5'
+      VERSION_CODE: '208021318'
+      EXPECTED_NATRO_VERSION_NAME: '2.8.5'
+      EXPECTED_NATRO_VERSION_CODE: '208021318'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
@@ -228,6 +229,16 @@ jobs:
           bash tools/build_hud_speed_bridge_dex.sh build/hud-speed-bridge-ci
           python3 tools/tests/test_verify_navigation_mod_baseline.py
           python3 tools/tests/test_navigation_mod_tools.py
+          python3 tools/tests/test_navigation_maneuver_patch.py
+          python3 tools/tests/test_cpu_hot_paths.py
+          JSON_JAR=$(find "$HOME/.gradle/caches" -path "*/org.json/json/20240303/*/*.jar" -print -quit)
+          test -f "$JSON_JAR"
+          export JSON_JAR
+          python3 tools/tests/test_stock_maneuver_commands.py
+          python3 tools/tests/test_navigation_position_policy.py
+          python3 tools/tests/test_navigation_layer_order.py
+          python3 tools/tests/test_navigation_event_visibility.py
+          python3 tools/tests/test_stock_maneuver_artwork.py
           CANDIDATE="$RUNNER_TEMP/candidate"
           mkdir -p "$CANDIDATE"
           NATRO=$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)
@@ -274,7 +285,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          HANDOFF_BRANCH: 'agent/natro-2.7.6-navigation-hud-signing'
+          HANDOFF_BRANCH: 'agent/natro-2.8.5-navigation-hud-signing'
           SIGNING_BUNDLE_SHA256: '4fb34ee8aed62dad3896d7aa6240d4066ec9b6ef3da5459bca9d7d1c4c3b7fc0'
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -298,14 +309,14 @@ jobs:
           esac
           unset KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS
           umask 077
-          TRANSPORT="$RUNNER_TEMP/natro-2.7.6-signing-transport"
-          SIGNING="$RUNNER_TEMP/natro-2.7.6-signing-material"
+          TRANSPORT="$RUNNER_TEMP/natro-2.8.5-signing-transport"
+          SIGNING="$RUNNER_TEMP/natro-2.8.5-signing-material"
           mkdir -p "$TRANSPORT/chunks" "$SIGNING"
           PRIVATE="$TRANSPORT/private.pem"
           PUBLIC="$TRANSPORT/public.pem"
           ENCRYPTED="$TRANSPORT/signing-bundle.enc"
           ARCHIVE="$TRANSPORT/signing-bundle.tar.gz"
-          PREFIX="natro276-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PREFIX="natro285-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           PUBLIC_PATH="release-handoff/${PREFIX}.pub"
           ENCRYPTED_PATH="release-handoff/${PREFIX}.enc"
 
@@ -323,10 +334,10 @@ jobs:
           PUBLIC_CONTENT=$(base64 -w0 "$PUBLIC")
           gh api --method PUT \
             "repos/${GITHUB_REPOSITORY}/contents/${PUBLIC_PATH}" \
-            -f message="ci: publish ephemeral Natro 2.7.6 transport key [skip ci]" \
+            -f message="ci: publish ephemeral Natro 2.8.5 transport key [skip ci]" \
             -f content="$PUBLIC_CONTENT" \
             -f branch="$HANDOFF_BRANCH" >/dev/null
-          echo "::notice title=Natro 2.7.6 encrypted handoff::Waiting for ${ENCRYPTED_PATH}"
+          echo "::notice title=Natro 2.8.5 encrypted handoff::Waiting for ${ENCRYPTED_PATH}"
 
           for _ in $(seq 1 180); do
             if gh api \
@@ -385,7 +396,7 @@ jobs:
           KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
           PASSWORD_FILE="$RUNNER_TEMP/stable-update.pass"
           ALIAS_FILE="$RUNNER_TEMP/stable-update.alias"
-          SIGNING="$RUNNER_TEMP/natro-2.7.6-signing-material"
+          SIGNING="$RUNNER_TEMP/natro-2.8.5-signing-material"
           CONFIGURED=0
           for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
             test -z "${!required:-}" || CONFIGURED=$((CONFIGURED + 1))
@@ -560,7 +571,7 @@ jobs:
       - name: Upload only the verified signed pair
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: navigation-hud-v2-signed-2.7.6-${{ github.run_number }}
+          name: navigation-hud-v2-signed-2.8.5-${{ github.run_number }}
           if-no-files-found: error
           retention-days: 14
           path: ${{ runner.temp }}/signed-pair/*
