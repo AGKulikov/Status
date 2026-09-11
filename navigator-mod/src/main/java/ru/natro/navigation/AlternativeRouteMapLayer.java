@@ -10,6 +10,7 @@ import android.graphics.Path;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.lang.reflect.Method;
@@ -25,6 +26,8 @@ final class AlternativeRouteMapLayer {
     private static final String TAG = "NatroAlternatives";
     private static final String OWNER = "alternative_routes";
     private static final int MAX_ROUTE_NAME_CHARS = 48;
+    /** Retained MapKit wrappers may fill fork/callout fields after their list identity is stable. */
+    private static final long RETAINED_INPUT_RESCAN_MS = 500L;
 
     private final Context context;
     private final MapOverlayPlacementCoordinator placement;
@@ -42,6 +45,7 @@ final class AlternativeRouteMapLayer {
     private int lastInputAlternativesSize = -1;
     private String lastInputActiveRouteId = "";
     private long lastInputPaletteVersion = Long.MIN_VALUE;
+    private long lastReflectedScanUptimeMs = Long.MIN_VALUE;
 
     AlternativeRouteMapLayer(Context context, MapOverlayPlacementCoordinator placement) {
         Context app = context.getApplicationContext();
@@ -85,16 +89,20 @@ final class AlternativeRouteMapLayer {
         List<?> input = nextAlternatives == null ? Collections.emptyList() : nextAlternatives;
         String nextActiveRouteId = routeId(nextActiveRoute);
         long nextPaletteVersion = StockAlternativePalette.version();
+        long now = SystemClock.uptimeMillis();
         if (nextRouteEpoch == routeEpoch
                 && input == lastInputAlternatives
                 && input.size() == lastInputAlternativesSize
                 && nextActiveRouteId.equals(lastInputActiveRouteId)
-                && nextPaletteVersion == lastInputPaletteVersion) {
-            // Guidance can repeat the same retained list on every frame. Its contents only change
-            // when the publisher replaces that list, so avoid a reflected scan and defensive copy.
+                && nextPaletteVersion == lastInputPaletteVersion
+                && now - lastReflectedScanUptimeMs >= 0L
+                && now - lastReflectedScanUptimeMs < RETAINED_INPUT_RESCAN_MS) {
+            // Avoid a reflected scan on every frame, but do not assume that retained regional
+            // Alternative wrappers are immutable: fork/delta fields can arrive after the list.
             activeRoute = nextActiveRoute;
             return;
         }
+        lastReflectedScanUptimeMs = now;
         lastInputAlternatives = input;
         lastInputAlternativesSize = input.size();
         lastInputActiveRouteId = nextActiveRouteId;
@@ -116,6 +124,7 @@ final class AlternativeRouteMapLayer {
         lastInputAlternativesSize = -1;
         lastInputActiveRouteId = "";
         lastInputPaletteVersion = Long.MIN_VALUE;
+        lastReflectedScanUptimeMs = Long.MIN_VALUE;
         dataFingerprint = Long.MIN_VALUE;
         render();
     }
@@ -188,24 +197,15 @@ final class AlternativeRouteMapLayer {
                             && candidateRouteId.equals(activeRouteId))
                             || (!candidateRouteId.isEmpty()
                             && renderedRouteIds.contains(candidateRouteId))) continue;
+                    Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
+                    if (geometry == null) continue;
                     Object forkOnAlternative = invoke(alternative,
                             "getForkPositionOnAlternative", new Class<?>[0]);
                     Object forkOnCurrent = invoke(alternative,
                             "getForkPositionOnCurrentRoute", new Class<?>[0]);
-                    if (forkOnAlternative == null || forkOnCurrent == null) continue;
-                    CalloutModel model = readCallout(
-                            route, forkOnAlternative, forkOnCurrent, alternativeIndex);
-                    if (model == null) continue;
-                    Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
-                    if (geometry == null) continue;
 
-                    // Build both objects hidden. Only a completely configured pair is published;
-                    // any reflected failure therefore leaves no orphan line or callout onscreen.
-                    Object point = pointClass.getConstructor(double.class, double.class)
-                            .newInstance(model.latitude, model.longitude);
-                    Object placemark = invoke(calloutCollection, "addPlacemark",
-                            new Class<?>[]{pointClass}, point);
-                    invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, false);
+                    // A missing optional label field must never suppress the alternative itself.
+                    // Publish the complete route line first, then add its callout independently.
                     Object line = invoke(polylineCollection, "addPolyline",
                             new Class<?>[]{polylineClass}, geometry);
                     invoke(line, "setVisible", new Class<?>[]{boolean.class}, false);
@@ -216,8 +216,27 @@ final class AlternativeRouteMapLayer {
                     invoke(line, "setOutlineWidth", new Class<?>[]{float.class}, 0f);
                     hideSharedPrefix(line, route, forkOnAlternative);
                     invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
-                    markers.add(new Marker(placemark, model));
                     if (!candidateRouteId.isEmpty()) renderedRouteIds.add(candidateRouteId);
+
+                    CalloutModel model = readCallout(
+                            route, forkOnAlternative, forkOnCurrent, alternativeIndex);
+                    if (model == null) {
+                        Log.w(TAG, "Alternative line has no usable fork callout: "
+                                + candidateRouteId);
+                        continue;
+                    }
+                    try {
+                        Object point = pointClass.getConstructor(double.class, double.class)
+                                .newInstance(model.latitude, model.longitude);
+                        Object placemark = invoke(calloutCollection, "addPlacemark",
+                                new Class<?>[]{pointClass}, point);
+                        invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, false);
+                        markers.add(new Marker(placemark, model));
+                    } catch (Throwable calloutFailure) {
+                        // The line is already valid and visible. Keep it while isolating a
+                        // regional MapKit placemark incompatibility to this one optional balloon.
+                        Log.w(TAG, "Alternative callout could not be created", calloutFailure);
+                    }
                 } catch (Throwable invalidAlternative) {
                     Log.w(TAG, "One Guidance alternative was skipped", invalidAlternative);
                 }
@@ -264,7 +283,9 @@ final class AlternativeRouteMapLayer {
     private CalloutModel readCallout(Object route, Object forkOnAlternative,
                                      Object forkOnCurrent, int index)
             throws Exception {
-        Object point = invoke(forkOnCurrent, "getPoint", new Class<?>[0]);
+        Object point = pointOrNull(forkOnCurrent);
+        if (point == null) point = pointOrNull(forkOnAlternative);
+        if (point == null) point = fallbackRoutePoint(route);
         if (point == null) return null;
         double latitude = number(invoke(point, "getLatitude", new Class<?>[0]));
         double longitude = number(invoke(point, "getLongitude", new Class<?>[0]));
@@ -278,14 +299,37 @@ final class AlternativeRouteMapLayer {
                 : (int) Math.round(alternativeTime - currentTime);
         Integer distanceDelta = alternativeDistance == null || currentDistance == null ? null
                 : (int) Math.round(alternativeDistance - currentDistance);
-        if (timeDelta == null && distanceDelta == null) return null;
-
         RouteProgress progress = routeProgress(forkOnCurrent, activeRoute);
         String routeId = routeId(route);
         String key = routeId.isEmpty() ? "alternative:" + routeEpoch + ':' + index : routeId;
         String name = sectionName(route, forkOnAlternative);
+        if (name.isEmpty() && timeDelta == null && distanceDelta == null) {
+            name = "Вариант " + (index + 1);
+        }
         return new CalloutModel(key, latitude, longitude, name,
                 timeDelta, distanceDelta, progress.segmentIndex, progress.segmentPosition);
+    }
+
+    private static Object pointOrNull(Object position) {
+        if (position == null) return null;
+        try { return invoke(position, "getPoint", new Class<?>[0]); }
+        catch (Throwable ignored) { return null; }
+    }
+
+    /** Last-resort anchor for a regional Alternative wrapper without fork positions. */
+    private static Object fallbackRoutePoint(Object route) {
+        if (route == null) return null;
+        try {
+            Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
+            List<?> points = list(invoke(geometry, "getPoints", new Class<?>[0]));
+            if (points.isEmpty()) return null;
+            // Avoid the vehicle/start pin while keeping the label near the first route branch.
+            int index = points.size() == 1 ? 0
+                    : Math.min(points.size() - 1, Math.max(1, points.size() / 4));
+            return points.get(index);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private void applyTexture(Marker marker, PreparedText text,
@@ -474,21 +518,29 @@ final class AlternativeRouteMapLayer {
         try {
             RouteProgress fork = routeProgress(routePosition, route);
             List<?> sections = list(invoke(route, "getSections", new Class<?>[0]));
+            String boundaryFallback = "";
             for (Object section : sections) {
                 Object geometry = invoke(section, "getGeometry", new Class<?>[0]);
                 Object begin = invoke(geometry, "getBegin", new Class<?>[0]);
                 Object end = invoke(geometry, "getEnd", new Class<?>[0]);
                 int first = ((Number) invoke(begin, "getSegmentIndex", new Class<?>[0])).intValue();
                 int last = ((Number) invoke(end, "getSegmentIndex", new Class<?>[0])).intValue();
-                if (fork.segmentIndex < first || fork.segmentIndex > last) continue;
                 Object metadata = invoke(section, "getMetadata", new Class<?>[0]);
                 Object annotation = invoke(metadata, "getAnnotation", new Class<?>[0]);
                 String name = text(invoke(annotation, "getToponym", new Class<?>[0]));
                 if (name.isEmpty()) {
                     name = text(invoke(annotation, "getDescriptionText", new Class<?>[0]));
                 }
-                if (!name.isEmpty()) return bounded(name, MAX_ROUTE_NAME_CHARS);
+                if (name.isEmpty()) continue;
+                // At an exact section boundary the section ending at the fork is usually the
+                // shared road. Prefer the first named section which starts at/after the fork so
+                // the balloon identifies the actual alternative street, like stock Navigator.
+                if (first >= fork.segmentIndex) return bounded(name, MAX_ROUTE_NAME_CHARS);
+                if (fork.segmentIndex >= first && fork.segmentIndex <= last) {
+                    boundaryFallback = bounded(name, MAX_ROUTE_NAME_CHARS);
+                }
             }
+            return boundaryFallback;
         } catch (Throwable ignored) {}
         return "";
     }
@@ -532,22 +584,28 @@ final class AlternativeRouteMapLayer {
 
     /** Hides the shared route prefix which previously looked like stray alternative fragments. */
     private static void hideSharedPrefix(Object line, Object route,
-                                         Object forkOnAlternative) throws Exception {
-        RouteProgress fork = routeProgress(forkOnAlternative, route);
-        if (fork.segmentIndex < 0
-                || (fork.segmentIndex == 0 && fork.segmentPosition <= .000001d)) return;
-        Class<?> positionClass = Class.forName(
-                "com.yandex.mapkit.geometry.PolylinePosition");
-        Object begin = positionClass.getConstructor(int.class, double.class)
-                .newInstance(0, 0d);
-        Object end = positionClass.getConstructor(int.class, double.class)
-                .newInstance(fork.segmentIndex, Math.max(0d,
-                        Math.min(1d, fork.segmentPosition)));
-        Class<?> subpolylineClass = Class.forName(
-                "com.yandex.mapkit.geometry.Subpolyline");
-        Object shared = subpolylineClass.getConstructor(positionClass, positionClass)
-                .newInstance(begin, end);
-        invoke(line, "hide", new Class<?>[]{subpolylineClass}, shared);
+                                         Object forkOnAlternative) {
+        try {
+            RouteProgress fork = routeProgress(forkOnAlternative, route);
+            if (fork.segmentIndex < 0
+                    || (fork.segmentIndex == 0 && fork.segmentPosition <= .000001d)) return;
+            Class<?> positionClass = Class.forName(
+                    "com.yandex.mapkit.geometry.PolylinePosition");
+            Object begin = positionClass.getConstructor(int.class, double.class)
+                    .newInstance(0, 0d);
+            Object end = positionClass.getConstructor(int.class, double.class)
+                    .newInstance(fork.segmentIndex, Math.max(0d,
+                            Math.min(1d, fork.segmentPosition)));
+            Class<?> subpolylineClass = Class.forName(
+                    "com.yandex.mapkit.geometry.Subpolyline");
+            Object shared = subpolylineClass.getConstructor(positionClass, positionClass)
+                    .newInstance(begin, end);
+            invoke(line, "hide", new Class<?>[]{subpolylineClass}, shared);
+        } catch (Throwable unavailable) {
+            // Some regional MapKit builds omit PolylineMapObject.hide(Subpolyline). A full
+            // alternative remains useful and is strictly better than silently dropping it.
+            Log.d(TAG, "Shared-prefix hiding is unavailable", unavailable);
+        }
     }
 
     private static String formatDistanceDelta(int meters) {
@@ -616,6 +674,7 @@ final class AlternativeRouteMapLayer {
             try {
                 Object candidate = invoke(alternative, "getAlternative", new Class<?>[0]);
                 result = mix(result, routeId(candidate).hashCode());
+                result = mix(result, routeGeometryFingerprint(candidate));
                 Object fork = invoke(alternative,
                         "getForkPositionOnCurrentRoute", new Class<?>[0]);
                 Object alternativeFork = invoke(alternative,
@@ -631,11 +690,18 @@ final class AlternativeRouteMapLayer {
                 result = mix(result, time == null || alternativeTime == null
                         ? Long.MIN_VALUE + 1L
                         : Math.round(alternativeTime - time));
-                Object point = invoke(fork, "getPoint", new Class<?>[0]);
-                result = mix(result, Double.doubleToLongBits(number(invoke(
-                        point, "getLatitude", new Class<?>[0]))));
-                result = mix(result, Double.doubleToLongBits(number(invoke(
-                        point, "getLongitude", new Class<?>[0]))));
+                Object point = pointOrNull(fork);
+                if (point == null) point = pointOrNull(alternativeFork);
+                if (point == null) point = fallbackRoutePoint(candidate);
+                if (point == null) {
+                    result = mix(result, Long.MIN_VALUE + 2L);
+                } else {
+                    result = mix(result, Double.doubleToLongBits(number(invoke(
+                            point, "getLatitude", new Class<?>[0]))));
+                    result = mix(result, Double.doubleToLongBits(number(invoke(
+                            point, "getLongitude", new Class<?>[0]))));
+                }
+                result = mix(result, sectionName(candidate, alternativeFork).hashCode());
             } catch (Throwable invalid) {
                 // MapKit may return a new Java wrapper for the same temporarily-invalid entry on
                 // every callback. A stable slot sentinel avoids clearing and rebuilding all good
@@ -645,6 +711,31 @@ final class AlternativeRouteMapLayer {
             index++;
         }
         return result;
+    }
+
+    /** Samples a fixed number of geometry points without walking a potentially long polyline. */
+    private static long routeGeometryFingerprint(Object route) {
+        try {
+            Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
+            List<?> points = list(invoke(geometry, "getPoints", new Class<?>[0]));
+            if (points.isEmpty()) return Long.MIN_VALUE;
+            long result = mix(17L, points.size());
+            result = mixGeometryPoint(result, points.get(0));
+            result = mixGeometryPoint(result, points.get(points.size() / 4));
+            result = mixGeometryPoint(result, points.get(points.size() / 2));
+            result = mixGeometryPoint(result, points.get(points.size() * 3 / 4));
+            result = mixGeometryPoint(result, points.get(points.size() - 1));
+            return result;
+        } catch (Throwable ignored) {
+            return Long.MIN_VALUE + 3L;
+        }
+    }
+
+    private static long mixGeometryPoint(long seed, Object point) throws Exception {
+        long result = mix(seed, Double.doubleToLongBits(number(invoke(
+                point, "getLatitude", new Class<?>[0]))));
+        return mix(result, Double.doubleToLongBits(number(invoke(
+                point, "getLongitude", new Class<?>[0]))));
     }
 
     private static long mix(long seed, long value) {

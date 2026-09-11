@@ -14,15 +14,11 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import ecarx.car.ECarXCar;
-import ecarx.car.hardware.annotation.AvailabilitySts;
+import ecarx.car.hardware.ECarXCarPropertyValue;
 import ecarx.car.hardware.signal.CarSignalManager;
 import ecarx.car.hardware.signal.SignalFilter;
-import ecarx.car.hardware.vehicle.CarPAEventCallback;
-import ecarx.car.hardware.vehicle.ECarXCarPhevManager;
-import ecarx.car.hardware.vehicle.ECarXCarSetManager;
-import ecarx.car.hardware.vehicle.PATypes;
 
-/** Read-only source for the two PA fields which back the stock “Trip 2” screen. */
+/** Read-only source for the instrument-cluster signals which back stock “Trip 2”. */
 final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
     private static final String TAG = "EcarxTrip2Access";
 
@@ -32,40 +28,35 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
 
     static final class Sample {
         final int distanceRaw;
-        final int durationRaw;
-        final int distanceFormat;
-        final int durationFormat;
-        final int distanceStatus;
-        final int durationStatus;
+        final int averageSpeedRaw;
+        final int speedUnitRaw;
         final long observedAtElapsedNanos;
 
-        Sample(int distanceRaw, int durationRaw,
-               int distanceFormat, int durationFormat, int distanceStatus,
-               int durationStatus, long observedAtElapsedNanos) {
+        Sample(int distanceRaw, int averageSpeedRaw, int speedUnitRaw,
+               long observedAtElapsedNanos) {
             this.distanceRaw = distanceRaw;
-            this.durationRaw = durationRaw;
-            this.distanceFormat = distanceFormat;
-            this.durationFormat = durationFormat;
-            this.distanceStatus = distanceStatus;
-            this.durationStatus = durationStatus;
+            this.averageSpeedRaw = averageSpeedRaw;
+            this.speedUnitRaw = speedUnitRaw;
             this.observedAtElapsedNanos = observedAtElapsedNanos;
         }
     }
 
     @NonNull private final Set<Listener> listeners = new CopyOnWriteArraySet<>();
-    @NonNull private final CarPAEventCallback callback = new CarPAEventCallback() {
-        @Override public void onPA_TS_OdometerTripMeter2(
-                PATypes.PA_TS_OdometerTripMeter2 ignored) {
-            publishCurrentPair();
-        }
+    @NonNull private final CarSignalManager.CarSignalEventCallback callback =
+            new CarSignalManager.CarSignalEventCallback() {
+                @Override
+                @SuppressWarnings("rawtypes")
+                public void onChangeEvent(ECarXCarPropertyValue ignored) {
+                    publishCurrentPair();
+                }
 
-        @Override public void onPA_TS_EDT_time2(PATypes.PA_TS_EDT_time2 ignored) {
-            publishCurrentPair();
-        }
-    };
+                @Override public void onErrorEvent(int propertyId, int areaId) {
+                    Log.w(TAG, "Trip 2 signal callback error " + propertyId + "/" + areaId);
+                }
+            };
 
     @Nullable private ECarXCarProxy proxy;
-    @Nullable private volatile ECarXCarPhevManager manager;
+    @Nullable private volatile CarSignalManager signals;
     @Nullable private volatile Sample latest;
     private volatile boolean callbackRegistered;
     private volatile boolean closed;
@@ -105,59 +96,43 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
 
     @Override
     public synchronized void onECarXCarServiceConnected(
-            ECarXCar root, CarSignalManager ignoredSignals) {
-        if (closed || root == null) return;
+            ECarXCar root, CarSignalManager connectedSignals) {
+        if (closed || connectedSignals == null) return;
         detachManager();
-        try {
-            Object service = root.getCarManager(ECarXCar.PA_SERVICE);
-            if (!(service instanceof ECarXCarSetManager)) {
-                throw new IllegalStateException("PA_SERVICE != ECarXCarSetManager");
-            }
-            ECarXCarPhevManager next = ((ECarXCarSetManager) service)
-                    .getECarXCarPhevManager();
-            if (next == null) throw new IllegalStateException("PHEV manager=null");
-            manager = next;
-            if (ensureCallbackForDemand()) publishCurrentPair();
-        } catch (Throwable failure) {
-            detachManager();
-            Log.w(TAG, "Trip 2 PA manager is unavailable", failure);
-        }
+        signals = connectedSignals;
+        if (ensureCallbackForDemand()) publishCurrentPair();
     }
 
     @Override
     public synchronized void onECarXCarServiceDeath() {
         callbackRegistered = false;
-        manager = null;
+        signals = null;
         latest = null;
     }
 
+    /**
+     * Reads one distance/average-speed/unit sample from the same CarSignalManager generation.
+     * The rejected PA fields are deliberately absent: they returned lifetime-like values on KX11.
+     */
     private void publishCurrentPair() {
-        ECarXCarPhevManager source = manager;
+        CarSignalManager source = signals;
         if (closed || source == null) return;
         try {
-            PATypes.PA_TS_OdometerTripMeter2 distance =
-                    source.getPA_TS_OdometerTripMeter2();
-            PATypes.PA_TS_EDT_time2 duration = source.getPA_TS_EDT_time2();
-            if (!active(distance) || !active(duration)) return;
-            int distanceRaw = distance.getData();
-            int durationRaw = duration.getData();
-            if (distanceRaw < 0 || durationRaw < 0) return;
-            // A binder-death callback can detach the manager while these two synchronous reads
-            // are in flight. Never republish that retired proxy as a fresh Trip 2 sample.
-            if (closed || manager != source) return;
-            Sample sample = new Sample(distanceRaw, durationRaw,
-                    distance.getFormat(), duration.getFormat(),
-                    distance.getStatus(), duration.getStatus(),
+            int distanceRaw = source.getDstTrvld2();
+            int averageSpeedRaw = source.getVehSpdAvgIndcdVehSpdIndcd();
+            int speedUnitRaw = source.getVehSpdAvgIndcdVeSpdIndcdUnit();
+            if (!CurrentTripMetrics.validRawSignalPair(
+                    distanceRaw, averageSpeedRaw, speedUnitRaw)) return;
+            // A Binder-death callback can detach the manager while synchronous reads are in
+            // flight. Never republish that retired proxy as a fresh Trip 2 sample.
+            if (closed || signals != source) return;
+            Sample sample = new Sample(distanceRaw, averageSpeedRaw, speedUnitRaw,
                     SystemClock.elapsedRealtimeNanos());
             latest = sample;
             for (Listener listener : listeners) notifyOne(listener, sample);
         } catch (Throwable failure) {
-            Log.w(TAG, "Trip 2 PA read failed", failure);
+            Log.w(TAG, "Trip 2 CarSignal read failed", failure);
         }
-    }
-
-    private static boolean active(@Nullable PATypes.PA_IntBase value) {
-        return value != null && value.getAvailability() == AvailabilitySts.Active;
     }
 
     private static void notifyOne(@NonNull Listener listener, @NonNull Sample sample) {
@@ -168,27 +143,28 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
         }
     }
 
-    /** The PA callback exists only while at least one visible consumer requests Trip 2. */
+    /** The signal callback exists only while at least one visible consumer requests Trip 2. */
     private synchronized boolean ensureCallbackForDemand() {
-        ECarXCarPhevManager current = manager;
+        CarSignalManager current = signals;
         if (closed || callbackRegistered || current == null || listeners.isEmpty()) return false;
         try {
             SignalFilter filter = new SignalFilter();
-            filter.add(ECarXCarPhevManager.ManagerId_patsodometertripmeter2);
-            filter.add(ECarXCarPhevManager.ManagerId_patsedttime2);
+            filter.add(CarSignalManager.SignalId_DstTrvld2);
+            filter.add(CarSignalManager.SignalId_VehSpdAvgIndcdVehSpdIndcd);
+            filter.add(CarSignalManager.SignalId_VehSpdAvgIndcdVeSpdIndcdUnit);
             current.registerCallback(callback, filter);
             callbackRegistered = true;
             return true;
         } catch (Throwable failure) {
             callbackRegistered = false;
-            Log.w(TAG, "Trip 2 PA callback registration failed", failure);
+            Log.w(TAG, "Trip 2 CarSignal callback registration failed", failure);
             return false;
         }
     }
 
     private synchronized void suspendCallbackWithoutDemand() {
         if (!listeners.isEmpty() || !callbackRegistered) return;
-        ECarXCarPhevManager current = manager;
+        CarSignalManager current = signals;
         if (current != null) {
             try {
                 current.unregisterCallback(callback);
@@ -200,8 +176,8 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
     }
 
     private synchronized void detachManager() {
-        ECarXCarPhevManager current = manager;
-        manager = null;
+        CarSignalManager current = signals;
+        signals = null;
         latest = null;
         if (callbackRegistered && current != null) {
             try {

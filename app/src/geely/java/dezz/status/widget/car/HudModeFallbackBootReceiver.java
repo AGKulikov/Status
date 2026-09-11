@@ -45,7 +45,7 @@ public final class HudModeFallbackBootReceiver extends BroadcastReceiver {
         if (Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)) return;
         long delay = StartupWorkCoordinator.hudFallbackDelayMillis();
         state(context).edit().putLong(KEY_NOT_BEFORE,
-                SystemClock.elapsedRealtime() + delay).commit();
+                SystemClock.elapsedRealtime() + delay).apply();
         schedule(context, delay);
     }
 

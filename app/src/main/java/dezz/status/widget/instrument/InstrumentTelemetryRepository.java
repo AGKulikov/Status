@@ -54,7 +54,7 @@ public final class InstrumentTelemetryRepository {
     private volatile float currentTripDistance = Float.NaN;
     private volatile float currentTripDurationMinutes = Float.NaN;
     private volatile float currentTripAverageSpeed = Float.NaN;
-    /** Monotonic freshness shared by values emitted from one IDrivingInfo callback. */
+    /** Monotonic freshness shared by values emitted from one instrument Trip 2 signal sample. */
     private volatile long currentTripObservedAtElapsedNanos;
     @NonNull private final AtomicLong generation = new AtomicLong();
     private volatile long newestSampleElapsedNanos;

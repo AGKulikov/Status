@@ -1666,28 +1666,31 @@ final class GeelyCarIntegration implements CarIntegration {
     private void addTrip2Diagnostics(@NonNull List<CarDiagnosticValue> out) {
         EcarxTrip2Access.Sample sample = trip2Access.latestSample();
         if (sample == null) {
-            out.add(new CarDiagnosticValue("PA_TS_OdometerTripMeter2",
+            out.add(new CarDiagnosticValue("DstTrvld2",
                     "Пробег поездки 2", "unavailable", "—",
-                    "raw PA; manager=33751; дождитесь первого активного PA callback"));
-            out.add(new CarDiagnosticValue("PA_TS_EDT_time2",
-                    "Время поездки 2", "unavailable", "—",
-                    "raw PA; manager=33749; дождитесь первого активного PA callback"));
+                    "raw CarSignal; id=30878; дождитесь первого callback"));
+            out.add(new CarDiagnosticValue("VehSpdAvgIndcdVehSpdIndcd",
+                    "Средняя скорость поездки 2", "unavailable", "—",
+                    "raw CarSignal; id=30957; unit id=30956"));
             return;
         }
         float distance = CurrentTripMetrics.distanceKilometres(
                 sample.distanceRaw);
-        float duration = CurrentTripMetrics.durationMinutes(sample.durationRaw);
-        out.add(new CarDiagnosticValue("PA_TS_OdometerTripMeter2",
+        float averageSpeed = CurrentTripMetrics.averageSpeedKmh(
+                sample.averageSpeedRaw, sample.speedUnitRaw);
+        float duration = CurrentTripMetrics.durationMinutes(distance, averageSpeed);
+        out.add(new CarDiagnosticValue("DstTrvld2",
                 "Пробег поездки 2", "active",
                 Integer.toString(sample.distanceRaw),
-                "raw PA; manager=33751; format=" + sample.distanceFormat
-                        + "; status=" + sample.distanceStatus,
+                "raw CarSignal; id=30878; scale=0.1 km",
                 Float.isFinite(distance) ? distance : null));
-        out.add(new CarDiagnosticValue("PA_TS_EDT_time2",
-                "Время поездки 2", "active", Integer.toString(sample.durationRaw),
-                "raw PA; manager=33749; format=" + sample.durationFormat
-                        + "; status=" + sample.durationStatus,
-                Float.isFinite(duration) ? duration : null));
+        out.add(new CarDiagnosticValue("VehSpdAvgIndcdVehSpdIndcd",
+                "Средняя скорость поездки 2", "active",
+                Integer.toString(sample.averageSpeedRaw),
+                "raw CarSignal; id=30957; unit=" + sample.speedUnitRaw
+                        + "; unit id=30956; derived time="
+                        + (Float.isFinite(duration) ? Float.toString(duration) : "unavailable"),
+                Float.isFinite(averageSpeed) ? averageSpeed : null));
     }
 
     private static void addUnavailableSensor(List<CarDiagnosticValue> out,
@@ -2698,8 +2701,9 @@ final class GeelyCarIntegration implements CarIntegration {
         if (ageNanos < 0L || ageNanos > CurrentTripMetrics.STALE_AFTER_NANOS) return;
         float distance = CurrentTripMetrics.distanceKilometres(
                 sample.distanceRaw);
-        float duration = CurrentTripMetrics.durationMinutes(sample.durationRaw);
-        float averageSpeed = CurrentTripMetrics.averageSpeedKmh(distance, duration);
+        float averageSpeed = CurrentTripMetrics.averageSpeedKmh(
+                sample.averageSpeedRaw, sample.speedUnitRaw);
+        float duration = CurrentTripMetrics.durationMinutes(distance, averageSpeed);
         long observedAt = Math.max(0L, System.currentTimeMillis()
                 - ageNanos / 1_000_000L);
         if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)
@@ -2729,8 +2733,9 @@ final class GeelyCarIntegration implements CarIntegration {
         if (ageNanos < 0L || ageNanos > CurrentTripMetrics.STALE_AFTER_NANOS) return;
         float distance = CurrentTripMetrics.distanceKilometres(
                 sample.distanceRaw);
-        float duration = CurrentTripMetrics.durationMinutes(sample.durationRaw);
-        float averageSpeed = CurrentTripMetrics.averageSpeedKmh(distance, duration);
+        float averageSpeed = CurrentTripMetrics.averageSpeedKmh(
+                sample.averageSpeedRaw, sample.speedUnitRaw);
+        float duration = CurrentTripMetrics.durationMinutes(distance, averageSpeed);
         long observedAt = sample.observedAtElapsedNanos;
         if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)
                 && Float.isFinite(distance)) {

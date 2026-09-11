@@ -682,12 +682,12 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.8.5}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021318}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.8.6}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021319}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.8.5")', verifier)
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021318")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.8.6")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021319")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
@@ -696,8 +696,10 @@ public final class MapOverlayPlacementHarness {
                     / "verify-navigation-hud-v2.yml").read_text()
         self.assertIn("if (version == '2.8.5')", build)
         self.assertIn("return 208021318", build)
-        self.assertIn("VERSION_NAME: '2.8.5'", workflow)
-        self.assertIn("VERSION_CODE: '208021318'", workflow)
+        self.assertIn("if (version == '2.8.6')", build)
+        self.assertIn("return 208021319", build)
+        self.assertIn("VERSION_NAME: '2.8.6'", workflow)
+        self.assertIn("VERSION_CODE: '208021319'", workflow)
         self.assertNotIn("2.5.10", build)
         self.assertNotIn("2.5.10", workflow)
 
@@ -1028,10 +1030,16 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("hideSharedPrefix", alternative)
         self.assertIn('invoke(line, "hide"', alternative)
         self.assertIn('if (seconds == 0) return "то же время"', alternative)
-        self.assertLess(alternative.index("CalloutModel model = readCallout"),
-                        alternative.index('invoke(polylineCollection, "addPolyline"'))
-        self.assertLess(alternative.index('invoke(calloutCollection, "addPlacemark"'),
-                        alternative.index('invoke(polylineCollection, "addPolyline"'))
+        self.assertLess(alternative.index('invoke(polylineCollection, "addPolyline"'),
+                        alternative.index("CalloutModel model = readCallout"))
+        self.assertLess(alternative.index('invoke(line, "setVisible",'
+                                          ' new Class<?>[]{boolean.class}, true)'),
+                        alternative.index("CalloutModel model = readCallout"))
+        self.assertIn("fallbackRoutePoint(route)", alternative)
+        self.assertIn("routeGeometryFingerprint(candidate)", alternative)
+        self.assertIn("pointOrNull(alternativeFork)", alternative)
+        self.assertIn("RETAINED_INPUT_RESCAN_MS = 500L", alternative)
+        self.assertIn('name = "Вариант " + (index + 1)', alternative)
         self.assertIn('invoke(line, "setVisible", new Class<?>[]{boolean.class}, false)',
                       alternative)
         self.assertNotIn("System.identityHashCode(alternative)", alternative)

@@ -1514,6 +1514,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(clusterSettings.contains("Автовысота"));
         assertTrue(canvas.contains("ManeuverCardAutoSizer.resolve"));
         assertTrue(cluster.contains("ManeuverCardAutoSizer.resolve"));
+        assertTrue(canvas.contains("maneuverCardContentFingerprint(item, nav)"));
+        assertTrue(canvas.contains("measurementOptionsFingerprint"));
+        assertTrue(cluster.contains("maneuverCardContentFingerprint(element, snapshot"));
+        assertTrue(cluster.contains("measurementOptionsFingerprint"));
+        assertTrue(autoSizer.contains("public static long measurementOptionsFingerprint"));
+        assertFalse(canvas.contains("this.navigation == navigation"));
+        assertFalse(cluster.contains("maneuverAutoSizeSource == source"));
         assertTrue(autoSizer.contains("Math.min(maximumWidth"));
         assertTrue(autoSizer.contains("bottomLimit - maximum.top"));
         assertTrue(autoSizer.contains("out.right = out.left + resolvedWidth"));

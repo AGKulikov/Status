@@ -83,7 +83,7 @@ public final class HudRuntimeData {
     private final HudVolumeVisibility volumeVisibility = new HudVolumeVisibility();
     private final Runnable volumeExpiry = this::notifyChanged;
     private boolean started;
-    /** All three fields originate in one paired Trip 2 PA sample and expire together. */
+    /** All three fields originate in one paired Trip 2 CarSignal sample and expire together. */
     private final Runnable currentTripExpiry = () -> {
         if (!started) return;
         boolean changed = false;
@@ -641,7 +641,8 @@ public final class HudRuntimeData {
     @NonNull
     private static String currentTripDuration(double minutesValue, @NonNull String unit) {
         if (!Double.isFinite(minutesValue) || minutesValue < 0d) return "—";
-        long minutes = Math.round(minutesValue);
+        // Match the stock Trip 2 row: show completed minutes, not a rounded-up partial minute.
+        long minutes = (long) Math.floor(minutesValue + .0001d);
         String value = String.format(Locale.getDefault(), "%02d:%02d",
                 minutes / 60L, minutes % 60L);
         return unit.trim().isEmpty() ? value : value + " " + unit.trim();

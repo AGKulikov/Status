@@ -178,8 +178,9 @@ public final class HudCanvasView extends View {
                 && !item.options.optBoolean("autoHeight", false)) return maximum;
         HudNavigationState nav = navigationFor(item);
         Typeface face = typeface(item.fontWeight);
+        long contentFingerprint = maneuverCardContentFingerprint(item, nav);
         ManeuverAutoSizeEntry cached = maneuverAutoSizeCache.get(item);
-        if (cached != null && cached.matches(nav, maximum, geometry.safeClip.bottom,
+        if (cached != null && cached.matches(contentFingerprint, maximum, geometry.safeClip.bottom,
                 geometry.scale, face, item.fontSizeSp)) {
             return cached.bounds;
         }
@@ -188,9 +189,56 @@ public final class HudCanvasView extends View {
         ManeuverCardAutoSizer.resolve(maximum, geometry.safeClip.bottom, item.options,
                 geometry.scale, geometry.scale, textPaint, face,
                 item.fontSizeSp, content, resolved);
-        maneuverAutoSizeCache.put(item, new ManeuverAutoSizeEntry(nav, maximum,
+        maneuverAutoSizeCache.put(item, new ManeuverAutoSizeEntry(contentFingerprint, maximum,
                 geometry.safeClip.bottom, geometry.scale, face, item.fontSizeSp, resolved));
         return resolved;
+    }
+
+    /** Hashes only text/graphic inputs which can change measured card size. */
+    private long maneuverCardContentFingerprint(@NonNull HudElementConfig item,
+                                                @Nullable HudNavigationState nav) {
+        long result = 17L;
+        result = fingerprintMix(result, ManeuverCardAutoSizer.measurementOptionsFingerprint(
+                item.options, item.fontSizeSp));
+        if (nav == null) return fingerprintMix(result, editor ? 1 : 0);
+        result = fingerprintMix(result, nav.stockCard.enabled ? 1 : 0);
+        if (nav.stockCard.enabled && commandCardRenderer().available(nav.stockCard)) {
+            StockManeuverCardState card = nav.stockCard;
+            result = fingerprintMix(result, card.distance.hashCode());
+            result = fingerprintMix(result, card.nextRoad.hashCode());
+            result = fingerprintMix(result, card.hasAuxiliary() ? 1 : 0);
+            result = fingerprintMix(result, card.auxiliaryText.hashCode());
+            result = fingerprintMix(result, card.signs.size());
+            for (StockManeuverCardState.Sign sign : card.signs) {
+                result = fingerprintMix(result, sign.text.hashCode());
+            }
+            result = fingerprintMix(result, card.followingSigns.size());
+            for (StockManeuverCardState.Sign sign : card.followingSigns) {
+                result = fingerprintMix(result, sign.text.hashCode());
+            }
+            return result;
+        }
+        result = fingerprintMix(result, nav.direct ? 1 : 0);
+        result = fingerprintMix(result, nav.turnDistance.hashCode());
+        result = fingerprintMix(result, nav.maneuverNextRoad.hashCode());
+        result = fingerprintMix(result, nav.maneuverTitle.hashCode());
+        result = fingerprintMix(result, nav.maneuverText.hashCode());
+        result = fingerprintMix(result, nav.maneuverSubtext.hashCode());
+        result = fingerprintMix(result, nav.street.hashCode());
+        result = fingerprintMix(result, nav.destination.hashCode());
+        result = fingerprintMix(result, nav.maneuverAuxiliaryType.hashCode());
+        result = fingerprintMix(result, nav.maneuverAuxiliaryText.hashCode());
+        result = fingerprintMix(result, nav.maneuverAuxiliaryManeuverType.hashCode());
+        result = fingerprintMix(result, nav.maneuverAuxiliaryDistance.hashCode());
+        result = fingerprintMix(result, nav.maneuverDirectionSigns.size());
+        for (HudNavigationState.DirectionSignItem sign : nav.maneuverDirectionSigns) {
+            result = fingerprintMix(result, sign.text.hashCode());
+        }
+        return result;
+    }
+
+    private static long fingerprintMix(long seed, long value) {
+        return seed * 1_000_003L + value;
     }
 
     @NonNull
@@ -1886,7 +1934,7 @@ public final class HudCanvasView extends View {
     }
 
     private static final class ManeuverAutoSizeEntry {
-        @Nullable final HudNavigationState navigation;
+        final long contentFingerprint;
         @NonNull final RectF maximum;
         final float bottomLimit;
         final float scale;
@@ -1894,11 +1942,11 @@ public final class HudCanvasView extends View {
         final int fontSizeSp;
         @NonNull final RectF bounds;
 
-        ManeuverAutoSizeEntry(@Nullable HudNavigationState navigation,
+        ManeuverAutoSizeEntry(long contentFingerprint,
                               @NonNull RectF maximum, float bottomLimit, float scale,
                               @NonNull Typeface typeface, int fontSizeSp,
                               @NonNull RectF bounds) {
-            this.navigation = navigation;
+            this.contentFingerprint = contentFingerprint;
             this.maximum = new RectF(maximum);
             this.bottomLimit = bottomLimit;
             this.scale = scale;
@@ -1907,10 +1955,10 @@ public final class HudCanvasView extends View {
             this.bounds = bounds;
         }
 
-        boolean matches(@Nullable HudNavigationState navigation, @NonNull RectF maximum,
+        boolean matches(long contentFingerprint, @NonNull RectF maximum,
                         float bottomLimit, float scale, @NonNull Typeface typeface,
                         int fontSizeSp) {
-            return this.navigation == navigation
+            return this.contentFingerprint == contentFingerprint
                     && this.maximum.equals(maximum)
                     && Float.compare(this.bottomLimit, bottomLimit) == 0
                     && Float.compare(this.scale, scale) == 0

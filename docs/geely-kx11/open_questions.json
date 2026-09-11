@@ -1,5 +1,5 @@
 {
-  "version": "1.5",
+  "version": "1.6",
   "date": "2026-09-11",
   "note": "Рабочая очередь приоритетных вопросов, а не исчерпывающий перечень и не расписание автоматических действий. Подробные неизвестные, аппаратные ограничения, необходимые артефакты и следующие шаги остаются в 94 связанных карточках. Сначала используются уже собранные исходники и архивы; новые наблюдения запрашиваются только для конкретного остаточного пробела.",
   "coverage": {
@@ -225,9 +225,9 @@
       "priority": "P1",
       "function": "Полная задержка кнопок руля",
       "status": "PARTLY_RESOLVED",
-      "known": "В прежних логах подтверждены три остановки main thread дольше 8 секунд. В текущем исходнике Natro обработчик клавиши только помещает команду в ограниченную очередь; выбор MediaSession, Binder-команда плееру и запись журнала разнесены по трём независимым HandlerThread. Очередь ограничена четырьмя командами, ожидающая команда старше 750 мс не исполняется, а смена session аннулирует прежнее поколение. Для next/previous в исследованной ветви MConfig отдельная задержка SRC 900/1400 мс не применяется.",
-      "missing_evidence": "Аппаратное нажатие → MConfig → Android KeyEvent → callback → command lane → Binder → player callback → слышимое аудио на одной шкале времени; поведение установленного MConfig и выбранного плеера при зависшем Binder. Изоляция Natro не доказывает отсутствие задержки до callback или внутри плеера.",
-      "next_step": "На KX11 записать парные трассы с eventTime/downTime/callback/queued/dispatch/completed и метками player callback/audio для одиночных, быстрых повторных и long-press нажатий. Разнести p50/p95/max по MConfig, Android delivery, очереди Natro и MediaSession; не увеличивать очередь и не воспроизводить просроченные команды.",
+      "known": "Пользователь сообщил о заметной задержке медиакнопок примерно через 10 минут работы. В прежних логах подтверждены три остановки main thread дольше 8 секунд. Кандидат 2.8.6 сохраняет три независимых HandlerThread и bounded/expiring очередь, раз в 2 минуты обновляет active MediaSession на resolver-потоке и фиксирует in-flight Binder. Если Binder проигрывателя занят дольше 750 мс, новое нажатие не ставится позади него: route инвалидируется/обновляется, а событие возвращается штатному Android media dispatcher. Доказанные синхронный boot preference fsync и PackageManager/icon work из AppsAdapter.getView убраны с main. Для next/previous в исследованной ветви MConfig задержка SRC 900/1400 мс не применяется.",
+      "missing_evidence": "Аппаратное нажатие → MConfig → Android KeyEvent → callback → command lane или stock fallback → Binder → player callback → слышимое аудио на одной шкале времени в 30-минутном прогоне. Нельзя из исходника доказать отсутствие задержки до accessibility callback, исправность установленного проигрывателя или физическое начало звука.",
+      "next_step": "По GATE-079 выполнить на KX11 не менее трёх 30-минутных прогонов, отдельно проверить отметки после 10 и 20 минут и искусственно зависшую MediaSession. Записать eventTime/downTime/callback/queued/dispatch/binder_stalled/fallback/player/audio, разнести p50/p95/max по MConfig, Android delivery, Natro и плееру; убедиться, что свежие события не исполняются поздней пачкой.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/continuation/systems.json",
@@ -317,11 +317,11 @@
       "priority": "P1",
       "function": "Пробег, время и средняя скорость текущей поездки на DIM/HUD",
       "status": "PARTLY_RESOLVED",
-      "known": "Аппаратная проверка подписанной Natro 2.8.4 отвергла ITripData.IDrivingInfo как источник штатной «Поездки 2»: время осталось 0, а пробег совпал с общим одометром автомобиля 37 278 км (сообщение пользователя). В комплектном ecarx.adaptapi.jar SHA-256 33d0c62851e834dbf443f969627973dbc6e00eec3dd1e8fb6fc9dfe5af78e886 подтверждены отдельные typed PA getters/callbacks PA_TS_OdometerTripMeter2 и PA_TS_EDT_time2, manager ID 33751 и 33749. Подписанная Natro 2.8.5 использует эту read-only пару: принимает только одновременно Active значения, перечитывает оба поля на callback любого из них и сохраняет raw, format и одну monotonic timestamp. Средняя скорость выводится только из этой пары; средний расход остаётся отдельным ignition-сигналом. Через 10 минут без нового наблюдения HUD и DIM скрывают зависимые значения.",
-      "missing_evidence": "Масштаб и единица raw PA_TS_OdometerTripMeter2, единица PA_TS_EDT_time2, совпадение reset/ignition semantics со штатным экраном «Поездка 2», частота callback и поведение после Binder reconnect. Деление distance на 10 и трактовка time как минут остаются гипотезами до синхронной пары raw/format/штатный экран/Natro.",
-      "next_step": "На KX11 выполнить только чтение по GATE-073: одновременно записать диагностические raw/format обоих Trip 2 PA-полей и фото/видео штатного экрана и Natro до движения, после известного расстояния, остановки, штатного сброса, Binder reconnect и следующего ignition. Подтвердить либо скорректировать масштаб, единицы и производную скорости; проверить, что общий одометр 37 278 км больше не попадает в поездку.",
+      "known": "Аппаратные результаты последовательно отвергли ITripData.IDrivingInfo в Natro 2.8.4 и PA_TS_OdometerTripMeter2/PA_TS_EDT_time2 в 2.8.5 как источник штатной «Поездки 2». На фото пользователя штатная приборка показывает 17,4 км / 00:43 / 11,5 / 24 км/ч, а Natro — lifetime-like значения. В комплектном ecarx.adaptapi.jar и каталоге прошивки подтверждены read-only CarSignal getters DstTrvld2 (30878, native 0x2140789E), VehSpdAvgIndcdVehSpdIndcd (30957, 0x214078ED) и его unit (30956, 0x214078EC). Кандидат 2.8.6 читает одну свежую тройку, использует 0,1 км и штатную среднюю скорость; время формируется из этой пары завершёнными минутами, что для 17,4/24 даёт 00:43. Старые PA/ITripData источники удалены; стабильные ID раскладки и отдельный ignition average-consumption сохранены.",
+      "missing_evidence": "Синхронные runtime raw новых трёх CarSignal на автомобиле, масштаб DstTrvld2, unit km/h/mph, граничное округление производного времени, частота callback и точное совпадение reset/reconnect/ignition semantics со штатным экраном. Статическая доступность SDK и одно фото не закрывают весь жизненный цикл.",
+      "next_step": "По GATE-076 одновременно записать raw DstTrvld2/average/unit, фото или видео штатной строки и Natro при 0/0, на эталоне 17,4 км / 00:43 / 24 км/ч, после движения, штатного reset, Binder reconnect и следующего ignition. Проверить km/h и mph, stale/unavailable и отсутствие прежних PA/ITripData значений в диагностике.",
       "sources": [
-        "../releases/2.8.5/README_RU.md",
+        "../releases/2.8.6/README_RU.md",
         "../../GEELY_KX11_KNOWLEDGE_RU.md",
         "../../app/src/geely/java/dezz/status/widget/car/GeelyCarIntegration.java",
         "../../app/src/geely/java/dezz/status/widget/car/EcarxTrip2Access.java",
@@ -331,6 +331,14 @@
         "PT-FUEL",
         "BASE-HUD",
         "PLAT_DISPLAY"
+      ],
+      "history": [
+        {
+          "version": "1.5",
+          "known": "Natro 2.8.5 использовала PA_TS_OdometerTripMeter2 и PA_TS_EDT_time2 после отрицательного результата ITripData в 2.8.4.",
+          "missing_evidence": "Единицы и reset PA-пары, совпадение со штатной «Поездкой 2».",
+          "next_step": "Исторический GATE-073; путь отвергнут последующим фото пользователя и заменён GATE-076."
+        }
       ]
     },
     {

@@ -101,10 +101,13 @@ public final class InstrumentPanelContractTest {
                 InstrumentElementType.CURRENT_TRIP_DURATION.metricId);
         assertEquals(CurrentTripMetrics.AVERAGE_SPEED_ID,
                 InstrumentElementType.CURRENT_TRIP_AVERAGE_SPEED.metricId);
-        assertEquals(211.5f, CurrentTripMetrics.distanceKilometres(2115), 0.001f);
-        assertEquals(156f, CurrentTripMetrics.durationMinutes(156), 0.001f);
-        assertEquals(81.346f,
-                CurrentTripMetrics.averageSpeedKmh(211.5f, 156f), 0.01f);
+        assertEquals(17.4f, CurrentTripMetrics.distanceKilometres(174), 0.001f);
+        assertEquals(24f, CurrentTripMetrics.averageSpeedKmh(24, 0), 0.001f);
+        assertEquals(24.14016f, CurrentTripMetrics.averageSpeedKmh(15, 1), 0.001f);
+        assertTrue(Float.isNaN(CurrentTripMetrics.averageSpeedKmh(24, 2)));
+        assertTrue(Float.isNaN(CurrentTripMetrics.averageSpeedKmh(400, 1)));
+        assertEquals(43.5f,
+                CurrentTripMetrics.durationMinutes(17.4f, 24f), 0.01f);
         assertEquals(600_000L, CurrentTripMetrics.STALE_AFTER_MILLIS);
 
         InstrumentElementConfig oldCard = new InstrumentElementConfig(
@@ -134,19 +137,25 @@ public final class InstrumentPanelContractTest {
         assertTrue(integration.contains("trip2Access.removeListener(listener)"));
         assertFalse(integration.contains("getLatestDrivingInfo"));
         assertFalse(integration.contains("getTripData()"));
-        assertTrue(trip2.contains("ManagerId_patsodometertripmeter2"));
-        assertTrue(trip2.contains("ManagerId_patsedttime2"));
-        assertTrue(trip2.contains("getPA_TS_OdometerTripMeter2()"));
-        assertTrue(trip2.contains("getPA_TS_EDT_time2()"));
-        assertTrue(trip2.contains("AvailabilitySts.Active"));
-        assertTrue(integration.contains("PA_TS_OdometerTripMeter2"));
-        assertTrue(integration.contains("PA_TS_EDT_time2"));
+        assertTrue(trip2.contains("SignalId_DstTrvld2"));
+        assertTrue(trip2.contains("SignalId_VehSpdAvgIndcdVehSpdIndcd"));
+        assertTrue(trip2.contains("SignalId_VehSpdAvgIndcdVeSpdIndcdUnit"));
+        assertTrue(trip2.contains("getDstTrvld2()"));
+        assertTrue(trip2.contains("getVehSpdAvgIndcdVehSpdIndcd()"));
+        assertTrue(trip2.contains("getVehSpdAvgIndcdVeSpdIndcdUnit()"));
+        assertFalse(trip2.contains("getPA_TS_OdometerTripMeter2()"));
+        assertFalse(trip2.contains("getPA_TS_EDT_time2()"));
+        assertTrue(integration.contains("DstTrvld2"));
+        assertTrue(integration.contains("VehSpdAvgIndcdVehSpdIndcd"));
+        assertFalse(integration.contains("PA_TS_OdometerTripMeter2"));
+        assertFalse(integration.contains("PA_TS_EDT_time2"));
         assertTrue(settings.contains("NAV_MANEUVER_CARD"));
         assertTrue(renderer.contains("case NAV_MANEUVER_CARD:"));
         assertTrue(renderer.contains("case CURRENT_TRIP_DISTANCE:"));
         assertTrue(renderer.contains("case CURRENT_TRIP_DURATION:"));
         assertTrue(renderer.contains("case CURRENT_TRIP_AVERAGE_SPEED:"));
         assertTrue(renderer.contains("tripDurationText(frame.currentTripDurationMinutes)"));
+        assertTrue(renderer.contains("Math.floor(minutesValue + .0001f)"));
         assertTrue(renderer.contains("scheduleCurrentTripExpiry()"));
         assertTrue(repository.contains("currentTripFreshUntilElapsedNanos"));
         assertTrue(repository.contains("CurrentTripMetrics.STALE_AFTER_NANOS"));

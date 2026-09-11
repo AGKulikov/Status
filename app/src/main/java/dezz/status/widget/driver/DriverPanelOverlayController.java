@@ -511,6 +511,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         grid.setPadding(dp(context, 16), dp(context, 16),
                 dp(context, 16), dp(context, 16));
         grid.setAdapter(new AppsAdapter(context, Collections.emptyList(),
+                Collections.emptyMap(), Collections.emptySet(),
                 preferences, appsGridScalePercent, drawerAppsListener));
         FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
@@ -551,12 +552,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
         final int generation = ++drawerGeneration;
         catalogExecutor.execute(() -> {
-            List<LauncherAppCatalog.App> apps =
-                    LauncherAppCatalog.loadVisible(appContext, preferences);
+            AppDrawerData data = loadAppDrawerData();
             mainHandler.post(() -> {
                 if (drawerGrid == null || drawerWindow == null
                         || generation != drawerGeneration) return;
-                AppsAdapter adapter = new AppsAdapter(drawerGrid.getContext(), apps,
+                AppsAdapter adapter = new AppsAdapter(drawerGrid.getContext(), data.apps,
+                        data.icons, data.uninstallableComponents,
                         preferences, appsGridScalePercent, drawerAppsListener);
                 adapter.setEditMode(drawerEditMode);
                 drawerGrid.setAdapter(adapter);
@@ -726,17 +727,41 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (drawerWindow == null || catalogExecutor.isShutdown()) return;
         final int generation = ++drawerGeneration;
         catalogExecutor.execute(() -> {
-            List<LauncherAppCatalog.App> apps =
-                    LauncherAppCatalog.loadVisible(appContext, preferences);
+            AppDrawerData data = loadAppDrawerData();
             mainHandler.post(() -> {
                 if (drawerGrid == null || drawerWindow == null
                         || generation != drawerGeneration) return;
-                AppsAdapter adapter = new AppsAdapter(drawerGrid.getContext(), apps,
+                AppsAdapter adapter = new AppsAdapter(drawerGrid.getContext(), data.apps,
+                        data.icons, data.uninstallableComponents,
                         preferences, drawerAppsGridScalePercent, drawerAppsListener);
                 adapter.setEditMode(drawerEditMode);
                 drawerGrid.setAdapter(adapter);
             });
         });
+    }
+
+    /** PackageManager icon/resource Binder work never runs from GridView.getView on MAIN. */
+    @NonNull
+    private AppDrawerData loadAppDrawerData() {
+        List<LauncherAppCatalog.App> apps =
+                LauncherAppCatalog.loadVisible(appContext, preferences);
+        Map<String, Drawable> icons = new HashMap<>();
+        Set<String> uninstallable = new LinkedHashSet<>();
+        for (LauncherAppCatalog.App app : apps) {
+            String component = app.component.flattenToString();
+            try {
+                icons.put(component, LauncherAppCatalog.loadIcon(appContext, app));
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Could not preload app icon " + component, failure);
+            }
+            if (AppDrawerUninstallPolicy.canUninstall(
+                    appContext, app.packageName, app.systemApp)) {
+                uninstallable.add(component);
+            }
+        }
+        return new AppDrawerData(Collections.unmodifiableList(new ArrayList<>(apps)),
+                Collections.unmodifiableMap(icons),
+                Collections.unmodifiableSet(uninstallable));
     }
 
     private void registerDrawerPackageReceiver() {
@@ -1884,6 +1909,20 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
     }
 
+    private static final class AppDrawerData {
+        @NonNull final List<LauncherAppCatalog.App> apps;
+        @NonNull final Map<String, Drawable> icons;
+        @NonNull final Set<String> uninstallableComponents;
+
+        AppDrawerData(@NonNull List<LauncherAppCatalog.App> apps,
+                      @NonNull Map<String, Drawable> icons,
+                      @NonNull Set<String> uninstallableComponents) {
+            this.apps = apps;
+            this.icons = icons;
+            this.uninstallableComponents = uninstallableComponents;
+        }
+    }
+
     private static final class AppsAdapter extends BaseAdapter {
         interface Listener {
             void launch(@NonNull Context context, @NonNull LauncherAppCatalog.App app);
@@ -1893,15 +1932,21 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
         private final Context context;
         private final List<LauncherAppCatalog.App> apps;
+        private final Map<String, Drawable> icons;
+        private final Set<String> uninstallableComponents;
         private final Map<String, FavoriteAppConfig> appearances;
         private final int scalePercent;
         private final Listener listener;
         private boolean editMode;
 
         AppsAdapter(Context context, List<LauncherAppCatalog.App> apps,
+                    Map<String, Drawable> icons,
+                    Set<String> uninstallableComponents,
                     Preferences preferences, int scalePercent, Listener listener) {
             this.context = context;
             this.apps = apps;
+            this.icons = icons;
+            this.uninstallableComponents = uninstallableComponents;
             this.appearances = new FavoriteAppsConfigStore(preferences).appearanceSnapshot();
             this.scalePercent = scalePercent;
             this.listener = listener;
@@ -1927,10 +1972,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             cell.setSoundEffectsEnabled(true);
             LinearLayout tile = LauncherAppTileRenderer.render(
                     context, cell.reusableContent(), app.label,
-                    LauncherAppCatalog.loadIcon(context, app),
+                    icons.get(app.component.flattenToString()),
                     appearance, scalePercent);
-            boolean uninstallable = AppDrawerUninstallPolicy.canUninstall(
-                    context, app.packageName, app.systemApp);
+            boolean uninstallable = uninstallableComponents.contains(
+                    app.component.flattenToString());
             cell.setContentDescription(app.label
                     + (editMode && uninstallable ? ", можно удалить" : ""));
             cell.bind(tile, editMode, uninstallable,

@@ -248,8 +248,10 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         Object sizeSource = maximumPreview ? MAXIMUM_MANEUVER_PREVIEW_KEY : snapshot;
         Typeface face = digitalTypeface(element.style, true);
         int fallbackFontSize = element.options.optInt("maneuverDetailTextSizeSp", 18);
-        if (sizeSource != null && runtime.maneuverAutoSizeMatches(sizeSource,
-                useCommandCard ? commandCard : null, maximum, getHeight(), face,
+        long contentFingerprint = maneuverCardContentFingerprint(element, snapshot,
+                useCommandCard ? commandCard : null, maximumPreview);
+        if (sizeSource != null && runtime.maneuverAutoSizeMatches(contentFingerprint,
+                maximum, getHeight(), face,
                 fallbackFontSize)) {
             return runtime.maneuverAutoSizeBounds;
         }
@@ -296,9 +298,56 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         ManeuverCardAutoSizer.resolve(maximum, getHeight(), element.options,
                 1f, getResources().getDisplayMetrics().scaledDensity, paint,
                 face, fallbackFontSize, content, runtime.maneuverAutoSizeBounds);
-        runtime.rememberManeuverAutoSize(sizeSource, useCommandCard ? commandCard : null,
+        runtime.rememberManeuverAutoSize(contentFingerprint,
                 maximum, getHeight(), face, fallbackFontSize);
         return runtime.maneuverAutoSizeBounds;
+    }
+
+    /** Stable content key avoids measuring on speed-only snapshots and detects grow-after-shrink. */
+    private static long maneuverCardContentFingerprint(
+            @NonNull InstrumentElementConfig element,
+            @Nullable NavigationSnapshotV2 snapshot,
+            @Nullable StockManeuverCardState card,
+            boolean maximumPreview) {
+        long result = 17L;
+        result = fingerprintMix(result, ManeuverCardAutoSizer.measurementOptionsFingerprint(
+                element.options, element.options.optInt("maneuverDetailTextSizeSp", 18)));
+        if (maximumPreview) return fingerprintMix(result, 0x4d415850524556L);
+        if (card != null) {
+            result = fingerprintMix(result, 1);
+            result = fingerprintMix(result, card.distance.hashCode());
+            result = fingerprintMix(result, card.nextRoad.hashCode());
+            result = fingerprintMix(result, card.hasAuxiliary() ? 1 : 0);
+            result = fingerprintMix(result, card.auxiliaryText.hashCode());
+            result = fingerprintMix(result, card.signs.size());
+            for (StockManeuverCardState.Sign sign : card.signs) {
+                result = fingerprintMix(result, sign.text.hashCode());
+            }
+            result = fingerprintMix(result, card.followingSigns.size());
+            for (StockManeuverCardState.Sign sign : card.followingSigns) {
+                result = fingerprintMix(result, sign.text.hashCode());
+            }
+            return result;
+        }
+        if (snapshot == null) return result;
+        result = fingerprintMix(result, snapshot.maneuverDisplayDistance.hashCode());
+        result = fingerprintMix(result, snapshot.maneuverDistanceMeters);
+        result = fingerprintMix(result, snapshot.maneuverTitle.hashCode());
+        result = fingerprintMix(result, snapshot.maneuverSubtext.hashCode());
+        result = fingerprintMix(result, snapshot.maneuverNextRoad.hashCode());
+        result = fingerprintMix(result, snapshot.street.hashCode());
+        result = fingerprintMix(result, snapshot.destination.hashCode());
+        result = fingerprintMix(result, snapshot.maneuverDirectionSignsJson.hashCode());
+        result = fingerprintMix(result, snapshot.maneuverAuxiliaryType.hashCode());
+        result = fingerprintMix(result, snapshot.maneuverAuxiliaryText.hashCode());
+        result = fingerprintMix(result,
+                snapshot.maneuverAuxiliaryManeuverType.hashCode());
+        result = fingerprintMix(result, snapshot.maneuverAuxiliaryDistanceMeters);
+        return result;
+    }
+
+    private static long fingerprintMix(long seed, long value) {
+        return seed * 1_000_003L + value;
     }
 
     private static void addStockBadgeRow(@NonNull List<List<String>> rows,
@@ -987,7 +1036,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
     @NonNull
     private static String tripDurationText(float minutesValue) {
         if (!Float.isFinite(minutesValue) || minutesValue < 0f) return "—";
-        long minutes = Math.round(minutesValue);
+        // The KX11 stock Trip 2 screen displays completed minutes (17.4 km / 24 km/h -> 00:43).
+        long minutes = (long) Math.floor(minutesValue + .0001f);
         return String.format(Locale.getDefault(), "%02d:%02d",
                 minutes / 60L, minutes % 60L);
     }
@@ -2548,8 +2598,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         int navigationTotalDistanceMeters = -1;
         int trafficTotalMeters;
         double navigationProgress = Double.NaN;
-        @Nullable Object maneuverAutoSizeSource;
-        @Nullable StockManeuverCardState maneuverAutoSizeCommandCard;
+        long maneuverAutoSizeContentFingerprint = Long.MIN_VALUE;
         @NonNull final RectF maneuverAutoSizeMaximum = new RectF();
         @NonNull final RectF maneuverAutoSizeBounds = new RectF();
         int maneuverAutoSizeBottomLimit;
@@ -2645,24 +2694,20 @@ public final class InstrumentClusterView extends View implements Choreographer.F
             navigationAuxiliaryText = "Затем налево · 500 м";
         }
 
-        boolean maneuverAutoSizeMatches(@NonNull Object source,
-                                        @Nullable StockManeuverCardState commandCard,
+        boolean maneuverAutoSizeMatches(long contentFingerprint,
                                         @NonNull RectF maximum, int bottomLimit,
                                         @NonNull Typeface typeface, int fontSizeSp) {
-            return maneuverAutoSizeSource == source
-                    && maneuverAutoSizeCommandCard == commandCard
+            return maneuverAutoSizeContentFingerprint == contentFingerprint
                     && maneuverAutoSizeMaximum.equals(maximum)
                     && maneuverAutoSizeBottomLimit == bottomLimit
                     && maneuverAutoSizeTypeface == typeface
                     && maneuverAutoSizeFontSizeSp == fontSizeSp;
         }
 
-        void rememberManeuverAutoSize(@Nullable Object source,
-                                      @Nullable StockManeuverCardState commandCard,
+        void rememberManeuverAutoSize(long contentFingerprint,
                                       @NonNull RectF maximum, int bottomLimit,
                                       @NonNull Typeface typeface, int fontSizeSp) {
-            maneuverAutoSizeSource = source;
-            maneuverAutoSizeCommandCard = commandCard;
+            maneuverAutoSizeContentFingerprint = contentFingerprint;
             maneuverAutoSizeMaximum.set(maximum);
             maneuverAutoSizeBottomLimit = bottomLimit;
             maneuverAutoSizeTypeface = typeface;

@@ -63,12 +63,17 @@ public final class SteeringMediaKeyRouterContractTest {
         assertTrue(router.contains("\"steering-media-journal\""));
         assertTrue(router.contains("MAX_PENDING_COMMANDS = 4"));
         assertTrue(router.contains("MAX_COMMAND_QUEUE_AGE_MS = 750L"));
+        assertTrue(router.contains("ROUTE_HEALTH_REFRESH_MS = 2L * 60L * 1_000L"));
         assertTrue(router.contains("pendingCommands.size() >= MAX_PENDING_COMMANDS"));
         assertTrue(router.contains("dispatchStarted - queued.enqueuedAtMs"
                 + " > MAX_COMMAND_QUEUE_AGE_MS"));
         assertTrue(router.contains("clearPendingCommands(\"session_generation\")"));
         assertTrue(router.contains("clearPendingCommands(\"close\")"));
         assertTrue(router.contains("pendingTraces.size() == MAX_PENDING_TRACES"));
+        assertTrue(router.contains("postAtFrontOfQueue(commandDrain)"));
+        assertTrue(router.contains("binder_stalled_sequence="));
+        assertTrue(router.contains("commandInFlightSinceMs"));
+        assertTrue(router.contains("resolver.postDelayed(routeHealthRefresh"));
 
         String queuedDispatch = between(router,
                 "private void dispatchQueued(@NonNull Command queued)",
@@ -95,6 +100,30 @@ public final class SteeringMediaKeyRouterContractTest {
         assertFalse(callbackRegistration.contains("main.post"));
         assertTrue(count(router, "getActiveSessions(listenerComponent)") == 1);
         assertFalse(router.contains("event.getEventTime()"));
+    }
+
+    @Test public void knownMainLooperBlockersStayOutsideTheAccessibilityKeyLane()
+            throws Exception {
+        String boot = read("app/src/geely/java/dezz/status/widget/car/"
+                + "HudModeFallbackBootReceiver.java");
+        String driver = read("app/src/main/java/dezz/status/widget/driver/"
+                + "DriverPanelOverlayController.java");
+        String loader = between(driver,
+                "private AppDrawerData loadAppDrawerData()",
+                "private void registerDrawerPackageReceiver()");
+        String adapter = driver.substring(driver.indexOf(
+                "private static final class AppsAdapter"));
+        String getView = between(adapter,
+                "public View getView(int position, View convertView, ViewGroup parent)",
+                "private final class ShortcutDrawerAdapter");
+
+        assertTrue(boot.contains("putLong(KEY_NOT_BEFORE"));
+        assertTrue(boot.contains(".apply()"));
+        assertFalse(boot.contains(".commit()"));
+        assertTrue(loader.contains("LauncherAppCatalog.loadIcon(appContext, app)"));
+        assertTrue(loader.contains("AppDrawerUninstallPolicy.canUninstall("));
+        assertFalse(getView.contains("LauncherAppCatalog.loadIcon"));
+        assertFalse(getView.contains("AppDrawerUninstallPolicy.canUninstall"));
     }
 
     private static int count(String source, String value) {

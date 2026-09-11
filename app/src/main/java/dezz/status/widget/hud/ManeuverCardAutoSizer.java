@@ -18,6 +18,46 @@ import java.util.List;
 /** Content measurement shared by the standalone blue maneuver cards on both displays. */
 public final class ManeuverCardAutoSizer {
     private static final int MAX_WRAPPED_LINES = 2;
+    private static final String[] MEASUREMENT_INTEGER_KEYS = {
+            "paddingLeftPx", "paddingTopPx", "paddingRightPx", "paddingBottomPx",
+            "textPaddingLeftPx", "textPaddingTopPx", "textPaddingRightPx",
+            "textPaddingBottomPx", "textRowGapPx", "roadBadgePaddingHorizontalPx",
+            "roadBadgePaddingVerticalPx", "arrowAreaPercent", "arrowTextGapPx",
+            "distanceAreaPercent"
+    };
+    private static final int[] MEASUREMENT_INTEGER_DEFAULTS = {
+            0, 0, 0, 0, 0, 0, 0, 0, 2, 5, 2, 38, 6, 56
+    };
+
+    /**
+     * Cheap allocation-free key for every option consumed by {@link #resolve}. Keeping it next
+     * to the measurement code prevents a newly configurable dimension from being omitted by one
+     * renderer's cache.
+     */
+    public static long measurementOptionsFingerprint(@NonNull JSONObject options,
+                                                     int fallbackFontSizeSp) {
+        long result = 17L;
+        result = mix(result, options.optBoolean("autoWidth", false) ? 1 : 0);
+        result = mix(result, options.optBoolean("autoHeight", false) ? 1 : 0);
+        result = mix(result, options.optBoolean("showDirection", true) ? 1 : 0);
+        result = mix(result, options.optBoolean("showRoadBadge", true) ? 1 : 0);
+        result = mix(result, options.optInt("distanceFontSizeSp", fallbackFontSizeSp));
+        result = mix(result, options.optInt("directionFontSizeSp",
+                Math.max(8, fallbackFontSizeSp / 2)));
+        result = mix(result, options.optInt("roadBadgeFontSizeSp",
+                Math.max(8, fallbackFontSizeSp / 2)));
+        result = mix(result, options.optInt("auxiliaryFontSizeSp",
+                Math.max(8, fallbackFontSizeSp / 2)));
+        for (int index = 0; index < MEASUREMENT_INTEGER_KEYS.length; index++) {
+            result = mix(result, options.optInt(MEASUREMENT_INTEGER_KEYS[index],
+                    MEASUREMENT_INTEGER_DEFAULTS[index]));
+        }
+        result = mix(result, options.optBoolean("distanceSingleLine", true) ? 1 : 0);
+        result = mix(result, options.optBoolean("directionSingleLine", true) ? 1 : 0);
+        result = mix(result, options.optBoolean("roadBadgeSingleLine", true) ? 1 : 0);
+        result = mix(result, options.optBoolean("auxiliarySingleLine", true) ? 1 : 0);
+        return mix(result, options.optString("arrowLayout", "LEFT").hashCode());
+    }
 
     public static final class Content {
         @NonNull public final String distance;
@@ -322,6 +362,10 @@ public final class ManeuverCardAutoSizer {
             count++;
         }
         return result + gap * Math.max(0, count - 1);
+    }
+
+    private static long mix(long seed, long value) {
+        return seed * 1_000_003L + value;
     }
 
     private static float textBlockHeight(TextPaint paint, String value, float size,

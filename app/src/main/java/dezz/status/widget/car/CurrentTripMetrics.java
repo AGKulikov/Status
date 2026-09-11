@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.car;
 
-/** Stable IDs and KX11 conversion rules for the stock “Trip 2” PA fields. */
+/** Stable IDs and KX11 conversion rules for the stock instrument-cluster “Trip 2” signals. */
 public final class CurrentTripMetrics {
     public static final String DISTANCE_ID = "Trip.current_distance_km";
     public static final String DURATION_ID = "Trip.current_duration_minutes";
@@ -14,27 +14,38 @@ public final class CurrentTripMetrics {
     public static final String DURATION_LABEL = "Время текущей поездки";
     public static final String AVERAGE_SPEED_LABEL = "Средняя скорость текущей поездки";
 
-    /**
-     * {@code PA_TS_OdometerTripMeter2} is the dedicated Trip 2 distance, not the vehicle's
-     * lifetime odometer. The one-decimal scale remains subject to the paired KX11 screen gate.
-     */
+    /** {@code DstTrvld2} is encoded in tenths of a kilometre on the KX11 cluster path. */
     public static float distanceKilometres(int rawTenthsKilometre) {
         if (rawTenthsKilometre < 0 || rawTenthsKilometre > 100_000_000) return Float.NaN;
         return rawTenthsKilometre / 10f;
     }
 
-    /** Dedicated Trip 2 time; the minute interpretation remains subject to the KX11 gate. */
-    public static float durationMinutes(long rawMinutes) {
-        if (rawMinutes < 0L || rawMinutes > 10L * 365L * 24L * 60L) return Float.NaN;
-        return rawMinutes;
+    /**
+     * Converts the stock indicated average-speed signal to km/h. The stable metric ID is retained
+     * so existing layouts survive the source correction from the rejected derived PA value.
+     */
+    public static float averageSpeedKmh(int rawSpeed, int rawUnit) {
+        if (rawSpeed < 0 || rawSpeed > 500) return Float.NaN;
+        float value = rawUnit == 0 ? rawSpeed
+                : rawUnit == 1 ? rawSpeed * 1.609344f : Float.NaN;
+        return Float.isFinite(value) && value <= 500f ? value : Float.NaN;
     }
 
-    /** Same-snapshot derived value; zero elapsed time cannot produce a meaningful average. */
-    public static float averageSpeedKmh(float distanceKilometres, float durationMinutes) {
-        if (!Float.isFinite(distanceKilometres) || !Float.isFinite(durationMinutes)
-                || distanceKilometres < 0f || durationMinutes <= 0f) return Float.NaN;
-        float value = distanceKilometres * 60f / durationMinutes;
-        return Float.isFinite(value) && value >= 0f && value <= 500f ? value : Float.NaN;
+    /** The stock elapsed-time row is reconstructed from its own distance/average pair. */
+    public static float durationMinutes(float distanceKilometres, float averageSpeedKmh) {
+        if (!Float.isFinite(distanceKilometres) || !Float.isFinite(averageSpeedKmh)
+                || distanceKilometres < 0f || averageSpeedKmh < 0f) return Float.NaN;
+        if (distanceKilometres == 0f && averageSpeedKmh == 0f) return 0f;
+        if (averageSpeedKmh == 0f) return Float.NaN;
+        float value = distanceKilometres * 60f / averageSpeedKmh;
+        return Float.isFinite(value) && value >= 0f
+                && value <= 10f * 365f * 24f * 60f ? value : Float.NaN;
+    }
+
+    public static boolean validRawSignalPair(int distanceRaw, int averageSpeedRaw,
+                                             int speedUnitRaw) {
+        return Float.isFinite(distanceKilometres(distanceRaw))
+                && Float.isFinite(averageSpeedKmh(averageSpeedRaw, speedUnitRaw));
     }
 
     public static boolean isMetricId(String id) {

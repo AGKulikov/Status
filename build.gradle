@@ -267,6 +267,11 @@ int getVersionCode() {
     if (version == '2.8.5') {
         return 208021318
     }
+    // Correct stock Trip 2 signals, bidirectional maneuver sizing, complete alternatives and
+    // a bounded steering-media fallback follow the published 2.8.5 pair.
+    if (version == '2.8.6') {
+        return 208021319
+    }
     if (version == '2.3.0') {
         return 208021254
     }

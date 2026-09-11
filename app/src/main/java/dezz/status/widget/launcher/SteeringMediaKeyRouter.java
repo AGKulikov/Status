@@ -46,6 +46,8 @@ public final class SteeringMediaKeyRouter {
     /** Physical presses are valuable, but an unbounded late burst is worse than stock fallback. */
     private static final int MAX_PENDING_COMMANDS = 4;
     private static final int MAX_PENDING_TRACES = 64;
+    /** Repairs a lost vendor active-session callback without polling on every steering press. */
+    private static final long ROUTE_HEALTH_REFRESH_MS = 2L * 60L * 1_000L;
 
     @NonNull private final Context context;
     @Nullable private final MediaSessionManager manager;
@@ -66,6 +68,9 @@ public final class SteeringMediaKeyRouter {
     private volatile int refreshGeneration;
     private volatile int routeGeneration;
     @NonNull private final AtomicLong commandSequence = new AtomicLong();
+    /** Non-zero only while the command looper is inside one player Binder transaction. */
+    private volatile long commandInFlightSinceMs;
+    private volatile long commandInFlightSequence;
     @NonNull private final Object commandLock = new Object();
     @NonNull private final ArrayDeque<Command> pendingCommands = new ArrayDeque<>();
     private boolean commandDrainPosted;
@@ -77,6 +82,13 @@ public final class SteeringMediaKeyRouter {
     @NonNull private final MediaSessionManager.OnActiveSessionsChangedListener sessionsListener =
             controllers -> scheduleSelection(controllers == null
                     ? Collections.emptyList() : controllers);
+    @NonNull private final Runnable routeHealthRefresh = new Runnable() {
+        @Override public void run() {
+            if (!started) return;
+            requestRefresh();
+            resolver.postDelayed(this, ROUTE_HEALTH_REFRESH_MS);
+        }
+    };
 
     public SteeringMediaKeyRouter(@NonNull Context source) {
         Context app = source.getApplicationContext();
@@ -115,6 +127,8 @@ public final class SteeringMediaKeyRouter {
             }
         }
         requestRefresh();
+        resolver.removeCallbacks(routeHealthRefresh);
+        resolver.postDelayed(routeHealthRefresh, ROUTE_HEALTH_REFRESH_MS);
     }
 
     /** Releases the accessibility-owned subscription and its small resolver looper. */
@@ -128,6 +142,7 @@ public final class SteeringMediaKeyRouter {
         routeGeneration++;
         refreshInFlight = false;
         refreshPending = false;
+        resolver.removeCallbacks(routeHealthRefresh);
         if (manager != null && listenerRegistered) {
             try { manager.removeOnActiveSessionsChangedListener(sessionsListener); }
             catch (RuntimeException ignored) {}
@@ -153,9 +168,24 @@ public final class SteeringMediaKeyRouter {
                             long callbackEntryUptimeMs) {
         Route current = route;
         if (!started || !isSupportedKey(keyCode) || current == null) return false;
+        long now = SystemClock.uptimeMillis();
+        long blockedSince = commandInFlightSinceMs;
+        if (blockedSince > 0L && now - blockedSince > MAX_COMMAND_QUEUE_AGE_MS) {
+            long blockedSequence = commandInFlightSequence;
+            trace("binder_stalled_sequence=" + blockedSequence + ", blocked_since="
+                    + blockedSince + ", fallback_key=" + keyCode + ", at=" + now);
+            // Do not enqueue a press behind a stuck player Binder. Returning false lets the
+            // AccessibilityService hand this fresh event to Android's normal media dispatcher.
+            resolver.post(() -> {
+                if (route != current || commandInFlightSequence != blockedSequence) return;
+                replaceRoute(null, null);
+                requestRefresh();
+            });
+            return false;
+        }
         Command command = new Command(commandSequence.incrementAndGet(), keyCode,
                 eventTimeMs, downTimeMs, callbackEntryUptimeMs,
-                SystemClock.uptimeMillis(), routeGeneration, current);
+                now, routeGeneration, current);
         if (!enqueueCommand(command)) {
             trace(command.describe("queue_rejected", 0L, SystemClock.uptimeMillis()));
             return false;
@@ -181,7 +211,7 @@ public final class SteeringMediaKeyRouter {
                 postDrain = true;
             }
         }
-        if (!postDrain || commandHandler.post(commandDrain)) return true;
+        if (!postDrain || commandHandler.postAtFrontOfQueue(commandDrain)) return true;
         synchronized (commandLock) {
             pendingCommands.remove(queued);
             commandDrainPosted = !pendingCommands.isEmpty();
@@ -217,6 +247,8 @@ public final class SteeringMediaKeyRouter {
             return;
         }
         String outcome = "accepted";
+        commandInFlightSequence = queued.sequence;
+        commandInFlightSinceMs = dispatchStarted;
         try {
             MediaController.TransportControls controls =
                     queued.target.controller.getTransportControls();
@@ -260,6 +292,11 @@ public final class SteeringMediaKeyRouter {
                 replaceRoute(null, null);
                 requestRefresh();
             });
+        } finally {
+            if (commandInFlightSequence == queued.sequence) {
+                commandInFlightSinceMs = 0L;
+                commandInFlightSequence = 0L;
+            }
         }
     }
 
