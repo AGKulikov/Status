@@ -1647,7 +1647,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("SliderField cursorLayerPriority = slider"));
         assertTrue(settings.contains("Штатные названия улиц Яндекса"));
         assertFalse(settings.contains("Названия улиц только на линии активного маршрута"));
-        assertTrue(settings.contains("из секций DrivingRoute"));
+        assertFalse(settings.contains("из секций DrivingRoute"));
         assertTrue(settings.contains("profile.roadsOnly = roadsOnly.isChecked()"));
         assertTrue(settings.contains("Цвет рекомендуемой полосы"));
         assertTrue(settings.contains("Красный сигнал"));
