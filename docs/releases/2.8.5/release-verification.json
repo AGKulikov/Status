@@ -1,0 +1,174 @@
+{
+  "version": "2.8.5",
+  "versionCode": 208021318,
+  "sourceCommit": "96155d45e44a8eaa4cdd54924f07f2d4c34b1ed6",
+  "sourceTree": "f15006bb1fb5ed64d2aca3c043e428acdc3f4d3a",
+  "ci": {
+    "runId": 34560271542,
+    "jobId": 103141369774,
+    "artifactId": 10184131694,
+    "artifactName": "Natro-2.8.5-candidate-4",
+    "artifactSha256": "d4b8a251ad00c5c82d298eaa7c1eff0233cd55e863b632815633ad64eb04e1a6",
+    "artifactBytes": 51638813,
+    "checksumManifestVerified": true,
+    "verifiedFiles": 387,
+    "junitSuites": 368,
+    "junit": {
+      "tests": 1875,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "pythonToolTests": 56,
+    "signedPair": {
+      "runId": 34560271547,
+      "runAttempt": 2,
+      "jobId": 103142402075,
+      "artifactId": 10184350202,
+      "artifactName": "navigation-hud-v2-signed-2.8.5-267",
+      "artifactSha256": "d4bf753cad43fa8e7639047bf167150ea856e7a23e54cfe42e9bd3f17e93a2fe",
+      "artifactBytes": 163518707,
+      "conclusion": "success",
+      "sourceCommitMatched": true,
+      "sourceTreeMatched": true,
+      "artifactChecksumManifestVerified": true
+    }
+  },
+  "natro": {
+    "file": "Natro-2.8.5-signed.apk",
+    "bytes": 28331374,
+    "sha256": "c96c977ceb036674226b9bad6c8f46c87bda05ceedd513bb7fcb17d22549e1e0",
+    "unsignedSha256": "6e61fb94d8c4f5495921e85ec68e31f119f5f13c0f6a4d5a2d8a52d19f52fe93",
+    "package": "ru.natro.statuswidget",
+    "label": "Natro",
+    "versionName": "2.8.5",
+    "versionCode": 208021318,
+    "minSdk": 28,
+    "targetSdk": 28,
+    "abiNeutral": true,
+    "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+    "signatureV2": true,
+    "signatureV3": true,
+    "signerCount": 1,
+    "zipalign16KiB": true,
+    "archiveCrcVerified": true,
+    "previous": {
+      "file": "Natro-2.8.4-signed.apk",
+      "sha256": "3389b0c66ebde0026ac7d21c96950e54d7db8a10cc6460711942edcac7f5772a",
+      "package": "ru.natro.statuswidget",
+      "versionName": "2.8.4",
+      "versionCode": 208021317,
+      "sameCertificate": true
+    },
+    "installOverMetadataVerified": true
+  },
+  "signatureRanges": {
+    "natro-api24-27": {
+      "scheme": "v2",
+      "verified": true,
+      "signerCount": 1
+    },
+    "natro-api28": {
+      "scheme": "v3",
+      "verified": true,
+      "signerCount": 1
+    },
+    "navigator-api26-27": {
+      "scheme": "v2",
+      "verified": true,
+      "signerCount": 1
+    },
+    "navigator-api28": {
+      "scheme": "v3",
+      "verified": true,
+      "signerCount": 1
+    }
+  },
+  "navigator": {
+    "file": "Navigator-30.3.0-Natro-2.8.5-signed.apk",
+    "ciFile": "YN_30.3.0_Natro-HUD-v2-signed.apk",
+    "bytes": 155145635,
+    "sha256": "921359eb05b2ee5ef055dc35aa776498c9fd75255c50b5771b10499bb850626d",
+    "package": "ru.yandex.yandexnavi",
+    "label": "Yandex Navi",
+    "versionName": "30.3.0",
+    "versionCode": 739564630,
+    "minSdk": 26,
+    "targetSdk": 29,
+    "abi": [
+      "arm64-v8a"
+    ],
+    "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+    "signatureV2": true,
+    "signatureV3": true,
+    "signerCount": 1,
+    "zipalign16KiB": true,
+    "archiveCrcVerified": true,
+    "baselineSha256": "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f",
+    "protectedEntriesUnchanged": 17222,
+    "changedBaselineEntries": [
+      "AndroidManifest.xml",
+      "classes4.dex",
+      "classes8.dex",
+      "classes12.dex"
+    ],
+    "newBaselineEntries": [
+      "classes19.dex"
+    ],
+    "patchDexSha256": "5111f291499d7cbf43323738739c94e8ffe39f11999341439789e2c23321db5f",
+    "patchDexMatchesCI": true,
+    "patchEntrySha256": {
+      "AndroidManifest.xml": "1e8d52eadd9f9561bc76cbeb6f22017d537af8b5eff8803e759be0694f8172e3",
+      "classes4.dex": "68f78d368c8051dc69cf689a3e4703c0c421740c29ca44af292e72243684216c",
+      "classes8.dex": "d8212ed318b43e9381e14efcd64d5cfd14d8865607f29c35ca94d8cd8eb0eadc",
+      "classes12.dex": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+      "classes19.dex": "5111f291499d7cbf43323738739c94e8ffe39f11999341439789e2c23321db5f"
+    },
+    "previous": {
+      "file": "Navigator-30.3.0-Natro-2.8.4-signed.apk",
+      "sha256": "9bc21097fe8949b52f048d46a96bda98c585ef1ccc47f68b06b1df327400e2f6",
+      "packageVersionSdkAbiCertificateMatched": true,
+      "changedZipPayloads": [
+        "classes19.dex"
+      ],
+      "equalZipPayloads": 17226,
+      "addedZipPayloads": [],
+      "removedZipPayloads": []
+    },
+    "actualHelloCapability": "0xbfe7",
+    "maneuverCommandsCapability": "0x8000",
+    "commandSchema": 1,
+    "nativeWrapperCount": 14
+  },
+  "cpuOptimization": {
+    "staticHotPathContractsVerified": true,
+    "surfaceResolutionChanged": false,
+    "configuredFpsLimitChanged": false,
+    "antialiasingChanged": false,
+    "dataCadenceChanged": false,
+    "functionalLayersChanged": false,
+    "measuredOnPhysicalKx11": false,
+    "numericReductionClaimed": false
+  },
+  "tools": {
+    "apktoolSha256": "dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423",
+    "aaptSha256": "c076aeeee8bd3ce58395a093747202265ab80c6c12e59358f598a30a81fde13b",
+    "apksignerSha256": "b47549e373b895ce6ca620d0c7887e674d9615ffa837a86ac601dcfd04adb0f0",
+    "zipalignSha256": "c5f559e946de5a9e7d58792181db20383b228877812136bc469d97ae00a43b0a",
+    "navigatorSigningScriptSha256": "c37eb1aaed30fe56bc36c3152bbb217786493a09f4101e403e8c92372b6a6d49"
+  },
+  "includedRequirements": [
+    "NAV-016",
+    "MAP-057",
+    "MAP-058",
+    "CARD-022",
+    "CARD-023",
+    "CARD-024",
+    "NATRO-022",
+    "NATRO-023"
+  ],
+  "hardwareAcceptance": "pending: GATE-069 through GATE-075 remain open",
+  "physicalInstallVerified": false,
+  "helperChanged": false,
+  "rawMaterialsPublished": false
+}
