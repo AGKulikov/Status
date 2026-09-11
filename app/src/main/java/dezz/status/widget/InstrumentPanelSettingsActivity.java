@@ -454,7 +454,7 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Настройка элемента")
                 .setView(scroll)
-                .setPositiveButton("Применить", (dialog, which) -> {
+                .setPositiveButton("Применить", (ignoredDialog, which) -> {
                     element.style = styles[style.getSelectedItemPosition()];
                     element.enabled = visible.isChecked();
                     element.responseMillis = response.getProgress();
