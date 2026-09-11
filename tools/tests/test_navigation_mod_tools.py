@@ -682,12 +682,12 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("build_navigation_mod_30_3.sh", pair)
         self.assertIn("sign_navigation_mod_30_3.sh", pair)
         self.assertIn("'AGKulikov/Status'", pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.8.6}"', pair)
-        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021319}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_NAME="${EXPECTED_NATRO_VERSION_NAME:-2.8.7}"', pair)
+        self.assertIn('EXPECTED_NATRO_VERSION_CODE="${EXPECTED_NATRO_VERSION_CODE:-208021320}"', pair)
         self.assertIn('test "$VERSION_NAME" = "$EXPECTED_NATRO_VERSION_NAME"', pair)
         verifier = (TOOLS / "verify_kx11_navigation_pair.py").read_text()
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.8.6")', verifier)
-        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021319")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_NAME", "2.8.7")', verifier)
+        self.assertIn('os.environ.get("EXPECTED_NATRO_VERSION_CODE", "208021320")', verifier)
         self.assertIn('test "$VERSION_CODE" = "$EXPECTED_NATRO_VERSION_CODE"', pair)
         self.assertNotIn('cp "$BASELINE_APK"', pair)
 
@@ -698,10 +698,33 @@ public final class MapOverlayPlacementHarness {
         self.assertIn("return 208021318", build)
         self.assertIn("if (version == '2.8.6')", build)
         self.assertIn("return 208021319", build)
-        self.assertIn("VERSION_NAME: '2.8.6'", workflow)
-        self.assertIn("VERSION_CODE: '208021319'", workflow)
+        self.assertIn("if (version == '2.8.7')", build)
+        self.assertIn("return 208021320", build)
+        self.assertIn("VERSION_NAME: '2.8.7'", workflow)
+        self.assertIn("VERSION_CODE: '208021320'", workflow)
         self.assertNotIn("2.5.10", build)
         self.assertNotIn("2.5.10", workflow)
+
+    def test_kx11_white_bootstrap_and_recursive_navigation_lists_are_gated(self):
+        source_root = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
+                       / "status" / "widget")
+        detector = (source_root / "navigation" / "MapFirstFrameDetector.java").read_text()
+        hud = (source_root / "hud" / "HudCompositeView.java").read_text()
+        cluster = (source_root / "instrument" / "InstrumentPanelView.java").read_text()
+        state = (source_root / "hud" / "HudNavigationState.java").read_text()
+        state_test = (TOOLS.parent / "app" / "src" / "test" / "java" / "dezz"
+                      / "status" / "widget" / "hud" / "HudNavigationStateTest.java").read_text()
+
+        self.assertIn("WHITE_PERCENT_MIN = 98", detector)
+        self.assertIn("texture.getBitmap(SAMPLE_WIDTH, SAMPLE_HEIGHT)", detector)
+        self.assertIn("MapFirstFrameDetector.hasRenderableContent(mapTexture)", hud)
+        self.assertIn("MapFirstFrameDetector.hasRenderableContent(mapTexture)", cluster)
+        self.assertIn("source instanceof ImmutableSnapshotList", state)
+        self.assertIn("return new ImmutableSnapshotList<>(source)", state)
+        self.assertNotIn("Collections.unmodifiableList(laneItems)", state)
+        self.assertNotIn("Collections.unmodifiableList(trafficLights)", state)
+        self.assertIn("index < 20_000", state_test)
+        self.assertIn("assertSame(first.laneItems, state.laneItems)", state_test)
 
     def test_hud_renderer_forbids_native_navigation_layer_on_external_map(self):
         renderer = (TOOLS.parent / "navigator-mod" / "src" / "main" / "java"

@@ -16,6 +16,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import dezz.status.widget.Preferences;
+import dezz.status.widget.navigation.MapFirstFrameDetector;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
 
@@ -211,7 +212,8 @@ public final class InstrumentPanelView extends FrameLayout
 
     @Override public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surfaceTexture) {
         if (mapTexture != null && awaitingFirstMapFrame && leasePublished
-                && mapTexture.getSurfaceTexture() == surfaceTexture) {
+                && mapTexture.getSurfaceTexture() == surfaceTexture
+                && MapFirstFrameDetector.hasRenderableContent(mapTexture)) {
             awaitingFirstMapFrame = false;
             mapView.setAlpha(desiredMapAlpha);
         }

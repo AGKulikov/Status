@@ -1105,12 +1105,14 @@
       "priority": "P1",
       "function": "Кто создаёт навигационные подсказки HUD/DIM и арбитрирует два маршрута?",
       "status": "OPEN",
-      "known": "Ранее выделены NAVI display API; новый разбор подтверждает отдельные GNSS и CarPlay location paths. NAVI ID сам по себе не является выключателем штатной навигации.",
-      "missing_evidence": "Production guidance owner, манёвры/полосы/дистанции и их единицы, display target, session lifecycle, приоритет штатной навигации и проекции и очистка устаревших подсказок.",
-      "next_step": "Найти сохранённые navigation consumers, callbacks и route-state поля, связать с display и CarPlay session; отделить координатное измерение от построенного маршрута.",
+      "known": "Ранее выделены NAVI display API; новый разбор подтверждает отдельные GNSS и CarPlay location paths. NAVI ID сам по себе не является выключателем штатной навигации. Видео IMG_8363.mov (SHA-256 ac43f94a9bc1511076e4c2589a68ff9980e1e01fd49a294c512ad3effbbb2dd4) доказало, что Android 9 KX11 выдаёт белый TextureView bootstrap-буфер и onSurfaceTextureUpdated до содержательного кадра MapKit. Фото IMG_8359.jpeg (SHA-256 64ebfb8746e98ebf8f3836a2354a680ac70e0c7433fcc093c21e4286eaf57967) фиксирует StackOverflowError 2.8.5 в hud-navigation-reader из-за растущей цепочки unmodifiable-обёрток renderer state.",
+      "missing_evidence": "Production guidance owner, манёвры/полосы/дистанции и их единицы, display target, session lifecycle, приоритет штатной навигации и проекции и очистка устаревших подсказок. Для новой защиты первого кадра не хватает аппаратной матрицы HUD+приборка GATE-080 и длительного reader-прогона GATE-081.",
+      "next_step": "Проверить content-qualified first-frame gate по 20 холодным запускам каждой поверхности и 30-минутные reader-прогоны, затем продолжить поиск сохранённых navigation consumers/callbacks и route-state полей; отделять координатное измерение от построенного маршрута.",
       "sources": [
         "research-2026-09-05/continuation/systems.json",
-        "research-2026-09-05/android_platform/systems.json"
+        "research-2026-09-05/android_platform/systems.json",
+        "user-evidence:IMG_8363.mov#sha256=ac43f94a9bc1511076e4c2589a68ff9980e1e01fd49a294c512ad3effbbb2dd4",
+        "user-evidence:IMG_8359.jpeg#sha256=64ebfb8746e98ebf8f3836a2354a680ac70e0c7433fcc093c21e4286eaf57967"
       ],
       "coverage_ids": [
         "BASE-NAV",

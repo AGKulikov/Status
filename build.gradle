@@ -272,6 +272,11 @@ int getVersionCode() {
     if (version == '2.8.6') {
         return 208021319
     }
+    // Content-qualified HUD/cluster first frames and stable navigation-state collections follow
+    // the published 2.8.6 pair. This identity is reserved for the next authorised release.
+    if (version == '2.8.7') {
+        return 208021320
+    }
     if (version == '2.3.0') {
         return 208021254
     }

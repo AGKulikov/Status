@@ -1551,6 +1551,7 @@ public final class NavigationHudV2ContractTest {
             assertTrue(source.contains("awaitingFirstMapFrame"));
             assertTrue(source.contains("desiredMapAlpha"));
             assertTrue(source.contains("onSurfaceTextureUpdated"));
+            assertTrue(source.contains("MapFirstFrameDetector.hasRenderableContent"));
             assertTrue(source.contains("setAlpha(0f)"));
             assertTrue(source.contains("setAlpha(desiredMapAlpha)"));
         }

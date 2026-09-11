@@ -3,6 +3,7 @@ package dezz.status.widget.hud;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -11,6 +12,36 @@ import dezz.status.widget.navigation.NavigationRouteGeometryV2;
 import dezz.status.widget.navigation.NavigationSnapshotV2;
 
 public final class HudNavigationStateTest {
+    @Test public void unchangedSnapshotsReuseStableCollectionsWithoutRecursiveWrappers() {
+        NavigationSnapshotV2 snapshot = new NavigationSnapshotV2(
+                8, 2, 900, true, 55.75, 37.61, 30, 72,
+                "RIGHT", "Направо", "", "Тверская", "Дом",
+                250, 10_000, 7_500, 900, -1, -1, 3_600_000, 60, 500,
+                "[{\"kind\":\"NORMAL\",\"highlightedDirection\":\"RIGHT90\","
+                        + "\"directions\":[\"RIGHT90\"]}]",
+                "[{\"id\":\"tl-1\",\"signal\":\"GREEN\",\"secondsLeft\":12}]",
+                "maneuver:2:4:500000:RIGHT", "Подольск",
+                "[{\"kind\":\"TOPONYM\",\"text\":\"Подольск\"}]",
+                "", "", "", -1);
+        NavigationRouteGeometryV2 route = new NavigationRouteGeometryV2(
+                2, "polyline", "[{\"from\":0,\"to\":3,\"type\":\"FREE\"}]");
+        HudNavigationState first = HudNavigationState.fromBridge(snapshot, route);
+        HudNavigationState state = first;
+
+        for (int index = 0; index < 20_000; index++) {
+            state = HudNavigationState.fromBridge(snapshot, route, state);
+            assertFalse(state.laneItems.isEmpty());
+            assertFalse(state.trafficLights.isEmpty());
+            assertFalse(state.trafficRuns.isEmpty());
+            assertFalse(state.maneuverDirectionSigns.isEmpty());
+        }
+
+        assertSame(first.laneItems, state.laneItems);
+        assertSame(first.trafficLights, state.trafficLights);
+        assertSame(first.trafficRuns, state.trafficRuns);
+        assertSame(first.maneuverDirectionSigns, state.maneuverDirectionSigns);
+    }
+
     @Test public void directSnapshotRequiresStockArtworkForTheArrowChannel() {
         NavigationSnapshotV2 snapshot = new NavigationSnapshotV2(
                 9, 2, 1_000, true, 55.75, 37.61, 30, 72,

@@ -10,11 +10,13 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.RandomAccess;
 
 import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.navigation.NavigationRouteGeometryV2;
@@ -38,7 +40,7 @@ public final class HudNavigationState {
         Lane(String kind, String highlightedDirection, List<String> directions) {
             this.kind = kind;
             this.highlightedDirection = highlightedDirection;
-            this.directions = Collections.unmodifiableList(directions);
+            this.directions = immutableSnapshot(directions);
         }
     }
 
@@ -172,7 +174,7 @@ public final class HudNavigationState {
         this.maneuverSubtext = maneuverSubtext;
         this.maneuverIdentity = maneuverIdentity;
         this.maneuverNextRoad = maneuverNextRoad;
-        this.maneuverDirectionSigns = Collections.unmodifiableList(maneuverDirectionSigns);
+        this.maneuverDirectionSigns = immutableSnapshot(maneuverDirectionSigns);
         this.maneuverAuxiliaryType = maneuverAuxiliaryType;
         this.maneuverAuxiliaryText = maneuverAuxiliaryText;
         this.maneuverAuxiliaryManeuverType = maneuverAuxiliaryManeuverType;
@@ -192,13 +194,13 @@ public final class HudNavigationState {
         this.laneDistance = laneDistance;
         this.laneDistanceMeters = laneDistanceMeters;
         this.laneAvailable = laneAvailable;
-        this.laneItems = Collections.unmodifiableList(laneItems);
+        this.laneItems = immutableSnapshot(laneItems);
         this.trafficColor = trafficColor;
         this.trafficCountdown = trafficCountdown;
         this.trafficArrow = trafficArrow;
         this.trafficAvailable = trafficAvailable;
-        this.trafficLights = Collections.unmodifiableList(trafficLights);
-        this.trafficRuns = Collections.unmodifiableList(trafficRuns);
+        this.trafficLights = immutableSnapshot(trafficLights);
+        this.trafficRuns = immutableSnapshot(trafficRuns);
         this.tripProgress = tripProgress;
         this.maneuverImage = maneuverImage;
         this.lanesImage = lanesImage;
@@ -544,6 +546,38 @@ public final class HudNavigationState {
             }
         } catch (Exception ignored) {}
         return result;
+    }
+
+    /**
+     * Reuses an already frozen parsed collection instead of wrapping it once per 10 Hz snapshot.
+     *
+     * <p>{@code Collections.unmodifiableList(previous)} creates a wrapper whose {@code isEmpty()}
+     * delegates to the previous wrapper. Repeating that for unchanged navigation JSON eventually
+     * builds thousands of delegates and overflows the 1 MiB KX11 reader stack. This stable wrapper
+     * copies external input once and is returned by identity on subsequent snapshots.</p>
+     */
+    @NonNull private static <T> List<T> immutableSnapshot(@NonNull List<T> source) {
+        if (source instanceof ImmutableSnapshotList<?>) return source;
+        if (source.isEmpty()) return Collections.emptyList();
+        return new ImmutableSnapshotList<>(source);
+    }
+
+    private static final class ImmutableSnapshotList<E> extends AbstractList<E>
+            implements RandomAccess {
+        @NonNull private final Object[] values;
+
+        ImmutableSnapshotList(@NonNull List<? extends E> source) {
+            values = source.toArray();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override public E get(int index) {
+            return (E) values[index];
+        }
+
+        @Override public int size() {
+            return values.length;
+        }
     }
 
     @NonNull static String formatDistance(int meters) {

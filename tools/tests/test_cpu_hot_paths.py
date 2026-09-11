@@ -80,12 +80,12 @@ class CpuHotPathContractTest(unittest.TestCase):
         renderer = read(
             "navigator-mod/src/main/java/ru/natro/navigation/HudMapRenderer.java"
         )
-        workflow = read(".github/workflows/build-natro-2.8.6.yml")
+        workflow = read(".github/workflows/build-natro-2.8.7.yml")
         self.assertIn("applyMaximumFps", renderer)
         self.assertIn("profile.maximumFps", renderer)
         self.assertIn("testGeelyDebugUnitTest assembleGeelyRelease", workflow)
-        self.assertIn("VERSION_NAME: '2.8.6'", workflow)
-        self.assertIn("VERSION_CODE: '208021319'", workflow)
+        self.assertIn("VERSION_NAME: '2.8.7'", workflow)
+        self.assertIn("VERSION_CODE: '208021320'", workflow)
 
 
 if __name__ == "__main__":

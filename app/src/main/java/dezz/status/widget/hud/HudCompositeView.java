@@ -17,6 +17,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import dezz.status.widget.diagnostics.DiagnosticJournal;
+import dezz.status.widget.navigation.MapFirstFrameDetector;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.navigation.MapEdgeFade;
 
@@ -190,9 +191,11 @@ final class HudCompositeView extends FrameLayout
     @Override
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture texture) {
         // Android initializes an opaque TextureView buffer to white on this secondary display.
-        // Reveal it only when MapKit has actually queued its first frame. Later resizes keep the
-        // same SurfaceTexture and therefore retain the last complete frame without another gate.
-        if (awaitingFirstMapFrame && leasedTexture == texture && activeMap != null) {
+        // onSurfaceTextureUpdated() also fires for that bootstrap buffer, so the callback alone is
+        // not proof of MapKit content. Read back a tiny sample only while hidden and reject the
+        // uniform white buffer. Later resizes retain the last complete frame without another gate.
+        if (awaitingFirstMapFrame && leasedTexture == texture && activeMap != null
+                && MapFirstFrameDetector.hasRenderableContent(mapTexture)) {
             awaitingFirstMapFrame = false;
             mapTexture.setAlpha(desiredMapAlpha);
         }
