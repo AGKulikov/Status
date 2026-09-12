@@ -23,13 +23,27 @@ public final class MapFirstFrameDetectorTest {
         assertFalse(MapFirstFrameDetector.hasRenderableContent(pixels, pixels.length));
     }
 
-    @Test public void acceptsAContentBearingMapAndTransparentRoadsOnlyFrame() {
+    @Test public void acceptsContentButNeverAnEmptyTransparentBuffer() {
         int[] map = new int[500];
         java.util.Arrays.fill(map, 0xFFFFFFFF);
-        for (int index = 0; index < 11; index++) map[index] = 0xFF162033;
+        for (int index = 0; index < 500; index += 13) map[index] = 0xFF162033;
         int[] transparent = new int[500];
 
         assertTrue(MapFirstFrameDetector.hasRenderableContent(map, map.length));
+        assertFalse(MapFirstFrameDetector.hasRenderableContent(transparent, transparent.length));
+        for (int index = 0; index < 500; index += 13) transparent[index] = 0xFF40D020;
         assertTrue(MapFirstFrameDetector.hasRenderableContent(transparent, transparent.length));
+    }
+
+    @Test public void readyAcknowledgementAndConsecutiveContentAreBothRequired() {
+        MapFirstFrameDetector.Gate gate = new MapFirstFrameDetector.Gate();
+        for (int index = 0; index < 20; index++) assertFalse(gate.acceptSample(false, true));
+        assertFalse(gate.acceptSample(true, true));
+        assertFalse(gate.acceptSample(true, false));
+        assertFalse(gate.acceptSample(true, true));
+        assertFalse(gate.acceptSample(true, true));
+        assertTrue(gate.acceptSample(true, true));
+        gate.reset();
+        assertFalse(gate.acceptSample(true, true));
     }
 }

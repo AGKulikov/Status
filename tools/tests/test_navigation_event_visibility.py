@@ -66,6 +66,15 @@ public final class VisibilityReplay {
         ScaledRoadEventStyleProvider p=create(new Stock(),"ROUTE_ONLY",true);
         check(visible(p,true));p.setVisibility(modes("ROUTE_ONLY"),false);check(!visible(p,true));
     }
+    static void unifiedInventoryDoesNotHideAdjacentCamerasOrAccidents() {
+        ScaledRoadEventStyleProvider p=create(new Stock(),"ALWAYS",true);
+        check(p.setUnifiedRouteCameras(true));check(!p.setUnifiedRouteCameras(true));
+        check(!visible(p,true));check(visible(p,false));
+        Map<String,String> map=modes("ALWAYS");map.put("ACCIDENT","ALWAYS");
+        p.setVisibility(map,true);
+        check(((Provider)p.proxy()).provideStyle(new Properties(true,"SPEED_CONTROL","ACCIDENT"),false,1f,null));
+        check(p.setUnifiedRouteCameras(false));check(visible(p,true));
+    }
     static void alwaysWorksWithoutRouteAndUnknownTagsStayHidden() {
         ScaledRoadEventStyleProvider p=create(new Stock(),"ALWAYS",false);check(visible(p,false));
         check(!((Provider)p.proxy()).provideStyle(new Properties(true,"UNKNOWN"),false,1f,null));
@@ -75,6 +84,14 @@ public final class VisibilityReplay {
         RoadEventVisibility p=new RoadEventVisibility(map,true);map.put("SPEED_CONTROL","ALWAYS");
         check(!p.allows(Arrays.asList("SPEED_CONTROL"),true));
         check(p.allows(Arrays.asList("SPEED_CONTROL","ACCIDENT"),false));check(!p.allows(null,true));
+        List<String> mixed=Arrays.asList("SPEED_CONTROL","ACCIDENT");
+        check(p.allowedTags(mixed,true).equals(Arrays.asList("ACCIDENT")));
+        check(mixed.size()==2); // Filtering never mutates the retained source frame.
+        List<String> allVisible=Arrays.asList("ACCIDENT");
+        check(p.allowedTags(allVisible,true)==allVisible);
+        check(p.allowedTags(Arrays.asList("SPEED_CONTROL"),true).isEmpty());
+        try {p.allowedTags(mixed,true).add("SPEED_CONTROL");throw new AssertionError();}
+        catch(UnsupportedOperationException expected){}
     }
     public static final class DrivingEvent {
         final String id,caption; final com.yandex.mapkit.geometry.Point location;
@@ -127,7 +144,7 @@ class NavigationEventVisibilityTest(unittest.TestCase):
         production = ROOT / "navigator-mod/src/main/java/ru/natro/navigation"
         files += [str(production / name) for name in (
             "RoadEventVisibility.java", "ScaledRoadEventStyleProvider.java",
-            "RoadEventRouteSynchronizer.java", "ReflectMethods.java")]
+            "RoadEventRouteSynchronizer.java", "ReflectMethods.java", "RouteCameraPolicy.java")]
         javac = shutil.which("javac")
         java = shutil.which("java")
         if javac is not None:
@@ -150,6 +167,7 @@ class NavigationEventVisibilityTest(unittest.TestCase):
     def test_adjacent_road(self): self.replay("adjacentRoadIsRejectedBeforeStockRendering")
     def test_profiles(self): self.replay("twoProfilesAndLiveEditsAreIndependent")
     def test_end_route(self): self.replay("completedRouteRejectsStaleNativeMembership")
+    def test_inventory_fallback(self): self.replay("unifiedInventoryDoesNotHideAdjacentCamerasOrAccidents")
     def test_free_drive(self): self.replay("alwaysWorksWithoutRouteAndUnknownTagsStayHidden")
     def test_snapshot(self): self.replay("profileIsSnapshotAndMixedTagsUseVisibleCategory")
     def test_route_membership(self): self.replay("routeMembershipIsExactAndClearsAtRouteEnd")

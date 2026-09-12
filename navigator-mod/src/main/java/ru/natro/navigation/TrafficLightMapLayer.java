@@ -335,8 +335,8 @@ final class TrafficLightMapLayer {
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
             invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
-            applyCompositeIcon(marker, provider, style, placement.legName,
-                    cardColor.isEmpty() ? stockTrafficLightLegColor() : resolvedCardColor());
+            // createTexture/getAnchor already describe the complete stock body AND leg.
+            applyBalloonIcon(marker, provider, style);
             invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
             marker.view = view;
             marker.imageProvider = provider;
@@ -380,8 +380,7 @@ final class TrafficLightMapLayer {
             invoke(style, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
             invoke(style, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
             invoke(style, "setZIndex", new Class<?>[]{Float.class}, Float.valueOf(zIndex));
-            applyCompositeIcon(marker, provider, style, placement.legName,
-                    resolvedCardColor());
+            applyBalloonIcon(marker, provider, style);
             invoke(marker.placemark, "setVisible", new Class<?>[]{boolean.class}, true);
             marker.view = bitmap;
             marker.imageProvider = provider;
@@ -391,112 +390,15 @@ final class TrafficLightMapLayer {
         }
     }
 
-    /**
-     * One placemark owns both parts, so MapKit collision handling cannot hide the connector while
-     * leaving a detached countdown card. The connector's normalized anchor is its sharp tip and
-     * therefore remains exactly at the traffic-light geometry for every pan/zoom/tilt frame.
-     */
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private void applyCompositeIcon(Marker marker, Object bodyProvider, Object bodyStyle,
-                                    String legName, int connectorColor) throws Exception {
-        ConnectorTexture connector = trafficLightConnector(legName, connectorColor);
+    /** One texture, one anchor, one scale, including the pointer. */
+    private void applyBalloonIcon(Marker marker, Object bodyProvider, Object bodyStyle)
+            throws Exception {
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
-        Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
-        Object connectorProvider = providerClass.getMethod("fromBitmap", Bitmap.class)
-                .invoke(null, connector.bitmap);
-        Object connectorStyle = styleClass.getConstructor().newInstance();
-        Object noRotation = Enum.valueOf((Class<? extends Enum>) rotationClass,
-                "NO_ROTATION");
-        invoke(connectorStyle, "setAnchor", new Class<?>[]{PointF.class}, connector.anchor);
-        invoke(connectorStyle, "setRotationType", new Class<?>[]{rotationClass}, noRotation);
-        // The vector connector is rasterised at its final physical size for this profile.
-        invoke(connectorStyle, "setScale", new Class<?>[]{Float.class}, Float.valueOf(1f));
-        invoke(connectorStyle, "setFlat", new Class<?>[]{Boolean.class}, Boolean.FALSE);
-        invoke(connectorStyle, "setVisible", new Class<?>[]{Boolean.class}, Boolean.TRUE);
-        invoke(connectorStyle, "setZIndex", new Class<?>[]{Float.class},
-                Float.valueOf(zIndex - .01f));
-
-        Object composite = invoke(marker.placemark, "useCompositeIcon", new Class<?>[0]);
-        // Replacing the two named parts avoids a blank frame on every countdown update.
-        invoke(composite, "setIcon",
-                new Class<?>[]{String.class, providerClass, styleClass},
-                "traffic-light-connector", connectorProvider, connectorStyle);
-        invoke(composite, "setIcon",
-                new Class<?>[]{String.class, providerClass, styleClass},
-                "traffic-light-body", bodyProvider, bodyStyle);
-        marker.connectorBitmap = connector.bitmap;
-        marker.connectorProvider = connectorProvider;
-        marker.connectorStyle = connectorStyle;
+        invoke(marker.placemark, "setIcon", new Class<?>[]{providerClass, styleClass},
+                bodyProvider, bodyStyle);
     }
 
-    /** Re-rasterises simple vector geometry directly for the selected physical card size. */
-    private ConnectorTexture trafficLightConnector(String legName, int connectorColor) {
-        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
-        float scale = scalePercent / 100f;
-        // Navigator 30.3.0 uses traffic_light_leg_size=34dp for a corner leg. Match that
-        // reach so this guaranteed part covers the complete stock connector, not only its tip.
-        float stockLegLength = navigatorDimension(
-                "traffic_light_leg_size", 34f * density);
-        float length = Math.max(14f, stockLegLength * scale);
-        float halfWidth = Math.max(3f, 6f * density * scale);
-        float padding = Math.max(2f, density);
-        float[] direction = connectorDirection(legName);
-        float dx = direction[0];
-        float dy = direction[1];
-        float magnitude = (float) Math.hypot(dx, dy);
-        dx /= magnitude;
-        dy /= magnitude;
-        float endX = dx * length;
-        float endY = dy * length;
-        float normalX = -dy * halfWidth;
-        float normalY = dx * halfWidth;
-        float firstX = endX + normalX;
-        float firstY = endY + normalY;
-        float secondX = endX - normalX;
-        float secondY = endY - normalY;
-        float minX = Math.min(0f, Math.min(firstX, secondX));
-        float maxX = Math.max(0f, Math.max(firstX, secondX));
-        float minY = Math.min(0f, Math.min(firstY, secondY));
-        float maxY = Math.max(0f, Math.max(firstY, secondY));
-        int width = Math.max(1, (int) Math.ceil(maxX - minX + padding * 2f));
-        int height = Math.max(1, (int) Math.ceil(maxY - minY + padding * 2f));
-        float offsetX = padding - minX;
-        float offsetY = padding - minY;
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Path path = new Path();
-        path.moveTo(offsetX, offsetY);
-        path.lineTo(offsetX + firstX, offsetY + firstY);
-        path.lineTo(offsetX + secondX, offsetY + secondY);
-        path.close();
-        Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-        fill.setStyle(Paint.Style.FILL);
-        fill.setColor(connectorColor);
-        canvas.drawPath(path, fill);
-        if (cardColor.isEmpty()) {
-            Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
-            outline.setStyle(Paint.Style.STROKE);
-            outline.setStrokeJoin(Paint.Join.ROUND);
-            outline.setStrokeWidth(Math.max(1f, density * .65f));
-            outline.setColor(nightMode ? 0x667D8490 : 0x55383C44);
-            canvas.drawPath(path, outline);
-        }
-        return new ConnectorTexture(bitmap,
-                new PointF(offsetX / width, offsetY / height));
-    }
-
-    /** Reads the same package resource used by TrafficLightViewImpl, with a reviewed fallback. */
-    private int stockTrafficLightLegColor() {
-        try {
-            int id = context.getResources().getIdentifier(
-                    "traffic_light_bg_primary", "color", context.getPackageName());
-            if (id != 0) return context.getColor(id);
-        } catch (Throwable ignored) {
-            // Exact 30.3.0 resource exists; regional fallback keeps rendering if it moves.
-        }
-        return nightMode ? 0xFF1A1A1A : 0xFF292C3D;
-    }
 
     /** Exact 30.3.0 stock-view recolour; any regional drift falls back to our Canvas renderer. */
     private static void applyConfiguredCardColor(
@@ -556,29 +458,6 @@ final class TrafficLightMapLayer {
         }
     }
 
-    private float navigatorDimension(String name, float fallback) {
-        try {
-            int id = context.getResources().getIdentifier(
-                    name, "dimen", context.getPackageName());
-            if (id != 0) return context.getResources().getDimension(id);
-        } catch (Throwable ignored) {
-            // Keep the reviewed physical fallback instead of dropping the complete layer.
-        }
-        return fallback;
-    }
-
-    /** Vector from exact source tip toward the body for every Yandex LegPlacement. */
-    private static float[] connectorDirection(String legName) {
-        if ("LEFT_CENTER".equals(legName)) return new float[]{1f, 0f};
-        if ("RIGHT_CENTER".equals(legName)) return new float[]{-1f, 0f};
-        if ("BOTTOM_LEFT".equals(legName)) return new float[]{1f, -1f};
-        if ("BOTTOM_RIGHT".equals(legName)) return new float[]{-1f, -1f};
-        if ("TOP_LEFT".equals(legName)) return new float[]{1f, 1f};
-        if ("TOP_RIGHT".equals(legName)) return new float[]{-1f, 1f};
-        if ("BOTTOM_CENTER".equals(legName)) return new float[]{0f, -1f};
-        if ("TOP_CENTER".equals(legName)) return new float[]{0f, 1f};
-        return new float[]{1f, 0f};
-    }
 
     private MapOverlayPlacementCoordinator.Placement reservePlacement(
             NavigatorStatePublisher.TrafficLightFrame light,
@@ -698,40 +577,27 @@ final class TrafficLightMapLayer {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(resolvedCardColor());
-        android.graphics.Path leg = new android.graphics.Path();
         PointF anchor;
         if (leftTail) {
-            leg.moveTo(0f, height * .5f);
-            leg.lineTo(tail, height * .5f - tail * .45f);
-            leg.lineTo(tail, height * .5f + tail * .45f);
             anchor = new PointF(0f, .5f);
         } else if (rightTail) {
-            leg.moveTo(width, height * .5f);
-            leg.lineTo(width - tail, height * .5f - tail * .45f);
-            leg.lineTo(width - tail, height * .5f + tail * .45f);
             anchor = new PointF(1f, .5f);
         } else {
             boolean leftCorner = legName.endsWith("LEFT");
             boolean rightCorner = legName.endsWith("RIGHT");
             float tipX = leftCorner ? cardWidth * .22f
                     : rightCorner ? cardWidth * .78f : cardWidth * .5f;
-            float baseY;
-            float tipY;
-            if (topTail) {
-                tipY = 0f;
-                baseY = tail;
-                anchor = new PointF(tipX / width, 0f);
-            } else {
-                tipY = height;
-                baseY = height - tail;
-                anchor = new PointF(tipX / width, 1f);
-            }
-            leg.moveTo(tipX, tipY);
-            leg.lineTo(tipX - tail * .45f, baseY);
-            leg.lineTo(tipX + tail * .45f, baseY);
+            anchor = new PointF(tipX / width, topTail ? 0f : 1f);
         }
-        leg.close();
-        canvas.drawPath(leg, paint);
+        RectF body = countdown
+                ? new RectF(offsetX + unit * .06f, offsetY + unit * .13f,
+                        offsetX + cardWidth - unit * .06f, offsetY + unit * .87f)
+                : new RectF(offsetX + unit * .10f, offsetY + unit * .10f,
+                        offsetX + unit * .90f, offsetY + unit * .90f);
+        float bodyRadius = countdown ? unit * .30f : unit * .40f;
+        android.graphics.Path silhouette = BalloonPath.create(body, bodyRadius,
+                anchor.x * width, anchor.y * height, tail * .45f);
+        canvas.drawPath(silhouette, paint);
         canvas.save();
         canvas.translate(offsetX, offsetY);
         float radius = unit * .36f;
@@ -739,9 +605,6 @@ final class TrafficLightMapLayer {
         float centerY = unit * .50f;
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(resolvedCardColor());
-        RectF pill = new RectF(unit * .06f, unit * .13f,
-                cardWidth - unit * .06f, unit * .87f);
-        canvas.drawRoundRect(pill, unit * .30f, unit * .30f, paint);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(signalColor(light.signal));
         canvas.drawCircle(centerX, centerY, radius, paint);
@@ -838,9 +701,6 @@ final class TrafficLightMapLayer {
         Object view;
         Object imageProvider;
         Object iconStyle;
-        Bitmap connectorBitmap;
-        Object connectorProvider;
-        Object connectorStyle;
         MapOverlayPlacementCoordinator.Placement placement;
         List<MapOverlayPlacementCoordinator.Footprint> footprints = Collections.emptyList();
 
@@ -859,13 +719,4 @@ final class TrafficLightMapLayer {
         }
     }
 
-    private static final class ConnectorTexture {
-        final Bitmap bitmap;
-        final PointF anchor;
-
-        ConnectorTexture(Bitmap bitmap, PointF anchor) {
-            this.bitmap = bitmap;
-            this.anchor = anchor;
-        }
-    }
 }

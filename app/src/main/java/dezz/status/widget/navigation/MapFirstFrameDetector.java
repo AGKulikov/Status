@@ -18,13 +18,10 @@ public final class MapFirstFrameDetector {
     static final int SAMPLE_WIDTH = 32;
     static final int SAMPLE_HEIGHT = 18;
     private static final int OPAQUE_ALPHA_MIN = 240;
-    private static final int WHITE_CHANNEL_MIN = 248;
-    private static final int NEUTRAL_CHANNEL_SPREAD_MAX = 6;
-    private static final int WHITE_PERCENT_MIN = 98;
 
     private MapFirstFrameDetector() {}
 
-    /** Returns true only when the current producer buffer is not the KX11 white bootstrap frame. */
+    /** Content qualification is necessary, but not a substitute for the producer's map-ready ACK. */
     public static boolean hasRenderableContent(@NonNull TextureView texture) {
         if (!texture.isAvailable()) return false;
         Bitmap sample = null;
@@ -49,7 +46,8 @@ public final class MapFirstFrameDetector {
     static boolean hasRenderableContent(@NonNull int[] pixels, int count) {
         int boundedCount = Math.max(0, Math.min(count, pixels.length));
         if (boundedCount == 0) return false;
-        int opaqueWhite = 0;
+        int visible = 0, edges = 0, colored = 0;
+        int minimumLuma = 255, maximumLuma = 0, previous = -1;
         for (int index = 0; index < boundedCount; index++) {
             int pixel = pixels[index];
             int alpha = pixel >>> 24;
@@ -58,11 +56,37 @@ public final class MapFirstFrameDetector {
             int blue = pixel & 0xFF;
             int minimum = Math.min(red, Math.min(green, blue));
             int maximum = Math.max(red, Math.max(green, blue));
-            if (alpha >= OPAQUE_ALPHA_MIN && minimum >= WHITE_CHANNEL_MIN
-                    && maximum - minimum <= NEUTRAL_CHANNEL_SPREAD_MAX) {
-                opaqueWhite++;
+            if (alpha < OPAQUE_ALPHA_MIN) {
+                if (alpha < 16) minimumLuma = 0;
+                previous = -1;
+                continue;
             }
+            visible++;
+            int luma = (red * 54 + green * 183 + blue * 19) >> 8;
+            minimumLuma = Math.min(minimumLuma, luma);
+            maximumLuma = Math.max(maximumLuma, luma);
+            if (maximum - minimum >= 24) colored++;
+            if (previous >= 0 && index % SAMPLE_WIDTH != 0
+                    && Math.abs(luma - previous) >= 24) edges++;
+            previous = luma;
         }
-        return (long) opaqueWhite * 100L < (long) boundedCount * WHITE_PERCENT_MIN;
+        // Reject transparent, dark/gray uniform and smooth neutral startup gradients as well
+        // as white. Sparse opaque roads on a transparent background remain valid content.
+        int evidence = Math.max(3, boundedCount / 100);
+        return visible >= evidence && maximumLuma - minimumLuma >= 18
+                && (edges >= evidence || colored >= evidence);
+    }
+
+    /** Recreated surfaces require their own ACK and consecutive content-bearing buffers. */
+    public static final class Gate {
+        private int consecutive;
+        public void reset() { consecutive = 0; }
+        public boolean accept(boolean producerReady, @NonNull TextureView texture) {
+            return acceptSample(producerReady, producerReady && hasRenderableContent(texture));
+        }
+        boolean acceptSample(boolean producerReady, boolean content) {
+            consecutive = producerReady && content ? consecutive + 1 : 0;
+            return consecutive >= 3;
+        }
     }
 }

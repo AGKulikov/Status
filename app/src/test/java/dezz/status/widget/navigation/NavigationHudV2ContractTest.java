@@ -1009,12 +1009,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(trafficLights.contains("TrafficLightViewImpl"));
         assertTrue(trafficLights.contains("applyCompactFallbackViews"));
         assertTrue(trafficLights.contains("compactTrafficLightBitmap"));
-        assertTrue(trafficLights.contains("useCompositeIcon"));
-        assertTrue(trafficLights.contains("traffic-light-connector"));
-        assertTrue(trafficLights.contains("traffic-light-body"));
+        assertFalse(trafficLights.contains("useCompositeIcon"));
+        assertFalse(trafficLights.contains("traffic-light-connector"));
+        assertTrue(trafficLights.contains("applyBalloonIcon(marker, provider, style)"));
         assertFalse(trafficLights.contains("ConnectorTexture.OVERSAMPLE"));
-        assertTrue(trafficLights.contains(
-                "invoke(connectorStyle, \"setScale\", new Class<?>[]{Float.class}, Float.valueOf(1f))"));
+        assertTrue(trafficLights.contains("BalloonPath.create(body, bodyRadius"));
         assertTrue(trafficLights.contains("profile.trafficLightCardColor")
                 || renderer.contains("profile.trafficLightCardColor"));
         assertTrue(trafficLights.contains("normalizedCardColor"));
@@ -1022,17 +1021,13 @@ public final class NavigationHudV2ContractTest {
         assertTrue(trafficLights.contains("applyConfiguredCardColor"));
         assertTrue(trafficLights.contains("backgroundPaintPrimary$delegate"));
         assertTrue(trafficLights.contains("setLegColor"));
-        assertTrue(trafficLights.contains("if (cardColor.isEmpty())"));
-        assertTrue(trafficLights.contains("Float.valueOf(zIndex - .01f)"));
+        assertTrue(trafficLights.contains("if (!cardColor.isEmpty())"));
+        assertFalse(trafficLights.contains("Float.valueOf(zIndex - .01f)"));
         assertEquals(trafficLights.indexOf("MapObjectLayerFactory.create(map"),
                 trafficLights.lastIndexOf("MapObjectLayerFactory.create(map"));
-        assertTrue(trafficLights.contains("traffic_light_leg_size"));
-        assertTrue(trafficLights.contains("traffic_light_bg_primary"));
-        assertTrue(trafficLights.contains("new PointF(offsetX / width, offsetY / height)"));
-        for (String legName : new String[]{"LEFT_CENTER", "RIGHT_CENTER", "BOTTOM_LEFT",
-                "BOTTOM_RIGHT", "TOP_LEFT", "TOP_RIGHT", "BOTTOM_CENTER", "TOP_CENTER"}) {
-            assertTrue(trafficLights.contains("\"" + legName + "\".equals(legName)"));
-        }
+        assertFalse(trafficLights.contains("traffic_light_leg_size"));
+        assertTrue(trafficLights.contains("anchor.x * width, anchor.y * height"));
+        assertTrue(trafficLights.contains("MapOverlayPlacementCoordinator.placementLegNames()"));
         assertTrue(trafficLights.contains("setSignal"));
         assertTrue(trafficLights.contains("setTime"));
         assertTrue(trafficLights.contains("createTexture"));
@@ -1551,7 +1546,8 @@ public final class NavigationHudV2ContractTest {
             assertTrue(source.contains("awaitingFirstMapFrame"));
             assertTrue(source.contains("desiredMapAlpha"));
             assertTrue(source.contains("onSurfaceTextureUpdated"));
-            assertTrue(source.contains("MapFirstFrameDetector.hasRenderableContent"));
+            assertTrue(source.contains("firstFrameGate.accept(ready, mapTexture)"));
+            assertTrue(source.contains("isMapContentReady"));
             assertTrue(source.contains("setAlpha(0f)"));
             assertTrue(source.contains("setAlpha(desiredMapAlpha)"));
         }

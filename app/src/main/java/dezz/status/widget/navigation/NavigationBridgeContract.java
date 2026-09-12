@@ -54,6 +54,8 @@ public final class NavigationBridgeContract {
     public static final int MSG_EXTERNAL_CAMERAS = 19;
     /** Exact, bounded stock maneuver artwork keyed to one snapshot sequence and identity. */
     public static final int MSG_MANEUVER_ARTWORK = 20;
+    public static final int MSG_HUD_MAP_READY = 21;
+    public static final int MSG_CLUSTER_MAP_READY = 22;
 
     public static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     public static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -73,6 +75,7 @@ public final class NavigationBridgeContract {
     public static final long CAP_EXTERNAL_CAMERA_OVERLAY = 1L << 13;
     public static final long CAP_MANEUVER_ARTWORK = 1L << 14;
     public static final long CAP_MANEUVER_COMMANDS = 1L << 15;
+    public static final long CAP_MAP_CONTENT_READY = 1L << 16;
     public static final long CAP_NATRO_CONFIGURATION_HOST = 1L << 32;
     public static final long CAP_NATRO_NAVIGATION_STATE_SINK = 1L << 33;
     /** Advertise only after Natro can lease a real Surface rather than a bitmap bridge. */

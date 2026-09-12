@@ -53,6 +53,8 @@ final class NavigationBridgeClient {
     private static final int MSG_PREPARE_INSTRUMENT_PANEL_LAUNCH = 18;
     private static final int MSG_EXTERNAL_CAMERAS = 19;
     private static final int MSG_MANEUVER_ARTWORK = 20;
+    private static final int MSG_HUD_MAP_READY = 21;
+    private static final int MSG_CLUSTER_MAP_READY = 22;
 
     private static final long CAP_NAVIGATION_SNAPSHOT = 1L;
     private static final long CAP_ROUTE_GEOMETRY = 1L << 1;
@@ -68,6 +70,7 @@ final class NavigationBridgeClient {
     private static final long CAP_EXTERNAL_CAMERA_OVERLAY = 1L << 13;
     private static final long CAP_MANEUVER_ARTWORK = 1L << 14;
     private static final long CAP_MANEUVER_COMMANDS = 1L << 15;
+    private static final long CAP_MAP_CONTENT_READY = 1L << 16;
 
     private static final String KEY_PROTOCOL_VERSION = "protocol_version";
     private static final String KEY_SESSION_ID = "session_id";
@@ -190,6 +193,10 @@ final class NavigationBridgeClient {
         hudMapRenderer = new HudMapRenderer(this.context, this::sendSurfaceLost);
         clusterMapRenderer = new HudMapRenderer(this.context, this::sendClusterSurfaceLost,
                 "clusterMap", "instrument cluster", true);
+        hudMapRenderer.setReadinessReporter((generation, ready) ->
+                sendSurfaceLost(MSG_HUD_MAP_READY, generation, ready ? "ready" : "loading"));
+        clusterMapRenderer.setReadinessReporter((generation, ready) ->
+                sendSurfaceLost(MSG_CLUSTER_MAP_READY, generation, ready ? "ready" : "loading"));
         backgroundMapLease = new BackgroundMapLease(main, this::sendDiagnostic);
         statePublisher = new NavigatorStatePublisher(new NavigatorStatePublisher.Sink() {
             @Override public void onPrimaryMap(Object mapWindow, Object map) {
@@ -228,8 +235,8 @@ final class NavigationBridgeClient {
                         alternatives, routeEvents, routeEventsFingerprint);
                 // Install the current DrivingRoute wrapper before applying the primitive frame so
                 // both maps trim against the exact RoutePosition read once by the publisher.
-                hudMapRenderer.updateNavigationState(navigationFrame);
-                clusterMapRenderer.updateNavigationState(navigationFrame);
+                hudMapRenderer.updateNavigationState(routeEpoch, navigationFrame);
+                clusterMapRenderer.updateNavigationState(routeEpoch, navigationFrame);
                 // The publisher builds text-rich state at 10 Hz while this primitive map path
                 // remains at 30 Hz. A null snapshot therefore means there is no Binder work.
                 if (snapshotJson != null) {
@@ -358,7 +365,7 @@ final class NavigationBridgeClient {
                         | CAP_CLUSTER_DIRECT_SURFACE
                         | CAP_EXTERNAL_INSTRUMENT_LAUNCHER
                         | CAP_EXTERNAL_CAMERA_OVERLAY
-                        | CAP_MANEUVER_COMMANDS);
+                        | CAP_MANEUVER_COMMANDS | CAP_MAP_CONTENT_READY);
         Message hello = Message.obtain(null, MSG_HELLO);
         hello.replyTo = callbacks;
         hello.setData(data);

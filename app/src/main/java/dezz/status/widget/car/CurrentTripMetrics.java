@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.car;
 
-/** Stable IDs and KX11 conversion rules for the stock instrument-cluster “Trip 2” signals. */
+/** Stable IDs and provisional Trip-2 conversions; source/units still require KX11 validation. */
 public final class CurrentTripMetrics {
     public static final String DISTANCE_ID = "Trip.current_distance_km";
     public static final String DURATION_ID = "Trip.current_duration_minutes";
@@ -14,7 +14,7 @@ public final class CurrentTripMetrics {
     public static final String DURATION_LABEL = "Время текущей поездки";
     public static final String AVERAGE_SPEED_LABEL = "Средняя скорость текущей поездки";
 
-    /** {@code DstTrvld2} is encoded in tenths of a kilometre on the KX11 cluster path. */
+    /** Candidate scale from the prior implementation, NOT independently verified on KX11. */
     public static float distanceKilometres(int rawTenthsKilometre) {
         if (rawTenthsKilometre < 0 || rawTenthsKilometre > 100_000_000) return Float.NaN;
         return rawTenthsKilometre / 10f;
@@ -31,7 +31,7 @@ public final class CurrentTripMetrics {
         return Float.isFinite(value) && value <= 500f ? value : Float.NaN;
     }
 
-    /** The stock elapsed-time row is reconstructed from its own distance/average pair. */
+    /** Estimate only: rounded indicated speed cannot reconstruct exact stock elapsed time. */
     public static float durationMinutes(float distanceKilometres, float averageSpeedKmh) {
         if (!Float.isFinite(distanceKilometres) || !Float.isFinite(averageSpeedKmh)
                 || distanceKilometres < 0f || averageSpeedKmh < 0f) return Float.NaN;

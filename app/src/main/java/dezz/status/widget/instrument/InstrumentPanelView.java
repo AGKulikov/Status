@@ -49,6 +49,7 @@ public final class InstrumentPanelView extends FrameLayout
     /** Keeps Android's white initial TextureView buffer out of the cluster composition. */
     private float desiredMapAlpha = 1f;
     private boolean awaitingFirstMapFrame = true;
+    private final MapFirstFrameDetector.Gate firstFrameGate = new MapFirstFrameDetector.Gate();
     @Nullable private String cachedMapProfileRaw;
     @Nullable private NavigationIntegrationConfig.MapProfile cachedMapProfile;
     @NonNull private final Runnable coldLeaseRetry = this::retryColdLease;
@@ -211,9 +212,11 @@ public final class InstrumentPanelView extends FrameLayout
     }
 
     @Override public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surfaceTexture) {
+        boolean ready = NavigationHudEndpointService.isMapContentReady(mapSurface, true);
+        if (!ready) beginFirstFrameGate();
         if (mapTexture != null && awaitingFirstMapFrame && leasePublished
                 && mapTexture.getSurfaceTexture() == surfaceTexture
-                && MapFirstFrameDetector.hasRenderableContent(mapTexture)) {
+                && firstFrameGate.accept(ready, mapTexture)) {
             awaitingFirstMapFrame = false;
             mapView.setAlpha(desiredMapAlpha);
         }
@@ -222,6 +225,7 @@ public final class InstrumentPanelView extends FrameLayout
     private void beginFirstFrameGate() {
         if (mapTexture == null) return;
         awaitingFirstMapFrame = true;
+        firstFrameGate.reset();
         mapView.setAlpha(0f);
     }
 
@@ -271,6 +275,7 @@ public final class InstrumentPanelView extends FrameLayout
             return;
         }
         if (leasePublished && width == publishedWidth && height == publishedHeight) return;
+        beginFirstFrameGate();
         SurfaceTexture texture = mapTexture.getSurfaceTexture();
         if (texture != null) texture.setDefaultBufferSize(width, height);
         NavigationHudEndpointService.ensureClusterEndpointStarted(getContext());

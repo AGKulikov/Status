@@ -458,6 +458,24 @@ public final class NavigationHudEndpointService extends Service {
         if (startId != 0) stopSelfResult(startId);
     }
 
+    /** Readiness belongs to one live producer Surface generation, not a display-wide boolean. */
+    public static boolean isMapContentReady(@Nullable Surface surface, boolean cluster) {
+        synchronized (SURFACE_LOCK) {
+            SurfaceLease lease = cluster ? publishedClusterSurface : publishedSurface;
+            return lease != null && lease.surface == surface && lease.contentReady;
+        }
+    }
+
+    private void acceptMapReadiness(boolean cluster, @NonNull Bundle data) {
+        synchronized (SURFACE_LOCK) {
+            SurfaceLease lease = cluster ? publishedClusterSurface : publishedSurface;
+            if (lease == null || lease.generation != data.getLong(
+                    NavigationBridgeContract.KEY_SURFACE_GENERATION, -1L)) return;
+            lease.contentReady = "ready".equals(data.getString(
+                    NavigationBridgeContract.KEY_ERROR_DETAIL, ""));
+        }
+    }
+
     private boolean onMessage(@NonNull Message message) {
         final int sendingUid = message.sendingUid;
         if (message.what == NavigationBridgeContract.MSG_HELLO) {
@@ -481,6 +499,11 @@ public final class NavigationHudEndpointService extends Service {
         current.lastSeenElapsedMs = android.os.SystemClock.elapsedRealtime();
         try {
             switch (message.what) {
+                case NavigationBridgeContract.MSG_HUD_MAP_READY:
+                case NavigationBridgeContract.MSG_CLUSTER_MAP_READY:
+                    acceptMapReadiness(message.what == NavigationBridgeContract.MSG_CLUSTER_MAP_READY,
+                            message.getData());
+                    break;
                 case NavigationBridgeContract.MSG_NAVIGATION_SNAPSHOT:
                     enqueueSnapshot(current, message.getData().getString(
                             NavigationBridgeContract.KEY_SNAPSHOT_JSON, ""));
@@ -586,6 +609,10 @@ public final class NavigationHudEndpointService extends Service {
                 remote,
                 death);
         NavigationBridgeStateStore.beginSession(session);
+        if ((client.capabilities & NavigationBridgeContract.CAP_MAP_CONTENT_READY) == 0L) {
+            DiagnosticJournal.warn("navigation-bridge",
+                    "Navigator mod update required: missing CAP_MAP_CONTENT_READY; maps stay masked");
+        }
         // A newly authenticated Navigator process gets its own bounded cold-attach budget. A
         // previous dead MapKit session must not leave the live producer permanently exhausted.
         clusterSurfaceRecoveryAttempts = 0;
@@ -907,13 +934,15 @@ public final class NavigationHudEndpointService extends Service {
 
     private static boolean supportsDirectHudMap(@NonNull Client value) {
         long required = NavigationBridgeContract.CAP_HUD_INDEPENDENT_MAP_WINDOW
-                | NavigationBridgeContract.CAP_HUD_DIRECT_SURFACE;
+                | NavigationBridgeContract.CAP_HUD_DIRECT_SURFACE
+                | NavigationBridgeContract.CAP_MAP_CONTENT_READY;
         return (value.capabilities & required) == required;
     }
 
     private static boolean supportsDirectClusterMap(@NonNull Client value) {
         long required = NavigationBridgeContract.CAP_CLUSTER_INDEPENDENT_MAP_WINDOW
-                | NavigationBridgeContract.CAP_CLUSTER_DIRECT_SURFACE;
+                | NavigationBridgeContract.CAP_CLUSTER_DIRECT_SURFACE
+                | NavigationBridgeContract.CAP_MAP_CONTENT_READY;
         return (value.capabilities & required) == required;
     }
 
@@ -925,6 +954,10 @@ public final class NavigationHudEndpointService extends Service {
     private void disconnectCurrentClient() {
         Client current = client;
         client = null;
+        synchronized (SURFACE_LOCK) {
+            if (publishedSurface != null) publishedSurface.contentReady = false;
+            if (publishedClusterSurface != null) publishedClusterSurface.contentReady = false;
+        }
         if (current == null) return;
         NavigationSnapshotV2 direct = NavigationBridgeStateStore.snapshot();
         try {
@@ -1007,6 +1040,7 @@ public final class NavigationHudEndpointService extends Service {
         final int height;
         final int dpi;
         final long generation;
+        boolean contentReady;
 
         SurfaceLease(@NonNull Surface surface, int width, int height,
                      int dpi, long generation) {

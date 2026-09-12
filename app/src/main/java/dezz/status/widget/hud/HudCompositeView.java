@@ -42,6 +42,7 @@ final class HudCompositeView extends FrameLayout
     /** Configured opacity is applied only after MapKit has submitted a real producer frame. */
     private float desiredMapAlpha = 1f;
     private boolean awaitingFirstMapFrame = true;
+    private final MapFirstFrameDetector.Gate firstFrameGate = new MapFirstFrameDetector.Gate();
     private final MapEdgeFade mapEdgeFade = new MapEdgeFade();
     private final RectF edgeBounds = new RectF();
 
@@ -190,12 +191,10 @@ final class HudCompositeView extends FrameLayout
 
     @Override
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture texture) {
-        // Android initializes an opaque TextureView buffer to white on this secondary display.
-        // onSurfaceTextureUpdated() also fires for that bootstrap buffer, so the callback alone is
-        // not proof of MapKit content. Read back a tiny sample only while hidden and reject the
-        // uniform white buffer. Later resizes retain the last complete frame without another gate.
+        boolean ready = NavigationHudEndpointService.isMapContentReady(leasedSurface, false);
+        if (!ready) beginFirstFrameGate();
         if (awaitingFirstMapFrame && leasedTexture == texture && activeMap != null
-                && MapFirstFrameDetector.hasRenderableContent(mapTexture)) {
+                && firstFrameGate.accept(ready, mapTexture)) {
             awaitingFirstMapFrame = false;
             mapTexture.setAlpha(desiredMapAlpha);
         }
@@ -203,6 +202,7 @@ final class HudCompositeView extends FrameLayout
 
     private void beginFirstFrameGate() {
         awaitingFirstMapFrame = true;
+        firstFrameGate.reset();
         mapTexture.setAlpha(0f);
     }
 
@@ -213,9 +213,10 @@ final class HudCompositeView extends FrameLayout
         if (activeMap == null || width <= 1 || height <= 1) return;
         if (leasedSurface != null && leasedTexture == texture
                 && leasedWidth == width && leasedHeight == height) return;
+        beginFirstFrameGate();
         texture.setDefaultBufferSize(width, height);
         if (leasedSurface != null && leasedTexture == texture) {
-            // Keep the same TextureView/Surface so its last complete buffer remains composed.
+            // Reuse the TextureView/Surface but keep it masked during the producer rebuild.
             // The endpoint nevertheless publishes a new generation: OffscreenMapWindow has
             // immutable creation dimensions and must rebuild its viewport instead of stretching
             // the old raster to this new rectangle.

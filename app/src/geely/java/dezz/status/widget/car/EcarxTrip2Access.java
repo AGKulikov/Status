@@ -18,7 +18,7 @@ import ecarx.car.hardware.ECarXCarPropertyValue;
 import ecarx.car.hardware.signal.CarSignalManager;
 import ecarx.car.hardware.signal.SignalFilter;
 
-/** Read-only source for the instrument-cluster signals which back stock “Trip 2”. */
+/** Read-only Trip-2 signal candidates. SDK presence does not prove support on the target KX11. */
 final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
     private static final String TAG = "EcarxTrip2Access";
 
@@ -52,6 +52,7 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
 
                 @Override public void onErrorEvent(int propertyId, int areaId) {
                     Log.w(TAG, "Trip 2 signal callback error " + propertyId + "/" + areaId);
+                    publishCurrentPair();
                 }
             };
 
@@ -90,7 +91,7 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
     @Nullable
     Sample latestSample() {
         // Diagnostics is an explicit one-shot demand and runs off the UI thread.
-        if (listeners.isEmpty()) publishCurrentPair();
+        publishCurrentPair();
         return latest;
     }
 
@@ -107,7 +108,7 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
     public synchronized void onECarXCarServiceDeath() {
         callbackRegistered = false;
         signals = null;
-        latest = null;
+        publishUnavailable();
     }
 
     /**
@@ -118,21 +119,33 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
         CarSignalManager source = signals;
         if (closed || source == null) return;
         try {
-            int distanceRaw = source.getDstTrvld2();
-            int averageSpeedRaw = source.getVehSpdAvgIndcdVehSpdIndcd();
-            int speedUnitRaw = source.getVehSpdAvgIndcdVeSpdIndcdUnit();
-            if (!CurrentTripMetrics.validRawSignalPair(
-                    distanceRaw, averageSpeedRaw, speedUnitRaw)) return;
+            // One unsupported getter must not erase other fields or disappear from diagnostics.
+            int distanceRaw = readSignal(() -> source.getDstTrvld2());
+            int averageSpeedRaw = readSignal(() -> source.getVehSpdAvgIndcdVehSpdIndcd());
+            int speedUnitRaw = readSignal(() -> source.getVehSpdAvgIndcdVeSpdIndcdUnit());
             // A Binder-death callback can detach the manager while synchronous reads are in
             // flight. Never republish that retired proxy as a fresh Trip 2 sample.
-            if (closed || signals != source) return;
             Sample sample = new Sample(distanceRaw, averageSpeedRaw, speedUnitRaw,
                     SystemClock.elapsedRealtimeNanos());
-            latest = sample;
-            for (Listener listener : listeners) notifyOne(listener, sample);
+            synchronized (this) {
+                if (closed || signals != source) return;
+                latest = sample;
+                for (Listener listener : listeners) notifyOne(listener, sample);
+            }
         } catch (Throwable failure) {
             Log.w(TAG, "Trip 2 CarSignal read failed", failure);
         }
+    }
+
+    private interface IntReader { int read(); }
+    private static int readSignal(IntReader reader) {
+        try { return reader.read(); } catch (RuntimeException unavailable) { return -1; }
+    }
+
+    private void publishUnavailable() {
+        Sample unavailable = new Sample(-1, -1, -1, SystemClock.elapsedRealtimeNanos());
+        latest = unavailable;
+        for (Listener listener : listeners) notifyOne(listener, unavailable);
     }
 
     private static void notifyOne(@NonNull Listener listener, @NonNull Sample sample) {

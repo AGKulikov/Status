@@ -28,6 +28,20 @@ final class HudMapRenderer {
     interface FailureReporter {
         void onSurfaceLost(long generation, String detail);
     }
+    interface ReadinessReporter { void onMapReady(long generation, boolean ready); }
+    private ReadinessReporter readinessReporter;
+    private Object mapLoadedListener;
+    private boolean mapConfigured;
+    private boolean mapContentLoaded;
+    private boolean mapReadyReported;
+
+    void setReadinessReporter(ReadinessReporter value) { readinessReporter = value; }
+
+    private void reportMapReady(boolean ready) {
+        if (readinessReporter != null && generation >= 0L) {
+            readinessReporter.onMapReady(generation, ready);
+        }
+    }
 
     private static final String TAG = "NatroHudMap";
     /** High, stable slots avoid replacing styles that Navigator itself may install. */
@@ -114,6 +128,7 @@ final class HudMapRenderer {
         routeTrafficLightMapLayer = new RouteTrafficLightMapLayer(
                 this.context, overlayPlacement);
         cameraDirectionMapLayer = new CameraDirectionMapLayer(this.context, overlayPlacement);
+        cameraDirectionMapLayer.setInventoryListener(this::applyRoadEventVisibility);
         speedBumpMapLayer = new SpeedBumpMapLayer(this.context, overlayPlacement);
         laneGuidanceMapLayer = new LaneGuidanceMapLayer(this.context, overlayPlacement);
         routeTurnMapLayer = new RouteTurnMapLayer(this.context);
@@ -214,8 +229,8 @@ final class HudMapRenderer {
     }
 
     /** Canonical navigation location, independent from every visual operation on the main map. */
-    void updateNavigationState(NavigatorStatePublisher.NavigationFrame frame) {
-        if (frame == null) return;
+    void updateNavigationState(long routeEpoch, NavigatorStatePublisher.NavigationFrame frame) {
+        if (frame == null || routeEpoch != activeRouteEpoch) return;
         latestNavigationFrame = frame;
         syncOverlayNavigationState();
         boolean routeVisibilityChanged = routeGuidanceActive != frame.routeActive;
@@ -318,6 +333,12 @@ final class HudMapRenderer {
             return;
         }
         if (changed) {
+            // Never trim or place a new route using the previous epoch's progress/overlays.
+            latestNavigationFrame = null;
+            trafficLightMapLayer.clearData();
+            cameraDirectionMapLayer.clearData();
+            laneGuidanceMapLayer.clearData();
+            routeTurnMapLayer.clearData();
             renderedRouteSegmentIndex = 0;
             renderedRouteSegmentPosition = Double.NaN;
             renderedRouteSegmentCount = 0;
@@ -372,6 +393,27 @@ final class HudMapRenderer {
             Object nextMapWindow = invoke(nextOffscreen, "getMapWindow", new Class<?>[0]);
             mapWindow = nextMapWindow;
             map = invoke(nextMapWindow, "getMap", new Class<?>[0]);
+            reportMapReady(false);
+            final Object loadingMap = map;
+            final long loadingGeneration = generation;
+            Class<?> loadedClass = Class.forName("com.yandex.mapkit.map.MapLoadedListener");
+            mapLoadedListener = java.lang.reflect.Proxy.newProxyInstance(
+                    loadedClass.getClassLoader(), new Class<?>[]{loadedClass},
+                    (proxy, method, args) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            if ("hashCode".equals(method.getName())) return System.identityHashCode(proxy);
+                            if ("equals".equals(method.getName())) return proxy == args[0];
+                            return "NatroMapLoadedListener";
+                        }
+                        if ("onMapLoaded".equals(method.getName()) && map == loadingMap
+                                && generation == loadingGeneration && args != null && args.length > 0) {
+                            Number count = (Number) invoke(args[0], "getRenderObjectCount", new Class<?>[0]);
+                            mapContentLoaded = count.intValue() > 0;
+                            acknowledgeMapContent();
+                        }
+                        return null;
+                    });
+            invoke(map, "setMapLoadedListener", new Class<?>[]{loadedClass}, mapLoadedListener);
             overlayPlacement.attach(nextMapWindow, width, height);
             overlayPlacement.updateRoute(activeRouteEpoch, activeRoute);
             syncOverlayNavigationState();
@@ -401,6 +443,8 @@ final class HudMapRenderer {
 
             createRoadEventsLayer(mapKit, mapKitClass, mapWindowClass, nextMapWindow);
             applyProfile();
+            mapConfigured = true;
+            acknowledgeMapContent();
             Log.i(TAG, "Independent " + displayName
                     + " OffscreenMapWindow attached, generation=" + generation
                     + ", size=" + width + "x" + height);
@@ -413,6 +457,13 @@ final class HudMapRenderer {
             Log.e(TAG, "Could not attach independent " + displayName + " MapWindow", failure);
             stopRenderer(false);
             reporter.onSurfaceLost(failedGeneration, detail);
+        }
+    }
+
+    private void acknowledgeMapContent() {
+        if (!mapReadyReported && mapConfigured && mapContentLoaded && runtimeSurfaceAttached) {
+            mapReadyReported = true;
+            reportMapReady(true);
         }
     }
 
@@ -435,8 +486,9 @@ final class HudMapRenderer {
         speedBumpMapLayer.apply(profile.showSpeedBumps,
                 profile.speedBumpScalePercent,
                 profile.effectiveSpeedBumpPriority());
+        cameraDirectionMapLayer.setRoadEventModes(profile.roadEventModes);
         cameraDirectionMapLayer.apply(
-                !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL")),
+                true,
                 profile.showHudSpeedCameras,
                 profile.cameraScalePercent,
                 profile.cameraDirectionLengthPercent,
@@ -454,7 +506,7 @@ final class HudMapRenderer {
                 profile.routeTurnFillColor,
                 profile.routeTurnOutlineColor,
                 profile.routeTurnOutlineWidth);
-        alternativeRouteMapLayer.apply(profile);
+        alternativeRouteMapLayer.apply(profile, night);
         try {
             applyMaximumFps();
             invoke(currentWindow, "setScaleFactor", new Class<?>[]{float.class},
@@ -640,27 +692,27 @@ final class HudMapRenderer {
     private void applyRoadEventVisibility() {
         Object everywhere = roadEventsLayer;
         if (everywhere == null) return;
-        if (scaledRoadEventStyleProvider != null && scaledRoadEventStyleProvider.setVisibility(
-                profile.roadEventModes, routeGuidanceActive)) {
+        boolean visibilityChanged = scaledRoadEventStyleProvider != null
+                && scaledRoadEventStyleProvider.setVisibility(profile.roadEventModes, routeGuidanceActive);
+        boolean inventoryChanged = scaledRoadEventStyleProvider != null
+                && scaledRoadEventStyleProvider.setUnifiedRouteCameras(
+                        routeGuidanceActive && cameraDirectionMapLayer.hasRouteInventory());
+        if (visibilityChanged || inventoryChanged) {
             // MapKit caches accepted styles. Changing a mode must also re-evaluate existing pins.
             resetRoadEventVisibilityForStyleRefresh();
         }
         try {
             Class<?> eventTagClass = Class.forName("com.yandex.mapkit.road_events.EventTag");
-            boolean unifiedCameraLayer = routeGuidanceActive
-                    && !"HIDDEN".equals(profile.roadEventMode("SPEED_CONTROL"));
             for (String tagName : NavigationMapProfile.ROAD_EVENT_TAGS) {
                 @SuppressWarnings({"rawtypes", "unchecked"})
                 Object tag = Enum.valueOf((Class) eventTagClass, tagName);
                 String mode = profile.roadEventMode(tagName);
-                boolean mergedCameraTag = unifiedCameraLayer
-                        && isUnifiedCameraControlTag(tagName);
                 // Automotive NavigationLayer is deliberately forbidden on an independent
                 // OffscreenMapWindow: MapKit 30.3.0 terminates the process asynchronously with
                 // either camera configuration. The stable RoadEventsLayer remains source-native.
                 // This is only a coarse tag gate. ScaledRoadEventStyleProvider also checks the
                 // event's native on-route flag, so a nearby road is not accepted by routeActive.
-                boolean visible = !mergedCameraTag && ("ALWAYS".equals(mode)
+                boolean visible = ("ALWAYS".equals(mode)
                         || (routeGuidanceActive && "ROUTE_ONLY".equals(mode)));
                 invoke(everywhere, "setRoadEventVisible",
                         new Class<?>[]{eventTagClass, boolean.class}, tag, visible);
@@ -668,14 +720,6 @@ final class HudMapRenderer {
         } catch (Throwable failure) {
             Log.w(TAG, "HUD road-event visibility could not be applied", failure);
         }
-    }
-
-    /** These tags are rendered as compact detail glyphs inside one unified camera marker. */
-    private static boolean isUnifiedCameraControlTag(String tag) {
-        return "SPEED_CONTROL".equals(tag) || "NO_STOPPING_CONTROL".equals(tag)
-                || "LANE_CONTROL".equals(tag) || "ROAD_MARKING_CONTROL".equals(tag)
-                || "MOBILE_CONTROL".equals(tag) || "CROSS_ROAD_CONTROL".equals(tag)
-                || "TRAFFIC_CONTROL".equals(tag);
     }
 
     /** A visibility round-trip makes MapKit request stock styles again after a live scale edit. */
@@ -1056,6 +1100,17 @@ final class HudMapRenderer {
     }
 
     private void stopRenderer(boolean releaseSurface) {
+        reportMapReady(false);
+        mapConfigured = false;
+        mapContentLoaded = false;
+        mapReadyReported = false;
+        if (map != null && mapLoadedListener != null) {
+            try {
+                invoke(map, "setMapLoadedListener", new Class<?>[]{Class.forName(
+                        "com.yandex.mapkit.map.MapLoadedListener")}, (Object) null);
+            } catch (Throwable ignored) {}
+        }
+        mapLoadedListener = null;
         Object currentMapWindow = mapWindow;
         Object currentRuntimeSurface = runtimeSurface;
         Surface currentSurface = surface;

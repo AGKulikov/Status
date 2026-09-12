@@ -18,6 +18,13 @@ final class ScaledRoadEventStyleProvider implements InvocationHandler {
     private volatile int eventScalePercent = 100;
     private volatile int cameraScalePercent = 100;
     private volatile RoadEventVisibility visibility;
+    private volatile boolean unifiedRouteCameras;
+
+    boolean setUnifiedRouteCameras(boolean value) {
+        boolean changed = unifiedRouteCameras != value;
+        unifiedRouteCameras = value;
+        return changed;
+    }
 
     ScaledRoadEventStyleProvider(Object delegate, Class<?> providerClass) {
         this.delegate = delegate;
@@ -61,6 +68,17 @@ final class ScaledRoadEventStyleProvider implements InvocationHandler {
                 }
                 if (!(tags instanceof Iterable) || !filter.allows((Iterable<?>) tags, onRoute)) {
                     return false;
+                }
+                // Preserve ALWAYS cameras on adjacent roads. Only native on-route controls
+                // have replacements in the complete DrivingRoute inventory.
+                if (onRoute && unifiedRouteCameras) {
+                    boolean replaced = false, otherVisibleCategory = false;
+                    for (Object tag : (Iterable<?>) tags) {
+                        if (tag == null || !filter.allows(java.util.Collections.singletonList(tag), onRoute)) continue;
+                        if (RouteCameraPolicy.isControl(String.valueOf(tag))) replaced = true;
+                        else otherVisibleCategory = true;
+                    }
+                    if (replaced && !otherVisibleCategory) return false;
                 }
             } catch (Exception unavailable) {
                 // An unavailable event has no verified membership. Never substitute routeActive.

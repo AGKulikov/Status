@@ -23,7 +23,7 @@ final class RouteTrafficLightMapLayer {
     private static final float PIN_ANCHOR_X = .50f;
     /** Stock 22x36 vector ends with its route-point tail at y=34. */
     private static final float PIN_ANCHOR_Y = 34f / 36f;
-    private static final double LIVE_POINT_TOLERANCE_METERS = 24d;
+    private static final double LIVE_POINT_TOLERANCE_METERS = 1d;
     private static final double EARTH_RADIUS_METERS = 6_371_000d;
 
     private final Context context;
@@ -287,11 +287,14 @@ final class RouteTrafficLightMapLayer {
     private boolean hasMatchingLiveLight(RouteLight routeLight) {
         for (NavigatorStatePublisher.TrafficLightFrame live : liveLights) {
             if (live == null) continue;
-            if (live.routeSegmentIndex >= 0
-                    && live.routeSegmentIndex == routeLight.routeSegmentIndex
+            if (live.routeSegmentIndex >= 0) {
+                if (live.routeSegmentIndex == routeLight.routeSegmentIndex
                     && finite(live.routeSegmentPosition)
                     && Math.abs(live.routeSegmentPosition
                     - routeLight.routeSegmentPosition) <= .002d) return true;
+                // Exact route positions disagree: proximity is not identity at a junction.
+                continue;
+            }
             if (validCoordinate(live.latitude, live.longitude)
                     && distanceMeters(routeLight.latitude, routeLight.longitude,
                     live.latitude, live.longitude) <= LIVE_POINT_TOLERANCE_METERS) return true;

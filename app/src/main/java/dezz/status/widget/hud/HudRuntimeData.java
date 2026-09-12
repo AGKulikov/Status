@@ -101,24 +101,35 @@ public final class HudRuntimeData {
     private long navigationFreshUntilElapsedMs;
     private long navigationScheduledExpiryElapsedMs;
     private boolean navigationExpiryPosted;
-    private final CarIntegration.TelemetryListener telemetryListener = value -> runOnMain(() -> {
-        if (!started) return;
-        CarIntegration.TelemetryValue previous = telemetry.put(value.id, value);
-        if (CurrentTripMetrics.isMetricId(value.id)) {
-            main.removeCallbacks(currentTripExpiry);
-            long ageMillis = System.currentTimeMillis() - value.observedAtMillis;
-            long remainingMillis = CurrentTripMetrics.STALE_AFTER_MILLIS
-                    - Math.max(0L, ageMillis);
-            if (remainingMillis <= 0L) {
-                currentTripExpiry.run();
-                return;
-            }
-            main.postDelayed(currentTripExpiry, remainingMillis);
+    private final CarIntegration.TelemetryListener telemetryListener = new CarIntegration.TelemetryListener() {
+        @Override public void onTelemetryUnavailable(@NonNull String metricId) {
+            runOnMain(() -> {
+                if (started && telemetry.remove(metricId) != null) notifyChanged();
+            });
         }
-        // Vendor callbacks often refresh an unchanged value. Keep the newer observation time for
-        // staleness, but do not rebuild the HUD Canvas when its visible value is byte-for-byte equal.
-        if (!sameTelemetryContent(previous, value)) notifyChanged();
-    });
+        @Override public void onTelemetry(@NonNull CarIntegration.TelemetryValue value) {
+            acceptTelemetry(value);
+        }
+    };
+    private void acceptTelemetry(@NonNull CarIntegration.TelemetryValue value) {
+        runOnMain(() -> {
+            if (!started) return;
+            CarIntegration.TelemetryValue previous = telemetry.put(value.id, value);
+            if (CurrentTripMetrics.isMetricId(value.id)) {
+                main.removeCallbacks(currentTripExpiry);
+                long ageMillis = System.currentTimeMillis() - value.observedAtMillis;
+                long remainingMillis = CurrentTripMetrics.STALE_AFTER_MILLIS
+                        - Math.max(0L, ageMillis);
+                if (remainingMillis <= 0L) {
+                    currentTripExpiry.run();
+                    return;
+                }
+                main.postDelayed(currentTripExpiry, remainingMillis);
+            }
+            // Keep observation time fresh without rebuilding an unchanged HUD Canvas.
+            if (!sameTelemetryContent(previous, value)) notifyChanged();
+        });
+    }
     private final ConnectorValueRegistry.Listener connectorListener = changed -> {
         List<ConnectorValue> copy = new ArrayList<>(changed);
         main.post(() -> {

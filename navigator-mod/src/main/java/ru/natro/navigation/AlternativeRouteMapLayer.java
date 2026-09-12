@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 /** All Guidance alternatives: passive polylines plus collision-safe fork callouts. */
@@ -30,6 +29,8 @@ final class AlternativeRouteMapLayer {
     private static final long RETAINED_INPUT_RESCAN_MS = 500L;
 
     private final Context context;
+    private final StockAlternativeContent stockContent;
+    private boolean nightMode;
     private final MapOverlayPlacementCoordinator placement;
     private final ArrayList<Marker> markers = new ArrayList<>();
     private Object map;
@@ -50,6 +51,7 @@ final class AlternativeRouteMapLayer {
     AlternativeRouteMapLayer(Context context, MapOverlayPlacementCoordinator placement) {
         Context app = context.getApplicationContext();
         this.context = app == null ? context : app;
+        stockContent = new StockAlternativeContent(this.context);
         this.placement = placement;
     }
 
@@ -68,7 +70,7 @@ final class AlternativeRouteMapLayer {
         map = null;
     }
 
-    void apply(NavigationMapProfile nextProfile) {
+    void apply(NavigationMapProfile nextProfile, boolean nextNight) {
         if (nextProfile == null) return;
         long nextAppearance = appearanceFingerprint(nextProfile);
         profile = nextProfile;
@@ -76,7 +78,8 @@ final class AlternativeRouteMapLayer {
                 NavigationMapProfile.layerZ(profile.effectiveAlternativeRoutePriority()));
         MapObjectLayerFactory.setZIndex(calloutCollection,
                 NavigationMapProfile.layerZ(profile.effectiveAlternativeCalloutPriority()));
-        if (nextAppearance != appearanceFingerprint) {
+        if (nextAppearance != appearanceFingerprint || nightMode != nextNight) {
+            nightMode = nextNight;
             appearanceFingerprint = nextAppearance;
             render();
         } else if (!profile.showAlternativeRoutes) {
@@ -143,15 +146,12 @@ final class AlternativeRouteMapLayer {
                         text.bodyWidth, text.bodyHeight, true,
                         marker.model.routeSegmentIndex, marker.model.routeSegmentPosition,
                         marker.placement, footprints);
-                // A stock alternative always keeps its information balloon. If all strictly
-                // clear legs are occupied, use the coordinator's least-conflicting stable leg
-                // rather than dropping the callout completely.
-                if (next == null) next = placement.reserve(
-                        OWNER, marker.model.key,
-                        marker.model.latitude, marker.model.longitude,
-                        text.bodyWidth, text.bodyHeight, true,
-                        marker.model.routeSegmentIndex, marker.model.routeSegmentPosition,
-                        marker.placement, footprints);
+                // Optional information must not displace a safety sign or cover the cursor.
+                // Keep the route line, and retry the balloon on the next camera/layout update.
+                if (next == null) {
+                    hide(marker);
+                    continue;
+                }
                 if (marker.placement == null || !marker.placement.sameSlot(next)
                         || marker.paletteVersion != StockAlternativePalette.version()) {
                     applyTexture(marker, text, next);
@@ -193,16 +193,19 @@ final class AlternativeRouteMapLayer {
                     Object route = invoke(alternative, "getAlternative", new Class<?>[0]);
                     if (route == null) continue;
                     String candidateRouteId = routeId(route);
-                    if ((!candidateRouteId.isEmpty()
-                            && candidateRouteId.equals(activeRouteId))
-                            || (!candidateRouteId.isEmpty()
-                            && renderedRouteIds.contains(candidateRouteId))) continue;
+                    if (candidateRouteId.isEmpty() || activeRouteId.isEmpty()
+                            || candidateRouteId.equals(activeRouteId)
+                            || renderedRouteIds.contains(candidateRouteId)) continue;
                     Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
                     if (geometry == null) continue;
                     Object forkOnAlternative = invoke(alternative,
                             "getForkPositionOnAlternative", new Class<?>[0]);
                     Object forkOnCurrent = invoke(alternative,
                             "getForkPositionOnCurrentRoute", new Class<?>[0]);
+
+                    // Reject stale/unrelated wrappers. Optional text is not route provenance.
+                    if (routeProgress(forkOnCurrent, activeRoute).segmentIndex < 0
+                            || routeProgress(forkOnAlternative, route).segmentIndex < 0) continue;
 
                     // A missing optional label field must never suppress the alternative itself.
                     // Publish the complete route line first, then add its callout independently.
@@ -214,7 +217,7 @@ final class AlternativeRouteMapLayer {
                     invoke(line, "setStrokeColor", new Class<?>[]{int.class},
                             Color.parseColor(profile.alternativeRouteColor));
                     invoke(line, "setOutlineWidth", new Class<?>[]{float.class}, 0f);
-                    hideSharedPrefix(line, route, forkOnAlternative);
+                    if (!hideSharedPrefix(line, route, forkOnAlternative)) continue;
                     invoke(line, "setVisible", new Class<?>[]{boolean.class}, true);
                     if (!candidateRouteId.isEmpty()) renderedRouteIds.add(candidateRouteId);
 
@@ -285,29 +288,21 @@ final class AlternativeRouteMapLayer {
             throws Exception {
         Object point = pointOrNull(forkOnCurrent);
         if (point == null) point = pointOrNull(forkOnAlternative);
-        if (point == null) point = fallbackRoutePoint(route);
         if (point == null) return null;
         double latitude = number(invoke(point, "getLatitude", new Class<?>[0]));
         double longitude = number(invoke(point, "getLongitude", new Class<?>[0]));
         if (!validCoordinate(latitude, longitude)) return null;
 
-        Double alternativeTime = finiteNumber(forkOnAlternative, "timeToFinish");
-        Double currentTime = finiteNumber(forkOnCurrent, "timeToFinish");
-        Double alternativeDistance = finiteNumber(forkOnAlternative, "distanceToFinish");
-        Double currentDistance = finiteNumber(forkOnCurrent, "distanceToFinish");
-        Integer timeDelta = alternativeTime == null || currentTime == null ? null
-                : (int) Math.round(alternativeTime - currentTime);
-        Integer distanceDelta = alternativeDistance == null || currentDistance == null ? null
-                : (int) Math.round(alternativeDistance - currentDistance);
         RouteProgress progress = routeProgress(forkOnCurrent, activeRoute);
         String routeId = routeId(route);
         String key = routeId.isEmpty() ? "alternative:" + routeEpoch + ':' + index : routeId;
-        String name = sectionName(route, forkOnAlternative);
-        if (name.isEmpty() && timeDelta == null && distanceDelta == null) {
-            name = "Вариант " + (index + 1);
-        }
-        return new CalloutModel(key, latitude, longitude, name,
-                timeDelta, distanceDelta, progress.segmentIndex, progress.segmentPosition);
+        // A section annotation (e.g. "левее") is not the text of Navigator's balloon.
+        // Never invent a route name, extra distance line, or a quarter-route anchor.
+        if (progress.segmentIndex < 0) return null;
+        StockAlternativeContent.Content content = stockContent.read(route, forkOnAlternative,
+                activeRoute, forkOnCurrent, nightMode);
+        return new CalloutModel(key, latitude, longitude,
+                progress.segmentIndex, progress.segmentPosition, content);
     }
 
     private static Object pointOrNull(Object position) {
@@ -316,21 +311,6 @@ final class AlternativeRouteMapLayer {
         catch (Throwable ignored) { return null; }
     }
 
-    /** Last-resort anchor for a regional Alternative wrapper without fork positions. */
-    private static Object fallbackRoutePoint(Object route) {
-        if (route == null) return null;
-        try {
-            Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
-            List<?> points = list(invoke(geometry, "getPoints", new Class<?>[0]));
-            if (points.isEmpty()) return null;
-            // Avoid the vehicle/start pin while keeping the label near the first route branch.
-            int index = points.size() == 1 ? 0
-                    : Math.min(points.size() - 1, Math.max(1, points.size() / 4));
-            return points.get(index);
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
 
     private void applyTexture(Marker marker, PreparedText text,
                               MapOverlayPlacementCoordinator.Placement placementValue)
@@ -365,48 +345,28 @@ final class AlternativeRouteMapLayer {
         paint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         paint.setTextSize((float) profile.alternativeCalloutTextSizeSp * scaledDensity * scale);
         ArrayList<TextPiece> pieces = new ArrayList<>();
-        String time = model.timeDeltaSeconds == null ? ""
-                : formatTimeDelta(model.timeDeltaSeconds);
-        String distance = model.distanceDeltaMeters == null ? ""
-                : formatDistanceDelta(model.distanceDeltaMeters);
         int base = Color.parseColor(profile.alternativeCalloutTextColor);
-        if (!model.name.isEmpty()) pieces.add(new TextPiece(model.name, base));
-        appendDelta(pieces, time, model.timeDeltaSeconds, base);
-        appendDelta(pieces, distance, model.distanceDeltaMeters, base);
+        // Selection, localized text, neutral threshold, colors and glyph are from Navigator.
+        pieces.add(new TextPiece(model.content.text, model.content.neutral ? base : model.content.color));
 
         float horizontalPadding = (float) profile.alternativeCalloutHorizontalPaddingDp
                 * density * scale;
         float verticalPadding = (float) profile.alternativeCalloutVerticalPaddingDp
                 * density * scale;
-        float maximumBodyWidth = 320f * density * scale;
-        if (!model.name.isEmpty() && measuredWidth(paint, pieces) + 2f * horizontalPadding
-                > maximumBodyWidth) {
-            float reserved = 0f;
-            for (int index = 1; index < pieces.size(); index++) {
-                reserved += paint.measureText(pieces.get(index).text);
-            }
-            float allowed = Math.max(0f, maximumBodyWidth - 2f * horizontalPadding - reserved);
-            pieces.get(0).text = ellipsize(paint, model.name, allowed);
-        }
         Paint.FontMetrics metrics = paint.getFontMetrics();
+        int iconHeight = model.content.icon == null ? 0 : Math.max(1, (int) Math.ceil(metrics.descent - metrics.ascent));
+        int iconWidth = iconHeight == 0 ? 0 : Math.max(1, Math.round(iconHeight
+                * Math.max(1, model.content.icon.getIntrinsicWidth())
+                / (float) Math.max(1, model.content.icon.getIntrinsicHeight())));
+        int iconGap = iconWidth == 0 ? 0 : Math.max(1, Math.round(4f * density * scale));
         int bodyWidth = Math.max(1, (int) Math.ceil(
-                measuredWidth(paint, pieces) + 2f * horizontalPadding));
+                measuredWidth(paint, pieces) + iconGap + iconWidth + 2f * horizontalPadding));
         int bodyHeight = Math.max(1, (int) Math.ceil(
                 metrics.descent - metrics.ascent + 2f * verticalPadding));
         int leader = Math.max(1, Math.round((float) profile.alternativeCalloutLeaderLengthDp
                 * density * scale));
         return new PreparedText(paint, pieces, horizontalPadding, verticalPadding,
-                bodyWidth, bodyHeight, leader);
-    }
-
-    private static void appendDelta(List<TextPiece> pieces, String value,
-                                    Integer delta, int baseColor) {
-        if (value.isEmpty()) return;
-        if (!pieces.isEmpty()) pieces.add(new TextPiece("  ", baseColor));
-        int color = delta == null || delta == 0 ? baseColor
-                : delta < 0 ? StockAlternativePalette.negativeColor()
-                : StockAlternativePalette.positiveColor();
-        pieces.add(new TextPiece(value, color));
+                bodyWidth, bodyHeight, leader, model.content.icon, iconWidth, iconHeight, iconGap);
     }
 
     private List<MapOverlayPlacementCoordinator.Footprint> footprints(PreparedText text) {
@@ -441,21 +401,13 @@ final class AlternativeRouteMapLayer {
         border.setStyle(Paint.Style.STROKE);
         border.setStrokeWidth(borderWidth);
         border.setColor(borderColor);
-        Path tail = new Path();
         float halfTail = Math.max(2f, Math.min(text.bodyHeight * .22f, text.leader * .35f));
-        tail.moveTo(geometry.tipX, geometry.tipY);
-        tail.lineTo(geometry.attachX + geometry.normalY * halfTail,
-                geometry.attachY - geometry.normalX * halfTail);
-        tail.lineTo(geometry.attachX - geometry.normalY * halfTail,
-                geometry.attachY + geometry.normalX * halfTail);
-        tail.close();
-        canvas.drawPath(tail, fill);
-        if (borderWidth > 0f) canvas.drawPath(tail, border);
-
         RectF body = new RectF(geometry.bodyLeft, geometry.bodyTop,
                 geometry.bodyLeft + text.bodyWidth, geometry.bodyTop + text.bodyHeight);
-        canvas.drawRoundRect(body, radius, radius, fill);
-        if (borderWidth > 0f) canvas.drawRoundRect(body, radius, radius, border);
+        Path silhouette = BalloonPath.create(body, radius,
+                geometry.tipX, geometry.tipY, halfTail);
+        canvas.drawPath(silhouette, fill);
+        if (borderWidth > 0f) canvas.drawPath(silhouette, border);
 
         Paint.FontMetrics metrics = text.paint.getFontMetrics();
         float x = geometry.bodyLeft + text.horizontalPadding;
@@ -465,11 +417,17 @@ final class AlternativeRouteMapLayer {
             canvas.drawText(piece.text, x, baseline, text.paint);
             x += text.paint.measureText(piece.text);
         }
+        if (text.icon != null) {
+            int left = Math.round(x + text.iconGap);
+            int top = Math.round(geometry.bodyTop + (text.bodyHeight - text.iconHeight) * .5f);
+            text.icon.setBounds(left, top, left + text.iconWidth, top + text.iconHeight);
+            text.icon.draw(canvas);
+        }
         return new Texture(bitmap, new PointF(
                 geometry.tipX / geometry.width, geometry.tipY / geometry.height));
     }
 
-    private static Geometry geometry(PreparedText text, String leg) {
+    private Geometry geometry(PreparedText text, String leg) {
         int diagonal = Math.max(1, Math.round(text.leader * .72f));
         int width = text.bodyWidth;
         int height = text.bodyHeight;
@@ -510,6 +468,13 @@ final class AlternativeRouteMapLayer {
         float dx = attachX - tipX;
         float dy = attachY - tipY;
         float length = Math.max(1f, (float) Math.hypot(dx, dy));
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        int padding = 2 + (int) Math.ceil(profile.alternativeCalloutBorderWidthDp * density
+                * profile.alternativeCalloutScalePercent / 200f);
+        width += 2 * padding; height += 2 * padding;
+        bodyLeft += padding; bodyTop += padding;
+        tipX += padding; tipY += padding;
+        attachX += padding; attachY += padding;
         return new Geometry(width, height, bodyLeft, bodyTop, tipX, tipY,
                 attachX, attachY, dx / length, dy / length);
     }
@@ -551,11 +516,15 @@ final class AlternativeRouteMapLayer {
             Object polylinePosition = invoke(position, "positionOnRoute",
                     new Class<?>[]{String.class}, routeId(route));
             if (polylinePosition == null) return RouteProgress.UNKNOWN;
-            return new RouteProgress(
-                    ((Number) invoke(polylinePosition, "getSegmentIndex",
-                            new Class<?>[0])).intValue(),
-                    ((Number) invoke(polylinePosition, "getSegmentPosition",
-                            new Class<?>[0])).doubleValue());
+            int segment = ((Number) invoke(polylinePosition, "getSegmentIndex",
+                    new Class<?>[0])).intValue();
+            double fraction = ((Number) invoke(polylinePosition, "getSegmentPosition",
+                    new Class<?>[0])).doubleValue();
+            Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
+            int count = list(invoke(geometry, "getPoints", new Class<?>[0])).size();
+            if (segment < 0 || segment >= count - 1 || !Double.isFinite(fraction)
+                    || fraction < 0d || fraction > 1d) return RouteProgress.UNKNOWN;
+            return new RouteProgress(segment, fraction);
         } catch (Throwable ignored) {
             return RouteProgress.UNKNOWN;
         }
@@ -575,20 +544,13 @@ final class AlternativeRouteMapLayer {
         }
     }
 
-    private static String formatTimeDelta(int seconds) {
-        if (seconds == 0) return "то же время";
-        int absoluteMinutes = Math.max(1,
-                (int) Math.round(Math.abs(seconds) / 60d));
-        return sign(seconds) + absoluteMinutes + " мин";
-    }
-
     /** Hides the shared route prefix which previously looked like stray alternative fragments. */
-    private static void hideSharedPrefix(Object line, Object route,
+    private static boolean hideSharedPrefix(Object line, Object route,
                                          Object forkOnAlternative) {
         try {
             RouteProgress fork = routeProgress(forkOnAlternative, route);
-            if (fork.segmentIndex < 0
-                    || (fork.segmentIndex == 0 && fork.segmentPosition <= .000001d)) return;
+            if (fork.segmentIndex < 0) return false;
+            if (fork.segmentIndex == 0 && fork.segmentPosition <= .000001d) return true;
             Class<?> positionClass = Class.forName(
                     "com.yandex.mapkit.geometry.PolylinePosition");
             Object begin = positionClass.getConstructor(int.class, double.class)
@@ -601,41 +563,18 @@ final class AlternativeRouteMapLayer {
             Object shared = subpolylineClass.getConstructor(positionClass, positionClass)
                     .newInstance(begin, end);
             invoke(line, "hide", new Class<?>[]{subpolylineClass}, shared);
+            return true;
         } catch (Throwable unavailable) {
-            // Some regional MapKit builds omit PolylineMapObject.hide(Subpolyline). A full
-            // alternative remains useful and is strictly better than silently dropping it.
+            // Fail closed: exposing the shared prefix creates a false additional route.
             Log.d(TAG, "Shared-prefix hiding is unavailable", unavailable);
+            return false;
         }
-    }
-
-    private static String formatDistanceDelta(int meters) {
-        int absolute = Math.abs(meters);
-        if (absolute < 1_000) {
-            return sign(meters) + Math.round(absolute / 10f) * 10 + " м";
-        }
-        String value = String.format(Locale.ROOT, "%.1f", absolute / 1_000d)
-                .replace('.', ',');
-        if (value.endsWith(",0")) value = value.substring(0, value.length() - 2);
-        return sign(meters) + value + " км";
-    }
-
-    private static String sign(int value) {
-        return value < 0 ? "\u2212" : value > 0 ? "+" : "";
     }
 
     private static float measuredWidth(Paint paint, List<TextPiece> pieces) {
         float result = 0f;
         for (TextPiece piece : pieces) result += paint.measureText(piece.text);
         return result;
-    }
-
-    private static String ellipsize(Paint paint, String text, float width) {
-        if (paint.measureText(text) <= width) return text;
-        String ellipsis = "\u2026";
-        float available = width - paint.measureText(ellipsis);
-        if (available <= 0f) return "";
-        int count = paint.breakText(text, true, available, null);
-        return count <= 0 ? "" : text.substring(0, count).trim() + ellipsis;
     }
 
     private static int withOpacity(int color, int opacityPercent) {
@@ -689,10 +628,9 @@ final class AlternativeRouteMapLayer {
                 Double alternativeTime = finiteNumber(alternativeFork, "timeToFinish");
                 result = mix(result, time == null || alternativeTime == null
                         ? Long.MIN_VALUE + 1L
-                        : Math.round(alternativeTime - time));
+                        : Double.doubleToLongBits(alternativeTime - time));
                 Object point = pointOrNull(fork);
                 if (point == null) point = pointOrNull(alternativeFork);
-                if (point == null) point = fallbackRoutePoint(candidate);
                 if (point == null) {
                     result = mix(result, Long.MIN_VALUE + 2L);
                 } else {
@@ -792,22 +730,18 @@ final class AlternativeRouteMapLayer {
         final String key;
         final double latitude;
         final double longitude;
-        final String name;
-        final Integer timeDeltaSeconds;
-        final Integer distanceDeltaMeters;
         final int routeSegmentIndex;
         final double routeSegmentPosition;
-        CalloutModel(String key, double latitude, double longitude, String name,
-                     Integer timeDeltaSeconds, Integer distanceDeltaMeters,
-                     int routeSegmentIndex, double routeSegmentPosition) {
+        final StockAlternativeContent.Content content;
+        CalloutModel(String key, double latitude, double longitude,
+                     int routeSegmentIndex, double routeSegmentPosition,
+                     StockAlternativeContent.Content content) {
             this.key = key;
             this.latitude = latitude;
             this.longitude = longitude;
-            this.name = name;
-            this.timeDeltaSeconds = timeDeltaSeconds;
-            this.distanceDeltaMeters = distanceDeltaMeters;
             this.routeSegmentIndex = routeSegmentIndex;
             this.routeSegmentPosition = routeSegmentPosition;
+            this.content = content;
         }
     }
 
@@ -835,8 +769,11 @@ final class AlternativeRouteMapLayer {
         final int bodyWidth;
         final int bodyHeight;
         final int leader;
+        final android.graphics.drawable.Drawable icon;
+        final int iconWidth, iconHeight, iconGap;
         PreparedText(Paint paint, List<TextPiece> pieces, float horizontalPadding,
-                     float verticalPadding, int bodyWidth, int bodyHeight, int leader) {
+                     float verticalPadding, int bodyWidth, int bodyHeight, int leader,
+                     android.graphics.drawable.Drawable icon, int iconWidth, int iconHeight, int iconGap) {
             this.paint = paint;
             this.pieces = pieces;
             this.horizontalPadding = horizontalPadding;
@@ -844,6 +781,7 @@ final class AlternativeRouteMapLayer {
             this.bodyWidth = bodyWidth;
             this.bodyHeight = bodyHeight;
             this.leader = leader;
+            this.icon = icon; this.iconWidth = iconWidth; this.iconHeight = iconHeight; this.iconGap = iconGap;
         }
     }
 

@@ -371,8 +371,6 @@ final class NavigatorStatePublisher {
     private static final long ALTERNATIVE_PALETTE_REFRESH_INTERVAL_MS = 5_000L;
     /** MapKit defaults vary by host; request enough upcoming lights for both independent maps. */
     private static final int MAX_UPCOMING_TRAFFIC_LIGHTS = 16;
-    /** Windshield returns only cameras which are active for the current route direction. */
-    private static final int MAX_ACTIVE_SPEED_CAMERAS = 8;
     private static final int MAX_MAP_LANES = 8;
     private static final int MAX_ROUTE_TURNS = 10;
     private static final long MIN_RESOLVE_RETRY_MS = 250L;
@@ -751,8 +749,7 @@ final class NavigatorStatePublisher {
                             readTrafficLights(inputs.routePosition, activeRoute));
                     activeTrafficLightsSampleElapsedMs = elapsedNow;
                     activeCameraDirections = Collections.unmodifiableList(
-                            readActiveSpeedCameras(activeRoute,
-                                    inputs.frame.bearingDegrees));
+                            readRouteCameras(activeRoute, inputs.frame));
                     activeCameraDirectionsSampleElapsedMs = elapsedNow;
                     lastTrafficLightsReadElapsedMs = elapsedNow;
                 }
@@ -1883,12 +1880,13 @@ final class NavigatorStatePublisher {
     /**
      * Reads the direction-aware camera stream. RoadEventsLayer's StyleProvider never receives
      * CameraData in MapKit 30.3.0, so styling the ordinary SPEED_CONTROL pin cannot expose this
-     * information. Windshield is the authoritative route-aware source used by Navigator itself.
+     * information. DrivingRoute.getEvents is the inventory; Windshield only enriches active
+     * records. A later camera must not wait for the previous one to leave the active list.
      */
-    private List<CameraDirectionFrame> readActiveSpeedCameras(
-            Object route, double fallbackBearingDegrees) throws Exception {
+    private List<CameraDirectionFrame> readRouteCameras(
+            Object route, NavigationFrame frame) throws Exception {
         ArrayList<CameraDirectionFrame> result = new ArrayList<>();
-        if (route == null || windshield == null) return result;
+        if (route == null) return result;
         List<?> routePoints = Collections.emptyList();
         try {
             Object geometry = invoke(route, "getGeometry");
@@ -1896,21 +1894,44 @@ final class NavigatorStatePublisher {
         } catch (Throwable ignored) {
             // Guidance bearing below remains valid while route geometry is being refreshed.
         }
-        List<?> cameras;
+        java.util.Map<String, Object> activeCameras = new java.util.HashMap<>();
         try {
-            cameras = invokeList(windshield, "getActiveSpeedCameras");
-        } catch (Throwable unavailable) {
-            // Direction arrows are optional map decoration. A transient Windshield update must
-            // not detach the otherwise healthy Guidance session or interrupt route publishing.
-            return result;
-        }
-        for (Object camera : cameras) {
-            if (result.size() >= MAX_ACTIVE_SPEED_CAMERAS) break;
-            try {
+            for (Object camera : invokeList(windshield, "getActiveSpeedCameras")) {
                 Object event = invoke(camera, "getEvent");
+                String id = text(invoke(event, "getEventId"));
+                if (!id.isEmpty()) activeCameras.put(id, camera);
+            }
+        } catch (Throwable unavailable) {
+            // The full route inventory remains usable without Windshield.
+        }
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Object event : activeRouteEvents) {
+            try {
                 Object point = event == null ? null : invoke(event, "getLocation");
                 if (point == null) continue;
-                Object directions = invoke(camera, "getActiveDirections");
+                ArrayList<String> controlTags = new ArrayList<>();
+                for (Object tag : invokeList(event, "getTags")) {
+                    String name = enumName(tag);
+                    if (RouteCameraPolicy.isControl(name) && !controlTags.contains(name)) controlTags.add(name);
+                }
+                if (controlTags.isEmpty()) continue;
+                Object position = invoke(event, "getPolylinePosition");
+                int segment = ((Number) invoke(position, "getSegmentIndex")).intValue();
+                double fraction = number(invoke(position, "getSegmentPosition"), Double.NaN);
+                if (!RouteCameraPolicy.isAhead(segment, fraction, routePoints.size(),
+                        frame.routeProgressValid, frame.routeSegmentIndex, frame.routeSegmentPosition)) continue;
+                String id = text(invoke(event, "getEventId"));
+                if (id.isEmpty()) id = "route-control:" + segment + ':' + fraction + ':' + controlTags;
+                if (!seen.add(id)) continue;
+                Object camera = activeCameras.get(id);
+                Object directions = null;
+                try { directions = invoke(event, "getCameraData"); } catch (Throwable ignored) {}
+                if (camera != null) {
+                    try {
+                        Object active = invoke(camera, "getActiveDirections");
+                        if (active != null) directions = active;
+                    } catch (Throwable ignored) {}
+                }
                 boolean inFace = directions != null
                         && Boolean.TRUE.equals(invoke(directions, "getInFace"));
                 boolean inBack = directions != null
@@ -1922,27 +1943,20 @@ final class NavigatorStatePublisher {
                         || longitude > 180d) {
                     continue;
                 }
-                String id = text(invoke(event, "getEventId"));
-                if (id.isEmpty()) {
-                    id = "speed-camera:" + Math.round(latitude * 100_000d)
-                            + ':' + Math.round(longitude * 100_000d);
+                int distanceMeters = -1;
+                if (camera != null) {
+                    try { distanceMeters = nonNegativeInt(number(invoke(camera, "getDistanceToCamera"), -1d)); }
+                    catch (Throwable ignored) {}
                 }
-                int distanceMeters = nonNegativeInt(
-                        number(invoke(camera, "getDistanceToCamera"), -1d));
                 float bearing = routeBearingAtEvent(
-                        routePoints, event, fallbackBearingDegrees);
+                        routePoints, event, frame.bearingDegrees);
                 int speedLimitKmh = CameraSpeedNormalizer.fromMapKitMetersPerSecond(
                         number(invoke(event, "getSpeedLimit"), Double.NaN));
-                if (speedLimitKmh < 0) {
-                    speedLimitKmh = CameraSpeedNormalizer.fromMapKitMetersPerSecond(number(
-                            invoke(camera, "getEffectiveSpeedLimit"), Double.NaN));
-                }
-                ArrayList<String> controlTags = new ArrayList<>();
-                for (Object tag : invokeList(event, "getTags")) {
-                    String name = enumName(tag);
-                    if (!name.isEmpty() && !controlTags.contains(name)) {
-                        controlTags.add(name);
-                    }
+                if (speedLimitKmh < 0 && camera != null) {
+                    try {
+                        speedLimitKmh = CameraSpeedNormalizer.fromMapKitMetersPerSecond(number(
+                                invoke(camera, "getEffectiveSpeedLimit"), Double.NaN));
+                    } catch (Throwable ignored) {}
                 }
                 result.add(new CameraDirectionFrame(id, latitude, longitude,
                         distanceMeters, bearing, inFace, inBack,

@@ -50,6 +50,22 @@ final class CameraDirectionMapLayer {
 
     private static final String SOURCE_YANDEX = "YANDEX";
     private static final String SOURCE_HUD_SPEED = "HUD_SPEED";
+    private RoadEventVisibility yandexVisibility;
+    private Runnable inventoryListener;
+    private boolean lastInventoryAvailable;
+
+    void setInventoryListener(Runnable value) { inventoryListener = value; }
+
+    void setRoadEventModes(java.util.Map<String, String> modes) {
+        yandexVisibility = new RoadEventVisibility(modes, true);
+        refreshFingerprintAndRender();
+    }
+
+    boolean hasRouteInventory() {
+        return yandexEnabled && latestRouteActive && !latestYandex.isEmpty()
+                && latestYandexSampleElapsedMs > 0L
+                && SystemClock.elapsedRealtime() - latestYandexSampleElapsedMs <= YANDEX_FRESH_MS;
+    }
 
     private final Context context;
     private final MapOverlayPlacementCoordinator placementCoordinator;
@@ -283,6 +299,11 @@ final class CameraDirectionMapLayer {
         // Presentation-only edits (sign size, sector geometry/colour/opacity and z-order)
         // deliberately invalidate the rendered fingerprint without changing camera data.
         if (map != null && (dataChanged || renderedFingerprint != fingerprint)) render();
+        boolean inventory = hasRouteInventory();
+        if (lastInventoryAvailable != inventory) {
+            lastInventoryAvailable = inventory;
+            if (inventoryListener != null) inventoryListener.run();
+        }
     }
 
     /** HUD Speed supplies the primary record; Yandex enriches it with exact event tags. */
@@ -298,26 +319,41 @@ final class CameraDirectionMapLayer {
             }
         }
         if (yandexEnabled && latestRouteActive && latestYandexSampleElapsedMs > 0L) {
+            int externalCount = target.size();
+            java.util.Set<Integer> matchedExternal = new java.util.HashSet<>();
+            java.util.Map<String, Integer> routeSlots = new java.util.HashMap<>();
             for (NavigatorStatePublisher.CameraDirectionFrame value : latestYandex) {
                 if (value == null || !value.hasMapPosition()) continue;
-                CameraMarker candidate = CameraMarker.fromYandex(value);
-                if (!mergeIntoNearbyHudSpeed(target, candidate)) {
-                    if (target.size() < MAX_CAMERAS) {
-                        addOrMergeDuplicate(target, candidate,
-                                SAME_SOURCE_DUPLICATE_DISTANCE_METERS);
-                    }
+                List<String> visibleTags = yandexVisibility == null ? value.controlTags
+                        : yandexVisibility.allowedTags(value.controlTags, true);
+                if (visibleTags.isEmpty()) continue;
+                CameraMarker candidate = CameraMarker.fromYandex(value, visibleTags);
+                Integer existing = candidate.id.isEmpty() ? null : routeSlots.get(candidate.id);
+                if (existing != null) {
+                    target.set(existing, CameraMarker.merge(target.get(existing), candidate));
+                    continue;
                 }
+                int slot = mergeIntoNearbyHudSpeed(target, candidate, matchedExternal, externalCount);
+                if (slot < 0) {
+                    slot = target.size();
+                    target.add(candidate);
+                }
+                if (!candidate.id.isEmpty()) routeSlots.put(candidate.id, slot);
             }
         }
     }
 
-    private static boolean mergeIntoNearbyHudSpeed(ArrayList<CameraMarker> values,
-                                                   CameraMarker candidate) {
+    private static int mergeIntoNearbyHudSpeed(ArrayList<CameraMarker> values,
+                                                   CameraMarker candidate,
+                                                   java.util.Set<Integer> matchedExternal,
+                                                   int externalCount) {
         int nearestIndex = -1;
         double nearestDistance = Double.MAX_VALUE;
-        for (int index = 0; index < values.size(); index++) {
+        // Only the bounded external prefix can match. Scanning the growing route suffix would
+        // make a full long-route inventory quadratic on every update.
+        for (int index = 0; index < externalCount; index++) {
             CameraMarker accepted = values.get(index);
-            if (!SOURCE_HUD_SPEED.equals(accepted.source)) continue;
+            if (!SOURCE_HUD_SPEED.equals(accepted.source) || matchedExternal.contains(index)) continue;
             double distance = distanceMeters(accepted.latitude, accepted.longitude,
                     candidate.latitude, candidate.longitude);
             if (distance <= HUD_SPEED_DUPLICATE_DISTANCE_METERS
@@ -326,10 +362,11 @@ final class CameraDirectionMapLayer {
                 nearestDistance = distance;
             }
         }
-        if (nearestIndex < 0) return false;
+        if (nearestIndex < 0) return -1;
+        matchedExternal.add(nearestIndex);
         values.set(nearestIndex,
                 CameraMarker.merge(values.get(nearestIndex), candidate));
-        return true;
+        return nearestIndex;
     }
 
     /** Collapses repeated source records into one physical camera marker. */
@@ -339,10 +376,7 @@ final class CameraDirectionMapLayer {
         for (int index = 0; index < values.size(); index++) {
             CameraMarker accepted = values.get(index);
             if (!accepted.source.equals(candidate.source)) continue;
-            boolean duplicateId = accepted.id.equals(candidate.id);
-            boolean duplicatePoint = distanceMeters(accepted.latitude, accepted.longitude,
-                    candidate.latitude, candidate.longitude) <= maximumDistanceMeters;
-            if (!duplicateId && !duplicatePoint) continue;
+            if (!RouteCameraPolicy.sameSourceIdentity(accepted.id, candidate.id)) continue;
             values.set(index, CameraMarker.merge(accepted, candidate));
             return;
         }
@@ -634,7 +668,7 @@ final class CameraDirectionMapLayer {
         int count = 0;
         for (CameraMarker value : values) {
             if (value == null || !value.hasMapPosition()) continue;
-            if (count++ >= MAX_CAMERAS) break;
+            count++;
             result = mix(result, value.source.hashCode());
             result = mix(result, value.id.hashCode());
             result = mix(result, Math.round(value.latitude * 1_000_000d));
@@ -781,12 +815,15 @@ final class CameraDirectionMapLayer {
             this.directions = directions;
         }
 
-        static CameraMarker fromYandex(NavigatorStatePublisher.CameraDirectionFrame value) {
+        static CameraMarker fromYandex(NavigatorStatePublisher.CameraDirectionFrame value,
+                                       List<String> visibleTags) {
             ArrayList<Double> directions = new ArrayList<>(2);
             if (value.inFace) directions.add(normalizedBearing(value.bearingDegrees + 180d));
             if (value.inBack) directions.add(normalizedBearing(value.bearingDegrees));
+            boolean hiddenSpeedControl = value.controlTags.contains("SPEED_CONTROL")
+                    && !visibleTags.contains("SPEED_CONTROL");
             return new CameraMarker(SOURCE_YANDEX, value.id, value.latitude, value.longitude,
-                    value.speedLimitKmh, value.controlTags,
+                    hiddenSpeedControl ? -1 : value.speedLimitKmh, visibleTags,
                     Collections.unmodifiableList(directions));
         }
 

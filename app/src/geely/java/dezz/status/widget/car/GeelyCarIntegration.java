@@ -1668,10 +1668,13 @@ final class GeelyCarIntegration implements CarIntegration {
         if (sample == null) {
             out.add(new CarDiagnosticValue("DstTrvld2",
                     "Пробег поездки 2", "unavailable", "—",
-                    "raw CarSignal; id=30878; дождитесь первого callback"));
+                    "raw CarSignal candidate; id=30878; manager/sample unavailable, support unconfirmed"));
             out.add(new CarDiagnosticValue("VehSpdAvgIndcdVehSpdIndcd",
                     "Средняя скорость поездки 2", "unavailable", "—",
                     "raw CarSignal; id=30957; unit id=30956"));
+            out.add(new CarDiagnosticValue("VehSpdAvgIndcdVeSpdIndcdUnit",
+                    "Единица средней скорости поездки 2", "unavailable", "—",
+                    "raw CarSignal candidate; id=30956; manager/sample unavailable"));
             return;
         }
         float distance = CurrentTripMetrics.distanceKilometres(
@@ -1680,17 +1683,22 @@ final class GeelyCarIntegration implements CarIntegration {
                 sample.averageSpeedRaw, sample.speedUnitRaw);
         float duration = CurrentTripMetrics.durationMinutes(distance, averageSpeed);
         out.add(new CarDiagnosticValue("DstTrvld2",
-                "Пробег поездки 2", "active",
+                "Пробег поездки 2", Float.isFinite(distance) ? "unverified" : "unavailable",
                 Integer.toString(sample.distanceRaw),
-                "raw CarSignal; id=30878; scale=0.1 km",
+                "raw CarSignal; id=30878; provisional scale=0.1 km; target support unconfirmed",
                 Float.isFinite(distance) ? distance : null));
         out.add(new CarDiagnosticValue("VehSpdAvgIndcdVehSpdIndcd",
-                "Средняя скорость поездки 2", "active",
+                "Средняя скорость поездки 2", Float.isFinite(averageSpeed) ? "unverified" : "unavailable",
                 Integer.toString(sample.averageSpeedRaw),
                 "raw CarSignal; id=30957; unit=" + sample.speedUnitRaw
-                        + "; unit id=30956; derived time="
+                        + "; unit id=30956; estimated (not stock) time="
                         + (Float.isFinite(duration) ? Float.toString(duration) : "unavailable"),
                 Float.isFinite(averageSpeed) ? averageSpeed : null));
+        out.add(new CarDiagnosticValue("VehSpdAvgIndcdVeSpdIndcdUnit",
+                "Единица средней скорости поездки 2",
+                sample.speedUnitRaw == 0 || sample.speedUnitRaw == 1 ? "unverified" : "unavailable",
+                Integer.toString(sample.speedUnitRaw),
+                "raw CarSignal candidate; id=30956; provisional 0=km/h, 1=mph; target support unconfirmed"));
     }
 
     private static void addUnavailableSensor(List<CarDiagnosticValue> out,
@@ -2706,6 +2714,7 @@ final class GeelyCarIntegration implements CarIntegration {
         float duration = CurrentTripMetrics.durationMinutes(distance, averageSpeed);
         long observedAt = Math.max(0L, System.currentTimeMillis()
                 - ageNanos / 1_000_000L);
+        invalidateUnavailableTripFields(subscription, distance, duration, averageSpeed);
         if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)
                 && Float.isFinite(distance)) {
             deliverTelemetry(subscription, new TelemetryValue(CurrentTripMetrics.DISTANCE_ID,
@@ -2737,20 +2746,32 @@ final class GeelyCarIntegration implements CarIntegration {
                 sample.averageSpeedRaw, sample.speedUnitRaw);
         float duration = CurrentTripMetrics.durationMinutes(distance, averageSpeed);
         long observedAt = sample.observedAtElapsedNanos;
-        if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)
-                && Float.isFinite(distance)) {
+        if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)) {
             deliverRealtimeTelemetry(subscription, CurrentTripMetrics.DISTANCE_ID,
                     distance, observedAt);
         }
-        if (subscription.metricIds.contains(CurrentTripMetrics.DURATION_ID)
-                && Float.isFinite(duration)) {
+        if (subscription.metricIds.contains(CurrentTripMetrics.DURATION_ID)) {
             deliverRealtimeTelemetry(subscription, CurrentTripMetrics.DURATION_ID,
                     duration, observedAt);
         }
-        if (subscription.metricIds.contains(CurrentTripMetrics.AVERAGE_SPEED_ID)
-                && Float.isFinite(averageSpeed)) {
+        if (subscription.metricIds.contains(CurrentTripMetrics.AVERAGE_SPEED_ID)) {
             deliverRealtimeTelemetry(subscription, CurrentTripMetrics.AVERAGE_SPEED_ID,
                     averageSpeed, observedAt);
+        }
+    }
+
+    private void invalidateUnavailableTripFields(TelemetrySubscription subscription,
+                                                float distance, float duration, float average) {
+        String[] ids = {CurrentTripMetrics.DISTANCE_ID, CurrentTripMetrics.DURATION_ID,
+                CurrentTripMetrics.AVERAGE_SPEED_ID};
+        float[] values = {distance, duration, average};
+        for (int index = 0; index < ids.length; index++) {
+            String id = ids[index];
+            if (!Float.isFinite(values[index]) && subscription.metricIds.contains(id)) {
+                mainHandler.post(() -> {
+                    if (!subscription.cancelled.get()) subscription.listener.onTelemetryUnavailable(id);
+                });
+            }
         }
     }
 

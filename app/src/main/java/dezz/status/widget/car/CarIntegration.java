@@ -85,6 +85,8 @@ public interface CarIntegration {
     /** Receives validated vehicle telemetry on the main thread. */
     interface TelemetryListener {
         void onTelemetry(@NonNull TelemetryValue value);
+        /** Explicit loss of one field, without inventing a numeric zero or a fresh old value. */
+        default void onTelemetryUnavailable(@NonNull String metricId) {}
     }
 
     /**
