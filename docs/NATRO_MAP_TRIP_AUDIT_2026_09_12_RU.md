@@ -41,6 +41,13 @@ versionCode, публикации точного дерева и совмест�
 Android 36 compilation Navigator и регрессии инструментов; никаких assemble/sign задач,
 проверяется отсутствие APK. Статус удалённого прогона будет записан после публикации.
 
+Первый исходниковый commit `6cfd9221614c47468d053e0ae447f01fa2310d3e`, tree
+`084010f75ea0beeab2a5e770f673a9cd782f60d5`, опубликован. CI `34708452918` остановился
+на компиляции Trip2: все три getter объявляют checked `android.car.CarNotConnectedException`.
+Сигнатуры повторно проверены по комплектному `ecarx-adaptapi.jar`; поправлены IntReader,
+поэлементный catch и тестовые getters, добавлены три отдельные проверки disconnect.
+Нового APK первый CI не создал. Повторный полный прогон обязателен.
+
 - 70 тестов `python -m unittest discover -s tools/tests -q`: успешно, без ошибок и пропусков;
   подключены локальные javac и org.json.
 - Java-компиляция всего `navigator-mod` с Android 35 platform jar, source/target 8,

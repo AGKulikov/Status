@@ -18,6 +18,7 @@ SOURCES = {
       public boolean isAvailable(){return false;}
       public android.graphics.Bitmap getBitmap(int w,int h){return null;} }""",
     "android/content/Context.java": "package android.content; public class Context { public Context getApplicationContext(){return this;} }",
+    "android/car/CarNotConnectedException.java": "package android.car; public class CarNotConnectedException extends Exception {}",
     "android/os/SystemClock.java": "package android.os; public class SystemClock { public static long elapsedRealtimeNanos(){return 1000000000L;} }",
     "android/util/Log.java": """package android.util; public class Log {
       public static int w(String t,String s){return 0;} public static int w(String t,String s,Throwable e){return 0;}
@@ -30,12 +31,17 @@ SOURCES = {
         public static final int SignalId_DstTrvld2=30878, SignalId_VehSpdAvgIndcdVehSpdIndcd=30957,
           SignalId_VehSpdAvgIndcdVeSpdIndcdUnit=30956;
         public int distance=174, speed=24, unit=0; public boolean failDistance;
+        public boolean disconnectedDistance,disconnectedSpeed,disconnectedUnit;
         public CarSignalEventCallback callback; public int registrations, removals;
         public interface CarSignalEventCallback {
           void onChangeEvent(ecarx.car.hardware.ECarXCarPropertyValue value); void onErrorEvent(int p,int a); }
-        public int getDstTrvld2(){if(failDistance)throw new IllegalStateException();return distance;}
-        public int getVehSpdAvgIndcdVehSpdIndcd(){return speed;}
-        public int getVehSpdAvgIndcdVeSpdIndcdUnit(){return unit;}
+        public int getDstTrvld2()throws android.car.CarNotConnectedException{
+          if(failDistance)throw new IllegalStateException();
+          if(disconnectedDistance)throw new android.car.CarNotConnectedException();return distance;}
+        public int getVehSpdAvgIndcdVehSpdIndcd()throws android.car.CarNotConnectedException{
+          if(disconnectedSpeed)throw new android.car.CarNotConnectedException();return speed;}
+        public int getVehSpdAvgIndcdVeSpdIndcdUnit()throws android.car.CarNotConnectedException{
+          if(disconnectedUnit)throw new android.car.CarNotConnectedException();return unit;}
         public void registerCallback(CarSignalEventCallback c,SignalFilter f){callback=c;registrations++;}
         public void unregisterCallback(CarSignalEventCallback c){callback=null;removals++;}
       }""",
@@ -130,6 +136,13 @@ SOURCES = {
           manager.speed=24;manager.failDistance=true;manager.callback.onChangeEvent(null);
           check(delivered[0].distanceRaw==-1 && delivered[0].averageSpeedRaw==24);
           check(CurrentTripMetrics.averageSpeedKmh(delivered[0].averageSpeedRaw,0)==24);
+          manager.failDistance=false;manager.disconnectedDistance=true;manager.callback.onChangeEvent(null);
+          check(delivered[0].distanceRaw==-1 && delivered[0].averageSpeedRaw==24 && delivered[0].speedUnitRaw==0);
+          manager.disconnectedDistance=false;manager.disconnectedUnit=true;manager.callback.onChangeEvent(null);
+          check(delivered[0].distanceRaw==174 && delivered[0].averageSpeedRaw==24 && delivered[0].speedUnitRaw==-1);
+          check(Float.isNaN(CurrentTripMetrics.averageSpeedKmh(delivered[0].averageSpeedRaw,delivered[0].speedUnitRaw)));
+          manager.disconnectedUnit=false;manager.disconnectedSpeed=true;manager.callback.onChangeEvent(null);
+          check(delivered[0].distanceRaw==174 && delivered[0].averageSpeedRaw==-1 && delivered[0].speedUnitRaw==0);
           source.onECarXCarServiceDeath();check(delivered[0].distanceRaw==-1 && delivered[0].averageSpeedRaw==-1);
           CarSignalManager fresh=new CarSignalManager();source.onECarXCarServiceConnected(null,fresh);
           check(delivered[0].distanceRaw==174);source.removeListener(listener);check(fresh.removals==1);
@@ -158,7 +171,9 @@ class MapRegressionTest(unittest.TestCase):
             "navigator-mod/src/main/java/ru/natro/navigation/BalloonGeometry.java",
             "navigator-mod/src/main/java/ru/natro/navigation/RouteCameraPolicy.java")]
         compiler = [shutil.which("javac")] if shutil.which("javac") else ["java", "com.sun.tools.javac.Main"]
-        subprocess.run([*compiler, "-d", str(cls.directory), *files], check=True, capture_output=True)
+        compiled = subprocess.run([*compiler, "-d", str(cls.directory), *files], capture_output=True, text=True)
+        if compiled.returncode:
+            raise AssertionError(compiled.stderr)
 
     @classmethod
     def tearDownClass(cls):

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.car;
 
+import android.car.CarNotConnectedException;
 import android.content.Context;
 import android.os.SystemClock;
 import android.util.Log;
@@ -137,9 +138,10 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
         }
     }
 
-    private interface IntReader { int read(); }
+    private interface IntReader { int read() throws CarNotConnectedException; }
     private static int readSignal(IntReader reader) {
-        try { return reader.read(); } catch (RuntimeException unavailable) { return -1; }
+        try { return reader.read(); }
+        catch (CarNotConnectedException | RuntimeException unavailable) { return -1; }
     }
 
     private void publishUnavailable() {
