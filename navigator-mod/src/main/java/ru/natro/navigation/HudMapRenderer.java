@@ -407,16 +407,6 @@ final class HudMapRenderer {
             alternativeRouteMapLayer.attach(map);
             cursorStyler.attach(map);
 
-            Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
-            Class<?> surfaceFactoryClass = Class.forName(
-                    "com.yandex.runtime.view.SurfaceFactory");
-            Object nextRuntimeSurface = surfaceFactoryClass.getMethod(
-                    "from", Surface.class).invoke(null, surface);
-            runtimeSurface = nextRuntimeSurface;
-            invoke(nextMapWindow, "addSurface",
-                    new Class<?>[]{runtimeSurfaceClass}, nextRuntimeSurface);
-            runtimeSurfaceAttached = true;
-
             // Optional traffic enriches the map but is not allowed to take down the renderer.
             Class<?> mapWindowClass = Class.forName("com.yandex.mapkit.map.MapWindow");
             trafficLayer = createOptionalLayer(
@@ -426,6 +416,20 @@ final class HudMapRenderer {
             createRoadEventsLayer(mapKit, mapKitClass, mapWindowClass, nextMapWindow);
             applyProfile();
             mapConfigured = true;
+
+            // addSurface can immediately publish a buffer. Configure the map while it has no
+            // consumer, otherwise its default light background can reach the first TextureView
+            // update before the requested night/roads-only appearance. Do not wait for tiles,
+            // a readiness ACK or pixel readback: cached/partial maps must still appear (NAV-019).
+            Class<?> runtimeSurfaceClass = Class.forName("com.yandex.runtime.view.Surface");
+            Class<?> surfaceFactoryClass = Class.forName(
+                    "com.yandex.runtime.view.SurfaceFactory");
+            Object nextRuntimeSurface = surfaceFactoryClass.getMethod(
+                    "from", Surface.class).invoke(null, surface);
+            runtimeSurface = nextRuntimeSurface;
+            invoke(nextMapWindow, "addSurface",
+                    new Class<?>[]{runtimeSurfaceClass}, nextRuntimeSurface);
+            runtimeSurfaceAttached = true;
             observeMapLoading();
             acknowledgeMapContent();
             Log.i(TAG, "Independent " + displayName
@@ -500,6 +504,7 @@ final class HudMapRenderer {
         boolean systemNight = (context.getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         boolean night = profile.automaticDayNight ? systemNight : profile.nightMode;
+        applyMapBackground(currentMap, night, profile.roadsOnly);
         boolean roadEventScaleChanged = scaledRoadEventStyleProvider != null
                 && scaledRoadEventStyleProvider.setScales(
                 profile.roadEventScalePercent, profile.cameraScalePercent);
@@ -547,15 +552,12 @@ final class HudMapRenderer {
                     profile.cursorColor, profile.cursorOutlineColor,
                     profile.effectiveCursorPriority());
             syncOverlayNavigationState();
-            invoke(currentMap, "setNightModeEnabled", new Class<?>[]{boolean.class}, night);
             invoke(currentMap, "setModelsEnabled", new Class<?>[]{boolean.class},
                     profile.showModels && !profile.roadsOnly);
             invoke(currentMap, "setAwesomeModelsEnabled", new Class<?>[]{boolean.class},
                     profile.showModels && !profile.roadsOnly);
             invoke(currentMap, "setPoiLimit", new Class<?>[]{Integer.class},
                     profile.roadsOnly || !profile.showPois ? Integer.valueOf(0) : null);
-            invoke(currentMap, "setTransparentBackgroundEnabled",
-                    new Class<?>[]{boolean.class}, profile.roadsOnly);
             invoke(currentMap, "setRotateGesturesEnabled", new Class<?>[]{boolean.class}, false);
             invoke(currentMap, "setScrollGesturesEnabled", new Class<?>[]{boolean.class}, false);
             invoke(currentMap, "setTiltGesturesEnabled", new Class<?>[]{boolean.class}, false);
@@ -575,6 +577,21 @@ final class HudMapRenderer {
             rebuildRoute();
         } catch (Throwable failure) {
             Log.w(TAG, "Some HUD MapProfile fields could not be applied", failure);
+        }
+    }
+
+    /** Basic appearance must not depend on an optional layer or FPS API succeeding first. */
+    private void applyMapBackground(Object currentMap, boolean night, boolean transparent) {
+        try {
+            invoke(currentMap, "setNightModeEnabled", new Class<?>[]{boolean.class}, night);
+        } catch (Throwable failure) {
+            Log.w(TAG, "Map night mode could not be applied", failure);
+        }
+        try {
+            invoke(currentMap, "setTransparentBackgroundEnabled",
+                    new Class<?>[]{boolean.class}, transparent);
+        } catch (Throwable failure) {
+            Log.w(TAG, "Map transparency could not be applied", failure);
         }
     }
 
