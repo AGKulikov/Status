@@ -466,12 +466,12 @@ public final class SteeringMediaKeyRouter {
         if (!started || route != next || routeGeneration != next.generation) return;
         try {
             next.controller.registerCallback(next.callback, resolver);
-            trace("session=" + next.packageName + ", token=" + next.sessionId
+            trace("session=" + next.packageName + ", session_id=" + next.sessionId
                     + ", generation=" + next.generation
                     + ", selected=" + SystemClock.uptimeMillis()
                     + ", playbackState=" + next.playbackState);
         } catch (RuntimeException stale) {
-            trace("session=" + next.packageName + ", token=" + next.sessionId
+            trace("session=" + next.packageName + ", session_id=" + next.sessionId
                     + ", selection_failed=" + stale.getClass().getSimpleName());
             resolver.post(() -> {
                 if (route != next) return;

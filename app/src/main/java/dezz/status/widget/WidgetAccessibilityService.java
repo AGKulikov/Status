@@ -345,7 +345,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
     }
 
     /**
-     * KX11 delivers the physical previous/next/play keys here before the default media dispatcher.
+     * Handles physical previous/next/play keys when KX11 delivers them to accessibility.
      * Consume only a key whose DOWN event reached one exact cached session; every other key keeps
      * Android's stock path unchanged.
      */
