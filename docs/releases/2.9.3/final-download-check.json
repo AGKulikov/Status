@@ -1,0 +1,372 @@
+{
+  "source_commit": "bc9a069460493711d4c51b7f58a752972007ff34",
+  "source_tree": "3b12cdf7a66658c8ea566f74940d50afca024208",
+  "downloaded_files_match_ci_sha256_manifest": true,
+  "signature_verification": "apksigner v2/v3 in CI; certificate identity re-read locally",
+  "apks": {
+    "natro": {
+      "file": "Natro-2.9.3-signed.apk",
+      "package": "ru.natro.statuswidget",
+      "versionName": "2.9.3",
+      "versionCode": 208021326,
+      "sha256": "19133dbabe4e6347897468e7ade8a101d3998b1830f10c3195f717096c508e62",
+      "bytes": 28360046,
+      "certificates": {
+        "v2": [
+          "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+        ],
+        "v3": [
+          "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+        ]
+      },
+      "zip_crc": "pass",
+      "minSdk": "28"
+    },
+    "navigator": {
+      "file": "Navigator-30.3.0-Natro-2.9.3-signed.apk",
+      "package": "ru.yandex.yandexnavi",
+      "versionName": "30.3.0",
+      "versionCode": 739564630,
+      "sha256": "48aea07ece1c3c6a73a1ce67563ab8741c504c25297f5f047fda13847aef0820",
+      "bytes": 155153827,
+      "certificates": {
+        "v2": [
+          "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+        ],
+        "v3": [
+          "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+        ]
+      },
+      "zip_crc": "pass",
+      "minSdk": "26"
+    }
+  },
+  "dex_declarations": {
+    "natro": [
+      {
+        "class": "Ldezz/status/widget/diagnostics/BoundedUtf8Tail;",
+        "dex": "classes2.dex",
+        "methods": [
+          {
+            "name": "read",
+            "signature": "(Ljava/io/File;I)Ljava/lang/String;",
+            "code_sha256": "11e94c57d9af5c58d63ee36b8270d08d44ea556b07b9e3d2edb0c8551b7ca73a"
+          }
+        ]
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/MediaKeyObservation$Candidate;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/MediaKeyObservation$Press;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/MediaKeyObservation;",
+        "dex": "classes2.dex",
+        "methods": [
+          {
+            "name": "candidate",
+            "signature": "(J)Ldezz/status/widget/diagnostics/MediaKeyObservation$Candidate;",
+            "code_sha256": "d6fdf6df1f919e66d2d8677305dedfc8a52b346da020ceb55b2c74ced3b5ac76"
+          },
+          {
+            "name": "received",
+            "signature": "(IIJJIIJ)Ldezz/status/widget/diagnostics/MediaKeyObservation$Press;",
+            "code_sha256": "bd39094b1d259d671a3f405a4e00716113932e57a975aacab9410438159c5179"
+          }
+        ]
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$$ExternalSyntheticLambda0;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$$ExternalSyntheticLambda1;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$$ExternalSyntheticLambda2;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$$ExternalSyntheticLambda3;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$1;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$2$$ExternalSyntheticLambda0;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$2;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$3;",
+        "dex": "classes2.dex",
+        "methods": [
+          {
+            "name": "onReceive",
+            "signature": "(Landroid/content/Context;Landroid/content/Intent;)V",
+            "code_sha256": "8467afc2c0efa65ff392200b69c3d01d5b0b977dbdf48dfbad228a52290d337d"
+          }
+        ]
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$Watch$1;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics$Watch;",
+        "dex": "classes2.dex",
+        "methods": []
+      },
+      {
+        "class": "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics;",
+        "dex": "classes2.dex",
+        "methods": [
+          {
+            "name": "clearSessions",
+            "signature": "()V",
+            "code_sha256": "db07ead4b5ab58ca77f5a81c88d4c6e722ac70fe897bb312862eea2c70dd6d41"
+          },
+          {
+            "name": "debugChanged",
+            "signature": "(Z)V",
+            "code_sha256": "f322c21eb96080d7272f8da579cfce99fe45a85f4dfa07f1ab0337217cf8c5aa"
+          },
+          {
+            "name": "emit",
+            "signature": "(Ljava/lang/String;)V",
+            "code_sha256": "c0eb20e3b8bd434f3facf86013c15e6c71c7b158f2b5993f30631142c3e104cf"
+          },
+          {
+            "name": "initialize",
+            "signature": "(Landroid/content/Context;)V",
+            "code_sha256": "12a586a669567501183d647376c0682a2710212835a19b070a8b8299658bda27"
+          },
+          {
+            "name": "reconcileOnInput",
+            "signature": "()V",
+            "code_sha256": "b5d2eabd2e479fd67647e1c157ac06b0bb8ac4c5e35fa02fb8c7d42a1ec91b69"
+          },
+          {
+            "name": "replaceSessions",
+            "signature": "(Ljava/util/List;J)V",
+            "code_sha256": "e24a00d327a4d80b772a25f16a7a74387e5444c703e64dd1c1e685252f7e79e2"
+          },
+          {
+            "name": "scheduleReconcile",
+            "signature": "()V",
+            "code_sha256": "592e8809f7397255e7656a018cfbdaee784227edae1739f6093d08498aaed077"
+          }
+        ]
+      },
+      {
+        "class": "Ldezz/status/widget/instrument/InstrumentPanelView;",
+        "dex": "classes2.dex",
+        "methods": [
+          {
+            "name": "recoverColdGeometry",
+            "signature": "()V",
+            "code_sha256": "366b71af5684f0f82ceaa47de6ae02c7fbf62d9970eb5ed16cb1c3d4ebcf2033"
+          },
+          {
+            "name": "retryColdLease",
+            "signature": "()V",
+            "code_sha256": "8da6b8c85f04821f5b7bffcc317c6a55240996732c6eabf1285c7e0fb8be4341"
+          },
+          {
+            "name": "onSurfaceTextureAvailable",
+            "signature": "(Landroid/graphics/SurfaceTexture;II)V",
+            "code_sha256": "4415899ec4a67c26d35fb2d47a12a27005edf06254c58863335e0b42bcbc01c8"
+          },
+          {
+            "name": "onSurfaceTextureDestroyed",
+            "signature": "(Landroid/graphics/SurfaceTexture;)Z",
+            "code_sha256": "ac48aa76bc4f66f4cff1852350d39171cd914cc4601c59fa8600b8e935abf006"
+          },
+          {
+            "name": "onSurfaceTextureUpdated",
+            "signature": "(Landroid/graphics/SurfaceTexture;)V",
+            "code_sha256": "070d4102b02c27c75b0aa17cb1243659c0dc7390193ef56481d5a581bac0aaa8"
+          }
+        ]
+      },
+      {
+        "class": "Ldezz/status/widget/navigation/NavigationHudEndpointService;",
+        "dex": "classes2.dex",
+        "methods": [
+          {
+            "name": "disconnectCurrentClient",
+            "signature": "()V",
+            "code_sha256": "ca7671dac2a4f9f3ba8d689ae905c80f2a7cb3a528c85116de6f9d99c5c14858"
+          },
+          {
+            "name": "sendClusterSurface",
+            "signature": "(Ldezz/status/widget/navigation/NavigationHudEndpointService$SurfaceLease;)V",
+            "code_sha256": "837e45adf3ac3be6634e8e263a3beba96415ca184707f5e4cdb39fbb8790fc06"
+          },
+          {
+            "name": "sendSurface",
+            "signature": "(Ldezz/status/widget/navigation/NavigationHudEndpointService$SurfaceLease;)V",
+            "code_sha256": "47a112fe3b99ba3a3f9c2ffaa34d568ca6640c0158a9d8620807d66807776d74"
+          },
+          {
+            "name": "sentMapGeneration",
+            "signature": "(Landroid/view/Surface;Z)J",
+            "code_sha256": "d3ae0ab2c5b5f8059190601a11f4b8c33857ccb2638f01df6bd02e8fbfc9349c"
+          }
+        ]
+      },
+      {
+        "class": "Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;",
+        "dex": "classes2.dex",
+        "methods": [
+          {
+            "name": "maybeCompleteTeardown",
+            "signature": "()V",
+            "code_sha256": "4c317618acbd1f67651bcbe04de5f22a5eb1ff11f9e13cb1b5a74ffbb483768b"
+          },
+          {
+            "name": "stopOnMain",
+            "signature": "(Ldezz/status/widget/phone/transport/v2/BleRouteEpoch;Ldezz/status/widget/phone/transport/v2/IphoneTransportStopReason;)V",
+            "code_sha256": "03f2c18e2cf3617cea1b9bb309704d42da5a39779d0529585df6fe1670c50d70"
+          }
+        ]
+      }
+    ],
+    "navigator": [
+      {
+        "class": "Lru/natro/navigation/CameraDirectionMapLayer;",
+        "dex": "classes19.dex",
+        "methods": [
+          {
+            "name": "applyAtomicVisibility",
+            "signature": "(Lru/natro/navigation/CameraDirectionMapLayer$CameraSign;)V",
+            "code_sha256": "96e57496520db31af07a6c071346408a8f9febfb43b566e03b750c0c32976d0f"
+          },
+          {
+            "name": "detailDrawableName",
+            "signature": "(Ljava/util/List;)Ljava/lang/String;",
+            "code_sha256": "275efbd57c380fccfb386d2e46a6e6e67429ed59d9775455ca96a751fc99c805"
+          },
+          {
+            "name": "invoke",
+            "signature": "(Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/Object;",
+            "code_sha256": "b60229370cd9f41dbf40202e44628286417d59112a550898d87fd14edbd791d0"
+          },
+          {
+            "name": "render",
+            "signature": "()V",
+            "code_sha256": "6e900efb94de6b4059c9757f9cf350e0c7e28feeeb8adef1317817c64a96b39d"
+          }
+        ]
+      },
+      {
+        "class": "Lru/natro/navigation/RouteCameraPolicy;",
+        "dex": "classes19.dex",
+        "methods": [
+          {
+            "name": "detailDrawableForStockResource",
+            "signature": "(Ljava/lang/String;)Ljava/lang/String;",
+            "code_sha256": "ea357800c571f6fff881f92bcce263bfa8b1f2827a031186a86cfdc2fd842660"
+          },
+          {
+            "name": "isAhead",
+            "signature": "(IDIZID)Z",
+            "code_sha256": "874b7e746e8f6fb0fcf59d28b5c53077b2ef378c210eb7827179502a4a95cfc0"
+          },
+          {
+            "name": "isCameraRecord",
+            "signature": "(Ljava/lang/Iterable;)Z",
+            "code_sha256": "566b02257c340c445244e3e2315b6e170752475799099a8cae2402c9d21218b2"
+          },
+          {
+            "name": "isReplacedCameraTag",
+            "signature": "(Ljava/lang/String;)Z",
+            "code_sha256": "6b2c66399590b701ea14097da28b0a2775fdad37d0bfb0aa5a7d92d802a2b962"
+          }
+        ]
+      },
+      {
+        "class": "Lru/natro/navigation/RouteRoadEventMapLayer;",
+        "dex": "classes19.dex",
+        "methods": [
+          {
+            "name": "invoke",
+            "signature": "(Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/Object;",
+            "code_sha256": "b60229370cd9f41dbf40202e44628286417d59112a550898d87fd14edbd791d0"
+          },
+          {
+            "name": "selectedCameraImageId",
+            "signature": "(Ljava/lang/Object;Ljava/util/List;)Ljava/lang/String;",
+            "code_sha256": "880200e277fe530588c7facfd240ca14e174bb382b475ad840a2e1f34d83f8a4"
+          },
+          {
+            "name": "stockStyle",
+            "signature": "(Ljava/lang/Object;Ljava/util/List;Z)Lru/natro/navigation/RouteRoadEventMapLayer$Style;",
+            "code_sha256": "90ca61e340b34e90e06c6ff087778ef23fdd676842a662d0c590cc0b29d838a0"
+          },
+          {
+            "name": "stockStyle",
+            "signature": "(Ljava/util/List;)Lru/natro/navigation/RouteRoadEventMapLayer$Style;",
+            "code_sha256": "9153872eec78784975a6ea36ce104a12e431fcd727d302ae031113ec2d5559df"
+          },
+          {
+            "name": "render",
+            "signature": "(Ljava/util/List;)V",
+            "code_sha256": "f7e0a29df1f3b288941c23e71dbd06012f82e320c2981a61eaf87ab4093ba0b6"
+          }
+        ]
+      },
+      {
+        "class": "Lru/natro/navigation/ScaledRoadEventStyleProvider;",
+        "dex": "classes19.dex",
+        "methods": [
+          {
+            "name": "invoke",
+            "signature": "(Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/Object;",
+            "code_sha256": "b60229370cd9f41dbf40202e44628286417d59112a550898d87fd14edbd791d0"
+          },
+          {
+            "name": "invoke",
+            "signature": "(Ljava/lang/Object;Ljava/lang/reflect/Method;[Ljava/lang/Object;)Ljava/lang/Object;",
+            "code_sha256": "a9e2465ecc19805d0c6b3dc38006afe955b73eb303bcba99b6ceef1cf19f0c2b"
+          },
+          {
+            "name": "setUnifiedRouteCameras",
+            "signature": "(Z)Z",
+            "code_sha256": "30ca1f3ee113701c94fe5b8c32f67467999ad575fb979e9953f0d3586f07d744"
+          }
+        ]
+      }
+    ]
+  },
+  "navigator_payload_comparison_2_9_2": {
+    "changed_entries": [
+      "classes19.dex"
+    ],
+    "unchanged_entries": 17030,
+    "signature_entries_excluded": "META-INF/",
+    "old_apk_sha256": "3a59e53618bc86865983ed7dfac45552f0dab4c10f50c2353fc6979ac2189d71"
+  },
+  "removed_custom_media_router": true,
+  "hardware_acceptance": "not performed: KX11 unavailable",
+  "declarations_scope": "Installed classes and selected compiled methods; DEX instruction hashes are provenance, not hardware acceptance."
+}
