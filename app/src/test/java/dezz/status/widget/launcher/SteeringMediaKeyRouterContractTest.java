@@ -126,6 +126,19 @@ public final class SteeringMediaKeyRouterContractTest {
         assertFalse(getView.contains("AppDrawerUninstallPolicy.canUninstall"));
     }
 
+    @Test public void earlyCallbacksAreCorrelatedBeforeThePlayerBinderCall() throws Exception {
+        String source=read("app/src/main/java/dezz/status/widget/launcher/SteeringMediaKeyRouter.java");
+        String dispatch=between(source,"private void dispatchQueued(@NonNull Command queued)",
+                "private void clearPendingCommands");
+        assertTrue(dispatch.indexOf("lastCommandSequence = queued.sequence")
+                < dispatch.indexOf("getTransportControls()"));
+        assertTrue(dispatch.indexOf("dispatch_started") < dispatch.indexOf("getTransportControls()"));
+        assertTrue(source.contains("metadata_changed="));
+        assertTrue(source.contains("binder_duration_ms="));
+        assertFalse(source.contains(", after_key="));
+        assertFalse(source.contains(", token="));
+    }
+
     private static int count(String source, String value) {
         int result = 0;
         for (int index = 0; (index = source.indexOf(value, index)) >= 0;

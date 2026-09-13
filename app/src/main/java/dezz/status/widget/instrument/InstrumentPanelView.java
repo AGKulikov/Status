@@ -49,6 +49,7 @@ public final class InstrumentPanelView extends FrameLayout
     /** Wait for a surface update, without depending on complete MapKit tile loading. */
     private float desiredMapAlpha = 1f;
     private boolean awaitingFirstMapFrame = true;
+    private long firstFrameWaitStarted;
     @Nullable private String cachedMapProfileRaw;
     @Nullable private NavigationIntegrationConfig.MapProfile cachedMapProfile;
     @NonNull private final Runnable coldLeaseRetry = this::retryColdLease;
@@ -217,14 +218,16 @@ public final class InstrumentPanelView extends FrameLayout
                 && mapSurface != null && mapSurface.isValid()) {
             awaitingFirstMapFrame = false;
             mapView.setAlpha(desiredMapAlpha);
-            DiagnosticJournal.info("cluster-map", "cluster surface updated; map shown, opacity="
-                    + desiredMapAlpha);
+            DiagnosticJournal.infoAsync("cluster-map", "cluster surface updated; map shown, opacity="
+                    + desiredMapAlpha + ", first_update_wait_ms="
+                    + (android.os.SystemClock.uptimeMillis() - firstFrameWaitStarted));
         }
     }
 
     private void beginFirstFrameGate() {
         if (mapTexture == null) return;
         awaitingFirstMapFrame = true;
+        firstFrameWaitStarted = android.os.SystemClock.uptimeMillis();
         mapView.setAlpha(0f);
     }
 

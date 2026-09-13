@@ -117,6 +117,8 @@ public final class SteeringMediaKeyRouter {
         }
         if (started) return;
         started = true;
+        trace("router_started, at=" + SystemClock.uptimeMillis()
+                + ", session_manager=" + (manager != null));
         if (manager != null) {
             try {
                 manager.addOnActiveSessionsChangedListener(
@@ -138,6 +140,7 @@ public final class SteeringMediaKeyRouter {
             return;
         }
         started = false;
+        trace("router_closed, at=" + SystemClock.uptimeMillis());
         refreshGeneration++;
         routeGeneration++;
         refreshInFlight = false;
@@ -167,13 +170,20 @@ public final class SteeringMediaKeyRouter {
     public boolean dispatch(int keyCode, long eventTimeMs, long downTimeMs,
                             long callbackEntryUptimeMs) {
         Route current = route;
-        if (!started || !isSupportedKey(keyCode) || current == null) return false;
+        if (!started || !isSupportedKey(keyCode) || current == null) {
+            trace("result=stock_fallback, reason=" + (!started ? "router_stopped"
+                    : !isSupportedKey(keyCode) ? "unsupported" : "no_exact_session")
+                    + ", key_code=" + keyCode + ", event=" + eventTimeMs
+                    + ", down=" + downTimeMs + ", callback=" + callbackEntryUptimeMs);
+            return false;
+        }
         long now = SystemClock.uptimeMillis();
         long blockedSince = commandInFlightSinceMs;
         if (blockedSince > 0L && now - blockedSince > MAX_COMMAND_QUEUE_AGE_MS) {
             long blockedSequence = commandInFlightSequence;
             trace("binder_stalled_sequence=" + blockedSequence + ", blocked_since="
-                    + blockedSince + ", fallback_key=" + keyCode + ", at=" + now);
+                    + blockedSince + ", fallback_key_code=" + keyCode + ", at=" + now
+                    + ", event=" + eventTimeMs + ", down=" + downTimeMs);
             // Do not enqueue a press behind a stuck player Binder. Returning false lets the
             // AccessibilityService hand this fresh event to Android's normal media dispatcher.
             resolver.post(() -> {
@@ -249,6 +259,11 @@ public final class SteeringMediaKeyRouter {
         String outcome = "accepted";
         commandInFlightSequence = queued.sequence;
         commandInFlightSinceMs = dispatchStarted;
+        // Publish correlation BEFORE Binder: the player can deliver a callback before it returns.
+        queued.target.lastCommandKey = queued.keyCode;
+        queued.target.lastCommandStartedMs = dispatchStarted;
+        queued.target.lastCommandSequence = queued.sequence;
+        trace(queued.describe("dispatch_started", dispatchStarted, 0L));
         try {
             MediaController.TransportControls controls =
                     queued.target.controller.getTransportControls();
@@ -281,8 +296,6 @@ public final class SteeringMediaKeyRouter {
                     outcome = "unsupported";
                     break;
             }
-            queued.target.lastCommandSequence = queued.sequence;
-            queued.target.lastCommandKey = queued.keyCode;
             trace(queued.describe(outcome, dispatchStarted, SystemClock.uptimeMillis()));
         } catch (RuntimeException staleSession) {
             outcome = staleSession.getClass().getSimpleName();
@@ -304,7 +317,10 @@ public final class SteeringMediaKeyRouter {
         int cleared;
         synchronized (commandLock) {
             cleared = pendingCommands.size();
-            pendingCommands.clear();
+            while (!pendingCommands.isEmpty()) {
+                Command removed = pendingCommands.removeFirst();
+                trace(removed.describe("cleared_" + reason, 0L, SystemClock.uptimeMillis()));
+            }
         }
         if (cleared > 0) trace("queue_cleared=" + cleared + ", reason=" + reason
                 + ", at=" + SystemClock.uptimeMillis());
@@ -505,6 +521,7 @@ public final class SteeringMediaKeyRouter {
 
     /** File I/O has its own bounded queue and can block neither route selection nor commands. */
     private void trace(@NonNull String message) {
+        if (!DiagnosticJournal.isEnabled()) return;
         boolean postDrain = false;
         synchronized (traceLock) {
             if (pendingTraces.size() == MAX_PENDING_TRACES) {
@@ -557,21 +574,54 @@ public final class SteeringMediaKeyRouter {
         volatile int playbackState;
         volatile long lastCommandSequence;
         volatile int lastCommandKey;
+        volatile long lastCommandStartedMs;
+        long lastPlaybackLogMs;
+        long lastPlaybackLogSequence = -1L;
+        int lastLoggedPlaybackState = -1;
+        int suppressedPlaybackCallbacks;
+        String lastMetadataIdentity;
+        long metadataRevision;
+        long lastMetadataLogSequence = -1L;
         @NonNull final MediaController.Callback callback = new MediaController.Callback() {
             @Override public void onPlaybackStateChanged(@Nullable PlaybackState state) {
                 if (route != Route.this) return;
                 playbackState = state == null ? PlaybackState.STATE_NONE : state.getState();
+                long now = SystemClock.uptimeMillis();
+                long sequence = lastCommandSequence;
+                if (playbackState == lastLoggedPlaybackState && sequence == lastPlaybackLogSequence
+                        && now - lastPlaybackLogMs < 30_000L) {
+                    suppressedPlaybackCallbacks++;
+                    return;
+                }
                 trace("session=" + packageName + ", playback_callback="
-                        + SystemClock.uptimeMillis() + ", state=" + playbackState
-                        + ", after_sequence=" + lastCommandSequence
-                        + ", after_key=" + lastCommandKey);
+                        + now + ", state=" + playbackState + ", after_sequence=" + sequence
+                        + ", after_key_code=" + lastCommandKey + ", session_id=" + sessionId
+                        + ", since_dispatch_ms=" + (sequence == 0L ? -1L : now - lastCommandStartedMs)
+                        + ", duplicate_callbacks=" + suppressedPlaybackCallbacks);
+                lastPlaybackLogMs = now;
+                lastPlaybackLogSequence = sequence;
+                lastLoggedPlaybackState = playbackState;
+                suppressedPlaybackCallbacks = 0;
             }
 
             @Override public void onMetadataChanged(@Nullable MediaMetadata metadata) {
                 if (route != Route.this) return;
+                String identity = metadata == null ? "" : String.valueOf(
+                        metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID)) + '\u0000'
+                        + metadata.getString(MediaMetadata.METADATA_KEY_TITLE) + '\u0000'
+                        + metadata.getString(MediaMetadata.METADATA_KEY_ARTIST);
+                boolean changed = !identity.equals(lastMetadataIdentity);
+                if (changed) metadataRevision++;
+                lastMetadataIdentity = identity;
+                long sequence = lastCommandSequence;
+                if (!changed && sequence == lastMetadataLogSequence) return;
+                lastMetadataLogSequence = sequence;
+                long now = SystemClock.uptimeMillis();
                 trace("session=" + packageName + ", metadata_callback="
-                        + SystemClock.uptimeMillis() + ", after_sequence="
-                        + lastCommandSequence + ", after_key=" + lastCommandKey);
+                        + now + ", after_sequence=" + sequence + ", after_key_code=" + lastCommandKey
+                        + ", session_id=" + sessionId + ", metadata_changed=" + changed
+                        + ", metadata_revision=" + metadataRevision
+                        + ", since_dispatch_ms=" + (sequence == 0L ? -1L : now - lastCommandStartedMs));
             }
 
             @Override public void onSessionDestroyed() {
@@ -623,8 +673,12 @@ public final class SteeringMediaKeyRouter {
             return "sequence=" + sequence + ", event=" + eventTimeMs
                     + ", down=" + downTimeMs + ", callback=" + callbackEntryUptimeMs
                     + ", queued=" + enqueuedAtMs + ", dispatch=" + dispatchStartedMs
-                    + ", completed=" + completedMs + ", key=" + keyCode
-                    + ", package=" + target.packageName + ", token=" + target.sessionId
+                    + ", completed=" + completedMs + ", key_code=" + keyCode
+                    + ", package=" + target.packageName + ", session_id=" + target.sessionId
+                    + ", input_delay_ms=" + Math.max(0L, callbackEntryUptimeMs - eventTimeMs)
+                    + ", queue_delay_ms=" + (dispatchStartedMs == 0L ? -1L : dispatchStartedMs - enqueuedAtMs)
+                    + ", binder_duration_ms=" + (dispatchStartedMs == 0L || completedMs == 0L
+                            ? -1L : completedMs - dispatchStartedMs)
                     + ", generation=" + routeGeneration + ", result=" + result;
         }
     }

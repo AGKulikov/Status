@@ -29,6 +29,10 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 import dezz.status.widget.VersionGetter;
@@ -89,6 +93,14 @@ public final class DiagnosticJournal {
     private static final int MAX_EARLY_ENTRIES = 64;
     private static final ArrayDeque<Entry> earlyEntries = new ArrayDeque<>();
     private static boolean initialPreferencesRead;
+    private static volatile long asyncGeneration;
+    private static final AtomicInteger droppedAsyncEntries = new AtomicInteger();
+    private static final ThreadPoolExecutor ASYNC = new ThreadPoolExecutor(0, 1,
+            30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(128), task -> {
+                Thread thread = new Thread(task, "status-input-journal");
+                thread.setDaemon(true);
+                return thread;
+            }, (task, executor) -> droppedAsyncEntries.incrementAndGet());
 
     private DiagnosticJournal() {
     }
@@ -129,6 +141,7 @@ public final class DiagnosticJournal {
 
     public static void initialize(@NonNull Context context, boolean initiallyEnabled) {
         synchronized (LOCK) {
+            asyncGeneration++;
             appContext = context.getApplicationContext();
             enabled = initiallyEnabled;
             finishEarlyEntriesLocked();
@@ -143,6 +156,7 @@ public final class DiagnosticJournal {
         synchronized (LOCK) {
             appContext = context.getApplicationContext();
             if (enabled == value && initialPreferencesRead) return;
+            asyncGeneration++;
             enabled = value;
             finishEarlyEntriesLocked();
             if (value) {
@@ -191,6 +205,25 @@ public final class DiagnosticJournal {
         }
     }
 
+    /** Input callbacks must never wait for journal rotation, export or another disk writer. */
+    public static void infoAsync(@NonNull String component, @NonNull String message) {
+        if (!enabled) return;
+        long timestamp = System.currentTimeMillis();
+        long uptime = SystemClock.elapsedRealtime();
+        long generation = asyncGeneration;
+        String bounded = message.length() > MAX_MESSAGE_CHARS
+                ? message.substring(0, MAX_MESSAGE_CHARS) : message;
+        ASYNC.execute(() -> {
+            synchronized (LOCK) {
+                if (!enabled || generation != asyncGeneration) return;
+                int dropped = droppedAsyncEntries.getAndSet(0);
+                if (dropped > 0) appendLocked(Level.WARN, "input-journal",
+                        "diagnostic_queue_dropped=" + dropped);
+                appendLocked(Level.INFO, component, bounded, timestamp, uptime);
+            }
+        });
+    }
+
     /** Crash handlers call this even if normal debug mode was disabled. */
     public static void recordCrash(@NonNull Thread thread, @NonNull Throwable error) {
         synchronized (LOCK) {
@@ -236,6 +269,9 @@ public final class DiagnosticJournal {
 
     public static void clear() {
         synchronized (LOCK) {
+            asyncGeneration++;
+            ASYNC.getQueue().clear();
+            droppedAsyncEntries.set(0);
             File file = journalFileLocked();
             if (file != null && file.exists()) {
                 //noinspection ResultOfMethodCallIgnored

@@ -41,6 +41,7 @@ final class HudCompositeView extends FrameLayout
     /** Apply configured opacity on the first update of the currently published surface. */
     private float desiredMapAlpha = 1f;
     private boolean awaitingFirstMapFrame = true;
+    private long firstFrameWaitStarted;
     private final MapEdgeFade mapEdgeFade = new MapEdgeFade();
     private final RectF edgeBounds = new RectF();
 
@@ -115,6 +116,7 @@ final class HudCompositeView extends FrameLayout
         if (activeMap == null) {
             revokeSurface();
             awaitingFirstMapFrame = true;
+            firstFrameWaitStarted = android.os.SystemClock.uptimeMillis();
             mapTexture.setAlpha(0f);
             mapTexture.setVisibility(View.GONE);
             return;
@@ -195,13 +197,15 @@ final class HudCompositeView extends FrameLayout
                 && leasedSurface != null && leasedSurface.isValid()) {
             awaitingFirstMapFrame = false;
             mapTexture.setAlpha(desiredMapAlpha);
-            DiagnosticJournal.info("hud-map", "HUD surface updated; map shown, opacity="
-                    + desiredMapAlpha);
+            DiagnosticJournal.infoAsync("hud-map", "HUD surface updated; map shown, opacity="
+                    + desiredMapAlpha + ", first_update_wait_ms="
+                    + (android.os.SystemClock.uptimeMillis() - firstFrameWaitStarted));
         }
     }
 
     private void beginFirstFrameGate() {
         awaitingFirstMapFrame = true;
+        firstFrameWaitStarted = android.os.SystemClock.uptimeMillis();
         mapTexture.setAlpha(0f);
     }
 
@@ -249,7 +253,7 @@ final class HudCompositeView extends FrameLayout
             NavigationHudEndpointService.revokeHudSurface(previous);
             try { previous.release(); } catch (RuntimeException ignored) {}
         }
-        DiagnosticJournal.info("hud-map",
+        DiagnosticJournal.infoAsync("hud-map",
                 "HUD TextureView surface published; generation=" + generation
                         + ", size=" + width + "x" + height
                         + ", transparent=" + !mapTexture.isOpaque());

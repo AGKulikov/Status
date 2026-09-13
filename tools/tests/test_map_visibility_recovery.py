@@ -48,7 +48,8 @@ public class MapVisibilityReplay {
   SurfaceTexture getSurfaceTexture(){return surface;}
   Object getBitmap(int w,int h){throw new AssertionError("Readback must not gate visibility");}
  }
- static class DiagnosticJournal {static void info(String tag,String text){}}
+ static class DiagnosticJournal {static void info(String tag,String text){} static void infoAsync(String tag,String text){}}
+ static class android {static class os {static class SystemClock {static long uptimeMillis(){return 1000L;}}}}
  static class NavigationHudEndpointService {
   static boolean isMapContentReady(Object surface,boolean cluster){
    throw new AssertionError("Full tile loading must not gate visibility");}
@@ -56,13 +57,13 @@ public class MapVisibilityReplay {
  static class Hud {
   TextureView mapTexture=new TextureView(); Surface leasedSurface=new Surface();
   SurfaceTexture leasedTexture=mapTexture.surface; Object activeMap=new Object();
-  boolean awaitingFirstMapFrame=true; float desiredMapAlpha=.72f;
+  long firstFrameWaitStarted; boolean awaitingFirstMapFrame=true; float desiredMapAlpha=.72f;
   HUD_METHODS
  }
  static class Cluster {
   TextureView mapTexture=new TextureView(); View mapView=mapTexture;
   Surface mapSurface=new Surface(); boolean attached=true,leasePublished=true;
-  boolean awaitingFirstMapFrame=true; float desiredMapAlpha=.43f;
+  long firstFrameWaitStarted; boolean awaitingFirstMapFrame=true; float desiredMapAlpha=.43f;
   CLUSTER_METHODS
  }
  static class Log {static void w(String tag,String text){}}

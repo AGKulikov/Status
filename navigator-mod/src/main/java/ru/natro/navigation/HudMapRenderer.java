@@ -63,6 +63,7 @@ final class HudMapRenderer {
     private final RouteTurnMapLayer routeTurnMapLayer;
     private final AlternativeRouteMapLayer alternativeRouteMapLayer;
     private final RoadEventRouteSynchronizer roadEventRouteSynchronizer;
+    private final RouteRoadEventMapLayer routeRoadEventMapLayer;
     private final String profileSection;
     private final String displayName;
     private final boolean adaptiveFrameRate;
@@ -135,6 +136,7 @@ final class HudMapRenderer {
         alternativeRouteMapLayer = new AlternativeRouteMapLayer(this.context,
                 overlayPlacement);
         roadEventRouteSynchronizer = new RoadEventRouteSynchronizer();
+        routeRoadEventMapLayer = new RouteRoadEventMapLayer(displayName);
     }
 
     void applyConfiguration(String raw) {
@@ -692,7 +694,8 @@ final class HudMapRenderer {
             scaledRoadEventStyleProvider = scaledProvider;
             roadEventsManager = manager;
             roadEventsLayer = layer;
-            roadEventRouteSynchronizer.attach(layer);
+            routeRoadEventMapLayer.attach(map, stockProvider);
+            roadEventRouteSynchronizer.attach(routeRoadEventMapLayer);
             applyRoadEventVisibility();
             Log.i(TAG, "Standalone Yandex road-events layer attached to " + displayName);
             NavigationBridgeClient.reportDiagnostic(
@@ -707,6 +710,7 @@ final class HudMapRenderer {
             roadEventsManager = null;
             roadEventsLayer = null;
             roadEventRouteSynchronizer.detach();
+            routeRoadEventMapLayer.detach();
             Log.w(TAG, "HUD road-events layer unavailable: " + shortMessage(failure));
             NavigationBridgeClient.reportDiagnostic(
                     "HUD road-events layer unavailable: " + shortMessage(failure));
@@ -714,6 +718,13 @@ final class HudMapRenderer {
     }
 
     private void applyRoadEventVisibility() {
+        boolean systemNight = (context.getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        routeRoadEventMapLayer.configure(profile.roadEventModes, routeGuidanceActive,
+                profile.automaticDayNight ? systemNight : profile.nightMode,
+                routeGuidanceActive && cameraDirectionMapLayer.hasRouteInventory(),
+                profile.roadEventScalePercent, profile.cameraScalePercent,
+                profile.effectiveRoadEventPriority());
         Object everywhere = roadEventsLayer;
         if (everywhere == null) return;
         boolean visibilityChanged = scaledRoadEventStyleProvider != null
@@ -1154,6 +1165,7 @@ final class HudMapRenderer {
         appliedLayerOrderFingerprint = Long.MIN_VALUE;
         lastLayerOrderApplyElapsedMs = 0L;
         roadEventRouteSynchronizer.detach();
+        routeRoadEventMapLayer.detach();
         map = null;
         trafficLayer = null;
         roadEventsLayer = null;

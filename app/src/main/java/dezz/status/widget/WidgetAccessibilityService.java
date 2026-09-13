@@ -351,24 +351,39 @@ public class WidgetAccessibilityService extends AccessibilityService {
      */
     @Override protected boolean onKeyEvent(@NonNull KeyEvent event) {
         final long callbackEntryUptimeMs = SystemClock.uptimeMillis();
+        long inputSequence = dezz.status.widget.diagnostics.SteeringKeyDiagnostics.received(
+                event, callbackEntryUptimeMs);
         int keyCode = event.getKeyCode();
         if (!SteeringMediaKeyRouter.isSupportedKey(keyCode)) {
+            dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(
+                    inputSequence, false, "stock_unsupported");
             return super.onKeyEvent(event);
         }
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            if (event.getRepeatCount() > 0) return consumedMediaKeys.get(keyCode, false);
+            if (event.getRepeatCount() > 0) {
+                boolean handled = consumedMediaKeys.get(keyCode, false);
+                dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(
+                        inputSequence, handled, "repeat_no_command");
+                return handled;
+            }
             SteeringMediaKeyRouter mediaRouter = steeringMediaKeyRouter;
             boolean handled = mediaRouter != null
                     && mediaRouter.dispatch(keyCode, event.getEventTime(), event.getDownTime(),
                     callbackEntryUptimeMs);
             consumedMediaKeys.put(keyCode, handled);
+            dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(inputSequence, handled,
+                    mediaRouter == null ? "router_absent" : handled ? "queued" : "stock_fallback");
             return handled || super.onKeyEvent(event);
         }
         if (event.getAction() == KeyEvent.ACTION_UP) {
             boolean handled = consumedMediaKeys.get(keyCode, false);
             consumedMediaKeys.delete(keyCode);
+            dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(
+                    inputSequence, handled, "up_no_command");
             return handled || super.onKeyEvent(event);
         }
+        dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(
+                inputSequence, false, "stock_action");
         return super.onKeyEvent(event);
     }
 

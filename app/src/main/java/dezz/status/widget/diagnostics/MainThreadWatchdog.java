@@ -11,14 +11,13 @@ import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** Records a bounded thread dump when the application's main looper stops responding. */
 public final class MainThreadWatchdog {
-    private static final long HEARTBEAT_MS = 2_000L;
-    private static final long HANG_THRESHOLD_MS = 8_000L;
+    private static final long HEARTBEAT_MS = 500L;
+    private static final long HANG_THRESHOLD_MS = 2_000L;
     private static final long REPORT_COOLDOWN_MS = 30_000L;
     private static final AtomicBoolean RUNNING = new AtomicBoolean();
     private static final AtomicLong HEARTBEAT = new AtomicLong();
@@ -36,16 +35,23 @@ public final class MainThreadWatchdog {
         }
         if (!RUNNING.compareAndSet(false, true)) return;
         long generation = GENERATION.incrementAndGet();
-        HEARTBEAT.set(SystemClock.elapsedRealtime());
+        HEARTBEAT.set(SystemClock.uptimeMillis());
         Thread worker = new Thread(() -> loop(generation), "status-main-watchdog");
         worker.setDaemon(true);
         worker.start();
     }
 
     private static void loop(long generation) {
-        long lastReport = 0L;
+        long lastReport = -REPORT_COOLDOWN_MS;
+        long reportedHeartbeat = -1L;
+        AtomicBoolean pending = new AtomicBoolean();
         while (RUNNING.get() && GENERATION.get() == generation) {
-            MAIN.post(() -> HEARTBEAT.set(SystemClock.elapsedRealtime()));
+            if (pending.compareAndSet(false, true)) {
+                if (!MAIN.post(() -> {
+                    if (GENERATION.get() == generation) HEARTBEAT.set(SystemClock.uptimeMillis());
+                    pending.set(false);
+                })) pending.set(false);
+            }
             try {
                 Thread.sleep(HEARTBEAT_MS);
             } catch (InterruptedException ignored) {
@@ -53,10 +59,18 @@ public final class MainThreadWatchdog {
                 if (GENERATION.get() == generation) RUNNING.set(false);
                 return;
             }
-            long now = SystemClock.elapsedRealtime();
-            long blocked = now - HEARTBEAT.get();
+            if (!RUNNING.get() || GENERATION.get() != generation) return;
+            long now = SystemClock.uptimeMillis();
+            long heartbeat = HEARTBEAT.get();
+            if (reportedHeartbeat >= 0L && heartbeat > reportedHeartbeat) {
+                DiagnosticJournal.info("watchdog", "main thread recovered; stalled_for_ms="
+                        + (heartbeat - reportedHeartbeat) + ", recovered_uptime=" + heartbeat);
+                reportedHeartbeat = -1L;
+            }
+            long blocked = now - heartbeat;
             if (blocked < HANG_THRESHOLD_MS || now - lastReport < REPORT_COOLDOWN_MS) continue;
             lastReport = now;
+            reportedHeartbeat = heartbeat;
             DiagnosticJournal.warn("watchdog",
                     "main thread unresponsive for " + blocked + " ms\n" + threadDump());
         }
@@ -64,19 +78,7 @@ public final class MainThreadWatchdog {
 
     @NonNull
     private static String threadDump() {
-        StringBuilder result = new StringBuilder();
-        int threadCount = 0;
-        for (Map.Entry<Thread, StackTraceElement[]> entry
-                : Thread.getAllStackTraces().entrySet()) {
-            if (threadCount++ >= 24 || result.length() >= 14_000) break;
-            Thread thread = entry.getKey();
-            result.append("THREAD ").append(thread.getName())
-                    .append(" state=").append(thread.getState()).append('\n');
-            StackTraceElement[] stack = entry.getValue();
-            for (int index = 0; index < stack.length && index < 48; index++) {
-                result.append("  at ").append(stack[index]).append('\n');
-            }
-        }
-        return result.toString();
+        return ThreadDumpFormatter.format(Looper.getMainLooper().getThread(),
+                Thread.getAllStackTraces());
     }
 }

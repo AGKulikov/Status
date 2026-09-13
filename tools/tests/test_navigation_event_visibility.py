@@ -8,6 +8,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = {
+    "ru/natro/navigation/NavigationBridgeClient.java": "package ru.natro.navigation; final class NavigationBridgeClient { static void reportDiagnostic(String text) {} }",
     "android/util/Log.java": '''package android.util;
 public final class Log { public static int w(String t,String m,Throwable x){return 0;} }
 ''',
@@ -93,7 +94,7 @@ public final class VisibilityReplay {
         try {p.allowedTags(mixed,true).add("SPEED_CONTROL");throw new AssertionError();}
         catch(UnsupportedOperationException expected){}
     }
-    public static final class DrivingEvent {
+    public static class DrivingEvent {
         final String id,caption; final com.yandex.mapkit.geometry.Point location;
         final List<String> tags;
         DrivingEvent(String id,double latitude,double longitude,String caption,String... tags) {
@@ -105,9 +106,10 @@ public final class VisibilityReplay {
         public List<String> getTags(){return tags;}
         public String getDescriptionText(){return caption;}
     }
-    public static final class EventLayer {
+    public static final class EventLayer implements RoadEventRouteSynchronizer.Sink {
         List<?> events=Collections.emptyList(); int calls;
-        public void setRoadEventsOnRoute(List<?> value){events=value;calls++;}
+        boolean fail;
+        public void render(List<RoadEventRouteSynchronizer.Event> value) throws Exception {calls++;if(fail)throw new Exception();events=value;}
     }
     static void routeMembershipIsExactAndClearsAtRouteEnd() {
         EventLayer layer=new EventLayer();RoadEventRouteSynchronizer sync=new RoadEventRouteSynchronizer();
@@ -118,11 +120,22 @@ public final class VisibilityReplay {
             new DrivingEvent("road-work",55.9,37.8,"Works","RECONSTRUCTION"));
         sync.update(7L,11L,source);
         check(layer.events.size()==2);
-        com.yandex.mapkit.road_events_layer.RoadEvent first=
-            (com.yandex.mapkit.road_events_layer.RoadEvent)layer.events.get(0);
-        check(first.id.equals("on-route"));check(!first.user);
+        RoadEventRouteSynchronizer.Event first=
+            (RoadEventRouteSynchronizer.Event)layer.events.get(0);
+        check(first.id.equals("on-route"));
         int applied=layer.calls;sync.update(7L,11L,source);check(layer.calls==applied);
         sync.clearData();check(layer.events.isEmpty());sync.detach();check(layer.events.isEmpty());
+    }
+    static void allEventsSurviveMissingCaptionsAndRetryFailedSink() throws Exception {
+        EventLayer layer=new EventLayer();RoadEventRouteSynchronizer sync=new RoadEventRouteSynchronizer();
+        sync.attach(layer);List<DrivingEvent> source=new ArrayList<>();
+        for(int i=0;i<80;i++)source.add(new DrivingEvent("id-"+i,55,37,"", "ACCIDENT") {
+            public String getDescriptionText(){throw new IllegalStateException();}
+        });
+        layer.fail=true;sync.update(9L,1L,source);check(layer.events.isEmpty());
+        layer.fail=false;sync.update(9L,1L,source);check(layer.events.size()==80);
+        sync.update(8L,2L,Collections.emptyList());check(layer.events.size()==80);
+        sync.clearData();check(layer.events.isEmpty());
     }
     public static void main(String[] args)throws Exception { VisibilityReplay.class.getDeclaredMethod(args[0]).invoke(null); }
 }
@@ -170,6 +183,7 @@ class NavigationEventVisibilityTest(unittest.TestCase):
     def test_inventory_fallback(self): self.replay("unifiedInventoryDoesNotHideAdjacentCamerasOrAccidents")
     def test_free_drive(self): self.replay("alwaysWorksWithoutRouteAndUnknownTagsStayHidden")
     def test_snapshot(self): self.replay("profileIsSnapshotAndMixedTagsUseVisibleCategory")
+    def test_all_events_and_retry(self): self.replay("allEventsSurviveMissingCaptionsAndRetryFailedSink")
     def test_route_membership(self): self.replay("routeMembershipIsExactAndClearsAtRouteEnd")
 
 
