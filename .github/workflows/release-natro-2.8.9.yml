@@ -1,4 +1,4 @@
-name: Release Natro 2.8.8 and compatible Navigator pair
+name: Release Natro 2.8.9 and compatible Navigator pair
 
 on:
   push:
@@ -10,17 +10,17 @@ permissions:
 
 jobs:
   sign-pair:
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[secure-sign-pair-2.8.8]')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[secure-sign-pair]')
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     permissions:
       actions: read
       contents: write
     env:
-      VERSION_NAME: '2.8.8'
-      VERSION_CODE: '208021321'
-      EXPECTED_NATRO_VERSION_NAME: '2.8.8'
-      EXPECTED_NATRO_VERSION_CODE: '208021321'
+      VERSION_NAME: '2.8.9'
+      VERSION_CODE: '208021322'
+      EXPECTED_NATRO_VERSION_NAME: '2.8.9'
+      EXPECTED_NATRO_VERSION_CODE: '208021322'
       ALLOW_UNSIGNED_RELEASE: 'true'
       BUILD_TOOLS_VERSION: '36.0.0'
       APKTOOL_SHA256: 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423'
@@ -123,14 +123,14 @@ jobs:
           esac
           unset KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS
           umask 077
-          TRANSPORT="$RUNNER_TEMP/natro-2.8.8-signing-transport"
-          SIGNING="$RUNNER_TEMP/natro-2.8.8-signing-material"
+          TRANSPORT="$RUNNER_TEMP/natro-2.8.9-signing-transport"
+          SIGNING="$RUNNER_TEMP/natro-2.8.9-signing-material"
           mkdir -p "$TRANSPORT/chunks" "$SIGNING"
           PRIVATE="$TRANSPORT/private.pem"
           PUBLIC="$TRANSPORT/public.pem"
           ENCRYPTED="$TRANSPORT/signing-bundle.enc"
           ARCHIVE="$TRANSPORT/signing-bundle.tar.gz"
-          PREFIX="natro288-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PREFIX="natro289-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           PUBLIC_PATH="release-handoff/${PREFIX}.pub"
           ENCRYPTED_PATH="release-handoff/${PREFIX}.enc"
 
@@ -148,10 +148,10 @@ jobs:
           PUBLIC_CONTENT=$(base64 -w0 "$PUBLIC")
           gh api --method PUT \
             "repos/${GITHUB_REPOSITORY}/contents/${PUBLIC_PATH}" \
-            -f message="ci: publish ephemeral Natro 2.8.8 transport key [skip ci]" \
+            -f message="ci: publish ephemeral Natro 2.8.9 transport key [skip ci]" \
             -f content="$PUBLIC_CONTENT" \
             -f branch="$HANDOFF_BRANCH" >/dev/null
-          echo "::notice title=Natro 2.8.8 encrypted handoff::Waiting for ${ENCRYPTED_PATH}"
+          echo "::notice title=Natro 2.8.9 encrypted handoff::Waiting for ${ENCRYPTED_PATH}"
 
           for _ in $(seq 1 180); do
             if gh api \
@@ -210,7 +210,7 @@ jobs:
           KEYSTORE="$RUNNER_TEMP/stable-update-keystore.jks"
           PASSWORD_FILE="$RUNNER_TEMP/stable-update.pass"
           ALIAS_FILE="$RUNNER_TEMP/stable-update.alias"
-          SIGNING="$RUNNER_TEMP/natro-2.8.8-signing-material"
+          SIGNING="$RUNNER_TEMP/natro-2.8.9-signing-material"
           CONFIGURED=0
           for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
             test -z "${!required:-}" || CONFIGURED=$((CONFIGURED + 1))
@@ -385,7 +385,7 @@ jobs:
       - name: Upload only the verified signed pair
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: navigation-hud-v2-signed-2.8.8-${{ github.run_number }}
+          name: navigation-hud-v2-signed-2.8.9-${{ github.run_number }}
           if-no-files-found: error
           retention-days: 14
           path: ${{ runner.temp }}/signed-pair/*
@@ -393,7 +393,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: natro-2.8.8-unit-tests-${{ github.run_number }}
+          name: natro-2.8.9-unit-tests-${{ github.run_number }}
           path: app/build/test-results/testGeelyDebugUnitTest/*
           if-no-files-found: warn
           retention-days: 14
