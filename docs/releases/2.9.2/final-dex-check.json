@@ -1,0 +1,27 @@
+{
+  "natro": {
+    "2.9.1": {
+      "emitCurrentTrip": "520d9f2c00439410e8e85d2b902be35d5d318a082b260096182d3639331371ba",
+      "emitRealtimeCurrentTrip": "0f9113ff903c40875ff33dc75af414d31b69c2f52a1e65413f0c2d7bdcce40d1"
+    },
+    "2.9.2": {
+      "emitCurrentTrip": "57270d18ccda761fb0addae50f4b97663bd26d22bd080a1884bd6e16dea9c1fa",
+      "emitRealtimeCurrentTrip": "716091eb3427031ed99f907c4611a059c0af93db5fedec624b28bcd314dd8c18"
+    }
+  },
+  "navigator": {
+    "2.9.1": {
+      "applyProfile": "a4ac3469116b8d09d4a1e824acddc2ec663af642e46f3977ebed77302d063422",
+      "startRenderer": "f898813f4c99ab95fe3dd40c3c356335e76d13736a5c0af03a2dc4db2c72d5ae"
+    },
+    "2.9.2": {
+      "applyMapBackground": "7651386ad46967cc81f4ebcb2b8c92d81f989f12758b0a765f22a6a54c185b5c",
+      "applyProfile": "c6b6c6a3fb92e5e576f824cf2ec3376fb156a9698d811122d08289555f556e91",
+      "startRenderer": "22a24b3543b3486ab6b77b76370e74d2cb8400810ec14bb428c5ce55004d3d4c"
+    }
+  },
+  "navigator_changed_from_2_9_1": [
+    "classes19.dex"
+  ],
+  "navigator_unchanged_entries": 17030
+}
