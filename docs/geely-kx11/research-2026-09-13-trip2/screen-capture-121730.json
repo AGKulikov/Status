@@ -1,0 +1,195 @@
+{
+  "schema": "kx11-trip-screen-followup-v1",
+  "archive": {
+    "file": "Natro-Trip-Check-20260913-121730-3feae8.zip",
+    "bytes": 6029,
+    "sha256": "634df4825bf7fbd75a66a9f443b6b7c90c36d3dc11328d304bee279e45365423"
+  },
+  "archive_crc_valid": true,
+  "all_files_manifest_entries_verified": true,
+  "collector_version": "1.0.1",
+  "repair_needed": false,
+  "captures": [
+    {
+      "file": "trip2.pcap",
+      "bytes": 15744,
+      "sha256": "52472c95f67bcb1270724db111d015f7ca4a269b40f641f669c1221175f3efaf",
+      "ipv4_checksums_valid": 20,
+      "udp_checksums_present_and_valid": 20,
+      "separate_stderr_bytes": 159,
+      "observation": {
+        "link_type": 1,
+        "counts": {
+          "packet_records": 20,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 20
+        },
+        "first": {
+          "time_words": [
+            1,
+            104684,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            3278504,
+            0,
+            0
+          ],
+          "packet": 1,
+          "timestamp": 1789291064.944755
+        },
+        "last": {
+          "time_words": [
+            1,
+            104703,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            3278504,
+            0,
+            0
+          ],
+          "packet": 20,
+          "timestamp": 1789291083.936383
+        },
+        "elapsed_capture_seconds": 18.99162793159485,
+        "elapsed_raw_delta": 19,
+        "raw_time_units_per_second": 1.000440829424171,
+        "distance_raw_values": [
+          3278504
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      },
+      "first_raw_time_delta_from_previous_capture": 373,
+      "first_timestamp_delta_from_previous_capture_seconds": 2788.0793249607086
+    },
+    {
+      "file": "trip1.pcap",
+      "bytes": 15744,
+      "sha256": "ac7c1d070fd7c4fc9925d24ac7e2db713fac54922c56bb751d2e5e179eeed3a1",
+      "ipv4_checksums_valid": 20,
+      "udp_checksums_present_and_valid": 20,
+      "separate_stderr_bytes": 159,
+      "observation": {
+        "link_type": 1,
+        "counts": {
+          "packet_records": 20,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 20
+        },
+        "first": {
+          "time_words": [
+            1,
+            104712,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            3278504,
+            0,
+            0
+          ],
+          "packet": 1,
+          "timestamp": 1789291092.936124
+        },
+        "last": {
+          "time_words": [
+            1,
+            104731,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            3278504,
+            0,
+            0
+          ],
+          "packet": 20,
+          "timestamp": 1789291111.935941
+        },
+        "elapsed_capture_seconds": 18.99981689453125,
+        "elapsed_raw_delta": 19,
+        "raw_time_units_per_second": 1.0000096372228093,
+        "distance_raw_values": [
+          3278504
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      },
+      "first_raw_time_delta_from_previous_capture": 364,
+      "first_timestamp_delta_from_previous_capture_seconds": 2779.010989189148
+    }
+  ],
+  "photos": [
+    {
+      "file": "IMG_8379.jpg",
+      "bytes": 751592,
+      "sha256": "0be040709f49194eb2a9ced081705f94ef2dbd38d9f4da23aa5fd7186622402c",
+      "stock_label": "Trip 2",
+      "distance_km": 4.9,
+      "displayed_time": "00:39",
+      "consumption_l_per_100km": 19.9,
+      "average_speed_kph": 8,
+      "reading_method": "Manual reading of supplied stock cluster photo",
+      "exif_timestamp": null
+    },
+    {
+      "file": "IMG_8380.jpg",
+      "bytes": 733338,
+      "sha256": "3610459e8fee13d4a29d8ee3bee53d0a596e9a3e7b9d12fa28b44564d124a9f6",
+      "stock_label": "Trip 1",
+      "distance_km": 7439.7,
+      "displayed_time": "19:01",
+      "consumption_l_per_100km": 10.6,
+      "average_speed_kph": 24,
+      "reading_method": "Manual reading of supplied stock cluster photo",
+      "exif_timestamp": null
+    }
+  ],
+  "collector_sources_match_published_1_0_1": true,
+  "collector_sources": {
+    "collect_trip_screens.py": "73dca2a575f50f395cf92fe4534631676d03adf6f4b8bbb4822eed6d8ce23c9c",
+    "audit_saved_pcaps.py": "9c706ea028695414987875f333fa5b4320ab5aa554374917ee47ab56e3e393f8"
+  },
+  "native_sha256_from_collector_receipt": "b6feed82f777bfa8773c03b78c1f17038e122f492ef85126c095354a29c16756",
+  "conclusion": {
+    "collector_transport_1_0_1": "Confirmed on the supplied KX11 captures; both PCAPs intact without repair",
+    "direct_pa_substitution": "Does not match either stock row",
+    "shared_counter_with_reset_offset": "Possible from deltas, not proven; do not calibrate from photos",
+    "distance_unit": "Unknown",
+    "automatic_reset_observed": false,
+    "next_missing_evidence": "Stock DIM consumer/producer, distance units and persisted reset base in already supplied firmware",
+    "hardware_gate": "GATE-086 remains open"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "apk_sha256": "1bb5ba22cd2a60726414779fa9d8ebb37973ee756f4e9f401f9efc5bc63da4a2",
+  "declarations": {
+    "Lcom/yandex/mapkit/MapKit;": {
+      "dex": "classes12.dex",
+      "dex_sha256": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+      "class_access": "public interface abstract",
+      "methods": [
+        {
+          "name": "createOffscreenMapWindow",
+          "descriptor": "(I I)Lcom/yandex/mapkit/map/OffscreenMapWindow;",
+          "access": "public abstract"
+        },
+        {
+          "name": "createOffscreenMapWindow",
+          "descriptor": "(I I F)Lcom/yandex/mapkit/map/OffscreenMapWindow;",
+          "access": "public abstract"
+        }
+      ]
+    },
+    "Lcom/yandex/mapkit/map/Map;": {
+      "dex": "classes12.dex",
+      "dex_sha256": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+      "class_access": "public interface abstract",
+      "methods": [
+        {
+          "name": "setMapLoadedListener",
+          "descriptor": "(Ljava/lang/ref/WeakReference;)V",
+          "access": "public abstract"
+        }
+      ]
+    },
+    "Lcom/yandex/mapkit/map/MapLoadStatistics;": {
+      "dex": "classes12.dex",
+      "dex_sha256": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+      "class_access": "public",
+      "methods": [
+        {
+          "name": "getRenderObjectCount",
+          "descriptor": "()I",
+          "access": "public"
+        }
+      ]
+    },
+    "Lcom/yandex/mapkit/map/MapWindow;": {
+      "dex": "classes12.dex",
+      "dex_sha256": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+      "class_access": "public interface abstract",
+      "methods": [
+        {
+          "name": "addSurface",
+          "descriptor": "(Lcom/yandex/runtime/view/Surface;)V",
+          "access": "public abstract"
+        },
+        {
+          "name": "getMap",
+          "descriptor": "()Lcom/yandex/mapkit/map/Map;",
+          "access": "public abstract"
+        },
+        {
+          "name": "removeSurface",
+          "descriptor": "(Lcom/yandex/runtime/view/Surface;)V",
+          "access": "public abstract"
+        }
+      ]
+    },
+    "Lcom/yandex/mapkit/map/OffscreenMapWindow;": {
+      "dex": "classes12.dex",
+      "dex_sha256": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+      "class_access": "public interface abstract",
+      "methods": [
+        {
+          "name": "getMapWindow",
+          "descriptor": "()Lcom/yandex/mapkit/map/MapWindow;",
+          "access": "public abstract"
+        }
+      ]
+    },
+    "Lcom/yandex/mapkit/map/internal/MapBinding;": {
+      "dex": "classes12.dex",
+      "dex_sha256": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+      "class_access": "public",
+      "methods": [
+        {
+          "name": "setMapLoadedListener",
+          "descriptor": "(Ljava/lang/ref/WeakReference;)V",
+          "access": "public native"
+        }
+      ]
+    },
+    "Lcom/yandex/runtime/view/SurfaceFactory;": {
+      "dex": "classes15.dex",
+      "dex_sha256": "eff5ff91eeb3d9d6c819487fe7b3962988147c9fc49fbb97f543f2bca7c16344",
+      "class_access": "public",
+      "methods": [
+        {
+          "name": "from",
+          "descriptor": "(Landroid/view/Surface;)Lcom/yandex/runtime/view/Surface;",
+          "access": "public static native"
+        }
+      ]
+    }
+  },
+  "limit": "Static API-shape verification only; no runtime log from failing KX11 session."
+}
