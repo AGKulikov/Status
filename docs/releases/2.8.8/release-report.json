@@ -1,0 +1,58 @@
+{
+  "schema": "natro-navigation-hud-v2-release/v1",
+  "source": {
+    "repository": "AGKulikov/Status",
+    "commit": "1ad7e8e1242a4e65a147f21fdf989b14d3183f73",
+    "tree": "65f8ec622c8bd025e66b5a4684cb97ed1cdc169f"
+  },
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "natro": {
+    "versionName": "2.8.8",
+    "versionCode": 208021321,
+    "apk": "Natro-2.8.8-signed.apk",
+    "sha256": "bcbfd5c0fc044d309ada196cc260d7459f89f9956466005bf98d8e4ca1e1db3b",
+    "signatureSchemes": [
+      "v2",
+      "v3"
+    ]
+  },
+  "navigator": {
+    "versionName": "30.3.0",
+    "package": "ru.yandex.yandexnavi",
+    "apk": "YN_30.3.0_Natro-HUD-v2-signed.apk",
+    "sha256": "d2620fc5dae6ef05a26aa079ea3d272e498b6a6e0b4d765add772fcf9730a70f",
+    "baselineSha256": "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f",
+    "signatureSchemes": [
+      "v2",
+      "v3"
+    ],
+    "changedEntries": [
+      "AndroidManifest.xml",
+      "classes4.dex",
+      "classes8.dex",
+      "classes12.dex"
+    ],
+    "newEntries": [
+      "classes19.dex"
+    ]
+  },
+  "compatibility": {
+    "headUnit": "ECARX KX11",
+    "androidApi": 28,
+    "mainContent": {
+      "width": 1760,
+      "height": 720
+    },
+    "navigatorAbi": "arm64-v8a",
+    "hud": {
+      "displayId": 2,
+      "surfaceWidth": 1920,
+      "surfaceHeight": 1080,
+      "x": 0,
+      "y": 720,
+      "width": 728,
+      "height": 190
+    },
+    "status": "static-gates-passed"
+  }
+}

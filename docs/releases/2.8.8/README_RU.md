@@ -1,12 +1,46 @@
 # Natro 2.8.8 — выпуск исправлений карт
 
-13.09.2026 пользователь потребовал завершить релиз. Подготовлены номер
-`2.8.8 / 208021321` и защищённый выпускной контур. Статус: сборка и подпись ещё
-не подтверждены; установочные файлы пока не выданы.
+13.09.2026 выпущена совместимая пара **Natro 2.8.8 / 208021321** и
+**Navigator 30.3.0 / 739564630**. Оба APK подписаны прежним общим сертификатом.
+[Защищённый выпускной CI 34740687264](https://github.com/AGKulikov/Status/actions/runs/34740687264)
+завершился успешно; фактические скачанные APK прошли отдельную проверку перед выдачей.
 
 Исходники и требования опубликованы в `feature/natro-map-trip-audit-20260912`.
+Точный исходный commit выпуска: `1ad7e8e1242a4e65a147f21fdf989b14d3183f73`,
+tree: `65f8ec622c8bd025e66b5a4684cb97ed1cdc169f`.
+Последующая фиксация отчёта меняет только документацию, не байты выпущенных APK.
 Перед выпуском CI `34739583540` проверил 1 881 JVM-тест / 369 наборов, 70 тестов
-инструментов и все исходники Navigator с Android 36 / JDK 21.
+инструментов и все исходники Navigator с Android 36 / JDK 21. Выпускной CI повторил
+полный набор тестов, собрал точную пару, проверил ключ, подписал и проверил APK.
+
+## Файлы и проверки
+
+| APK | Размер, байт | SHA-256 |
+|---|---:|---|
+| `Natro-2.8.8-signed.apk` | 28 343 662 | `bcbfd5c0fc044d309ada196cc260d7459f89f9956466005bf98d8e4ca1e1db3b` |
+| `YN_30.3.0_Natro-HUD-v2-signed.apk` | 155 149 731 | `d2620fc5dae6ef05a26aa079ea3d272e498b6a6e0b4d765add772fcf9730a70f` |
+
+При выдаче Navigator назван `Navigator-30.3.0-Natro-2.8.8-signed.apk`, чтобы отличать
+его от прежних модов с тем же versionName; содержимое и SHA-256 не изменены.
+Артефакт CI `10312591300`, SHA-256 ZIP:
+`2328fca2c5c3f78ecb5562578049f66a70ecc48934bd1b306c7ad7812efff1be`.
+Проверены digest ZIP, CRC и все пять записей `SHA256SUMS.txt`.
+
+У каждого нового APK один подписант; v2 и v3 проверены непосредственно по APK,
+`zipalign -c -P 16 4` успешен. Natro сохраняет пакет `ru.natro.statuswidget`, label
+`Natro`, min/target API 28; versionCode вырос с 208021320 до 208021321.
+Navigator сохраняет `ru.yandex.yandexnavi`, versionCode 739564630, min/target API
+26/29 и `arm64-v8a`. Сертификат совпадает с проверенной парой 2.8.7; Natro 2.8.7
+дополнительно проверен непосредственно, для Navigator 2.8.7 использованы его
+ранее проверенные выпускные отчёты, поскольку текущая локальная копия неполная.
+
+Выпускной CI подтвердил границу точного Navigator baseline: сохранены 17 222
+защищённые записи, включая `resources.arsc` и `res/`; изменены только manifest,
+`classes4/8/12.dex`, добавлен наш `classes19.dex`.
+
+Доказательства: [отчёт выпускного контура](release-report.json),
+[подписи](signature-reports.txt), [статическая совместимость](KX11-COMPATIBILITY.txt),
+[проверка файлов перед выдачей](delivery-verification.json).
 
 ## Состав изменений
 
@@ -23,9 +57,23 @@
 
 Подробный аудит: `docs/NATRO_MAP_TRIP_AUDIT_2026_09_12_RU.md`.
 
+| Требование | Основные исходники | Автоматическая проверка | KX11 |
+|---|---|---|---|
+| NAV-018 | `MapFirstFrameDetector`, `HudMapRenderer`, обе TextureView | `MapFirstFrameDetectorTest`, `test_map_regressions.py`, полный CI | GATE-082 открыт |
+| MAP-060 | `StockAlternativeContent`, `AlternativeRouteMapLayer` | `test_stock_alternative_content.py`, проверка API baseline | GATE-084 открыт |
+| MAP-061/063 | `RouteCameraPolicy`, `HudMapRenderer`, слои камер/светофоров | `test_map_regressions.py`: 80 контролей, ID, режимы, epoch | GATE-083/084 открыты |
+| MAP-062 | `AlternativeRouteMapLayer`, `TrafficLightMapLayer`, `RouteTrafficLightMapLayer` | `test_map_regressions.py`: 1 920 геометрических сочетаний | GATE-085 открыт |
+| NATRO-026 | `EcarxTrip2Access`, `GeelyCarIntegration` | Частичный отказ, disconnect/reconnect, инвалидизация | GATE-086 открыт; данные не восстановлены |
+
+Дополнительная проверка штатного источника: все три ID 30878/30957/30956 одинаковы
+во всех десяти копиях соответствующих констант в опубликованном каталоге 621 DEX.
+Простой конфликт числовых ID для этой тройки не найден. Это не доказывает поддержку
+сигналов на конкретной прошивке; прежние записи содержат только raw=-1.
+[Проверяемый отчёт с хешами источников](trip-source-id-audit.json).
+
 ## Условия пары
 
-После успешной подписи выдаются ровно Natro и Navigator 30.3.0 / 739564630.
+Выдаются ровно Natro и Navigator 30.3.0 / 739564630.
 Общий прежний сертификат SHA-256:
 `6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75`.
 HUD Speed не включается. Нужен **новый Navigator** с `CAP_MAP_CONTENT_READY=0x10000`;

@@ -1,0 +1,180 @@
+{
+  "schema": "natro-trip-candidate-id-audit/v1",
+  "date": "2026-09-13",
+  "source_commit": "1ad7e8e1242a4e65a147f21fdf989b14d3183f73",
+  "inputs": [
+    {
+      "path": "docs/geely-kx11/research-2026-09-05-next/sdk_completeness/catalog/fields.jsonl.gz",
+      "sha256": "7f185ac7451d2004ca10c1b8ee95164876bda84b6a192536ea63e14bd65816d4"
+    },
+    {
+      "path": "docs/geely-kx11/research-2026-09-05-next/sdk_completeness/catalog/sources.json",
+      "sha256": "2809bf43197f4e141284c7d95cf1b4bf6fe735b0b47178486a7190adb979eec6"
+    },
+    {
+      "path": "docs/geely-kx11/research-2026-09-05-next/sdk_completeness/catalog/value_conflicts.jsonl.gz",
+      "sha256": "675e0a73a0f349910e92eab1af0d5288e54dee6551429f055e5826a14c7b66f9"
+    }
+  ],
+  "scope": "All matching CarSignalManager constant declarations in the published 621-DEX catalog. This does not identify the runtime classloader or prove source support.",
+  "records": [
+    {
+      "class": "Lecarx/car/hardware/signal/CarSignalManager;",
+      "field": "SignalId_DstTrvld2",
+      "variants": [
+        {
+          "value": 30878,
+          "sources": [
+            {
+              "dex_source": "sha256:1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+              "field_index": 30855
+            },
+            {
+              "dex_source": "sha256:1fe7c6ea33b89881247d9930d454ab015a76dbd8a3000b0a05220ce74b534cfd",
+              "field_index": 27157
+            },
+            {
+              "dex_source": "sha256:2c10fa5e90d400c489c7c7c76a86bc75de77dff01f545656ead9719a8f9965bd",
+              "field_index": 35668
+            },
+            {
+              "dex_source": "sha256:4eb373f4ae040306296f015beee77c09391c61a25ed488f64682aaef9a37b70f",
+              "field_index": 23650
+            },
+            {
+              "dex_source": "sha256:608676008421db51e1b81596d97d2b9ce8350ef0286152301fe2f3f819bb02df",
+              "field_index": 15197
+            },
+            {
+              "dex_source": "sha256:7d5cfc2fa44eff4d5125461be67373b28ff6f41095f05a0ff5f067e0a254b8e3",
+              "field_index": 492
+            },
+            {
+              "dex_source": "sha256:8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+              "field_index": 14944
+            },
+            {
+              "dex_source": "sha256:a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+              "field_index": 7027
+            },
+            {
+              "dex_source": "sha256:abd2d6de229a651ec30eab9f9e45ff79431edddeef6e18f45d533cd81ecd0c3a",
+              "field_index": 6444
+            },
+            {
+              "dex_source": "sha256:d7fa4b044cad29969dc78c408870d596b5e7366bd5f0e44e86e3c25cbeb9806a",
+              "field_index": 18733
+            }
+          ]
+        }
+      ],
+      "has_id_conflict": false
+    },
+    {
+      "class": "Lecarx/car/hardware/signal/CarSignalManager;",
+      "field": "SignalId_VehSpdAvgIndcdVeSpdIndcdUnit",
+      "variants": [
+        {
+          "value": 30956,
+          "sources": [
+            {
+              "dex_source": "sha256:1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+              "field_index": 32135
+            },
+            {
+              "dex_source": "sha256:1fe7c6ea33b89881247d9930d454ab015a76dbd8a3000b0a05220ce74b534cfd",
+              "field_index": 28437
+            },
+            {
+              "dex_source": "sha256:2c10fa5e90d400c489c7c7c76a86bc75de77dff01f545656ead9719a8f9965bd",
+              "field_index": 36948
+            },
+            {
+              "dex_source": "sha256:4eb373f4ae040306296f015beee77c09391c61a25ed488f64682aaef9a37b70f",
+              "field_index": 24930
+            },
+            {
+              "dex_source": "sha256:608676008421db51e1b81596d97d2b9ce8350ef0286152301fe2f3f819bb02df",
+              "field_index": 16477
+            },
+            {
+              "dex_source": "sha256:7d5cfc2fa44eff4d5125461be67373b28ff6f41095f05a0ff5f067e0a254b8e3",
+              "field_index": 1772
+            },
+            {
+              "dex_source": "sha256:8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+              "field_index": 16224
+            },
+            {
+              "dex_source": "sha256:a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+              "field_index": 8307
+            },
+            {
+              "dex_source": "sha256:abd2d6de229a651ec30eab9f9e45ff79431edddeef6e18f45d533cd81ecd0c3a",
+              "field_index": 7724
+            },
+            {
+              "dex_source": "sha256:d7fa4b044cad29969dc78c408870d596b5e7366bd5f0e44e86e3c25cbeb9806a",
+              "field_index": 20013
+            }
+          ]
+        }
+      ],
+      "has_id_conflict": false
+    },
+    {
+      "class": "Lecarx/car/hardware/signal/CarSignalManager;",
+      "field": "SignalId_VehSpdAvgIndcdVehSpdIndcd",
+      "variants": [
+        {
+          "value": 30957,
+          "sources": [
+            {
+              "dex_source": "sha256:1b1005a51f85e1009af7dce7f1bafac3083a884f9bd5eb69b83099f6bd1c2b11",
+              "field_index": 32136
+            },
+            {
+              "dex_source": "sha256:1fe7c6ea33b89881247d9930d454ab015a76dbd8a3000b0a05220ce74b534cfd",
+              "field_index": 28438
+            },
+            {
+              "dex_source": "sha256:2c10fa5e90d400c489c7c7c76a86bc75de77dff01f545656ead9719a8f9965bd",
+              "field_index": 36949
+            },
+            {
+              "dex_source": "sha256:4eb373f4ae040306296f015beee77c09391c61a25ed488f64682aaef9a37b70f",
+              "field_index": 24931
+            },
+            {
+              "dex_source": "sha256:608676008421db51e1b81596d97d2b9ce8350ef0286152301fe2f3f819bb02df",
+              "field_index": 16478
+            },
+            {
+              "dex_source": "sha256:7d5cfc2fa44eff4d5125461be67373b28ff6f41095f05a0ff5f067e0a254b8e3",
+              "field_index": 1773
+            },
+            {
+              "dex_source": "sha256:8c9f0c1ba3370851c2dd9894adedb92f73fb45fb81ea379040c03263b1e45971",
+              "field_index": 16225
+            },
+            {
+              "dex_source": "sha256:a413e91986f4b18dec4fc44c010353c7b48ddb6aeefaae164719463baf566847",
+              "field_index": 8308
+            },
+            {
+              "dex_source": "sha256:abd2d6de229a651ec30eab9f9e45ff79431edddeef6e18f45d533cd81ecd0c3a",
+              "field_index": 7725
+            },
+            {
+              "dex_source": "sha256:d7fa4b044cad29969dc78c408870d596b5e7366bd5f0e44e86e3c25cbeb9806a",
+              "field_index": 20014
+            }
+          ]
+        }
+      ],
+      "has_id_conflict": false
+    }
+  ],
+  "result": "No numeric ID conflict for the three current Trip-2 signal candidates across ten static copies. No supported stock Trip-2 source established.",
+  "runtime_acceptance": "OPEN: NATRO-026/GATE-086"
+}

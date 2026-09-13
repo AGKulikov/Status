@@ -1,0 +1,73 @@
+{
+  "schema": "natro-delivery-verification/v1",
+  "checkedAt": "2026-09-13T05:59:23.470056+00:00",
+  "source": {
+    "repository": "AGKulikov/Status",
+    "commit": "1ad7e8e1242a4e65a147f21fdf989b14d3183f73",
+    "tree": "65f8ec622c8bd025e66b5a4684cb97ed1cdc169f"
+  },
+  "workflowRun": 34740687264,
+  "artifactId": 10312591300,
+  "artifactSha256": "2328fca2c5c3f78ecb5562578049f66a70ecc48934bd1b306c7ad7812efff1be",
+  "releaseChecksums": "all five PASS",
+  "files": [
+    {
+      "file": "Natro-2.8.8-signed.apk",
+      "sizeBytes": 28343662,
+      "sha256": "bcbfd5c0fc044d309ada196cc260d7459f89f9956466005bf98d8e4ca1e1db3b",
+      "package": "ru.natro.statuswidget",
+      "versionName": "2.8.8",
+      "versionCode": 208021321,
+      "signatureSchemesVerified": [
+        "v2",
+        "v3"
+      ],
+      "signerCount": 1,
+      "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "previousPairComparison": {
+        "version": "2.8.7",
+        "certificateEvidence": "release-report.json and signature-reports.txt of verified 2.8.7 pair",
+        "versionCodeEvidence": "release-report.json / KX11-COMPATIBILITY.txt",
+        "localPreviousApkSignatureVerified": true
+      },
+      "zipalign": "-c -P 16 4: PASS",
+      "metadata": [
+        "package: name='ru.natro.statuswidget' versionCode='208021321' versionName='2.8.8' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'",
+        "sdkVersion:'28'",
+        "targetSdkVersion:'28'",
+        "application-label:'Natro'"
+      ]
+    },
+    {
+      "file": "YN_30.3.0_Natro-HUD-v2-signed.apk",
+      "sizeBytes": 155149731,
+      "sha256": "d2620fc5dae6ef05a26aa079ea3d272e498b6a6e0b4d765add772fcf9730a70f",
+      "package": "ru.yandex.yandexnavi",
+      "versionName": "30.3.0",
+      "versionCode": 739564630,
+      "signatureSchemesVerified": [
+        "v2",
+        "v3"
+      ],
+      "signerCount": 1,
+      "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "previousPairComparison": {
+        "version": "2.8.7",
+        "certificateEvidence": "release-report.json and signature-reports.txt of verified 2.8.7 pair",
+        "versionCodeEvidence": "release-report.json / KX11-COMPATIBILITY.txt",
+        "localPreviousApkSignatureVerified": false,
+        "localPreviousApkNote": "Previous cached Navigator is incomplete; used the already verified 2.8.7 release reports. New Navigator verified directly."
+      },
+      "zipalign": "-c -P 16 4: PASS",
+      "metadata": [
+        "package: name='ru.yandex.yandexnavi' versionCode='739564630' versionName='30.3.0' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'",
+        "sdkVersion:'26'",
+        "targetSdkVersion:'29'",
+        "application-label:'Yandex Navi'",
+        "native-code: 'arm64-v8a'"
+      ]
+    }
+  ],
+  "hardwareAcceptance": "OPEN; static checks do not prove installation or visual behavior on KX11",
+  "trip2": "NATRO-026/GATE-086 OPEN: stock data source not restored"
+}
