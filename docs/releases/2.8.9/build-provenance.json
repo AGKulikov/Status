@@ -1,0 +1,33 @@
+{
+  "schema": "natro-authorized-release-build/v1",
+  "version_name": "2.8.9",
+  "version_code": 208021322,
+  "source_commit": "61f896bebd08c92335877a5af94620beece2e95d",
+  "source_tree": "7cf79cf13277b942956c8c24d048138591460af0",
+  "workflow_run": 34754670964,
+  "workflow_url": "https://github.com/AGKulikov/Status/actions/runs/34754670964",
+  "workflow_file": ".github/workflows/release-natro-2.8.9.yml",
+  "workflow_sha256": "11c579cc2a4cb109bfe598fde070ddc2f4cd65bdd68b076fcb02bb8465121a83",
+  "status": "success",
+  "hardware_validation": "not performed",
+  "unit_tests": {
+    "suites": 369,
+    "tests": 1881,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "tool_tests": {
+    "tests": 108,
+    "failures": 0,
+    "errors": 0
+  },
+  "archives_sha256": {
+    "Natro-2.8.9-signed-pair.zip": "954c4516fdb7d6aacbc306b1efc5cb591cf671a1a958e73f942672f4c450b6e0",
+    "Natro-2.8.9-unit-tests.zip": "928673e4266121f97828a5fc59d9787c47046661ea01d81c592afa52f29aff67"
+  },
+  "artifact_ids": {
+    "signed_pair": 10317520445,
+    "unit_tests": 10317210876
+  }
+}
