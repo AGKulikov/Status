@@ -1,0 +1,73 @@
+{
+  "schema": "kx11-stock-trip-reset-static-route-v1",
+  "scope": "Derived facts from the supplied firmware; not decompiled code, vehicle execution or active reset-setting confirmation",
+  "source_archive": {
+    "name": "ecarx-hud-system-20260727-010640.zip",
+    "sha256": "9bc62950e55910fc6eb59c99bf80439f7e7ac41f853b4c6c486977e14d062edd"
+  },
+  "sources": [
+    {
+      "member": "packages/ecarx.settings/base.apk",
+      "sha256": "4fe63822f44d6f6dfb77564d1b0f9b4aec9fb725c6e1a590862efc1c0ac570e5",
+      "evidence": "ComputerClearFragment methods, layout 0x7f0c0156 and resolved string resources"
+    },
+    {
+      "name": "system ecarx.adaptapi.jar",
+      "sha256": "87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0",
+      "evidence": "TripData buildFunctions lambdas mapping reset-setting values to PA methods"
+    }
+  ],
+  "manual_group": {
+    "field_name": "mLlTrip1",
+    "view_id": "0x7f0901d0",
+    "title_resource": "0x7f10007e",
+    "title_en": "Trip reset",
+    "title_ru": "Сброс значений промежуточного пробега",
+    "function_id": 612369920,
+    "zone": -2147483648,
+    "actions_after_ui_confirmation": {
+      "setResetDistance": 612369921,
+      "setResetSpeed": 612369922,
+      "setResetTime": 612369923,
+      "setResetConsumption": 612369924
+    },
+    "setResetOneAll": "Invokes speed, distance, time and consumption handlers in that order; not one atomic reset call"
+  },
+  "automatic_group": {
+    "field_name": "mRlTrip2",
+    "view_id": "0x7f090254",
+    "radio_group_id": "0x7f09022d",
+    "title_resource": "0x7f100081",
+    "title_en": "Mileage for this trip",
+    "title_ru": "Пробег за текущую поездку",
+    "function_id": 612369152,
+    "zone": -2147483648,
+    "options": [
+      {
+        "handler": "setResetParking",
+        "resource": "0x7f100080",
+        "title_en": "Parking reset",
+        "value": 612369156,
+        "pa_method": "CB_ParkingAutoResetSetting",
+        "pa_argument": 1
+      },
+      {
+        "handler": "setResetOil",
+        "resource": "0x7f10007f",
+        "title_en": "Refueling reset",
+        "value": 612369155,
+        "pa_method": "CB_RefuleAutoResetSetting",
+        "pa_argument": 1
+      }
+    ],
+    "interpretation": "Selects an automatic-reset condition; this is not evidence of an immediate manual Trip 2 reset"
+  },
+  "user_observation_2026_09_13": "Trip 2 resets only automatically; exact active condition was not specified in this correction",
+  "unresolved": [
+    "Which stock Trip 1 or Trip 2 row matches PA33749/33751",
+    "Distance scale of PA33751",
+    "Active automatic reset condition and actual reset timing on this vehicle",
+    "Whether the candidate time and distance follow the same stock automatic reset"
+  ],
+  "next_observation": "Pair current stock Trip 2 and Trip 1 photos with bounded incoming IPCP006e/00c8 captures; do not change counters or settings"
+}
