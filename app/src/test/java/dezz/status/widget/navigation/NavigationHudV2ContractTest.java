@@ -1212,8 +1212,9 @@ public final class NavigationHudV2ContractTest {
         assertFalse(backgroundLease.contains("postDelayed(this"));
         assertFalse(client.contains("parseNavigationState(snapshotJson)"));
         assertTrue(publisher.contains("readSnapshotInputs(currentGuidance, activeRoute, routeStatus)"));
-        assertTrue(client.contains("hudMapRenderer.updateNavigationState(navigationFrame)"));
-        assertTrue(client.contains("clusterMapRenderer.updateNavigationState(navigationFrame)"));
+        assertTrue(client.contains("hudMapRenderer.updateNavigationState(routeEpoch, navigationFrame)"));
+        assertTrue(client.contains("clusterMapRenderer.updateNavigationState(routeEpoch, navigationFrame)"));
+        assertTrue(renderer.contains("if (frame == null || routeEpoch != activeRouteEpoch) return"));
         assertTrue(client.contains("jamFingerprint, jamStyle"));
         assertTrue(client.contains("if (snapshotJson != null)"));
         assertTrue(publisher.contains("SNAPSHOT_INTERVAL_MS = 100L"));

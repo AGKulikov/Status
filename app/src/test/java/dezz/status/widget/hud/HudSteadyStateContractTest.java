@@ -56,7 +56,14 @@ public final class HudSteadyStateContractTest {
         assertTrue(source.contains("retainedAutomationCache.get(item.automationId)"));
         assertTrue(source.contains("retainedAutomationCache.clear()"));
         assertTrue(source.contains("if (cachedAppVersion != null) return cachedAppVersion"));
-        assertTrue(source.contains("telemetryListener = value -> runOnMain"));
+        String telemetryCallbacks = between(source,
+                "telemetryListener = new CarIntegration.TelemetryListener()",
+                "private final ConnectorValueRegistry.Listener connectorListener");
+        assertTrue(telemetryCallbacks.contains("onTelemetryUnavailable(@NonNull String metricId)"));
+        assertTrue(telemetryCallbacks.contains("telemetry.remove(metricId) != null) notifyChanged()"));
+        assertTrue(telemetryCallbacks.contains("acceptTelemetry(value)"));
+        assertTrue(telemetryCallbacks.contains("runOnMain(() ->"));
+        assertTrue(telemetryCallbacks.contains("if (!sameTelemetryContent(previous, value)) notifyChanged()"));
         assertTrue(source.contains("Process.THREAD_PRIORITY_BACKGROUND"));
         assertTrue(source.contains("reconcileMediaController()"));
         assertTrue(source.contains("item.enabled && isMediaElement(item.type)"));

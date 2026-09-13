@@ -46,7 +46,11 @@ Android 36 compilation Navigator и регрессии инструментов;
 на компиляции Trip2: все три getter объявляют checked `android.car.CarNotConnectedException`.
 Сигнатуры повторно проверены по комплектному `ecarx-adaptapi.jar`; поправлены IntReader,
 поэлементный catch и тестовые getters, добавлены три отдельные проверки disconnect.
-Нового APK первый CI не создал. Повторный полный прогон обязателен.
+Нового APK первый CI не создал. Повторный CI `34708642072` на `615e2caf` прошёл
+компиляцию и выполнил 1 881 JVM-тест, из которых два старых текстовых контракта
+ожидали прежние подписи telemetry listener и updateNavigationState. Обновлены
+проверки callback потери телеметрии, сохранения event-driven обновлений и epoch
+для обоих renderer. Зелёный полный прогон всё ещё обязателен.
 
 - 70 тестов `python -m unittest discover -s tools/tests -q`: успешно, без ошибок и пропусков;
   подключены локальные javac и org.json.
