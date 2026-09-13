@@ -413,7 +413,7 @@ final class HudMapRenderer {
                         }
                         return null;
                     });
-            invoke(map, "setMapLoadedListener", new Class<?>[]{loadedClass}, mapLoadedListener);
+            MapLoadedListenerBinding.set(map, mapLoadedListener);
             overlayPlacement.attach(nextMapWindow, width, height);
             overlayPlacement.updateRoute(activeRouteEpoch, activeRoute);
             syncOverlayNavigationState();
@@ -1106,8 +1106,7 @@ final class HudMapRenderer {
         mapReadyReported = false;
         if (map != null && mapLoadedListener != null) {
             try {
-                invoke(map, "setMapLoadedListener", new Class<?>[]{Class.forName(
-                        "com.yandex.mapkit.map.MapLoadedListener")}, (Object) null);
+                MapLoadedListenerBinding.set(map, null);
             } catch (Throwable ignored) {}
         }
         mapLoadedListener = null;

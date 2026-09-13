@@ -1,0 +1,35 @@
+{
+  "schema": "natro-map-loaded-listener-abi-v1",
+  "source_apk_sha256": "d2620fc5dae6ef05a26aa079ea3d272e498b6a6e0b4d765add772fcf9730a70f",
+  "dex_entry": "classes12.dex",
+  "dex_sha256": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+  "declarations": [
+    {
+      "owner": "Lcom/yandex/mapkit/map/Map;",
+      "name": "setMapLoadedListener",
+      "descriptor": "(Ljava/lang/ref/WeakReference;)V",
+      "access": "public abstract"
+    },
+    {
+      "owner": "Lcom/yandex/mapkit/map/MapLoadStatistics;",
+      "name": "getRenderObjectCount",
+      "descriptor": "()I",
+      "access": "public"
+    },
+    {
+      "owner": "Lcom/yandex/mapkit/map/MapLoadedListener;",
+      "name": "onMapLoaded",
+      "descriptor": "(Lcom/yandex/mapkit/map/MapLoadStatistics;)V",
+      "access": "public abstract"
+    },
+    {
+      "owner": "Lcom/yandex/mapkit/map/internal/MapBinding;",
+      "name": "setMapLoadedListener",
+      "descriptor": "(Ljava/lang/ref/WeakReference;)V",
+      "access": "public native"
+    }
+  ],
+  "rejected_288_lookup": "setMapLoadedListener(com.yandex.mapkit.map.MapLoadedListener)",
+  "result": "No direct-listener overload exists in Map or MapBinding; use WeakReference",
+  "scope": "Declared signatures in supplied APK plus local JVM reflection replay; not a physical KX11 test"
+}
