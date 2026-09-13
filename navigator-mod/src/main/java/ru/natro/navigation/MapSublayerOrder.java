@@ -19,6 +19,7 @@ import java.util.List;
 final class MapSublayerOrder {
     static final String CAMERA_SECTORS = "ru.natro.navigation.camera_sectors";
     static final String CAMERA_SIGNS = "ru.natro.navigation.camera_signs";
+    static final String ROUTE_EVENTS = "ru.natro.navigation.route_events";
     static final String ALTERNATIVE_ROUTES = "ru.natro.navigation.alternative_routes";
     static final String ROUTE = "ru.natro.navigation.route";
     static final String ALTERNATIVE_CALLOUTS = "ru.natro.navigation.alternative_callouts";
@@ -116,6 +117,8 @@ final class MapSublayerOrder {
         placeAfter(manager, ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), base);
         LayerRef events = firstExisting(manager, ref(roadEvents, PLACEMARKS),
                 ref(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS), base);
+        placeAfter(manager, ref(ROUTE_EVENTS, PLACEMARKS), events);
+        events = firstExisting(manager, ref(ROUTE_EVENTS, PLACEMARKS), events);
         placeAfter(manager, ref(CAMERA_SIGNS, PLACEMARKS), events);
 
         LayerRef routePinsAnchor = firstExisting(manager,
@@ -157,6 +160,8 @@ final class MapSublayerOrder {
                                                String roadEvents,
                                                NavigationMapProfile profile) throws Exception {
         ArrayList<LayerRef> custom = new ArrayList<>();
+        custom.add(new LayerRef(ROUTE_EVENTS, PLACEMARKS,
+                profile.effectiveRoadEventPriority(), -2));
         custom.add(new LayerRef(ROUTE_TRAFFIC_LIGHTS, PLACEMARKS,
                 profile.effectiveRouteTrafficLightPriority(), -1));
         custom.add(new LayerRef(CAMERA_SIGNS, PLACEMARKS,

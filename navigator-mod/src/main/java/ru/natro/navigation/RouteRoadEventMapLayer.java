@@ -47,7 +47,7 @@ final class RouteRoadEventMapLayer implements RoadEventRouteSynchronizer.Sink {
         events = next;
         if (map == null || stockProvider == null || visibility == null) return;
         if (collection == null) collection = MapObjectLayerFactory.create(map,
-                "natro-route-road-events", MapObjectLayerFactory.EQUAL, zIndex);
+                MapSublayerOrder.ROUTE_EVENTS, MapObjectLayerFactory.EQUAL, zIndex);
         clear();
         MapObjectLayerFactory.setZIndex(collection, zIndex);
         int hidden = 0, replaced = 0, submitted = 0, unavailable = 0;

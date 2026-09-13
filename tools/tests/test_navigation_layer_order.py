@@ -27,8 +27,9 @@ public final class LayerIds {
 final class NavigationMapProfile {
     boolean manualLayerPrioritiesEnabled;
     int routeLight = 20;
+    int eventPriority = 40;
     int effectiveCameraPriority() { return 30; }
-    int effectiveRoadEventPriority() { return 40; }
+    int effectiveRoadEventPriority() { return eventPriority; }
     int effectiveAlternativeRoutePriority() { return 45; }
     int effectiveRoutePriority() { return 50; }
     int effectiveAlternativeCalloutPriority() { return 65; }
@@ -77,6 +78,7 @@ public final class LayerOrderReplay {
                 MapSublayerOrder.LANE_GUIDANCE + P, MapSublayerOrder.TRAFFIC_LIGHTS + P,
                 MapSublayerOrder.CURSOR + P, MapSublayerOrder.ROUTE_TRAFFIC_LIGHTS + P,
                 MapSublayerOrder.SPEED_BUMPS + P, MapSublayerOrder.CAMERA_SIGNS + P,
+                MapSublayerOrder.ROUTE_EVENTS + P,
                 MapSublayerOrder.ALTERNATIVE_CALLOUTS + P,
                 MapSublayerOrder.ROUTE + G, MapSublayerOrder.ALTERNATIVE_ROUTES + G,
                 MapSublayerOrder.CAMERA_SECTORS + G);
@@ -101,7 +103,7 @@ public final class LayerOrderReplay {
         for (String name : new String[]{"map" + P, "jams" + P}) {
             if (map.manager.layers.contains(name)) below(map, name, ordinary);
         }
-        for (String name : new String[]{MapSublayerOrder.CAMERA_SIGNS, MapSublayerOrder.SPEED_BUMPS,
+        for (String name : new String[]{MapSublayerOrder.ROUTE_EVENTS, MapSublayerOrder.CAMERA_SIGNS, MapSublayerOrder.SPEED_BUMPS,
                 MapSublayerOrder.CURSOR, MapSublayerOrder.TRAFFIC_LIGHTS,
                 MapSublayerOrder.ALTERNATIVE_CALLOUTS, MapSublayerOrder.LANE_GUIDANCE,
                 MapSublayerOrder.DESTINATION}) {
@@ -173,6 +175,20 @@ public final class LayerOrderReplay {
         custom.routeLight = 0;
         applyAndCheck(hud, custom);
     }
+    void exactRouteEventsFollowAutomaticAndManualEventPriority() throws Exception {
+        MapFixture hud=map(false),cluster=map(false);
+        NavigationMapProfile automatic=new NavigationMapProfile();
+        applyAndCheck(hud,automatic);
+        below(hud,"events"+P,MapSublayerOrder.ROUTE_EVENTS+P);
+        below(hud,MapSublayerOrder.ROUTE_EVENTS+P,MapSublayerOrder.CAMERA_SIGNS+P);
+        below(hud,MapSublayerOrder.ROUTE_EVENTS+P,MapSublayerOrder.CURSOR+P);
+        NavigationMapProfile manual=new NavigationMapProfile();manual.manualLayerPrioritiesEnabled=true;
+        manual.eventPriority=95;MapSublayerOrder.apply(cluster,manual);
+        below(cluster,MapSublayerOrder.DESTINATION+P,MapSublayerOrder.ROUTE_EVENTS+P);
+        manual.eventPriority=10;MapSublayerOrder.apply(cluster,manual);
+        below(cluster,MapSublayerOrder.ROUTE_EVENTS+P,MapSublayerOrder.CAMERA_SIGNS+P);
+        applyAndCheck(hud,automatic);
+    }
     public static void main(String[] args) throws Exception {
         LayerOrderReplay.class.getDeclaredMethod(args[0]).invoke(new LayerOrderReplay());
     }
@@ -215,7 +231,8 @@ class NavigationLayerOrderTest(unittest.TestCase):
 
 for case in ("automaticBothStockAndIndependentMaps", "labelOrderDoesNotDependOnFirstExistingId",
              "missingOptionalAnchorsAndLabels", "lateCreationAndFeatureAwareLookup",
-             "standardManualOrderIsAlsoLow", "manualOverrideIsIndependentForTwoMaps"):
+             "standardManualOrderIsAlsoLow", "manualOverrideIsIndependentForTwoMaps",
+             "exactRouteEventsFollowAutomaticAndManualEventPriority"):
     setattr(NavigationLayerOrderTest, "test_" + case, lambda self, name=case: self.replay(name))
 
 if __name__ == "__main__":

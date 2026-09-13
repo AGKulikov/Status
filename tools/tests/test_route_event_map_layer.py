@@ -8,6 +8,7 @@ from test_navigation_event_visibility import SOURCES as BASE, ROOT
 
 SOURCES = {k:v for k,v in BASE.items() if not k.endswith('VisibilityReplay.java')}
 SOURCES.update({
+'ru/natro/navigation/MapSublayerOrder.java': 'package ru.natro.navigation; final class MapSublayerOrder {static final String ROUTE_EVENTS="ru.natro.navigation.route_events";}',
 'ru/natro/navigation/NavigationMapProfile.java': '''package ru.natro.navigation;
 final class NavigationMapProfile {static float layerZ(int p){return p;}}''',
 'com/yandex/runtime/image/ImageProvider.java': '''package com.yandex.runtime.image;
