@@ -703,6 +703,7 @@ public final class NavigationHudV2ContractTest {
         String mapProfile = read(patchRoot.resolve("NavigationMapProfile.java"));
         String trafficLights = read(patchRoot.resolve("TrafficLightMapLayer.java"));
         String cameraDirections = read(patchRoot.resolve("CameraDirectionMapLayer.java"));
+        String cameraPolicy = read(patchRoot.resolve("RouteCameraPolicy.java"));
         String speedBumps = read(patchRoot.resolve("SpeedBumpMapLayer.java"));
         String laneGuidance = read(patchRoot.resolve("LaneGuidanceMapLayer.java"));
         String overlayPlacement = read(
@@ -1085,8 +1086,12 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cameraDirections.contains("STANDARD_SIGN_RED"));
         assertTrue(cameraDirections.contains("contentWidth"));
         assertTrue(cameraDirections.contains("diameter - overlap"));
-        assertTrue(cameraDirections.contains("new_pin_alerts_lanecamera_40"));
-        assertTrue(cameraDirections.contains("new_pin_alerts_crossroad_camera_40"));
+        assertTrue(cameraDirections.contains(
+                "RouteRoadEventMapLayer.selectedCameraImageId(stockCameraProvider, controls)"));
+        assertTrue(cameraDirections.contains(
+                "RouteCameraPolicy.detailDrawableForStockResource(resourceName)"));
+        assertTrue(cameraPolicy.contains("new_pin_alerts_lanecamera_40"));
+        assertTrue(cameraPolicy.contains("new_pin_alerts_crossroad_camera_40"));
         assertFalse(cameraDirections.contains("badgeSize"));
         assertFalse(cameraDirections.contains("badgeCx"));
         assertFalse(cameraDirections.contains("drawCameraGlyph"));
