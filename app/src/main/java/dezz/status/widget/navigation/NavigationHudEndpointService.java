@@ -467,13 +467,19 @@ public final class NavigationHudEndpointService extends Service {
     }
 
     private void acceptMapReadiness(boolean cluster, @NonNull Bundle data) {
+        long generation;
+        boolean ready;
         synchronized (SURFACE_LOCK) {
             SurfaceLease lease = cluster ? publishedClusterSurface : publishedSurface;
             if (lease == null || lease.generation != data.getLong(
                     NavigationBridgeContract.KEY_SURFACE_GENERATION, -1L)) return;
-            lease.contentReady = "ready".equals(data.getString(
+            ready = "ready".equals(data.getString(
                     NavigationBridgeContract.KEY_ERROR_DETAIL, ""));
+            lease.contentReady = ready;
+            generation = lease.generation;
         }
+        DiagnosticJournal.info(cluster ? "cluster-map" : "hud-map",
+                "MapKit readiness accepted; generation=" + generation + ", ready=" + ready);
     }
 
     private boolean onMessage(@NonNull Message message) {

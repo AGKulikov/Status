@@ -1551,6 +1551,13 @@ public final class NavigationHudV2ContractTest {
             assertTrue(source.contains("isMapContentReady"));
             assertTrue(source.contains("setAlpha(0f)"));
             assertTrue(source.contains("setAlpha(desiredMapAlpha)"));
+            int callback = source.indexOf("void onSurfaceTextureUpdated(");
+            int deferred = source.indexOf("private void checkFirstMapFrame()", callback);
+            assertTrue(callback >= 0 && deferred > callback);
+            String callbackBody = source.substring(callback, deferred);
+            assertTrue(callbackBody.contains("frameCheck.onFrame()"));
+            assertFalse(callbackBody.contains("firstFrameGate.accept"));
+            assertFalse(callbackBody.contains("getBitmap("));
         }
         assertTrue(hud.contains("leasedTexture == texture"));
         assertTrue(cluster.contains("leasePublished"));

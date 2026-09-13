@@ -1,0 +1,47 @@
+{
+  "apk_sha256": "bcbfd5c0fc044d309ada196cc260d7459f89f9956466005bf98d8e4ca1e1db3b",
+  "own_code_call_chain": [
+    {
+      "class": "Ldezz/status/widget/hud/HudCompositeView;",
+      "method": "onSurfaceTextureUpdated",
+      "descriptor": "(Landroid/graphics/SurfaceTexture;)V",
+      "dex": "classes2.dex",
+      "dex_sha256": "0b55b7957a28d9a4b8774beea8179b13b60ac8143169e5119ddafbf7cdbaa17c",
+      "calls": [
+        "dezz/status/widget/navigation/MapFirstFrameDetector$Gate;->accept(Z Landroid/view/TextureView;)Z"
+      ]
+    },
+    {
+      "class": "Ldezz/status/widget/instrument/InstrumentPanelView;",
+      "method": "onSurfaceTextureUpdated",
+      "descriptor": "(Landroid/graphics/SurfaceTexture;)V",
+      "dex": "classes2.dex",
+      "dex_sha256": "0b55b7957a28d9a4b8774beea8179b13b60ac8143169e5119ddafbf7cdbaa17c",
+      "calls": [
+        "dezz/status/widget/navigation/MapFirstFrameDetector$Gate;->accept(Z Landroid/view/TextureView;)Z"
+      ]
+    },
+    {
+      "class": "Ldezz/status/widget/navigation/MapFirstFrameDetector$Gate;",
+      "method": "accept",
+      "descriptor": "(Z Landroid/view/TextureView;)Z",
+      "dex": "classes2.dex",
+      "dex_sha256": "0b55b7957a28d9a4b8774beea8179b13b60ac8143169e5119ddafbf7cdbaa17c",
+      "calls": [
+        "dezz/status/widget/navigation/MapFirstFrameDetector;->hasRenderableContent(Landroid/view/TextureView;)Z",
+        "dezz/status/widget/navigation/MapFirstFrameDetector$Gate;->acceptSample(Z Z)Z"
+      ]
+    },
+    {
+      "class": "Ldezz/status/widget/navigation/MapFirstFrameDetector;",
+      "method": "hasRenderableContent",
+      "descriptor": "(Landroid/view/TextureView;)Z",
+      "dex": "classes2.dex",
+      "dex_sha256": "0b55b7957a28d9a4b8774beea8179b13b60ac8143169e5119ddafbf7cdbaa17c",
+      "calls": [
+        "android/view/TextureView;->getBitmap(I I)Landroid/graphics/Bitmap;",
+        "dezz/status/widget/navigation/MapFirstFrameDetector;->hasRenderableContent([I I)Z"
+      ]
+    }
+  ]
+}

@@ -409,6 +409,11 @@ final class HudMapRenderer {
                                 && generation == loadingGeneration && args != null && args.length > 0) {
                             Number count = (Number) invoke(args[0], "getRenderObjectCount", new Class<?>[0]);
                             mapContentLoaded = count.intValue() > 0;
+                            NavigationBridgeClient.reportDiagnostic(displayName
+                                    + " MapLoadedListener; generation=" + loadingGeneration
+                                    + ", renderObjects=" + count.intValue()
+                                    + ", configured=" + mapConfigured
+                                    + ", surfaceAttached=" + runtimeSurfaceAttached);
                             acknowledgeMapContent();
                         }
                         return null;
@@ -463,6 +468,8 @@ final class HudMapRenderer {
     private void acknowledgeMapContent() {
         if (!mapReadyReported && mapConfigured && mapContentLoaded && runtimeSurfaceAttached) {
             mapReadyReported = true;
+            NavigationBridgeClient.reportDiagnostic(displayName
+                    + " MapKit readiness sent; generation=" + generation);
             reportMapReady(true);
         }
     }

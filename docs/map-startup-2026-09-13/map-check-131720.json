@@ -1,0 +1,141 @@
+{
+  "schema": "natro-map-check-review-v1",
+  "archive": "Natro-Map-Check-20260913-131720-b8aa36.zip",
+  "archive_bytes": 196893,
+  "archive_sha256": "586b7b5300e0f0666025811fa6d25df34b8178d7f251931b506bfbaa1f17b766",
+  "crc_verified": true,
+  "manifest_members_verified": 58,
+  "collector_version": "1.0.0",
+  "collector_commands_collected": 19,
+  "collector_duration_seconds": 11.290701,
+  "installed_apks": {
+    "ru.natro.statuswidget": {
+      "sha256": "bcbfd5c0fc044d309ada196cc260d7459f89f9956466005bf98d8e4ca1e1db3b",
+      "matches_delivered_artifact": true
+    },
+    "ru.yandex.yandexnavi": {
+      "sha256": "1bb5ba22cd2a60726414779fa9d8ebb37973ee756f4e9f401f9efc5bc63da4a2",
+      "matches_delivered_artifact": true
+    }
+  },
+  "android_sdk": 28,
+  "selected_member_sha256": {
+    "RESULT.json": "bd299f2890b523a35fdfbafa393d87d87407d3ea05bc774ff7e28b45cfcdefe3",
+    "natro-journal.txt": "e156d659ab03a63c6b8b4e60ddaa2f126632293ef8d2418ecd529082ec79f9d2",
+    "map-logcat-final.txt": "797b2a718ec1d438410f2baaad3cff3cd25329a396c4280d83302ec7d8098c3b",
+    "natro-package.txt": "40f8b0bae8ae9136ffc76bc2f4694231ba09004c0b069e1aa0525952c8a7e1ab",
+    "navigator-package.txt": "9ebf82598c9c7a2c1a30931f7511b6eca6e73aa49db518682ad2d07a3aa3ccde",
+    "natro-graphics.txt": "897282109b06970604864415a83dc172f2b9cb4001cdc49085fdc01adc0cbabe",
+    "window-state.txt": "aa04d6e82f0c2daa8c06557929213e3affc81cda52720f99f1cff38dd1b05c38"
+  },
+  "historical_wrong_listener_lookup_failures": {
+    "before_mapfix": 60,
+    "after_mapfix": 0,
+    "mapfix_package_update_utc": "2026-09-13T09:19:21+00:00"
+  },
+  "post_mapfix_attachments": [
+    {
+      "journal_line": 8707,
+      "utc": "2026-09-13T09:20:32.749000+00:00",
+      "uptime_ms": 222221,
+      "target": "HUD",
+      "generation": 11,
+      "width": 728,
+      "height": 190
+    },
+    {
+      "journal_line": 8710,
+      "utc": "2026-09-13T09:20:32.857000+00:00",
+      "uptime_ms": 222329,
+      "target": "instrument cluster",
+      "generation": 9,
+      "width": 1920,
+      "height": 720
+    },
+    {
+      "journal_line": 8766,
+      "utc": "2026-09-13T09:22:07.841000+00:00",
+      "uptime_ms": 53652,
+      "target": "HUD",
+      "generation": 2,
+      "width": 728,
+      "height": 190
+    },
+    {
+      "journal_line": 8769,
+      "utc": "2026-09-13T09:22:07.922000+00:00",
+      "uptime_ms": 53733,
+      "target": "instrument cluster",
+      "generation": 3,
+      "width": 1920,
+      "height": 720
+    },
+    {
+      "journal_line": 8803,
+      "utc": "2026-09-13T09:22:24.356000+00:00",
+      "uptime_ms": 70168,
+      "target": "HUD",
+      "generation": 4,
+      "width": 728,
+      "height": 190
+    },
+    {
+      "journal_line": 8817,
+      "utc": "2026-09-13T09:22:49.670000+00:00",
+      "uptime_ms": 95482,
+      "target": "HUD",
+      "generation": 5,
+      "width": 728,
+      "height": 190
+    },
+    {
+      "journal_line": 8952,
+      "utc": "2026-09-13T10:16:31.238000+00:00",
+      "uptime_ms": 56682,
+      "target": "HUD",
+      "generation": 2,
+      "width": 728,
+      "height": 190
+    },
+    {
+      "journal_line": 8955,
+      "utc": "2026-09-13T10:16:31.371000+00:00",
+      "uptime_ms": 56815,
+      "target": "instrument cluster",
+      "generation": 3,
+      "width": 1920,
+      "height": 720
+    },
+    {
+      "journal_line": 8982,
+      "utc": "2026-09-13T10:17:02.717000+00:00",
+      "uptime_ms": 87162,
+      "target": "HUD",
+      "generation": 4,
+      "width": 728,
+      "height": 190
+    }
+  ],
+  "latest_session_capabilities_hex": "1bfe7",
+  "graphics_observation": {
+    "natro_frames_rendered": 5847,
+    "natro_janky_frames": 4995,
+    "jank_percentage": 85.43,
+    "layers": [
+      {
+        "width": 728,
+        "height": 190
+      },
+      {
+        "width": 1920,
+        "height": 720
+      }
+    ],
+    "scope": "Aggregate application graphics, not isolated map timing"
+  },
+  "remaining_stage": "After attach: producer readiness / accepted ACK / consumer readback qualification / visibility",
+  "ack_and_pixel_result": "Not recorded by the installed version; no absence inferred from missing log lines",
+  "new_source_defect": "Both consumers call TextureView.getBitmap synchronously from onSurfaceTextureUpdated, which Android 9 invokes from draw",
+  "complete_runtime_cause_confirmed": false,
+  "hardware_gate": "GATE-082 remains open"
+}

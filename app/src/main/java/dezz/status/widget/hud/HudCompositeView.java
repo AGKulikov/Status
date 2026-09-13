@@ -43,6 +43,8 @@ final class HudCompositeView extends FrameLayout
     private float desiredMapAlpha = 1f;
     private boolean awaitingFirstMapFrame = true;
     private final MapFirstFrameDetector.Gate firstFrameGate = new MapFirstFrameDetector.Gate();
+    private final MapFirstFrameDetector.DeferredCheck frameCheck;
+    private int startupChecks;
     private final MapEdgeFade mapEdgeFade = new MapEdgeFade();
     private final RectF edgeBounds = new RectF();
 
@@ -58,6 +60,11 @@ final class HudCompositeView extends FrameLayout
         setClipToPadding(true);
 
         mapTexture = new TextureView(context);
+        frameCheck = new MapFirstFrameDetector.DeferredCheck(
+                new MapFirstFrameDetector.DeferredCheck.Queue() {
+                    @Override public boolean post(Runnable task) { return mapTexture.post(task); }
+                    @Override public void remove(Runnable task) { mapTexture.removeCallbacks(task); }
+                }, this::checkFirstMapFrame);
         mapTexture.setOpaque(true);
         mapTexture.setAlpha(0f);
         // TextureView rejects every background Drawable on Android 9, including the Drawable
@@ -191,16 +198,33 @@ final class HudCompositeView extends FrameLayout
 
     @Override
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture texture) {
+        // Android 9 invokes this inside TextureView.draw(). Never read pixels here.
+        if (leasedTexture == texture && activeMap != null) frameCheck.onFrame();
+    }
+
+    private void checkFirstMapFrame() {
+        if (leasedSurface == null || !leasedSurface.isValid() || activeMap == null
+                || mapTexture.getSurfaceTexture() != leasedTexture) return;
         boolean ready = NavigationHudEndpointService.isMapContentReady(leasedSurface, false);
-        if (!ready) beginFirstFrameGate();
-        if (awaitingFirstMapFrame && leasedTexture == texture && activeMap != null
-                && firstFrameGate.accept(ready, mapTexture)) {
+        if (!ready && !awaitingFirstMapFrame) beginFirstFrameGate();
+        if (!awaitingFirstMapFrame) return;
+        boolean accepted = firstFrameGate.accept(ready, mapTexture);
+        startupChecks++;
+        if (accepted || startupChecks == 1 || startupChecks == 3
+                || startupChecks == 30 || startupChecks == 120) {
+            DiagnosticJournal.info("hud-map", "HUD first-frame check=" + startupChecks
+                    + ", " + firstFrameGate.diagnosticState() + ", visible=" + accepted
+                    + ", opacity=" + desiredMapAlpha);
+        }
+        if (accepted) {
             awaitingFirstMapFrame = false;
             mapTexture.setAlpha(desiredMapAlpha);
         }
     }
 
     private void beginFirstFrameGate() {
+        frameCheck.cancel();
+        startupChecks = 0;
         awaitingFirstMapFrame = true;
         firstFrameGate.reset();
         mapTexture.setAlpha(0f);
@@ -263,6 +287,7 @@ final class HudCompositeView extends FrameLayout
     }
 
     private void revokeSurface() {
+        frameCheck.cancel();
         Surface current = leasedSurface;
         leasedSurface = null;
         leasedTexture = null;
