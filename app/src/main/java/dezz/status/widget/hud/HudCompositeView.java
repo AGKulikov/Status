@@ -17,7 +17,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import dezz.status.widget.diagnostics.DiagnosticJournal;
-import dezz.status.widget.navigation.MapFirstFrameDetector;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.navigation.MapEdgeFade;
 
@@ -39,12 +38,9 @@ final class HudCompositeView extends FrameLayout
     private int leasedWidth;
     private int leasedHeight;
     @Nullable private HudElementConfig activeMap;
-    /** Configured opacity is applied only after MapKit has submitted a real producer frame. */
+    /** Apply configured opacity on the first update of the currently published surface. */
     private float desiredMapAlpha = 1f;
     private boolean awaitingFirstMapFrame = true;
-    private final MapFirstFrameDetector.Gate firstFrameGate = new MapFirstFrameDetector.Gate();
-    private final MapFirstFrameDetector.DeferredCheck frameCheck;
-    private int startupChecks;
     private final MapEdgeFade mapEdgeFade = new MapEdgeFade();
     private final RectF edgeBounds = new RectF();
 
@@ -60,11 +56,6 @@ final class HudCompositeView extends FrameLayout
         setClipToPadding(true);
 
         mapTexture = new TextureView(context);
-        frameCheck = new MapFirstFrameDetector.DeferredCheck(
-                new MapFirstFrameDetector.DeferredCheck.Queue() {
-                    @Override public boolean post(Runnable task) { return mapTexture.post(task); }
-                    @Override public void remove(Runnable task) { mapTexture.removeCallbacks(task); }
-                }, this::checkFirstMapFrame);
         mapTexture.setOpaque(true);
         mapTexture.setAlpha(0f);
         // TextureView rejects every background Drawable on Android 9, including the Drawable
@@ -198,35 +189,19 @@ final class HudCompositeView extends FrameLayout
 
     @Override
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture texture) {
-        // Android 9 invokes this inside TextureView.draw(). Never read pixels here.
-        if (leasedTexture == texture && activeMap != null) frameCheck.onFrame();
-    }
-
-    private void checkFirstMapFrame() {
-        if (leasedSurface == null || !leasedSurface.isValid() || activeMap == null
-                || mapTexture.getSurfaceTexture() != leasedTexture) return;
-        boolean ready = NavigationHudEndpointService.isMapContentReady(leasedSurface, false);
-        if (!ready && !awaitingFirstMapFrame) beginFirstFrameGate();
-        if (!awaitingFirstMapFrame) return;
-        boolean accepted = firstFrameGate.accept(ready, mapTexture);
-        startupChecks++;
-        if (accepted || startupChecks == 1 || startupChecks == 3
-                || startupChecks == 30 || startupChecks == 120) {
-            DiagnosticJournal.info("hud-map", "HUD first-frame check=" + startupChecks
-                    + ", " + firstFrameGate.diagnosticState() + ", visible=" + accepted
-                    + ", opacity=" + desiredMapAlpha);
-        }
-        if (accepted) {
+        // Recovery: a current surface update must be enough to show the map. Full tile loading
+        // and bitmap heuristics can remain pending forever; neither may block presentation.
+        if (awaitingFirstMapFrame && leasedTexture == texture && activeMap != null
+                && leasedSurface != null && leasedSurface.isValid()) {
             awaitingFirstMapFrame = false;
             mapTexture.setAlpha(desiredMapAlpha);
+            DiagnosticJournal.info("hud-map", "HUD surface updated; map shown, opacity="
+                    + desiredMapAlpha);
         }
     }
 
     private void beginFirstFrameGate() {
-        frameCheck.cancel();
-        startupChecks = 0;
         awaitingFirstMapFrame = true;
-        firstFrameGate.reset();
         mapTexture.setAlpha(0f);
     }
 
@@ -237,10 +212,11 @@ final class HudCompositeView extends FrameLayout
         if (activeMap == null || width <= 1 || height <= 1) return;
         if (leasedSurface != null && leasedTexture == texture
                 && leasedWidth == width && leasedHeight == height) return;
-        beginFirstFrameGate();
+        // A resize of this live surface keeps its last frame visible during producer rebuild.
+        if (leasedSurface == null || leasedTexture != texture) beginFirstFrameGate();
         texture.setDefaultBufferSize(width, height);
         if (leasedSurface != null && leasedTexture == texture) {
-            // Reuse the TextureView/Surface but keep it masked during the producer rebuild.
+            // Reuse the TextureView/Surface and preserve its current presentation.
             // The endpoint nevertheless publishes a new generation: OffscreenMapWindow has
             // immutable creation dimensions and must rebuild its viewport instead of stretching
             // the old raster to this new rectangle.
@@ -287,7 +263,6 @@ final class HudCompositeView extends FrameLayout
     }
 
     private void revokeSurface() {
-        frameCheck.cancel();
         Surface current = leasedSurface;
         leasedSurface = null;
         leasedTexture = null;

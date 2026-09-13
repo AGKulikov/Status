@@ -17,7 +17,6 @@ import androidx.annotation.Nullable;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
-import dezz.status.widget.navigation.MapFirstFrameDetector;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
 
@@ -47,12 +46,9 @@ public final class InstrumentPanelView extends FrameLayout
     private int publishedWidth;
     private int publishedHeight;
     private int coldLeaseRetryCount;
-    /** Keeps Android's white initial TextureView buffer out of the cluster composition. */
+    /** Wait for a surface update, without depending on complete MapKit tile loading. */
     private float desiredMapAlpha = 1f;
     private boolean awaitingFirstMapFrame = true;
-    private final MapFirstFrameDetector.Gate firstFrameGate = new MapFirstFrameDetector.Gate();
-    private final MapFirstFrameDetector.DeferredCheck frameCheck;
-    private int startupChecks;
     @Nullable private String cachedMapProfileRaw;
     @Nullable private NavigationIntegrationConfig.MapProfile cachedMapProfile;
     @NonNull private final Runnable coldLeaseRetry = this::retryColdLease;
@@ -66,11 +62,6 @@ public final class InstrumentPanelView extends FrameLayout
         this.config = config;
         panelStore = new InstrumentPanelStore(context);
         navigationPreferences = new Preferences(context);
-        frameCheck = new MapFirstFrameDetector.DeferredCheck(
-                new MapFirstFrameDetector.DeferredCheck.Queue() {
-                    @Override public boolean post(Runnable task) { return InstrumentPanelView.this.post(task); }
-                    @Override public void remove(Runnable task) { removeCallbacks(task); }
-                }, this::checkFirstMapFrame);
         if (editorMode) {
             mapTexture = null;
             mapView = new MapPlaceholderView(context);
@@ -220,37 +211,20 @@ public final class InstrumentPanelView extends FrameLayout
     }
 
     @Override public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surfaceTexture) {
-        // This callback is part of TextureView.draw() on Android 9; post every readback.
-        if (mapTexture != null && leasePublished
-                && mapTexture.getSurfaceTexture() == surfaceTexture) frameCheck.onFrame();
-    }
-
-    private void checkFirstMapFrame() {
-        if (mapTexture == null || !attached || !leasePublished || mapSurface == null
-                || !mapSurface.isValid() || !mapTexture.isAvailable()) return;
-        boolean ready = NavigationHudEndpointService.isMapContentReady(mapSurface, true);
-        if (!ready && !awaitingFirstMapFrame) beginFirstFrameGate();
-        if (!awaitingFirstMapFrame) return;
-        boolean accepted = firstFrameGate.accept(ready, mapTexture);
-        startupChecks++;
-        if (accepted || startupChecks == 1 || startupChecks == 3
-                || startupChecks == 30 || startupChecks == 120) {
-            DiagnosticJournal.info("cluster-map", "cluster first-frame check=" + startupChecks
-                    + ", " + firstFrameGate.diagnosticState() + ", visible=" + accepted
-                    + ", opacity=" + desiredMapAlpha);
-        }
-        if (accepted) {
+        // Full tile loading is optional: cached and partially loaded maps must remain visible.
+        if (awaitingFirstMapFrame && attached && leasePublished && mapTexture != null
+                && mapTexture.getSurfaceTexture() == surfaceTexture
+                && mapSurface != null && mapSurface.isValid()) {
             awaitingFirstMapFrame = false;
             mapView.setAlpha(desiredMapAlpha);
+            DiagnosticJournal.info("cluster-map", "cluster surface updated; map shown, opacity="
+                    + desiredMapAlpha);
         }
     }
 
     private void beginFirstFrameGate() {
-        frameCheck.cancel();
-        startupChecks = 0;
         if (mapTexture == null) return;
         awaitingFirstMapFrame = true;
-        firstFrameGate.reset();
         mapView.setAlpha(0f);
     }
 
@@ -300,7 +274,8 @@ public final class InstrumentPanelView extends FrameLayout
             return;
         }
         if (leasePublished && width == publishedWidth && height == publishedHeight) return;
-        beginFirstFrameGate();
+        // Preserve the last frame when replacing only this live lease's dimensions.
+        if (!leasePublished) beginFirstFrameGate();
         SurfaceTexture texture = mapTexture.getSurfaceTexture();
         if (texture != null) texture.setDefaultBufferSize(width, height);
         NavigationHudEndpointService.ensureClusterEndpointStarted(getContext());
@@ -340,7 +315,6 @@ public final class InstrumentPanelView extends FrameLayout
     }
 
     private void revokeLease() {
-        frameCheck.cancel();
         Surface surface = mapSurface;
         if (leasePublished && surface != null) {
             NavigationHudEndpointService.revokeClusterSurface(surface);

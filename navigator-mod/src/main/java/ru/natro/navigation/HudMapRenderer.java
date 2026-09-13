@@ -394,31 +394,6 @@ final class HudMapRenderer {
             mapWindow = nextMapWindow;
             map = invoke(nextMapWindow, "getMap", new Class<?>[0]);
             reportMapReady(false);
-            final Object loadingMap = map;
-            final long loadingGeneration = generation;
-            Class<?> loadedClass = Class.forName("com.yandex.mapkit.map.MapLoadedListener");
-            mapLoadedListener = java.lang.reflect.Proxy.newProxyInstance(
-                    loadedClass.getClassLoader(), new Class<?>[]{loadedClass},
-                    (proxy, method, args) -> {
-                        if (method.getDeclaringClass() == Object.class) {
-                            if ("hashCode".equals(method.getName())) return System.identityHashCode(proxy);
-                            if ("equals".equals(method.getName())) return proxy == args[0];
-                            return "NatroMapLoadedListener";
-                        }
-                        if ("onMapLoaded".equals(method.getName()) && map == loadingMap
-                                && generation == loadingGeneration && args != null && args.length > 0) {
-                            Number count = (Number) invoke(args[0], "getRenderObjectCount", new Class<?>[0]);
-                            mapContentLoaded = count.intValue() > 0;
-                            NavigationBridgeClient.reportDiagnostic(displayName
-                                    + " MapLoadedListener; generation=" + loadingGeneration
-                                    + ", renderObjects=" + count.intValue()
-                                    + ", configured=" + mapConfigured
-                                    + ", surfaceAttached=" + runtimeSurfaceAttached);
-                            acknowledgeMapContent();
-                        }
-                        return null;
-                    });
-            MapLoadedListenerBinding.set(map, mapLoadedListener);
             overlayPlacement.attach(nextMapWindow, width, height);
             overlayPlacement.updateRoute(activeRouteEpoch, activeRoute);
             syncOverlayNavigationState();
@@ -449,6 +424,7 @@ final class HudMapRenderer {
             createRoadEventsLayer(mapKit, mapKitClass, mapWindowClass, nextMapWindow);
             applyProfile();
             mapConfigured = true;
+            observeMapLoading();
             acknowledgeMapContent();
             Log.i(TAG, "Independent " + displayName
                     + " OffscreenMapWindow attached, generation=" + generation
@@ -462,6 +438,47 @@ final class HudMapRenderer {
             Log.e(TAG, "Could not attach independent " + displayName + " MapWindow", failure);
             stopRenderer(false);
             reporter.onSurfaceLost(failedGeneration, detail);
+        }
+    }
+
+    /** Tile-completion telemetry must never be a prerequisite for attaching or showing a map. */
+    private void observeMapLoading() {
+        try {
+            final Object loadingMap = map;
+            final long loadingGeneration = generation;
+            Class<?> loadedClass = Class.forName("com.yandex.mapkit.map.MapLoadedListener");
+            mapLoadedListener = java.lang.reflect.Proxy.newProxyInstance(
+                    loadedClass.getClassLoader(), new Class<?>[]{loadedClass},
+                    (proxy, method, args) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            if ("hashCode".equals(method.getName())) return System.identityHashCode(proxy);
+                            if ("equals".equals(method.getName())) return proxy == args[0];
+                            return "NatroMapLoadedListener";
+                        }
+                        if ("onMapLoaded".equals(method.getName()) && map == loadingMap
+                                && generation == loadingGeneration && args != null && args.length > 0) {
+                            try {
+                                Number count = (Number) invoke(args[0], "getRenderObjectCount", new Class<?>[0]);
+                                mapContentLoaded = count.intValue() > 0;
+                                NavigationBridgeClient.reportDiagnostic(displayName
+                                        + " MapLoadedListener; generation=" + loadingGeneration
+                                        + ", renderObjects=" + count.intValue()
+                                        + ", configured=" + mapConfigured
+                                        + ", surfaceAttached=" + runtimeSurfaceAttached);
+                                acknowledgeMapContent();
+                            } catch (Throwable failure) {
+                                Log.w(TAG, "Optional map load statistics unavailable: "
+                                        + shortMessage(failure));
+                            }
+                        }
+                        return null;
+                    });
+            MapLoadedListenerBinding.set(map, mapLoadedListener);
+        } catch (Throwable failure) {
+            mapLoadedListener = null;
+            Log.w(TAG, "Optional map loading listener unavailable: " + shortMessage(failure));
+            NavigationBridgeClient.reportDiagnostic(displayName
+                    + " map loading listener unavailable; renderer remains attached");
         }
     }
 

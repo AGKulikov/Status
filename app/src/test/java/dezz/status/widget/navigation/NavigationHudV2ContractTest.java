@@ -1538,7 +1538,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(canvas.contains("Paint.SUBPIXEL_TEXT_FLAG"));
     }
 
-    @Test public void mapSurfacesStayHiddenUntilTheFirstProducerFrame() throws Exception {
+    @Test public void mapSurfacesShowOnCurrentUpdateWithoutTileOrReadbackGates() throws Exception {
         Path root = sourceRoot();
         String hud = read(root.resolve("hud/HudCompositeView.java"));
         String cluster = read(root.resolve("instrument/InstrumentPanelView.java"));
@@ -1547,15 +1547,16 @@ public final class NavigationHudV2ContractTest {
             assertTrue(source.contains("awaitingFirstMapFrame"));
             assertTrue(source.contains("desiredMapAlpha"));
             assertTrue(source.contains("onSurfaceTextureUpdated"));
-            assertTrue(source.contains("firstFrameGate.accept(ready, mapTexture)"));
-            assertTrue(source.contains("isMapContentReady"));
+            assertFalse(source.contains("MapFirstFrameDetector"));
+            assertFalse(source.contains("isMapContentReady"));
             assertTrue(source.contains("setAlpha(0f)"));
             assertTrue(source.contains("setAlpha(desiredMapAlpha)"));
             int callback = source.indexOf("void onSurfaceTextureUpdated(");
-            int deferred = source.indexOf("private void checkFirstMapFrame()", callback);
+            int deferred = source.indexOf("private void beginFirstFrameGate()", callback);
             assertTrue(callback >= 0 && deferred > callback);
             String callbackBody = source.substring(callback, deferred);
-            assertTrue(callbackBody.contains("frameCheck.onFrame()"));
+            assertTrue(callbackBody.contains("setAlpha(desiredMapAlpha)"));
+            assertTrue(callbackBody.contains("awaitingFirstMapFrame = false"));
             assertFalse(callbackBody.contains("firstFrameGate.accept"));
             assertFalse(callbackBody.contains("getBitmap("));
         }

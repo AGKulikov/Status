@@ -7,7 +7,9 @@ import android.view.TextureView;
 import androidx.annotation.NonNull;
 
 /**
- * Qualifies the first {@link TextureView} buffer before a secondary-display map is revealed.
+ * Historical pixel/ACK policy retained for regression analysis; not used by the live HUD or
+ * instrument map since the 2.9.0 visibility recovery. A missing tile-completion event or failed
+ * bitmap copy must not leave either map hidden.
  *
  * <p>Android 9 on the KX11 can publish a uniform opaque-white bootstrap buffer and report
  * {@code onSurfaceTextureUpdated()} before MapKit has drawn any map content. The callback alone

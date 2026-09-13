@@ -705,7 +705,7 @@ public final class MapOverlayPlacementHarness {
         self.assertNotIn("2.5.10", build)
         self.assertNotIn("2.5.10", workflow)
 
-    def test_kx11_white_bootstrap_and_recursive_navigation_lists_are_gated(self):
+    def test_kx11_map_presentation_is_not_blocked_by_historical_pixel_gate(self):
         source_root = (TOOLS.parent / "app" / "src" / "main" / "java" / "dezz"
                        / "status" / "widget")
         detector = (source_root / "navigation" / "MapFirstFrameDetector.java").read_text()
@@ -717,10 +717,11 @@ public final class MapOverlayPlacementHarness {
 
         self.assertIn("consecutive >= 3", detector)
         self.assertIn("texture.getBitmap(SAMPLE_WIDTH, SAMPLE_HEIGHT)", detector)
-        self.assertIn("firstFrameGate.accept(ready, mapTexture)", hud)
-        self.assertIn("firstFrameGate.accept(ready, mapTexture)", cluster)
-        self.assertIn("isMapContentReady(leasedSurface, false)", hud)
-        self.assertIn("isMapContentReady(mapSurface, true)", cluster)
+        for source in (hud, cluster):
+            self.assertNotIn("MapFirstFrameDetector", source)
+            self.assertNotIn("isMapContentReady", source)
+            self.assertNotIn("getBitmap(", source)
+            self.assertIn("surface updated; map shown", source)
         self.assertIn("source instanceof ImmutableSnapshotList", state)
         self.assertIn("return new ImmutableSnapshotList<>(source)", state)
         self.assertNotIn("Collections.unmodifiableList(laneItems)", state)
