@@ -277,6 +277,11 @@ int getVersionCode() {
     if (version == '2.8.7') {
         return 208021320
     }
+    // Producer-confirmed map readiness, native alternative content and complete route events.
+    // Trip2 source remains unverified; this release improves unavailable-field diagnostics only.
+    if (version == '2.8.8') {
+        return 208021321
+    }
     if (version == '2.3.0') {
         return 208021254
     }
