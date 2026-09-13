@@ -78,3 +78,13 @@ python3 -m pip install androguard==4.1.4
 python3 tools/audit_map_loaded_listener.py /path/to/Navigator-30.3.0-Natro-2.8.8-signed.apk --output /tmp/actual-api.json
 python3 -m unittest tools.tests.test_map_loaded_listener_binding tools.tests.test_map_regressions -v
 ```
+
+Исправление, тесты, аудит и уточнение требований опубликованы в commit
+[`33851bcdff77814c976e55b609885385a0aeab25`](https://github.com/AGKulikov/Status/commit/33851bcdff77814c976e55b609885385a0aeab25),
+tree `4152acc5f940c6edddb37766a5087d0f1f877d9c`. Дерево побайтно совпадает с локальным;
+все 350 прежних ID требований сохранены. Релизный workflow для этого commit пропущен.
+
+[CI 34747441467](https://github.com/AGKulikov/Status/actions/runs/34747441467) прошёл:
+компиляция Natro и все unit-тесты приложения, компиляция всех исходников Navigator
+bridge, все тесты инструментов и отдельная проверка отсутствия созданного APK.
+Это завершает проверку исходников; обновление APK и аппаратный GATE-082 впереди.
