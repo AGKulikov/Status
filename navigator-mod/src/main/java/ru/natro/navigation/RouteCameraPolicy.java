@@ -12,6 +12,30 @@ final class RouteCameraPolicy {
                 || "TRAFFIC_CONTROL".equals(tag);
     }
 
+    static boolean isCameraRecord(Iterable<?> tags) {
+        for (Object tag : tags) if (isControl(String.valueOf(tag))) return true;
+        return false;
+    }
+
+    /** POLICE attached to this same control record is its stock camera alias, not another pin. */
+    static boolean isReplacedCameraTag(String tag) {
+        return isControl(tag) || "POLICE".equals(tag);
+    }
+
+    /** Only the category actually chosen by the stock provider may supply an extra plate. */
+    static String detailDrawableForStockResource(String name) {
+        if ("poi_alerts_lane_control_26".equals(name) || "pin_alerts_lane_control".equals(name)) {
+            return "new_pin_alerts_lanecamera_40";
+        }
+        if ("poi_alerts_cross_road_control_26".equals(name) || "pin_alerts_cross_road_control".equals(name)) {
+            return "new_pin_alerts_crossroad_camera_40";
+        }
+        if ("poi_alerts_no_stopping_control_24".equals(name) || "pin_alerts_no_stopping_control".equals(name)) {
+            return "new_pin_alerts_camera_stop_40";
+        }
+        return null;
+    }
+
     static boolean isAhead(int eventSegment, double eventFraction, int pointCount,
                            boolean progressValid, int segment, double fraction) {
         if (eventSegment < 0 || eventSegment >= pointCount - 1

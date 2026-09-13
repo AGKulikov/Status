@@ -36,6 +36,8 @@ public final class InstrumentPanelView extends FrameLayout
     @NonNull private final View mapView;
     @Nullable private final TextureView mapTexture;
     @Nullable private Surface mapSurface;
+    @Nullable private SurfaceTexture ownedTexture;
+    @Nullable private Surface publishedSurface;
     private boolean attached;
     private boolean windowVisible;
     private boolean leasePublished;
@@ -46,6 +48,9 @@ public final class InstrumentPanelView extends FrameLayout
     private int publishedWidth;
     private int publishedHeight;
     private int coldLeaseRetryCount;
+    private long lastGeometryRecovery;
+    private long lastWaitLog;
+    @NonNull private String lastWaitReason = "";
     /** Wait for a surface update, without depending on complete MapKit tile loading. */
     private float desiredMapAlpha = 1f;
     private boolean awaitingFirstMapFrame = true;
@@ -190,8 +195,17 @@ public final class InstrumentPanelView extends FrameLayout
 
     @Override public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surfaceTexture,
                                                     int width, int height) {
+        if (mapTexture == null || mapTexture.getSurfaceTexture() != surfaceTexture) return;
+        // Recovery can already have published this exact TextureView surface before Android's
+        // delayed callback. Releasing it here would strand a lease pointing at a dead Surface.
+        if (ownedTexture == surfaceTexture && mapSurface != null && mapSurface.isValid()) {
+            replaceLeaseIfReady();
+            return;
+        }
+        revokeLease();
         beginFirstFrameGate();
         releaseOwnedSurface();
+        ownedTexture = surfaceTexture;
         mapSurface = new Surface(surfaceTexture);
         coldLeaseRetryCount = 0;
         publishLeaseIfReady();
@@ -199,11 +213,13 @@ public final class InstrumentPanelView extends FrameLayout
 
     @Override public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surfaceTexture,
                                                       int width, int height) {
-        if (width == publishedWidth && height == publishedHeight) return;
+        if (surfaceTexture != ownedTexture) return;
+        if (hasLiveLease() && width == publishedWidth && height == publishedHeight) return;
         replaceLeaseIfReady();
     }
 
     @Override public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surfaceTexture) {
+        if (ownedTexture != null && surfaceTexture != ownedTexture) return true;
         removeCallbacks(coldLeaseRetry);
         revokeLease();
         releaseOwnedSurface();
@@ -216,10 +232,17 @@ public final class InstrumentPanelView extends FrameLayout
         if (awaitingFirstMapFrame && attached && leasePublished && mapTexture != null
                 && mapTexture.getSurfaceTexture() == surfaceTexture
                 && mapSurface != null && mapSurface.isValid()) {
+            long sentGeneration = NavigationHudEndpointService.sentMapGeneration(mapSurface, true);
+            if (sentGeneration < 0L) {
+                logColdWait("local_update_before_dispatch");
+                return;
+            }
             awaitingFirstMapFrame = false;
             mapView.setAlpha(desiredMapAlpha);
+            removeCallbacks(coldLeaseRetry);
             DiagnosticJournal.infoAsync("cluster-map", "cluster surface updated; map shown, opacity="
-                    + desiredMapAlpha + ", first_update_wait_ms="
+                    + desiredMapAlpha + ", sent_generation=" + sentGeneration
+                    + ", producer_frame_ack=false, first_update_wait_ms="
                     + (android.os.SystemClock.uptimeMillis() - firstFrameWaitStarted));
         }
     }
@@ -250,33 +273,38 @@ public final class InstrumentPanelView extends FrameLayout
             removeCallbacks(coldLeaseRetry);
             return;
         }
-        if (!replace && leasePublished) return;
         // Android 9 on KX11 can make TextureView.isAvailable() true without delivering the first
         // SurfaceTextureListener callback after a cold multi-display launch. The old retry loop
         // only checked mapSurface and therefore retried a permanently null value until some
         // unrelated window transition happened to deliver another callback. Recover the owned
         // Surface directly from TextureView on every admission attempt.
-        if ((mapSurface == null || !mapSurface.isValid()) && mapTexture.isAvailable()) {
+        if (mapTexture.isAvailable()) {
             SurfaceTexture texture = mapTexture.getSurfaceTexture();
-            if (texture != null) {
+            if (texture != null && (texture != ownedTexture
+                    || mapSurface == null || !mapSurface.isValid())) {
+                revokeLease();
                 releaseOwnedSurface();
+                ownedTexture = texture;
                 mapSurface = new Surface(texture);
             }
         }
         // ECARX can expose the DIM TextureView before it reports the secondary window as visible.
         // We intentionally keep an existing lease through later visibility changes, so admission
         // must follow the real attached Surface instead of the unreliable initial visibility bit.
-        if (mapSurface == null || !mapSurface.isValid()) {
+        if (!mapTexture.isAvailable() || ownedTexture != mapTexture.getSurfaceTexture()
+                || mapSurface == null || !mapSurface.isValid()) {
+            logColdWait("surface_unavailable");
             scheduleColdLeaseRetry();
             return;
         }
         int width = mapTexture.getWidth();
         int height = mapTexture.getHeight();
         if (width <= 1 || height <= 1) {
+            logColdWait("geometry_not_ready");
             scheduleColdLeaseRetry();
             return;
         }
-        if (leasePublished && width == publishedWidth && height == publishedHeight) return;
+        if (hasLiveLease() && width == publishedWidth && height == publishedHeight) return;
         // Preserve the last frame when replacing only this live lease's dimensions.
         if (!leasePublished) beginFirstFrameGate();
         SurfaceTexture texture = mapTexture.getSurfaceTexture();
@@ -287,11 +315,18 @@ public final class InstrumentPanelView extends FrameLayout
                 Math.max(1, getResources().getDisplayMetrics().densityDpi));
         if (generation >= 0L) {
             leasePublished = true;
+            publishedSurface = mapSurface;
             publishedWidth = width;
             publishedHeight = height;
             coldLeaseRetryCount = 0;
             removeCallbacks(coldLeaseRetry);
+            DiagnosticJournal.infoAsync("cluster-map", "stage=local_surface_published, generation="
+                    + generation + ", size=" + width + "x" + height
+                    + ", texture_id=" + System.identityHashCode(ownedTexture)
+                    + ", surface_id=" + System.identityHashCode(mapSurface));
+            scheduleColdLeaseRetry();
         } else {
+            logColdWait("endpoint_admission_rejected");
             scheduleColdLeaseRetry();
         }
     }
@@ -302,27 +337,78 @@ public final class InstrumentPanelView extends FrameLayout
      * after six seconds the cadence drops to one check per second and stops immediately on success.
      */
     private void scheduleColdLeaseRetry() {
-        if (!attached || leasePublished || mapTexture == null || !clusterMapEnabled
+        if (!attached || (hasLiveLease() && !awaitingFirstMapFrame) || mapTexture == null || !clusterMapEnabled
                 || mapView.getVisibility() != VISIBLE) return;
         removeCallbacks(coldLeaseRetry);
-        long delay = coldLeaseRetryCount < COLD_LEASE_FAST_RETRY_COUNT
+        long delay = !leasePublished && coldLeaseRetryCount < COLD_LEASE_FAST_RETRY_COUNT
                 ? COLD_LEASE_FAST_RETRY_MS : COLD_LEASE_SLOW_RETRY_MS;
         postDelayed(coldLeaseRetry, delay);
     }
 
     private void retryColdLease() {
-        if (!attached || leasePublished || mapTexture == null || !clusterMapEnabled
+        if (!attached || (hasLiveLease() && !awaitingFirstMapFrame) || mapTexture == null || !clusterMapEnabled
                 || mapView.getVisibility() != VISIBLE) return;
+        if (!panelStore.isEnabled()) { revokeLease(); return; }
         coldLeaseRetryCount++;
+        if (!hasLiveLease()) recoverColdGeometry();
         publishLeaseIfReady(false);
+        if (hasLiveLease() && awaitingFirstMapFrame) {
+            logColdWait(NavigationHudEndpointService.sentMapGeneration(mapSurface, true) < 0L
+                    ? "awaiting_dispatch" : "awaiting_surface_update");
+            scheduleColdLeaseRetry();
+        }
+    }
+
+    private boolean hasLiveLease() {
+        return leasePublished && publishedSurface == mapSurface && mapSurface != null
+                && mapSurface.isValid() && mapTexture != null && mapTexture.isAvailable()
+                && ownedTexture == mapTexture.getSurfaceTexture();
+    }
+
+    /** Replays only the missing layout part of Settings' reload; a healthy map is never rebuilt. */
+    private void recoverColdGeometry() {
+        long now = android.os.SystemClock.uptimeMillis();
+        if (lastGeometryRecovery != 0L && now - lastGeometryRecovery < 1_000L) return;
+        lastGeometryRecovery = now;
+        InstrumentElementConfig map = firstMap();
+        if (map == null || !map.enabled || getWidth() <= 1 || getHeight() <= 1) return;
+        LayoutParams expected = mapParams(map);
+        android.view.ViewGroup.LayoutParams current = mapView.getLayoutParams();
+        boolean changed = !(current instanceof LayoutParams) || current.width != expected.width
+                || current.height != expected.height
+                || ((LayoutParams) current).leftMargin != expected.leftMargin
+                || ((LayoutParams) current).topMargin != expected.topMargin;
+        if (changed) mapView.setLayoutParams(expected);
+        if (changed || !mapTexture.isAvailable() || mapView.getWidth() <= 1 || mapView.getHeight() <= 1) {
+            requestLayout();
+            mapView.requestLayout();
+            mapView.invalidate();
+            invalidate();
+            logColdWait("geometry_reconciled");
+        }
+    }
+
+    private void logColdWait(@NonNull String reason) {
+        long now = android.os.SystemClock.uptimeMillis();
+        if (reason.equals(lastWaitReason) && now - lastWaitLog < 2_000L) return;
+        lastWaitReason = reason;
+        lastWaitLog = now;
+        DiagnosticJournal.infoAsync("cluster-map", "stage=cold_wait, reason=" + reason
+                + ", retry=" + coldLeaseRetryCount + ", parent=" + getWidth() + "x" + getHeight()
+                + ", map=" + mapView.getWidth() + "x" + mapView.getHeight()
+                + ", texture_available=" + (mapTexture != null && mapTexture.isAvailable())
+                + ", surface_valid=" + (mapSurface != null && mapSurface.isValid())
+                + ", attached=" + attached + ", window_visible=" + windowVisible
+                + ", local_lease=" + leasePublished + ", awaiting_update=" + awaitingFirstMapFrame);
     }
 
     private void revokeLease() {
-        Surface surface = mapSurface;
+        Surface surface = publishedSurface;
         if (leasePublished && surface != null) {
             NavigationHudEndpointService.revokeClusterSurface(surface);
         }
         leasePublished = false;
+        publishedSurface = null;
         publishedWidth = 0;
         publishedHeight = 0;
     }
@@ -330,6 +416,7 @@ public final class InstrumentPanelView extends FrameLayout
     private void releaseOwnedSurface() {
         Surface surface = mapSurface;
         mapSurface = null;
+        ownedTexture = null;
         if (surface != null) {
             try { surface.release(); } catch (RuntimeException ignored) {}
         }

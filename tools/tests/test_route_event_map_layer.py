@@ -12,7 +12,9 @@ SOURCES.update({
 'ru/natro/navigation/NavigationMapProfile.java': '''package ru.natro.navigation;
 final class NavigationMapProfile {static float layerZ(int p){return p;}}''',
 'com/yandex/runtime/image/ImageProvider.java': '''package com.yandex.runtime.image;
-public class ImageProvider {public final String tag; public ImageProvider(String tag){this.tag=tag;}}''',
+public class ImageProvider {public final String tag; public ImageProvider(String tag){this.tag=tag;}public String getId(){return tag;}}''',
+'com/yandex/mapkit/road_events/EventTag.java': '''package com.yandex.mapkit.road_events;
+public enum EventTag {SPEED_CONTROL,LANE_CONTROL,ROAD_MARKING_CONTROL,TRAFFIC_CONTROL,NO_STOPPING_CONTROL,CROSS_ROAD_CONTROL,MOBILE_CONTROL}''',
 'com/yandex/mapkit/ConflictResolutionMode.java': '''package com.yandex.mapkit;
 public enum ConflictResolutionMode {IGNORE,MINOR,EQUAL,MAJOR}''',
 'com/yandex/mapkit/road_events_layer/RoadEventSignificance.java': '''package com.yandex.mapkit.road_events_layer;
@@ -57,11 +59,11 @@ public class RoutePinsReplay {
   public Collection addMapObjectLayer(String id){return collection;}
  }
  public static class Stock {
-  final List<List<?>> tags=new ArrayList<>();boolean rejected;
+  final List<List<?>> tags=new ArrayList<>();boolean rejected;String selectedImageId;
   public boolean provideStyle(RoadEventStylingProperties p,boolean night,float scale,RoadEventStyle style){
    check(p.isOnRoute());check(p.isValid());check(!p.isUserEvent());
    if(rejected)return false;tags.add(new ArrayList<>(p.getTags()));
-   style.setIconImage(new ImageProvider(String.valueOf(p.getTags().get(0))));
+   style.setIconImage(new ImageProvider(selectedImageId==null?String.valueOf(p.getTags().get(0)):selectedImageId));
    style.setIconAnchor(new PointF(0.5f,0.5f));
    style.setZoomScaleFunction(Arrays.asList(new PointF(10,0.5f),new PointF(20,1f)));
    return true;
@@ -107,6 +109,33 @@ public class RoutePinsReplay {
   stock.rejected=true;layer.render(events("ACCIDENT"));check(map.collection.pins.isEmpty());
   layer.detach();check(map.collection.pins.isEmpty());
  }
+ static void cameraPoliceAliasDoesNotSurviveOrHideIndependentEvents() throws Exception {
+  MapObject map=new MapObject();Stock stock=new Stock();RouteRoadEventMapLayer layer=new RouteRoadEventMapLayer("cluster");
+  Map<String,String> modes=new HashMap<>();
+  for(String tag:new String[]{"SPEED_CONTROL","POLICE","ACCIDENT"})modes.put(tag,"ALWAYS");
+  layer.attach(map,stock);layer.configure(modes,true,false,true,100,100,20);
+  layer.render(events("SPEED_CONTROL","POLICE"));check(map.collection.pins.isEmpty());
+  layer.render(events("POLICE"));check(map.collection.pins.size()==80);
+  layer.render(events("SPEED_CONTROL","POLICE","ACCIDENT"));check(map.collection.pins.size()==80);
+  for(Pin pin:map.collection.pins)check(pin.image.tag.equals("ACCIDENT"));
+  layer.configure(modes,true,false,false,100,100,20);
+  layer.render(events("SPEED_CONTROL","POLICE"));check(map.collection.pins.size()==80);
+ }
+ static void cameraDetailFollowsActualStockChoiceNotPresenceOfLaneTag() throws Exception {
+  Stock stock=new Stock();stock.selectedImageId="resource:123";
+  List<String> tags=Arrays.asList("SPEED_CONTROL","LANE_CONTROL","POLICE");
+  check(RouteRoadEventMapLayer.selectedCameraImageId(stock,tags).equals("resource:123"));
+  check(stock.tags.get(0).toString().equals("[SPEED_CONTROL, LANE_CONTROL]"));
+  check(RouteCameraPolicy.detailDrawableForStockResource("poi_alerts_speed_control_24")==null);
+  check(RouteCameraPolicy.detailDrawableForStockResource("poi_alerts_lane_control_26").equals("new_pin_alerts_lanecamera_40"));
+  check(RouteCameraPolicy.detailDrawableForStockResource("pin_alerts_cross_road_control").equals("new_pin_alerts_crossroad_camera_40"));
+  check(RouteCameraPolicy.detailDrawableForStockResource("poi_alerts_camera_pdd_24")==null);
+  check(RouteCameraPolicy.detailDrawableForStockResource(null)==null);
+  check(RouteCameraPolicy.detailDrawableForStockResource("unknown_lane_icon")==null);
+  stock.selectedImageId="resource:456";
+  check(RouteRoadEventMapLayer.selectedCameraImageId(stock,tags).equals("resource:456"));
+  stock.rejected=true;check(RouteRoadEventMapLayer.selectedCameraImageId(stock,tags)==null);
+ }
  public static void main(String[] args)throws Exception{RoutePinsReplay.class.getDeclaredMethod(args[0]).invoke(null);}
 }'''
 })
@@ -127,3 +156,5 @@ class RouteEventMapLayerTest(unittest.TestCase):
  def test_all_22_tags_and_80_events(self):self.replay('allTagsAndEveryEventReachNativePins')
  def test_two_displays_and_mixed_tags(self):self.replay('profilesAndMixedTagsStayIndependent')
  def test_camera_replacement_and_stock_failure(self):self.replay('cameraReplacementAndUnavailableStockNeverInventArtwork')
+ def test_camera_alias_and_independent_police_accidents(self):self.replay('cameraPoliceAliasDoesNotSurviveOrHideIndependentEvents')
+ def test_camera_detail_uses_selected_stock_artwork(self):self.replay('cameraDetailFollowsActualStockChoiceNotPresenceOfLaneTag')

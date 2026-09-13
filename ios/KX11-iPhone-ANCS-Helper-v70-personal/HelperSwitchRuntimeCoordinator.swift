@@ -25,6 +25,8 @@ public final class HelperSwitchRuntimeCoordinator {
         public let desiredRole: BleRoleSwitchPolicy.Role
         public let activeRole: BleRoleSwitchPolicy.Role?
         public let phase: Phase
+        /// Local publication is not an authenticated peer/CONTROL subscription.
+        public let peerReady: Bool
         public let detail: String
         public let routeBDiagnosticsEnabled: Bool
     }
@@ -356,12 +358,17 @@ public final class HelperSwitchRuntimeCoordinator {
 
     public func sendCarRemoteFrame(_ frame: Data) {
         queue.async { [weak self] in
-            guard let self, frame.count == CarRemoteProtocolV1.frameBytes,
+            guard let self else { return }
+            guard frame.count == CarRemoteProtocolV1.frameBytes,
                   AuthenticatedC5FrameV1.isValid(frame),
                   self.runtimeFailure == nil, self.peerReady,
                   self.policy.state.phase == .active,
                   let role = self.policy.state.activeRole,
-                  let generation = self.policy.state.activeGeneration else { return }
+                  let generation = self.policy.state.activeGeneration else {
+                self.onDiagnosticEvent?("C5 запрос передачи отклонён: нет готового подтверждённого owner либо кадр невалиден")
+                return
+            }
+            self.onDiagnosticEvent?("C5 запрос передачи принят runtime; доставка и ответ ещё не подтверждены")
             if role == .helperPeripheralAndroidCentral {
                 self.routes.sendRouteACarRemoteFrame(frame, generation: generation)
             } else {
@@ -1763,6 +1770,7 @@ public final class HelperSwitchRuntimeCoordinator {
             desiredRole: desired,
             activeRole: active,
             phase: phase,
+            peerReady: phase == .active && peerReady,
             detail: detail,
             routeBDiagnosticsEnabled: runtimeMode == .diagnosticDualRoute
         )

@@ -125,14 +125,15 @@ public final class PositionReplay {
 class NavigationPositionReplayTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not shutil.which("java") or not shutil.which("javac"):
+        if not shutil.which("java"):
             raise RuntimeError("JDK required to execute navigation-position regression tests")
         cls.temp = tempfile.TemporaryDirectory()
         cls.directory = Path(cls.temp.name)
         harness = cls.directory / "PositionReplay.java"
         harness.write_text(HARNESS)
         policy = ROOT / "navigator-mod/src/main/java/ru/natro/navigation/NavigationPositionPolicy.java"
-        subprocess.run(["javac", "-d", str(cls.directory), str(policy), str(harness)], check=True)
+        compiler = [shutil.which("javac")] if shutil.which("javac") else ["java", "com.sun.tools.javac.Main"]
+        subprocess.run([*compiler, "-d", str(cls.directory), str(policy), str(harness)], check=True)
 
     @classmethod
     def tearDownClass(cls):

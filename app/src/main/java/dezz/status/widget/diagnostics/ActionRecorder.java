@@ -16,6 +16,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.OutputStreamWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -30,6 +32,10 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -57,7 +63,14 @@ public final class ActionRecorder {
             new CopyOnWriteArraySet<>();
 
     @Nullable private static Context appContext;
-    @Nullable private static Session activeSession;
+    @Nullable private static volatile Session activeSession;
+    private static final AtomicInteger droppedAsync = new AtomicInteger();
+    private static final ThreadPoolExecutor ASYNC = new ThreadPoolExecutor(0, 1,
+            30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(128), task -> {
+                Thread thread = new Thread(task, "status-action-journal");
+                thread.setDaemon(true);
+                return thread;
+            }, (task, executor) -> droppedAsync.incrementAndGet());
 
     private ActionRecorder() {
     }
@@ -151,6 +164,22 @@ public final class ActionRecorder {
         }
     }
 
+    /** Observer callbacks never wait for a recorder file, export or session transition. */
+    public static void recordAsync(@NonNull String source, @NonNull String event,
+                                   @Nullable JSONObject safeDetails) {
+        Session expected = activeSession;
+        if (expected == null) return;
+        ASYNC.execute(() -> {
+            synchronized (LOCK) {
+                if (activeSession != expected) return;
+                int dropped = droppedAsync.getAndSet(0);
+                if (dropped > 0) appendLocked(SOURCE_SYSTEM_TRACE,
+                        "RECORDER_QUEUE_DROPPED", object("count", dropped));
+                appendLocked(source, event, safeDetails == null ? new JSONObject() : safeDetails);
+            }
+        });
+    }
+
     public static void mark(@Nullable String comment) {
         record(SOURCE_USER, "MARK", object(
                 "comment", DiagnosticJournal.redact(comment)));
@@ -177,42 +206,62 @@ public final class ActionRecorder {
 
     @NonNull
     public static String latestTimeline(int maxChars) {
+        final File latest;
         synchronized (LOCK) {
-            File latest = latestLocked(".txt");
-            if (latest == null) return "Сессий пока нет";
-            return readTail(latest, Math.max(1_000, maxChars));
+            latest = latestLocked(".txt");
         }
+        if (latest == null) return "Сессий пока нет";
+        return readTail(latest, Math.max(1_000, maxChars));
     }
 
     @Nullable
     public static File copyLatestForExport(@NonNull Context context, boolean json) {
+        final File source;
+        final long snapshotBytes;
         synchronized (LOCK) {
-            File source = latestLocked(json ? ".jsonl" : ".txt");
+            source = latestLocked(json ? ".jsonl" : ".txt");
             if (source == null) return null;
-            File directory = new File(context.getCacheDir(), "exports");
-            if (!directory.isDirectory() && !directory.mkdirs()) return null;
+            // Appends finish under the same lock, so this boundary ends at a complete event.
+            snapshotBytes = source.length();
+        }
+        File directory = new File(context.getCacheDir(), "exports");
+        if (!directory.isDirectory() && !directory.mkdirs()) return null;
+        File snapshot = null;
+        try {
+            snapshot = File.createTempFile("action-export-", ".snapshot", directory);
+            copy(source, snapshot, snapshotBytes);
             File target = new File(directory,
                     json ? "status-action-session.json" : "status-action-session.txt");
-            try {
-                if (json) {
-                    JSONArray events = new JSONArray();
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                            new FileInputStream(source), StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            if (!line.trim().isEmpty()) events.put(new JSONObject(line));
-                        }
+            if (json) {
+                // Stream the envelope instead of retaining a whole long session as a JSONArray.
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                            new FileInputStream(snapshot), StandardCharsets.UTF_8));
+                     BufferedWriter output = new BufferedWriter(new OutputStreamWriter(
+                            new FileOutputStream(target, false), StandardCharsets.UTF_8))) {
+                    output.write("{\"format\":\"status-widget-action-session-v1\",\"events\":[");
+                    boolean first = true;
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (line.trim().isEmpty()) continue;
+                        JSONObject event = new JSONObject(line);
+                        if (!first) output.write(",");
+                        output.write("\n");
+                        output.write(event.toString());
+                        first = false;
                     }
-                    JSONObject document = new JSONObject();
-                    document.put("format", "status-widget-action-session-v1");
-                    document.put("events", events);
-                    write(target, document.toString(2), false);
-                } else {
-                    copy(source, target);
+                    output.write("\n]}");
                 }
-                return target;
-            } catch (IOException | JSONException ignored) {
-                return null;
+            } else {
+                copy(snapshot, target, snapshotBytes);
+            }
+            return target;
+        } catch (IOException | JSONException ignored) {
+            return null;
+        } finally {
+            if (snapshot != null) {
+                // Only our private temporary export snapshot; recorded sessions are never deleted.
+                //noinspection ResultOfMethodCallIgnored
+                snapshot.delete();
             }
         }
     }
@@ -382,12 +431,17 @@ public final class ActionRecorder {
         }
     }
 
-    private static void copy(@NonNull File source, @NonNull File target) throws IOException {
+    private static void copy(@NonNull File source, @NonNull File target, long limit) throws IOException {
         try (FileInputStream input = new FileInputStream(source);
              FileOutputStream output = new FileOutputStream(target, false)) {
             byte[] buffer = new byte[16_384];
             int read;
-            while ((read = input.read(buffer)) > 0) output.write(buffer, 0, read);
+            long remaining = limit;
+            while (remaining > 0 && (read = input.read(buffer, 0,
+                    (int) Math.min(buffer.length, remaining))) > 0) {
+                output.write(buffer, 0, read);
+                remaining -= read;
+            }
         }
     }
 
@@ -405,9 +459,7 @@ public final class ActionRecorder {
     @NonNull
     private static String readTail(@NonNull File file, int maxChars) {
         try {
-            String value = read(file);
-            if (value.length() <= maxChars) return value;
-            return "…\n" + value.substring(value.length() - maxChars);
+            return BoundedUtf8Tail.read(file, maxChars);
         } catch (IOException ignored) {
             return "Не удалось прочитать сессию";
         }

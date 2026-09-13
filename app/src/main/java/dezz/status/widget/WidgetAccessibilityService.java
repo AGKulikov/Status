@@ -28,8 +28,6 @@ import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
-import android.util.SparseBooleanArray;
-import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
@@ -50,7 +48,6 @@ import dezz.status.widget.climate.StockHvacPopupClient;
 import dezz.status.widget.launcher.NavigationCollectionDemand;
 import dezz.status.widget.launcher.NavigationCollectionPolicy;
 import dezz.status.widget.launcher.NavigationDataRepository;
-import dezz.status.widget.launcher.SteeringMediaKeyRouter;
 import dezz.status.widget.diagnostics.ActionRecorder;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
 
@@ -95,8 +92,6 @@ public class WidgetAccessibilityService extends AccessibilityService {
     private volatile boolean serviceConnected;
     private volatile long lastNavigationScanElapsed;
     private long lastFrameworkFailureLogElapsed;
-    @Nullable private SteeringMediaKeyRouter steeringMediaKeyRouter;
-    @NonNull private final SparseBooleanArray consumedMediaKeys = new SparseBooleanArray();
     /** Accessed only on {@link #navigationThread}; prevents event storms postponing a scan. */
     private long nextNavigationScanElapsed;
     private static final class NavigationWindowScan {
@@ -270,7 +265,6 @@ public class WidgetAccessibilityService extends AccessibilityService {
     public void onCreate() {
         super.onCreate();
         instance = this;
-        steeringMediaKeyRouter = new SteeringMediaKeyRouter(this);
         ActionRecorder.initialize(this);
         ActionRecorder.addRecordingListener(actionRecordingListener);
     }
@@ -283,10 +277,6 @@ public class WidgetAccessibilityService extends AccessibilityService {
                             "service", getClass().getName()));
         }
         ActionRecorder.removeRecordingListener(actionRecordingListener);
-        SteeringMediaKeyRouter mediaRouter = steeringMediaKeyRouter;
-        steeringMediaKeyRouter = null;
-        if (mediaRouter != null) mediaRouter.close();
-        consumedMediaKeys.clear();
         resetStockHvacObservation();
         serviceConnected = false;
         if (navigationDemand != null) {
@@ -312,8 +302,6 @@ public class WidgetAccessibilityService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
-        SteeringMediaKeyRouter mediaRouter = steeringMediaKeyRouter;
-        if (mediaRouter != null) mediaRouter.start();
         // Initial seed: walk all windows currently known to the accessibility framework and
         // remember the per-display foreground packages. Otherwise the first event-driven
         // update would have to wait for a real window change.
@@ -344,48 +332,9 @@ public class WidgetAccessibilityService extends AccessibilityService {
         }
     }
 
-    /**
-     * Handles physical previous/next/play keys when KX11 delivers them to accessibility.
-     * Consume only a key whose DOWN event reached one exact cached session; every other key keeps
-     * Android's stock path unchanged.
-     */
-    @Override protected boolean onKeyEvent(@NonNull KeyEvent event) {
-        final long callbackEntryUptimeMs = SystemClock.uptimeMillis();
-        long inputSequence = dezz.status.widget.diagnostics.SteeringKeyDiagnostics.received(
-                event, callbackEntryUptimeMs);
-        int keyCode = event.getKeyCode();
-        if (!SteeringMediaKeyRouter.isSupportedKey(keyCode)) {
-            dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(
-                    inputSequence, false, "stock_unsupported");
-            return super.onKeyEvent(event);
-        }
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            if (event.getRepeatCount() > 0) {
-                boolean handled = consumedMediaKeys.get(keyCode, false);
-                dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(
-                        inputSequence, handled, "repeat_no_command");
-                return handled;
-            }
-            SteeringMediaKeyRouter mediaRouter = steeringMediaKeyRouter;
-            boolean handled = mediaRouter != null
-                    && mediaRouter.dispatch(keyCode, event.getEventTime(), event.getDownTime(),
-                    callbackEntryUptimeMs);
-            consumedMediaKeys.put(keyCode, handled);
-            dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(inputSequence, handled,
-                    mediaRouter == null ? "router_absent" : handled ? "queued" : "stock_fallback");
-            return handled || super.onKeyEvent(event);
-        }
-        if (event.getAction() == KeyEvent.ACTION_UP) {
-            boolean handled = consumedMediaKeys.get(keyCode, false);
-            consumedMediaKeys.delete(keyCode);
-            dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(
-                    inputSequence, handled, "up_no_command");
-            return handled || super.onKeyEvent(event);
-        }
-        dezz.status.widget.diagnostics.SteeringKeyDiagnostics.result(
-                inputSequence, false, "stock_action");
-        return super.onKeyEvent(event);
-    }
+    // Physical media keys belong to MConfig/Android. Do not request key filtering here, even
+    // for logging: a delayed accessibility callback would become another input-path dependency.
+    // SteeringKeyDiagnostics observes delivered broadcasts and session feedback independently.
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {

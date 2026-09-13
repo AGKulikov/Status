@@ -714,6 +714,7 @@ final class HudMapRenderer {
             routeRoadEventMapLayer.attach(map, stockProvider);
             roadEventRouteSynchronizer.attach(routeRoadEventMapLayer);
             applyRoadEventVisibility();
+            cameraDirectionMapLayer.setStockCameraProvider(stockProvider);
             Log.i(TAG, "Standalone Yandex road-events layer attached to " + displayName);
             NavigationBridgeClient.reportDiagnostic(
                     "safe standalone road-events layer attached to independent "
@@ -728,6 +729,7 @@ final class HudMapRenderer {
             roadEventsLayer = null;
             roadEventRouteSynchronizer.detach();
             routeRoadEventMapLayer.detach();
+            cameraDirectionMapLayer.setStockCameraProvider(null);
             Log.w(TAG, "HUD road-events layer unavailable: " + shortMessage(failure));
             NavigationBridgeClient.reportDiagnostic(
                     "HUD road-events layer unavailable: " + shortMessage(failure));

@@ -742,7 +742,7 @@ public final class CarRemoteClient {
 
     private func sendHello() {
         guard transportReady else { return }
-        onDiagnostic?("C5 HELLO отправлен; ждём полный базовый каталог и границу")
+        onDiagnostic?("C5 HELLO запрошен; отправка ещё не подтверждена, ждём полный базовый каталог и границу")
         sender(CarRemoteProtocolV1.encode(.init(
             type: .hello, controlID: 0, code: 0, flags: 0, transactionID: 0,
             sequence: sequence, value: 0, maxAgeDeciseconds: 0

@@ -168,7 +168,9 @@ def verify_sources() -> None:
     assert "final class ViewController: UITabBarController" in ui
     assert "final class HelperSettingsViewController" in settings
     assert "beginEnrollment" in settings and "confirmEnrollmentSAS" in settings
-    assert "setTransportReady(snapshot.phase == .active)" in settings
+    assert "setTransportReady(snapshot.phase == .active && snapshot.peerReady)" in settings
+    assert "setTransportReady(snapshot.phase == .active)" not in settings
+    assert "C5 HELLO запрошен" in swift and "C5 HELLO отправлен" not in swift
     assert "http://" not in swift + peripheral + central + ui
     assert "https://" not in swift + peripheral + central + ui
 

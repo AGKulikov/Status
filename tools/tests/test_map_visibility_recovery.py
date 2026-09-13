@@ -51,6 +51,8 @@ public class MapVisibilityReplay {
  static class DiagnosticJournal {static void info(String tag,String text){} static void infoAsync(String tag,String text){}}
  static class android {static class os {static class SystemClock {static long uptimeMillis(){return 1000L;}}}}
  static class NavigationHudEndpointService {
+  static boolean sent=true;
+  static long sentMapGeneration(Object surface,boolean cluster){return sent?4L:-1L;}
   static boolean isMapContentReady(Object surface,boolean cluster){
    throw new AssertionError("Full tile loading must not gate visibility");}
  }
@@ -64,6 +66,9 @@ public class MapVisibilityReplay {
   TextureView mapTexture=new TextureView(); View mapView=mapTexture;
   Surface mapSurface=new Surface(); boolean attached=true,leasePublished=true;
   long firstFrameWaitStarted; boolean awaitingFirstMapFrame=true; float desiredMapAlpha=.43f;
+  Object coldLeaseRetry=new Object();
+  void removeCallbacks(Object callback){}
+  void logColdWait(String reason){}
   CLUSTER_METHODS
  }
  static class Log {static void w(String tag,String text){}}
@@ -129,6 +134,14 @@ public class MapVisibilityReplay {
   check(observer.mapConfigured && observer.runtimeSurfaceAttached);
   check(observer.mapLoadedListener==null);
  }
+ static void localAllocationUpdateCannotRevealAnUnsentLease(){
+  Cluster c=new Cluster();NavigationHudEndpointService.sent=false;
+  c.onSurfaceTextureUpdated(c.mapTexture.surface);
+  check(c.awaitingFirstMapFrame && c.mapView.alpha==0);
+  NavigationHudEndpointService.sent=true;
+  c.onSurfaceTextureUpdated(c.mapTexture.surface);
+  check(!c.awaitingFirstMapFrame && c.mapView.alpha==.43f);
+ }
  public static void main(String[] args)throws Exception {
   MapVisibilityReplay.class.getDeclaredMethod(args[0]).invoke(null);
  }
@@ -168,3 +181,6 @@ public class MapVisibilityReplay {
 
     def test_optional_listener_failure(self):
         self.replay("unavailableMapLoadedListenerDoesNotStopAttachedRenderer")
+
+    def test_unsent_local_update_is_not_a_producer_frame(self):
+        self.replay("localAllocationUpdateCannotRevealAnUnsentLease")

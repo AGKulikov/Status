@@ -636,6 +636,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         BleRouteTransition<AndroidCentralRoute.State> transition =
                 AndroidCentralRoute.stop(state, epoch, reason.name());
         apply(transition);
+        if (transition.accepted && transition.state.phase == AndroidCentralRoute.Phase.STOPPING) {
+            // A FAILED attempt can already have no scan/GATT owner. No platform callback is
+            // coming in that case; complete only through the existing exact-owner/drain proof.
+            maybeCompleteTeardown();
+            return;
+        }
         if (!transition.accepted
                 || transition.state.phase != AndroidCentralRoute.Phase.FAILED) return;
 

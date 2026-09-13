@@ -281,6 +281,7 @@ int getVersionCode() {
     // Trip2 source remains unverified; this release improves unavailable-field diagnostics only.
     if (version == '2.9.1') { return 208021324 }
     if (version == '2.9.2') { return 208021325 }
+    if (version == '2.9.3') { return 208021326 }
     if (version == '2.9.0') { return 208021323 }
     if (version == '2.8.9') { return 208021322 }
     if (version == '2.8.8') {

@@ -59,9 +59,10 @@ final class RouteRoadEventMapLayer implements RoadEventRouteSynchronizer.Sink {
                 if (visibility.allows(Collections.singletonList(tag), true)) allowed.add(tag);
             }
             if (allowed.isEmpty()) { hidden++; continue; }
+            boolean cameraOwned = unifiedCameras && RouteCameraPolicy.isCameraRecord(event.tags);
             ArrayList<Object> tags = new ArrayList<>();
             for (Object tag : allowed) {
-                if (!unifiedCameras || !RouteCameraPolicy.isControl(String.valueOf(tag))) tags.add(tag);
+                if (!cameraOwned || !RouteCameraPolicy.isReplacedCameraTag(String.valueOf(tag))) tags.add(tag);
             }
             if (tags.isEmpty()) { replaced++; continue; }
             try {
@@ -106,6 +107,26 @@ final class RouteRoadEventMapLayer implements RoadEventRouteSynchronizer.Sink {
     }
 
     private Style stockStyle(List<?> tags) throws Exception {
+        return stockStyle(stockProvider, tags, night);
+    }
+
+    /** Ask the installed Navigator provider which artwork wins for these exact control tags. */
+    static String selectedCameraImageId(Object provider, List<String> tags) throws Exception {
+        Class<?> tagClass = Class.forName("com.yandex.mapkit.road_events.EventTag");
+        List<Object> nativeTags = new ArrayList<>();
+        for (String tag : tags) {
+            if (!RouteCameraPolicy.isControl(tag)) continue;
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            Object nativeTag = Enum.valueOf((Class) tagClass, tag);
+            nativeTags.add(nativeTag);
+        }
+        if (provider == null || nativeTags.isEmpty()) return null;
+        // Day/night affects colours, not the provider's selected control category.
+        Style style = stockStyle(provider, nativeTags, false);
+        return style.image == null ? null : String.valueOf(invoke(style.image, "getId", new Class<?>[0]));
+    }
+
+    private static Style stockStyle(Object stockProvider, List<?> tags, boolean night) throws Exception {
         Class<?> propertiesClass = Class.forName("com.yandex.mapkit.road_events_layer.RoadEventStylingProperties");
         Object properties = Proxy.newProxyInstance(propertiesClass.getClassLoader(),
                 new Class<?>[]{propertiesClass}, (proxy, method, args) -> {

@@ -91,6 +91,7 @@ public class StatusWidgetApplication extends Application {
         }
         ActionRecorder.initialize(this);
         PrivilegedActionCollector.initialize(this);
+        dezz.status.widget.diagnostics.SteeringKeyDiagnostics.initialize(this);
         registerLifecycleJournal();
         MainThreadWatchdog.setEnabled(preferences.debugModeEnabled.get());
         if (preferences.actionRecorderOverlayVisible.get()) {

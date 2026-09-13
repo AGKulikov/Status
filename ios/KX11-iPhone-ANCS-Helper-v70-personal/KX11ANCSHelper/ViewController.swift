@@ -81,7 +81,7 @@ final class HelperSettingsViewController: UIViewController {
                 DispatchQueue.main.async {
                     self?.recordJournalSnapshot(snapshot)
                     self?.render(snapshot)
-                    self?.carRemoteClient.setTransportReady(snapshot.phase == .active)
+                    self?.carRemoteClient.setTransportReady(snapshot.phase == .active && snapshot.peerReady)
                 }
             }
             runtime.onEnrollmentEvent = { [weak self] event in
@@ -124,7 +124,7 @@ final class HelperSettingsViewController: UIViewController {
             let interval: TimeInterval?
             if message.contains("получен валидный C5 кадр автомобиля") {
                 interval = 30
-            } else if message.contains("C5 HELLO отправлен") {
+            } else if message.contains("C5 HELLO запрошен") {
                 interval = 60
             } else {
                 interval = nil
@@ -497,7 +497,9 @@ final class HelperSettingsViewController: UIViewController {
         roleControl.selectedSegmentIndex = index(for: snapshot.desiredRole)
         desiredLabel.text = "Желаемый режим: \(name(for: snapshot.desiredRole))"
         activeLabel.text = "Активный режим: \(snapshot.activeRole.map(name(for:)) ?? "нет")"
-        phaseLabel.text = "Состояние: \(snapshot.phase.title)"
+        phaseLabel.text = snapshot.phase == .active && !snapshot.peerReady
+            ? "Состояние: локальный BLE готов, ждём подтверждённое подключение магнитолы"
+            : "Состояние: \(snapshot.phase.title)"
         detailLabel.text = snapshot.detail
         roleControl.isHidden = !snapshot.routeBDiagnosticsEnabled
         roleControl.isEnabled = snapshot.phase == .active
@@ -514,12 +516,12 @@ final class HelperSettingsViewController: UIViewController {
 
     private func recordJournalSnapshot(_ snapshot: HelperSwitchRuntimeCoordinator.Snapshot) {
         let role = snapshot.activeRole.map(name(for:)) ?? "нет"
-        let value = "\(snapshot.phase.title)|\(role)|\(snapshot.detail)"
+        let value = "\(snapshot.phase.title)|\(role)|peerReady=\(snapshot.peerReady)|\(snapshot.detail)"
         guard value != lastJournalSnapshot else { return }
         lastJournalSnapshot = value
         ANCSConnectionJournal.shared.append(
             "runtime",
-            "состояние: \(snapshot.phase.title); активный маршрут: \(role); \(snapshot.detail)"
+            "состояние: \(snapshot.phase.title); peerReady=\(snapshot.peerReady); активный маршрут: \(role); \(snapshot.detail)"
         )
     }
 

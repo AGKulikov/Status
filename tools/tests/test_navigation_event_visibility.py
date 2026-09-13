@@ -29,8 +29,9 @@ this.id=id;this.point=point;this.tags=tags;this.caption=caption;this.user=user;}
     "ru/natro/navigation/VisibilityReplay.java": '''package ru.natro.navigation;
 import java.util.*;
 public final class VisibilityReplay {
-    public interface Provider { boolean provideStyle(Properties properties, boolean night, float scale, Object style); }
-    public static final class Properties {
+    public interface EventProperties {List<String> getTags();boolean isOnRoute();}
+    public interface Provider { boolean provideStyle(EventProperties properties, boolean night, float scale, Object style); }
+    public static final class Properties implements EventProperties {
         final boolean onRoute;
         final List<String> tags;
         Properties(boolean onRoute, String... tags) { this.onRoute=onRoute;this.tags=Arrays.asList(tags); }
@@ -38,8 +39,10 @@ public final class VisibilityReplay {
         public boolean isOnRoute() { return onRoute; }
     }
     public static final class Stock implements Provider {
-        int calls;
-        public boolean provideStyle(Properties p, boolean n, float s, Object style) { calls++;return true; }
+        int calls; List<String> lastTags;
+        public boolean provideStyle(EventProperties p, boolean n, float s, Object style) {
+            calls++;lastTags=p.getTags();return true;
+        }
     }
     static Map<String,String> modes(String mode) {
         Map<String,String> map=new HashMap<>();map.put("SPEED_CONTROL",mode);return map;
@@ -68,12 +71,16 @@ public final class VisibilityReplay {
         check(visible(p,true));p.setVisibility(modes("ROUTE_ONLY"),false);check(!visible(p,true));
     }
     static void unifiedInventoryDoesNotHideAdjacentCamerasOrAccidents() {
-        ScaledRoadEventStyleProvider p=create(new Stock(),"ALWAYS",true);
+        Stock stock=new Stock();ScaledRoadEventStyleProvider p=create(stock,"ALWAYS",true);
         check(p.setUnifiedRouteCameras(true));check(!p.setUnifiedRouteCameras(true));
         check(!visible(p,true));check(visible(p,false));
-        Map<String,String> map=modes("ALWAYS");map.put("ACCIDENT","ALWAYS");
+        Map<String,String> map=modes("ALWAYS");map.put("ACCIDENT","ALWAYS");map.put("POLICE","ALWAYS");
         p.setVisibility(map,true);
-        check(((Provider)p.proxy()).provideStyle(new Properties(true,"SPEED_CONTROL","ACCIDENT"),false,1f,null));
+        check(!((Provider)p.proxy()).provideStyle(new Properties(true,"SPEED_CONTROL","POLICE"),false,1f,null));
+        check(((Provider)p.proxy()).provideStyle(new Properties(true,"POLICE"),false,1f,null));
+        check(stock.lastTags.equals(Arrays.asList("POLICE")));
+        check(((Provider)p.proxy()).provideStyle(new Properties(true,"SPEED_CONTROL","POLICE","ACCIDENT"),false,1f,null));
+        check(stock.lastTags.equals(Arrays.asList("ACCIDENT")));
         check(p.setUnifiedRouteCameras(false));check(visible(p,true));
     }
     static void alwaysWorksWithoutRouteAndUnknownTagsStayHidden() {

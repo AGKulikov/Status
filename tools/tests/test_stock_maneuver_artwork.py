@@ -92,7 +92,9 @@ class StockManeuverArtworkTest(unittest.TestCase):
             path.write_text(source)
             files.append(str(path))
         files.append(str(ROOT / "navigator-mod/src/main/java/ru/natro/navigation/StockManeuverArtwork.java"))
-        subprocess.run(["javac", "-d", str(cls.directory), *files], check=True, capture_output=True)
+        import shutil
+        compiler = [shutil.which("javac")] if shutil.which("javac") else ["java", "com.sun.tools.javac.Main"]
+        subprocess.run([*compiler, "-d", str(cls.directory), *files], check=True, capture_output=True)
 
     @classmethod
     def tearDownClass(cls): cls.temp.cleanup()

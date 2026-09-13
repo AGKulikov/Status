@@ -71,14 +71,26 @@ final class ScaledRoadEventStyleProvider implements InvocationHandler {
                 }
                 // Preserve ALWAYS cameras on adjacent roads. Only native on-route controls
                 // have replacements in the complete DrivingRoute inventory.
-                if (onRoute && unifiedRouteCameras) {
-                    boolean replaced = false, otherVisibleCategory = false;
+                if (onRoute && unifiedRouteCameras
+                        && RouteCameraPolicy.isCameraRecord((Iterable<?>) tags)) {
+                    List<Object> remaining = new ArrayList<>();
                     for (Object tag : (Iterable<?>) tags) {
                         if (tag == null || !filter.allows(java.util.Collections.singletonList(tag), onRoute)) continue;
-                        if (RouteCameraPolicy.isControl(String.valueOf(tag))) replaced = true;
-                        else otherVisibleCategory = true;
+                        if (!RouteCameraPolicy.isReplacedCameraTag(String.valueOf(tag))) remaining.add(tag);
                     }
-                    if (replaced && !otherVisibleCategory) return false;
+                    if (remaining.isEmpty()) return false;
+                    // Preserve a genuine ACCIDENT/other category on this record, but do not let
+                    // the delegate choose the removed control/POLICE artwork again.
+                    Class<?> propertiesClass = method.getParameterTypes()[0];
+                    Object originalProperties = properties;
+                    Object filtered = Proxy.newProxyInstance(propertiesClass.getClassLoader(),
+                            new Class<?>[]{propertiesClass}, (proxy, call, args) -> {
+                                if ("getTags".equals(call.getName())) return remaining;
+                                try { return call.invoke(originalProperties, args); }
+                                catch (InvocationTargetException failure) { throw failure.getCause(); }
+                            });
+                    arguments = arguments.clone();
+                    arguments[0] = filtered;
                 }
             } catch (Exception unavailable) {
                 // An unavailable event has no verified membership. Never substitute routeActive.

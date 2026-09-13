@@ -150,6 +150,7 @@ public final class DiagnosticJournal {
                         "journal enabled; " + environmentLocked());
             }
         }
+        SteeringKeyDiagnostics.debugChanged(initiallyEnabled);
     }
 
     public static void setEnabled(@NonNull Context context, boolean value) {
@@ -164,6 +165,7 @@ public final class DiagnosticJournal {
                         "journal enabled; " + environmentLocked());
             }
         }
+        SteeringKeyDiagnostics.debugChanged(value);
     }
 
     public static boolean isEnabled() {

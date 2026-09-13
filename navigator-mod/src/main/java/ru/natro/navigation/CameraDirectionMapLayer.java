@@ -53,8 +53,18 @@ final class CameraDirectionMapLayer {
     private RoadEventVisibility yandexVisibility;
     private Runnable inventoryListener;
     private boolean lastInventoryAvailable;
+    private Object stockCameraProvider;
+    private final java.util.Map<String, String> stockCameraResources = new java.util.HashMap<>();
 
     void setInventoryListener(Runnable value) { inventoryListener = value; }
+
+    void setStockCameraProvider(Object provider) {
+        if (stockCameraProvider == provider) return;
+        stockCameraProvider = provider;
+        stockCameraResources.clear();
+        renderedFingerprint = Long.MIN_VALUE;
+        refreshFingerprintAndRender();
+    }
 
     void setRoadEventModes(java.util.Map<String, String> modes) {
         yandexVisibility = new RoadEventVisibility(modes, true);
@@ -62,9 +72,11 @@ final class CameraDirectionMapLayer {
     }
 
     boolean hasRouteInventory() {
-        return yandexEnabled && latestRouteActive && !latestYandex.isEmpty()
-                && latestYandexSampleElapsedMs > 0L
-                && SystemClock.elapsedRealtime() - latestYandexSampleElapsedMs <= YANDEX_FRESH_MS;
+        // An authoritative empty result means no cameras ahead, not permission to resurrect
+        // all already-passed controls from the complete route's ordinary event layer.
+        long age = SystemClock.elapsedRealtime() - latestYandexSampleElapsedMs;
+        return yandexEnabled && latestRouteActive && latestYandexSampleElapsedMs > 0L
+                && age >= 0L && age <= YANDEX_FRESH_MS;
     }
 
     private final Context context;
@@ -292,6 +304,12 @@ final class CameraDirectionMapLayer {
     }
 
     private void refreshFingerprintAndRender() {
+        boolean inventory = hasRouteInventory();
+        boolean ownershipChanged = lastInventoryAvailable != inventory;
+        lastInventoryAvailable = inventory;
+        // On takeover exclude ordinary pins BEFORE creating their unified replacements.
+        // On release remove replacements first, then allow the ordinary fallback again.
+        if (ownershipChanged && inventory && inventoryListener != null) inventoryListener.run();
         selectVisible(visibleScratch);
         long fingerprint = visualFingerprint(visibleScratch);
         boolean dataChanged = fingerprint != latestVisualFingerprint;
@@ -299,11 +317,7 @@ final class CameraDirectionMapLayer {
         // Presentation-only edits (sign size, sector geometry/colour/opacity and z-order)
         // deliberately invalidate the rendered fingerprint without changing camera data.
         if (map != null && (dataChanged || renderedFingerprint != fingerprint)) render();
-        boolean inventory = hasRouteInventory();
-        if (lastInventoryAvailable != inventory) {
-            lastInventoryAvailable = inventory;
-            if (inventoryListener != null) inventoryListener.run();
-        }
+        if (ownershipChanged && !inventory && inventoryListener != null) inventoryListener.run();
     }
 
     /** HUD Speed supplies the primary record; Yandex enriches it with exact event tags. */
@@ -561,8 +575,8 @@ final class CameraDirectionMapLayer {
 
     /**
      * One compact marker. A speed-only camera is one clean speed circle. When the same physical
-     * event also controls lanes/crossroads/stopping, the exact stock 40dp control plate is joined
-     * directly to that circle; no additional miniature camera badge is painted.
+     * stock provider actually chooses lanes/crossroads/stopping, its matching 40dp plate is joined
+     * directly to that circle. Merely containing a lane tag is not sufficient.
      */
     private int cameraDisplayDiameter() {
         float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
@@ -634,17 +648,30 @@ final class CameraDirectionMapLayer {
         }
     }
 
-    private static String detailDrawableName(List<String> tags) {
-        if (tags.contains("LANE_CONTROL") || tags.contains("ROAD_MARKING_CONTROL")) {
-            return "new_pin_alerts_lanecamera_40";
+    private String detailDrawableName(List<String> tags) {
+        ArrayList<String> controls = new ArrayList<>();
+        for (String tag : tags) if (RouteCameraPolicy.isControl(tag) && !controls.contains(tag)) controls.add(tag);
+        Collections.sort(controls);
+        String key = controls.toString();
+        if (stockCameraResources.containsKey(key)) {
+            return RouteCameraPolicy.detailDrawableForStockResource(stockCameraResources.get(key));
         }
-        if (tags.contains("CROSS_ROAD_CONTROL") || tags.contains("TRAFFIC_CONTROL")) {
-            return "new_pin_alerts_crossroad_camera_40";
+        String resourceName = null;
+        try {
+            String id = RouteRoadEventMapLayer.selectedCameraImageId(stockCameraProvider, controls);
+            if (id != null && id.startsWith("resource:")) {
+                int resource = Integer.parseInt(id.substring("resource:".length()));
+                resourceName = context.getResources().getResourceEntryName(resource);
+            }
+        } catch (Exception unavailable) {
+            // Missing stock evidence never becomes an invented lane/crossroad plate.
         }
-        if (tags.contains("NO_STOPPING_CONTROL")) {
-            return "new_pin_alerts_camera_stop_40";
-        }
-        return null;
+        // Seven unique control tags yield at most 128 combinations, including the empty set.
+        stockCameraResources.put(key, resourceName);
+        NavigationBridgeClient.reportDiagnostic("camera-stock-choice controls=" + controls
+                + ", resource=" + resourceName + ", detail="
+                + RouteCameraPolicy.detailDrawableForStockResource(resourceName));
+        return RouteCameraPolicy.detailDrawableForStockResource(resourceName);
     }
 
     private void clearVisual() {

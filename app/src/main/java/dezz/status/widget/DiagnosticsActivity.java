@@ -43,6 +43,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.diagnostics.ActionRecorder;
@@ -70,6 +73,17 @@ public final class DiagnosticsActivity extends AppCompatActivity {
     private Button recorderToggle;
     private EditText markerComment;
     private Switch rootInputEnabled;
+    private boolean screenResumed;
+    private long refreshGeneration;
+    private long lifecycleGeneration;
+    private List<String> lastComponentChoices = new ArrayList<>();
+    private final ThreadPoolExecutor refreshWorker = new ThreadPoolExecutor(0, 1,
+            30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1), task ->
+                    new Thread(task, "diagnostics-screen-reader"),
+            new ThreadPoolExecutor.DiscardOldestPolicy());
+    private final ThreadPoolExecutor exportWorker = new ThreadPoolExecutor(0, 1,
+            30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1), task ->
+                    new Thread(task, "diagnostics-export"));
 
     @Override
     protected void onCreate(@Nullable Bundle state) {
@@ -77,6 +91,7 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         DiagnosticJournal.initialize(this, preferences.debugModeEnabled.get());
         ActionRecorder.initialize(this);
+        dezz.status.widget.diagnostics.SteeringKeyDiagnostics.initialize(this);
         CarIntegrations.get(this);
         View screen = buildScreen();
         setContentView(screen);
@@ -86,7 +101,24 @@ public final class DiagnosticsActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        screenResumed = true;
         refreshAll();
+    }
+
+    @Override protected void onPause() {
+        screenResumed = false;
+        lifecycleGeneration++;
+        refreshGeneration++;
+        refreshWorker.getQueue().clear();
+        super.onPause();
+    }
+
+    @Override protected void onDestroy() {
+        lifecycleGeneration++;
+        refreshGeneration++;
+        refreshWorker.shutdownNow();
+        exportWorker.shutdownNow();
+        super.onDestroy();
     }
 
     private View buildScreen() {
@@ -140,8 +172,7 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         copy.setOnClickListener(view -> copyJournal());
         journalActions.addView(copy, weighted());
         Button export = button("Экспорт TXT");
-        export.setOnClickListener(view -> share(DiagnosticJournal.copyForExport(this),
-                "text/plain"));
+        export.setOnClickListener(view -> exportAsync(0));
         journalActions.addView(export, weightedWithMargin(8));
         Button clear = button("Очистить");
         clear.setOnClickListener(view -> confirmClearJournal());
@@ -213,12 +244,10 @@ public final class DiagnosticsActivity extends AppCompatActivity {
 
         LinearLayout exportActions = row();
         Button exportText = button("Сессия TXT");
-        exportText.setOnClickListener(view -> share(
-                ActionRecorder.copyLatestForExport(this, false), "text/plain"));
+        exportText.setOnClickListener(view -> exportAsync(1));
         exportActions.addView(exportText, weighted());
         Button exportJson = button("Сессия JSON");
-        exportJson.setOnClickListener(view -> share(
-                ActionRecorder.copyLatestForExport(this, true), "application/json"));
+        exportJson.setOnClickListener(view -> exportAsync(2));
         exportActions.addView(exportJson, weightedWithMargin(8));
         page.addView(exportActions, topMargin(10));
 
@@ -268,10 +297,14 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         page.addView(rootInputEnabled, topMargin(10));
 
         page.addView(heading("Доступные источники", 20), topMargin(24));
-        page.addView(label("Прямой read-only канал ECARX ловит подтверждённые сигналы кнопок "
-                + "ACC/G-Pilot/ограничителя без root. Спецвозможности фиксируют штатные окна и "
-                + "обычные KeyEvent. Расширенные права дополняют их системным следом. "
-                + "Регистратор ничего не отправляет в CAN/ECARX и не включает функции авто."),
+        page.addView(label("Медиакнопки: пассивные копии событий MConfig/Android и отклики плееров. "
+                + "Natro не перехватывает и не пересылает кнопки. Адресные или остановленные "
+                + "другим приложением события могут быть невидимы; совпадение по времени не "
+                + "доказывает исполнение команды или изменение звука. Для откликов плееров "
+                + "нужен доступ к уведомлениям. Расширенные права добавляют системный след "
+                + "только при записи сессии; root-захват сам не включается. "
+                + "Спецвозможности остаются источником событий окон, не фильтром клавиш. "
+                + "Регистратор ничего не отправляет в CAN/ECARX."),
                 topMargin(5));
         Button accessibility = button("Открыть настройки спецвозможностей");
         accessibility.setOnClickListener(view -> {
@@ -307,9 +340,7 @@ public final class DiagnosticsActivity extends AppCompatActivity {
     }
 
     private void refreshAll() {
-        refreshComponentChoices();
         refreshJournal();
-        refreshRecorder();
         int width = clamp(preferences.actionRecorderOverlayWidth.get(), 330, 760);
         widthValue.setText("Ширина плавающего фрейма: " + width + " px");
         int alpha = clamp(preferences.actionRecorderOverlayAlpha.get(), 80, 255);
@@ -393,56 +424,72 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         return value ? "есть" : "нет";
     }
 
-    private void refreshComponentChoices() {
-        if (componentFilter == null) return;
-        String selected = componentFilter.getSelectedItem() == null ? ALL
-                : componentFilter.getSelectedItem().toString();
-        Set<String> values = new LinkedHashSet<>();
-        values.add(ALL);
-        for (DiagnosticJournal.Entry entry : DiagnosticJournal.read()) {
-            values.add(entry.component);
-        }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, new ArrayList<>(values));
-        componentFilter.setAdapter(adapter);
-        int position = adapter.getPosition(selected);
-        componentFilter.setSelection(Math.max(0, position));
-    }
-
     private void refreshJournal() {
-        if (journal == null) return;
-        String level = selected(levelFilter);
-        String component = selected(componentFilter);
-        List<DiagnosticJournal.Entry> values = DiagnosticJournal.read();
-        int start = Math.max(0, values.size() - 1_000);
-        SpannableStringBuilder text = new SpannableStringBuilder();
-        for (int index = start; index < values.size(); index++) {
-            DiagnosticJournal.Entry entry = values.get(index);
-            if (!ALL.equals(level) && !entry.level.name().equals(level)) continue;
-            if (!ALL.equals(component) && !entry.component.equals(component)) continue;
-            int from = text.length();
-            text.append(entry.readable()).append('\n');
-            text.setSpan(new ForegroundColorSpan(levelColor(entry.level)), from, text.length(),
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        if (text.length() == 0) text.append("Журнал пуст");
-        journal.setText(text);
-    }
-
-    private void refreshRecorder() {
-        if (recorderState == null) return;
-        if (ActionRecorder.isRecording()) {
+        if (!screenResumed || journal == null) return;
+        final long expected = ++refreshGeneration;
+        final String level = selected(levelFilter);
+        final String component = selected(componentFilter);
+        refreshWorker.execute(() -> {
+            List<DiagnosticJournal.Entry> values = DiagnosticJournal.read();
+            Set<String> components = new LinkedHashSet<>();
+            components.add(ALL);
+            for (DiagnosticJournal.Entry entry : values) components.add(entry.component);
+            int start = Math.max(0, values.size() - 1_000);
+            SpannableStringBuilder text = new SpannableStringBuilder();
+            for (int index = start; index < values.size(); index++) {
+                DiagnosticJournal.Entry entry = values.get(index);
+                if (!ALL.equals(level) && !entry.level.name().equals(level)) continue;
+                if (!ALL.equals(component) && !entry.component.equals(component)) continue;
+                int from = text.length();
+                text.append(entry.readable()).append('\n');
+                text.setSpan(new ForegroundColorSpan(levelColor(entry.level)), from, text.length(),
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                if (text.length() > 64_000) text.delete(0, text.length() - 64_000);
+            }
+            if (text.length() == 0) text.append("Журнал пуст");
+            String tail = ActionRecorder.latestTimeline(24_000);
+            boolean recording = ActionRecorder.isRecording();
             long seconds = Math.max(0L,
                     (System.currentTimeMillis() - ActionRecorder.startedAt()) / 1_000L);
-            recorderState.setText("● ИДЁТ ЗАПИСЬ · " + seconds + " сек");
-            recorderState.setTextColor(0xFFFF453A);
-            recorderToggle.setText("Остановить запись");
-        } else {
-            recorderState.setText("Запись остановлена");
-            recorderState.setTextColor(Color.LTGRAY);
-            recorderToggle.setText("Начать запись");
+            List<String> choices = new ArrayList<>(components);
+            runOnUiThread(() -> {
+                if (!screenResumed || isFinishing() || isDestroyed()
+                        || refreshGeneration != expected) return;
+                journal.setText(text);
+                timeline.setText(tail);
+                recorderState.setText(recording ? "● ИДЁТ ЗАПИСЬ · " + seconds + " сек" : "Запись остановлена");
+                recorderState.setTextColor(recording ? 0xFFFF453A : Color.LTGRAY);
+                recorderToggle.setText(recording ? "Остановить запись" : "Начать запись");
+                // Avoid an adapter/selection refresh loop on every completed background read.
+                if (!choices.equals(lastComponentChoices)) {
+                    lastComponentChoices = choices;
+                    ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                            android.R.layout.simple_spinner_dropdown_item, choices);
+                    componentFilter.setAdapter(adapter);
+                    componentFilter.setSelection(Math.max(0, adapter.getPosition(component)));
+                }
+            });
+        });
+    }
+
+    private void refreshRecorder() { refreshJournal(); }
+
+    private void exportAsync(int type) {
+        final long expected = lifecycleGeneration;
+        try {
+            exportWorker.execute(() -> {
+                File file = type == 0 ? DiagnosticJournal.copyForExport(this)
+                        : ActionRecorder.copyLatestForExport(this, type == 2);
+                runOnUiThread(() -> {
+                    if (!screenResumed || isFinishing() || isDestroyed()
+                            || lifecycleGeneration != expected) return;
+                    share(file, type == 2 ? "application/json" : "text/plain");
+                });
+            });
+        } catch (java.util.concurrent.RejectedExecutionException busy) {
+            Toast.makeText(this, "Экспорт уже выполняется; дождитесь завершения",
+                    Toast.LENGTH_SHORT).show();
         }
-        timeline.setText(ActionRecorder.latestTimeline(24_000));
     }
 
     private void copyJournal() {
