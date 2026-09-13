@@ -95,3 +95,21 @@ code, и четыре теста восстановления: точное со
 python3 tools/geely-trip2/recover_screen_capture.py /path/to/Natro-Trip-Check-20260913-113103-9f194d.zip --output /tmp/screen-capture-recovery.json
 python3 -m unittest tools.tests.test_trip_screen_collector tools.tests.test_trip_capture_recovery -v
 ```
+
+## Выданный сборщик 1.0.1
+
+По прямому запросу пользователя передан `Natro-Trip-Check-macOS-v1.0.1.zip`:
+12933 байта, SHA-256
+`8c69f3ed6103c00e0224d0d98946c2268d89df3d5f8a91cf05f67b718c1da9df`.
+Четыре файла комплекта побайтно совпадают с опубликованным commit
+`bdc290e1bcef6ff617815b7a9fcbf35cc4af9fce`, tree
+`b6fb183c2d566df2d5db316ce7a5609107ba5cd8`.
+[CI 34748601272](https://github.com/AGKulikov/Status/actions/runs/34748601272)
+успешен. Проверены ZIP CRC, SHA всех файлов, executable mode launcher и запуск
+`--plan` после распаковки в путь с пробелами. [Машинный протокол](collector-1.0.1-release.json).
+
+Для запуска распаковать ZIP на Mac и открыть `Collect-Trip-Screens.command`.
+В комплекте есть инструкция, нужны прежние ADB и Python 3.8+. Версия исправляет
+смешивание PCAP и stderr, но использует прежний фильтр данных. Повторная запись
+ради восстановления уже прочитанного архива не нужна. Новый рабочий источник
+штатной поездки или аппаратная проверка транспорта этим ZIP не заявляются.

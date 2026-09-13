@@ -1,0 +1,17 @@
+{
+  "file": "Natro-Trip-Check-macOS-v1.0.1.zip",
+  "bytes": 12933,
+  "sha256": "8c69f3ed6103c00e0224d0d98946c2268d89df3d5f8a91cf05f67b718c1da9df",
+  "source_commit": "bdc290e1bcef6ff617815b7a9fcbf35cc4af9fce",
+  "source_tree": "b6fb183c2d566df2d5db316ce7a5609107ba5cd8",
+  "ci_run": 34748601272,
+  "ci_conclusion": "success",
+  "checks": {
+    "zip_crc": true,
+    "manifest_hashes": true,
+    "all_files_match_published_git": true,
+    "launcher_executable_mode": true,
+    "launcher_plan_in_path_with_spaces": true
+  },
+  "hardware_validation": "Transport 1.0.1 has not been run on KX11"
+}
