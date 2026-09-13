@@ -1,0 +1,38 @@
+{
+  "vhal_sha256": "b6feed82f777bfa8773c03b78c1f17038e122f492ef85126c095354a29c16756",
+  "converter_va": "0x125b60",
+  "converter_bytes": 475796,
+  "routes": [
+    {
+      "sdk_manager_id": 33749,
+      "native_property": "0x217083d5",
+      "literal_words": [
+        "0x20000000",
+        "0x217083d5"
+      ],
+      "service": "0x6e",
+      "method": "0xc8",
+      "payload_bytes": 712,
+      "payload_offset": "0x30",
+      "property_literal_va": "0x244110",
+      "property_load_va": "0x135db0",
+      "field_load_va": "0x135e2c"
+    },
+    {
+      "sdk_manager_id": 33751,
+      "native_property": "0x217083d7",
+      "literal_words": [
+        "0x20000000",
+        "0x217083d7"
+      ],
+      "service": "0x6e",
+      "method": "0xc8",
+      "payload_bytes": 712,
+      "payload_offset": "0x50",
+      "property_literal_va": "0x244120",
+      "property_load_va": "0x13a1a4",
+      "field_load_va": "0x13a220"
+    }
+  ],
+  "limit": "Static transport route. Does not prove distance unit or stock reset behavior."
+}

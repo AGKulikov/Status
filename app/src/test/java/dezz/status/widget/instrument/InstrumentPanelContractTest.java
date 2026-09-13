@@ -143,12 +143,16 @@ public final class InstrumentPanelContractTest {
         assertTrue(trip2.contains("getDstTrvld2()"));
         assertTrue(trip2.contains("getVehSpdAvgIndcdVehSpdIndcd()"));
         assertTrue(trip2.contains("getVehSpdAvgIndcdVeSpdIndcdUnit()"));
-        assertFalse(trip2.contains("getPA_TS_OdometerTripMeter2()"));
-        assertFalse(trip2.contains("getPA_TS_EDT_time2()"));
+        // PA observations are now readable explicitly, but unverified fields never enter HUD.
+        String tripPublish = trip2.substring(trip2.indexOf("private void publishCurrentPair()"),
+                trip2.indexOf("private interface IntReader"));
+        assertFalse(tripPublish.contains("getPA_TS_OdometerTripMeter2"));
+        assertFalse(tripPublish.contains("getPA_TS_EDT_time2"));
+        assertTrue(trip2.contains("Trip2PaObservation readPaDiagnostics()"));
         assertTrue(integration.contains("DstTrvld2"));
         assertTrue(integration.contains("VehSpdAvgIndcdVehSpdIndcd"));
-        assertFalse(integration.contains("PA_TS_OdometerTripMeter2"));
-        assertFalse(integration.contains("PA_TS_EDT_time2"));
+        assertTrue(integration.contains("PA_TS_OdometerTripMeter2"));
+        assertTrue(integration.contains("PA_TS_EDT_time2"));
         assertTrue(settings.contains("NAV_MANEUVER_CARD"));
         assertTrue(renderer.contains("case NAV_MANEUVER_CARD:"));
         assertTrue(renderer.contains("case CURRENT_TRIP_DISTANCE:"));

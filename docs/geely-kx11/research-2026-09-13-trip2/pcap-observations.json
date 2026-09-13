@@ -1,0 +1,1790 @@
+{
+  "schema": "kx11-pa-trip-observation-v1",
+  "archives": [
+    {
+      "archive": "KX11-Cruise-Trace-20260809-093747.zip",
+      "sha256": "58fe89e812b33780d7eeab05c7b63a90927b4d3e1a090ddbe2f4d37a71880d8f"
+    },
+    {
+      "archive": "KX11-Cruise-Trace-20260809-101433.zip",
+      "sha256": "4cf60f5dd0c979616649fe8fc09d0ea739d8deb3414d57c290fefa74e4174f6f"
+    },
+    {
+      "archive": "KX11-Cruise-Trace-20260809-133652.zip",
+      "sha256": "e610d154f98d3be3d4ba5258027c954306e6e6b2a5af6d289fb86294bfd291ec"
+    },
+    {
+      "archive": "KX11-Cruise-Trace-20260809-135239.zip",
+      "sha256": "4f257e5d1d5cc443d7285b617e80359d12619da707feed85457e86f0e7d9e10c"
+    },
+    {
+      "archive": "KX11-Cruise-Trace-20260809-150147.zip",
+      "sha256": "f1faab66e9ca5b17bc7207ac5b1ddd4bc4d48c145d7ce31f2045b5af4e16b77b"
+    },
+    {
+      "archive": "KX11-QNX-IPCP-Evidence 2.zip",
+      "sha256": "f5e69a2deeadc09f2c3d053437da2d0bd216d4f2088e3f637e01a7f2d6fbb706"
+    },
+    {
+      "archive": "KX11-Raw-Ethernet-Evidence-20260815-135547_77986.zip",
+      "sha256": "6245b558d3d3c20f062d42aee486ed1aca165342a8503b057c57e32c1eec87e3"
+    },
+    {
+      "archive": "KX11-VP-Action-Evidence-20260815-190324_83890.zip",
+      "sha256": "770a60c64e3730f3718ff3783cb8d86ec016f4856751a137678eed7fb66427c6"
+    }
+  ],
+  "scope": "Classic PCAP IPv4 UDP only. Duplicate captures deduplicated by bytes; different interfaces may still contain the same wire events. Time unit observation does not establish stock Trip-2 identity or reset.",
+  "captures": [
+    {
+      "sha256": "07e6366419b8787ea94fecb6f9d2f8bba29851ed2bf91da72b2867da0cb85592",
+      "bytes": 260104,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-093747.zip",
+          "member": "KX11-Cruise-Trace-20260809-093747/actions/05-CANCEL/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1335,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 11
+        },
+        "first": {
+          "time_words": [
+            1,
+            220986,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 49,
+          "timestamp": 1786257612.074053
+        },
+        "last": {
+          "time_words": [
+            1,
+            220996,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 1219,
+          "timestamp": 1786257622.085205
+        },
+        "elapsed_capture_seconds": 10.011152029037476,
+        "elapsed_raw_delta": 10,
+        "raw_time_units_per_second": 0.9988860393883612,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "11e3420c313fe22cceb5294a38afed702b53a9a3450eaab31fe7260f620814fc",
+      "bytes": 188007,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-150147.zip",
+          "member": "KX11-Cruise-Trace-20260809-150147/transport/qnx-dlt-operation/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 970,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 8
+        },
+        "first": {
+          "time_words": [
+            1,
+            224272,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 94,
+          "timestamp": 1786276953.198448
+        },
+        "last": {
+          "time_words": [
+            1,
+            224279,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 922,
+          "timestamp": 1786276960.203255
+        },
+        "elapsed_capture_seconds": 7.004806995391846,
+        "elapsed_raw_delta": 7,
+        "raw_time_units_per_second": 0.9993137576245844,
+        "distance_raw_values": [
+          1360717
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "15a3c733b81bee2eb062562684a3d0ea9ea3516f390674e9b82c8fe72f241872",
+      "bytes": 256184,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-093747.zip",
+          "member": "KX11-Cruise-Trace-20260809-093747/actions/02-CRUISE_MODE_SELECT/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1321,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 11
+        },
+        "first": {
+          "time_words": [
+            1,
+            220913,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 103,
+          "timestamp": 1786257539.068714
+        },
+        "last": {
+          "time_words": [
+            1,
+            220923,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 1256,
+          "timestamp": 1786257549.071635
+        },
+        "elapsed_capture_seconds": 10.002921104431152,
+        "elapsed_raw_delta": 10,
+        "raw_time_units_per_second": 0.9997079748604777,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "18c08bf3fed3144391bfcf609bd9b0344db8680e9cb9ad373373df7b8fddd817",
+      "bytes": 254550,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-093747.zip",
+          "member": "KX11-Cruise-Trace-20260809-093747/actions/06-CRUISE_MAIN/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1318,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 12
+        },
+        "first": {
+          "time_words": [
+            1,
+            221021,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 31,
+          "timestamp": 1786257647.075445
+        },
+        "last": {
+          "time_words": [
+            1,
+            221032,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 1303,
+          "timestamp": 1786257658.086637
+        },
+        "elapsed_capture_seconds": 11.011192083358765,
+        "elapsed_raw_delta": 11,
+        "raw_time_units_per_second": 0.9989835720534129,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "240fe0568a77895b6a6e197ee04a2b58352db1b9cc89163ce43a7748d5476c30",
+      "bytes": 272122,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-093747.zip",
+          "member": "KX11-Cruise-Trace-20260809-093747/actions/01-LIMITER_SELECT/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1367,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 12
+        },
+        "first": {
+          "time_words": [
+            1,
+            220885,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 31,
+          "timestamp": 1786257511.081135
+        },
+        "last": {
+          "time_words": [
+            1,
+            220896,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 1350,
+          "timestamp": 1786257522.070943
+        },
+        "elapsed_capture_seconds": 10.989808082580566,
+        "elapsed_raw_delta": 11,
+        "raw_time_units_per_second": 1.000927397215934,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "3297d0cba84ef94f309688098beaf01051ddd12f8c4739fb1f2b177e3d22e82c",
+      "bytes": 5982895,
+      "sources": [
+        {
+          "archive": "KX11-VP-Action-Evidence-20260815-190324_83890.zip",
+          "member": "KX11-VP-Action-Evidence-20260815-190324_83890/capture/vp-channel.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 29858,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 268
+        },
+        "first": {
+          "time_words": [
+            1,
+            305903,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 67,
+          "timestamp": 1786809829.98045
+        },
+        "last": {
+          "time_words": [
+            1,
+            306169,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 29793,
+          "timestamp": 1786810095.999404
+        },
+        "elapsed_capture_seconds": 266.01895403862,
+        "elapsed_raw_delta": 266,
+        "raw_time_units_per_second": 0.9999287492927393,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "37033f88cfd587e827354fb725a874b6faca6cae50ffcb3c4d7b75d2bf463ffe",
+      "bytes": 188191,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-150147.zip",
+          "member": "KX11-Cruise-Trace-20260809-150147/transport/qnx-dlt-trigger-gate/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 969,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 8
+        },
+        "first": {
+          "time_words": [
+            1,
+            224261,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 68,
+          "timestamp": 1786276942.198447
+        },
+        "last": {
+          "time_words": [
+            1,
+            224268,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 891,
+          "timestamp": 1786276949.208536
+        },
+        "elapsed_capture_seconds": 7.010088920593262,
+        "elapsed_raw_delta": 7,
+        "raw_time_units_per_second": 0.9985607999117352,
+        "distance_raw_values": [
+          1360717
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "3f5dcae061824c0063423e07ef1edfdff4cdc898330f9d1adbdbac0a997842ea",
+      "bytes": 194871,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-150147.zip",
+          "member": "KX11-Cruise-Trace-20260809-150147/transport/qnx-dlt-preflight-attempt-1/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 984,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 8
+        },
+        "first": {
+          "time_words": [
+            1,
+            224249,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 55,
+          "timestamp": 1786276930.20594
+        },
+        "last": {
+          "time_words": [
+            1,
+            224256,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 884,
+          "timestamp": 1786276937.208319
+        },
+        "elapsed_capture_seconds": 7.002378940582275,
+        "elapsed_raw_delta": 7,
+        "raw_time_units_per_second": 0.999660266803259,
+        "distance_raw_values": [
+          1360717
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "474919e6eaf01956c9175c248b53f39c42bc673dee0413e309d73b55c2ac88ad",
+      "bytes": 213900,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-135239.zip",
+          "member": "KX11-Cruise-Trace-20260809-135239/transport/qnx-dlt-operation/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1096,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 10
+        },
+        "first": {
+          "time_words": [
+            1,
+            225085,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 7,
+          "timestamp": 1786272806.772902
+        },
+        "last": {
+          "time_words": [
+            1,
+            225094,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 1060,
+          "timestamp": 1786272815.773494
+        },
+        "elapsed_capture_seconds": 9.00059199333191,
+        "elapsed_raw_delta": 9,
+        "raw_time_units_per_second": 0.9999342272894552,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "48070d74a6a2b2792f691efd958b2965dd1521b93f799504a10fcaf854b30edf",
+      "bytes": 54757,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-101433.zip",
+          "member": "KX11-Cruise-Trace-20260809-101433/transport/tcpdump-root-test/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 271,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 2
+        },
+        "first": {
+          "time_words": [
+            1,
+            221391,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 12,
+          "timestamp": 1786259682.965723
+        },
+        "last": {
+          "time_words": [
+            1,
+            221392,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 140,
+          "timestamp": 1786259683.981049
+        },
+        "elapsed_capture_seconds": 1.0153260231018066,
+        "elapsed_raw_delta": 1,
+        "raw_time_units_per_second": 0.9849053183380587,
+        "distance_raw_values": [
+          1360717
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "5a94e1cfb568f304faa6ec1791f7cb1d4cf182574108258bc9ce8234658805b4",
+      "bytes": 255380,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-093747.zip",
+          "member": "KX11-Cruise-Trace-20260809-093747/actions/04-MINUS/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1322,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 12
+        },
+        "first": {
+          "time_words": [
+            1,
+            220962,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 28,
+          "timestamp": 1786257588.072649
+        },
+        "last": {
+          "time_words": [
+            1,
+            220973,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 1304,
+          "timestamp": 1786257599.073642
+        },
+        "elapsed_capture_seconds": 11.000993013381958,
+        "elapsed_raw_delta": 11,
+        "raw_time_units_per_second": 0.999909734204835,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "5e9430a25fea2b3ca019f90fbc7b54e8a541f950ebc3431d2df5a6d146e683a8",
+      "bytes": 198252,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-133652.zip",
+          "member": "KX11-Cruise-Trace-20260809-133652/transport/qnx-dlt-preflight-attempt-1/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 996,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 8
+        },
+        "first": {
+          "time_words": [
+            1,
+            224111,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 97,
+          "timestamp": 1786271832.732966
+        },
+        "last": {
+          "time_words": [
+            1,
+            224118,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 939,
+          "timestamp": 1786271839.742937
+        },
+        "elapsed_capture_seconds": 7.0099711418151855,
+        "elapsed_raw_delta": 7,
+        "raw_time_units_per_second": 0.9985775773375576,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "661c0360680c06f55e924add98ea5ca31547b1cf486513f179d2b94c8a57afa8",
+      "bytes": 260537,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-101433.zip",
+          "member": "KX11-Cruise-Trace-20260809-101433/actions/04-LIMITER_MAIN_ON_CONFIRM/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1334,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 11
+        },
+        "first": {
+          "time_words": [
+            1,
+            221450,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 67,
+          "timestamp": 1786259742.027197
+        },
+        "last": {
+          "time_words": [
+            1,
+            221460,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 1244,
+          "timestamp": 1786259752.018325
+        },
+        "elapsed_capture_seconds": 9.991128206253052,
+        "elapsed_raw_delta": 10,
+        "raw_time_units_per_second": 1.0008879671608453,
+        "distance_raw_values": [
+          1360717
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "72f1f76cb116e9c883a7e72c830f6eb7da8b88000fa2716fa958aadecef3bf1d",
+      "bytes": 14950699,
+      "sources": [
+        {
+          "archive": "KX11-Raw-Ethernet-Evidence-20260815-135547_77986.zip",
+          "member": "KX11-Raw-Ethernet-Evidence-20260815-135547_77986/capture/any-ipcp.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 76236,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 658
+        },
+        "first": {
+          "time_words": [
+            1,
+            303119,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1765580,
+            0,
+            0
+          ],
+          "packet": 102,
+          "timestamp": 1786791400.695306
+        },
+        "last": {
+          "time_words": [
+            1,
+            303774,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1765580,
+            0,
+            0
+          ],
+          "packet": 76214,
+          "timestamp": 1786792055.806898
+        },
+        "elapsed_capture_seconds": 655.1115920543671,
+        "elapsed_raw_delta": 655,
+        "raw_time_units_per_second": 0.9998296594721868,
+        "distance_raw_values": [
+          1765580
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "821060dcc74d9498c2ee863fca27e64fe834442c25673453c8327e860fadb787",
+      "bytes": 14752759,
+      "sources": [
+        {
+          "archive": "KX11-Raw-Ethernet-Evidence-20260815-135547_77986.zip",
+          "member": "KX11-Raw-Ethernet-Evidence-20260815-135547_77986/capture/eth0-raw.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 1,
+        "counts": {
+          "packet_records": 75606,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 658
+        },
+        "first": {
+          "time_words": [
+            1,
+            303119,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1765580,
+            0,
+            0
+          ],
+          "packet": 97,
+          "timestamp": 1786791400.695306
+        },
+        "last": {
+          "time_words": [
+            1,
+            303774,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1765580,
+            0,
+            0
+          ],
+          "packet": 75576,
+          "timestamp": 1786792055.806898
+        },
+        "elapsed_capture_seconds": 655.1115920543671,
+        "elapsed_raw_delta": 655,
+        "raw_time_units_per_second": 0.9998296594721868,
+        "distance_raw_values": [
+          1765580
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "8a9c31933c4e5c385663b660b1a3c5f06f6b0e487e27b60b86381ccdd7287330",
+      "bytes": 552945,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-133652.zip",
+          "member": "KX11-Cruise-Trace-20260809-133652/transport/qnx-dlt-operation/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 2830,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 24
+        },
+        "first": {
+          "time_words": [
+            1,
+            224136,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 56,
+          "timestamp": 1786271857.744045
+        },
+        "last": {
+          "time_words": [
+            1,
+            224159,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 2788,
+          "timestamp": 1786271880.734903
+        },
+        "elapsed_capture_seconds": 22.99085807800293,
+        "elapsed_raw_delta": 23,
+        "raw_time_units_per_second": 1.0003976329185302,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "95cebef550311a2767a92a74106187dc16f1072b0060fad22108e167e764dc44",
+      "bytes": 273766,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-101433.zip",
+          "member": "KX11-Cruise-Trace-20260809-101433/actions/02-MAIN_OFF_CONFIRM/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1381,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 12
+        },
+        "first": {
+          "time_words": [
+            1,
+            221418,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 36,
+          "timestamp": 1786259709.966722
+        },
+        "last": {
+          "time_words": [
+            1,
+            221429,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 1374,
+          "timestamp": 1786259721.027062
+        },
+        "elapsed_capture_seconds": 11.06033992767334,
+        "elapsed_raw_delta": 11,
+        "raw_time_units_per_second": 0.994544478011714,
+        "distance_raw_values": [
+          1360717
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "a9aeb442d974fab2f3d774328588889c156c3b0bdd7ace13f595a05dde7fe3ca",
+      "bytes": 253968,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-101433.zip",
+          "member": "KX11-Cruise-Trace-20260809-101433/actions/05-LIMITER_MAIN_OFF_CONFIRM/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1320,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 11
+        },
+        "first": {
+          "time_words": [
+            1,
+            221466,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 103,
+          "timestamp": 1786259758.017867
+        },
+        "last": {
+          "time_words": [
+            1,
+            221476,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 1252,
+          "timestamp": 1786259768.018189
+        },
+        "elapsed_capture_seconds": 10.000321865081787,
+        "elapsed_raw_delta": 10,
+        "raw_time_units_per_second": 0.9999678145277593,
+        "distance_raw_values": [
+          1360717
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "ab7819a731e6010b6922df75e0977eb37a1dbf25a006a67191cf3926b73495eb",
+      "bytes": 3006298,
+      "sources": [
+        {
+          "archive": "KX11-QNX-IPCP-Evidence 2.zip",
+          "member": "KX11-QNX-IPCP-Evidence 2/android/files/pcap/eb1fa3c7ebb3-KX11_IPCP_20260814-210238_62429.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 15298,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 130
+        },
+        "first": {
+          "time_words": [
+            1,
+            295623,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1738090,
+            0,
+            0
+          ],
+          "packet": 105,
+          "timestamp": 1786730565.046999
+        },
+        "last": {
+          "time_words": [
+            1,
+            295752,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1738090,
+            0,
+            0
+          ],
+          "packet": 15186,
+          "timestamp": 1786730694.104898
+        },
+        "elapsed_capture_seconds": 129.0578989982605,
+        "elapsed_raw_delta": 129,
+        "raw_time_units_per_second": 0.9995513719136147,
+        "distance_raw_values": [
+          1738090
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "c68e69e831990ae522ae87f4f115bb97e5b6ba05555e1bc4703a3a00e6bb1d70",
+      "bytes": 251073,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-093747.zip",
+          "member": "KX11-Cruise-Trace-20260809-093747/actions/03-PLUS/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1297,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 12
+        },
+        "first": {
+          "time_words": [
+            1,
+            220941,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 20,
+          "timestamp": 1786257567.073062
+        },
+        "last": {
+          "time_words": [
+            1,
+            220952,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 1273,
+          "timestamp": 1786257578.072934
+        },
+        "elapsed_capture_seconds": 10.999871969223022,
+        "elapsed_raw_delta": 11,
+        "raw_time_units_per_second": 1.000011639297015,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "d23e97f6846698719c4ef75e01508f6bea9977743f21412c7c862eab5d423a9f",
+      "bytes": 68800,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-093747.zip",
+          "member": "KX11-Cruise-Trace-20260809-093747/transport/tcpdump-root-test/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 349,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 3
+        },
+        "first": {
+          "time_words": [
+            1,
+            220859,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 116,
+          "timestamp": 1786257485.122491
+        },
+        "last": {
+          "time_words": [
+            1,
+            220861,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 336,
+          "timestamp": 1786257487.111902
+        },
+        "elapsed_capture_seconds": 1.9894111156463623,
+        "elapsed_raw_delta": 2,
+        "raw_time_units_per_second": 1.0053226224938416,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "d2b2334be8e7984c82ee49c071f634cc0eeef199f2ab9e706b8bef20ea4e064c",
+      "bytes": 249403,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-101433.zip",
+          "member": "KX11-Cruise-Trace-20260809-101433/actions/03-LIMITER_SELECT_CONFIRM/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1303,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 11
+        },
+        "first": {
+          "time_words": [
+            1,
+            221434,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 57,
+          "timestamp": 1786259726.017051
+        },
+        "last": {
+          "time_words": [
+            1,
+            221444,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 1209,
+          "timestamp": 1786259736.026926
+        },
+        "elapsed_capture_seconds": 10.009875059127808,
+        "elapsed_raw_delta": 10,
+        "raw_time_units_per_second": 0.9990134682931129,
+        "distance_raw_values": [
+          1360717
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "d5d1198a0ade215ab2cfe38e87592f4122d3ae6e7c6d61555536c9011c9b0c94",
+      "bytes": 271654,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-101433.zip",
+          "member": "KX11-Cruise-Trace-20260809-101433/actions/01-MAIN_ON_CONFIRM/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 1376,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 12
+        },
+        "first": {
+          "time_words": [
+            1,
+            221402,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 21,
+          "timestamp": 1786259694.026074
+        },
+        "last": {
+          "time_words": [
+            1,
+            221413,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            1360717,
+            0,
+            0
+          ],
+          "packet": 1347,
+          "timestamp": 1786259704.977313
+        },
+        "elapsed_capture_seconds": 10.951239109039307,
+        "elapsed_raw_delta": 11,
+        "raw_time_units_per_second": 1.0044525455498863,
+        "distance_raw_values": [
+          1360717
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "d72ef91bed4884f39e5cdcf694e4c53d8ef8c77315a37a704b376c0353ee8e05",
+      "bytes": 184918,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-135239.zip",
+          "member": "KX11-Cruise-Trace-20260809-135239/transport/qnx-dlt-trigger-gate/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 953,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 8
+        },
+        "first": {
+          "time_words": [
+            1,
+            225075,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 95,
+          "timestamp": 1786272796.775246
+        },
+        "last": {
+          "time_words": [
+            1,
+            225082,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 903,
+          "timestamp": 1786272803.772961
+        },
+        "elapsed_capture_seconds": 6.997714996337891,
+        "elapsed_raw_delta": 7,
+        "raw_time_units_per_second": 1.0003265356853352,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "sha256": "f1ec788df864680d77e02dec36a5f94a45e7ae1980797c75192cdb18f574e0e6",
+      "bytes": 199159,
+      "sources": [
+        {
+          "archive": "KX11-Cruise-Trace-20260809-135239.zip",
+          "member": "KX11-Cruise-Trace-20260809-135239/transport/qnx-dlt-preflight-attempt-1/someip.pcap"
+        }
+      ],
+      "analysis": {
+        "link_type": 113,
+        "counts": {
+          "packet_records": 998,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 8
+        },
+        "first": {
+          "time_words": [
+            1,
+            225063,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 106,
+          "timestamp": 1786272784.773702
+        },
+        "last": {
+          "time_words": [
+            1,
+            225070,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "packet": 944,
+          "timestamp": 1786272791.772437
+        },
+        "elapsed_capture_seconds": 6.998735189437866,
+        "elapsed_raw_delta": 7,
+        "raw_time_units_per_second": 1.0001807198769348,
+        "distance_raw_values": [
+          0
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    }
+  ]
+}

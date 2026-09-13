@@ -23,7 +23,22 @@ SOURCES = {
     "android/util/Log.java": """package android.util; public class Log {
       public static int w(String t,String s){return 0;} public static int w(String t,String s,Throwable e){return 0;}
       public static int d(String t,String s,Throwable e){return 0;} }""",
-    "ecarx/car/ECarXCar.java": "package ecarx.car; public class ECarXCar {}",
+    "ecarx/car/ECarXCar.java": """package ecarx.car; public class ECarXCar {
+      public static final String PA_SERVICE="pa"; public Object service;
+      public Object getCarManager(String s)throws android.car.CarNotConnectedException{return service;} }""",
+    "ecarx/car/hardware/vehicle/ECarXCarSetManager.java": """package ecarx.car.hardware.vehicle;
+      public class ECarXCarSetManager { public ECarXCarPhevManager manager=new ECarXCarPhevManager();
+      public ECarXCarPhevManager getECarXCarPhevManager(){return manager;} }""",
+    "ecarx/car/hardware/vehicle/ECarXCarPhevManager.java": """package ecarx.car.hardware.vehicle;
+      public class ECarXCarPhevManager { public boolean failDistance; public Runnable duringRead;
+      public PATypes.PA_IntBase getPA_TS_OdometerTripMeter2()throws android.car.CarNotConnectedException{
+        if(failDistance)throw new android.car.CarNotConnectedException();return new PATypes.PA_IntBase(1738090);}
+      public PATypes.PA_IntBase getPA_TS_EDT_time2(){if(duringRead!=null)duringRead.run();
+        return new PATypes.PA_IntBase(295623);} }""",
+    "ecarx/car/hardware/vehicle/PATypes.java": """package ecarx.car.hardware.vehicle;
+      public class PATypes { public static class PA_IntBase { private int data;
+      public PA_IntBase(int d){data=d;} public int getData(){return data;} public int getAvailability(){return 1;}
+      public int getStatus(){return 0;} public int getFormat(){return 0;} } }""",
     "ecarx/car/hardware/ECarXCarPropertyValue.java": "package ecarx.car.hardware; public class ECarXCarPropertyValue {}",
     "ecarx/car/hardware/signal/SignalFilter.java": "package ecarx.car.hardware.signal; public class SignalFilter { public void add(int id){} }",
     "ecarx/car/hardware/signal/CarSignalManager.java": """package ecarx.car.hardware.signal;
@@ -148,6 +163,30 @@ SOURCES = {
           check(delivered[0].distanceRaw==174);source.removeListener(listener);check(fresh.removals==1);
           source.close();
         }
+        static void paObservationsStaySeparate(){
+          EcarxTrip2Access source=new EcarxTrip2Access(new android.content.Context());
+          ecarx.car.ECarXCar root=new ecarx.car.ECarXCar();
+          ecarx.car.hardware.vehicle.ECarXCarSetManager service=new ecarx.car.hardware.vehicle.ECarXCarSetManager();
+          root.service=service;CarSignalManager signals=new CarSignalManager();signals.distance=-1;
+          source.onECarXCarServiceConnected(root,signals);
+          check(signals.registrations==0);
+          Trip2PaObservation p=source.readPaDiagnostics();
+          check(p.distance.raw==1738090 && p.elapsed.raw==295623);
+          check(Math.abs(p.elapsedMinutes()-4927.05f)<.001f);
+          check(source.latestSample().distanceRaw==-1);
+          service.manager.failDistance=true;p=source.readPaDiagnostics();
+          check(p.distance==null && p.elapsed.raw==295623);
+          service.manager.duringRead=source::onECarXCarServiceDeath;
+          check(source.readPaDiagnostics()==null);
+          source.onECarXCarServiceConnected(root,null);service.manager.duringRead=null;
+          check(source.readPaDiagnostics().elapsed.raw==295623);
+          service.manager.duringRead=()->source.onECarXCarServiceConnected(root,null);
+          check(source.readPaDiagnostics()==null);
+          source.close();check(source.readPaDiagnostics()==null);
+          for(int[] invalid:new int[][]{{-1,1,0,0},{10,0,0,0},{10,3,0,0},{10,1,1,0},{10,1,0,1}}){
+            p=new Trip2PaObservation(null,new Trip2PaObservation.Field(invalid[0],invalid[1],invalid[2],invalid[3]));
+            check(Float.isNaN(p.elapsedMinutes()));}
+        }
         public static void main(String[] a)throws Exception{Trip2Replay.class.getDeclaredMethod(a[0]).invoke(null);}
       }""",
 }
@@ -167,6 +206,7 @@ class MapRegressionTest(unittest.TestCase):
         files += [str(ROOT / path) for path in (
             "app/src/main/java/dezz/status/widget/navigation/MapFirstFrameDetector.java",
             "app/src/main/java/dezz/status/widget/car/CurrentTripMetrics.java",
+            "app/src/main/java/dezz/status/widget/car/Trip2PaObservation.java",
             "app/src/geely/java/dezz/status/widget/car/EcarxTrip2Access.java",
             "navigator-mod/src/main/java/ru/natro/navigation/BalloonGeometry.java",
             "navigator-mod/src/main/java/ru/natro/navigation/RouteCameraPolicy.java")]
@@ -186,7 +226,7 @@ class MapRegressionTest(unittest.TestCase):
 for package, cases in (
     ("dezz.status.widget.navigation.BootstrapReplay", ("blankFrames", "dayNightAndTransparentRoads", "startupSequence")),
     ("ru.natro.navigation.MapRegressionReplay", ("connectedBalloons", "allConsecutiveControls")),
-    ("dezz.status.widget.car.Trip2Replay", ("partialAndUnavailable",)),
+    ("dezz.status.widget.car.Trip2Replay", ("partialAndUnavailable", "paObservationsStaySeparate")),
 ):
     for case in cases:
         setattr(MapRegressionTest, "test_" + case,

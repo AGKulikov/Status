@@ -1664,6 +1664,17 @@ final class GeelyCarIntegration implements CarIntegration {
     }
 
     private void addTrip2Diagnostics(@NonNull List<CarDiagnosticValue> out) {
+        // Runs on ecarx-diagnostics, including when the CarSignal candidates are unavailable.
+        Trip2PaObservation pa = trip2Access.readPaDiagnostics();
+        addTrip2PaDiagnostic(out, "PA_TS_OdometerTripMeter2", "PA — счётчик пробега",
+                pa == null ? null : pa.distance,
+                "id=33751; IPCP=006e/00c8+0x50; distance unit and stock Trip 2 mapping unconfirmed");
+        addTrip2PaDiagnostic(out, "PA_TS_EDT_time2", "PA — счётчик времени",
+                pa == null ? null : pa.elapsed,
+                "id=33749; IPCP=006e/00c8+0x30; observed encoding: seconds; minutes="
+                        + (pa != null && Float.isFinite(pa.elapsedMinutes())
+                        ? Float.toString(pa.elapsedMinutes()) : "unavailable")
+                        + "; stock Trip 2 mapping/reset unconfirmed; getter cache freshness unknown");
         EcarxTrip2Access.Sample sample = trip2Access.latestSample();
         if (sample == null) {
             out.add(new CarDiagnosticValue("DstTrvld2",
@@ -1699,6 +1710,14 @@ final class GeelyCarIntegration implements CarIntegration {
                 sample.speedUnitRaw == 0 || sample.speedUnitRaw == 1 ? "unverified" : "unavailable",
                 Integer.toString(sample.speedUnitRaw),
                 "raw CarSignal candidate; id=30956; provisional 0=km/h, 1=mph; target support unconfirmed"));
+    }
+
+    private static void addTrip2PaDiagnostic(List<CarDiagnosticValue> out, String id,
+                                              String label, Trip2PaObservation.Field field,
+                                              String detail) {
+        out.add(new CarDiagnosticValue(id, label, field == null ? "unavailable" : "unverified",
+                field == null ? "—" : Integer.toString(field.raw),
+                detail + (field == null ? "; no value" : "; " + field.metadata())));
     }
 
     private static void addUnavailableSensor(List<CarDiagnosticValue> out,

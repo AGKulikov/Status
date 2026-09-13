@@ -18,6 +18,9 @@ import ecarx.car.ECarXCar;
 import ecarx.car.hardware.ECarXCarPropertyValue;
 import ecarx.car.hardware.signal.CarSignalManager;
 import ecarx.car.hardware.signal.SignalFilter;
+import ecarx.car.hardware.vehicle.ECarXCarPhevManager;
+import ecarx.car.hardware.vehicle.ECarXCarSetManager;
+import ecarx.car.hardware.vehicle.PATypes;
 
 /** Read-only Trip-2 signal candidates. SDK presence does not prove support on the target KX11. */
 final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
@@ -58,6 +61,8 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
             };
 
     @Nullable private ECarXCarProxy proxy;
+    @Nullable private volatile ECarXCar connectedRoot;
+    private long connectionGeneration;
     @Nullable private volatile CarSignalManager signals;
     @Nullable private volatile Sample latest;
     private volatile boolean callbackRegistered;
@@ -96,17 +101,60 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
         return latest;
     }
 
+    /** Explicit diagnostic demand only. No PA callbacks, polling, vehicle writes or HUD values. */
+    @Nullable
+    Trip2PaObservation readPaDiagnostics() {
+        final ECarXCar root;
+        final long generation;
+        synchronized (this) {
+            root = connectedRoot;
+            generation = connectionGeneration;
+            if (closed || root == null) return null;
+        }
+        try {
+            Object service = root.getCarManager(ECarXCar.PA_SERVICE);
+            if (!(service instanceof ECarXCarSetManager)) return null;
+            ECarXCarPhevManager manager = ((ECarXCarSetManager) service)
+                    .getECarXCarPhevManager();
+            if (manager == null) return null;
+            Trip2PaObservation.Field distance = readPaField(manager::getPA_TS_OdometerTripMeter2);
+            Trip2PaObservation.Field elapsed = readPaField(manager::getPA_TS_EDT_time2);
+            synchronized (this) {
+                if (closed || connectedRoot != root || connectionGeneration != generation) return null;
+                return new Trip2PaObservation(distance, elapsed);
+            }
+        } catch (CarNotConnectedException | RuntimeException unavailable) {
+            return null;
+        }
+    }
+
+    private interface PaReader { PATypes.PA_IntBase read() throws CarNotConnectedException; }
+
+    @Nullable
+    private static Trip2PaObservation.Field readPaField(PaReader reader) {
+        try {
+            PATypes.PA_IntBase value = reader.read();
+            return value == null ? null : new Trip2PaObservation.Field(value.getData(),
+                    value.getAvailability(), value.getStatus(), value.getFormat());
+        } catch (CarNotConnectedException | RuntimeException unavailable) {
+            return null;
+        }
+    }
+
     @Override
     public synchronized void onECarXCarServiceConnected(
             ECarXCar root, CarSignalManager connectedSignals) {
-        if (closed || connectedSignals == null) return;
+        if (closed) return;
         detachManager();
+        connectedRoot = root;
         signals = connectedSignals;
         if (ensureCallbackForDemand()) publishCurrentPair();
     }
 
     @Override
     public synchronized void onECarXCarServiceDeath() {
+        connectionGeneration++;
+        connectedRoot = null;
         callbackRegistered = false;
         signals = null;
         publishUnavailable();
@@ -114,7 +162,8 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
 
     /**
      * Reads one distance/average-speed/unit sample from the same CarSignalManager generation.
-     * The rejected PA fields are deliberately absent: they returned lifetime-like values on KX11.
+     * PA is inspected separately: its seconds clock is now observed, but its distance scale and
+     * correspondence with the requested stock row are not established. Do not mix the sources.
      */
     private void publishCurrentPair() {
         CarSignalManager source = signals;
@@ -191,6 +240,8 @@ final class EcarxTrip2Access implements ECarXCarProxy.ECarXCarProxyMethod {
     }
 
     private synchronized void detachManager() {
+        connectionGeneration++;
+        connectedRoot = null;
         CarSignalManager current = signals;
         signals = null;
         latest = null;
