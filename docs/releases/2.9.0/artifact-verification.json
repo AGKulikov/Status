@@ -1,0 +1,89 @@
+{
+  "schema": "natro-pair-local-release-verification/v1",
+  "source_commit": "15dd69166f96d2cc2311c251c59acd0ac3493c45",
+  "source_tree": "ddca621f9b37ccc794226ab7c025743b4ba404d5",
+  "workflow_run": 34756328599,
+  "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "apks": [
+    {
+      "filename": "Natro-2.9.0-signed.apk",
+      "size_bytes": 28347758,
+      "sha256": "edcf18967578c5cf3dc02d2166ae10140884e934c30997bdc4934822b951d01a",
+      "package_fields": {
+        "name": "ru.natro.statuswidget",
+        "versionCode": "208021323",
+        "versionName": "2.9.0",
+        "platformBuildVersionName": "16",
+        "platformBuildVersionCode": "36",
+        "compileSdkVersion": "36",
+        "compileSdkVersionCodename": "16"
+      },
+      "previous_sha256": "4575b28ca91e971d71e998c648b05fdc6354e3cb5d57a97a85cc6bb7f8ead97e",
+      "previous_version_code": "208021322",
+      "signature_schemes": [
+        "v2",
+        "v3"
+      ],
+      "signer_count": 1,
+      "zip_crc_pass": true,
+      "zipalign_16k": true,
+      "dex_sha256": {
+        "classes.dex": "7959f77152352336635c88fba0b218ed7d1aaa0738c7f89ab1a2c840e6f3c081",
+        "classes2.dex": "b8422f505c2b766ad24c0d02d01c55166a2be005a5e8b246f8ee97fb646eea23",
+        "classes3.dex": "c74ac8e37abf1287f08b28af8a6e71b4269d23bef11cbbfd222ec84a6319bc9c"
+      }
+    },
+    {
+      "filename": "Navigator-30.3.0-Natro-2.9.0-signed.apk",
+      "size_bytes": 155149731,
+      "sha256": "d84a606f7d158cc59a21571158d531667aee2c3480470a440c5991bea34f2381",
+      "package_fields": {
+        "name": "ru.yandex.yandexnavi",
+        "versionCode": "739564630",
+        "versionName": "30.3.0",
+        "platformBuildVersionName": "16",
+        "platformBuildVersionCode": "36",
+        "compileSdkVersion": "36",
+        "compileSdkVersionCodename": "16"
+      },
+      "previous_sha256": "be2a81b5625dc5a2e4c3e0934ee9fdd3ef0b95ed46692956327b74ab3b7d6745",
+      "previous_version_code": "739564630",
+      "signature_schemes": [
+        "v2",
+        "v3"
+      ],
+      "signer_count": 1,
+      "zip_crc_pass": true,
+      "zipalign_16k": true,
+      "dex_sha256": {
+        "classes16.dex": "35b7edcc0f827de17113f6663429f707ed16ee7a7ef5bb00a1dae085b46b61ae",
+        "classes6.dex": "93be5646ed479848c6f864e26cd915215a8fbd06abe4859018f89d42a9e45294",
+        "classes15.dex": "eff5ff91eeb3d9d6c819487fe7b3962988147c9fc49fbb97f543f2bca7c16344",
+        "classes10.dex": "f98397d13fd41868d4b66e47c4c3fb982b79fe93dbb9df8245c70c83b797180c",
+        "classes17.dex": "c76ab9039fa5bf3520814f63dcbe0d866c366d65ebb5feb53e95235512e97a00",
+        "classes7.dex": "d4f0a5f5552bc63662e5167b594cee787eb8f9274e57e0b5d29ec4bf215d285a",
+        "classes12.dex": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+        "classes11.dex": "453ed7d7e92c7d69b7eddeb08a1302ce63d9060a60757ef4db0b18785e710d23",
+        "classes2.dex": "1d61139847ee270b6289d746c3212b61c652b2789b3c636c0ee5bc88fe803582",
+        "classes8.dex": "d8212ed318b43e9381e14efcd64d5cfd14d8865607f29c35ca94d8cd8eb0eadc",
+        "classes13.dex": "5c73add5bfd864b4357b9328099f4cae23ebcd134ebbadc7e7ebb5b6611bc46f",
+        "classes3.dex": "03b3a2fb3725028f7056c009572c898690374231c3bb55c9156cb9d46358743f",
+        "classes.dex": "2c710bc59a568c1f6337518ad523724af5116116e6e00e1a049ec60a1612d5c9",
+        "classes9.dex": "33b15995dafb7bbc3dea8159b87424c8ef472b88ee66cdd506bf833091aa8d0a",
+        "classes18.dex": "ce01e3a1862e7070691fd2470729610d3fdfbde5ce761d08885e2a90fa822dbc",
+        "classes4.dex": "68f78d368c8051dc69cf689a3e4703c0c421740c29ca44af292e72243684216c",
+        "classes5.dex": "2dfd7b56b9aff0bf98dc4eb03768cb1056cc22943eb4ef5ebb307a0339e0cb4d",
+        "classes14.dex": "d8e4a689557d79e45a9eedc6a8f0cfb65637071febaa3a7ba5ef36f2670a2c7a",
+        "classes19.dex": "7e50fa98892869665a8bfa8f3e1c846793443a882bd6883e89d39d23086e8f4f"
+      }
+    }
+  ],
+  "hardware_validation": "not performed; GATE-087, GATE-082 and GATE-086 remain open",
+  "navigator_payload_change": {
+    "changed": [
+      "classes19.dex"
+    ],
+    "unchanged_count": 17226,
+    "badging_identical_to_previous": true
+  }
+}

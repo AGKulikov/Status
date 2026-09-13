@@ -1,0 +1,29 @@
+{
+  "schema": "natro-visibility-recovery-release-build/v1",
+  "status": "success",
+  "source_commit": "15dd69166f96d2cc2311c251c59acd0ac3493c45",
+  "source_tree": "ddca621f9b37ccc794226ab7c025743b4ba404d5",
+  "workflow_run": 34756328599,
+  "workflow_url": "https://github.com/AGKulikov/Status/actions/runs/34756328599",
+  "unit_tests": {
+    "suites": 369,
+    "tests": 1881,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "tool_tests": {
+    "tests": 114,
+    "failures": 0,
+    "errors": 0
+  },
+  "archives_sha256": {
+    "Natro-2.9.0-signed-pair.zip": "05f1c26c218589f9c7b8cde9a839d8936c2ba9329d7fb7eb326ba8721dadecf0",
+    "Natro-2.9.0-unit-tests.zip": "e3e9812d4bf1b1706e0ffaa5de07b365f275cdebabf34f89a717a78fdf7a0fbc"
+  },
+  "artifact_ids": {
+    "signed_pair": 10318061690,
+    "unit_tests": 10317278845
+  },
+  "hardware_validation": "not performed; white startup frame may return"
+}
