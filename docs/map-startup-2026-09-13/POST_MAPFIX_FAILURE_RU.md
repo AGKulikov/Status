@@ -54,3 +54,13 @@ getRenderObjectCount. Эти объявления доступны с нужны
 python3 -m unittest tools.tests.test_map_check_collector -v
 python3 tools/geely-map-check/build_bundle.py /tmp/Natro-Map-Check-macOS-v1.0.0.zip
 ```
+
+## Выданный комплект
+
+`Natro-Map-Check-macOS-v1.0.0.zip`, 16259 байт, SHA-256
+`7d45e79ebfd38d95202ea639be72300e16b4b7c45f16ffc2ca61f1919f28abee`. Все пять файлов запуска
+равны опубликованному commit `cfd750d67affd1f6aa5f480512ec370e5560c59a`,
+tree `d7b743d36fe0dfb0734968f38f4231eb6e85cae6`. Проверены CRC,
+манифест и executable mode. [Машинный протокол](map-collector-1.0.0-release.json).
+На Mac открыть `Collect-Maps.command` при текущем отказе; прислать ZIP с рабочего
+стола даже при частичном сборе. Аппаратный запуск сборщика ещё не получен.

@@ -1,0 +1,48 @@
+{
+  "schema": "natro-map-check-release-v1",
+  "artifact": "Natro-Map-Check-macOS-v1.0.0.zip",
+  "bytes": 16259,
+  "sha256": "7d45e79ebfd38d95202ea639be72300e16b4b7c45f16ffc2ca61f1919f28abee",
+  "source_commit": "cfd750d67affd1f6aa5f480512ec370e5560c59a",
+  "source_tree": "d7b743d36fe0dfb0734968f38f4231eb6e85cae6",
+  "files": [
+    {
+      "path": "Collect-Maps.command",
+      "bytes": 1016,
+      "sha256": "1ef64532b6ab2b655e279484087d1b1b57c35fa805495b6599d70f86ab32cc2e",
+      "source": "tools/geely-map-check/Collect-Maps.command"
+    },
+    {
+      "path": "README_RU.md",
+      "bytes": 3904,
+      "sha256": "10db9412c5cda337e411f023070ac36dd2112238891db0f76db9ea57c1f75b10",
+      "source": "tools/geely-map-check/README_RU.md"
+    },
+    {
+      "path": "audit_saved_pcaps.py",
+      "bytes": 6213,
+      "sha256": "9c706ea028695414987875f333fa5b4320ab5aa554374917ee47ab56e3e393f8",
+      "source": "tools/geely-trip2/audit_saved_pcaps.py"
+    },
+    {
+      "path": "collect_maps.py",
+      "bytes": 10679,
+      "sha256": "1f8aa6969d98ed52ab1376a8e5237273a012ce8b149d8c03e9a5b2bc6665d17b",
+      "source": "tools/geely-map-check/collect_maps.py"
+    },
+    {
+      "path": "collect_trip_screens.py",
+      "bytes": 16421,
+      "sha256": "73dca2a575f50f395cf92fe4534631676d03adf6f4b8bbb4822eed6d8ce23c9c",
+      "source": "tools/geely-trip2/collect_trip_screens.py"
+    }
+  ],
+  "verified": {
+    "zip_crc": true,
+    "all_five_runtime_files_equal_published_source": true,
+    "launcher_executable_mode": true,
+    "offline_collector_tests_passed": 8,
+    "packaged_launcher_path_with_spaces_test": true
+  },
+  "hardware_result": "Not yet run on KX11; this artifact collects diagnostics and does not fix map startup"
+}
