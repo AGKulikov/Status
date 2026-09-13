@@ -2730,7 +2730,9 @@ final class GeelyCarIntegration implements CarIntegration {
                 sample.distanceRaw);
         float averageSpeed = CurrentTripMetrics.averageSpeedKmh(
                 sample.averageSpeedRaw, sample.speedUnitRaw);
-        float duration = CurrentTripMetrics.durationMinutes(distance, averageSpeed);
+        // Rounded indicated speed cannot reconstruct the stock Trip 2 timer.
+        // Keep the estimate in explicit diagnostics only; invalidate any old displayed value.
+        float duration = Float.NaN;
         long observedAt = Math.max(0L, System.currentTimeMillis()
                 - ageNanos / 1_000_000L);
         invalidateUnavailableTripFields(subscription, distance, duration, averageSpeed);
@@ -2763,7 +2765,9 @@ final class GeelyCarIntegration implements CarIntegration {
                 sample.distanceRaw);
         float averageSpeed = CurrentTripMetrics.averageSpeedKmh(
                 sample.averageSpeedRaw, sample.speedUnitRaw);
-        float duration = CurrentTripMetrics.durationMinutes(distance, averageSpeed);
+        // Rounded indicated speed cannot reconstruct the stock Trip 2 timer.
+        // Keep the estimate in explicit diagnostics only; invalidate any old displayed value.
+        float duration = Float.NaN;
         long observedAt = sample.observedAtElapsedNanos;
         if (subscription.metricIds.contains(CurrentTripMetrics.DISTANCE_ID)) {
             deliverRealtimeTelemetry(subscription, CurrentTripMetrics.DISTANCE_ID,
