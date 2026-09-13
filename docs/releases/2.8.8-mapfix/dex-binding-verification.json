@@ -1,0 +1,31 @@
+{
+  "renderer_calls": [
+    {
+      "caller": "startRenderer",
+      "instruction": "invoke-static v8, v9, Lru/natro/navigation/MapLoadedListenerBinding;->set(Ljava/lang/Object; Ljava/lang/Object;)V"
+    },
+    {
+      "caller": "stopRenderer",
+      "instruction": "invoke-static v1, v2, Lru/natro/navigation/MapLoadedListenerBinding;->set(Ljava/lang/Object; Ljava/lang/Object;)V"
+    }
+  ],
+  "binding": [
+    "invoke-virtual v3, Ljava/lang/Object;->getClass()Ljava/lang/Class;",
+    "move-result-object v0",
+    "const-class v1, Ljava/lang/ref/WeakReference;",
+    "filled-new-array v1, [Ljava/lang/Class;",
+    "move-result-object v1",
+    "const-string v2, \"setMapLoadedListener\"",
+    "invoke-static v0, v2, v1, Lru/natro/navigation/ReflectMethods;->publicMethod(Ljava/lang/Class; Ljava/lang/String; [Ljava/lang/Class;)Ljava/lang/reflect/Method;",
+    "move-result-object v0",
+    "new-instance v1, Ljava/lang/ref/WeakReference;",
+    "invoke-direct v1, v4, Ljava/lang/ref/WeakReference;-><init>(Ljava/lang/Object;)V",
+    "filled-new-array v1, [Ljava/lang/Object;",
+    "move-result-object v4",
+    "invoke-virtual v0, v3, v4, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object; [Ljava/lang/Object;)Ljava/lang/Object;",
+    "return-void "
+  ],
+  "hello": [
+    "const-wide/32 v3, 114663"
+  ]
+}

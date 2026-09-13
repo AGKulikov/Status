@@ -1,0 +1,84 @@
+{
+  "schema": "natro-navigator-mapfix-release-v1",
+  "source_commit": "844e22a0acec8331a32faf13880843dbedebc297",
+  "source_tree": "e318db746af5711d6aa506f32ba25a258d5840e3",
+  "filename": "Navigator-30.3.0-Natro-2.8.8-mapfix-signed.apk",
+  "size_bytes": 155145635,
+  "sha256": "1bb5ba22cd2a60726414779fa9d8ebb37973ee756f4e9f401f9efc5bc63da4a2",
+  "package_fields": {
+    "name": "ru.yandex.yandexnavi",
+    "versionCode": "739564630",
+    "versionName": "30.3.0",
+    "platformBuildVersionName": "16",
+    "platformBuildVersionCode": "36",
+    "compileSdkVersion": "36",
+    "compileSdkVersionCodename": "16"
+  },
+  "min_sdk": "26",
+  "native_abis": [
+    "arm64-v8a"
+  ],
+  "signer_cert_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signature_schemes": [
+    "v2",
+    "v3"
+  ],
+  "signer_count": 1,
+  "zipalign_16k": true,
+  "zip_crc_pass": true,
+  "baseline_sha256": "663018fb66074e001eed7caba8e33bee1bcf78f6798bc84949d253dcb348f27f",
+  "protected_baseline_entries": 17222,
+  "previous_navigator_sha256": "d2620fc5dae6ef05a26aa079ea3d272e498b6a6e0b4d765add772fcf9730a70f",
+  "changed_payload_entries_from_previous": [
+    "classes19.dex"
+  ],
+  "unchanged_payload_entries_from_previous": 17226,
+  "badging_identical_to_previous": true,
+  "entry_sha256": {
+    "AndroidManifest.xml": "1e8d52eadd9f9561bc76cbeb6f22017d537af8b5eff8803e759be0694f8172e3",
+    "classes4.dex": "68f78d368c8051dc69cf689a3e4703c0c421740c29ca44af292e72243684216c",
+    "classes8.dex": "d8212ed318b43e9381e14efcd64d5cfd14d8865607f29c35ca94d8cd8eb0eadc",
+    "classes12.dex": "5f618db97dfa9d9e76ebdae849be9d3c251e79ec90bc853703cc7b4ed0620b23",
+    "classes19.dex": "7858bbec73e0b462f492bd2e91232050defd91bb167e5dd37a3ea5064a503184"
+  },
+  "hardware_validation": "not performed; GATE-082 remains open",
+  "protocol_capabilities": 114663,
+  "cap_map_content_ready": 65536,
+  "compatible_natro": {
+    "version_name": "2.8.8",
+    "version_code": 208021321,
+    "sha256": "bcbfd5c0fc044d309ada196cc260d7459f89f9956466005bf98d8e4ca1e1db3b",
+    "new_natro_built": false,
+    "basis": "Existing released artifact and unchanged messages 21/22 with generation/session ACK; physical install and rendering pending"
+  },
+  "toolchain": {
+    "java": "OpenJDK 17.0.20",
+    "javac": "com.sun.tools.javac.Main from the same JDK",
+    "platform": "android-36 revision 2",
+    "build_tools": "36.0.0",
+    "d8_min_api": 28,
+    "javac_source_target": 8,
+    "verified_downloads": [
+      {
+        "name": "platform-36_r02.zip",
+        "sha1": "2c1a80dd4d9f7d0e6dd336ec603d9b5c55a6f576",
+        "size": 65878410,
+        "url": "https://dl.google.com/android/repository/platform-36_r02.zip",
+        "sha256": "37607369a28c5b640b3a7998868d45898ebcb777565a0e85f9acf36f29631d2e"
+      },
+      {
+        "name": "build-tools_r36_linux.zip",
+        "sha1": "b0b6376977657e8ad9b969bacf4093601da2c6fb",
+        "size": 63737259,
+        "url": "https://dl.google.com/android/repository/build-tools_r36_linux.zip",
+        "sha256": "5d9ac77fb6ff43d9da518a337b4fcf8f9097113df531d99ccefe80ef7ce8250b"
+      },
+      {
+        "name": "apktool_3.0.3.jar",
+        "sha256": "dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423",
+        "url": "https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar",
+        "size": 15478013
+      }
+    ]
+  }
+}

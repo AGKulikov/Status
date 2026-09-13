@@ -8,13 +8,13 @@ import zipfile
 
 FILES = ('Collect-Trip-Screens.command', 'collect_trip_screens.py',
          'audit_saved_pcaps.py', 'SCREEN_CHECK_RU.md')
-DIRECTORY = 'Natro-Trip-Check-macOS-v1.0.0'
+DIRECTORY = 'Natro-Trip-Check-macOS-v1.0.1'
 
 
 def build(destination, source=None):
     source = Path(source or Path(__file__).resolve().parent)
     payloads = {name: (source / name).read_bytes() for name in FILES}
-    manifest = {'schema': 'natro-trip-screen-bundle-v1', 'version': '1.0.0',
+    manifest = {'schema': 'natro-trip-screen-bundle-v1', 'version': '1.0.1',
                 'sources': 'AGKulikov/Status tools/geely-trip2',
                 'files': [{'path': name, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
                           for name, data in sorted(payloads.items())]}

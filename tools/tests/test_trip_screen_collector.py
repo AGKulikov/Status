@@ -65,8 +65,8 @@ if args == ['devices']:
     if os.environ.get('TRIP_TEST_MULTIPLE'):
         print('second-device\tdevice')
     raise SystemExit(0)
-assert args[:3] == ['-s', os.environ.get('TRIP_TEST_SERIAL', 'fake-kx11:5555'), 'exec-out'], args
-outer = shlex.split(args[3])
+assert args[:4] == ['-s', os.environ.get('TRIP_TEST_SERIAL', 'fake-kx11:5555'), 'shell', '-T'], args
+outer = shlex.split(args[4])
 command = outer[-1]
 tokens = shlex.split(command)
 if command == 'id -u':
@@ -74,6 +74,14 @@ if command == 'id -u':
         print('permission denied', file=sys.stderr)
         raise SystemExit(1)
     print('0' if outer[0] == 'su' else '2000')
+elif 'natro-trip-stderr-probe' in command:
+    sys.stdout.buffer.write(b'\x01\x00\xff\n')
+    sys.stdout.buffer.flush()
+    if os.environ.get('TRIP_TEST_MERGED_STDERR'):
+        print('natro-trip-stderr-probe')
+    else:
+        print('natro-trip-stderr-probe', file=sys.stderr)
+    raise SystemExit(0 if os.environ.get('TRIP_TEST_LOST_EXIT_CODE') else 17)
 elif command == 'toybox timeout 2 true':
     pass
 elif command.startswith('if [ -x /system/xbin/tcpdump'):
@@ -142,7 +150,7 @@ class TripScreenCollectorTests(unittest.TestCase):
             self.assertEqual(point['observation']['first']['time_words'], [1, 600, 0, 0])
             self.assertEqual(point['observation']['last']['time_words'], [1, 619, 0, 0])
             self.assertEqual(point['observation']['distance_raw_values'], [1234567])
-        commands = [shlex.split(c[-1])[-1] for c in self.commands() if 'exec-out' in c]
+        commands = [shlex.split(c[-1])[-1] for c in self.commands() if 'shell' in c]
         captures = [shlex.split(c) for c in commands if c.startswith('toybox timeout 30 ')]
         self.assertEqual(len(captures), 2)
         for command in captures:
@@ -152,6 +160,22 @@ class TripScreenCollectorTests(unittest.TestCase):
                          'and src port 50500 and dst port 50335 and udp[8:4] = 0x006e00c8')
         for dangerous in ('pkill', 'killall', 'setprop', 'service call', 'install ', 'push ', 'reboot'):
             self.assertFalse(any(dangerous in c for c in commands), dangerous)
+
+    def test_merged_device_stderr_stops_before_binary_capture(self):
+        self.env['TRIP_TEST_MERGED_STDERR'] = '1'
+        run, report, _ = self.run_collector()
+        self.assertEqual(run.returncode, 3)
+        self.assertIn('отдельный stderr', report['error'])
+        self.assertEqual(report['points'], [])
+        self.assertNotIn('tcpdump', self.log.read_text())
+
+    def test_missing_remote_exit_status_stops_before_binary_capture(self):
+        self.env['TRIP_TEST_LOST_EXIT_CODE'] = '1'
+        run, report, _ = self.run_collector()
+        self.assertEqual(run.returncode, 3)
+        self.assertIn('код выхода', report['error'])
+        self.assertEqual(report['points'], [])
+        self.assertNotIn('tcpdump', self.log.read_text())
 
     def test_unknown_firmware_keeps_bytes_without_decoded_fields(self):
         self.env['TRIP_TEST_DIGEST'] = 'a' * 64

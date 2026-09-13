@@ -22,7 +22,7 @@ import zipfile
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from audit_saved_pcaps import audit_capture
 
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 EXPECTED_VHAL = 'b6feed82f777bfa8773c03b78c1f17038e122f492ef85126c095354a29c16756'
 VHAL_PATHS = ('/system/vendor/lib64/vhal_v1_0_net_impl-lib.so',
               '/vendor/lib64/vhal_v1_0_net_impl-lib.so')
@@ -129,7 +129,9 @@ class Adb:
     def command(self, script, privileged=False):
         # The entire remote shell program is one ADB argument; all variable tokens are quoted.
         prefix = 'su 0 sh -c ' if privileged and not self.root else 'sh -c '
-        return [self.executable, '-s', self.serial, 'exec-out', prefix + shlex.quote(script)]
+        # exec-out merges device stderr into the binary stream on the observed KX11.
+        # shell -T uses no PTY and retains shell-v2 stream/exit-code separation.
+        return [self.executable, '-s', self.serial, 'shell', '-T', prefix + shlex.quote(script)]
 
     def text(self, script, privileged=False, timeout=12):
         data, err, code = bounded(self.command(script, privileged), timeout)
@@ -141,6 +143,10 @@ class Adb:
         self.root = self.text('id -u') == '0'
         if self.text('id -u', True) != '0':
             raise CollectionError('Недоступен прежний root-доступ для пассивного tcpdump')
+        probe = "printf '\\001\\000\\377\\012'; printf 'natro-trip-stderr-probe\\n' >&2; exit 17"
+        data, error, code = bounded(self.command(probe, True))
+        if data != b'\x01\x00\xff\n' or error != 'natro-trip-stderr-probe\n' or code != 17:
+            raise CollectionError('ADB не сохраняет бинарные данные, отдельный stderr и код выхода; запись не начата')
         self.text('toybox timeout 2 true', True)
         tcpdump = self.text(
             'if [ -x /system/xbin/tcpdump ]; then echo /system/xbin/tcpdump; '

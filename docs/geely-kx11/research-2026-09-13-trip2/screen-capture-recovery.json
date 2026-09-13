@@ -1,0 +1,194 @@
+{
+  "schema": "kx11-trip-screen-recovery-v1",
+  "archive": "Natro-Trip-Check-20260913-113103-9f194d.zip",
+  "archive_sha256": "d0c27bc08dc766bc94c41b3c7dee688641be5de1f1088678b7d5184a6d5146ba",
+  "archive_bytes": 5605,
+  "native_sha256_from_collector_receipt": "b6feed82f777bfa8773c03b78c1f17038e122f492ef85126c095354a29c16756",
+  "original_collector_status": "partial",
+  "method": "Retain the original global header and all 20 original packet records; remove only the exact observed tcpdump banner and zero-drop footer.",
+  "captures": [
+    {
+      "file": "trip2.pcap",
+      "source_bytes": 15903,
+      "source_sha256": "5200e4e06b61c182e6146776ebf56410db5dcf5127a5d4aa38e0389caa15cbe6",
+      "recovered_bytes": 15744,
+      "recovered_sha256": "bc828c468dc6273588c2d91723fe988a267039367be458880165ed5dbd332236",
+      "retained_source_ranges_half_open": [
+        [
+          0,
+          24
+        ],
+        [
+          105,
+          15825
+        ]
+      ],
+      "removed_spans": [
+        {
+          "start": 24,
+          "bytes": 81,
+          "text": "tcpdump: listening on eth0, link-type EN10MB (Ethernet), capture size 1024 bytes\n"
+        },
+        {
+          "start": 15825,
+          "bytes": 78,
+          "text": "20 packets captured\n20 packets received by filter\n0 packets dropped by kernel\n"
+        }
+      ],
+      "ipv4_checksums_valid": 20,
+      "udp_checksums_present_and_valid": 20,
+      "observation": {
+        "link_type": 1,
+        "counts": {
+          "packet_records": 20,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 20
+        },
+        "first": {
+          "time_words": [
+            1,
+            104311,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            3278504,
+            0,
+            0
+          ],
+          "packet": 1,
+          "timestamp": 1789288276.86543
+        },
+        "last": {
+          "time_words": [
+            1,
+            104330,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            3278504,
+            0,
+            0
+          ],
+          "packet": 20,
+          "timestamp": 1789288295.925158
+        },
+        "elapsed_capture_seconds": 19.059727907180786,
+        "elapsed_raw_delta": 19,
+        "raw_time_units_per_second": 0.9968662770281057,
+        "distance_raw_values": [
+          3278504
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "file": "trip1.pcap",
+      "source_bytes": 15903,
+      "source_sha256": "4581d562bc0311cc9fd25c77634769769f42c145f04606a2e6a42ec86e7b93e4",
+      "recovered_bytes": 15744,
+      "recovered_sha256": "c5c84f46d20dc12cafbe8776238fa0ef886dc4370da8431b30e8421961aa34b2",
+      "retained_source_ranges_half_open": [
+        [
+          0,
+          24
+        ],
+        [
+          105,
+          15825
+        ]
+      ],
+      "removed_spans": [
+        {
+          "start": 24,
+          "bytes": 81,
+          "text": "tcpdump: listening on eth0, link-type EN10MB (Ethernet), capture size 1024 bytes\n"
+        },
+        {
+          "start": 15825,
+          "bytes": 78,
+          "text": "20 packets captured\n20 packets received by filter\n0 packets dropped by kernel\n"
+        }
+      ],
+      "ipv4_checksums_valid": 20,
+      "udp_checksums_present_and_valid": 20,
+      "observation": {
+        "link_type": 1,
+        "counts": {
+          "packet_records": 20,
+          "unparsed_tail_bytes": 0,
+          "trip_messages": 20
+        },
+        "first": {
+          "time_words": [
+            1,
+            104348,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            3278504,
+            0,
+            0
+          ],
+          "packet": 1,
+          "timestamp": 1789288313.925135
+        },
+        "last": {
+          "time_words": [
+            1,
+            104367,
+            0,
+            0
+          ],
+          "distance_words": [
+            1,
+            3278504,
+            0,
+            0
+          ],
+          "packet": 20,
+          "timestamp": 1789288332.857419
+        },
+        "elapsed_capture_seconds": 18.932284116744995,
+        "elapsed_raw_delta": 19,
+        "raw_time_units_per_second": 1.003576741339684,
+        "distance_raw_values": [
+          3278504
+        ],
+        "time_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "distance_encodings": [
+          [
+            1,
+            0,
+            0
+          ]
+        ]
+      }
+    }
+  ],
+  "limits": "Photo files have no EXIF timestamp. No automatic reset was captured. PA time is seconds; PA distance units and stock source remain unresolved."
+}
