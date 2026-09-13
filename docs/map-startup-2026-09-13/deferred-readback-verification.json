@@ -1,0 +1,22 @@
+{
+  "schema": "natro-deferred-map-frame-source-verification-v1",
+  "source_commit": "f48692a6385c67af5baef985cdcea01dea01bcdc",
+  "source_tree": "11ee25131588960fb1895b78dbdd52bdaa07b177",
+  "local_replay_tests_passed": 17,
+  "new_deferred_readback_replays": 6,
+  "navigator_java_sources_compiled": 36,
+  "ci": {
+    "run_id": 34752272383,
+    "head_sha": "f48692a6385c67af5baef985cdcea01dea01bcdc",
+    "conclusion": "success",
+    "url": "https://github.com/AGKulikov/Status/actions/runs/34752272383",
+    "scope": [
+      "Compile Natro and execute all local unit tests",
+      "Compile all Navigator bridge Java sources",
+      "Execute tool and production-policy regression tests",
+      "Verify no APK was produced"
+    ]
+  },
+  "apk_built": false,
+  "hardware_gate": "GATE-082 remains open; complete runtime cause not proven by the supplied capture"
+}

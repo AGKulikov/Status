@@ -86,7 +86,7 @@ MapLoadedListener остаётся одноразовым событием по�
 отказ очереди, потеря ACK и невалидные пиксели. С 11 прежними map/trip/binding
 проверками прошли 17 тестов. Модель проверяет контракт и lifecycle; она не
 воспроизводит GPU KX11 и не является аппаратной приёмкой. Все 36 Java-файлов
-Navigator скомпилированы с Android SDK. Проверка всего Natro выполняется в CI.
+Navigator скомпилированы с Android SDK. Полная проверка Natro и инструментов в CI завершилась успешно.
 
 ```bash
 python3 -m unittest tools.tests.test_deferred_map_frame_check tools.tests.test_map_regressions tools.tests.test_map_loaded_listener_binding -v
@@ -96,3 +96,13 @@ python3 -m unittest tools.tests.test_deferred_map_frame_check tools.tests.test_m
 добавляет состояния producer в журнал; исправленная WeakReference-регистрация
 сохранена. Новый APK пока не выпущен. Перед отдельным разрешением на APK исходники
 и проверки должны быть опубликованы; после установки GATE-082 остаётся обязательным.
+
+## Публикация и полный CI
+
+Исходники опубликованы в commit
+[`f48692a6385c67af5baef985cdcea01dea01bcdc`](https://github.com/AGKulikov/Status/commit/f48692a6385c67af5baef985cdcea01dea01bcdc),
+tree `11ee25131588960fb1895b78dbdd52bdaa07b177`; дерево равно локальному.
+[CI 34752272383](https://github.com/AGKulikov/Status/actions/runs/34752272383)
+успешно выполнил все unit-тесты и компиляцию Natro, компиляцию всех исходников
+Navigator, тесты инструментов и проверку отсутствия нового APK.
+[Машинный протокол](deferred-readback-verification.json). GATE-082 открыт.
