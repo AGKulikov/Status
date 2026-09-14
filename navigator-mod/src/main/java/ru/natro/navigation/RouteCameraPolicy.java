@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package ru.natro.navigation;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** Route membership and identity rules shared by camera inventory and rendering. */
 final class RouteCameraPolicy {
     private RouteCameraPolicy() {}
@@ -22,18 +25,30 @@ final class RouteCameraPolicy {
         return isControl(tag) || "POLICE".equals(tag);
     }
 
-    /** Only the category actually chosen by the stock provider may supply an extra plate. */
-    static String detailDrawableForStockResource(String name) {
-        if ("poi_alerts_lane_control_26".equals(name) || "pin_alerts_lane_control".equals(name)) {
-            return "new_pin_alerts_lanecamera_40";
+    /** A road speed value alone is not evidence that this event controls speed. */
+    static boolean showSpeed(List<String> tags, int speedLimit) {
+        return speedLimit > 0 && tags.contains("SPEED_CONTROL");
+    }
+
+    /**
+     * Navigator 30.3's PlatformIconsProvider composes camera controls separately from the
+     * max-priority ordinary-pin StyleProvider. LANE and ROAD_MARKING share its lane artwork;
+     * neither removes an independently present SPEED_CONTROL. Keep one copy of each plate.
+     */
+    static List<String> detailDrawables(List<String> tags) {
+        ArrayList<String> result = new ArrayList<>();
+        for (String tag : tags) {
+            String image = null;
+            if ("LANE_CONTROL".equals(tag) || "ROAD_MARKING_CONTROL".equals(tag)) {
+                image = "new_pin_alerts_lanecamera_40";
+            } else if ("CROSS_ROAD_CONTROL".equals(tag)) {
+                image = "new_pin_alerts_crossroad_camera_40";
+            } else if ("NO_STOPPING_CONTROL".equals(tag)) {
+                image = "new_pin_alerts_camera_stop_40";
+            }
+            if (image != null && !result.contains(image)) result.add(image);
         }
-        if ("poi_alerts_cross_road_control_26".equals(name) || "pin_alerts_cross_road_control".equals(name)) {
-            return "new_pin_alerts_crossroad_camera_40";
-        }
-        if ("poi_alerts_no_stopping_control_24".equals(name) || "pin_alerts_no_stopping_control".equals(name)) {
-            return "new_pin_alerts_camera_stop_40";
-        }
-        return null;
+        return result;
     }
 
     static boolean isAhead(int eventSegment, double eventFraction, int pointCount,

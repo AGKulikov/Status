@@ -242,6 +242,7 @@ public final class InstrumentPanelView extends FrameLayout
             removeCallbacks(coldLeaseRetry);
             DiagnosticJournal.infoAsync("cluster-map", "cluster surface updated; map shown, opacity="
                     + desiredMapAlpha + ", sent_generation=" + sentGeneration
+                    + ", texture_timestamp_ns=" + surfaceTexture.getTimestamp()
                     + ", producer_frame_ack=false, first_update_wait_ms="
                     + (android.os.SystemClock.uptimeMillis() - firstFrameWaitStarted));
         }

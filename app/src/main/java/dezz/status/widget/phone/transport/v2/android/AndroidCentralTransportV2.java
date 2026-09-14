@@ -173,6 +173,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         final ControlTransmit controlTransmit;
         final ControlCompletion controlCompletion;
         final byte[] carRemoteFrame;
+        final long startedElapsedMs = SystemClock.elapsedRealtime();
 
         PendingGattOperation(RawOperation type, BleRouteToken routeToken,
                              AncsRequestTokenV2 ancsRequest,
@@ -1476,6 +1477,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void subscribe(BleRouteToken token, RawOperation operation,
                            UUID serviceUuid, UUID characteristicUuid, boolean indication) {
         if (!readyForGattOperation(token) || pendingGatt != null) {
+            reportPlatformDiagnostic(token, "cccd_not_queued operation=" + operation
+                    + ", ownerReady=" + readyForGattOperation(token)
+                    + ", pending=" + (pendingGatt == null ? "none" : pendingGatt.type)
+                    + ", pendingAgeMs=" + (pendingGatt == null ? 0L
+                        : Math.max(0L, SystemClock.elapsedRealtime() - pendingGatt.startedElapsedMs)));
             postSubscription(token, operation, GattResultV2.TRANSIENT_FAILURE);
             return;
         }
@@ -1484,6 +1490,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         BluetoothGattDescriptor descriptor = characteristic == null ? null
                 : characteristic.getDescriptor(AncsProtocol.CLIENT_CONFIGURATION);
         if (characteristic == null || descriptor == null) {
+            reportPlatformDiagnostic(token, "cccd_not_queued operation=" + operation
+                    + ", reason=" + (characteristic == null ? "characteristic_missing" : "descriptor_missing"));
             postSubscription(token, operation, GattResultV2.TRANSIENT_FAILURE);
             return;
         }
@@ -1494,6 +1502,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             notificationSet = false;
         }
         if (!notificationSet) {
+            reportPlatformDiagnostic(token, "cccd_not_queued operation=" + operation
+                    + ", reason=setCharacteristicNotification_rejected");
             postSubscription(token, operation, GattResultV2.TRANSIENT_FAILURE);
             return;
         }
@@ -1510,7 +1520,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         if (!started) {
             pendingGatt = null;
+            reportPlatformDiagnostic(token, "cccd_not_queued operation=" + operation
+                    + ", reason=writeDescriptor_rejected");
             postSubscription(token, operation, GattResultV2.TRANSIENT_FAILURE);
+        } else {
+            reportPlatformDiagnostic(token, "cccd_queued operation=" + operation
+                    + ", indication=" + indication);
         }
     }
 
@@ -1555,6 +1570,17 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                     break;
                 case RETRY_WAIT:
                     apply(AndroidCentralRoute.retryElapsed(current, token, radioEnabled()));
+                    break;
+                case WAIT_ANCS_RETRY:
+                    PendingGattOperation pending = pendingGatt;
+                    if (pending != null && (pending.type == RawOperation.SUBSCRIBE_NOTIFICATION_SOURCE
+                            || pending.type == RawOperation.SUBSCRIBE_DATA_SOURCE)) {
+                        BleRouteTransition<AndroidCentralRoute.State> stalled =
+                                AndroidCentralRoute.stalledAncsAttSlot(current, pending.routeToken,
+                                        Math.max(0L, firedAt - pending.startedElapsedMs));
+                        if (stalled.accepted) { apply(stalled); break; }
+                    }
+                    apply(AndroidCentralRoute.deadline(current, token));
                     break;
                 default:
                     if (current.phase != AndroidCentralRoute.Phase.CONNECTING
@@ -2842,6 +2868,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 return IphoneTransportRecoveryStateV2.NO_OWNER;
             case WAIT_ANCS:
                 return IphoneTransportRecoveryStateV2.WAIT_SERVICE_CHANGED;
+            case WAIT_ANCS_RETRY:
+                return IphoneTransportRecoveryStateV2.PROGRESSING;
             case WAIT_AUTHORIZATION:
                 return IphoneTransportRecoveryStateV2.WAIT_AUTHORIZATION;
             case READY:
@@ -2872,6 +2900,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             case SUBSCRIBING_ROUTE_CONTROL: return IphoneTransportLifecycle.SUBSCRIBING;
             case SUBSCRIBING_TELEMETRY: return IphoneTransportLifecycle.SUBSCRIBING;
             case SUBSCRIBING_NOTIFICATION_SOURCE:
+            case WAIT_ANCS_RETRY:
             case SUBSCRIBING_DATA_SOURCE: return IphoneTransportLifecycle.SUBSCRIBING;
             case READY: return IphoneTransportLifecycle.READY;
             case RETRY_DRAINING:
@@ -3405,6 +3434,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         PendingGattOperation pending = pendingGatt;
         if (owner == null || owner.gatt != callbackGatt || pending == null
                 || pending.descriptor != descriptor) return;
+        reportPlatformDiagnostic(pending.routeToken == null ? owner.ownerToken : pending.routeToken,
+                "cccd_result operation=" + pending.type + ", androidStatus=" + status
+                        + ", result=" + GattResultV2.fromAndroidStatus(status)
+                        + ", elapsedMs=" + Math.max(0L,
+                                SystemClock.elapsedRealtime() - pending.startedElapsedMs));
         noteCacheSensitiveFailure(owner, status, "descriptor_write");
         if (pending.type == RawOperation.SUBSCRIBE_BATTERY_STATUS
                 || pending.type == RawOperation.SUBSCRIBE_BATTERY_LEVEL) {
@@ -3544,6 +3578,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             if (!ingressFrozen) acceptStandardBatteryValue(characteristic, value);
         } else if (SERVICE_CHANGED.equals(uuid)) {
             if (ingressFrozen) return;
+            if (state.phase == AndroidCentralRoute.Phase.WAIT_ANCS_RETRY && pendingGatt != null) {
+                resetCurrentOwner("Service Changed invalidated a timed-out raw ATT operation");
+                return;
+            }
             pendingGatt = null;
             apply(AndroidCentralRoute.serviceChanged(state, owner.ownerToken));
         } else if (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid) && ancsSession != null) {

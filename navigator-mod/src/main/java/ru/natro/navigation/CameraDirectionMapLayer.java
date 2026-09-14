@@ -574,9 +574,8 @@ final class CameraDirectionMapLayer {
     }
 
     /**
-     * One compact marker. A speed-only camera is one clean speed circle. When the same physical
-     * stock provider actually chooses lanes/crossroads/stopping, its matching 40dp plate is joined
-     * directly to that circle. Merely containing a lane tag is not sufficient.
+     * One compact marker: independently present controls compose its plates. A positive road
+     * speed does not add speed enforcement to a lane-only event, and speed does not discard lanes.
      */
     private int cameraDisplayDiameter() {
         float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
@@ -586,17 +585,19 @@ final class CameraDirectionMapLayer {
 
     private Bitmap createCameraBitmap(CameraMarker camera, int diameter) {
         float padding = Math.max(1f, diameter * .035f);
-        String detailDrawableName = detailDrawableName(camera.controlTags);
-        if (camera.speedLimit <= 0 && detailDrawableName == null) {
-            detailDrawableName = "new_pin_alerts_camera_40";
+        List<String> names = RouteCameraPolicy.detailDrawables(camera.controlTags);
+        boolean showSpeed = RouteCameraPolicy.showSpeed(camera.controlTags, camera.speedLimit);
+        recordStockPinChoice(camera.controlTags, names, showSpeed);
+        if (!showSpeed && names.isEmpty()) names.add("new_pin_alerts_camera_40");
+        ArrayList<Bitmap> details = new ArrayList<>();
+        for (String name : names) {
+            Bitmap detail = stockDrawableBitmap(name, diameter);
+            if (detail != null) details.add(detail);
         }
-        Bitmap detail = detailDrawableName == null
-                ? null : stockDrawableBitmap(detailDrawableName, diameter);
-        boolean showSpeed = camera.speedLimit > 0;
-        int overlap = showSpeed && detail != null
-                ? Math.max(1, Math.round(diameter * .08f)) : 0;
+        int parts = details.size() + (showSpeed ? 1 : 0);
+        int overlap = parts > 1 ? Math.max(1, Math.round(diameter * .08f)) : 0;
         int contentWidth = (showSpeed ? diameter : 0)
-                + (detail != null ? diameter : 0) - overlap;
+                + details.size() * diameter - Math.max(0, parts - 1) * overlap;
         if (contentWidth <= 0) contentWidth = diameter;
         int bitmapWidth = Math.max(1, (int) Math.ceil(contentWidth + padding * 2f));
         int bitmapHeight = Math.max(1, (int) Math.ceil(diameter + padding * 2f));
@@ -605,9 +606,11 @@ final class CameraDirectionMapLayer {
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         float cy = bitmapHeight * .5f;
-        float speedCx = padding + (detail == null ? 0f : diameter - overlap)
+        float speedCx = padding + details.size() * (diameter - overlap)
                 + diameter * .5f;
-        if (detail != null) canvas.drawBitmap(detail, padding, padding, paint);
+        for (int index = 0; index < details.size(); index++) {
+            canvas.drawBitmap(details.get(index), padding + index * (diameter - overlap), padding, paint);
+        }
         if (!showSpeed) return bitmap;
         float stroke = Math.max(2f, diameter * .085f);
         float radius = diameter * .5f - stroke * .5f;
@@ -648,13 +651,13 @@ final class CameraDirectionMapLayer {
         }
     }
 
-    private String detailDrawableName(List<String> tags) {
+    private void recordStockPinChoice(List<String> tags, List<String> plates, boolean showSpeed) {
         ArrayList<String> controls = new ArrayList<>();
         for (String tag : tags) if (RouteCameraPolicy.isControl(tag) && !controls.contains(tag)) controls.add(tag);
         Collections.sort(controls);
-        String key = controls.toString();
+        String key = controls.toString() + ":speed=" + showSpeed;
         if (stockCameraResources.containsKey(key)) {
-            return RouteCameraPolicy.detailDrawableForStockResource(stockCameraResources.get(key));
+            return;
         }
         String resourceName = null;
         try {
@@ -664,14 +667,13 @@ final class CameraDirectionMapLayer {
                 resourceName = context.getResources().getResourceEntryName(resource);
             }
         } catch (Exception unavailable) {
-            // Missing stock evidence never becomes an invented lane/crossroad plate.
+            // Ordinary-pin provider availability cannot change composite control semantics.
         }
-        // Seven unique control tags yield at most 128 combinations, including the empty set.
+        // Seven controls and a known/unknown limit yield at most 256 diagnostic combinations.
         stockCameraResources.put(key, resourceName);
-        NavigationBridgeClient.reportDiagnostic("camera-stock-choice controls=" + controls
-                + ", resource=" + resourceName + ", detail="
-                + RouteCameraPolicy.detailDrawableForStockResource(resourceName));
-        return RouteCameraPolicy.detailDrawableForStockResource(resourceName);
+        NavigationBridgeClient.reportDiagnostic("camera-presentation controls=" + controls
+                + ", ordinary_pin_resource=" + resourceName + ", speed_sign=" + showSpeed
+                + ", composite_plates=" + plates + ", policy=independent_controls");
     }
 
     private void clearVisual() {
@@ -801,6 +803,8 @@ final class CameraDirectionMapLayer {
                     }
                 }
             }
+            // Legacy HUD Speed frames omitted tags and supplied only the explicit camera limit.
+            if (tags.isEmpty() && speed > 0) tags.add("SPEED_CONTROL");
             ArrayList<Double> directions = new ArrayList<>(2);
             JSONArray directionArray = source.optJSONArray("directions");
             if (directionArray != null) {

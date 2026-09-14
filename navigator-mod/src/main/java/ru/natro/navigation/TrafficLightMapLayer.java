@@ -50,6 +50,7 @@ final class TrafficLightMapLayer {
     private long renderedStructureFingerprint = Long.MIN_VALUE;
     private long renderedVisualFingerprint = Long.MIN_VALUE;
     private boolean expiryPosted;
+    private String stockFailure = "";
 
     private final Runnable expire = new Runnable() {
         @Override public void run() {
@@ -265,7 +266,14 @@ final class TrafficLightMapLayer {
             List<NavigatorStatePublisher.TrafficLightFrame> values) throws Exception {
         try {
             applyStockYandexViews(values);
+            stockFailure = "";
         } catch (Throwable unavailable) {
+            String reason = unavailable.getClass().getSimpleName();
+            if (!reason.equals(stockFailure)) {
+                stockFailure = reason;
+                NavigationBridgeClient.reportDiagnostic("traffic-light-renderer stock_failed="
+                        + reason + ", fallback=compact, body_and_leg=one_texture");
+            }
             // Some 30.3.0 regional builds move the private Navigator view implementation while
             // preserving the public Windshield payload. Keep the compact signal+seconds contract
             // alive instead of deleting the complete traffic-light layer.
@@ -343,6 +351,7 @@ final class TrafficLightMapLayer {
             marker.iconStyle = style;
             marker.placement = placement;
             marker.footprints = footprints;
+            reportGeometry(marker, light, "stock", anchorX, anchorY);
         }
     }
 
@@ -387,7 +396,29 @@ final class TrafficLightMapLayer {
             marker.iconStyle = style;
             marker.placement = placement;
             marker.footprints = footprints;
+            reportGeometry(marker, light, "compact", texture.anchor.x, texture.anchor.y);
         }
+    }
+
+    /** Geometry changes only: countdown ticks must not flood the navigation IPC or journal. */
+    private void reportGeometry(Marker marker, NavigatorStatePublisher.TrafficLightFrame light,
+                                String renderer, float anchorX, float anchorY) {
+        MapOverlayPlacementCoordinator.Footprint selected = null;
+        for (MapOverlayPlacementCoordinator.Footprint footprint : marker.footprints) {
+            if (marker.placement.legName.equals(footprint.legName)) { selected = footprint; break; }
+        }
+        String signature = renderer + ":" + marker.placement.legName + ":"
+                + (selected == null ? "unknown" : selected.width + "x" + selected.height)
+                + ":" + anchorX + ":" + anchorY;
+        if (signature.equals(marker.geometrySignature)) return;
+        marker.geometrySignature = signature;
+        NavigationBridgeClient.reportDiagnostic("traffic-light-geometry renderer=" + renderer
+                + ", id=" + light.id
+                + ", leg=" + marker.placement.legName
+                + ", texture=" + (selected == null ? "unknown" : selected.width + "x" + selected.height)
+                + ", anchor=" + anchorX + "," + anchorY
+                + ", section=" + light.sectionType + ", signal=" + light.signal
+                + ", seconds=" + light.secondsLeft + ", body_and_leg=one_texture");
     }
 
     /** One texture, one anchor, one scale, including the pointer. */
@@ -493,16 +524,26 @@ final class TrafficLightMapLayer {
         Method setLeg = viewClass.getMethod("setLegPlacement", legClass);
         Method getSize = viewClass.getMethod("getSize", legClass);
         Method getAnchor = viewClass.getMethod("getAnchor");
+        Object texture = privateField(view, viewClass, "texture");
+        Object shadow = invoke(texture, "getShadow", new Class<?>[0]);
+        float shadowRadius = 0f, shadowX = 0f, shadowY = 0f;
+        if (shadow != null) {
+            shadowRadius = ((Number) invoke(shadow, "getRadius", new Class<?>[0])).floatValue();
+            PointF offset = (PointF) invoke(shadow, "getOffset", new Class<?>[0]);
+            if (offset != null) { shadowX = offset.x; shadowY = offset.y; }
+        }
         float safeScale = Math.max(.01f, textureScale);
         for (String legName : MapOverlayPlacementCoordinator.placementLegNames()) {
             Object leg = Enum.valueOf((Class<? extends Enum>) legClass, legName);
             Object size = getSize.invoke(view, leg);
             setLeg.invoke(view, leg);
             Object anchor = getAnchor.invoke(view);
-            int width = Math.max(1, Math.round(((Number) invoke(
-                    size, "getX", new Class<?>[0])).floatValue() * safeScale));
-            int height = Math.max(1, Math.round(((Number) invoke(
-                    size, "getY", new Class<?>[0])).floatValue() * safeScale));
+            // getSize includes the leg but excludes the shadow. getAnchor refers to the entire
+            // bitmap, so pairing it with the smaller size under-reserves the card and its tail.
+            int width = BalloonTextureBounds.pixels(((Number) invoke(
+                    size, "getX", new Class<?>[0])).floatValue(), shadowRadius, shadowX, safeScale);
+            int height = BalloonTextureBounds.pixels(((Number) invoke(
+                    size, "getY", new Class<?>[0])).floatValue(), shadowRadius, shadowY, safeScale);
             float anchorX = ((Number) invoke(
                     anchor, "getX", new Class<?>[0])).floatValue();
             float anchorY = ((Number) invoke(
@@ -701,6 +742,7 @@ final class TrafficLightMapLayer {
         Object view;
         Object imageProvider;
         Object iconStyle;
+        String geometrySignature = "";
         MapOverlayPlacementCoordinator.Placement placement;
         List<MapOverlayPlacementCoordinator.Footprint> footprints = Collections.emptyList();
 

@@ -144,6 +144,33 @@ public final class VisibilityReplay {
         sync.update(8L,2L,Collections.emptyList());check(layer.events.size()==80);
         sync.clearData();check(layer.events.isEmpty());
     }
+    static void cameraPlatesPreserveIndependentControls() {
+        List<String> speed=Arrays.asList("SPEED_CONTROL");
+        List<String> lane=Arrays.asList("LANE_CONTROL");
+        List<String> combined=Arrays.asList("LANE_CONTROL","SPEED_CONTROL");
+        check(RouteCameraPolicy.showSpeed(speed,110));
+        check(RouteCameraPolicy.detailDrawables(speed).isEmpty());
+        check(!RouteCameraPolicy.showSpeed(lane,110));
+        check(RouteCameraPolicy.detailDrawables(lane).equals(Arrays.asList("new_pin_alerts_lanecamera_40")));
+        check(RouteCameraPolicy.showSpeed(combined,110));
+        check(RouteCameraPolicy.detailDrawables(combined).equals(RouteCameraPolicy.detailDrawables(lane)));
+        // ROAD_MARKING and LANE select the same stock plate, never two overlapping copies.
+        List<String> all=Arrays.asList("ROAD_MARKING_CONTROL","SPEED_CONTROL","LANE_CONTROL",
+                "CROSS_ROAD_CONTROL","NO_STOPPING_CONTROL");
+        check(RouteCameraPolicy.detailDrawables(all).equals(Arrays.asList(
+                "new_pin_alerts_lanecamera_40","new_pin_alerts_crossroad_camera_40",
+                "new_pin_alerts_camera_stop_40")));
+        check(!RouteCameraPolicy.showSpeed(all,-1));
+        check(!RouteCameraPolicy.showSpeed(Arrays.asList("ROAD_MARKING_CONTROL"),110));
+        check(!RouteCameraPolicy.showSpeed(Collections.emptyList(),110));
+        Map<String,String> hiddenSpeed=new HashMap<>();
+        hiddenSpeed.put("LANE_CONTROL","ALWAYS");hiddenSpeed.put("SPEED_CONTROL","HIDDEN");
+        List<String> filtered=new RoadEventVisibility(hiddenSpeed,true).allowedTags(combined,true);
+        check(!RouteCameraPolicy.showSpeed(filtered,110));
+        check(RouteCameraPolicy.detailDrawables(filtered).equals(RouteCameraPolicy.detailDrawables(lane)));
+        check(combined.equals(Arrays.asList("LANE_CONTROL","SPEED_CONTROL")));
+        check(!RouteCameraPolicy.sameSourceIdentity("nearby-speed", "nearby-lane"));
+    }
     public static void main(String[] args)throws Exception { VisibilityReplay.class.getDeclaredMethod(args[0]).invoke(null); }
 }
 ''',
@@ -192,6 +219,7 @@ class NavigationEventVisibilityTest(unittest.TestCase):
     def test_snapshot(self): self.replay("profileIsSnapshotAndMixedTagsUseVisibleCategory")
     def test_all_events_and_retry(self): self.replay("allEventsSurviveMissingCaptionsAndRetryFailedSink")
     def test_route_membership(self): self.replay("routeMembershipIsExactAndClearsAtRouteEnd")
+    def test_camera_plates(self): self.replay("cameraPlatesPreserveIndependentControls")
 
 
 if __name__ == "__main__":

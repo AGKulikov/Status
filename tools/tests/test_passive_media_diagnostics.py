@@ -14,7 +14,9 @@ JAVA = ROOT / "app/src/main/java/dezz/status/widget"
 
 STUBS = {
     "android/os/SystemClock.java": """package android.os;
-public class SystemClock { public static long now=1000; public static long uptimeMillis(){return now;} }""",
+public class SystemClock { public static long now=1000; public static long uptimeMillis(){return now;}
+ public static long elapsedRealtime(){return now;} }""",
+    "android/content/pm/PackageManager.java": "package android.content.pm; public class PackageManager {public static final int PERMISSION_GRANTED=0;}",
     "android/os/Build.java": """package android.os;
 public class Build { public static class VERSION {public static int SDK_INT=28;} }""",
     "android/os/Process.java": """package android.os;
@@ -62,6 +64,7 @@ public class Context {
  public final MediaSessionManager manager=new MediaSessionManager();
  public BroadcastReceiver receiver;public Handler handler;public IntentFilter filter;public int flags;
  public Context getApplicationContext(){return this;}
+ public int checkSelfPermission(String name){return -1;}
  public Object getSystemService(String name){return manager;}
  public Intent registerReceiver(BroadcastReceiver r,IntentFilter f,String p,Handler h){
   receiver=r;filter=f;handler=h;return null;}
@@ -243,7 +246,7 @@ class PassiveMediaDiagnosticsTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory(prefix="natro-passive-media-")
         cls.folder = Path(cls.temp.name)
         sources = dict(STUBS)
-        for name in ("SteeringKeyDiagnostics", "MediaKeyObservation", "BoundedUtf8Tail", "ThreadDumpFormatter"):
+        for name in ("SteeringKeyDiagnostics", "MediaKeyObservation", "MediaKeySystemLog", "MediaKeyLogRecord", "BoundedUtf8Tail", "ThreadDumpFormatter"):
             sources[f"dezz/status/widget/diagnostics/{name}.java"] = (JAVA / f"diagnostics/{name}.java").read_text()
         sources["dezz/status/widget/diagnostics/PassiveMediaReplay.java"] = REPLAY
         paths = []

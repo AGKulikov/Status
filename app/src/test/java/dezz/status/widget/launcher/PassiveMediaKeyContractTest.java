@@ -46,6 +46,16 @@ public final class PassiveMediaKeyContractTest {
         assertFalse(input.contains("getPlaybackState("));
         assertTrue(observer.contains("unregisterReceiver(receiver)"));
         assertTrue(observer.contains("unregisterCallback(watch.callback)"));
+        String systemLog = read("app/src/main/java/dezz/status/widget/diagnostics/MediaKeySystemLog.java");
+        assertTrue(systemLog.contains("checkSelfPermission(\"android.permission.READ_LOGS\")"));
+        assertTrue(systemLog.contains("read_logs_not_granted"));
+        assertTrue(systemLog.contains("media-key-system-log"));
+        assertTrue(systemLog.contains("MediaKeyLogRecord.parse(line)"));
+        assertTrue(systemLog.contains("*:S"));
+        for (String forbidden : new String[]{"getevent", "Runtime.getRuntime(", "grantRuntimePermission(",
+                "sendBroadcast(", "dispatchMediaKeyEvent(", "su\",", "settings put"}) {
+            assertFalse(forbidden, systemLog.contains(forbidden));
+        }
     }
 
     @Test public void knownMainLooperBlockersStayOutsideTheInputLane() throws Exception {

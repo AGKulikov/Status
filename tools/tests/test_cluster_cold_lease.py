@@ -26,7 +26,7 @@ class ClusterColdLeaseTest(unittest.TestCase):
   static class os {static class SystemClock {static long uptimeMillis(){return 5000;}}}
   static class view {static class ViewGroup {static class LayoutParams {int width,height;}}}
  }
- static class SurfaceTexture {void setDefaultBufferSize(int w,int h){}}
+ static class SurfaceTexture {void setDefaultBufferSize(int w,int h){} long getTimestamp(){return 1000;}}
  static class Surface {boolean valid=true;Surface(SurfaceTexture t){} boolean isValid(){return valid;}void release(){valid=false;}}
  static class LayoutParams extends android.view.ViewGroup.LayoutParams {int leftMargin,topMargin;
   LayoutParams(int w,int h){width=w;height=h;}}

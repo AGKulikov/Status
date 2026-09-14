@@ -29,8 +29,8 @@ final class PhoneTelemetryStore {
     PhoneTelemetryStore(@NonNull Context context) {
         Context app = context.getApplicationContext();
         Context device = app.createDeviceProtectedStorageContext();
-        prefs = device.getSharedPreferences(app.getPackageName() + PREFS_SUFFIX,
-                Context.MODE_PRIVATE);
+        prefs = dezz.status.widget.RuntimeSnapshotPreferences.open(device,
+                app.getPackageName() + PREFS_SUFFIX);
     }
 
     @Nullable Record load(@NonNull String address, long nowWallMs) {

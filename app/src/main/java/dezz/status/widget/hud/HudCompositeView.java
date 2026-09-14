@@ -195,11 +195,15 @@ final class HudCompositeView extends FrameLayout
         // and bitmap heuristics can remain pending forever; neither may block presentation.
         if (awaitingFirstMapFrame && leasedTexture == texture && activeMap != null
                 && leasedSurface != null && leasedSurface.isValid()) {
+            long sentGeneration = NavigationHudEndpointService.sentMapGeneration(leasedSurface, false);
+            if (sentGeneration < 0L) return;
             awaitingFirstMapFrame = false;
             mapTexture.setAlpha(desiredMapAlpha);
             DiagnosticJournal.infoAsync("hud-map", "HUD surface updated; map shown, opacity="
                     + desiredMapAlpha + ", first_update_wait_ms="
-                    + (android.os.SystemClock.uptimeMillis() - firstFrameWaitStarted));
+                    + (android.os.SystemClock.uptimeMillis() - firstFrameWaitStarted)
+                    + ", sent_generation=" + sentGeneration
+                    + ", texture_timestamp_ns=" + texture.getTimestamp() + ", producer_frame_ack=false");
         }
     }
 

@@ -368,8 +368,8 @@ final class MediaBroadcastRepository {
                 Bitmap artwork = null;
                 try {
                     Context cacheContext = storage(context);
-                    SharedPreferences preferences = cacheContext.getSharedPreferences(
-                            PREFS, Context.MODE_PRIVATE);
+                    SharedPreferences preferences = dezz.status.widget.RuntimeSnapshotPreferences.open(
+                            cacheContext, PREFS);
                     File image = new File(cacheContext.getFilesDir(), ARTWORK_FILE);
                     PendingUpdate effective = new PendingUpdate(update, preferences);
                     String trackSignature = MediaArtworkPolicy.trackSignature(
@@ -402,7 +402,7 @@ final class MediaBroadcastRepository {
     @Nullable
     static State read(@NonNull Context rawContext) {
         Context context = storage(rawContext);
-        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences prefs = dezz.status.widget.RuntimeSnapshotPreferences.open(context, PREFS);
         if (!prefs.getBoolean("available", false)) return null;
         long observedWall = prefs.getLong("observed", 0L);
         long nowWall = System.currentTimeMillis();
@@ -457,7 +457,7 @@ final class MediaBroadcastRepository {
                                 @NonNull String trackSignature,
                                 @Nullable Bitmap artwork) {
         context = storage(context);
-        SharedPreferences preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences preferences = dezz.status.widget.RuntimeSnapshotPreferences.open(context, PREFS);
         File image = new File(context.getFilesDir(), ARTWORK_FILE);
         boolean oldArtworkAdvertised = preferences.getBoolean("hasArtwork", false);
         boolean oldHasArtwork = oldArtworkAdvertised && isArtworkFileValid(image);
@@ -583,7 +583,7 @@ final class MediaBroadcastRepository {
 
     private static void clearNow(@NonNull Context context) {
         context = storage(context);
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply();
+        dezz.status.widget.RuntimeSnapshotPreferences.open(context, PREFS).edit().clear().apply();
         deleteQuietly(new File(context.getFilesDir(), ARTWORK_FILE));
         deleteQuietly(new File(context.getFilesDir(), ARTWORK_FILE + ".tmp"));
         notifyChanged(context);

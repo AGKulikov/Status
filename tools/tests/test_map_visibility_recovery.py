@@ -40,7 +40,7 @@ class MapVisibilityRecoveryTests(unittest.TestCase):
         source = r'''import java.lang.reflect.*;
 public class MapVisibilityReplay {
  @interface NonNull {}
- static class SurfaceTexture {}
+ static class SurfaceTexture {long getTimestamp(){return 1000;}}
  static class Surface { boolean valid=true; boolean isValid(){return valid;} }
  static class View { float alpha; int writes; void setAlpha(float a){alpha=a;writes++;} }
  static class TextureView extends View {
@@ -136,9 +136,13 @@ public class MapVisibilityReplay {
  }
  static void localAllocationUpdateCannotRevealAnUnsentLease(){
   Cluster c=new Cluster();NavigationHudEndpointService.sent=false;
+  Hud h=new Hud();h.onSurfaceTextureUpdated(h.leasedTexture);
+  check(h.awaitingFirstMapFrame && h.mapTexture.alpha==0);
   c.onSurfaceTextureUpdated(c.mapTexture.surface);
   check(c.awaitingFirstMapFrame && c.mapView.alpha==0);
   NavigationHudEndpointService.sent=true;
+  h.onSurfaceTextureUpdated(h.leasedTexture);
+  check(!h.awaitingFirstMapFrame);
   c.onSurfaceTextureUpdated(c.mapTexture.surface);
   check(!c.awaitingFirstMapFrame && c.mapView.alpha==.43f);
  }

@@ -121,17 +121,13 @@ public class RoutePinsReplay {
   layer.configure(modes,true,false,false,100,100,20);
   layer.render(events("SPEED_CONTROL","POLICE"));check(map.collection.pins.size()==80);
  }
- static void cameraDetailFollowsActualStockChoiceNotPresenceOfLaneTag() throws Exception {
+ static void ordinaryPinChoiceDoesNotEraseCompositeControls() throws Exception {
   Stock stock=new Stock();stock.selectedImageId="resource:123";
   List<String> tags=Arrays.asList("SPEED_CONTROL","LANE_CONTROL","POLICE");
   check(RouteRoadEventMapLayer.selectedCameraImageId(stock,tags).equals("resource:123"));
   check(stock.tags.get(0).toString().equals("[SPEED_CONTROL, LANE_CONTROL]"));
-  check(RouteCameraPolicy.detailDrawableForStockResource("poi_alerts_speed_control_24")==null);
-  check(RouteCameraPolicy.detailDrawableForStockResource("poi_alerts_lane_control_26").equals("new_pin_alerts_lanecamera_40"));
-  check(RouteCameraPolicy.detailDrawableForStockResource("pin_alerts_cross_road_control").equals("new_pin_alerts_crossroad_camera_40"));
-  check(RouteCameraPolicy.detailDrawableForStockResource("poi_alerts_camera_pdd_24")==null);
-  check(RouteCameraPolicy.detailDrawableForStockResource(null)==null);
-  check(RouteCameraPolicy.detailDrawableForStockResource("unknown_lane_icon")==null);
+  check(RouteCameraPolicy.showSpeed(tags,110));
+  check(RouteCameraPolicy.detailDrawables(tags).equals(Arrays.asList("new_pin_alerts_lanecamera_40")));
   stock.selectedImageId="resource:456";
   check(RouteRoadEventMapLayer.selectedCameraImageId(stock,tags).equals("resource:456"));
   stock.rejected=true;check(RouteRoadEventMapLayer.selectedCameraImageId(stock,tags)==null);
@@ -157,4 +153,4 @@ class RouteEventMapLayerTest(unittest.TestCase):
  def test_two_displays_and_mixed_tags(self):self.replay('profilesAndMixedTagsStayIndependent')
  def test_camera_replacement_and_stock_failure(self):self.replay('cameraReplacementAndUnavailableStockNeverInventArtwork')
  def test_camera_alias_and_independent_police_accidents(self):self.replay('cameraPoliceAliasDoesNotSurviveOrHideIndependentEvents')
- def test_camera_detail_uses_selected_stock_artwork(self):self.replay('cameraDetailFollowsActualStockChoiceNotPresenceOfLaneTag')
+ def test_ordinary_pin_choice_preserves_composite(self):self.replay('ordinaryPinChoiceDoesNotEraseCompositeControls')

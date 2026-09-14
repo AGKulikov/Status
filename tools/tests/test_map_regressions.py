@@ -116,6 +116,19 @@ SOURCES = {
             }
           }
         }
+        static void shadowBoundsMatchRasterForEveryLeg(){
+          for(float w:new float[]{28,38,76,240,640})for(float r:new float[]{0,2,6})
+          for(float offset:new float[]{-8,0,3,12})for(float scale:new float[]{.5f,1,1.25f,2.5f}){
+            Rectangle2D original=new Rectangle2D.Float(0,0,w,38);
+            Rectangle2D shadow=new Rectangle2D.Float(offset-r,-r,w+2*r,38+2*r);
+            Rectangle2D union=original.createUnion(shadow);
+            int expected=Math.max(1,(int)(union.getWidth()*scale));
+            check(BalloonTextureBounds.pixels(w,r,offset,scale)==expected);
+          }
+          check(BalloonTextureBounds.pixels(120,6,0,1)==132);
+          check(BalloonTextureBounds.pixels(120,6,-8,1)==134);
+          check(BalloonTextureBounds.pixels(120,6,8,1)==134);
+        }
         static void allConsecutiveControls(){
           int count=0;for(int segment=0;segment<80;segment++){
             if(RouteCameraPolicy.isAhead(segment,.5,81,true,0,.1))count++; }
@@ -209,6 +222,7 @@ class MapRegressionTest(unittest.TestCase):
             "app/src/main/java/dezz/status/widget/car/Trip2PaObservation.java",
             "app/src/geely/java/dezz/status/widget/car/EcarxTrip2Access.java",
             "navigator-mod/src/main/java/ru/natro/navigation/BalloonGeometry.java",
+            "navigator-mod/src/main/java/ru/natro/navigation/BalloonTextureBounds.java",
             "navigator-mod/src/main/java/ru/natro/navigation/RouteCameraPolicy.java")]
         compiler = [shutil.which("javac")] if shutil.which("javac") else ["java", "com.sun.tools.javac.Main"]
         compiled = subprocess.run([*compiler, "-d", str(cls.directory), *files], capture_output=True, text=True)
@@ -225,7 +239,7 @@ class MapRegressionTest(unittest.TestCase):
 
 for package, cases in (
     ("dezz.status.widget.navigation.BootstrapReplay", ("blankFrames", "dayNightAndTransparentRoads", "startupSequence")),
-    ("ru.natro.navigation.MapRegressionReplay", ("connectedBalloons", "allConsecutiveControls")),
+    ("ru.natro.navigation.MapRegressionReplay", ("connectedBalloons", "shadowBoundsMatchRasterForEveryLeg", "allConsecutiveControls")),
     ("dezz.status.widget.car.Trip2Replay", ("partialAndUnavailable", "paObservationsStaySeparate")),
 ):
     for case in cases:

@@ -24,6 +24,7 @@ public final class AndroidCentralRoute {
     public static final long DISCOVERY_TIMEOUT_MS = 8_000L;
     public static final long PROOF_TIMEOUT_MS = 5_000L;
     public static final long CCCD_TIMEOUT_MS = 5_000L;
+    public static final long STALLED_ANCS_ATT_MS = 30_000L;
     public static final long STOP_TIMEOUT_MS = 4_000L;
     /** Lets Android P retire the replaced APK process's native client before a fresh registration. */
     public static final long STARTUP_QUIET_MS = 3_000L;
@@ -37,6 +38,8 @@ public final class AndroidCentralRoute {
     public static final int MAX_ATTEMPTS_PER_EPOCH = 6;
     private static final long[] SAME_OWNER_REASSERT_MS = {30_000L, 60_000L, 120_000L};
     private static final long[] REGISTERED_ERROR_REASSERT_MS = {1_000L, 3_000L};
+    /** Present ANCS with a transient CCCD failure needs no Service Changed indication. */
+    private static final long[] ANCS_SUBSCRIPTION_RETRY_MS = {1_000L, 3_000L, 10_000L, 30_000L, 60_000L};
     /** Two fast reassertions plus one stack-recovery window, then retire the proven wrapper. */
     private static final int REGISTERED_ERROR_RETIRE_AFTER_REASSERTIONS = 3;
 
@@ -54,6 +57,8 @@ public final class AndroidCentralRoute {
         SUBSCRIBING_DATA_SOURCE,
         WAIT_AUTHORIZATION,
         WAIT_ANCS,
+        /** The service exists; retry its failed subscription on the retained owner. */
+        WAIT_ANCS_RETRY,
         /** ANCS is absent and no Service Changed indication can make this link recoverable. */
         NEEDS_FRESH_LINK,
         READY,
@@ -503,6 +508,7 @@ public final class AndroidCentralRoute {
         if (state.phase == Phase.SUBSCRIBING_NOTIFICATION_SOURCE
                 || state.phase == Phase.SUBSCRIBING_DATA_SOURCE
                 || state.phase == Phase.WAIT_ANCS
+                || state.phase == Phase.WAIT_ANCS_RETRY
                 || state.phase == Phase.NEEDS_FRESH_LINK
                 || state.phase == Phase.READY) {
             return true;
@@ -521,7 +527,8 @@ public final class AndroidCentralRoute {
                 || state.activeOwnerId != ownerCallback.ownerId) {
             return BleRouteTransition.ignored(state);
         }
-        if (state.phase != Phase.WAIT_ANCS && state.phase != Phase.READY) {
+        if (state.phase != Phase.WAIT_ANCS && state.phase != Phase.WAIT_ANCS_RETRY
+                && state.phase != Phase.READY) {
             if (state.expected != null && handlesInFlight(state.phase)) {
                 return retry(state, state.expected,
                         "Service Changed invalidated an in-flight raw object");
@@ -538,6 +545,9 @@ public final class AndroidCentralRoute {
                 AuthorizationStep.NONE, 0, 0,
                 "Service Changed; rediscover same owner once");
         return BleRouteTransition.accepted(next,
+                op(BleRouteEffect.Type.CANCEL_DEADLINE,
+                        state.expected == null ? ownerCallback : state.expected,
+                        "Service Changed supersedes subscription recovery"),
                 op(BleRouteEffect.Type.RESET_SESSION_STATE, ownerCallback,
                         "ANCS epoch invalidated; clear all session-local data"),
                 op(BleRouteEffect.Type.DISCOVER_SERVICES, discover,
@@ -554,8 +564,6 @@ public final class AndroidCentralRoute {
             if (result == null || result == GattResultV2.TRANSIENT_FAILURE) {
                 return retryAncsSubscriptionOnSameOwner(state, token,
                         AuthorizationStep.NOTIFICATION_SOURCE_CCCD,
-                        Phase.SUBSCRIBING_NOTIFICATION_SOURCE,
-                        BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE,
                         "Notification Source", "transient Notification Source CCCD failure");
             }
             return gattFailure(state, token, result,
@@ -579,8 +587,6 @@ public final class AndroidCentralRoute {
             if (result == null || result == GattResultV2.TRANSIENT_FAILURE) {
                 return retryAncsSubscriptionOnSameOwner(state, token,
                         AuthorizationStep.DATA_SOURCE_CCCD,
-                        Phase.SUBSCRIBING_DATA_SOURCE,
-                        BleRouteEffect.Type.SUBSCRIBE_ANCS_DATA_SOURCE,
                         "Data Source", "transient Data Source CCCD failure");
             }
             return gattFailure(state, token, result, AuthorizationStep.DATA_SOURCE_CCCD);
@@ -644,18 +650,34 @@ public final class AndroidCentralRoute {
         if (state.expected == null || !state.expected.equals(token)) {
             return BleRouteTransition.ignored(state);
         }
+        if (state.phase == Phase.WAIT_ANCS_RETRY) {
+            boolean notification = state.authorizationStep
+                    == AuthorizationStep.NOTIFICATION_SOURCE_CCCD;
+            if (!notification && state.authorizationStep != AuthorizationStep.DATA_SOURCE_CCCD) {
+                return BleRouteTransition.ignored(state);
+            }
+            BleRouteToken operation = nextOperation(token);
+            if (operation == null) return counterExhausted(state, token, "operation");
+            State retrying = copyPolicy(state, notification
+                            ? Phase.SUBSCRIBING_NOTIFICATION_SOURCE : Phase.SUBSCRIBING_DATA_SOURCE,
+                    operation, token.ownerId, state.nextOwnerId, state.consecutiveFailures,
+                    state.authorizationStep, state.authorizationRetries,
+                    state.invalidHandleRediscoveries, "delayed same-owner ANCS subscription retry");
+            return BleRouteTransition.accepted(retrying,
+                    op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "subscription backoff elapsed"),
+                    op(notification ? BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE
+                            : BleRouteEffect.Type.SUBSCRIBE_ANCS_DATA_SOURCE, operation,
+                            "serialized CCCD retry; CONTROL/telemetry owner retained"),
+                    BleRouteEffect.deadline(operation, CCCD_TIMEOUT_MS));
+        }
         if (state.phase == Phase.SUBSCRIBING_NOTIFICATION_SOURCE) {
             return retryAncsSubscriptionOnSameOwner(state, token,
                     AuthorizationStep.NOTIFICATION_SOURCE_CCCD,
-                    Phase.SUBSCRIBING_NOTIFICATION_SOURCE,
-                    BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE,
                     "Notification Source", "Notification Source CCCD callback timeout");
         }
         if (state.phase == Phase.SUBSCRIBING_DATA_SOURCE) {
             return retryAncsSubscriptionOnSameOwner(state, token,
                     AuthorizationStep.DATA_SOURCE_CCCD,
-                    Phase.SUBSCRIBING_DATA_SOURCE,
-                    BleRouteEffect.Type.SUBSCRIBE_ANCS_DATA_SOURCE,
                     "Data Source", "Data Source CCCD callback timeout");
         }
         if (state.phase == Phase.CONNECTING) {
@@ -1126,44 +1148,46 @@ public final class AndroidCentralRoute {
         return retry(state, token, "transient GATT failure during " + step);
     }
 
+    /** Fences a connected owner whose old ANCS descriptor operation never completed. */
+    public static BleRouteTransition<State> stalledAncsAttSlot(
+            State state, BleRouteToken pendingSubscription, long pendingAgeMs) {
+        if (state == null || state.phase != Phase.WAIT_ANCS_RETRY || state.expected == null
+                || pendingSubscription == null || !state.expected.sameOwner(pendingSubscription)
+                || pendingSubscription.operationId >= state.expected.operationId
+                || pendingAgeMs < STALLED_ANCS_ATT_MS) return BleRouteTransition.ignored(state);
+        // A callback-less ATT write cannot be overwritten: a late callback has no operation ID
+        // on Android. Retire this connected owner via the normal teardown fence before retrying.
+        return retry(state, state.expected, "ANCS CCCD ATT slot stuck for " + pendingAgeMs
+                + " ms; retire exact owner before another descriptor operation");
+    }
+
     /**
-     * Android 9 can return one late transient result while enabling either mandatory ANCS CCCD,
-     * even though the authenticated CONTROL/telemetry owner is still usable. Re-serialize that
-     * exact operation once. A repeated failure stays explicitly down without closing the owner
-     * or manufacturing a false READY transition.
+     * A present service can reject its CCCD without ever emitting Service Changed. Pace retries
+     * on the authenticated owner: a short ladder, then once a minute. Missing ANCS and explicit
+     * authorization failures keep their separate event-driven policies; READY is never implied.
      */
     private static BleRouteTransition<State> retryAncsSubscriptionOnSameOwner(
-            State state, BleRouteToken completed, AuthorizationStep step, Phase retryPhase,
-            BleRouteEffect.Type retryEffect, String sourceName, String reason) {
+            State state, BleRouteToken completed, AuthorizationStep step,
+            String sourceName, String reason) {
         int retries = state.authorizationStep == step
                 ? state.authorizationRetries : 0;
-        if (retries >= 1) {
-            State waiting = copyPolicy(state, Phase.WAIT_ANCS, null,
-                    completed.ownerId, state.nextOwnerId, state.consecutiveFailures,
-                    step, 1,
-                    state.invalidHandleRediscoveries,
-                    reason + "; exact owner retained for Service Changed recovery");
-            return BleRouteTransition.accepted(waiting,
-                    op(BleRouteEffect.Type.CANCEL_DEADLINE, completed,
-                            "bounded " + sourceName + " retry exhausted"),
-                    op(BleRouteEffect.Type.REPORT_ERROR, completed,
-                            reason + "; CONTROL/telemetry retained; ANCS remains down"),
-                    op(BleRouteEffect.Type.REPORT_DOWN, completed,
-                            "ANCS " + sourceName + " unavailable; wait for Service Changed"));
-        }
         BleRouteToken retry = nextOperation(completed);
         if (retry == null) return counterExhausted(state, completed, "operation");
-        State retrying = copyPolicy(state, retryPhase, retry,
+        int retryIndex = Math.min(retries, ANCS_SUBSCRIPTION_RETRY_MS.length - 1);
+        long delay = ANCS_SUBSCRIPTION_RETRY_MS[retryIndex];
+        State retrying = copyPolicy(state, Phase.WAIT_ANCS_RETRY, retry,
                 completed.ownerId, state.nextOwnerId, state.consecutiveFailures,
-                step, 1,
+                step, Math.min(retryIndex + 1, ANCS_SUBSCRIPTION_RETRY_MS.length),
                 state.invalidHandleRediscoveries,
-                reason + "; one same-owner retry");
+                reason + "; same-owner retry in " + delay + " ms");
         return BleRouteTransition.accepted(retrying,
                 op(BleRouteEffect.Type.CANCEL_DEADLINE, completed,
                         "serialize same-owner " + sourceName + " retry"),
-                op(retryEffect, retry,
-                        "one bounded " + sourceName + " CCCD retry on existing owner"),
-                BleRouteEffect.deadline(retry, CCCD_TIMEOUT_MS));
+                op(BleRouteEffect.Type.REPORT_ERROR, completed,
+                        reason + "; CONTROL/telemetry retained; retry armed"),
+                op(BleRouteEffect.Type.REPORT_DOWN, completed,
+                        "ANCS " + sourceName + " unavailable; autonomous subscription recovery"),
+                BleRouteEffect.deadline(retry, delay));
     }
 
     private static List<BleRouteEffect> closeEffects(State state, String reason) {
@@ -1334,6 +1358,7 @@ public final class AndroidCentralRoute {
                 || phase == Phase.SUBSCRIBING_TELEMETRY
                 || phase == Phase.SUBSCRIBING_NOTIFICATION_SOURCE
                 || phase == Phase.SUBSCRIBING_DATA_SOURCE || phase == Phase.WAIT_ANCS
+                || phase == Phase.WAIT_ANCS_RETRY
                 || phase == Phase.NEEDS_FRESH_LINK
                 || phase == Phase.WAIT_AUTHORIZATION
                 || phase == Phase.READY

@@ -39,6 +39,7 @@ public final class SteeringKeyDiagnostics {
     private final Handler input;
     private final Handler sessions;
     private final MediaKeyObservation observation = new MediaKeyObservation();
+    private final MediaKeySystemLog systemLog;
     private final List<Watch> watches = new ArrayList<>();
     private final ComponentName listener;
     private final MediaSessionManager manager;
@@ -59,9 +60,11 @@ public final class SteeringKeyDiagnostics {
     private final Runnable health = new Runnable() {
         @Override public void run() {
             if (!active) return;
+            systemLog.start();
             emit("stage=coverage, broadcasts_received=" + receivedCount
                     + ", input_rate_dropped=" + droppedCount + ", session_access=" + sessionAccess
                     + ", sessions=" + sessionCount
+                    + ", system_log=" + systemLog.coverage()
                     + ", system_dispatch=unobserved, audio_output=unobserved"
                     + ", explicit_or_aborted_broadcasts_may_be_invisible=true");
             input.postDelayed(this, HEALTH_MS);
@@ -141,6 +144,7 @@ public final class SteeringKeyDiagnostics {
 
     private SteeringKeyDiagnostics(Context context) {
         this.context = context.getApplicationContext();
+        systemLog = new MediaKeySystemLog(this.context, this::systemKeyObserved, this::emit);
         listener = new ComponentName(context, MediaNotificationListener.class);
         manager = (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE);
         HandlerThread inputThread = new HandlerThread("media-key-observer", Process.THREAD_PRIORITY_BACKGROUND);
@@ -216,6 +220,7 @@ public final class SteeringKeyDiagnostics {
                 refreshSessions.run();
             });
         } else {
+            systemLog.stop();
             if (receiverRegistered) {
                 try { context.unregisterReceiver(receiver); } catch (RuntimeException ignored) {}
                 receiverRegistered = false;
@@ -229,6 +234,24 @@ public final class SteeringKeyDiagnostics {
     }
 
     private boolean current(long expected) { return active && generation == expected; }
+
+    private void systemKeyObserved(MediaKeyLogRecord record) {
+        if (!active) return;
+        long now = SystemClock.uptimeMillis();
+        long sequence = 0L;
+        // Do not invent a key timestamp from the log reader's delivery time. Only complete
+        // KeyEvent fields can share the existing broadcast/session association window.
+        if (record.deviceId >= 0 && record.downTime > 0 && record.eventTime > 0
+                && record.eventTime <= now && now - record.eventTime <= 15_000L) {
+            sequence = observation.received(record.keyCode, record.deviceId, record.downTime,
+                    record.eventTime, record.action, record.repeat, now).sequence;
+        }
+        emit("stage=system_key_log, input_sequence=" + sequence + ", source_tag=" + record.tag
+                + ", source_time=" + record.timestamp + ", key_code=" + record.keyCode
+                + ", action=" + record.action + ", event_uptime_ms=" + record.eventTime
+                + ", observed_uptime_ms=" + now + ", log_delivery_ms=" + delay(now, record.eventTime)
+                + ", physical_origin=unverified, commands_sent=0, audio_ack=false");
+    }
 
     /** Worker-only: follows all observable sessions without selecting or controlling one. */
     private void replaceSessions(List<MediaController> controllers, long expected) {
