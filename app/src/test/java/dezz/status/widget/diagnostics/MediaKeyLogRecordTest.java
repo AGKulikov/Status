@@ -5,6 +5,28 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public final class MediaKeyLogRecordTest {
+    @Test public void virtualKeysAndSystemStagesRemainDistinctFromMissingFields() {
+        String header = "09-14 18:02:31.848  812  934 D MediaSessionService: ";
+        String event = "KeyEvent { action=ACTION_DOWN, keyCode=KEYCODE_MEDIA_NEXT, "
+                + "repeatCount=0, eventTime=802256, downTime=802256, deviceId=-1 }";
+        MediaKeyLogRecord entry = MediaKeyLogRecord.parse(header
+                + "dispatchMediaKeyEvent, pkg=private.package pid=735, uid=10027, asSystem=false, event=" + event);
+        assertNotNull(entry);
+        assertEquals("system_entry", entry.stage);
+        assertTrue(entry.deviceIdPresent);
+        assertEquals(-1, entry.deviceId);
+        assertEquals(812, entry.sourcePid); assertEquals(934, entry.sourceTid);
+        assertEquals(735, entry.callerPid); assertEquals(10027, entry.callerUid);
+        assertEquals(802256L, entry.eventTime);
+        assertEquals("session_send", MediaKeyLogRecord.parse(header + "Sending " + event + " to private.session").stage);
+        assertEquals("listener_forward", MediaKeyLogRecord.parse(header + "Send " + event + " to the media key listener").stage);
+        assertEquals("listener_timeout", MediaKeyLogRecord.parse(header + "The media key listener is timed-out for " + event).stage);
+        assertEquals("broadcast_send", MediaKeyLogRecord.parse(header + "Sending " + event + " to the last known PendingIntent private").stage);
+        MediaKeyLogRecord incomplete = MediaKeyLogRecord.parse(header + "keyCode=87 action=0");
+        assertFalse(incomplete.deviceIdPresent);
+        assertEquals("key_record", incomplete.stage);
+    }
+
     @Test public void standardSessionKeyCarriesOriginalUptimeWithoutCopyingMessage() {
         MediaKeyLogRecord record = MediaKeyLogRecord.parse("09-14 07:17:20.521  812  934 D MediaSessionService: "
                 + "Sending media key KeyEvent { action=ACTION_DOWN, keyCode=KEYCODE_MEDIA_NEXT, "

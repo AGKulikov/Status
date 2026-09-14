@@ -52,10 +52,29 @@ public final class PassiveMediaKeyContractTest {
         assertTrue(systemLog.contains("media-key-system-log"));
         assertTrue(systemLog.contains("MediaKeyLogRecord.parse(line)"));
         assertTrue(systemLog.contains("*:S"));
+        assertTrue(observer.contains("record.deviceIdPresent"));
+        assertTrue(observer.contains("event_age_ms="));
+        assertFalse(observer.contains("log_delivery_ms="));
+        assertTrue(observer.contains("after_system_sequence="));
+        assertTrue(observer.contains("systemObservation.clear()"));
         for (String forbidden : new String[]{"getevent", "Runtime.getRuntime(", "grantRuntimePermission(",
                 "sendBroadcast(", "dispatchMediaKeyEvent(", "su\",", "settings put"}) {
             assertFalse(forbidden, systemLog.contains(forbidden));
         }
+    }
+
+    @Test public void everyOrdinaryJournalProducerIsSeparatedFromDiskLock() throws Exception {
+        String journal = read("app/src/main/java/dezz/status/widget/diagnostics/DiagnosticJournal.java");
+        String record = between(journal, "public static void record(@NonNull Level", "public static void infoAsync");
+        String early = between(journal, "public static void recordEarly(", "private static void finishEarlyEntriesLocked");
+        assertTrue(record.contains("enqueueLocked("));
+        assertTrue(early.contains("enqueueLocked("));
+        assertFalse(record.contains("appendLocked("));
+        assertFalse(early.contains("appendLocked("));
+        assertFalse(record.contains("DISK_LOCK"));
+        assertFalse(journal.contains("CallerRunsPolicy"));
+        assertTrue(journal.contains("new ArrayBlockingQueue<>(128)"));
+        assertTrue(journal.contains("status-journal-writer"));
     }
 
     @Test public void knownMainLooperBlockersStayOutsideTheInputLane() throws Exception {

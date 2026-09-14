@@ -417,6 +417,7 @@ final class TrafficLightMapLayer {
                 + ", leg=" + marker.placement.legName
                 + ", texture=" + (selected == null ? "unknown" : selected.width + "x" + selected.height)
                 + ", anchor=" + anchorX + "," + anchorY
+                + ", usable_legs=" + marker.footprints.size()
                 + ", section=" + light.sectionType + ", signal=" + light.signal
                 + ", seconds=" + light.secondsLeft + ", body_and_leg=one_texture");
     }
@@ -512,7 +513,7 @@ final class TrafficLightMapLayer {
                 MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS, light.id,
                 light.latitude, light.longitude,
                 estimatedWidth, estimatedHeight, preferRight,
-                light.routeSegmentIndex, light.routeSegmentPosition, previous, footprints);
+                light.routeSegmentIndex, light.routeSegmentPosition, previous, footprints, true);
     }
 
     /** Uses the actual TrafficLightViewImpl bitmap and anchor for every stock leg. */
@@ -525,6 +526,10 @@ final class TrafficLightMapLayer {
         Method getSize = viewClass.getMethod("getSize", legClass);
         Method getAnchor = viewClass.getMethod("getAnchor");
         Object texture = privateField(view, viewClass, "texture");
+        Object params = privateField(view, viewClass, "balloonParams");
+        float radius = ((Number) invoke(params, "getCornerRadius", new Class<?>[0])).floatValue();
+        float halfBase = ((Number) invoke(params, "getWidthCenterLeg", new Class<?>[0])).floatValue()
+                * ((Number) invoke(texture, "getLegScale", new Class<?>[0])).floatValue() * .5f;
         Object shadow = invoke(texture, "getShadow", new Class<?>[0]);
         float shadowRadius = 0f, shadowX = 0f, shadowY = 0f;
         if (shadow != null) {
@@ -536,6 +541,8 @@ final class TrafficLightMapLayer {
         for (String legName : MapOverlayPlacementCoordinator.placementLegNames()) {
             Object leg = Enum.valueOf((Class<? extends Enum>) legClass, legName);
             Object size = getSize.invoke(view, leg);
+            float bodyHeight = ((android.view.View) view).getMeasuredHeight();
+            if (!StockTrafficLightLegPolicy.usable(legName, bodyHeight, radius, halfBase)) continue;
             setLeg.invoke(view, leg);
             Object anchor = getAnchor.invoke(view);
             // getSize includes the leg but excludes the shadow. getAnchor refers to the entire

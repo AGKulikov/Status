@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,7 +38,7 @@ import java.util.regex.Pattern;
 
 import dezz.status.widget.VersionGetter;
 
-/** Small crash-safe, privacy-filtered, cyclic journal shared by every runtime component. */
+/** Bounded, privacy-filtered cyclic journal. Only the exceptional crash path writes synchronously. */
 public final class DiagnosticJournal {
     public enum Level {
         DEBUG, INFO, WARN, ERROR;
@@ -77,6 +78,9 @@ public final class DiagnosticJournal {
     }
 
     private static final Object LOCK = new Object();
+    // Never acquire this from a normal producer or while holding LOCK. A slow write, rotation,
+    // read or export must not block Android broadcast delivery or the application main thread.
+    private static final Object DISK_LOCK = new Object();
     private static final long ROTATE_AT_BYTES = 1_500_000L;
     private static final int KEEP_TAIL_BYTES = 900_000;
     private static final int MAX_MESSAGE_CHARS = 16_000;
@@ -88,7 +92,7 @@ public final class DiagnosticJournal {
     private static final Pattern LONG_CREDENTIAL = Pattern.compile(
             "\\b[A-Za-z0-9_\\-+/=]{48,}\\b");
 
-    @Nullable private static Context appContext;
+    @Nullable private static volatile Context appContext;
     private static volatile boolean enabled;
     private static final int MAX_EARLY_ENTRIES = 64;
     private static final ArrayDeque<Entry> earlyEntries = new ArrayDeque<>();
@@ -97,7 +101,7 @@ public final class DiagnosticJournal {
     private static final AtomicInteger droppedAsyncEntries = new AtomicInteger();
     private static final ThreadPoolExecutor ASYNC = new ThreadPoolExecutor(0, 1,
             30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(128), task -> {
-                Thread thread = new Thread(task, "status-input-journal");
+                Thread thread = new Thread(task, "status-journal-writer");
                 thread.setDaemon(true);
                 return thread;
             }, (task, executor) -> droppedAsyncEntries.incrementAndGet());
@@ -117,7 +121,8 @@ public final class DiagnosticJournal {
                                    @NonNull String message) {
         synchronized (LOCK) {
             if (enabled) {
-                appendLocked(level, component, message);
+                enqueueLocked(level, component, message,
+                        System.currentTimeMillis(), SystemClock.elapsedRealtime());
             } else if (!initialPreferencesRead) {
                 if (earlyEntries.size() == MAX_EARLY_ENTRIES) earlyEntries.removeFirst();
                 String safe = sanitize(message);
@@ -132,7 +137,7 @@ public final class DiagnosticJournal {
         initialPreferencesRead = true;
         if (enabled) {
             for (Entry entry : earlyEntries) {
-                appendLocked(entry.level, entry.component, entry.message,
+                enqueueLocked(entry.level, entry.component, entry.message,
                         entry.timestamp, entry.uptimeMs);
             }
         }
@@ -146,8 +151,8 @@ public final class DiagnosticJournal {
             enabled = initiallyEnabled;
             finishEarlyEntriesLocked();
             if (enabled) {
-                appendLocked(Level.INFO, "runtime",
-                        "journal enabled; " + environmentLocked());
+                enqueueLocked(Level.INFO, "runtime", "journal enabled; " + environmentLocked(),
+                        System.currentTimeMillis(), SystemClock.elapsedRealtime());
             }
         }
         SteeringKeyDiagnostics.debugChanged(initiallyEnabled);
@@ -161,8 +166,8 @@ public final class DiagnosticJournal {
             enabled = value;
             finishEarlyEntriesLocked();
             if (value) {
-                appendLocked(Level.INFO, "runtime",
-                        "journal enabled; " + environmentLocked());
+                enqueueLocked(Level.INFO, "runtime", "journal enabled; " + environmentLocked(),
+                        System.currentTimeMillis(), SystemClock.elapsedRealtime());
             }
         }
         SteeringKeyDiagnostics.debugChanged(value);
@@ -203,32 +208,37 @@ public final class DiagnosticJournal {
                               @NonNull String message) {
         if (!enabled) return;
         synchronized (LOCK) {
-            appendLocked(level, component, message);
+            if (!enabled) return;
+            enqueueLocked(level, component, message,
+                    System.currentTimeMillis(), SystemClock.elapsedRealtime());
         }
     }
 
-    /** Input callbacks must never wait for journal rotation, export or another disk writer. */
+    /** Kept for callers: every normal severity is now asynchronous, not just input observations. */
     public static void infoAsync(@NonNull String component, @NonNull String message) {
-        if (!enabled) return;
-        long timestamp = System.currentTimeMillis();
-        long uptime = SystemClock.elapsedRealtime();
+        record(Level.INFO, component, message);
+    }
+
+    /** LOCK protects only admission/epochs; the disk worker never takes it. */
+    private static void enqueueLocked(Level level, String component, String message,
+                                      long timestamp, long uptime) {
         long generation = asyncGeneration;
         String bounded = message.length() > MAX_MESSAGE_CHARS
                 ? message.substring(0, MAX_MESSAGE_CHARS) : message;
         ASYNC.execute(() -> {
-            synchronized (LOCK) {
+            synchronized (DISK_LOCK) {
                 if (!enabled || generation != asyncGeneration) return;
                 int dropped = droppedAsyncEntries.getAndSet(0);
-                if (dropped > 0) appendLocked(Level.WARN, "input-journal",
+                if (dropped > 0) appendLocked(Level.WARN, "journal-writer",
                         "diagnostic_queue_dropped=" + dropped);
-                appendLocked(Level.INFO, component, bounded, timestamp, uptime);
+                appendLocked(level, component, bounded, timestamp, uptime);
             }
         });
     }
 
     /** Crash handlers call this even if normal debug mode was disabled. */
     public static void recordCrash(@NonNull Thread thread, @NonNull Throwable error) {
-        synchronized (LOCK) {
+        synchronized (DISK_LOCK) {
             StringWriter stack = new StringWriter();
             error.printStackTrace(new PrintWriter(stack));
             appendLocked(Level.ERROR, "crash",
@@ -239,7 +249,7 @@ public final class DiagnosticJournal {
 
     @NonNull
     public static List<Entry> read() {
-        synchronized (LOCK) {
+        synchronized (DISK_LOCK) {
             File file = journalFileLocked();
             if (file == null || !file.isFile()) return Collections.emptyList();
             ArrayList<Entry> result = new ArrayList<>();
@@ -270,22 +280,28 @@ public final class DiagnosticJournal {
     }
 
     public static void clear() {
-        synchronized (LOCK) {
-            asyncGeneration++;
-            ASYNC.getQueue().clear();
-            droppedAsyncEntries.set(0);
+        synchronized (DISK_LOCK) {
+            synchronized (LOCK) {
+                asyncGeneration++;
+                ASYNC.getQueue().clear();
+                droppedAsyncEntries.set(0);
+                // Queue the boundary before admitting new producers; the worker waits only on
+                // DISK_LOCK until deletion finishes, never the other way around.
+                if (enabled) enqueueLocked(Level.INFO, "runtime", "journal cleared",
+                        System.currentTimeMillis(), SystemClock.elapsedRealtime());
+            }
             File file = journalFileLocked();
             if (file != null && file.exists()) {
                 //noinspection ResultOfMethodCallIgnored
                 file.delete();
             }
-            if (enabled) appendLocked(Level.INFO, "runtime", "journal cleared");
         }
     }
 
     @Nullable
     public static File copyForExport(@NonNull Context context) {
-        synchronized (LOCK) {
+        awaitPendingWrites(); // Called by the export worker, never inside DISK_LOCK.
+        synchronized (DISK_LOCK) {
             File source = journalFileLocked();
             if (source == null || !source.isFile()) return null;
             File directory = new File(context.getCacheDir(), "exports");
@@ -300,6 +316,14 @@ public final class DiagnosticJournal {
                 return null;
             }
         }
+    }
+
+    /** Best-effort bounded export barrier. Queue saturation cannot turn into CallerRuns disk IO. */
+    private static void awaitPendingWrites() {
+        CountDownLatch barrier = new CountDownLatch(1);
+        synchronized (LOCK) { ASYNC.execute(barrier::countDown); }
+        try { barrier.await(1500L, TimeUnit.MILLISECONDS); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
     }
 
     private static void appendLocked(@NonNull Level level, @NonNull String component,

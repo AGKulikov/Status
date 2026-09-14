@@ -7,34 +7,58 @@ import java.util.regex.Pattern;
 /** Extracts key fields only. Never persists arbitrary system messages, track titles or text input. */
 final class MediaKeyLogRecord {
     private static final Pattern HEADER = Pattern.compile(
-            "^\\s*(\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d\\.\\d+)\\s+\\d+\\s+\\d+\\s+[VDIWEF]\\s+([^:]+):\\s*(.*)$");
+            "^\\s*(\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d\\.\\d+)\\s+(\\d{1,9})\\s+(\\d{1,9})\\s+[VDIWEF]\\s+([^:]+):\\s*(.*)$");
     private static final Pattern KEY = Pattern.compile("\\bkeyCode\\s*[=:]\\s*(KEYCODE_[A-Z_]+|[0-9]+)\\b");
     private static final Pattern ACTION = Pattern.compile("\\baction\\s*[=:]\\s*(ACTION_DOWN|ACTION_UP|0|1)\\b");
-    final String timestamp, tag;
-    final int keyCode, action, deviceId, repeat;
+    final String timestamp, tag, stage;
+    final int keyCode, action, deviceId, repeat, sourcePid, sourceTid, callerPid, callerUid;
+    final boolean deviceIdPresent;
     final long eventTime, downTime;
 
-    private MediaKeyLogRecord(String timestamp, String tag, int keyCode, int action, String body) {
+    private MediaKeyLogRecord(String timestamp, String tag, int pid, int tid,
+                              int keyCode, int action, String body) {
         this.timestamp = timestamp; this.tag = tag; this.keyCode = keyCode; this.action = action;
-        deviceId = (int) number(body, "deviceId", -1);
+        sourcePid = pid; sourceTid = tid;
+        long device = number(body, "deviceId", Long.MIN_VALUE);
+        deviceIdPresent = device >= Integer.MIN_VALUE && device <= Integer.MAX_VALUE;
+        deviceId = deviceIdPresent ? (int) device : -1;
         repeat = (int) number(body, "repeatCount", 0);
         eventTime = number(body, "eventTime", -1);
         downTime = number(body, "downTime", -1);
+        callerPid = (int) number(body, "pid", -1);
+        callerUid = (int) number(body, "uid", -1);
+        stage = stage(tag, body);
     }
 
     static MediaKeyLogRecord parse(String line) {
         if (line == null || line.length() > 4096) return null;
         Matcher header = HEADER.matcher(line);
         if (!header.matches()) return null;
-        String tag = header.group(2).trim(), body = header.group(3);
+        String tag = header.group(4).trim(), body = header.group(5);
         if (!allowedTag(tag)) return null;
         Matcher key = KEY.matcher(body), action = ACTION.matcher(body);
         if (!key.find() || !action.find()) return null;
         int code = keyCode(key.group(1));
         if (code < 0) return null;
         String a = action.group(1);
-        return new MediaKeyLogRecord(header.group(1), tag, code,
+        return new MediaKeyLogRecord(header.group(1), tag,
+                Integer.parseInt(header.group(2)), Integer.parseInt(header.group(3)), code,
                 "0".equals(a) || "ACTION_DOWN".equals(a) ? 0 : 1, body);
+    }
+
+    /** Literal Android 9 stages only. Unknown vendor text stays unknown, never an invented ACK. */
+    private static String stage(String tag, String body) {
+        if (!"MediaSessionService".equals(tag)) return "key_record";
+        if (body.startsWith("dispatchMediaKeyEvent,")) return "system_entry";
+        if (body.startsWith("The media key listener is timed-out for ")) return "listener_timeout";
+        if (body.startsWith("Failed to send ")) return "send_failed";
+        if (body.startsWith("Send ") && body.endsWith(" to the media key listener")) return "listener_forward";
+        if (body.startsWith("Sending ")) {
+            if (body.contains(" to the last known PendingIntent ")
+                    || body.contains(" to the restored intent ")) return "broadcast_send";
+            if (body.contains(" to ")) return "session_send";
+        }
+        return "key_record";
     }
 
     static boolean allowedTag(String tag) {

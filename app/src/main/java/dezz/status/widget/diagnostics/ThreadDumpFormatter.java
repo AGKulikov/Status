@@ -24,6 +24,7 @@ final class ThreadDumpFormatter {
             String name = entry.getKey().getName();
             if (name.startsWith("steering-media-") || name.startsWith("media-key-observer")
                     || name.startsWith("media-session-observer") || name.equals("status-input-journal")
+                    || name.equals("status-journal-writer") || name.equals("media-key-system-log")
                     || name.equals("status-action-journal") || name.startsWith("diagnostics-")
                     || containsWriterFrame(entry.getValue())) {
                 ordered.put(entry.getKey(), entry.getValue());

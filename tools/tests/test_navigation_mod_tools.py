@@ -403,7 +403,30 @@ public final class MapOverlayPlacementHarness {
                         && Math.abs(placement.anchorY - .5f) < .0001f,
                 "returned anchor is not the exact stock anchor");
     }
+    private static void exerciseRejectedStockLegs() {
+        List<MapOverlayPlacementCoordinator.Footprint> allowed = Arrays.asList(
+            new MapOverlayPlacementCoordinator.Footprint("TOP_RIGHT",70,50,.8f,0f),
+            new MapOverlayPlacementCoordinator.Footprint("BOTTOM_LEFT",70,50,.2f,1f));
+        for(boolean projection:new boolean[]{false,true})for(boolean right:new boolean[]{false,true}){
+            MapOverlayPlacementCoordinator coordinator=new MapOverlayPlacementCoordinator();
+            coordinator.attach(projection ? new Window(0d) : null,220,220);
+            MapOverlayPlacementCoordinator.Placement previous=
+                new MapOverlayPlacementCoordinator.Placement(0f,.5f,"LEFT_CENTER");
+            coordinator.beginLayout();
+            MapOverlayPlacementCoordinator.Placement selected=coordinator.reserve(
+                MapOverlayPlacementCoordinator.OWNER_TRAFFIC_LIGHTS,"capsule",0d,0d,70,50,
+                right,-1,Double.NaN,previous,allowed,true);
+            expect("TOP_RIGHT".equals(selected.legName)||"BOTTOM_LEFT".equals(selected.legName),
+                "invalid stock side revived by fallback or previous-slot preference");
+            try {
+                coordinator.reserve("traffic_lights","empty",0d,0d,70,50,right,-1,
+                    Double.NaN,previous,new java.util.ArrayList<>(),true);
+                throw new AssertionError("empty strict geometry invented a leg");
+            } catch(IllegalArgumentException expected) {}
+        }
+    }
     public static void main(String[] args) {
+        exerciseRejectedStockLegs();
         RectF clip = new RectF(0f, 0f, 10f, 10f);
         expect(Math.abs(MapOverlayPlacementCoordinator.clippedSegmentLength(
                 clip, -5f, 5f, 15f, 5f) - 10d) < .0001d, "horizontal clip");

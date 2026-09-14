@@ -179,10 +179,28 @@ final class MapOverlayPlacementCoordinator {
                       int bitmapWidth, int bitmapHeight, boolean preferRight,
                       int routeSegmentIndex, double routeSegmentPosition,
                       Placement previous, List<Footprint> footprints) {
+        return reserve(owner, key, latitude, longitude, bitmapWidth, bitmapHeight,
+                preferRight, routeSegmentIndex, routeSegmentPosition, previous, footprints, false);
+    }
+
+    /** A renderer may explicitly reject a stock leg; missing geometry is then not a fallback. */
+    Placement reserve(String owner, String key, double latitude, double longitude,
+                      int bitmapWidth, int bitmapHeight, boolean preferRight,
+                      int routeSegmentIndex, double routeSegmentPosition,
+                      Placement previous, List<Footprint> footprints,
+                      boolean requireMeasuredFootprint) {
         float[] screen = projectOrNull(latitude, longitude);
         int safeWidth = Math.max(1, bitmapWidth);
         int safeHeight = Math.max(1, bitmapHeight);
         Candidate[] candidates = candidates(preferRight);
+        if (requireMeasuredFootprint) {
+            ArrayList<Candidate> usable = new ArrayList<>(candidates.length);
+            for (Candidate candidate : candidates) {
+                if (footprintFor(footprints, candidate.legName) != null) usable.add(candidate);
+            }
+            if (usable.isEmpty()) throw new IllegalArgumentException("No renderable balloon legs");
+            candidates = usable.toArray(new Candidate[0]);
+        }
         if (screen == null) {
             Candidate fallback = candidates[0];
             Footprint measured = footprintFor(footprints, fallback.legName);

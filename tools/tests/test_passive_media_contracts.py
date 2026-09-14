@@ -22,7 +22,7 @@ public static void main(String[] args)throws Exception{int n=0;for(String name:a
 Class<?> c=Class.forName(name);Object instance=c.getConstructor().newInstance();
 for(java.lang.reflect.Method m:c.getDeclaredMethods())if(m.isAnnotationPresent(org.junit.Test.class)){
 try{m.invoke(instance);n++;}catch(java.lang.reflect.InvocationTargetException e){throw new AssertionError(name+\".\"+m.getName(),e.getCause());}}}
-if(n!=7)throw new AssertionError(n);}}"""
+if(n!=8)throw new AssertionError(n);}}"""
             }
             files = []
             for name, source in sources.items():

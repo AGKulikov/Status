@@ -39,6 +39,9 @@ public final class SteeringKeyDiagnostics {
     private final Handler input;
     private final Handler sessions;
     private final MediaKeyObservation observation = new MediaKeyObservation();
+    // Separate arrival-time correlation includes delayed/virtual system keys. It must not be
+    // presented as a hardware press or merged with the physical-origin-unverified broadcast ID.
+    private final MediaKeyObservation systemObservation = new MediaKeyObservation();
     private final MediaKeySystemLog systemLog;
     private final List<Watch> watches = new ArrayList<>();
     private final ComponentName listener;
@@ -188,6 +191,7 @@ public final class SteeringKeyDiagnostics {
         long expected = ++generation;
         input.removeCallbacks(health);
         observation.clear();
+        systemObservation.clear();
         sessions.removeCallbacks(refreshSessions);
         if (wanted) {
             IntentFilter filter = new IntentFilter();
@@ -241,15 +245,24 @@ public final class SteeringKeyDiagnostics {
         long sequence = 0L;
         // Do not invent a key timestamp from the log reader's delivery time. Only complete
         // KeyEvent fields can share the existing broadcast/session association window.
-        if (record.deviceId >= 0 && record.downTime > 0 && record.eventTime > 0
+        if (record.deviceIdPresent && record.downTime > 0 && record.eventTime > 0
                 && record.eventTime <= now && now - record.eventTime <= 15_000L) {
             sequence = observation.received(record.keyCode, record.deviceId, record.downTime,
                     record.eventTime, record.action, record.repeat, now).sequence;
         }
+        long systemSequence = systemObservation.received(record.keyCode,
+                record.deviceIdPresent ? record.deviceId : Integer.MIN_VALUE,
+                record.downTime, record.eventTime, record.action, record.repeat, now).sequence;
         emit("stage=system_key_log, input_sequence=" + sequence + ", source_tag=" + record.tag
+                + ", system_sequence=" + systemSequence + ", system_stage=" + record.stage
+                + ", source_pid=" + record.sourcePid + ", source_tid=" + record.sourceTid
+                + ", caller_pid=" + record.callerPid + ", caller_uid=" + record.callerUid
                 + ", source_time=" + record.timestamp + ", key_code=" + record.keyCode
                 + ", action=" + record.action + ", event_uptime_ms=" + record.eventTime
-                + ", observed_uptime_ms=" + now + ", log_delivery_ms=" + delay(now, record.eventTime)
+                + ", down_uptime_ms=" + record.downTime + ", device_id=" + record.deviceId
+                + ", device_id_present=" + record.deviceIdPresent + ", repeat=" + record.repeat
+                + ", observed_uptime_ms=" + now + ", observed_wall_ms=" + System.currentTimeMillis()
+                + ", event_age_ms=" + delay(now, record.eventTime)
                 + ", physical_origin=unverified, commands_sent=0, audio_ack=false");
     }
 
@@ -335,12 +348,16 @@ public final class SteeringKeyDiagnostics {
             if (!current(epoch) || !watches.contains(this)) return;
             long now = SystemClock.uptimeMillis();
             MediaKeyObservation.Candidate candidate = observation.candidate(now);
+            MediaKeyObservation.Candidate systemCandidate = systemObservation.candidate(now);
             emit("stage=" + stage + ", package=" + packageName + ", observed_uptime_ms=" + now
                     + ", state=" + (state == null ? -1 : state.getState())
                     + ", state_update_uptime_ms=" + (state == null ? -1 : state.getLastPositionUpdateTime())
                     + ", after_input_sequence=" + candidate.sequence
                     + ", nearby_presses=" + candidate.count
                     + ", since_input_observed_ms=" + candidate.delayMs
+                    + ", after_system_sequence=" + systemCandidate.sequence
+                    + ", nearby_system_events=" + systemCandidate.count
+                    + ", since_system_observed_ms=" + systemCandidate.delayMs
                     + ", association=temporal_only, command_delivery=unobserved, audio_output=unobserved");
         }
     }

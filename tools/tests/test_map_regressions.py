@@ -129,6 +129,18 @@ SOURCES = {
           check(BalloonTextureBounds.pixels(120,6,-8,1)==134);
           check(BalloonTextureBounds.pixels(120,6,8,1)==134);
         }
+        static void capsuleSideLegsAreRejected(){
+          for(float h:new float[]{28,38,40,41,80,81,180}){
+            float r=(float)Math.floor(h/2);
+            for(String leg:new String[]{"LEFT_CENTER","RIGHT_CENTER"})
+              check(!StockTrafficLightLegPolicy.usable(leg,h,r,40));
+            for(String leg:new String[]{"TOP_LEFT","TOP_RIGHT","BOTTOM_LEFT","BOTTOM_RIGHT",
+                "TOP_CENTER","BOTTOM_CENTER"})check(StockTrafficLightLegPolicy.usable(leg,h,r,40));
+          }
+          check(StockTrafficLightLegPolicy.usable("LEFT_CENTER",60,12,15));
+          check(!StockTrafficLightLegPolicy.usable("LEFT_CENTER",Float.NaN,12,15));
+          check(!StockTrafficLightLegPolicy.usable("RIGHT_CENTER",40,20,0));
+        }
         static void allConsecutiveControls(){
           int count=0;for(int segment=0;segment<80;segment++){
             if(RouteCameraPolicy.isAhead(segment,.5,81,true,0,.1))count++; }
@@ -223,6 +235,7 @@ class MapRegressionTest(unittest.TestCase):
             "app/src/geely/java/dezz/status/widget/car/EcarxTrip2Access.java",
             "navigator-mod/src/main/java/ru/natro/navigation/BalloonGeometry.java",
             "navigator-mod/src/main/java/ru/natro/navigation/BalloonTextureBounds.java",
+            "navigator-mod/src/main/java/ru/natro/navigation/StockTrafficLightLegPolicy.java",
             "navigator-mod/src/main/java/ru/natro/navigation/RouteCameraPolicy.java")]
         compiler = [shutil.which("javac")] if shutil.which("javac") else ["java", "com.sun.tools.javac.Main"]
         compiled = subprocess.run([*compiler, "-d", str(cls.directory), *files], capture_output=True, text=True)
@@ -239,7 +252,7 @@ class MapRegressionTest(unittest.TestCase):
 
 for package, cases in (
     ("dezz.status.widget.navigation.BootstrapReplay", ("blankFrames", "dayNightAndTransparentRoads", "startupSequence")),
-    ("ru.natro.navigation.MapRegressionReplay", ("connectedBalloons", "shadowBoundsMatchRasterForEveryLeg", "allConsecutiveControls")),
+    ("ru.natro.navigation.MapRegressionReplay", ("connectedBalloons", "shadowBoundsMatchRasterForEveryLeg", "capsuleSideLegsAreRejected", "allConsecutiveControls")),
     ("dezz.status.widget.car.Trip2Replay", ("partialAndUnavailable", "paObservationsStaySeparate")),
 ):
     for case in cases:
