@@ -1,0 +1,89 @@
+{
+  "source_commit": "fa623bd893fe23b04c586b6e7eca868d29a47ccc",
+  "source_tree": "c7dea83d4ac2f443891b66d72aa3d157b7d29a95",
+  "release_ci": 34862131513,
+  "files": [
+    {
+      "file": "Natro-2.9.5-signed.apk",
+      "bytes": 28380526,
+      "sha256": "ff3b026657e23c10254d07e0d01e408d6d782a441d2e58d3a0f8a45b7d2aadd0",
+      "package": "ru.natro.statuswidget",
+      "versionName": "2.9.5",
+      "versionCode": 208021328,
+      "minSdk": "28",
+      "targetSdk": "28",
+      "crc_ok": true,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "v2_block": true,
+      "v3_block": true,
+      "cryptographic_apksigner_verification": "release CI"
+    },
+    {
+      "file": "Navigator-30.3.0-Natro-2.9.5-signed.apk",
+      "bytes": 155153827,
+      "sha256": "82c046f6fe849d1f93e6099528b44a0b9626ff55d76aa3f41b1d206b6a0b2a53",
+      "package": "ru.yandex.yandexnavi",
+      "versionName": "30.3.0",
+      "versionCode": 739564630,
+      "minSdk": "26",
+      "targetSdk": "29",
+      "crc_ok": true,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "v2_block": true,
+      "v3_block": true,
+      "cryptographic_apksigner_verification": "release CI"
+    }
+  ],
+  "method_checks": {
+    "Lru/natro/navigation/StockTrafficLightLegPolicy;": [
+      "usable"
+    ],
+    "Lru/natro/navigation/MapOverlayPlacementCoordinator;": [
+      "reserve"
+    ],
+    "Lru/natro/navigation/RouteCameraPolicy;": [
+      "showSpeed",
+      "detailDrawables"
+    ],
+    "Lru/natro/navigation/BalloonTextureBounds;": [
+      "pixels"
+    ],
+    "Lru/natro/navigation/TrafficLightMapLayer;": [
+      "reportGeometry",
+      "measureStockFootprints"
+    ],
+    "Ldezz/status/widget/diagnostics/DiagnosticJournal;": [
+      "enqueueLocked",
+      "awaitPendingWrites"
+    ],
+    "Ldezz/status/widget/RuntimeSnapshotPreferences;": [
+      "persistLatest"
+    ],
+    "Ldezz/status/widget/phone/transport/v2/AndroidCentralRoute;": [
+      "stalledAncsAttSlot"
+    ],
+    "Ldezz/status/widget/diagnostics/MediaKeyLogRecord;": [
+      "parse"
+    ],
+    "Ldezz/status/widget/diagnostics/MediaKeySystemLog;": [
+      "start",
+      "stop"
+    ],
+    "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics;": [
+      "systemKeyObserved"
+    ]
+  },
+  "navigator_payload_comparison": {
+    "previous_version": "2.9.3",
+    "changed": [
+      "classes19.dex"
+    ],
+    "unchanged_entries": 17030,
+    "excluded": "META-INF signatures"
+  },
+  "signed_pair_artifact": {
+    "id": 10355237284,
+    "zip_sha256": "5a2a869577491e635b33bc079a2a655a1e2923ab5c89f8a691bd9b8f8dba1725",
+    "zip_bytes": 163550127
+  }
+}
