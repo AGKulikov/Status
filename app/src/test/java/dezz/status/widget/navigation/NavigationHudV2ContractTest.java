@@ -1038,7 +1038,9 @@ public final class NavigationHudV2ContractTest {
         assertTrue(trafficLights.contains("scalePercent / 100f"));
         assertTrue(trafficLights.contains(
                 "float safeScale = Math.max(.01f, textureScale)"));
-        assertTrue(trafficLights.contains("floatValue() * safeScale"));
+        assertTrue(trafficLights.contains("BalloonTextureBounds.pixels"));
+        assertTrue(trafficLights.contains("shadowRadius, shadowX, safeScale"));
+        assertTrue(trafficLights.contains("shadowRadius, shadowY, safeScale"));
         assertFalse(trafficLights.contains(
                 "Enum.valueOf((Class<? extends Enum>) legClass, \"NONE\")"));
         assertTrue(trafficLights.contains(
@@ -1082,14 +1084,14 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cameraDirections.contains("No direction supplied means exactly one sign"));
         assertTrue(cameraDirections.contains("ImageProvider"));
         assertTrue(cameraDirections.contains("createCameraBitmap"));
-        assertTrue(cameraDirections.contains("camera.speedLimit > 0"));
+        assertTrue(cameraDirections.contains("RouteCameraPolicy.showSpeed(camera.controlTags, camera.speedLimit)"));
         assertTrue(cameraDirections.contains("STANDARD_SIGN_RED"));
         assertTrue(cameraDirections.contains("contentWidth"));
         assertTrue(cameraDirections.contains("diameter - overlap"));
         assertTrue(cameraDirections.contains(
                 "RouteRoadEventMapLayer.selectedCameraImageId(stockCameraProvider, controls)"));
         assertTrue(cameraDirections.contains(
-                "RouteCameraPolicy.detailDrawableForStockResource(resourceName)"));
+                "RouteCameraPolicy.detailDrawables(camera.controlTags)"));
         assertTrue(cameraPolicy.contains("new_pin_alerts_lanecamera_40"));
         assertTrue(cameraPolicy.contains("new_pin_alerts_crossroad_camera_40"));
         assertFalse(cameraDirections.contains("badgeSize"));
