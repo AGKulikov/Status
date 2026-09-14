@@ -1,0 +1,74 @@
+{
+  "source_commit": "32ad1445df4e9fcd476d52a8a3fee22fe9bd9234",
+  "source_tree": "7bdf381c13d75942ddd06e46e170ba648a63cb36",
+  "release_ci": 34810494266,
+  "files": [
+    {
+      "file": "Natro-2.9.4-signed.apk",
+      "bytes": 28376430,
+      "sha256": "7ff5c2ec100deec83f8e69ec1f1fbe5f93041dfb7b9b5477022401817c0354be",
+      "package": "ru.natro.statuswidget",
+      "versionName": "2.9.4",
+      "versionCode": 208021327,
+      "minSdk": "28",
+      "targetSdk": "28",
+      "crc_ok": true,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "v2_block": true,
+      "v3_block": true,
+      "cryptographic_apksigner_verification": "release CI"
+    },
+    {
+      "file": "Navigator-30.3.0-Natro-2.9.4-signed.apk",
+      "bytes": 155153827,
+      "sha256": "65ddfcc1f2d32a4059b2a7dc34b8d8f0dd90b2994c5c44cd2579f8511f63f42f",
+      "package": "ru.yandex.yandexnavi",
+      "versionName": "30.3.0",
+      "versionCode": 739564630,
+      "minSdk": "26",
+      "targetSdk": "29",
+      "crc_ok": true,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "v2_block": true,
+      "v3_block": true,
+      "cryptographic_apksigner_verification": "release CI"
+    }
+  ],
+  "method_checks": {
+    "Lru/natro/navigation/RouteCameraPolicy;": [
+      "showSpeed",
+      "detailDrawables"
+    ],
+    "Lru/natro/navigation/BalloonTextureBounds;": [
+      "pixels"
+    ],
+    "Lru/natro/navigation/TrafficLightMapLayer;": [
+      "reportGeometry",
+      "measureStockFootprints"
+    ],
+    "Ldezz/status/widget/RuntimeSnapshotPreferences;": [
+      "persistLatest"
+    ],
+    "Ldezz/status/widget/phone/transport/v2/AndroidCentralRoute;": [
+      "stalledAncsAttSlot"
+    ],
+    "Ldezz/status/widget/diagnostics/MediaKeyLogRecord;": [
+      "parse"
+    ],
+    "Ldezz/status/widget/diagnostics/MediaKeySystemLog;": [
+      "start",
+      "stop"
+    ],
+    "Ldezz/status/widget/diagnostics/SteeringKeyDiagnostics;": [
+      "systemKeyObserved"
+    ]
+  },
+  "navigator_payload_comparison": {
+    "previous_version": "2.9.3",
+    "changed": [
+      "classes19.dex"
+    ],
+    "unchanged_entries": 17030,
+    "excluded": "META-INF signatures"
+  }
+}
