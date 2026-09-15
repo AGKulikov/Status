@@ -111,7 +111,11 @@ public final class MediaAutoResumeContractTest {
         assertTrue(history.contains("createDeviceProtectedStorageContext()"));
         assertTrue(launcher.contains("MediaPlaybackHistoryStore.record("));
         assertTrue(repository.contains("MediaPlaybackHistoryStore.record("));
-        assertTrue(status.contains("MediaPlaybackHistoryStore.record("));
+        // WidgetService now consumes the same engine as HOME, so it must not race its history.
+        assertFalse(status.contains("MediaPlaybackHistoryStore.record("));
+        assertTrue(status.contains("new dezz.status.widget.launcher.LauncherMediaController(this, prefs, state ->"));
+        assertTrue(launcher.contains("MediaPlaybackHistoryStore.record(context, live.packageName, playing)"));
+        assertTrue(launcher.contains("MediaPlaybackHistoryStore.record(context, packageName, playback.playing)"));
     }
 
     @Test

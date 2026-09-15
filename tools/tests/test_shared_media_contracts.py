@@ -6,6 +6,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = [
+    "dezz.status.widget.Ha1161CarPlayQualityContractTest",
+    "dezz.status.widget.Ha1170TextAlignmentAndArtworkContractTest",
+    "dezz.status.widget.launcher.MediaAutoResumeContractTest",
     "dezz.status.widget.Ha1217StatusMediaPlaybackContractTest",
     "dezz.status.widget.StatusMediaBrickLayoutContractTest",
     "dezz.status.widget.settings.SettingsBackNavigationContractTest",

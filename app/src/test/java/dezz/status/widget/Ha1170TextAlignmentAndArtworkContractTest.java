@@ -24,16 +24,20 @@ public final class Ha1170TextAlignmentAndArtworkContractTest {
         assertFalse(card.contains("element.maxLines <= 1"));
     }
 
-    @Test public void previousCoverRemainsRejectedForTheWholeCurrentTrack()
+    @Test public void lateCoverIsRejectedByOwnerWithoutRejectingSharedAlbumArtwork()
             throws Exception {
         String panel = source("launcher/media/MediaPanelView.java");
-        String policy = source("launcher/media/MediaArtworkBindingPolicy.java");
+        String controller = source("launcher/LauncherMediaController.java");
 
-        assertTrue(panel.contains("previousTrackFingerprintToReject("));
-        assertTrue(panel.contains("isRejectedForCurrentTrack("));
-        assertTrue(panel.contains("including after the correct new cover has"));
-        assertFalse(panel.contains("rejectedArtworkFingerprint = 0L;"));
-        assertTrue(policy.contains("Keep A blocked until another real track boundary"));
+        // MUSIC-017 supersedes HA1170's blacklist, while retaining stale-publication rejection.
+        assertFalse(panel.contains("previousTrackFingerprintToReject("));
+        assertFalse(panel.contains("isRejectedForCurrentTrack("));
+        assertTrue(panel.contains("artworkBitmap = state.artwork"));
+        assertTrue(controller.contains("if (started && displayNotification == request)"));
+        assertTrue(controller.contains("if (!sameTrack) notificationArtwork = null"));
+        assertTrue(controller.contains("next.artwork != null && !next.artwork.isRecycled()"));
+        assertTrue(controller.contains("if (artwork == null && sameTrack) artwork = session.artwork"));
+        assertTrue(controller.contains("revision == sessionRevision"));
     }
 
     @Test public void releaseIdentityIsHa1170() throws Exception {

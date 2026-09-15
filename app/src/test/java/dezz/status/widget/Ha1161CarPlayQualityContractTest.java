@@ -56,11 +56,14 @@ public final class Ha1161CarPlayQualityContractTest {
 
     @Test public void artworkAndAndroidConnectionJournalHavePersistentRecoveryState()
             throws Exception {
-        String media = source("launcher/media/MediaPanelView.java");
+        String media = source("launcher/LauncherMediaController.java");
         String androidJournal = source("phone/PhoneConnectionJournal.java");
         String settings = source("PhoneConnectorSettingsActivity.java");
-        assertTrue(media.contains("rejectedArtworkFingerprint"));
-        assertTrue(media.contains("keep that fingerprint hidden"));
+        // MUSIC-017 replaces the old pixel blacklist: adjacent songs may share an album cover.
+        // A late decode must still belong to the exact live notification before publication.
+        assertTrue(media.contains("if (started && displayNotification == request)"));
+        assertTrue(media.contains("else if (result != null) result.recycle()"));
+        assertTrue(media.contains("if (!sameTrack) notificationArtwork = null"));
         assertTrue(androidJournal.contains("MAX_LINES = 1_600"));
         assertTrue(androidJournal.contains("phone-connection.log"));
         assertTrue(androidJournal.contains("NOTIFICATION_CONTENT"));
