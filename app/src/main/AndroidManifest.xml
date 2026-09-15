@@ -95,6 +95,15 @@
         <!-- ECARX/SEC multi-display capability declarations used by the known-good KX11
              dashboard. They let the instrument task remain an independent DIM page. -->
         <meta-data android:name="eos_resizeableActivity" android:value="true" />
+        <activity android:name=".MediaButtonsSettingsActivity"
+            android:exported="false" android:screenOrientation="landscape" />
+        <receiver android:name=".media.MediaInputReceiver" android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.NEDIA_BUTTON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
         <meta-data android:name="eos_supports_psd" android:value="true" />
         <meta-data android:name="eos_supports_multipages" android:value="true" />
         <meta-data android:name="com.sec.android.support.multiwindow" android:value="true" />

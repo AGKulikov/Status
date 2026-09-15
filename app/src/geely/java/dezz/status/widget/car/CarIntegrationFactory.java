@@ -32,6 +32,10 @@ public final class CarIntegrationFactory {
     private CarIntegrationFactory() {
     }
 
+    public static InstrumentTsrAccess createInstrumentTsrAccess(Context context) {
+        return new EcarxInstrumentTsrAccess(context);
+    }
+
     @NonNull
     public static CarIntegration create(@NonNull Context appContext) {
         return new GeelyPassengerControlIntegration(

@@ -257,13 +257,14 @@ final class MapOverlayPlacementCoordinator {
             Footprint footprint = footprintFor(footprints, candidate.legName);
             RectF bounds = rect(screen[0], screen[1], safeWidth, safeHeight,
                     candidate, footprint);
-            if (!insideSafeViewport(bounds) || overlapsReservation(bounds)) continue;
-            double score = score(bounds, candidate, index, previous, screen,
+            RectF body = footprint == null ? bounds : footprint.collisionBounds(bounds);
+            if (!insideSafeViewport(bounds) || overlapsReservation(body)) continue;
+            double score = score(body, candidate, index, previous, screen,
                     latitude, longitude, routeSegmentIndex, routeSegmentPosition);
             if (score < bestScore) {
                 best = candidate;
                 bestFootprint = footprint;
-                bestRect = bounds;
+                bestRect = body;
                 bestScore = score;
             }
         }
@@ -658,13 +659,30 @@ final class MapOverlayPlacementCoordinator {
         final int height;
         final float anchorX;
         final float anchorY;
+        final RectF collisionBody;
 
         Footprint(String legName, int width, int height, float anchorX, float anchorY) {
+            this(legName, width, height, anchorX, anchorY, null);
+        }
+
+        Footprint(String legName, int width, int height, float anchorX, float anchorY,
+                  RectF collisionBody) {
             this.legName = legName == null ? "" : legName;
             this.width = width;
             this.height = height;
             this.anchorX = anchorX;
             this.anchorY = anchorY;
+            this.collisionBody = collisionBody == null ? null : new RectF(collisionBody);
+        }
+
+        RectF collisionBounds(RectF textureBounds) {
+            if (collisionBody == null) return textureBounds;
+            // The text body must stay clear. A shared fork/tail tip and transparent padding
+            // are not a second opaque label and must not reject all eight placement legs.
+            return new RectF(textureBounds.left + collisionBody.left,
+                    textureBounds.top + collisionBody.top,
+                    textureBounds.left + collisionBody.right,
+                    textureBounds.top + collisionBody.bottom);
         }
 
         private boolean isUsable() {

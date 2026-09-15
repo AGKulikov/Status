@@ -152,11 +152,16 @@ public final class SettingsDestinationCatalog {
                 "hud", "dezz.status.widget.HudPanelSettingsActivity",
                 "hud", "проекция", "внешний дисплей", "стрелки", "светофоры",
                 "полосы", "телеметрия", "умный дом", "сценарии", "сетка"));
+        values.add(activity("media_buttons", Group.AUTOMATION, "Кнопки руля · MEDIA",
+                "Обработка медиакнопок и отключение штатного действия",
+                "automation", "dezz.status.widget.MediaButtonsSettingsActivity",
+                "media", "mconfig", "руль", "кнопки", "музыка", "src"));
         values.add(activity("panel_instrument_cluster", Group.PANELS, "Панель приборов",
                 "Живой редактор 1920×720, аналоговые и цифровые приборы и независимая карта",
                 "vehicle", "dezz.status.widget.InstrumentPanelSettingsActivity",
                 "приборка", "панель приборов", "спидометр", "тахометр", "одометр",
-                "аналоговый", "цифровой", "карта", "display 2", "dim", "1920 720"));
+                "аналоговый", "цифровой", "карта", "display 2", "dim", "1920 720",
+                "белая полоса", "ограничение скорости", "штатный знак", "tsr"));
         values.add(activity("panel_dim_menu", Group.PANELS, "Меню экрана водителя",
                 "Отдельная панель во вкладке навигации с управлением кнопками руля",
                 "navigation", "dezz.status.widget.DimMenuPanelSettingsActivity",

@@ -47,6 +47,7 @@ final class AlternativeRouteMapLayer {
     private String lastInputActiveRouteId = "";
     private long lastInputPaletteVersion = Long.MIN_VALUE;
     private long lastReflectedScanUptimeMs = Long.MIN_VALUE;
+    private final Set<String> reportedBuildFailures = new HashSet<>();
 
     AlternativeRouteMapLayer(Context context, MapOverlayPlacementCoordinator placement) {
         Context app = context.getApplicationContext();
@@ -117,6 +118,7 @@ final class AlternativeRouteMapLayer {
         alternatives = safe;
         if (nextFingerprint == dataFingerprint) return;
         dataFingerprint = nextFingerprint;
+        reportedBuildFailures.clear();
         render();
     }
 
@@ -150,6 +152,7 @@ final class AlternativeRouteMapLayer {
                 // Keep the route line, and retry the balloon on the next camera/layout update.
                 if (next == null) {
                     hide(marker);
+                    reportPlacement(marker, "blocked");
                     continue;
                 }
                 if (marker.placement == null || !marker.placement.sameSlot(next)
@@ -159,11 +162,23 @@ final class AlternativeRouteMapLayer {
                 invoke(marker.placemark, "setVisible",
                         new Class<?>[]{boolean.class}, true);
                 marker.placement = next;
+                // This confirms submission, not native MapKit decluttering or physical pixels.
+                reportPlacement(marker, "submitted");
             } catch (Throwable failure) {
                 hide(marker);
+                reportPlacement(marker, "failed_" + failure.getClass().getSimpleName());
                 Log.w(TAG, "Alternative callout could not be placed", failure);
             }
         }
+    }
+
+    private void reportPlacement(Marker marker, String state) {
+        if (state.equals(marker.reportedState)) return;
+        marker.reportedState = state;
+        NavigationBridgeClient.reportDiagnostic("alternative-callout state=" + state
+                + ", epoch=" + routeEpoch + ", size="
+                + (marker.preparedText == null ? "unknown" : marker.preparedText.bodyWidth
+                + "x" + marker.preparedText.bodyHeight));
     }
 
     private PreparedText preparedText(Marker marker) {
@@ -224,6 +239,7 @@ final class AlternativeRouteMapLayer {
                     CalloutModel model = readCallout(
                             route, forkOnAlternative, forkOnCurrent, alternativeIndex);
                     if (model == null) {
+                        reportBuildFailure("missing_fork", alternativeIndex);
                         Log.w(TAG, "Alternative line has no usable fork callout: "
                                 + candidateRouteId);
                         continue;
@@ -239,15 +255,28 @@ final class AlternativeRouteMapLayer {
                         // The line is already valid and visible. Keep it while isolating a
                         // regional MapKit placemark incompatibility to this one optional balloon.
                         Log.w(TAG, "Alternative callout could not be created", calloutFailure);
+                        reportBuildFailure("placemark_" + calloutFailure.getClass().getSimpleName(),
+                                alternativeIndex);
                     }
                 } catch (Throwable invalidAlternative) {
+                    reportBuildFailure("model_" + invalidAlternative.getClass().getSimpleName(),
+                            alternativeIndex);
                     Log.w(TAG, "One Guidance alternative was skipped", invalidAlternative);
                 }
             }
         } catch (Throwable failure) {
+            reportBuildFailure("layer_" + failure.getClass().getSimpleName(), -1);
             Log.w(TAG, "Alternative route layer could not be rendered", failure);
             clearVisual();
         }
+    }
+
+    private void reportBuildFailure(String stage, int index) {
+        // At most one entry per failure and alternative in the current data snapshot.
+        // No route IDs, coordinates or repeated per-frame stack dumps in the exported journal.
+        if (!reportedBuildFailures.add(stage + ':' + index)) return;
+        NavigationBridgeClient.reportDiagnostic("alternative-callout state=" + stage
+                + ", epoch=" + routeEpoch + ", alternative=" + index);
     }
 
     private void ensureCollections() throws Exception {
@@ -375,7 +404,10 @@ final class AlternativeRouteMapLayer {
             Geometry geometry = geometry(text, leg);
             result.add(new MapOverlayPlacementCoordinator.Footprint(
                     leg, geometry.width, geometry.height,
-                    geometry.tipX / geometry.width, geometry.tipY / geometry.height));
+                    geometry.tipX / geometry.width, geometry.tipY / geometry.height,
+                    new RectF(geometry.bodyLeft, geometry.bodyTop,
+                            geometry.bodyLeft + text.bodyWidth,
+                            geometry.bodyTop + text.bodyHeight)));
         }
         return result;
     }
@@ -719,6 +751,7 @@ final class AlternativeRouteMapLayer {
         long paletteVersion = Long.MIN_VALUE;
         long preparedPaletteVersion = Long.MIN_VALUE;
         PreparedText preparedText;
+        String reportedState = "";
         List<MapOverlayPlacementCoordinator.Footprint> footprints = Collections.emptyList();
         Marker(Object placemark, CalloutModel model) {
             this.placemark = placemark;

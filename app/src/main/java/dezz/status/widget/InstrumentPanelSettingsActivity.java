@@ -162,7 +162,55 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
         Button map = button("Карта");
         map.setOnClickListener(view -> editMapPerformance());
         row.addView(map);
+        Button stock = button("Штатные элементы");
+        stock.setOnClickListener(view -> editStockElements());
+        row.addView(stock);
         return row;
+    }
+
+    private void editStockElements() {
+        dezz.status.widget.instrument.InstrumentOemController controller =
+                dezz.status.widget.instrument.InstrumentOemController.get(this);
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(18), dp(12), dp(18), dp(12));
+        Switch sign = switchView("Скрыть штатный знак ограничения скорости", controller.isTsrHidden());
+        Switch bar = switchView("Скрыть белую полосу внизу экрана водителя", controller.isWhiteBarHidden());
+        TextView signStatus = label(controller.tsrStatus());
+        TextView barStatus = label(controller.whiteStatus());
+        body.addView(sign);
+        body.addView(label("Как в MConfig: выключает штатную настройку TSR; при отключении возвращает её."));
+        body.addView(signStatus);
+        body.addView(bar, marginTop(16));
+        body.addView(label("Скрывает наложения штатного меню в режиме навигации. При выходе возвращает их."));
+        body.addView(barStatus);
+        boolean[] updating = {false};
+        sign.setOnCheckedChangeListener((button, value) -> {
+            if (updating[0]) return;
+            sign.setEnabled(false);
+            signStatus.setText("Применение…");
+            controller.setTsrHidden(value, (success, detail) -> {
+                if (isDestroyed()) return;
+                updating[0] = true;
+                sign.setChecked(controller.isTsrHidden());
+                updating[0] = false;
+                sign.setEnabled(true); signStatus.setText(detail);
+            });
+        });
+        bar.setOnCheckedChangeListener((button, value) -> {
+            if (updating[0]) return;
+            bar.setEnabled(false); barStatus.setText("Применение…");
+            controller.setWhiteBarHidden(value, (success, detail) -> {
+                if (isDestroyed()) return;
+                updating[0] = true;
+                bar.setChecked(controller.isWhiteBarHidden());
+                updating[0] = false;
+                bar.setEnabled(true); barStatus.setText(detail);
+            });
+        });
+        ScrollView scroll = new ScrollView(this); scroll.addView(body);
+        new AlertDialog.Builder(this).setTitle("Штатные элементы панели приборов")
+                .setView(scroll).setPositiveButton("Готово", null).show();
     }
 
     private View selectionBar() {
