@@ -116,7 +116,7 @@ public final class MediaPanelView extends FrameLayout {
         this.store = store;
         this.controls = controls;
         config = store.load();
-        if (controls != null) volumePercent = readSystemVolume();
+        // The shared playback snapshot supplies volume; construction must never query AudioManager.
         setClipChildren(false);
         setClipToPadding(false);
         rebuild();

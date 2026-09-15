@@ -92,6 +92,8 @@ public final class MediaPanelInteractionContractTest {
         assertTrue(source.contains("controls.setVolumePercent(percent)"));
         assertFalse(source.contains("getStreamVolume("));
         assertFalse(source.contains("getStreamMaxVolume("));
+        assertFalse(source.contains("readSystemVolume("));
+        assertTrue(source.contains("if (volume == null || !volume.isPressed()) volumePercent = state.volumePercent"));
         assertTrue(controller.contains("audioManager.setStreamVolume(AudioManager.STREAM_MUSIC"));
         assertTrue(controller.contains("android.media.VOLUME_CHANGED_ACTION"));
         assertTrue(controller.contains("VOLUME_QUERY_LANE.execute("));
