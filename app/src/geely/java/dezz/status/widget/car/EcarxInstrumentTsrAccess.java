@@ -119,7 +119,12 @@ final class EcarxInstrumentTsrAccess implements InstrumentTsrAccess,
         });
     }
     @Override public void onECarXCarServiceDeath() {
-        worker.post(() -> { manager = null; generation++; });
+        worker.post(() -> {
+            manager = null;
+            generation++;
+            // Do not leave the settings switch waiting forever if the service dies mid-write.
+            finish(false, "Соединение TSR прервано; настройка не подтверждена");
+        });
     }
     @Override public void close() {
         closed = true;

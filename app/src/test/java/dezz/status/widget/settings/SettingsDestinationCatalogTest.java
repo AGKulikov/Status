@@ -35,6 +35,7 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.InstrumentPanelSettingsActivity",
             "dezz.status.widget.LauncherSettingsActivity",
             "dezz.status.widget.MainActivity",
+            "dezz.status.widget.MediaButtonsSettingsActivity",
             "dezz.status.widget.MqttSettingsActivity",
             "dezz.status.widget.NavigatorWindowSettingsActivity",
             "dezz.status.widget.PhoneConnectorSettingsActivity",

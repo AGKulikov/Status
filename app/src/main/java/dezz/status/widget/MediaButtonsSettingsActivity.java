@@ -23,6 +23,7 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
         content.setPadding(24, 18, 24, 24);
         content.setBackgroundColor(0xFF0B0D12);
         Button back = new Button(this); back.setText("← Назад");
+        back.setContentDescription("Назад");
         back.setOnClickListener(v -> finish()); content.addView(back);
         TextView title = text("Кнопки руля · MEDIA", 24); content.addView(title);
         content.addView(text("Отключите обработку MEDIA в MConfig перед включением здесь. "
