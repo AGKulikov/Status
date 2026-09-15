@@ -1,0 +1,40 @@
+{
+  "sourceCommit": "bf08e40817faa02ddef645a9b09bb19d1ed98b60",
+  "sourceTree": "7aa804a487a88f342da8da234493e622b9ced1f5",
+  "sourceCiRun": 35003875068,
+  "releaseCiRun": 35003875053,
+  "unitTests": {
+    "tests": 1896,
+    "suites": 372,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "releaseUnitTests": {
+    "tests": 1896,
+    "suites": 372,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "toolTests": {
+    "tests": 170,
+    "failures": 0,
+    "skipped": 0
+  },
+  "localSourcePolicyReplayIncludedInTools": {
+    "tests": 100,
+    "failures": 0
+  },
+  "sourceArtifact": {
+    "id": 10410479201,
+    "bytes": 848270,
+    "sha256": "97fdabc1a766a9c560cf5ae7e661204c01f79bc18956dc6b6ea3eae371542594"
+  },
+  "releaseUnitArtifact": {
+    "id": 10410094815,
+    "bytes": 310547,
+    "sha256": "d12b87d1a4602d84ddb0a756a91f32694d8a1533383fe034007a14b01ddd3592"
+  },
+  "evidence": "Downloaded XML suites, ZIP CRC/SHA-256 and successful CI logs; not hardware acceptance"
+}

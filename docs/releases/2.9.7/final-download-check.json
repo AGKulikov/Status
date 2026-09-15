@@ -1,0 +1,103 @@
+{
+  "files": [
+    {
+      "bytes": 28523886,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "crc_ok": true,
+      "cryptographic_apksigner_verification": "release CI (download hashes match)",
+      "file": "Natro-2.9.7-signed.apk",
+      "minSdk": "28",
+      "package": "ru.natro.statuswidget",
+      "sha256": "e2898abaa7cc26c5908049516ef82d14028d39d59c1b5b1267ba4c7ee8b3b860",
+      "targetSdk": "28",
+      "v2_block": true,
+      "v3_block": true,
+      "versionCode": 208021330,
+      "versionName": "2.9.7"
+    },
+    {
+      "bytes": 155157923,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "crc_ok": true,
+      "cryptographic_apksigner_verification": "release CI (download hashes match)",
+      "file": "Navigator-30.3.0-Natro-2.9.7-signed.apk",
+      "minSdk": "26",
+      "package": "ru.yandex.yandexnavi",
+      "sha256": "4603525b3c0c85a99350b4915db812d4c278af4809fd28ee22205aa1df2987ae",
+      "targetSdk": "29",
+      "v2_block": true,
+      "v3_block": true,
+      "versionCode": 739564630,
+      "versionName": "30.3.0"
+    }
+  ],
+  "method_checks": {
+    "Ldezz/status/widget/instrument/InstrumentOemController;": [
+      "setTsrHidden",
+      "setWhiteBarHidden"
+    ],
+    "Ldezz/status/widget/launcher/LauncherMediaController;": [
+      "adoptNotification",
+      "publishLiveNotification",
+      "requestNotificationArtwork"
+    ],
+    "Ldezz/status/widget/launcher/MediaDisplayNotification;": [
+      "read",
+      "samePublication"
+    ],
+    "Ldezz/status/widget/launcher/ShortcutActionPicker;": [
+      "showNew",
+      "showPrimary",
+      "chooseKind"
+    ],
+    "Ldezz/status/widget/media/ButtonActionExecutor;": [
+      "execute",
+      "settingsChanged"
+    ],
+    "Ldezz/status/widget/media/ButtonGestureEngine;": [
+      "input",
+      "reset"
+    ],
+    "Ldezz/status/widget/media/ButtonInputPatch;": [
+      "apply"
+    ],
+    "Ldezz/status/widget/media/VehicleButtonController;": [
+      "readKeys",
+      "invalidateInput",
+      "saveBinding",
+      "driverMenuBindings"
+    ],
+    "Lru/natro/navigation/AlternativeRouteMapLayer;": [
+      "reportPlacement",
+      "footprints",
+      "geometry"
+    ],
+    "Lru/natro/navigation/MapOverlayPlacementCoordinator$Footprint;": [
+      "collisionBounds"
+    ]
+  },
+  "navigator_payload_comparison": {
+    "changed": [
+      "classes19.dex"
+    ],
+    "excluded": "META-INF signatures",
+    "previous_version": "2.9.6",
+    "unchanged_entries": 17030
+  },
+  "release_ci": 35003875053,
+  "signed_pair_artifact": {
+    "id": 10411380673,
+    "zip_bytes": 163616490,
+    "zip_sha256": "006af18469bfe65b119f77c55dfdfe238c1265e4c62f482ca5f19c24adf8504e"
+  },
+  "source_commit": "bf08e40817faa02ddef645a9b09bb19d1ed98b60",
+  "source_tree": "7aa804a487a88f342da8da234493e622b9ced1f5",
+  "natro_update_identity": {
+    "previous_version": "2.9.6",
+    "previous_code": 208021329,
+    "same_package": true,
+    "same_certificate": true,
+    "code_increment": 1,
+    "oem_install_policy": "requires KX11 acceptance"
+  }
+}
