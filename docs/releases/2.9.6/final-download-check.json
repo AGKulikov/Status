@@ -1,0 +1,79 @@
+{
+  "source_commit": "9e24b4fa5ae02275604c0fe65243b0b615dcf853",
+  "source_tree": "a719b92509b13f0ef432804615b89507a5a05a5c",
+  "release_ci": 34932425548,
+  "files": [
+    {
+      "file": "Natro-2.9.6-signed.apk",
+      "bytes": 28396910,
+      "sha256": "09547edb8da0a58d4e6671e033ef099e15611ff73f40be237dec70cd5e4bf51b",
+      "package": "ru.natro.statuswidget",
+      "versionName": "2.9.6",
+      "versionCode": 208021329,
+      "minSdk": "28",
+      "targetSdk": "28",
+      "crc_ok": true,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "v2_block": true,
+      "v3_block": true,
+      "cryptographic_apksigner_verification": "release CI (download hashes match)"
+    },
+    {
+      "file": "Navigator-30.3.0-Natro-2.9.6-signed.apk",
+      "bytes": 155157923,
+      "sha256": "74edb329cb1c8baa854bc753a1a5a0dd8de18542a5ca307aaf4081916a5dd1f7",
+      "package": "ru.yandex.yandexnavi",
+      "versionName": "30.3.0",
+      "versionCode": 739564630,
+      "minSdk": "26",
+      "targetSdk": "29",
+      "crc_ok": true,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "v2_block": true,
+      "v3_block": true,
+      "cryptographic_apksigner_verification": "release CI (download hashes match)"
+    }
+  ],
+  "method_checks": {
+    "Ldezz/status/widget/car/EcarxInstrumentTsrAccess;": [
+      "apply",
+      "verify",
+      "onECarXCarServiceDeath"
+    ],
+    "Ldezz/status/widget/instrument/InstrumentOemController;": [
+      "setTsrHidden",
+      "setWhiteBarHidden"
+    ],
+    "Ldezz/status/widget/media/MediaButtonController;": [
+      "receive",
+      "setDisableDefault"
+    ],
+    "Ldezz/status/widget/media/MediaInputPatchMain;": [
+      "main",
+      "restartInputService"
+    ],
+    "Ldezz/status/widget/media/MediaInputReceiver;": [
+      "onReceive"
+    ],
+    "Lru/natro/navigation/AlternativeRouteMapLayer;": [
+      "reportPlacement",
+      "reportBuildFailure"
+    ],
+    "Lru/natro/navigation/MapOverlayPlacementCoordinator$Footprint;": [
+      "collisionBounds"
+    ]
+  },
+  "navigator_payload_comparison": {
+    "previous_version": "2.9.5",
+    "changed": [
+      "classes19.dex"
+    ],
+    "unchanged_entries": 17030,
+    "excluded": "META-INF signatures"
+  },
+  "signed_pair_artifact": {
+    "id": 10382755205,
+    "zip_sha256": "381a2f814087451b4c1b414b647fdd121bb7a0c89c4ffa5b54db0894800fc0ea",
+    "zip_bytes": 163562962
+  }
+}
