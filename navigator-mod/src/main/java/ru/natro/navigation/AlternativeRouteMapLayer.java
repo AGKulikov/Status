@@ -173,10 +173,13 @@ final class AlternativeRouteMapLayer {
     }
 
     private void reportPlacement(Marker marker, String state) {
-        if (state.equals(marker.reportedState)) return;
-        marker.reportedState = state;
+        String slot = marker.placement == null ? "none"
+                : marker.placement.legName + ':' + marker.placement.variant;
+        String reportKey = state + ':' + slot;
+        if (reportKey.equals(marker.reportedState)) return;
+        marker.reportedState = reportKey;
         NavigationBridgeClient.reportDiagnostic("alternative-callout state=" + state
-                + ", epoch=" + routeEpoch + ", size="
+                + ", slot=" + slot + ", epoch=" + routeEpoch + ", size="
                 + (marker.preparedText == null ? "unknown" : marker.preparedText.bodyWidth
                 + "x" + marker.preparedText.bodyHeight));
     }
@@ -344,7 +347,7 @@ final class AlternativeRouteMapLayer {
     private void applyTexture(Marker marker, PreparedText text,
                               MapOverlayPlacementCoordinator.Placement placementValue)
             throws Exception {
-        Texture texture = texture(text, placementValue.legName);
+        Texture texture = texture(text, placementValue.legName, placementValue.variant);
         Class<?> providerClass = Class.forName("com.yandex.runtime.image.ImageProvider");
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
         Class<?> rotationClass = Class.forName("com.yandex.mapkit.map.RotationType");
@@ -399,21 +402,23 @@ final class AlternativeRouteMapLayer {
     }
 
     private List<MapOverlayPlacementCoordinator.Footprint> footprints(PreparedText text) {
-        ArrayList<MapOverlayPlacementCoordinator.Footprint> result = new ArrayList<>(8);
+        ArrayList<MapOverlayPlacementCoordinator.Footprint> result = new ArrayList<>(40);
+        for (int variant = 0; variant < 5; variant++) {
         for (String leg : MapOverlayPlacementCoordinator.placementLegNames()) {
-            Geometry geometry = geometry(text, leg);
+            Geometry geometry = geometry(text, leg, variant);
             result.add(new MapOverlayPlacementCoordinator.Footprint(
                     leg, geometry.width, geometry.height,
                     geometry.tipX / geometry.width, geometry.tipY / geometry.height,
                     new RectF(geometry.bodyLeft, geometry.bodyTop,
                             geometry.bodyLeft + text.bodyWidth,
-                            geometry.bodyTop + text.bodyHeight)));
+                            geometry.bodyTop + text.bodyHeight), variant));
+        }
         }
         return result;
     }
 
-    private Texture texture(PreparedText text, String leg) {
-        Geometry geometry = geometry(text, leg);
+    private Texture texture(PreparedText text, String leg, int variant) {
+        Geometry geometry = geometry(text, leg, variant);
         Bitmap bitmap = Bitmap.createBitmap(geometry.width, geometry.height,
                 Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
@@ -459,8 +464,9 @@ final class AlternativeRouteMapLayer {
                 geometry.tipX / geometry.width, geometry.tipY / geometry.height));
     }
 
-    private Geometry geometry(PreparedText text, String leg) {
-        int diagonal = Math.max(1, Math.round(text.leader * .72f));
+    private Geometry geometry(PreparedText text, String leg, int variant) {
+        int leader = text.leader + Math.max(0, Math.min(4, variant)) * Math.max(16, text.bodyHeight / 2);
+        int diagonal = Math.max(1, Math.round(leader * .72f));
         int width = text.bodyWidth;
         int height = text.bodyHeight;
         float bodyLeft = 0f;
@@ -471,7 +477,7 @@ final class AlternativeRouteMapLayer {
         float attachY;
         switch (leg) {
             case "RIGHT_CENTER":
-                width += text.leader; tipX = width; tipY = height / 2f;
+                width += leader; tipX = width; tipY = height / 2f;
                 attachX = text.bodyWidth; attachY = tipY; break;
             case "BOTTOM_LEFT":
                 width += diagonal; height += diagonal; bodyLeft = diagonal;
@@ -487,14 +493,14 @@ final class AlternativeRouteMapLayer {
                 width += diagonal; height += diagonal; bodyTop = diagonal;
                 tipX = width; tipY = 0f; attachX = text.bodyWidth; attachY = bodyTop; break;
             case "BOTTOM_CENTER":
-                height += text.leader; tipX = width / 2f; tipY = height;
+                height += leader; tipX = width / 2f; tipY = height;
                 attachX = tipX; attachY = text.bodyHeight; break;
             case "TOP_CENTER":
-                height += text.leader; bodyTop = text.leader; tipX = width / 2f; tipY = 0f;
+                height += leader; bodyTop = leader; tipX = width / 2f; tipY = 0f;
                 attachX = tipX; attachY = bodyTop; break;
             case "LEFT_CENTER":
             default:
-                width += text.leader; bodyLeft = text.leader; tipX = 0f; tipY = height / 2f;
+                width += leader; bodyLeft = leader; tipX = 0f; tipY = height / 2f;
                 attachX = bodyLeft; attachY = tipY; break;
         }
         float dx = attachX - tipX;

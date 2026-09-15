@@ -100,6 +100,7 @@ public class StatusWidgetApplication extends Application {
         EcarxSystemStatusBarPolicy.applyStored(this);
         SystemStatusBarContentPolicy.applyStored(this);
         dezz.status.widget.media.MediaButtonController.get(this).restoreStored();
+        dezz.status.widget.media.VehicleButtonController.get(this);
         dezz.status.widget.instrument.InstrumentOemController.get(this);
     }
 

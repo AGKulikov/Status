@@ -50,6 +50,8 @@ final class SystemShadePanelView extends FrameLayout {
     private TextView mediaTitle;
     private TextView mediaArtist;
     private ImageButton mediaPlay;
+    private final java.util.List<SeekBar> volumeBars = new java.util.ArrayList<>();
+    private Boolean mediaPlaying;
 
     private final Runnable timeTick = new Runnable() {
         @Override public void run() {
@@ -140,10 +142,8 @@ final class SystemShadePanelView extends FrameLayout {
                     Settings.System.SCREEN_BRIGHTNESS, 128);
             bar.setProgress(Math.round(current * 100f / 255f));
         } else {
-            AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-            int max = audio == null ? 1 : Math.max(1, audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
-            int current = audio == null ? 0 : audio.getStreamVolume(AudioManager.STREAM_MUSIC);
-            bar.setProgress(Math.round(current * 100f / max));
+            volumeBars.add(bar);
+            bar.setEnabled(false);
         }
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -240,10 +240,16 @@ final class SystemShadePanelView extends FrameLayout {
     }
 
     private void renderMedia(LauncherMediaController.Snapshot snapshot) {
-        if (mediaTitle != null) mediaTitle.setText(snapshot.title);
-        if (mediaArtist != null) mediaArtist.setText(snapshot.artist);
-        if (mediaPlay != null) mediaPlay.setImageDrawable(LauncherIconResolver.resolvePreset(
-                context, snapshot.playing ? "media_pause" : "media", "#FFFFFFFF"));
+        if (mediaTitle != null && !snapshot.title.contentEquals(mediaTitle.getText())) mediaTitle.setText(snapshot.title);
+        if (mediaArtist != null && !snapshot.artist.contentEquals(mediaArtist.getText())) mediaArtist.setText(snapshot.artist);
+        if (mediaPlay != null && (mediaPlaying == null || mediaPlaying != snapshot.playing))
+            mediaPlay.setImageDrawable(LauncherIconResolver.resolvePreset(
+                    context, snapshot.playing ? "media_pause" : "media", "#FFFFFFFF"));
+        mediaPlaying = snapshot.playing;
+        for (SeekBar volume : volumeBars) {
+            volume.setEnabled(snapshot.volumeMaximum > 0);
+            if (!volume.isPressed()) volume.setProgress(snapshot.volumePercent);
+        }
     }
 
     private TextView label(SystemShadeConfig.Element e, int gravity) {
@@ -264,11 +270,7 @@ final class SystemShadePanelView extends FrameLayout {
     }
 
     private void setVolume(int percent) {
-        AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-        if (audio == null) return;
-        int max = Math.max(1, audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
-        audio.setStreamVolume(AudioManager.STREAM_MUSIC,
-                Math.round(max * Math.max(0, Math.min(100, percent)) / 100f), 0);
+        mediaController.setVolumePercent(percent);
     }
 
     private void setBrightness(int percent) {

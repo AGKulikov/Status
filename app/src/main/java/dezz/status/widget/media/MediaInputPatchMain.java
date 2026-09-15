@@ -11,20 +11,25 @@ import java.util.Arrays;
 public final class MediaInputPatchMain {
     public static void main(String[] args) {
         try {
-            if (args.length != 1 || !("status".equals(args[0]) || "on".equals(args[0])
+            if ((args.length != 1 && args.length != 2) || !("status".equals(args[0]) || "on".equals(args[0])
                     || "off".equals(args[0]))) throw new IllegalArgumentException("Bad operation");
+            VehicleButton button = args.length == 2 ? VehicleButton.valueOf(args[1]) : VehicleButton.MEDIA;
             File file = new File(MediaInputPatch.PATH);
             if (!file.getCanonicalPath().equals(MediaInputPatch.PATH))
                 throw new IllegalStateException("Unexpected cache path");
             if (file.length() > 64 * 1024 * 1024 || file.length() < 16)
                 throw new IllegalStateException("Unsupported cache size");
             try (RandomAccessFile access = new RandomAccessFile(file,
-                    "status".equals(args[0]) ? "r" : "rw")) {
+                    "status".equals(args[0]) ? "r" : "rw");
+                 java.nio.channels.FileLock lock = access.getChannel().lock(0, Long.MAX_VALUE,
+                         "status".equals(args[0]))) {
                 byte[] before = new byte[(int) access.length()];
                 access.readFully(before);
-                String state = MediaInputPatch.state(before);
+                String state = state(before, button);
                 if (!"status".equals(args[0])) {
-                    byte[] after = MediaInputPatch.apply(before, "on".equals(args[0]));
+                    byte[] after = button == VehicleButton.MEDIA
+                            ? MediaInputPatch.apply(before, "on".equals(args[0]))
+                            : ButtonInputPatch.apply(before, button, "on".equals(args[0]));
                     if (!Arrays.equals(before, after)) {
                         File backup = new File(MediaInputPatch.PATH + ".natro-backup");
                         // Preserve the latest pre-change bytes, owned and readable only by root.
@@ -46,7 +51,7 @@ public final class MediaInputPatchMain {
                             throw failure;
                         }
                     }
-                    state = MediaInputPatch.state(after);
+                    state = state(after, button);
                 }
                 System.out.println("NATRO_MEDIA_ROUTE=" + state);
             }
@@ -55,6 +60,11 @@ public final class MediaInputPatchMain {
                     + ": " + failure.getMessage());
             System.exit(1);
         }
+    }
+
+    private static String state(byte[] data, VehicleButton button) {
+        return button == VehicleButton.MEDIA ? MediaInputPatch.state(data)
+                : button.name() + ":" + (ButtonInputPatch.state(data, button) ? "disabled" : "stock");
     }
 
     private static void restartInputService() throws Exception {

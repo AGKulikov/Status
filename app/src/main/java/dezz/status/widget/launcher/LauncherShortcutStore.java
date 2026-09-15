@@ -701,6 +701,15 @@ public final class LauncherShortcutStore {
                 ? clean : "#00000000";
     }
 
+    /** Complete shared action representation, also used by physical-button bindings. */
+    public static String encodeAction(@NonNull Shortcut value) throws JSONException {
+        return toJson(value).toString();
+    }
+
+    @NonNull public static Shortcut decodeAction(@NonNull String json) throws JSONException {
+        return fromJson(new JSONObject(json));
+    }
+
     private static JSONObject toJson(Shortcut value) throws JSONException {
         JSONObject json = new JSONObject()
                 .put("id", value.id).put("title", value.title).put("kind", value.kind.name())

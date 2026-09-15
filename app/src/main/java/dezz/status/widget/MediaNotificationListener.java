@@ -61,7 +61,18 @@ public class MediaNotificationListener extends NotificationListenerService {
     private static final Map<String, MediaNotificationLikeSnapshot> MEDIA_LIKE_ACTIONS =
             new LinkedHashMap<>();
     private static final Set<MediaLikeObserver> MEDIA_LIKE_OBSERVERS = new HashSet<>();
+    private static final Map<String, dezz.status.widget.launcher.MediaDisplayNotification>
+            MEDIA_DISPLAY = new LinkedHashMap<>();
+    private static final Set<MediaDisplayObserver> MEDIA_DISPLAY_OBSERVERS = new HashSet<>();
+    private static long mediaDisplayGeneration;
     private static long mediaLikeGeneration;
+    private static volatile MediaNotificationListener activeMediaListener;
+    private static final java.util.concurrent.ThreadPoolExecutor MEDIA_READ_LANE = new java.util.concurrent.ThreadPoolExecutor(
+            0, 1, 10, java.util.concurrent.TimeUnit.SECONDS, new java.util.concurrent.ArrayBlockingQueue<>(1),
+            task -> new Thread(task, "media-notification-read"));
+    private final Handler mediaMain = new Handler(android.os.Looper.getMainLooper());
+    private boolean mediaReadInFlight;
+    private long mediaReadAt, mediaEventRevision;
     private int consecutiveNoRouteScans;
     private HandlerThread navigationThread;
     private volatile Handler navigationHandler;
@@ -101,7 +112,8 @@ public class MediaNotificationListener extends NotificationListenerService {
     public void onListenerConnected() {
         super.onListenerConnected();
         listenerConnected = true;
-        rebuildMediaSessions();
+        activeMediaListener = this; ++mediaEventRevision;
+        requestMediaRead(true);
         if (navigationDemand == null) {
             navigationDemand = new NavigationCollectionDemand(this);
             navigationDemand.start(this::onNavigationDemandChanged);
@@ -112,6 +124,8 @@ public class MediaNotificationListener extends NotificationListenerService {
     @Override
     public void onListenerDisconnected() {
         listenerConnected = false;
+        if (activeMediaListener == this) activeMediaListener = null;
+        ++mediaEventRevision;
         clearMediaSessions();
         stopNavigationWorker();
         if (navigationDemand != null) {
@@ -123,6 +137,7 @@ public class MediaNotificationListener extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
+        ++mediaEventRevision;
         rememberMediaSession(sbn);
         if (sbn != null && NavigationDataRepository.isSupportedPackage(sbn.getPackageName())) {
             // Reconciliation handles replacement and chooses the most complete notification.
@@ -133,6 +148,7 @@ public class MediaNotificationListener extends NotificationListenerService {
 
     @Override
     public void onNotificationRemoved(StatusBarNotification sbn) {
+        ++mediaEventRevision;
         forgetMediaSession(sbn);
         if (sbn != null && NavigationDataRepository.isSupportedPackage(sbn.getPackageName())) {
             // Reconcile immediately instead of clearing the old key first: Navigator commonly
@@ -145,6 +161,8 @@ public class MediaNotificationListener extends NotificationListenerService {
     @Override
     public void onDestroy() {
         listenerConnected = false;
+        if (activeMediaListener == this) activeMediaListener = null;
+        ++mediaEventRevision;
         clearMediaSessions();
         stopNavigationWorker();
         if (navigationDemand != null) {
@@ -198,6 +216,43 @@ public class MediaNotificationListener extends NotificationListenerService {
         void onMediaLikeActionsChanged();
     }
 
+    public interface MediaDisplayObserver { void onMediaDisplayChanged(); }
+
+    public static void addMediaDisplayObserver(MediaDisplayObserver observer) {
+        synchronized (MEDIA_SESSION_LOCK) { MEDIA_DISPLAY_OBSERVERS.add(observer); }
+        reconcileMediaNotifications();
+    }
+    public static void removeMediaDisplayObserver(MediaDisplayObserver observer) {
+        synchronized (MEDIA_SESSION_LOCK) { MEDIA_DISPLAY_OBSERVERS.remove(observer); }
+    }
+
+    @Nullable public static dezz.status.widget.launcher.MediaDisplayNotification latestMediaDisplay(
+            @Nullable String packageName) {
+        return latestMediaDisplay(packageName, Collections.emptySet());
+    }
+
+    @Nullable public static dezz.status.widget.launcher.MediaDisplayNotification latestMediaDisplay(
+            @Nullable String packageName, Set<MediaSession.Token> excludedTokens) {
+        synchronized (MEDIA_SESSION_LOCK) {
+            dezz.status.widget.launcher.MediaDisplayNotification latest = null;
+            for (dezz.status.widget.launcher.MediaDisplayNotification value : MEDIA_DISPLAY.values()) {
+                if (value.token != null && excludedTokens.contains(value.token)) continue;
+                if (packageName == null || packageName.isEmpty() || packageName.equals(value.packageName)) {
+                    latest = value;
+                }
+            }
+            return latest;
+        }
+    }
+
+    private static void notifyMediaDisplayObservers() {
+        List<MediaDisplayObserver> observers;
+        synchronized (MEDIA_SESSION_LOCK) { observers = new ArrayList<>(MEDIA_DISPLAY_OBSERVERS); }
+        for (MediaDisplayObserver observer : observers) {
+            try { observer.onMediaDisplayChanged(); } catch (RuntimeException ignored) { }
+        }
+    }
+
     public static void addMediaLikeObserver(@NonNull MediaLikeObserver observer) {
         synchronized (MEDIA_SESSION_LOCK) {
             MEDIA_LIKE_OBSERVERS.add(observer);
@@ -226,13 +281,52 @@ public class MediaNotificationListener extends NotificationListenerService {
         return null;
     }
 
-    private void rebuildMediaSessions() {
+    /** One bounded two-second recovery read while a display consumes media, never on MAIN. */
+    public static void reconcileMediaNotifications() {
+        MediaNotificationListener current = activeMediaListener;
+        if (current != null) current.mediaMain.post(() -> current.requestMediaRead(false));
+    }
+
+    private void requestMediaRead(boolean force) {
+        if (!listenerConnected || mediaReadInFlight) return;
+        synchronized (MEDIA_SESSION_LOCK) { if (!force && MEDIA_DISPLAY_OBSERVERS.isEmpty()) return; }
+        long now = SystemClock.elapsedRealtime();
+        if (!force && now - mediaReadAt < 2000L) return;
+        mediaReadInFlight = true; mediaReadAt = now;
+        long revision = mediaEventRevision;
+        try { MEDIA_READ_LANE.execute(() -> {
+            StatusBarNotification[] active = null;
+            try { active = getActiveNotifications(); } catch (RuntimeException unavailable) { }
+            StatusBarNotification[] result = active;
+            mediaMain.post(() -> {
+                mediaReadInFlight = false;
+                // A query begun before a live callback cannot put the previous track back.
+                if (!listenerConnected || revision != mediaEventRevision || result == null) return;
+                rebuildMediaSessions(result);
+            });
+        }); } catch (java.util.concurrent.RejectedExecutionException busy) { mediaReadInFlight = false; }
+    }
+
+    private boolean rebuildingMedia;
+    private void rebuildMediaSessions(StatusBarNotification[] active) {
         try {
-            StatusBarNotification[] active = getActiveNotifications();
-            clearMediaSessions();
-            if (active == null) return;
-            for (StatusBarNotification notification : active) rememberMediaSession(notification);
+            rebuildingMedia = true;
+            synchronized (MEDIA_SESSION_LOCK) {
+                Map<String, dezz.status.widget.launcher.MediaDisplayNotification> previous = new LinkedHashMap<>(MEDIA_DISPLAY);
+                MEDIA_SESSIONS.clear(); MEDIA_DISPLAY.clear(); MEDIA_LIKE_ACTIONS.clear();
+                java.util.Arrays.sort(active, java.util.Comparator.comparingLong(StatusBarNotification::getPostTime));
+                for (StatusBarNotification notification : active) {
+                    rememberMediaSession(notification);
+                    if (notification == null) continue;
+                    dezz.status.widget.launcher.MediaDisplayNotification before = previous.get(notification.getKey());
+                    dezz.status.widget.launcher.MediaDisplayNotification after = MEDIA_DISPLAY.get(notification.getKey());
+                    if (before != null && before.samePublication(after)) MEDIA_DISPLAY.put(notification.getKey(), before);
+                }
+            }
         } catch (RuntimeException ignored) {
+        } finally {
+            rebuildingMedia = false;
+            notifyMediaDisplayObservers(); notifyMediaLikeObservers();
         }
     }
 
@@ -246,8 +340,9 @@ public class MediaNotificationListener extends NotificationListenerService {
                     : notification.extras.get(NotificationCompat.EXTRA_MEDIA_SESSION);
             boolean mediaNotification = token instanceof MediaSession.Token
                     || Notification.CATEGORY_TRANSPORT.equals(notification.category);
-            Boolean ratingActive = token instanceof MediaSession.Token
-                    ? mediaSessionLikeState((MediaSession.Token) token) : null;
+            // A notification callback must not wait on a media Binder before publishing the
+            // new title. Session ratings are already read by the shared media worker.
+            Boolean ratingActive = null;
             MediaNotificationLikeSnapshot like = mediaNotification ? findLikeAction(
                     sbn.getPackageName(), notification.actions, ratingActive) : null;
             boolean likeChanged;
@@ -260,13 +355,19 @@ public class MediaNotificationListener extends NotificationListenerService {
                 }
                 likeChanged = previous != null || like != null;
             }
-            if (likeChanged) notifyMediaLikeObservers();
-            if (!(token instanceof MediaSession.Token)) return;
             synchronized (MEDIA_SESSION_LOCK) {
                 // Reinsert so LinkedHashMap order reflects the newest notification update.
                 MEDIA_SESSIONS.remove(key);
-                MEDIA_SESSIONS.put(key,
+                if (token instanceof MediaSession.Token) MEDIA_SESSIONS.put(key,
                         new MediaNotificationSession((MediaSession.Token) token));
+                MEDIA_DISPLAY.remove(key);
+                dezz.status.widget.launcher.MediaDisplayNotification display =
+                        dezz.status.widget.launcher.MediaDisplayNotification.read(sbn, ++mediaDisplayGeneration);
+                if (display != null) MEDIA_DISPLAY.put(key, display);
+            }
+            if (!rebuildingMedia) {
+                notifyMediaDisplayObservers();
+                if (likeChanged) notifyMediaLikeObservers();
             }
         } catch (RuntimeException | LinkageError ignored) {
         }
@@ -277,19 +378,23 @@ public class MediaNotificationListener extends NotificationListenerService {
         boolean likeChanged;
         synchronized (MEDIA_SESSION_LOCK) {
             MEDIA_SESSIONS.remove(sbn.getKey());
+            MEDIA_DISPLAY.remove(sbn.getKey());
             likeChanged = MEDIA_LIKE_ACTIONS.remove(sbn.getKey()) != null;
         }
         if (likeChanged) notifyMediaLikeObservers();
+        notifyMediaDisplayObservers();
     }
 
     private static void clearMediaSessions() {
         boolean likeChanged;
         synchronized (MEDIA_SESSION_LOCK) {
             MEDIA_SESSIONS.clear();
+            MEDIA_DISPLAY.clear();
             likeChanged = !MEDIA_LIKE_ACTIONS.isEmpty();
             MEDIA_LIKE_ACTIONS.clear();
         }
         if (likeChanged) notifyMediaLikeObservers();
+        notifyMediaDisplayObservers();
     }
 
     @Nullable

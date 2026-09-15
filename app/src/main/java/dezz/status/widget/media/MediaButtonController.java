@@ -30,7 +30,7 @@ public final class MediaButtonController {
     }
 
     private final Context context;
-    private final SharedPreferences preferences;
+    private SharedPreferences preferences;
     private final MediaKeyPolicy policy = new MediaKeyPolicy();
     private final ThreadPoolExecutor commands = new ThreadPoolExecutor(0, 1, 30,
             TimeUnit.SECONDS, new ArrayBlockingQueue<>(16), task -> new Thread(task, "natro-media-command"));
@@ -39,6 +39,7 @@ public final class MediaButtonController {
     private volatile boolean enabled;
     private volatile boolean defaultSource;
     private volatile boolean isolated;
+    private volatile boolean ready;
     private volatile long generation;
     private boolean changingRoute;
     private volatile String status = "Штатный путь кнопок";
@@ -54,14 +55,10 @@ public final class MediaButtonController {
         catch (RuntimeException malformed) { finished.run(); return; }
         if (event == null || (event.getAction() != KeyEvent.ACTION_DOWN
                 && event.getAction() != KeyEvent.ACTION_UP)) { finished.run(); return; }
-        MediaKeyPolicy.Route route = MediaKeyPolicy.route(intent.getAction(), enabled, defaultSource);
-        if (route == MediaKeyPolicy.Route.IGNORE || !policy.admit(event.getKeyCode(),
-                event.getAction(), event.getRepeatCount(), event.getDownTime(),
-                event.getEventTime(), event.getDeviceId(), event.getScanCode(), event.getSource())) {
-            finished.run(); return;
-        }
         final long received = SystemClock.uptimeMillis();
         final long owner = generation;
+        // Reserve space for settings persistence and readiness callbacks during key bursts.
+        if (commands.getQueue().size() >= 8) { finished.run(); return; }
         try {
             commands.execute(() -> {
                 long started = SystemClock.uptimeMillis();
@@ -70,6 +67,10 @@ public final class MediaButtonController {
                         record(event, "discarded_stale", received, started);
                         return;
                     }
+                    MediaKeyPolicy.Route route = MediaKeyPolicy.route(intent.getAction(), enabled, defaultSource);
+                    if (route == MediaKeyPolicy.Route.IGNORE || !policy.admit(event.getKeyCode(),
+                            event.getAction(), event.getRepeatCount(), event.getDownTime(), event.getEventTime(),
+                            event.getDeviceId(), event.getScanCode(), event.getSource())) return;
                     if (route == MediaKeyPolicy.Route.AUDIO_MANAGER) {
                         AudioManager audio = context.getSystemService(AudioManager.class);
                         if (audio == null) throw new IllegalStateException("AudioManager unavailable");
@@ -92,17 +93,25 @@ public final class MediaButtonController {
 
     private MediaButtonController(Context context) {
         this.context = context;
-        preferences = context.createDeviceProtectedStorageContext()
-                .getSharedPreferences("media_buttons", Context.MODE_PRIVATE);
-        enabled = preferences.getBoolean("enabled", false);
-        defaultSource = preferences.getBoolean("default_source", false);
-        isolated = preferences.getBoolean("disable_default", false);
-        reconcileReceiver();
+        control(() -> {
+            preferences = context.createDeviceProtectedStorageContext()
+                    .getSharedPreferences("media_buttons", Context.MODE_PRIVATE);
+            enabled = preferences.getBoolean("enabled", false);
+            defaultSource = preferences.getBoolean("default_source", false);
+            isolated = preferences.getBoolean("disable_default", false);
+            synchronized (this) { reconcileReceiver(); }
+            ready = true;
+        });
     }
 
     /** Invoked by the ordinary startup owner, never by a physical-key callback. */
     public void restoreStored() {
-        if (isolated) setDisableDefault(true, (success, detail) -> {});
+        control(() -> { if (isolated) setDisableDefault(true, (success, detail) -> {}); });
+    }
+
+    public boolean isReady() { return ready; }
+    public void whenReady(Runnable callback) {
+        control(() -> new Handler(context.getMainLooper()).post(callback));
     }
 
     public boolean isEnabled() { return enabled; }
@@ -113,16 +122,34 @@ public final class MediaButtonController {
     public synchronized void setEnabled(boolean value) {
         enabled = value;
         generation++;
-        commands.getQueue().clear();
-        preferences.edit().putBoolean("enabled", value).apply();
+        control(() -> preferences.edit().putBoolean("enabled", value).apply());
         reconcileReceiver();
     }
 
-    public synchronized void setDefaultSource(boolean value) {
+    private synchronized void setDefaultSource(boolean value) {
         defaultSource = value;
         generation++;
-        commands.getQueue().clear();
         preferences.edit().putBoolean("default_source", value).apply();
+    }
+
+    /** Internal mode changed only by action 20; this is not a third MEDIA settings switch. */
+    public void cycleSource() {
+        control(() -> {
+            setDefaultSource(!defaultSource);
+            long time = SystemClock.uptimeMillis();
+            AudioManager audio = context.getSystemService(AudioManager.class);
+            for (int action : new int[]{KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP}) {
+                KeyEvent event = new KeyEvent(time, time, action, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 0);
+                // Returned broadcasts must never start another dispatch cycle.
+                policy.admit(event.getKeyCode(), action, 0, time, time, event.getDeviceId(), event.getScanCode(), event.getSource());
+                if (defaultSource) context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_BUTTON)
+                        .setFlags(0x01000020).addCategory(Intent.CATEGORY_DEFAULT).putExtra(Intent.EXTRA_KEY_EVENT, event));
+                else if (audio != null) audio.dispatchMediaKeyEvent(event);
+            }
+            String message = defaultSource ? "SRC multimedia" : "SRC android media";
+            new Handler(context.getMainLooper()).post(() -> android.widget.Toast.makeText(context,
+                    message, android.widget.Toast.LENGTH_SHORT).show());
+        });
     }
 
     public interface Result { void done(boolean success, String detail); }
@@ -145,7 +172,7 @@ public final class MediaButtonController {
                         && !output.contains("NATRO_MEDIA_ERROR=");
                 if (success) {
                     isolated = value;
-                    preferences.edit().putBoolean("disable_default", value).apply();
+                    control(() -> preferences.edit().putBoolean("disable_default", value).apply());
                     status = value ? "Кнопки передаются в Natro" : "Штатный путь восстановлен";
                 } else {
                     status = "Не удалось изменить путь кнопок: " + shortError(error, output);
@@ -155,6 +182,14 @@ public final class MediaButtonController {
                 callback.done(success, status);
             }
         });
+    }
+
+    private void control(Runnable work) {
+        try { commands.execute(work); }
+        catch (RejectedExecutionException full) {
+            // These few durable mutations are not physical commands and must not be discarded.
+            new Handler(context.getMainLooper()).postDelayed(() -> control(work), 50);
+        }
     }
 
     private void reconcileReceiver() {

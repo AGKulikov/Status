@@ -865,25 +865,8 @@ public class WidgetService extends Service {
 
     @Nullable private OverlayStateListener overlayStateListener;
 
-    private MediaSessionManager mediaSessionManager;
-    private int mediaBindingGeneration;
-    private final List<MediaController> activeMediaControllers = new ArrayList<>();
-    private final MediaController.Callback mediaControllerCallback = new MediaController.Callback() {
-        @Override
-        public void onPlaybackStateChanged(@Nullable PlaybackState state) {
-            updateMediaInfo();
-        }
-
-        @Override
-        public void onMetadataChanged(@Nullable MediaMetadata metadata) {
-            updateMediaInfo();
-        }
-    };
-    private final MediaSessionManager.OnActiveSessionsChangedListener activeSessionsChangedListener =
-            controllers -> {
-                mediaBindingGeneration++;
-                rebindMediaControllers(controllers);
-            };
+    private dezz.status.widget.launcher.LauncherMediaController sharedMedia;
+    @Nullable private dezz.status.widget.launcher.LauncherMediaController.Snapshot mediaSnapshot;
 
     private int satellitesCount = -1;
     private int gnssModeFlags = 0;
@@ -5386,11 +5369,11 @@ public class WidgetService extends Service {
         // deferred post-boot integration refresh must not make an empty mediaContainer visible
         // after enableMediaTracking already hid it: only real active media may occupy the row.
         boolean phoneNotificationActive = isPhoneNotificationActive();
-        MediaController mediaController = pickActiveMediaController();
+        dezz.status.widget.launcher.LauncherMediaController.Snapshot media = mediaSnapshot;
         boolean mediaSessionActive = StatusMediaVisibilityPolicy.hasVisibleContent(
                 phoneNotificationActive,
-                mediaController != null,
-                isActuallyPlaying(mediaController),
+                media != null && media.available,
+                media != null && media.playing,
                 prefs.media.onlyWhilePlaying.get());
         boolean mediaShouldBeGone = !bricksSet.contains(BrickType.MEDIA)
                 || !isRemotelyVisible(BrickType.MEDIA) || !mediaSessionActive;
@@ -5954,79 +5937,21 @@ public class WidgetService extends Service {
     }
 
     private void enableMediaTracking() {
-        if (mediaSessionManager != null) {
-            // applyBrickVisibility() runs before this method and may have made the configured
-            // media brick VISIBLE. Reconcile it even when tracking was already registered:
-            // without an active controller the empty container must return to GONE immediately,
-            // rather than occupying a blank row until the first MediaSession callback.
-            updateMediaInfo();
-            return;
-        }
-        mediaSessionManager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
-        if (mediaSessionManager == null) return;
-        ComponentName component = new ComponentName(this, MediaNotificationListener.class);
-        int generation = ++mediaBindingGeneration;
-        try {
-            mediaSessionManager.addOnActiveSessionsChangedListener(activeSessionsChangedListener, component, mainHandler);
-            requestInitialMediaControllers(mediaSessionManager, component, generation);
-        } catch (SecurityException e) {
-            Log.w(TAG, "Notification access not granted; media tracking disabled", e);
-            mediaSessionManager = null;
-        }
+        if (sharedMedia == null) {
+            sharedMedia = new dezz.status.widget.launcher.LauncherMediaController(this, prefs, state -> {
+                if (destroyed) return;
+                mediaSnapshot = state;
+                updateMediaInfo();
+            });
+            sharedMedia.start();
+        } else updateMediaInfo();
     }
 
     private void disableMediaTracking() {
-        if (mediaSessionManager == null) return;
-        mediaBindingGeneration++;
-        try {
-            mediaSessionManager.removeOnActiveSessionsChangedListener(activeSessionsChangedListener);
-        } catch (Exception ignored) {
-        }
-        for (MediaController c : activeMediaControllers) {
-            c.unregisterCallback(mediaControllerCallback);
-        }
-        activeMediaControllers.clear();
-        mediaSessionManager = null;
-    }
-
-    private void requestInitialMediaControllers(@NonNull MediaSessionManager source,
-                                                @NonNull ComponentName component,
-                                                int generation) {
-        try {
-            startupStateWorker.execute(() -> {
-                List<MediaController> controllers = null;
-                RuntimeException failure = null;
-                try {
-                    controllers = source.getActiveSessions(component);
-                } catch (RuntimeException error) {
-                    failure = error;
-                }
-                List<MediaController> result = controllers;
-                RuntimeException queryFailure = failure;
-                mainHandler.post(() -> {
-                    if (destroyed || mediaSessionManager != source
-                            || generation != mediaBindingGeneration) return;
-                    if (queryFailure == null) rebindMediaControllers(result);
-                    else updateMediaInfo();
-                });
-            });
-        } catch (RuntimeException stopped) {
-            updateMediaInfo();
-        }
-    }
-
-    private void rebindMediaControllers(@Nullable List<MediaController> controllers) {
-        for (MediaController c : activeMediaControllers) {
-            c.unregisterCallback(mediaControllerCallback);
-        }
-        activeMediaControllers.clear();
-        if (controllers != null) {
-            for (MediaController c : controllers) {
-                activeMediaControllers.add(c);
-                c.registerCallback(mediaControllerCallback, mainHandler);
-            }
-        }
-        updateMediaInfo();
+        dezz.status.widget.launcher.LauncherMediaController previous = sharedMedia;
+        sharedMedia = null;
+        if (previous != null) previous.stop();
+        mediaSnapshot = null;
     }
 
     private void handlePhoneLowBatteryAlert(@NonNull ConnectorValue value) {
@@ -6493,12 +6418,11 @@ public class WidgetService extends Service {
         boolean popupMediaRequested = isPopupBuiltinRequested(BrickType.MEDIA);
         boolean driverMediaRequested =
                 driverInformationBrickTypes().contains(BrickType.MEDIA);
-        MediaController playing = pickActiveMediaController();
-        PlaybackState playbackState = playing == null ? null : playing.getPlaybackState();
+        dezz.status.widget.launcher.LauncherMediaController.Snapshot playing = mediaSnapshot;
         boolean musicPresentationVisible = StatusMediaVisibilityPolicy.hasVisibleContent(
                 false,
-                playing != null,
-                isActuallyPlaying(playbackState),
+                playing != null && playing.available,
+                playing != null && playing.playing,
                 prefs.media.onlyWhilePlaying.get());
         boolean mainMediaKeepsSpace = musicPresentationVisible && mainMediaHidden
                 && prefs.hideKeepsSpaceFor(BrickType.MEDIA).get();
@@ -6514,7 +6438,7 @@ public class WidgetService extends Service {
             schedulePopupRefresh();
             return;
         }
-        if (playing == null) {
+        if (playing == null || !playing.available) {
             binding.mediaContainer.setVisibility(View.GONE);
             stopMediaProgressTicker();
             binding.mediaAppText.setMarqueeText("");
@@ -6523,9 +6447,8 @@ public class WidgetService extends Service {
             schedulePopupRefresh();
             return;
         }
-        MediaMetadata metadata = playing.getMetadata();
-        String title = pickMediaTitle(metadata);
-        String artist = metadata != null ? metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) : null;
+        String title = playing.title;
+        String artist = playing.artist;
         if (isUnknownArtistPlaceholder(artist)) {
             // Some players (notably stock Android Music) fill the artist field with a literal
             // "Unknown artist" / "Неизвестный исполнитель" string when the tag is missing.
@@ -6547,12 +6470,6 @@ public class WidgetService extends Service {
             // placeholder so the user can see that media playback is active.
             subtitle = getString(R.string.media_unknown_track);
         }
-        if (playbackState != null
-                && (playbackState.getState() == PlaybackState.STATE_PLAYING
-                || playbackState.getState() == PlaybackState.STATE_PAUSED)) {
-            MediaPlaybackHistoryStore.record(this, playing.getPackageName(),
-                    playbackState.getState() == PlaybackState.STATE_PLAYING);
-        }
         // Pause shape only for an actual PAUSED; transient states (buffering / seeking) keep the
         // play shape so the icon doesn't flicker every time the user scrubs.
         // Players republish PlaybackState continuously (Yandex Music every second), and
@@ -6560,9 +6477,8 @@ public class WidgetService extends Service {
         // for identical text. On OEM head units that per-second layout storm makes the whole
         // title row visibly jitter while the marquee scrolls — so every setter here must be
         // a no-op when the value didn't actually change (MediaStateIconView.setPaused is).
-        binding.mediaStateIcon.setPaused(playbackState != null
-                && playbackState.getState() == PlaybackState.STATE_PAUSED);
-        binding.mediaAppText.setMarqueeText(getAppLabel(playing.getPackageName()));
+        binding.mediaStateIcon.setPaused(!playing.playing);
+        binding.mediaAppText.setMarqueeText(playing.application);
         // Reconcile the row structure too: settings may have changed while a controller callback
         // was queued. The same method already ran during applyPreferences(), so playback starting
         // cannot be the first event that establishes the configured widget height.
@@ -6572,9 +6488,7 @@ public class WidgetService extends Service {
 
         // Duration: format ms → "M:SS" / "H:MM:SS". Hidden when the user opted out or the
         // player doesn't expose a positive duration (live streams, podcast pre-buffer).
-        long durationMs = metadata != null
-                ? metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)
-                : 0L;
+        long durationMs = playing.durationMs;
         // Track identity: duration/progress visibility may only COLLAPSE on a real track
         // change. Players republish metadata continuously (Yandex Music: every second) and
         // the duration is transiently absent in some republishes — hiding on those blips
@@ -6676,56 +6590,20 @@ public class WidgetService extends Service {
      * Called both from {@link #updateMediaInfo} (state/metadata flips) and from
      * {@link #mediaProgressTick} (once per second while playing) to advance the bar smoothly.
      */
-    private void updateMediaProgress(@Nullable MediaController playing) {
-        if (binding == null) return;
-        // Visibility policy: this method NEVER changes the bar's visibility. Flipping
-        // GONE/VISIBLE changes the media container's height and relayouts the whole brick
-        // row — and players like Yandex Music republish state/metadata every second, with
-        // the duration transiently missing, which turned that flip into a once-a-second
-        // visible "regroup" of the row while the marquee scrolls. Visibility is decided
-        // solely in updateMediaInfo (real track/state changes); here we only advance the
-        // fill fraction — a pure repaint.
-        if (!prefs.media.progressBarEnabled.get() || playing == null
-                || binding.mediaProgressBar.getVisibility() != View.VISIBLE) {
-            stopMediaProgressTicker();
-            return;
-        }
-        MediaMetadata metadata = playing.getMetadata();
-        long duration = metadata != null
-                ? metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)
-                : 0L;
-        PlaybackState state = playing.getPlaybackState();
-        if (duration <= 0L || state == null) {
-            // Timeline transiently unavailable (metadata republish in flight) — keep the last
-            // rendered fill and let the next tick catch up rather than touching layout.
-            return;
-        }
-        long now = android.os.SystemClock.elapsedRealtime();
-        long lastUpdate = state.getLastPositionUpdateTime();
-        long basePosition = state.getPosition();
-        // PlaybackState.getPosition() returns the position as of getLastPositionUpdateTime();
-        // for the *current* moment we extrapolate with the reported playback speed (typically 1.0).
-        long actualPosition = basePosition
-                + (long) ((now - lastUpdate) * state.getPlaybackSpeed());
-        if (actualPosition < 0L) actualPosition = 0L;
-        if (actualPosition > duration) actualPosition = duration;
-
-        binding.mediaProgressBar.setProgress((float) actualPosition / (float) duration);
-
-        if (state.getState() == PlaybackState.STATE_PLAYING) {
-            // Re-arm — the new postDelayed replaces any previously queued one, idempotent.
-            mainHandler.removeCallbacks(mediaProgressTick);
-            mainHandler.postDelayed(mediaProgressTick, MEDIA_PROGRESS_TICK_MS);
-        } else {
-            stopMediaProgressTicker();
-        }
+    private void updateMediaProgress(
+            @Nullable dezz.status.widget.launcher.LauncherMediaController.Snapshot playing) {
+        if (binding == null || playing == null || playing.durationMs <= 0
+                || !prefs.media.progressBarEnabled.get()
+                || binding.mediaProgressBar.getVisibility() != View.VISIBLE) return;
+        // The single shared ticker already extrapolated this position for every display.
+        binding.mediaProgressBar.setProgress((float) playing.positionMs / (float) playing.durationMs);
     }
 
     private void stopMediaProgressTicker() {
         mainHandler.removeCallbacks(mediaProgressTick);
     }
 
-    private final Runnable mediaProgressTick = () -> updateMediaProgress(pickActiveMediaController());
+    private final Runnable mediaProgressTick = () -> updateMediaProgress(mediaSnapshot);
 
     /**
      * Best-effort extraction of a track title from the media metadata. Falls back through several
@@ -6783,52 +6661,6 @@ public class WidgetService extends Service {
         return android.net.Uri.decode(last);
     }
 
-    @Nullable
-    private MediaController pickActiveMediaController() {
-        // Prefer a controller that is currently playing. If none is playing, fall back to any
-        // controller in a transient "media is loaded and the user is doing something with it"
-        // state — paused, buffering, fast-forwarding, rewinding, skipping. Keeping the brick
-        // visible across these short-lived transitions avoids a VISIBLE→GONE→VISIBLE blink
-        // (which would re-layout the title text from zero size and reset the marquee scroll)
-        // every time the user seeks or the player briefly buffers.
-        MediaController fallback = null;
-        for (MediaController c : activeMediaControllers) {
-            PlaybackState s = c.getPlaybackState();
-            if (s == null) continue;
-            int state = s.getState();
-            if (state == PlaybackState.STATE_PLAYING) {
-                return c;
-            }
-            if (fallback == null && isMediaActiveState(state)) {
-                fallback = c;
-            }
-        }
-        return fallback;
-    }
-
-    private static boolean isMediaActiveState(int state) {
-        switch (state) {
-            case PlaybackState.STATE_PAUSED:
-            case PlaybackState.STATE_BUFFERING:
-            case PlaybackState.STATE_FAST_FORWARDING:
-            case PlaybackState.STATE_REWINDING:
-            case PlaybackState.STATE_SKIPPING_TO_NEXT:
-            case PlaybackState.STATE_SKIPPING_TO_PREVIOUS:
-            case PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM:
-            case PlaybackState.STATE_CONNECTING:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private static boolean isActuallyPlaying(@Nullable MediaController controller) {
-        return controller != null && isActuallyPlaying(controller.getPlaybackState());
-    }
-
-    private static boolean isActuallyPlaying(@Nullable PlaybackState state) {
-        return state != null && state.getState() == PlaybackState.STATE_PLAYING;
-    }
 
     private String getAppLabel(String pkg) {
         try {

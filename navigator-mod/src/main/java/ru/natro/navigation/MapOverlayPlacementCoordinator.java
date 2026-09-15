@@ -254,18 +254,24 @@ final class MapOverlayPlacementCoordinator {
         Candidate[] candidates = candidates(preferRight);
         for (int index = 0; index < candidates.length; index++) {
             Candidate candidate = candidates[index];
-            Footprint footprint = footprintFor(footprints, candidate.legName);
-            RectF bounds = rect(screen[0], screen[1], safeWidth, safeHeight,
-                    candidate, footprint);
-            RectF body = footprint == null ? bounds : footprint.collisionBounds(bounds);
-            if (!insideSafeViewport(bounds) || overlapsReservation(body)) continue;
-            double score = score(body, candidate, index, previous, screen,
-                    latitude, longitude, routeSegmentIndex, routeSegmentPosition);
-            if (score < bestScore) {
-                best = candidate;
-                bestFootprint = footprint;
-                bestRect = body;
-                bestScore = score;
+            ArrayList<Footprint> measured = new ArrayList<>();
+            if (footprints != null) for (Footprint item : footprints) {
+                if (item != null && item.isUsable() && candidate.legName.equals(item.legName)) measured.add(item);
+            }
+            if (measured.isEmpty()) measured.add(null);
+            for (Footprint footprint : measured) {
+                RectF bounds = rect(screen[0], screen[1], safeWidth, safeHeight, candidate, footprint);
+                RectF body = footprint == null ? bounds : footprint.collisionBounds(bounds);
+                if (!insideSafeViewport(bounds) || overlapsReservation(body)) continue;
+                int variant = footprint == null ? 0 : footprint.variant;
+                double score = score(body, candidate, index, previous, screen,
+                        latitude, longitude, routeSegmentIndex, routeSegmentPosition);
+                score += variant * 10000d;
+                if (previous != null && candidate.legName.equals(previous.legName)
+                        && variant != previous.variant) score += SLOT_CHANGE_PENALTY;
+                if (score < bestScore) {
+                    best = candidate; bestFootprint = footprint; bestRect = body; bestScore = score;
+                }
             }
         }
         if (best == null || bestRect == null) return null;
@@ -603,7 +609,7 @@ final class MapOverlayPlacementCoordinator {
     private static Placement placement(Candidate candidate, Footprint footprint) {
         return footprint == null
                 ? new Placement(candidate.anchorX, candidate.anchorY, candidate.legName)
-                : new Placement(footprint.anchorX, footprint.anchorY, candidate.legName);
+                : new Placement(footprint.anchorX, footprint.anchorY, candidate.legName, footprint.variant);
     }
 
     private static Footprint footprintFor(List<Footprint> footprints, String legName) {
@@ -640,15 +646,21 @@ final class MapOverlayPlacementCoordinator {
         final float anchorX;
         final float anchorY;
         final String legName;
+        final int variant;
 
         Placement(float anchorX, float anchorY, String legName) {
+            this(anchorX, anchorY, legName, 0);
+        }
+
+        Placement(float anchorX, float anchorY, String legName, int variant) {
             this.anchorX = anchorX;
             this.anchorY = anchorY;
             this.legName = legName;
+            this.variant = variant;
         }
 
         boolean sameSlot(Placement other) {
-            return other != null && legName.equals(other.legName);
+            return other != null && legName.equals(other.legName) && variant == other.variant;
         }
     }
 
@@ -660,6 +672,7 @@ final class MapOverlayPlacementCoordinator {
         final float anchorX;
         final float anchorY;
         final RectF collisionBody;
+        final int variant;
 
         Footprint(String legName, int width, int height, float anchorX, float anchorY) {
             this(legName, width, height, anchorX, anchorY, null);
@@ -667,12 +680,18 @@ final class MapOverlayPlacementCoordinator {
 
         Footprint(String legName, int width, int height, float anchorX, float anchorY,
                   RectF collisionBody) {
+            this(legName, width, height, anchorX, anchorY, collisionBody, 0);
+        }
+
+        Footprint(String legName, int width, int height, float anchorX, float anchorY,
+                  RectF collisionBody, int variant) {
             this.legName = legName == null ? "" : legName;
             this.width = width;
             this.height = height;
             this.anchorX = anchorX;
             this.anchorY = anchorY;
             this.collisionBody = collisionBody == null ? null : new RectF(collisionBody);
+            this.variant = variant;
         }
 
         RectF collisionBounds(RectF textureBounds) {

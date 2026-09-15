@@ -38,6 +38,23 @@ public class ForkReplay {
    check(p.reserveIfClear("alt","new",55,37,168,80,true,-1,0,null,body)!=null);
    // A second opaque body cannot use the same slot, regardless of its transparent tail.
    check(p.reserveIfClear("alt2","overlap",55,37,168,80,true,-1,0,null,body)==null);
+   // The nearest eight slots are occupied; extending the leader finds a free body while
+   // the icon anchor continues to represent exactly the same fork coordinate.
+   p.attach(new Window(),1000,700);
+   p.reserveFixed("lanes","junction",55,37,120,100,.5f,.5f);
+   List<MapOverlayPlacementCoordinator.Footprint> adaptive=new ArrayList<>();
+   for(String leg:MapOverlayPlacementCoordinator.placementLegNames()) {
+     adaptive.add(new MapOverlayPlacementCoordinator.Footprint(leg,204,84,2f/204,.5f,new RectF(34,2,202,82),0));
+     adaptive.add(new MapOverlayPlacementCoordinator.Footprint(leg,332,84,2f/332,.5f,new RectF(162,2,330,82),1));
+   }
+   MapOverlayPlacementCoordinator.Placement farther=p.reserveIfClear("alt","adaptive",55,37,168,80,true,-1,0,null,adaptive);
+   check(farther!=null && farther.variant==1);
+   check(Math.abs(farther.anchorX*332-2)<.001f);
+   p.clearOwner("alt");
+   check(farther.sameSlot(p.reserveIfClear("alt","stable",55,37,168,80,true,-1,0,farther,adaptive)));
+   p.clearOwner("alt");
+   p.reserveFixed("camera","farther-body",55,37,168,80,-.95f,.5f);
+   check(p.reserveIfClear("alt","fully-occupied",55,37,168,80,true,-1,0,null,adaptive)==null);
    p.attach(new Window(),550,400);
    check(p.reserveIfClear("alt","clipped",55,37,168,80,true,-1,0,null,body)==null);
    p.detach();check(p.reserveIfClear("alt","unknown",55,37,168,80,true,-1,0,null,body)==null);

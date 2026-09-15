@@ -1067,6 +1067,18 @@ final class GeelyCarIntegration implements CarIntegration {
                     "drive_mode", CarControlDescriptor.Kind.OPTIONS,
                     IDriveMode.DM_FUNC_DRIVE_MODE_SELECT, NO_ZONE, false,
                     driveModeOptions(), 0, 0, 0, "", "#FFFFC107"),
+            // MConfig+ 46.1 hfp.handleMessage / xgo.cz: real ECARX default zone MIN_VALUE.
+            new ControlDefinition("vehicle.star_default", "Штатное действие ★", "Кнопки",
+                    "star", CarControlDescriptor.Kind.TOGGLE, 554762496,
+                    DEFAULT_ZONE, false, toggleOptions(), 0, 1, 1, "", "#FF42A5F5"),
+            new ControlDefinition("vehicle.screen_theme", "Тема экранов", "Комфорт",
+                    "screen", CarControlDescriptor.Kind.OPTIONS, 538247424,
+                    DEFAULT_ZONE, false, Arrays.asList(option(538247425, "День"),
+                    option(538247426, "Ночь"), option(538247427, "Авто")), 0, 0, 0, "", "#FF42A5F5"),
+            // Camera uses the two-argument global overload, unlike STAR/theme above.
+            new ControlDefinition("vehicle.camera_360", "Камера 360", "Автомобиль",
+                    "camera", CarControlDescriptor.Kind.TOGGLE, 587399424,
+                    NO_ZONE, false, toggleOptions(), 0, 1, 1, "", "#FF42A5F5"),
             new ControlDefinition(TrunkControlSafety.CONTROL_ID, "Багажник", "Автомобиль",
                     TrunkControlSafety.ICON_CLOSED, CarControlDescriptor.Kind.TOGGLE,
                     TRUNK_FUNCTION_ID, TRUNK_ZONE, false,
@@ -4104,6 +4116,48 @@ final class GeelyCarIntegration implements CarIntegration {
     }
 
     @Override
+    public void restartInfotainment(@NonNull ControlCommandListener listener) {
+        if (!executeControlTask(() -> EcarxButtonPowerAccess.restart(appContext, listener)))
+            postCommandResult(listener, false, "ECARX уже остановлен");
+    }
+
+    @Override
+    public void selectButtonDriveMode(int value, @NonNull java.util.function.BooleanSupplier stillRequested,
+                                      @NonNull ControlCommandListener listener) {
+        if (value != 570491137 && value != 570491138 && value != 570491139
+                && value != 570491145 && value != 570491149 && value != 570491155 && value != 570491158) {
+            postCommandResult(listener, false, "Неизвестный режим движения"); return;
+        }
+        if (!executeControlTask(() -> attemptButtonDriveMode(value, 0, stillRequested, listener)))
+            postCommandResult(listener, false, "ECARX уже остановлен");
+    }
+
+    private void attemptButtonDriveMode(int value, int attempt, java.util.function.BooleanSupplier stillRequested,
+                                        ControlCommandListener listener) {
+        try {
+            if (controlsShuttingDown || !stillRequested.getAsBoolean()) {
+                postCommandResult(listener, false, "Команда отменена"); return;
+            }
+            ICarFunction source = ensureCarFunctions();
+            if (source == null || source.isFunctionSupported(570491136, DEFAULT_ZONE) != FunctionStatus.active) {
+                postCommandResult(listener, false, "Режим движения пока недоступен"); return;
+            }
+            if (!stillRequested.getAsBoolean()) { postCommandResult(listener, false, "Команда отменена"); return; }
+            boolean accepted = source.setFunctionValue(570491136, DEFAULT_ZONE, value);
+            int actual = source.getFunctionValue(570491136, DEFAULT_ZONE);
+            if (accepted && actual == value) { postCommandResult(listener, true, "Режим подтверждён"); return; }
+            if (attempt < 2) {
+                mainHandler.postDelayed(() -> {
+                    if (!executeControlTask(() -> attemptButtonDriveMode(value, attempt + 1, stillRequested, listener)))
+                        postCommandResult(listener, false, "ECARX уже остановлен");
+                }, 150);
+                return;
+            }
+            postCommandResult(listener, false, "Автомобиль не подтвердил режим движения");
+        } catch (Throwable failed) { postCommandResult(listener, false, "Режим движения недоступен"); }
+    }
+
+    @Override
     public void setStockHudProfileMode(int mode, boolean autoRepeat,
                                        @NonNull ControlCommandListener listener) {
         if (mode < 0 || mode > 3) {
@@ -4727,6 +4781,9 @@ final class GeelyCarIntegration implements CarIntegration {
                 }
                 return 1d;
             case CYCLE:
+                if ("vehicle.screen_theme".equals(definition.descriptor.id) && command.cycleValues.isEmpty()) {
+                    return current == 538247425 ? 538247426d : current == 538247427 ? 538247425d : 538247427d;
+                }
                 return cycleTargetWithMandatoryOff(definition.descriptor, availableOptions,
                         command.cycleValues, current);
             default:

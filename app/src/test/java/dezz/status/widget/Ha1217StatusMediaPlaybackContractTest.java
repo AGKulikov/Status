@@ -26,19 +26,22 @@ public final class Ha1217StatusMediaPlaybackContractTest {
         assertTrue(layout.contains("@+id/brickMediaOnlyWhilePlaying"));
     }
 
-    @Test public void mediaSessionCallbacksDriveVisibilityWithoutANewTimer() throws Exception {
+    @Test public void sharedMediaCallbacksDriveVisibilityWithoutANewTimer() throws Exception {
         String service = source("WidgetService.java");
         String callback = between(service,
-                "private final MediaController.Callback mediaControllerCallback",
-                "private final MediaSessionManager.OnActiveSessionsChangedListener");
-        assertTrue(callback.contains("onPlaybackStateChanged"));
+                "private void enableMediaTracking()",
+                "private void disableMediaTracking()");
+        assertTrue(callback.contains("LauncherMediaController(this, prefs, state ->"));
+        assertTrue(callback.contains("mediaSnapshot = state"));
         assertTrue(callback.contains("updateMediaInfo();"));
         assertFalse(callback.contains("postDelayed"));
+        assertFalse(service.contains("getActiveSessions("));
+        assertFalse(service.contains("getPlaybackState()"));
 
         String update = between(service, "private void updateMediaInfo()",
                 "private void syncMediaProgressWidth()");
         assertTrue(update.contains("prefs.media.onlyWhilePlaying.get()"));
-        assertTrue(update.contains("isActuallyPlaying(playbackState)"));
+        assertTrue(update.contains("playing != null && playing.playing"));
         assertTrue(update.contains("musicPresentationVisible"));
         assertTrue(update.contains("binding.mediaContainer.setVisibility("));
     }

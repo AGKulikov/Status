@@ -6,19 +6,13 @@
 package dezz.status.widget.launcher.media;
 
 import android.content.Context;
-import android.content.BroadcastReceiver;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
-import android.media.AudioManager;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -34,7 +28,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -49,12 +42,11 @@ import dezz.status.widget.launcher.panels.PanelContentResizeMath;
 
 /** Responsive HOME media surface whose contents are fully driven by {@link MediaPanelConfig}. */
 public final class MediaPanelView extends FrameLayout {
-    private static final String ACTION_VOLUME_CHANGED = "android.media.VOLUME_CHANGED_ACTION";
-    private static final String EXTRA_VOLUME_STREAM_TYPE = "android.media.EXTRA_VOLUME_STREAM_TYPE";
     public interface Controls {
         void previous();
         void playPause();
         void next();
+        void setVolumePercent(int percent);
         boolean like();
         void seekTo(long positionMs);
         void finishSeek(long positionMs);
@@ -79,16 +71,6 @@ public final class MediaPanelView extends FrameLayout {
     @Nullable private final Controls controls;
     private final Map<String, View> elementViews = new LinkedHashMap<>();
     private final int[] dragGridLocation = new int[2];
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Runnable delayedVolumeSync = this::syncSystemVolume;
-    private boolean volumeReceiverRegistered;
-    private final BroadcastReceiver volumeReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) {
-            int stream = intent == null ? AudioManager.STREAM_MUSIC : intent.getIntExtra(
-                    EXTRA_VOLUME_STREAM_TYPE, AudioManager.STREAM_MUSIC);
-            if (stream == AudioManager.STREAM_MUSIC) syncSystemVolume();
-        }
-    };
     private MediaPanelConfig config;
     private MediaElementGridLayout grid;
     @Nullable private LayoutEditor layoutEditor;
@@ -111,14 +93,6 @@ public final class MediaPanelView extends FrameLayout {
     private long renderedArtworkFingerprint;
     private boolean renderedArtworkOwned;
     private boolean artworkRenderInitialized;
-    private boolean artworkTrackChanged;
-    @NonNull private String artworkTrackKey = "";
-    @NonNull private String artworkTrackApplication = "";
-    @NonNull private String artworkTrackTitle = "";
-    @NonNull private String artworkTrackArtist = "";
-    @NonNull private String artworkTrackAlbum = "";
-    @NonNull private String previousArtworkTrackAlbum = "";
-    private long rejectedArtworkFingerprint;
     private boolean playPauseRenderInitialized;
     private boolean renderedPlaying;
     private int renderedPlayPauseTint;
@@ -195,17 +169,6 @@ public final class MediaPanelView extends FrameLayout {
 
     /** Existing Android MediaSession state remains owned by LauncherMediaController. */
     public void setSnapshot(@NonNull LauncherMediaController.Snapshot state) {
-        boolean sameTrack = MediaArtworkBindingPolicy.sameTrack(
-                artworkTrackApplication, artworkTrackTitle, artworkTrackArtist,
-                artworkTrackAlbum, state.application, state.title, state.artist, state.album);
-        artworkTrackChanged = !artworkTrackKey.isEmpty() && !sameTrack;
-        previousArtworkTrackAlbum = artworkTrackAlbum;
-        artworkTrackApplication = state.application;
-        artworkTrackTitle = state.title;
-        artworkTrackArtist = state.artist;
-        artworkTrackAlbum = state.album;
-        artworkTrackKey = MediaArtworkBindingPolicy.rejectionKey(
-                state.application, state.title, state.artist, state.album);
         titleValue = state.title;
         artistValue = state.artist;
         albumValue = state.album;
@@ -215,7 +178,7 @@ public final class MediaPanelView extends FrameLayout {
         // A one-second controller tick can arrive while the user is dragging. Keep the finger's
         // selected position authoritative until UP/CANCEL instead of snapping the bar backwards.
         if (progress == null || !progress.isPressed()) positionMs = state.positionMs;
-        volumePercent = state.volumePercent;
+        if (volume == null || !volume.isPressed()) volumePercent = state.volumePercent;
         playing = state.playing;
         likeAvailable = state.likeAvailable;
         liked = state.liked;
@@ -261,11 +224,6 @@ public final class MediaPanelView extends FrameLayout {
         renderedArtworkFingerprint = 0L;
         renderedArtworkOwned = false;
         artworkRenderInitialized = false;
-        artworkTrackChanged = false;
-        // Keep a rejected previous-track fingerprint across a settings/layout rebuild. The
-        // MediaSession may keep publishing that same stale bitmap for minutes; rebuilding the
-        // panel must not admit it as the new track's cover on the next one-second snapshot.
-        // A genuinely different fingerprint clears the rejection in applyArtwork().
         playPauseRenderInitialized = false;
         renderedPlayPauseTint = 0;
         likeRenderInitialized = false;
@@ -462,39 +420,7 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     private void setSystemVolume(int percent) {
-        AudioManager manager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
-        if (manager == null) return;
-        try {
-            int maximum = manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-            int selected = MediaVolumeMath.stepForPercent(percent, maximum);
-            manager.setStreamVolume(AudioManager.STREAM_MUSIC, selected, 0);
-            // ECARX applies an absolute volume asynchronously on some firmware. Reflect the
-            // actual discrete stream step immediately and verify it once the vendor mixer settles.
-            volumePercent = MediaVolumeMath.percentForStep(
-                    manager.getStreamVolume(AudioManager.STREAM_MUSIC), maximum);
-            updateVolumeUi();
-            mainHandler.removeCallbacks(delayedVolumeSync);
-            mainHandler.postDelayed(delayedVolumeSync, 180L);
-            mainHandler.postDelayed(delayedVolumeSync, 650L);
-        } catch (RuntimeException ignored) {}
-    }
-
-    private int readSystemVolume() {
-        AudioManager manager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
-        if (manager == null) return volumePercent;
-        try {
-            return MediaVolumeMath.percentForStep(
-                    manager.getStreamVolume(AudioManager.STREAM_MUSIC),
-                    manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
-        } catch (RuntimeException ignored) {
-            return volumePercent;
-        }
-    }
-
-    private void syncSystemVolume() {
-        if (controls == null) return;
-        volumePercent = readSystemVolume();
-        updateVolumeUi();
+        if (controls != null) controls.setVolumePercent(percent);
     }
 
     private void updateVolumeUi() {
@@ -646,25 +572,7 @@ public final class MediaPanelView extends FrameLayout {
             observedArtworkBitmap = artworkBitmap;
             observedArtworkFingerprint = fingerprint;
         }
-        if (artworkTrackChanged) {
-            // Capture the previous track's rendered pixels even when the first snapshot for the
-            // new track already contains its correct new cover.  A vendor session can emit the
-            // previous bitmap again after that correct frame; the rejection must survive it.
-            rejectedArtworkFingerprint =
-                    MediaArtworkBindingPolicy.previousTrackFingerprintToReject(
-                            true, previousArtworkTrackAlbum, artworkTrackAlbum,
-                            renderedArtworkFingerprint);
-        }
-        boolean previouslyRejected = MediaArtworkBindingPolicy.isRejectedForCurrentTrack(
-                rejectedArtworkFingerprint, fingerprint);
-        if (previouslyRejected) {
-            // New metadata arrived with the old track's pixels: keep that fingerprint hidden.
-            // It stays blocked for this entire track, including after the correct new cover has
-            // already appeared, so a late old MediaSession/cache packet cannot flash on screen.
-            artworkBitmap = null;
-            fingerprint = 0L;
-        }
-        artworkTrackChanged = false;
+        // The shared snapshot owns track/artwork ordering. Equal covers on adjacent songs are valid.
         boolean same = artworkRenderInitialized
                 && sameArtwork(artworkBitmap, fingerprint,
                 renderedArtworkBitmap, renderedArtworkFingerprint);
@@ -1241,26 +1149,4 @@ public final class MediaPanelView extends FrameLayout {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
-    @Override protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        if (controls == null || volumeReceiverRegistered) return;
-        try {
-            ContextCompat.registerReceiver(getContext(), volumeReceiver,
-                    new IntentFilter(ACTION_VOLUME_CHANGED), ContextCompat.RECEIVER_EXPORTED);
-            volumeReceiverRegistered = true;
-        } catch (RuntimeException ignored) {
-            volumeReceiverRegistered = false;
-        }
-        syncSystemVolume();
-    }
-
-    @Override protected void onDetachedFromWindow() {
-        mainHandler.removeCallbacks(delayedVolumeSync);
-        if (volumeReceiverRegistered) {
-            volumeReceiverRegistered = false;
-            try { getContext().unregisterReceiver(volumeReceiver); }
-            catch (RuntimeException ignored) {}
-        }
-        super.onDetachedFromWindow();
-    }
 }

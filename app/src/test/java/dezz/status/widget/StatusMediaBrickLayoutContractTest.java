@@ -53,12 +53,10 @@ public final class StatusMediaBrickLayoutContractTest {
         int enableEnd = service.indexOf("private void disableMediaTracking()", enableStart);
         String enable = service.substring(enableStart, enableEnd);
 
-        int existingManager = enable.indexOf("if (mediaSessionManager != null)");
-        int createManager = enable.indexOf("mediaSessionManager = (MediaSessionManager)");
-        int reconcile = enable.indexOf("updateMediaInfo();", existingManager);
-        assertTrue(existingManager >= 0);
-        assertTrue(reconcile > existingManager);
-        assertTrue(createManager > reconcile);
+        assertTrue(enable.contains("if (sharedMedia == null)"));
+        assertTrue(enable.contains("sharedMedia.start();"));
+        assertTrue(enable.contains("} else updateMediaInfo();"));
+        assertTrue(enable.contains("mediaSnapshot = state;"));
     }
 
     @Test public void visibilityPolicyRequiresAnActiveMediaSession() throws IOException {

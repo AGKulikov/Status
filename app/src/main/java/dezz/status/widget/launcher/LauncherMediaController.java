@@ -12,6 +12,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.Rating;
@@ -61,6 +63,7 @@ public final class LauncherMediaController {
     private static final int MAX_ARTWORK_BYTES = 4 * 1024 * 1024;
     private static final int MAX_ARTWORK_EDGE = 640;
     private static final long UI_TICK_MS = 1_000L;
+    private static final long MEDIA_NOTIFICATION_REFRESH_MS = 2_000L;
     private static final long SESSION_REFRESH_PLAYING_MS = 2_500L;
     /** Some ECARX players miss callbacks while paused; keep stale metadata bounded. */
     private static final long SESSION_REFRESH_PAUSED_MS = 20_000L;
@@ -75,7 +78,46 @@ public final class LauncherMediaController {
      * MediaSessionManager is an OEM Binder service and may block while the head unit is under
      * GPU pressure. One shared worker keeps that call off every HOME/HUD main Looper.
      */
-    private static final ThreadPoolExecutor SESSION_QUERY_LANE = createSessionQueryLane();
+    private static final ThreadPoolExecutor SESSION_QUERY_LANE = createSessionQueryLane("media-session-list");
+    private static final ThreadPoolExecutor SESSION_READ_LANE = createSessionQueryLane("media-session-read");
+    private static final ThreadPoolExecutor SESSION_CALLBACK_LANE = createSessionQueryLane("media-session-callbacks");
+    private static final ThreadPoolExecutor VOLUME_QUERY_LANE = createSessionQueryLane("media-volume-read");
+    private static final ThreadPoolExecutor ARTWORK_QUERY_LANE = createSessionQueryLane("media-artwork");
+
+    /** One runtime, one notification/session selection and one ticker for every display. */
+    private static SharedPlayback sharedPlayback;
+    private static synchronized SharedPlayback shared(Context context, Preferences preferences) {
+        if (sharedPlayback == null) sharedPlayback = new SharedPlayback(context, preferences);
+        return sharedPlayback;
+    }
+
+    private static final class SharedPlayback {
+        final ArrayList<LauncherMediaController> clients = new ArrayList<>();
+        final LauncherMediaController engine;
+        Snapshot latest;
+        SharedPlayback(Context context, Preferences preferences) {
+            engine = new LauncherMediaController(context, preferences, this::publish, true);
+        }
+        void add(LauncherMediaController client) {
+            if (clients.contains(client)) return;
+            clients.add(client);
+            if (latest != null) client.listener.onMediaChanged(latest);
+            if (clients.size() == 1) engine.start();
+        }
+        void remove(LauncherMediaController client) {
+            clients.remove(client);
+            client.listener.onMediaChanged(Snapshot.empty(engine.cachedVolume));
+            if (clients.isEmpty()) { engine.stop(); latest = null; }
+        }
+        void publish(Snapshot state) {
+            latest = state;
+            for (LauncherMediaController client : new ArrayList<>(clients)) {
+                if (!client.clientActive) continue;
+                try { client.listener.onMediaChanged(state); }
+                catch (RuntimeException failure) { Log.w(TAG, "Media display callback failed", failure); }
+            }
+        }
+    }
 
     public interface Listener { void onMediaChanged(@NonNull Snapshot state); }
 
@@ -159,6 +201,7 @@ public final class LauncherMediaController {
         final long contentChangedElapsedMs;
         final long playbackChangedElapsedMs;
         final long artworkChangedElapsedMs;
+        final float playbackSpeed;
 
         MediaState(@NonNull String title, @NonNull String artist, @NonNull String album,
                    @NonNull String packageName, @NonNull String application,
@@ -192,6 +235,19 @@ public final class LauncherMediaController {
                    @Nullable Boolean liked, long positionTimestampWallMs, long receivedElapsedMs,
                    long contentChangedElapsedMs, long playbackChangedElapsedMs,
                    long artworkChangedElapsedMs) {
+            this(title, artist, album, packageName, application, artwork, observedArtworkIdentity,
+                    durationMs, positionMs, playing, likeAvailable, liked, positionTimestampWallMs,
+                    receivedElapsedMs, contentChangedElapsedMs, playbackChangedElapsedMs,
+                    artworkChangedElapsedMs, 1f);
+        }
+
+        MediaState(@NonNull String title, @NonNull String artist, @NonNull String album,
+                   @NonNull String packageName, @NonNull String application,
+                   @Nullable Bitmap artwork, long observedArtworkIdentity,
+                   long durationMs, long positionMs, boolean playing, boolean likeAvailable,
+                   @Nullable Boolean liked, long positionTimestampWallMs, long receivedElapsedMs,
+                   long contentChangedElapsedMs, long playbackChangedElapsedMs,
+                   long artworkChangedElapsedMs, float playbackSpeed) {
             this.title = title;
             this.artist = artist;
             this.album = album;
@@ -209,14 +265,13 @@ public final class LauncherMediaController {
             this.contentChangedElapsedMs = contentChangedElapsedMs;
             this.playbackChangedElapsedMs = playbackChangedElapsedMs;
             this.artworkChangedElapsedMs = artworkChangedElapsedMs;
+            this.playbackSpeed = playbackSpeed;
         }
 
         long currentPosition(long nowWallMs) {
-            long value = positionMs;
-            if (playing && positionTimestampWallMs > 0L) {
-                value += Math.max(0L, nowWallMs - positionTimestampWallMs);
-            }
-            return MediaTimeline.clampPosition(value, durationMs);
+            return MediaTimeline.position(positionMs,
+                    positionTimestampWallMs > 0L ? Math.max(0L, nowWallMs - positionTimestampWallMs) : 0L,
+                    playbackSpeed, playing, durationMs);
         }
     }
 
@@ -226,7 +281,31 @@ public final class LauncherMediaController {
     private final AudioManager audioManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Listener listener;
+    @Nullable private final SharedPlayback shared;
+    private boolean clientActive;
+    private VolumeState cachedVolume = new VolumeState(-1, -1);
+    private boolean volumeReadInFlight;
+    private boolean volumeWriteInFlight;
+    private int pendingVolumePercent = -1;
+    private final Runnable volumeVerify = () -> requestVolume(true);
+    private long volumeReadAt;
+    private int volumeGeneration;
+    @Nullable private MediaDisplayNotification displayNotification;
+    @Nullable private Bitmap notificationArtwork;
+    private long artworkNotificationGeneration;
+    private boolean artworkReadInFlight;
+    private long notificationProbeGeneration;
+    private int sessionRevision;
+    @Nullable private MediaMetadata cachedMetadata;
+    @Nullable private PlaybackState cachedPlayback;
+    private final java.util.Map<String, String> applicationLabels = new java.util.HashMap<>();
+    private boolean sessionReadInFlight;
+    private boolean sessionReadPending;
+    private int sessionReadGeneration;
+    private final java.util.Map<android.media.session.MediaSession.Token, PlaybackState>
+            queriedPlayback = new java.util.HashMap<>();
     @Nullable private MediaController current;
+    private final java.util.LinkedHashSet<android.media.session.MediaSession.Token> deadTokens = new java.util.LinkedHashSet<>();
     @Nullable private MediaState sessionState;
     @Nullable private MediaState broadcastState;
     /**
@@ -234,9 +313,19 @@ public final class LauncherMediaController {
      * Kept across track transitions so a lagging OEM session cannot pull the panel backwards.
      */
     private boolean sessionBroadcastCorrelated;
-    private boolean started;
+    private volatile boolean started;
     private boolean receiverRegistered;
-    private boolean sessionsListenerRegistered;
+    private volatile boolean sessionsListenerRegistered;
+    private final java.util.concurrent.atomic.AtomicBoolean sessionListenerUpdateQueued = new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicBoolean callbackUpdateQueued = new java.util.concurrent.atomic.AtomicBoolean();
+    @Nullable private volatile SessionCallbackBinding desiredCallbackBinding, registeredCallbackBinding;
+    private static final class SessionCallbackBinding {
+        final MediaController controller;
+        final MediaController.Callback callback;
+        SessionCallbackBinding(MediaController controller, MediaController.Callback callback) {
+            this.controller = controller; this.callback = callback;
+        }
+    }
     private boolean cacheReadInFlight;
     private boolean cacheReloadPending;
     private int cacheLoadGeneration;
@@ -261,6 +350,7 @@ public final class LauncherMediaController {
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
             if (!started) return;
+            MediaNotificationListener.reconcileMediaNotifications();
             long nowElapsed = SystemClock.elapsedRealtime();
             boolean playing = (sessionState != null && sessionState.playing)
                     || (broadcastState != null && broadcastState.playing);
@@ -296,6 +386,11 @@ public final class LauncherMediaController {
                 else publish();
             });
 
+    private final MediaNotificationListener.MediaDisplayObserver mediaDisplayObserver = () -> {
+        if (Looper.myLooper() == Looper.getMainLooper()) receiveMediaNotification();
+        else mainHandler.post(this::receiveMediaNotification);
+    };
+
     private final Runnable pendingSeekDispatch = () -> {
         seekDispatchScheduled = false;
         dispatchPendingSeek(false);
@@ -309,37 +404,19 @@ public final class LauncherMediaController {
         }
     };
 
-    private final MediaController.Callback mediaCallback = new MediaController.Callback() {
-        @Override public void onPlaybackStateChanged(PlaybackState state) {
-            if (started) publishSession();
-        }
-        @Override public void onMetadataChanged(MediaMetadata metadata) {
-            if (started) publishSession();
-        }
-        @Override public void onSessionDestroyed() {
-            if (started) refresh();
-        }
-    };
+    @Nullable private MediaController.Callback mediaCallback;
 
-    private final MediaSessionManager.OnActiveSessionsChangedListener sessionsListener =
-            controllers -> {
-                if (!started) return;
-                try {
-                    select(controllers == null ? Collections.emptyList() : controllers);
-                } catch (RuntimeException ignored) {
-                    // Several ECARX builds expose a short-lived dead MediaSession binder while
-                    // switching players. Keep the last callback-tracked controller: clearing it
-                    // here would send the next steering command into the expensive global scan.
-                    publish();
-                }
-            };
+    private final MediaSessionManager.OnActiveSessionsChangedListener sessionsListener = controllers -> {
+        if (started) refresh();
+    };
 
     private final BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context receiverContext, Intent intent) {
             if (!started) return;
             String action = intent == null ? null : intent.getAction();
             if ("android.media.VOLUME_CHANGED_ACTION".equals(action)) {
-                // Re-read AudioManager; incoming extras are only a wakeup, never trusted values.
+                // Re-read on the dedicated worker; this wakeup never blocks a track update.
+                requestVolume(true);
                 publish();
                 return;
             }
@@ -369,18 +446,32 @@ public final class LauncherMediaController {
     public LauncherMediaController(@NonNull Context context,
                                    @NonNull Preferences preferences,
                                    @NonNull Listener listener) {
+        this(context, preferences, listener, false);
+    }
+
+    private LauncherMediaController(@NonNull Context context, @NonNull Preferences preferences,
+                                    @NonNull Listener listener, boolean engine) {
         Context app = context.getApplicationContext();
         this.context = app == null ? context : app;
         this.preferences = preferences;
         this.listener = listener;
+        shared = engine ? null : shared(this.context, preferences);
         manager = (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE);
         audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
     }
 
     public void start() {
+        if (Looper.myLooper() != Looper.getMainLooper()) { mainHandler.post(this::start); return; }
+        if (shared != null) {
+            if (!clientActive) { clientActive = true; shared.add(this); }
+            return;
+        }
         if (started) return;
         started = true;
         MediaNotificationListener.addMediaLikeObserver(mediaLikeObserver);
+        MediaNotificationListener.addMediaDisplayObserver(mediaDisplayObserver);
+        receiveMediaNotification();
+        requestVolume(true);
         registerBroadcastReceiver();
         loadCachedBroadcast();
         registerSessionsListener();
@@ -389,10 +480,26 @@ public final class LauncherMediaController {
     }
 
     public void stop() {
+        if (Looper.myLooper() != Looper.getMainLooper()) { mainHandler.post(this::stop); return; }
+        if (shared != null) {
+            if (clientActive) { clientActive = false; shared.remove(this); }
+            return;
+        }
         if (!started) return;
         started = false;
         MediaNotificationListener.removeMediaLikeObserver(mediaLikeObserver);
+        MediaNotificationListener.removeMediaDisplayObserver(mediaDisplayObserver);
+        displayNotification = null;
+        notificationArtwork = null;
+        artworkNotificationGeneration = 0L;
+        volumeGeneration++;
+        notificationProbeGeneration++;
+        sessionReadGeneration++;
+        sessionReadInFlight = false;
+        sessionReadPending = false;
         mainHandler.removeCallbacks(ticker);
+        mainHandler.removeCallbacks(volumeVerify);
+        pendingVolumePercent = -1;
         mainHandler.removeCallbacks(commandReconcile);
         mainHandler.removeCallbacks(broadcastExpiry);
         mainHandler.removeCallbacks(pendingSeekDispatch);
@@ -403,12 +510,7 @@ public final class LauncherMediaController {
         sessionQueryGeneration++;
         clearSeekGesture();
         lastSessionRefreshElapsedMs = 0L;
-        boolean removeSessionsListener = sessionsListenerRegistered;
-        sessionsListenerRegistered = false;
-        if (manager != null && removeSessionsListener) {
-            try { manager.removeOnActiveSessionsChangedListener(sessionsListener); }
-            catch (RuntimeException ignored) {}
-        }
+        registerSessionsListener();
         unregisterBroadcastReceiver();
         replace(null);
         sessionState = null;
@@ -417,15 +519,20 @@ public final class LauncherMediaController {
         invalidateCacheRead();
         // Clear ImageView references before the owned broadcast bitmap is recycled on the next
         // main-loop turn. A stopped HOME must not pin or attempt to draw media artwork.
-        listener.onMediaChanged(Snapshot.empty(readVolume()));
+        listener.onMediaChanged(Snapshot.empty(cachedVolume));
         replaceBroadcastState(null);
     }
 
     public void refresh() {
+        if (shared != null) { shared.engine.refresh(); return; }
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post(this::refresh);
             return;
         }
+        if (!started) return;
+        if (displayNotification != null && preferences.launcherMediaFixedPlayerEnabled.get()
+                && !displayNotification.packageName.equals(preferences.launcherMediaFixedPlayerPackage.get()))
+            receiveMediaNotification();
         if (manager == null) {
             publish();
             return;
@@ -441,14 +548,31 @@ public final class LauncherMediaController {
                 List<MediaController> controllers = null;
                 RuntimeException failure = null;
                 try {
-                    controllers = manager.getActiveSessions(listenerComponent());
+                    // Notification tokens precede the OEM list, which can retain old tokens.
+                    controllers = new ArrayList<>(MediaNotificationListener.activeMediaNotificationControllers(context));
+                    for (MediaController candidate : manager.getActiveSessions(listenerComponent())) {
+                        boolean duplicate = false;
+                        for (MediaController existing : controllers) {
+                            if (sameSession(existing, candidate)) { duplicate = true; break; }
+                        }
+                        if (!duplicate) controllers.add(candidate);
+                    }
                 } catch (RuntimeException error) {
                     failure = error;
                 }
                 List<MediaController> result = controllers;
                 RuntimeException queryFailure = failure;
-                mainHandler.post(() -> completeSessionQuery(
-                        generation, result, queryFailure));
+                java.util.Map<android.media.session.MediaSession.Token, PlaybackState> playback = new java.util.HashMap<>();
+                if (result != null) for (MediaController candidate : result) {
+                    try { playback.put(candidate.getSessionToken(), candidate.getPlaybackState()); }
+                    catch (RuntimeException ignored) { }
+                }
+                mainHandler.post(() -> {
+                    if (generation != sessionQueryGeneration) return;
+                    queriedPlayback.clear(); queriedPlayback.putAll(playback);
+                    completeSessionQuery(generation, result,
+                            result != null && !result.isEmpty() ? null : queryFailure);
+                });
             });
         } catch (RejectedExecutionException saturated) {
             sessionQueryInFlight = false;
@@ -486,6 +610,7 @@ public final class LauncherMediaController {
     }
 
     public void playPause() {
+        if (shared != null) { shared.engine.playPause(); return; }
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
         if (!dispatchCurrentPlayPause(target)) {
@@ -494,7 +619,41 @@ public final class LauncherMediaController {
         scheduleCommandReconcile();
     }
 
+    /** All media sliders share one latest-value write and one off-MAIN stream read. */
+    public void setVolumePercent(int percent) {
+        if (shared != null) { shared.engine.setVolumePercent(percent); return; }
+        if (Looper.myLooper() != Looper.getMainLooper()) { mainHandler.post(() -> setVolumePercent(percent)); return; }
+        pendingVolumePercent = Math.max(0, Math.min(100, percent));
+        drainVolumeWrite();
+    }
+
+    private void drainVolumeWrite() {
+        if (volumeWriteInFlight || pendingVolumePercent < 0 || audioManager == null) return;
+        int percent = pendingVolumePercent; pendingVolumePercent = -1;
+        volumeWriteInFlight = true; ++volumeGeneration;
+        try { VOLUME_QUERY_LANE.execute(() -> {
+            try {
+                int maximum = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                if (maximum > 0) {
+                    int step = dezz.status.widget.launcher.media.MediaVolumeMath.stepForPercent(percent, maximum);
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, step, 0);
+                }
+            } catch (RuntimeException unavailable) { }
+            mainHandler.post(() -> {
+                volumeWriteInFlight = false;
+                if (pendingVolumePercent >= 0) { drainVolumeWrite(); return; }
+                requestVolume(true);
+                mainHandler.removeCallbacks(volumeVerify);
+                if (started) {
+                    mainHandler.postDelayed(volumeVerify, 180L);
+                    mainHandler.postDelayed(volumeVerify, 650L);
+                }
+            });
+        }); } catch (RejectedExecutionException busy) { volumeWriteInFlight = false; }
+    }
+
     public void previous() {
+        if (shared != null) { shared.engine.previous(); return; }
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
         if (!dispatchCurrentSkip(target, false)) {
@@ -504,6 +663,7 @@ public final class LauncherMediaController {
     }
 
     public void next() {
+        if (shared != null) { shared.engine.next(); return; }
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
         if (!dispatchCurrentSkip(target, true)) {
@@ -555,6 +715,7 @@ public final class LauncherMediaController {
      * broadcast is emitted.
      */
     public boolean like() {
+        if (shared != null) return shared.engine.like();
         String targetPackage = seekTargetPackage();
         for (MediaController controller : resolveSeekControllers(true)) {
             boolean matches = !targetPackage.isEmpty()
@@ -649,6 +810,7 @@ public final class LauncherMediaController {
 
     /** Coalesces live scrubbing while preserving the exact player represented on HOME. */
     public void seekTo(long positionMs) {
+        if (shared != null) { shared.engine.seekTo(positionMs); return; }
         pendingSeekPositionMs = Math.max(0L, positionMs);
         long elapsed = SystemClock.elapsedRealtime() - lastSeekDispatchElapsedMs;
         if (!seekDispatchScheduled && elapsed >= SEEK_COMMAND_INTERVAL_MS) {
@@ -663,6 +825,7 @@ public final class LauncherMediaController {
 
     /** Commits ACTION_UP immediately, including players visible only through notifications. */
     public void finishSeek(long positionMs) {
+        if (shared != null) { shared.engine.finishSeek(positionMs); return; }
         pendingSeekPositionMs = Math.max(0L, positionMs);
         mainHandler.removeCallbacks(pendingSeekDispatch);
         seekDispatchScheduled = false;
@@ -824,6 +987,7 @@ public final class LauncherMediaController {
 
     /** Opens the same player that owns HOME transport commands. */
     public boolean openTargetPlayer() {
+        if (shared != null) return shared.engine.openTargetPlayer();
         String target = commandTargetPackage();
         return target.isEmpty()
                 ? MediaAppLauncher.launchYandexMusic(context)
@@ -867,15 +1031,23 @@ public final class LauncherMediaController {
     }
 
     private void registerSessionsListener() {
-        if (manager == null || sessionsListenerRegistered) return;
-        try {
-            manager.addOnActiveSessionsChangedListener(
-                    sessionsListener, listenerComponent(), mainHandler);
-            sessionsListenerRegistered = true;
-        } catch (RuntimeException ignored) {
-            // The durable broadcast source remains usable without MediaSession authorization.
-            sessionsListenerRegistered = false;
-        }
+        if (manager == null || !sessionListenerUpdateQueued.compareAndSet(false, true)) return;
+        try { SESSION_CALLBACK_LANE.execute(() -> {
+            boolean requested = started;
+            try {
+                if (requested && !sessionsListenerRegistered) {
+                    manager.addOnActiveSessionsChangedListener(sessionsListener, listenerComponent(), mainHandler);
+                    sessionsListenerRegistered = true;
+                } else if (!requested && sessionsListenerRegistered) {
+                    manager.removeOnActiveSessionsChangedListener(sessionsListener);
+                    sessionsListenerRegistered = false;
+                }
+            } catch (RuntimeException unavailable) { }
+            finally {
+                sessionListenerUpdateQueued.set(false);
+                if (requested != started) registerSessionsListener();
+            }
+        }); } catch (RejectedExecutionException busy) { sessionListenerUpdateQueued.set(false); }
     }
 
     private void registerBroadcastReceiver() {
@@ -1168,9 +1340,10 @@ public final class LauncherMediaController {
         try {
             for (MediaController candidate : controllers) {
                 if (candidate == null) continue;
+                if (deadTokens.contains(candidate.getSessionToken())) continue;
                 PlaybackState playback;
                 try {
-                    playback = candidate.getPlaybackState();
+                    playback = queriedPlayback.get(candidate.getSessionToken());
                 } catch (RuntimeException ignored) {
                     continue;
                 }
@@ -1194,7 +1367,16 @@ public final class LauncherMediaController {
         boolean keepCurrent = MediaStateFreshness.shouldKeepCurrentSession(
                 retained != null, retainedPlaying, firstPlaying != null);
         MediaController selected;
-        if (targetPlaying != null || target != null) {
+        MediaDisplayNotification live = displayNotification;
+        MediaController notificationController = null;
+        if (live != null && live.token != null && !deadTokens.contains(live.token)) {
+            for (MediaController candidate : controllers) {
+                if (live.token.equals(candidate.getSessionToken())) { notificationController = candidate; break; }
+            }
+        }
+        if (notificationController != null) {
+            selected = notificationController;
+        } else if (targetPlaying != null || target != null) {
             selected = targetPlaying != null ? targetPlaying : target;
         } else if (preferences.launcherMediaFixedPlayerEnabled.get()
                 && !targetPackage.isEmpty()) {
@@ -1210,6 +1392,8 @@ public final class LauncherMediaController {
 
     @NonNull
     private String commandTargetPackage() {
+        if (!preferences.launcherMediaFixedPlayerEnabled.get() && displayNotification != null
+                && !displayNotification.packageName.isEmpty()) return displayNotification.packageName;
         MediaPlaybackHistoryStore.Snapshot history = MediaPlaybackHistoryStore.read(context);
         String target = MediaPlaybackTargetPolicy.resolve(
                 preferences.launcherMediaFixedPlayerEnabled.get(),
@@ -1232,25 +1416,60 @@ public final class LauncherMediaController {
 
     private void replace(@Nullable MediaController next) {
         MediaController previous = current;
-        if (sameSession(previous, next)) {
-            current = next;
-            return;
-        }
-        // Publish callbacks can be dispatched synchronously by vendor implementations. Expose the
-        // new controller before registering so such a callback never reads the old session.
-        current = next;
-        // Yandex may rotate between several tokens owned by the same package during a track
-        // handoff. Preserve the proven broadcast relationship across that rotation, but never
-        // leak it to a genuinely different player.
+        if (sameSession(previous, next)) return;
+        current = next; sessionRevision++;
+        cachedMetadata = null; cachedPlayback = null;
+        sessionState = null;
         if (!sameControllerPackage(previous, next)) sessionBroadcastCorrelated = false;
-        if (previous != null) {
-            try { previous.unregisterCallback(mediaCallback); }
-            catch (RuntimeException ignored) {}
-        }
-        if (next != null) {
-            try { next.registerCallback(mediaCallback, mainHandler); }
-            catch (RuntimeException ignored) {}
-        }
+        MediaController.Callback callback = next == null ? null : new MediaController.Callback() {
+            private boolean active() { return started && current == next && mediaCallback == this; }
+            @Override public void onPlaybackStateChanged(PlaybackState state) {
+                if (!active()) return;
+                ++sessionRevision; cachedPlayback = state;
+                queriedPlayback.put(next.getSessionToken(), state);
+                acceptSession(next, cachedMetadata, cachedPlayback);
+                if (cachedMetadata == null) publishSession();
+            }
+            @Override public void onMetadataChanged(MediaMetadata metadata) {
+                if (!active()) return;
+                ++sessionRevision; cachedMetadata = metadata;
+                acceptSession(next, cachedMetadata, cachedPlayback);
+                if (cachedPlayback == null) publishSession();
+            }
+            @Override public void onSessionDestroyed() {
+                if (!active()) return;
+                deadTokens.add(next.getSessionToken());
+                while (deadTokens.size() > 8) deadTokens.remove(deadTokens.iterator().next());
+                ++sessionRevision; replace(null); sessionState = null;
+                receiveMediaNotification(); refresh();
+            }
+        };
+        mediaCallback = callback;
+        desiredCallbackBinding = next == null ? null : new SessionCallbackBinding(next, callback);
+        updateSessionCallback();
+    }
+
+    /** Coalesces token churn: at most one registered callback and one pending replacement. */
+    private void updateSessionCallback() {
+        if (!callbackUpdateQueued.compareAndSet(false, true)) return;
+        try { SESSION_CALLBACK_LANE.execute(() -> {
+            SessionCallbackBinding desired = desiredCallbackBinding;
+            SessionCallbackBinding old = registeredCallbackBinding;
+            try {
+                if (old != desired) {
+                    if (old != null) old.controller.unregisterCallback(old.callback);
+                    registeredCallbackBinding = null;
+                    if (desired != null) {
+                        desired.controller.registerCallback(desired.callback, mainHandler);
+                        registeredCallbackBinding = desired;
+                    }
+                }
+            } catch (RuntimeException unavailable) { }
+            finally {
+                callbackUpdateQueued.set(false);
+                if (desiredCallbackBinding != desired) updateSessionCallback();
+            }
+        }); } catch (RejectedExecutionException busy) { callbackUpdateQueued.set(false); }
     }
 
     private static boolean sameSession(@Nullable MediaController left,
@@ -1276,17 +1495,45 @@ public final class LauncherMediaController {
     }
 
     private void publishSession() {
+        if (!started) return;
+        updateSessionCallback();
+        registerSessionsListener();
+        if (sessionReadInFlight) { sessionReadPending = true; return; }
+        MediaController selected = current;
+        if (selected == null) { sessionState = null; publish(); return; }
+        sessionReadInFlight = true;
+        int generation = sessionReadGeneration;
+        int revision = sessionRevision;
+        try {
+            SESSION_READ_LANE.execute(() -> {
+                MediaMetadata metadata = null;
+                PlaybackState playback = null;
+                try { metadata = selected.getMetadata(); playback = selected.getPlaybackState(); }
+                catch (RuntimeException ignored) { }
+                MediaMetadata resultMetadata = metadata;
+                PlaybackState resultPlayback = playback;
+                mainHandler.post(() -> {
+                    if (generation != sessionReadGeneration) return;
+                    sessionReadInFlight = false;
+                    if (started && sameSession(current, selected) && revision == sessionRevision) {
+                        cachedMetadata = resultMetadata; cachedPlayback = resultPlayback;
+                        acceptSession(selected, resultMetadata, resultPlayback);
+                    }
+                    if (started && sessionReadPending) { sessionReadPending = false; publishSession(); }
+                });
+            });
+        } catch (RejectedExecutionException busy) { sessionReadInFlight = false; publish(); }
+    }
+
+    private void acceptSession(MediaController controller, MediaMetadata metadata, PlaybackState playback) {
         long observedElapsed = SystemClock.elapsedRealtime();
         lastSessionRefreshElapsedMs = observedElapsed;
-        MediaController controller = current;
         if (controller == null) {
             sessionState = null;
             publish();
             return;
         }
         try {
-            MediaMetadata metadata = controller.getMetadata();
-            PlaybackState playback = controller.getPlaybackState();
             String title = metadata == null ? "" : first(metadata,
                     MediaMetadata.METADATA_KEY_TITLE, MediaMetadata.METADATA_KEY_DISPLAY_TITLE);
             String artist = metadata == null ? "" : first(metadata,
@@ -1325,10 +1572,9 @@ public final class LauncherMediaController {
                     packageName, title, artist, album);
             boolean playbackChanged = previous == null || previous.playing != playing;
             long incomingArtworkIdentity = artworkIdentity(metadataArtwork);
-            boolean displayArtwork = MediaStateFreshness.shouldDisplaySessionArtwork(
-                    previous != null, trackChanged,
-                    previous == null ? 0L : previous.artworkIdentity,
-                    previous != null && previous.artwork != null, incomingArtworkIdentity);
+            // Equal album artwork is valid on adjacent songs; notification ownership guards
+            // stale covers instead of rejecting an image just because its pixels stayed equal.
+            boolean displayArtwork = metadataArtwork != null && !metadataArtwork.isRecycled();
             Bitmap artwork = displayArtwork ? metadataArtwork : null;
             boolean artworkChanged = previous == null || MediaStateFreshness.artworkChanged(
                     contentChanged, previous.artworkIdentity, incomingArtworkIdentity)
@@ -1342,7 +1588,8 @@ public final class LauncherMediaController {
                     MediaStateFreshness.changedAt(playbackChanged, receivedElapsed,
                             previous == null ? 0L : previous.playbackChangedElapsedMs),
                     MediaStateFreshness.changedAt(artworkChanged, receivedElapsed,
-                            previous == null ? 0L : previous.artworkChangedElapsedMs));
+                            previous == null ? 0L : previous.artworkChangedElapsedMs),
+                    playback == null ? 1f : playback.getPlaybackSpeed());
         } catch (RuntimeException ignored) {
             // A dead or malformed vendor session must not take the shared launcher/widget process
             // down. Drop only this source; the durable mHUD broadcast can still drive the panel.
@@ -1353,9 +1600,11 @@ public final class LauncherMediaController {
 
     private void publish() {
         expireBroadcastIfNeeded();
-        VolumeState volume = readVolume();
+        requestVolume(false);
+        VolumeState volume = cachedVolume;
         MediaState session = sessionState;
         MediaState broadcast = broadcastState;
+        if (publishLiveNotification(session, volume)) return;
         if (session == null && broadcast == null) {
             clearVisibleMedia();
             listener.onMediaChanged(Snapshot.empty(volume));
@@ -1504,7 +1753,7 @@ public final class LauncherMediaController {
     private void scheduleTicker(boolean playing) {
         mainHandler.removeCallbacks(ticker);
         if (started) {
-            mainHandler.postDelayed(ticker, playing ? UI_TICK_MS : SESSION_REFRESH_PAUSED_MS);
+            mainHandler.postDelayed(ticker, playing ? UI_TICK_MS : MEDIA_NOTIFICATION_REFRESH_MS);
         }
     }
 
@@ -1525,11 +1774,146 @@ public final class LauncherMediaController {
         }
     }
 
+    private void requestVolume(boolean force) {
+        long now = SystemClock.elapsedRealtime();
+        if (!started || volumeReadInFlight || volumeWriteInFlight || (!force && now - volumeReadAt < UI_TICK_MS)) return;
+        volumeReadInFlight = true;
+        volumeReadAt = now;
+        int generation = volumeGeneration;
+        try {
+            VOLUME_QUERY_LANE.execute(() -> {
+                VolumeState next = readVolume();
+                mainHandler.post(() -> {
+                    volumeReadInFlight = false;
+                    if (!started || generation != volumeGeneration) return;
+                    if (next.steps == cachedVolume.steps && next.maximum == cachedVolume.maximum) return;
+                    cachedVolume = next;
+                    publish();
+                });
+            });
+        } catch (RejectedExecutionException busy) { volumeReadInFlight = false; }
+    }
+
+    private void receiveMediaNotification() {
+        if (!started) return;
+        boolean fixed = preferences.launcherMediaFixedPlayerEnabled.get();
+        String target = fixed ? preferences.launcherMediaFixedPlayerPackage.get() : null;
+        MediaDisplayNotification next = MediaNotificationListener.latestMediaDisplay(target, deadTokens);
+        long probe = ++notificationProbeGeneration;
+        if (next == null) { adoptNotification(null); return; }
+        if (next == displayNotification) return;
+        boolean sameToken = displayNotification != null && next.token != null
+                && next.token.equals(displayNotification.token);
+        if (fixed || displayNotification == null || sameToken
+                || "ru.yandex.music".equals(next.packageName)
+                || sessionState == null || !sessionState.playing) {
+            adoptNotification(next); return;
+        }
+        // A paused player's notification must not steal the display from the active player.
+        // Probe the candidate's exact token off MAIN, without waiting for the OEM session list.
+        MediaDisplayNotification request = next;
+        try { SESSION_READ_LANE.execute(() -> {
+            PlaybackState state = null;
+            try { if (request.token != null) state = new MediaController(context, request.token).getPlaybackState(); }
+            catch (RuntimeException ignored) {}
+            boolean playing = state != null && state.getState() == PlaybackState.STATE_PLAYING;
+            mainHandler.post(() -> {
+                if (!started || probe != notificationProbeGeneration) return;
+                if (playing) adoptNotification(request);
+                else if (displayNotification != null) {
+                    MediaDisplayNotification retained = MediaNotificationListener.latestMediaDisplay(displayNotification.packageName, deadTokens);
+                    adoptNotification(retained != null ? retained : request);
+                }
+            });
+        }); } catch (RejectedExecutionException busy) { }
+    }
+
+    private void adoptNotification(@Nullable MediaDisplayNotification next) {
+        if (next == displayNotification) return;
+        MediaDisplayNotification previous = displayNotification;
+        displayNotification = next;
+        boolean sameTrack = next != null && previous != null
+                && MediaStateFreshness.sameContent(previous.packageName, previous.title,
+                previous.artist, previous.album, 0L, next.packageName, next.title, next.artist, next.album, 0L);
+        if (!sameTrack) notificationArtwork = null;
+        if (next != null && next.artwork != null && !next.artwork.isRecycled()) notificationArtwork = next.artwork;
+        if (next != null && next.token != null && !deadTokens.contains(next.token)
+                && (current == null || !next.token.equals(current.getSessionToken()))) {
+            try { replace(new MediaController(context, next.token)); }
+            catch (RuntimeException stale) {}
+        }
+        publish();
+        publishSession();
+        requestNotificationArtwork();
+        if (next == null) refresh();
+    }
+
+    private void requestNotificationArtwork() {
+        MediaDisplayNotification request = displayNotification;
+        if (!started || artworkReadInFlight || request == null || request.artwork != null
+                || request.artworkIcon == null || request.generation == artworkNotificationGeneration) return;
+        artworkReadInFlight = true;
+        artworkNotificationGeneration = request.generation;
+        try {
+            ARTWORK_QUERY_LANE.execute(() -> {
+                Bitmap decoded = null;
+                try {
+                    Drawable drawable = request.artworkIcon.loadDrawable(context);
+                    if (drawable != null) {
+                        int width = Math.max(1, drawable.getIntrinsicWidth());
+                        int height = Math.max(1, drawable.getIntrinsicHeight());
+                        float scale = Math.min(1f, MAX_ARTWORK_EDGE / (float) Math.max(width, height));
+                        decoded = Bitmap.createBitmap(Math.max(1, Math.round(width * scale)),
+                                Math.max(1, Math.round(height * scale)), Bitmap.Config.ARGB_8888);
+                        drawable.setBounds(0, 0, decoded.getWidth(), decoded.getHeight());
+                        drawable.draw(new Canvas(decoded));
+                    }
+                } catch (RuntimeException | OutOfMemoryError ignored) {}
+                Bitmap result = decoded;
+                mainHandler.post(() -> {
+                    artworkReadInFlight = false;
+                    if (started && displayNotification == request) {
+                        if (result != null) { notificationArtwork = result; publish(); }
+                    } else if (result != null) result.recycle();
+                    requestNotificationArtwork();
+                });
+            });
+        } catch (RejectedExecutionException busy) {
+            artworkReadInFlight = false; artworkNotificationGeneration = 0L;
+        }
+    }
+
+    /** The live Android notification owns text/cover as in mSaver; MConfig is fallback only. */
+    private boolean publishLiveNotification(MediaState session, VolumeState volume) {
+        MediaDisplayNotification live = displayNotification;
+        if (live == null || "com.android.bluetooth".equals(live.packageName)) return false;
+        boolean samePlayer = session != null && samePackage(live.packageName, session.packageName)
+                && (live.token == null || (current != null && live.token.equals(current.getSessionToken())));
+        String title = live.title.isEmpty() && samePlayer ? session.title : live.title;
+        if (title.isEmpty()) return false;
+        String artist = live.artist.isEmpty() && samePlayer ? session.artist : live.artist;
+        boolean sameTrack = samePlayer && MediaStateFreshness.sameTrackMetadata(live.trackTitle, live.trackArtist,
+                live.album, session.title, session.artist, session.album);
+        long duration = sameTrack ? session.durationMs : 0L;
+        long position = sameTrack ? session.currentPosition(System.currentTimeMillis()) : 0L;
+        boolean playing = samePlayer && session.playing;
+        Bitmap artwork = notificationArtwork;
+        if (artwork == null && sameTrack) artwork = session.artwork;
+        visiblePackage = live.packageName; visibleTitle = title; visibleArtist = artist;
+        LikeUiState like = resolveLikeUiState(live.packageName);
+        listener.onMediaChanged(new Snapshot(title, artist, live.album,
+                applicationLabel(live.packageName), artwork, duration, position, playing, true,
+                like.available, like.active, volume.percent(), volume.steps, volume.maximum));
+        MediaPlaybackHistoryStore.record(context, live.packageName, playing);
+        scheduleTicker(playing);
+        return true;
+    }
+
     @NonNull
-    private static ThreadPoolExecutor createSessionQueryLane() {
+    private static ThreadPoolExecutor createSessionQueryLane(String name) {
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
                 0, 1, 10L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(8), task -> {
-            Thread worker = new Thread(task, "media-session-query");
+            Thread worker = new Thread(task, name);
             worker.setDaemon(true);
             return worker;
         }, new ThreadPoolExecutor.AbortPolicy());
@@ -1540,12 +1924,19 @@ public final class LauncherMediaController {
     @NonNull
     private String applicationLabel(@NonNull String packageName) {
         if (packageName.isEmpty()) return "";
-        try {
-            return context.getPackageManager().getApplicationLabel(
-                    context.getPackageManager().getApplicationInfo(packageName, 0)).toString();
-        } catch (Exception ignored) {
-            return packageName;
-        }
+        String known = applicationLabels.get(packageName);
+        if (known != null) return known;
+        applicationLabels.put(packageName, packageName);
+        try { ARTWORK_QUERY_LANE.execute(() -> {
+            String label = packageName;
+            try {
+                label = context.getPackageManager().getApplicationLabel(
+                        context.getPackageManager().getApplicationInfo(packageName, 0)).toString();
+            } catch (Exception ignored) {}
+            String value = label;
+            mainHandler.post(() -> { applicationLabels.put(packageName, value); if (started) publish(); });
+        }); } catch (RejectedExecutionException busy) {}
+        return packageName;
     }
 
     @Nullable

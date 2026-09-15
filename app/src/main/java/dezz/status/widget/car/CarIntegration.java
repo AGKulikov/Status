@@ -216,6 +216,17 @@ public interface CarIntegration {
         listener.onResult(false, "Функции автомобиля недоступны в этой сборке");
     }
 
+    /** MConfig button route: the public drive-mode function with explicit default zone. */
+    default void selectButtonDriveMode(int value, @NonNull java.util.function.BooleanSupplier stillRequested,
+                                       @NonNull ControlCommandListener listener) {
+        listener.onResult(false, "Режимы движения недоступны");
+    }
+
+    /** Request the documented infotainment restart, after caller confirmation/long hold. */
+    default void restartInfotainment(@NonNull ControlCommandListener listener) {
+        listener.onResult(false, "Перезагрузка мультимедиа недоступна");
+    }
+
     /**
      * Select the OEM ProfileTransfer HUD layout (0 Guide, 1 Drive, 2 AR, 3 Simple).
      *

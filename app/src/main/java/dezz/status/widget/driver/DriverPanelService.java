@@ -39,6 +39,8 @@ public final class DriverPanelService extends Service {
             "ru.natro.statuswidget.action.DRIVER_PANEL_STOCK_CLIMATE";
     public static final String ACTION_FAVORITES =
             "ru.natro.statuswidget.action.DRIVER_PANEL_FAVORITES";
+    public static final String ACTION_ALL_APPS =
+            "ru.natro.statuswidget.action.DRIVER_PANEL_ALL_APPS";
     public static final String EXTRA_FAVORITES_PANEL_ID =
             "ru.natro.statuswidget.extra.DRIVER_FAVORITES_PANEL_ID";
 
@@ -78,6 +80,10 @@ public final class DriverPanelService extends Service {
 
     public static void showFavorites(@NonNull Context context) {
         showFavorites(context, DriverFavoritesPanelConfig.DEFAULT_ID);
+    }
+
+    public static void showAllApps(@NonNull Context context) {
+        start(context, ACTION_ALL_APPS);
     }
 
     public static void showFavorites(@NonNull Context context, @NonNull String panelId) {
@@ -162,6 +168,8 @@ public final class DriverPanelService extends Service {
                 || !preferences.driverPanelEnabled.get()) {
             runtimeStatus = "stopped";
             runtimeDetail = "Панель водителя выключена";
+            if (ACTION_FAVORITES.equals(action) || ACTION_ALL_APPS.equals(action))
+                Toast.makeText(this, runtimeDetail, Toast.LENGTH_LONG).show();
             stopSelfSafely();
             return START_NOT_STICKY;
         }
@@ -173,6 +181,7 @@ public final class DriverPanelService extends Service {
                 controller.showFavorites(panelId == null
                         ? DriverFavoritesPanelConfig.DEFAULT_ID : panelId, null);
             }
+            else if (ACTION_ALL_APPS.equals(action)) controller.showAllApps(null);
             else if (ACTION_RAISE.equals(action)) controller.raise();
             else if (!refreshed) controller.applyPreferences();
         }

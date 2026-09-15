@@ -156,10 +156,18 @@ public class WidgetAccessibilityService extends AccessibilityService {
      * @return {@code true} when the enabled accessibility service accepted the request.
      */
     public static boolean performGlobalBack() {
+        return performGlobalBack(success -> {});
+    }
+
+    public static boolean performGlobalBack(@NonNull GlobalActionCallback callback) {
         WidgetAccessibilityService current = instance;
         if (current == null) return false;
-        new Handler(Looper.getMainLooper()).post(
-                () -> current.performGlobalAction(GLOBAL_ACTION_BACK));
+        new Handler(Looper.getMainLooper()).post(() -> {
+            boolean accepted;
+            try { accepted = current.performGlobalAction(GLOBAL_ACTION_BACK); }
+            catch (RuntimeException unavailable) { accepted = false; }
+            callback.onFinished(accepted);
+        });
         return true;
     }
 
@@ -355,6 +363,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
         String eventPackage = packageValue == null ? "" : packageValue.toString().trim();
         CharSequence classValue = event.getClassName();
         String eventClass = classValue == null ? "" : classValue.toString().trim();
+        dezz.status.widget.media.ButtonBluetoothMedia.windowChanged(type, eventPackage, eventClass);
         if (!ActionRecorder.isRecording()) {
             resetStockHvacObservation();
         } else {

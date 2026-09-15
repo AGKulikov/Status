@@ -55,6 +55,7 @@ public final class ShortcutActionPicker {
     private final Preferences preferences;
     private final LauncherShortcutStore store;
     private final Runnable changed;
+    @Nullable private java.util.function.Consumer<LauncherShortcutStore.Shortcut> selection;
     private boolean longPress;
 
     public ShortcutActionPicker(@NonNull AppCompatActivity activity,
@@ -65,6 +66,17 @@ public final class ShortcutActionPicker {
         this.preferences = preferences;
         this.store = store;
         this.changed = changed;
+    }
+
+    /** Reuse the exact action editor without inserting a new tile into any screen's layout. */
+    public ShortcutActionPicker(@NonNull AppCompatActivity activity,
+                                @NonNull Preferences preferences,
+                                @NonNull java.util.function.Consumer<LauncherShortcutStore.Shortcut> selection) {
+        this.activity = activity;
+        this.preferences = preferences;
+        this.store = null;
+        this.changed = () -> {};
+        this.selection = selection;
     }
 
     public void showNew() {
@@ -88,8 +100,7 @@ public final class ShortcutActionPicker {
                         value.hasLongAction = false;
                         value.longTarget = "";
                         value.longPackageName = "";
-                        store.upsert(value);
-                        changed.run();
+                        save(value);
                         return;
                     }
                     longPress = true;
@@ -103,6 +114,7 @@ public final class ShortcutActionPicker {
         String[] values = {"Приложение", "Готовая функция", "Функция автомобиля",
                 "Устройство умного дома / сценарий", "Телефонный звонок", "Android Intent",
                 "Информационная плитка (без нажатия)", "Разделитель"};
+        if (selection != null) values = java.util.Arrays.copyOf(values, 6);
         new AlertDialog.Builder(activity).setTitle(title)
                 .setItems(values, (dialog, which) -> chooseKindIndex(value, which))
                 .setNegativeButton("Отмена", null).show();
@@ -791,6 +803,10 @@ public final class ShortcutActionPicker {
     }
 
     private void save(@NonNull LauncherShortcutStore.Shortcut value) {
+        if (selection != null) {
+            selection.accept(value.copy());
+            return;
+        }
         if (!store.upsert(value)) {
             toast("На панели водителя уже 10 кнопок. "
                     + "Информационные плитки и разделители можно добавлять без ограничения.");

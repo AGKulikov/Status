@@ -27,6 +27,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Legacy Bluetooth permissions (granted at install time on targetSdk 28). They are
          sufficient on Android 9-12 for the calls we make: reading adapter state, observing
@@ -95,6 +97,9 @@
         <!-- ECARX/SEC multi-display capability declarations used by the known-good KX11
              dashboard. They let the instrument task remain an independent DIM page. -->
         <meta-data android:name="eos_resizeableActivity" android:value="true" />
+        <activity android:name=".media.ButtonPromptActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StatusWidget.TransparentProxy" />
         <activity android:name=".MediaButtonsSettingsActivity"
             android:exported="false" android:screenOrientation="landscape" />
         <receiver android:name=".media.MediaInputReceiver" android:exported="true"

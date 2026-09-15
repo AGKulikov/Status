@@ -86,11 +86,15 @@ public final class MediaPanelInteractionContractTest {
         assertFalse(button.contains("value.setPadding(dp(16), dp(16), dp(16), dp(16))"));
     }
 
-    @Test public void volumeWritesMusicStreamAndListensForSystemChanges() throws IOException {
+    @Test public void volumeUsesSharedMusicStreamWithoutViewBinderReads() throws IOException {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
-        assertTrue(source.contains("manager.setStreamVolume(AudioManager.STREAM_MUSIC"));
-        assertTrue(source.contains("android.media.VOLUME_CHANGED_ACTION"));
-        assertTrue(source.contains("syncSystemVolume()"));
+        String controller = source("dezz/status/widget/launcher/LauncherMediaController.java");
+        assertTrue(source.contains("controls.setVolumePercent(percent)"));
+        assertFalse(source.contains("getStreamVolume("));
+        assertFalse(source.contains("getStreamMaxVolume("));
+        assertTrue(controller.contains("audioManager.setStreamVolume(AudioManager.STREAM_MUSIC"));
+        assertTrue(controller.contains("android.media.VOLUME_CHANGED_ACTION"));
+        assertTrue(controller.contains("VOLUME_QUERY_LANE.execute("));
         assertTrue(source.contains("class ResponsiveVolumeBar extends View"));
         assertTrue(source.contains("height * .28f"));
         assertTrue(source.contains("height * .22f"));
@@ -178,7 +182,9 @@ public final class MediaPanelInteractionContractTest {
         assertTrue(source.contains("MediaStateFreshness.shouldRefreshSession("));
         assertTrue(source.contains("lastSessionRefreshElapsedMs = nowElapsed"));
         assertTrue(source.contains(
-                "playing ? UI_TICK_MS : SESSION_REFRESH_PAUSED_MS"));
+                "playing ? UI_TICK_MS : MEDIA_NOTIFICATION_REFRESH_MS"));
+        assertTrue(source.contains("MEDIA_NOTIFICATION_REFRESH_MS = 2_000L"));
+        assertTrue(source.contains("MediaNotificationListener.reconcileMediaNotifications()"));
     }
 
     @Test public void asyncArtworkUsesIndependentClocksAndTrackGate() throws IOException {
@@ -195,7 +201,9 @@ public final class MediaPanelInteractionContractTest {
                 source.indexOf("private void receiveBroadcast")));
         assertTrue(source.contains("boolean artworkChanged = previous == null"));
         assertTrue(source.contains("MediaStateFreshness.artworkChanged("));
-        assertTrue(source.contains("MediaStateFreshness.shouldDisplaySessionArtwork("));
+        assertFalse(source.contains("MediaStateFreshness.shouldDisplaySessionArtwork("));
+        assertTrue(source.contains("displayNotification == request"));
+        assertTrue(source.contains("revision == sessionRevision"));
         assertTrue(source.contains("MediaStateFreshness.incomingArtworkWins("));
         assertTrue(source.contains("mixArtworkFingerprint"));
         assertTrue(source.contains(

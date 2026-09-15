@@ -18,6 +18,14 @@ public final class MediaTimeline {
         return durationMs > 0L ? Math.min(position, durationMs) : position;
     }
 
+    public static long position(long positionMs, long elapsedMs, float playbackSpeed,
+                                boolean playing, long durationMs) {
+        double speed = Float.isFinite(playbackSpeed) ? playbackSpeed : 1d;
+        double delta = playing ? Math.max(0L, elapsedMs) * speed : 0d;
+        double value = Math.max(0L, positionMs) + delta;
+        return clampPosition((long) Math.min(Long.MAX_VALUE, Math.max(0d, value)), durationMs);
+    }
+
     public static int progress(long positionMs, long durationMs, int maximum) {
         if (durationMs <= 0L || maximum <= 0) return 0;
         double ratio = (double) clampPosition(positionMs, durationMs) / (double) durationMs;

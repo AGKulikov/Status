@@ -3469,6 +3469,9 @@ public final class LauncherActivity extends AppCompatActivity {
                     @Override public boolean like() {
                         return mediaController != null && mediaController.like();
                     }
+                    @Override public void setVolumePercent(int percent) {
+                        if (mediaController != null) mediaController.setVolumePercent(percent);
+                    }
                     @Override public void seekTo(long positionMs) {
                         if (mediaController != null) mediaController.seekTo(positionMs);
                     }
