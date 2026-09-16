@@ -57,7 +57,11 @@ public class MapVisibilityReplay {
   static boolean isMapContentReady(Object surface,boolean cluster){
    throw new AssertionError("Full tile loading must not gate visibility");}
  }
+ // This fixture covers ownership after the bounded presentation stage completes.
+ // Its timing/readback/failure contract is exercised separately with the real implementation.
+ static class Presentation {void reset(){}void onFrame(Surface s,long t,Runnable show){show.run();}}
  static class Hud {
+  Presentation firstPresentation=new Presentation();
   TextureView mapTexture=new TextureView(); Surface leasedSurface=new Surface();
   SurfaceTexture leasedTexture=mapTexture.surface; Object activeMap=new Object();
   long firstFrameWaitStarted; boolean awaitingFirstMapFrame=true; float desiredMapAlpha=.72f;
@@ -65,6 +69,7 @@ public class MapVisibilityReplay {
   HUD_METHODS
  }
  static class Cluster {
+  Presentation firstPresentation=new Presentation();
   TextureView mapTexture=new TextureView(); View mapView=mapTexture;
   Surface mapSurface=new Surface(); boolean attached=true,leasePublished=true;
   SurfaceTexture ownedTexture=mapTexture.surface;

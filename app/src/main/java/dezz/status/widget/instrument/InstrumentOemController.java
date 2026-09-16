@@ -29,7 +29,11 @@ public final class InstrumentOemController {
     private final Handler main = new Handler(Looper.getMainLooper());
     private InstrumentTsrAccess tsr;
     private boolean tsrBusy;
-    private boolean whiteBarEnabled;
+    private volatile boolean whiteBarEnabled;
+    private boolean whiteOwned, tsrHidden;
+    private boolean whiteScheduled;
+    private volatile Boolean lastWhiteDeny;
+    private volatile boolean forceWhiteApply = true;
     private boolean observing;
     private boolean shellBusy;
     private long whiteGeneration;
@@ -39,6 +43,12 @@ public final class InstrumentOemController {
     private String tsrStatus = "Не изменено";
     private Result whitePending;
     private final Runnable applyWhiteBar = this::applyWhiteBarNow;
+    private final Runnable verifyWhiteBar = () -> {
+        if (whiteBarEnabled && !shellBusy && !whiteScheduled) {
+            whiteAttempt = 0;
+            applyWhiteBarNow();
+        }
+    };
     private final ContentObserver naviObserver = new ContentObserver(main) {
         @Override public void onChange(boolean selfChange) { scheduleWhiteBar(); }
     };
@@ -54,7 +64,9 @@ public final class InstrumentOemController {
         preferences = context.createDeviceProtectedStorageContext()
                 .getSharedPreferences(InstrumentPanelStore.PREFS, Context.MODE_PRIVATE);
         whiteBarEnabled = preferences.getBoolean("hide_oem_white_bar", false);
-        if (whiteBarEnabled || preferences.getBoolean("oem_white_bar_owned", false)) {
+        whiteOwned = preferences.getBoolean("oem_white_bar_owned", false);
+        tsrHidden = preferences.getBoolean("hide_oem_speed_sign", false);
+        if (whiteBarEnabled || whiteOwned) {
             reconcileObserver();
             scheduleWhiteBar();
         }
@@ -62,7 +74,7 @@ public final class InstrumentOemController {
     }
     public interface Result { void complete(boolean success, String detail); }
     public boolean isWhiteBarHidden() { return whiteBarEnabled; }
-    public boolean isTsrHidden() { return preferences.getBoolean("hide_oem_speed_sign", false); }
+    public boolean isTsrHidden() { return tsrHidden; }
     public String whiteStatus() { return whiteStatus; }
     public String tsrStatus() { return tsrStatus; }
 
@@ -77,7 +89,10 @@ public final class InstrumentOemController {
         tsr.setHidden(hidden, (success, detail) -> {
             tsrBusy = false;
             tsrStatus = detail;
-            if (success) preferences.edit().putBoolean("hide_oem_speed_sign", hidden).apply();
+            if (success && tsrHidden != hidden) {
+                tsrHidden = hidden;
+                dezz.status.widget.media.RuntimePreferenceWriter.put(preferences, "hide_oem_speed_sign", hidden);
+            }
             if ((success && !hidden) || (!success && !isTsrHidden())) {
                 CarIntegrations.get(context).unsubscribeTelemetry(ignition);
                 tsr.close(); tsr = null;
@@ -92,7 +107,7 @@ public final class InstrumentOemController {
     public void setWhiteBarHidden(boolean hidden, Result callback) {
         if (whitePending != null) { callback.complete(false, "Изменение полосы уже выполняется"); return; }
         whiteBarEnabled = hidden;
-        preferences.edit().putBoolean("hide_oem_white_bar", hidden).apply();
+        dezz.status.widget.media.RuntimePreferenceWriter.put(preferences, "hide_oem_white_bar", hidden);
         whitePending = callback;
         reconcileObserver();
         scheduleWhiteBar();
@@ -110,33 +125,61 @@ public final class InstrumentOemController {
     private void scheduleWhiteBar() {
         whiteGeneration++;
         whiteAttempt = 0;
-        main.removeCallbacks(applyWhiteBar);
-        main.postDelayed(applyWhiteBar, whiteBarEnabled ? 1500 : 0);
+        main.removeCallbacks(verifyWhiteBar);
+        // A stream of mode notifications cannot keep moving the existing deadline.
+        if (!whiteBarEnabled) { main.removeCallbacks(applyWhiteBar); whiteScheduled = false; }
+        if (!whiteScheduled) {
+            whiteScheduled = true;
+            main.postDelayed(applyWhiteBar, whiteBarEnabled ? 1500 : 0);
+        }
     }
     private void applyWhiteBarNow() {
+        whiteScheduled = false;
         if (shellBusy) return; // completion will reconcile the newest generation.
         final long owner = whiteGeneration;
-        int mode = Settings.Global.getInt(context.getContentResolver(), "NaviMode", -1);
-        boolean deny = InstrumentOemPolicy.suppressWhiteBar(whiteBarEnabled, mode);
         shellBusy = true;
         whiteAttempt++;
-        if (deny) preferences.edit().putBoolean("oem_white_bar_owned", true).apply();
-        // A fixed command/target only, never disable SystemUI or stop the DIM activity.
-        String command = "appops set com.ecarx.dimmenu SYSTEM_ALERT_WINDOW " + (deny ? "deny" : "allow")
-                + " && appops get com.ecarx.dimmenu SYSTEM_ALERT_WINDOW";
-        PrivilegedShell.get(context).runCommand(command, (output, error) -> {
+        final int[] modes = {-1, -1};
+        final boolean[] requested = {false};
+        final boolean[] wrote = {false};
+        PrivilegedShell.get(context).runCommand(() -> {
+            modes[0] = Settings.Global.getInt(context.getContentResolver(), "NaviMode", -1);
+            Integer actual = whiteBarEnabled ? InstrumentDisplayLauncher.readDimMode(context) : null;
+            modes[1] = actual == null || actual < 1 || actual > 3 ? modes[0] : actual;
+            boolean deny = InstrumentOemPolicy.suppressWhiteBar(whiteBarEnabled, modes[1]);
+            requested[0] = deny;
+            wrote[0] = forceWhiteApply || lastWhiteDeny == null || lastWhiteDeny != deny;
+            String read = "appops get com.ecarx.dimmenu SYSTEM_ALERT_WINDOW";
+            return wrote[0] ? "appops set com.ecarx.dimmenu SYSTEM_ALERT_WINDOW "
+                    + (deny ? "deny" : "allow") + " && " + read : read;
+        }, (output, error) -> {
             shellBusy = false;
-            if (owner != whiteGeneration) { main.post(applyWhiteBar); return; }
+            boolean deny = requested[0];
             boolean success = error == null && InstrumentOemPolicy.appOpMatches(output, deny);
-            if (!success && whiteAttempt < 3) { main.postDelayed(applyWhiteBar, 100); return; }
-            whiteStatus = success ? (deny ? "Полоса скрыта в режиме навигации" : "Штатные наложения восстановлены")
+            forceWhiteApply = !success;
+            if (success) {
+                lastWhiteDeny = deny;
+                if (whiteOwned != deny) {
+                    whiteOwned = deny;
+                    dezz.status.widget.media.RuntimePreferenceWriter.put(preferences, "oem_white_bar_owned", deny);
+                }
+            }
+            if (owner != whiteGeneration) {
+                main.removeCallbacks(applyWhiteBar); whiteScheduled = true;
+                main.post(applyWhiteBar); return;
+            }
+            if (!success && whiteAttempt < 3) { whiteScheduled = true; main.postDelayed(applyWhiteBar, 100); return; }
+            whiteStatus = success ? (deny ? "Запрет штатного наложения подтверждён"
+                    : whiteBarEnabled ? "Ожидание режима навигации приборки" : "Штатные наложения восстановлены")
                     : "Не удалось подтвердить настройку полосы через встроенный ADB";
-            if (success && !deny) preferences.edit().putBoolean("oem_white_bar_owned", false).apply();
-            DiagnosticJournal.infoAsync("instrument-oem", "white_bar navi_mode=" + mode
-                    + ", denied=" + deny + ", confirmed=" + success);
+            if (wrote[0] || !success) DiagnosticJournal.infoAsync("instrument-oem", "white_bar navi_mode=" + modes[1]
+                    + ", global_mode=" + modes[0] + ", enabled=" + whiteBarEnabled
+                    + ", denied=" + deny + ", confirmed=" + success
+                    + ", window=" + InstrumentPanelActivity.windowState());
             Result callback = whitePending;
             whitePending = null;
             if (callback != null) callback.complete(success, whiteStatus);
+            if (whiteBarEnabled) main.postDelayed(verifyWhiteBar, 5000);
         });
     }
 }

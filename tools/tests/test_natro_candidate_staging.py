@@ -25,6 +25,7 @@ class CandidateStagingTest(unittest.TestCase):
             "VERSION_NAME": "3.0.0", "VERSION_CODE": "208021333",
             "RUNNER_TEMP": str(self.root), "ANDROID_HOME": str(self.root / "sdk"),
             "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "123",
+            "REUSE_NAVIGATOR_300": "false",
         })
         self.environment.start()
         self.addCleanup(self.environment.stop)
@@ -81,6 +82,12 @@ class CandidateStagingTest(unittest.TestCase):
         self.dex.unlink()
         with self.assertRaisesRegex(ValueError, "Compiled Navigator patch"):
             self.stage()
+        self.assertFalse((self.out / "candidate.json").exists())
+
+    def test_reuse_refuses_a_different_navigator_patch(self):
+        with patch.dict(os.environ, {"REUSE_NAVIGATOR_300": "true"}):
+            with self.assertRaisesRegex(ValueError, "exact verified 3.0.0 patch"):
+                self.stage()
         self.assertFalse((self.out / "candidate.json").exists())
 
     def test_missing_asset_stops_publication(self):

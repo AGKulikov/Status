@@ -124,7 +124,10 @@ final class ButtonActionExecutor {
             case DRIVER_MENU:
                 try {
                 LauncherShortcutStore.Shortcut shortcut = LauncherShortcutStore.decodeAction(binding.shortcutJson);
-                if (shortcut.enabled && LauncherShortcutStore.isInteractive(shortcut)) main.post(() -> driver.execute(shortcut));
+                ButtonActionDeadline deadline = ButtonActionDeadline.current();
+                if (shortcut.enabled && LauncherShortcutStore.isInteractive(shortcut)) main.post(() -> {
+                    if (deadline.valid()) driver.execute(shortcut);
+                });
                 } catch (org.json.JSONException invalid) { throw new IllegalArgumentException("Некорректное действие меню", invalid); }
                 return;
         }

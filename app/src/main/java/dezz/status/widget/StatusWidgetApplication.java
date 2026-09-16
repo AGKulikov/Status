@@ -70,6 +70,11 @@ public class StatusWidgetApplication extends Application {
         // compatibility for :hud, not a transactional cross-process state machine.
         if (!hudProcess) StartupWorkCoordinator.clearLegacyStartupDeferrals(this);
         if (!StartupWorkCoordinator.isUserUnlocked(this)) return;
+        if (!hudProcess) {
+            // Input subscription must not wait for the launcher, maps or connector stages.
+            dezz.status.widget.media.VehicleButtonController.get(this);
+            dezz.status.widget.media.MediaButtonController.get(this).restoreStored();
+        }
         // Full diagnostics and the ECARX status-bar Binder are surface work. Launcher/settings
         // notify after their first traversal; a headless host notifies after startForeground.
     }

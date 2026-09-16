@@ -11,7 +11,13 @@ public final class ButtonInputPatch {
                 {"ecarx.intent.action.ECARX_KEY_RSRC_EVENT", "ecarx.intent.action.ECARX_KEY_ISRC_EVENT"},
                 {"handle_we_chat_action", "handle_no_chat_action"}};
             case VA: return new String[][] {{"handle_voice_action", "handle_ioice_action"},
-                {"yandexnavi://ask_alice", "iandexnavi://ask_alice"}};
+                {"yandexnavi://ask_alice", "iandexnavi://ask_alice"},
+                // KX11 XSF c4e38040…: ECarXRVoiceAssistAction, key200231. All three
+                // routes must be present; root entry point also verifies the source APK hash.
+                {"ecarx.intent.action.vr_pressed", "ecarx.intent.action.nr_pressed"},
+                {"ecarx.intent.action.vr_released", "ecarx.intent.action.nr_released"},
+                {"ecarx.intent.action.ECARX_KEY_RVOICEASSIST_EVENT",
+                 "ecarx.intent.action.ECARX_KEY_NVOICEASSIST_EVENT"}};
             case DM: return new String[][] {{"ecarx.settings.service.DrivingModeService",
                 "ecarx.settings.service.DrivingKnobService"}};
             case POWER: return new String[][] {{"com.ecarx.screensaver", "com.ecarx.icreensaver"}};
@@ -20,6 +26,7 @@ public final class ButtonInputPatch {
     }
     public static boolean state(byte[] data, VehicleButton button) {
         validateCache(data);
+        if (button == VehicleButton.VA) validateBroadcastVa(data);
         Boolean disabled = null;
         for (String[] pair : routes(button)) {
             boolean stock = count(data, bytes(pair[0])) > 0, custom = count(data, bytes(pair[1])) > 0;
@@ -41,6 +48,7 @@ public final class ButtonInputPatch {
     }
     public static byte[] apply(byte[] original, VehicleButton button, boolean disabled) {
         validateCache(original);
+        if (button == VehicleButton.VA) validateBroadcastVa(original);
         byte[] result = original.clone();
         for (String[] pair : routes(button)) {
             // Normalize every known spelling to the requested state, including a partially
@@ -56,6 +64,22 @@ public final class ButtonInputPatch {
         }
         if (state(result, button) != disabled) throw new IllegalStateException("Route validation failed");
         return result;
+    }
+
+    public static boolean hasBroadcastVaRoute(byte[] data) {
+        String[][] pairs = routes(VehicleButton.VA);
+        for (int i = 2; i < pairs.length; i++)
+            if (count(data, bytes(pairs[i][0])) + count(data, bytes(pairs[i][1])) > 0) return true;
+        return false;
+    }
+    private static void validateBroadcastVa(byte[] data) {
+        if (!hasBroadcastVaRoute(data)) return;
+        if (count(data, bytes("Lecarx/xsf/inputservice/key/ECarXRVoiceAssistAction;")) == 0)
+            throw new IllegalArgumentException("Unidentified VA broadcast owner");
+        String[][] pairs = routes(VehicleButton.VA);
+        for (int i = 2; i < pairs.length; i++)
+            if (count(data, bytes(pairs[i][0])) + count(data, bytes(pairs[i][1])) == 0)
+                throw new IllegalArgumentException("Incomplete VA down/up/click routes");
     }
 
     public static String coverage(byte[] data, VehicleButton button) {

@@ -284,6 +284,11 @@ public class PrivilegedShell {
 
     /** Run an arbitrary shell command through the active transport (rediscovering if needed). */
     public void runCommand(String command, CommandCallback callback) {
+        runCommand(() -> command, callback);
+    }
+
+    /** Resolve mutable state after waiting for the transport queue, not when enqueuing. */
+    public void runCommand(java.util.function.Supplier<String> command, CommandCallback callback) {
         executor.execute(() -> {
             ConnectionStorage.Endpoint endpoint = ensureEndpoint();
             if (endpoint == null) {
@@ -293,7 +298,12 @@ public class PrivilegedShell {
             ShellTransport transport = null;
             try {
                 transport = open(endpoint);
-                String output = transport.exec(command);
+                String resolved = command.get();
+                if (resolved == null) {
+                    mainHandler.post(() -> callback.onResult(null, "Command superseded"));
+                    return;
+                }
+                String output = transport.exec(resolved);
                 mainHandler.post(() -> callback.onResult(output, null));
             } catch (Exception e) {
                 Log.w(TAG, "runCommand failed", e);

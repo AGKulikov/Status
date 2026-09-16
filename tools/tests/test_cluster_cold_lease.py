@@ -53,6 +53,8 @@ class ClusterColdLeaseTest(unittest.TestCase):
   static long sentMapGeneration(Surface s,boolean cluster){return live==s?publications:-1;}
  }
  static class Panel {
+  final Presentation firstPresentation=new Presentation();
+  static class Presentation {void reset(){}void onFrame(Surface s,long t,Runnable show){show.run();}}
   static final int VISIBLE=0,COLD_LEASE_FAST_RETRY_COUNT=40;
   static final long COLD_LEASE_FAST_RETRY_MS=150,COLD_LEASE_SLOW_RETRY_MS=1000;
   TextureView mapTexture=new TextureView(),mapView=mapTexture;

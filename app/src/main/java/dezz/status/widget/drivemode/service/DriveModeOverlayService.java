@@ -23,6 +23,7 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
         DriveModeRepository.SupportedModesListener, SharedPreferences.OnSharedPreferenceChangeListener {
     public static final String ACTION_KNOB_STEP = "dezz.status.widget.drivemode.service.KNOB_STEP";
     public static final String ACTION_SHOW_PREVIEW = "dezz.status.widget.drivemode.service.SHOW_PREVIEW";
+    public static final String EXTRA_ACTION_DEADLINE = "natro_action_deadline_uptime";
     private static DriveModeOverlayService instance;
     private DriveModeRepository repository;
     private DriveModeSettings settings;
@@ -54,13 +55,19 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
     }
     @Override public int onStartCommand(Intent intent, int flags, int id) {
         if (!Settings.canDrawOverlays(this)) { stopSelf(); return START_NOT_STICKY; }
+        long deadline = intent == null ? Long.MAX_VALUE
+                : intent.getLongExtra(EXTRA_ACTION_DEADLINE, Long.MAX_VALUE);
+        if (android.os.SystemClock.uptimeMillis() > deadline) {
+            if (!settings.isEnabled() && !busy) stopSelf();
+            return START_NOT_STICKY;
+        }
         if (intent != null && ACTION_SHOW_PREVIEW.equals(intent.getAction())) preview();
         else if (intent != null && ACTION_KNOB_STEP.equals(intent.getAction())) {
             int steps = intent.getIntExtra(KnobReceiver.EXTRA_STEPS, 1);
             String direction = intent.getStringExtra(KnobReceiver.EXTRA_DIRECTION);
             if (steps < 1 || steps > 3 || (!KnobReceiver.DIRECTION_PREV.equals(direction)
                     && !KnobReceiver.DIRECTION_NEXT.equals(direction))) return START_NOT_STICKY;
-            step(KnobReceiver.DIRECTION_PREV.equals(direction) ? -steps : steps);
+            step(KnobReceiver.DIRECTION_PREV.equals(direction) ? -steps : steps, deadline);
         }
         return settings.isEnabled() ? START_STICKY : START_NOT_STICKY;
     }
@@ -81,11 +88,12 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
             overlay.show(enabled, actual, settings.getAutoHidePreviewMs());
         });
     }
-    private void step(int steps) {
+    private void step(int steps, long deadline) {
         if (busy) { toast("Дождитесь подтверждения режима"); return; }
         busy = true; long owner = ++operation;
         repository.readCurrentModeAsync(actual -> {
             if (destroyed || owner != operation) return;
+            if (android.os.SystemClock.uptimeMillis() > deadline) { busy = false; return; }
             if (actual < 0) { fail("Текущий режим неизвестен — переключение не выполнено"); return; }
             List<Integer> order = new ArrayList<>(enabled);
             Integer target = DriveSelectorStepPolicy.target(order, actual, steps);

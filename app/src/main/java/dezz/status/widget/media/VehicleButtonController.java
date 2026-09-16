@@ -107,14 +107,14 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
             status = "Настройки загружены";
             reconcile();
             if (needed() || bool("temperature.visible") || bool("drive.restore")) submit(() -> actionExecutor(), null);
-            for (VehicleButton button : VehicleButton.values())
-                if (button != VehicleButton.MEDIA && bool(button.key + ".disable_default")) setDisableDefault(button, true, null);
+            if (bool(VehicleButton.STAR.key + ".disable_default")) setDisableDefault(VehicleButton.STAR, true, null);
         });
     }
     private ButtonActionExecutor actionExecutor() {
         if (executor == null) executor = new ButtonActionExecutor(context, this);
         return executor;
     }
+    void whenInputReady(Runnable callback) { input.post(callback); }
     public void whenReady(Runnable callback) { input.post(() -> main.post(callback)); }
     public boolean ready() { return ready; }
     public String status() { return status; }
@@ -157,26 +157,20 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     }
     public void setEnabled(VehicleButton button, boolean enabled) { put(button.key + ".enabled", enabled); }
     public void setVolume(boolean enabled, int steps) {
-        input.post(() -> save(storage.edit().putBoolean("knob.volume", enabled)
-                .putInt("volume_steps", Math.max(1, Math.min(20, steps)))));
+        input.post(() -> save(true, "knob.volume", enabled,
+                "volume_steps", Math.max(1, Math.min(20, steps))));
     }
     public void put(String key, Object value) {
         input.post(() -> {
-            SharedPreferences.Editor editor = storage.edit();
-            if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
-            else if (value instanceof Integer) editor.putInt(key, (Integer) value);
-            else editor.putString(key, String.valueOf(value));
-            if (key.equals("drive.selected") || key.startsWith("temperature.")) {
-                editor.apply(); values = new HashMap<>(storage.getAll());
-            } else save(editor);
+            save(!(key.equals("drive.selected") || key.startsWith("temperature.")), key, value);
         });
     }
     public void saveBinding(String group, String gesture, ButtonBinding binding, Runnable done) {
         input.post(() -> {
             String key = "binding." + group + "." + gesture + ".";
-            save(storage.edit().putInt(key + "action", binding.action.id)
-                    .putString(key + "app", binding.application).putString(key + "command", binding.command)
-                    .putString(key + "package", binding.packageName).putString(key + "shortcut", binding.shortcutJson));
+            save(true, key + "action", binding.action.id, key + "app", binding.application,
+                    key + "command", binding.command, key + "package", binding.packageName,
+                    key + "shortcut", binding.shortcutJson);
             if (done != null) main.post(done);
         });
     }
@@ -193,8 +187,17 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
         }
         return result;
     }
-    private void save(SharedPreferences.Editor editor) {
-        editor.apply(); values = new HashMap<>(storage.getAll());
+    private void save(boolean settingsChanged, Object... pairs) {
+        Map<String, Object> next = new HashMap<>(values);
+        Map<String, Object> changed = new HashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) {
+            String key = (String) pairs[i]; Object value = pairs[i + 1];
+            if (!java.util.Objects.equals(next.get(key), value)) { next.put(key, value); changed.put(key, value); }
+        }
+        if (changed.isEmpty()) return;
+        values = Collections.unmodifiableMap(next);
+        RuntimePreferenceWriter.put(storage, changed);
+        if (!settingsChanged) return;
         generation++; engine.reset(); reconcile();
         if (executor != null || needed() || bool("drive.restore")) submit(() -> actionExecutor().settingsChanged(), null);
     }
@@ -236,6 +239,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                     "InputImpl:V", "*:S").redirectErrorStream(true).start();
             if (owner != logGeneration) return;
             logProcess = process; status = "Кнопки подключены";
+            DiagnosticJournal.infoAsync("vehicle-buttons", "input_subscription_ready uptime_ms=" + SystemClock.uptimeMillis());
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while (owner == logGeneration && (line = reader.readLine()) != null) {
@@ -292,10 +296,12 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
         long owner = generation, received = SystemClock.uptimeMillis();
         long epoch = inputEpoch.get();
         try { actions.execute(() -> {
-            if (owner != generation || SystemClock.uptimeMillis() - received > 750) return;
+            if (owner != generation || (detail != null && SystemClock.uptimeMillis() - received > 750)) return;
             if (detail != null && epoch != inputEpoch.get()) return;
             try {
-                action.run();
+                if (detail == null) action.run();
+                else ButtonActionDeadline.run(received + 750L,
+                        () -> owner == generation && epoch == inputEpoch.get(), action);
                 if (detail != null) DiagnosticJournal.infoAsync("vehicle-buttons", "dispatch=" + detail + ", effect=unobserved");
             } catch (Exception failed) {
                 status = "Действие недоступно: " + failed.getClass().getSimpleName();
@@ -305,6 +311,33 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
             status = "Очередь действий занята";
         }
     }
+    void beginStoredRestore(java.util.List<VehicleButton> buttons, Runnable ready) {
+        input.post(() -> {
+            buttons.removeIf(b -> b != VehicleButton.MEDIA
+                    && (patching.contains(b) || !bool(b.key + ".disable_default")));
+            for (VehicleButton b : buttons) if (b != VehicleButton.MEDIA) {
+                patching.add(b); defaultDetails.put(b, "Восстановление штатного пути…");
+            }
+            ready.run();
+        });
+    }
+    void finishStoredRestore(java.util.List<VehicleButton> buttons, String output, String error) {
+        input.post(() -> {
+            for (VehicleButton b : buttons) if (b != VehicleButton.MEDIA) {
+                patching.remove(b);
+                boolean ok = error == null && output != null && !output.contains("NATRO_MEDIA_ERROR=")
+                        && output.contains("NATRO_MEDIA_ROUTE=" + b.name() + ":disabled");
+                if (ok) verifiedDefault.put(b, true); else verifiedDefault.remove(b);
+                String detail = ok ? "Маршрут записан и проверен; физический эффект ещё не подтверждён"
+                        : "Штатный путь недоступен: " + (error != null ? error
+                        : field(output, "NATRO_BUTTON_ERROR=" + b.name() + ":"));
+                defaultDetails.put(b, detail);
+                DiagnosticJournal.infoAsync("vehicle-buttons", "restore_route button=" + b
+                        + ", applied=" + ok + ", detail=" + detail);
+            }
+        });
+    }
+
     public interface Result { void finished(boolean success, String detail); }
     public void setDisableDefault(VehicleButton button, boolean disabled, Result callback) {
         input.post(() -> {
@@ -317,7 +350,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                                 : "Применение штатного пути не подтверждено") : detail;
                 if (success) {
                     verifiedDefault.put(button, disabled);
-                    save(storage.edit().putBoolean(button.key + ".disable_default", disabled));
+                    save(false, button.key + ".disable_default", disabled);
                 } else verifiedDefault.remove(button);
                 defaultDetails.put(button, resolved);
                 DiagnosticJournal.infoAsync("vehicle-buttons", "default_route button=" + button.name()

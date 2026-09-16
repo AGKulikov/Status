@@ -220,18 +220,26 @@ final class HudCompositeView extends FrameLayout
                 && leasedSurface != null && leasedSurface.isValid()) {
             long sentGeneration = NavigationHudEndpointService.sentMapGeneration(leasedSurface, false);
             if (sentGeneration < 0L) return;
-            awaitingFirstMapFrame = false;
-            mapTexture.setAlpha(desiredMapAlpha);
-            tracePresentation();
-            DiagnosticJournal.infoAsync("hud-map", "HUD surface updated; map shown, opacity="
-                    + desiredMapAlpha + ", first_update_wait_ms="
-                    + (android.os.SystemClock.uptimeMillis() - firstFrameWaitStarted)
-                    + ", sent_generation=" + sentGeneration
-                    + ", texture_timestamp_ns=" + texture.getTimestamp() + ", producer_frame_ack=false");
+            final Surface presentationSurface = leasedSurface;
+            firstPresentation.onFrame(leasedSurface, texture.getTimestamp(), () -> {
+                if (!awaitingFirstMapFrame || leasedSurface != presentationSurface || leasedTexture != texture || activeMap == null || leasedSurface == null || !leasedSurface.isValid()) return;
+                awaitingFirstMapFrame = false;
+                mapTexture.setAlpha(desiredMapAlpha);
+                tracePresentation();
+                DiagnosticJournal.infoAsync("hud-map", "HUD surface updated; map shown, opacity="
+                        + desiredMapAlpha + ", first_update_wait_ms="
+                        + (android.os.SystemClock.uptimeMillis() - firstFrameWaitStarted)
+                        + ", sent_generation=" + sentGeneration
+                        + ", texture_timestamp_ns=" + texture.getTimestamp() + ", producer_frame_ack=false");
+            });
         }
     }
 
+    private final dezz.status.widget.navigation.MapStartupPresentation firstPresentation =
+            new dezz.status.widget.navigation.MapStartupPresentation();
+
     private void beginFirstFrameGate() {
+        firstPresentation.reset();
         awaitingFirstMapFrame = true;
         firstFrameWaitStarted = android.os.SystemClock.uptimeMillis();
         mapTexture.setAlpha(0f);

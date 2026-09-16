@@ -157,13 +157,28 @@ public class ButtonReplay {
       VehicleButton b=route.contains("voice")||route.contains("alice")?VehicleButton.VA:VehicleButton.SRC;
       byte[] one=("vdex000000000000"+route+"\0END").getBytes(StandardCharsets.US_ASCII);
       byte[] on=ButtonInputPatch.apply(one,b,true);
-      check(ButtonInputPatch.state(on,b)&&ButtonInputPatch.coverage(on,b).equals("1/2"),"single firmware variant "+route);
+      check(ButtonInputPatch.state(on,b)&&ButtonInputPatch.coverage(on,b).equals(b==VehicleButton.VA?"1/5":"1/2"),"single firmware variant "+route);
       check(Arrays.equals(one,ButtonInputPatch.apply(on,b,false)),"single route restores");
     }
     byte[] partial=("vdex000000000000handle_ioice_action\0yandexnavi://ask_alice\0").getBytes(StandardCharsets.US_ASCII);
     try {ButtonInputPatch.state(partial,VehicleButton.VA);throw new AssertionError("mixed state must be reported");}catch(IllegalArgumentException good){}
     check(ButtonInputPatch.state(ButtonInputPatch.apply(partial,VehicleButton.VA,true),VehicleButton.VA),"repair interrupted disable");
     check(!ButtonInputPatch.state(ButtonInputPatch.apply(partial,VehicleButton.VA,false),VehicleButton.VA),"repair interrupted restore");
+    String nativeVa="Lecarx/xsf/inputservice/key/ECarXRVoiceAssistAction;\0"
+      +"ecarx.intent.action.vr_pressed\0ecarx.intent.action.vr_released\0"
+      +"ecarx.intent.action.ECARX_KEY_RVOICEASSIST_EVENT\0";
+    byte[] nativeBytes=("vdex000000000000"+nativeVa+"com.ecarx.screensaver\0").getBytes(StandardCharsets.US_ASCII);
+    byte[] nativeOn=ButtonInputPatch.apply(nativeBytes,VehicleButton.VA,true);
+    check(ButtonInputPatch.state(nativeOn,VehicleButton.VA),"native broadcast VA disabled");
+    check(new String(nativeOn,StandardCharsets.US_ASCII).contains("ecarx.intent.action.nr_pressed"),"DOWN rerouted");
+    check(new String(nativeOn,StandardCharsets.US_ASCII).contains("ecarx.intent.action.nr_released"),"UP rerouted");
+    check(new String(nativeOn,StandardCharsets.US_ASCII).contains("ECARX_KEY_NVOICEASSIST_EVENT"),"short and long rerouted");
+    check(!ButtonInputPatch.state(nativeOn,VehicleButton.POWER),"unrelated power route preserved");
+    check(Arrays.equals(nativeBytes,ButtonInputPatch.apply(nativeOn,VehicleButton.VA,false)),"native VA exact roundtrip");
+    for(String bad:new String[]{nativeVa.replace("ecarx.intent.action.vr_released", "missing"),nativeVa.replace("ECarXRVoiceAssistAction", "UnknownOwner")}) {
+      try {ButtonInputPatch.apply(("vdex000000000000"+bad).getBytes(StandardCharsets.US_ASCII),VehicleButton.VA,true);throw new AssertionError("incomplete native VA accepted");}
+      catch(IllegalArgumentException expected){}
+    }
     try {ButtonInputPatch.apply("vdex000000000000UNKNOWN".getBytes(),VehicleButton.VA,true);throw new AssertionError("absent hook accepted");}catch(IllegalArgumentException good){}
     try { ButtonInputPatch.apply("not a cache of adequate size".getBytes(),VehicleButton.SRC,true);throw new AssertionError("bad cache accepted"); } catch(IllegalArgumentException good){}
     System.out.println("button timing, routes, action grammar, VDEX round trips: PASS");

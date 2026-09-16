@@ -339,7 +339,7 @@ public final class InstrumentDisplayLauncher {
         }
     }
 
-    private static Integer readDimMode(Context app) {
+    static Integer readDimMode(Context app) {
         try {
             Object menu = dimMenu(app);
             Object result = menu == null ? null : menu.getClass().getMethod("getNaviMode").invoke(menu);

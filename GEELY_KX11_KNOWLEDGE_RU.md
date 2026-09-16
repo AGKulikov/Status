@@ -1,5 +1,75 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 16.09.2026 — дополнительный native-вариант VA и кандидат исправлений
+
+Повторно получен ранее предоставленный KX11-HU-Route-20260810-070911-29994-1234567.zip;
+член packages/ecarx.xsf.inputservice/XSFInputService.apk имеет SHA256
+`c4e380408d952298370ce8f9df177e902233c2a24825f15a02c1dbf371fccc14`, DEX SHA256
+`1fe7c6ea33b89881247d9930d454ab015a76dbd8a3000b0a05220ce74b534cfd`.
+В ECarXRVoiceAssistAction getKeyCode/code_off0x3ab4e4 возвращает200231;
+onKeyDown0x3ab4fc отправляет vr_pressed; onKeyUp0x3ab558 — vr_released;
+onShortClick0x3ab634 и onLongPressTriggered0x3ab5b0 —
+ecarx.intent.action.ECARX_KEY_RVOICEASSIST_EVENT с типом0/1. Все три литерала
+вызваны только этими четырьмя методами в проверенном DEX. KeyPolicyImpl.registerActions
+0x3accd4 создаёт ECarXRVoiceAssistAction. Строк handle_voice_action/ask_alice нет.
+Это STATIC-доказательство варианта прошивки, объясняющего Missing VA routes;
+оно не доказывает совпадение нынешнего системного APK с августовским дампом.
+
+В кандидате3.0.1 новый вариант допущен только при проверке хэша системного APK,
+класса-владельца и полного набора DOWN/UP/short-long. Используются обратимые
+равнодлинные vr→nr и RVOICEASSIST→NVOICEASSIST, без изменения кода кнопки, зон,
+автомобильных функций и общего input service. Старый VDEX восстанавливается при
+ошибке записи; неизвестная прошивка отклоняется с её SHA. Предыдущие две VA-пары
+из MConfig+46.1 остаются: APK MConfig SHA256
+`a1f2f1d486422afd65a47ba06201ed0a87a8dd4f7b9052db860765a5e3fb35e0` содержит
+ровно прежние sed-подстановки. Недостающий новый вариант не приписывается MConfig.
+
+Также кандидат применяет readDimMode/getNaviMode существующего AdaptAPI с Global
+fallback непосредственно перед AppOp, без записи новых DIM значений. Ограниченная
+защита показа карт не зависит от тайлов и имеет800мс fallback. Кнопочные состояния
+сохраняются отдельной commit-очередью; свежесть селектора проверяется до эффекта.
+Исходники/локальные replay — IMPLEMENTED, аппаратные эффекты VA/полосы/карт — OPEN.
+
+## 16.09.2026, вечер — повторные симптомы на Natro 3.0.0
+
+Источник: `status-widget-debug(20260916-183931).txt`, SHA-256
+`4918ba13b240b4553cf523786b8a5f55c79229ddc79a3730d7521b95b8fd42ed`;
+4476 строк, QUALCOMM KX11, Android 9. Ревизия сопоставления исходников
+`39d4893d258a4808ff7e54f83c424351121c41e2`. Физические симптомы сообщены
+пользователем; установленный Navigator и прошивка не идентифицируются по хэшу.
+
+OBSERVED: строка 3246, 21:20:57.721 — белый непрозрачный образец cluster Surface
+при alpha=1, white_permille=1000, luma255..255; единственный образец не задаёт
+длительность вспышки. В строках 3241/3245 и 3861/3878 раскрытие карты сопровождается
+texture timestamp около18–20с; считать его возрастом буфера относительно uptime
+нельзя без подтверждения временной базы производителя. JVM replay текущих callback
+HUD/cluster допускает раскрытие старого буфера после отправки lease, но это не
+доказывает тот же порядок на GPU. Причина белого буфера не локализована до компонента
+GPU/MapKit; NAV-019 запрещает возвращать обязательную готовность тайлов/PixelCopy.
+Семантика timestamp: [Android SurfaceTexture](https://developer.android.com/reference/android/graphics/SurfaceTexture#getTimestamp()).
+
+OBSERVED: строки 3601–3825 — main BLOCKED в QueuedWork, queued-work-looper в
+FileDescriptor.sync при SharedPreferencesImpl.writeToFile, stall7510мс. Во время
+эпизода Natro принимает DM DOWN/UP и пишет dispatch (effect=unobserved). Replay
+submit + DriveSelectorController.request подтверждает, что переданная на MAIN
+команда селектора исполняется после такой задержки без повторной проверки750мс.
+Это не доказательство момента физической смены режима и не конфликт с MConfig.
+
+OBSERVED: строки 3324 и 4117 — white_bar NaviMode=1, denied=false, confirmed=true.
+Это собственная запись Natro `appops ... allow`; флаг скрытия и действительное
+подавление различаются. Уведомление NaviMode не называет инициатора изменения.
+Изолированно воспроизведены starvation debounce1500мс, stale allow при смене режима
+в очереди shell и отсутствие восстановления после внешнего сброса AppOp без
+уведомления режима. Последние два механизма не доказаны как конкретная причина
+физического эпизода пользователя. Не вводить безусловный deny во всех режимах
+и не приравнивать visible=true Android-окна к владению физическими пикселями DIM.
+
+NEGATIVE: строка1192, 20:53:22.594 — запрос отключения штатного VA завершился
+`applied=false`, `IllegalArgumentException: Missing VA routes`. Результат относится
+к данной попытке и найденным маршрутам; не доказывает абсолютную невозможность VA.
+GATE-107/112 и физическая приёмка CLUSTER-028 открыты. Изменения приложения и новый
+APK на этом этапе не выполнялись; подробности нового требования — в реестре.
+
 ## 16.09.2026 — исходные команды селектора и сервисный режим
 
 В DezzK/monjaro-selector v1.0.0 (commit 2c6c8c010aae6a7eb47c886db4dbd7d76132e959)

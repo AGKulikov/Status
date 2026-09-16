@@ -51,6 +51,9 @@ def main():
     if not patch.is_file() or patch.stat().st_size < 10000:
         raise ValueError("Compiled Navigator patch is required for this pair")
     shutil.copy2(patch, out / "classes19.dex")
+    reuse_navigator = os.environ.get("REUSE_NAVIGATOR_300") == "true"
+    if reuse_navigator and sha256(patch) != "b73c91580683a0b8ccd85c746f5ee290bd70cc9ea9e54e397839a028be7cf142":
+        raise ValueError("Navigator reuse requires the exact verified 3.0.0 patch bytes")
     manifest = {
         "versionName": version, "versionCode": code, "package": "ru.natro.statuswidget",
         "sourceCommit": os.environ["GITHUB_SHA"],
@@ -58,7 +61,9 @@ def main():
         "ciRunId": os.environ["GITHUB_RUN_ID"], "unitTests": counts,
         "unsignedSha256": sha256(unsigned),
         "navigator": {
-            "pairRequired": True, "patch": "classes19.dex", "patchSha256": sha256(patch),
+            "pairRequired": not reuse_navigator,
+            "compatiblePair": "Natro 3.0.0 / Navigator 30.3.0" if reuse_navigator else None,
+            "patch": "classes19.dex", "patchSha256": sha256(patch),
             "baselineVersion": "30.3.0-Natro-2.9.8",
             "baselineSha256": "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a",
             "allowedPayloadChanges": ["classes19.dex"],

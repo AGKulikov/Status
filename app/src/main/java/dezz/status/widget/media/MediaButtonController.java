@@ -110,8 +110,26 @@ public final class MediaButtonController {
 
     /** Invoked by the ordinary startup owner, never by a physical-key callback. */
     public void restoreStored() {
-        control(() -> { if (isolated) setDisableDefault(true, (success, detail) -> {}); });
+        ButtonRouteRestorer.restore(context);
     }
+
+    synchronized boolean beginStoredRestore() {
+        if (changingRoute || !isolated) return false;
+        changingRoute = true; ensureReceiver(); status = "Восстановление пути MEDIA…";
+        return true;
+    }
+    synchronized void finishStoredRestore(String output, String error) {
+        changingRoute = false;
+        routeVerified = error == null && output != null
+                && output.contains("NATRO_MEDIA_ROUTE=" + MediaKeyPolicy.NATRO)
+                && !output.contains("NATRO_MEDIA_ERROR=");
+        status = routeVerified ? "Маршрут MEDIA проверен; готовность физической кнопки требует проверки"
+                : "Не удалось восстановить маршрут MEDIA";
+        reconcileReceiver();
+        DiagnosticJournal.infoAsync("media-buttons", status);
+    }
+
+    void whenInputReady(Runnable callback) { control(callback); }
 
     public boolean isReady() { return ready; }
     public void whenReady(Runnable callback) {
@@ -126,14 +144,14 @@ public final class MediaButtonController {
     public synchronized void setEnabled(boolean value) {
         enabled = value;
         generation++;
-        control(() -> preferences.edit().putBoolean("enabled", value).apply());
+        control(() -> RuntimePreferenceWriter.put(preferences, "enabled", value));
         reconcileReceiver();
     }
 
     private synchronized void setDefaultSource(boolean value) {
         defaultSource = value;
         generation++;
-        preferences.edit().putBoolean("default_source", value).apply();
+        RuntimePreferenceWriter.put(preferences, "default_source", value);
     }
 
     /** Internal mode changed only by action 20; this is not a third MEDIA settings switch. */
@@ -177,7 +195,7 @@ public final class MediaButtonController {
                 if (success) {
                     routeVerified = true;
                     isolated = value;
-                    control(() -> preferences.edit().putBoolean("disable_default", value).apply());
+                    control(() -> RuntimePreferenceWriter.put(preferences, "disable_default", value));
                     status = (value ? "Путь MEDIA в Natro записан и проверен" : "Штатный путь MEDIA записан и проверен")
                             + ". Перезапуск XSF запрошен; проверьте физическое нажатие.";
                 } else {

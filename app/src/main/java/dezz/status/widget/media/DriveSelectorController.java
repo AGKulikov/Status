@@ -18,11 +18,14 @@ public final class DriveSelectorController {
     public static void request(Context context, int steps) {
         if (steps < -3 || steps > 3) throw new IllegalArgumentException("Invalid drive steps");
         Context app = context.getApplicationContext();
+        ButtonActionDeadline deadline = ButtonActionDeadline.current();
         new Handler(Looper.getMainLooper()).post(() -> {
+            if (!deadline.valid()) return;
             if (!Settings.canDrawOverlays(app)) {
                 Toast.makeText(app, "Разрешите Natro показ поверх других приложений", Toast.LENGTH_LONG).show(); return;
             }
             Intent service = new Intent(app, DriveModeOverlayService.class);
+            service.putExtra(DriveModeOverlayService.EXTRA_ACTION_DEADLINE, deadline.expiresAt);
             service.setAction(steps == 0 ? DriveModeOverlayService.ACTION_SHOW_PREVIEW : DriveModeOverlayService.ACTION_KNOB_STEP);
             service.putExtra(KnobReceiver.EXTRA_STEPS, Math.abs(steps));
             service.putExtra(KnobReceiver.EXTRA_DIRECTION, steps < 0 ? KnobReceiver.DIRECTION_PREV : KnobReceiver.DIRECTION_NEXT);
