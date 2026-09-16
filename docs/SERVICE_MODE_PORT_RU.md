@@ -1,5 +1,13 @@
 # Сервисный режим — перенос в Natro
 
+Проверка восстановления: `python3 -m unittest tools.tests.test_adb_service_replay -v`.
+Исполняются ServiceModeJournal/PinStorage/AppsToHideStorage с Android test doubles:
+запись до pm, восстановление DEFAULT/ENABLED, отказ чтения состояния, ошибка commit,
+сохранение PIN, запрет системных/self/ECARX/звонилки. Поиск портов отменяется при
+onStop, журнал с сохранённым исходным состоянием не очищается обновлением списка.
+Реальные PackageManager, звонилка, reboot и частичное скрытие на KX11 остаются
+отдельной открытой приёмкой.
+
 Источник: [DezzK/stealth](https://github.com/DezzK/stealth/tree/47ca7f6cc02f3edac5a3f4c220852b390f156b82),
 commit `47ca7f6cc02f3edac5a3f4c220852b390f156b82`, проверен через GitHub plugin
 16.09.2026. Автор — Dezz, © 2025–2026; GPL-3.0-or-later. Java/XML перенесены

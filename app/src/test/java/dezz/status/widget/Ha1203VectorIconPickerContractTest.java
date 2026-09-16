@@ -82,8 +82,13 @@ public final class Ha1203VectorIconPickerContractTest {
             assertTrue("Persisted automotive id must keep resolving: " + key,
                     resolver.contains("case \"" + key + "\": return R.drawable."));
         }
-        assertEquals("100 historical choices plus 24 original drive-mode descriptors",
-                124, dezz.status.widget.launcher.LauncherIconResolver.presets().size());
+        assertEquals("All 100 historical base choices remain alongside other icon packs",
+                100, occurrences(resolver.substring(resolver.indexOf("buildBasePresets()"),
+                        resolver.indexOf("private LauncherIconResolver()")), "new Preset(\""));
+        for (dezz.status.widget.drivemode.car.DriveModeDescriptor mode
+                : dezz.status.widget.drivemode.car.DriveModeCatalog.all())
+            assertTrue("Original drive mode must be selectable: " + mode.key,
+                    dezz.status.widget.launcher.LauncherIconResolver.preset("drive_" + mode.key) != null);
         java.util.Set<String> keys = new java.util.HashSet<>();
         for (dezz.status.widget.launcher.LauncherIconResolver.Preset preset
                 : dezz.status.widget.launcher.LauncherIconResolver.presets())

@@ -27,13 +27,21 @@ public final class AutoHoldAdbReader {
     private volatile long speedAt, gearAt;
     private long lastTrue, lastPublish;
     private Boolean lastState;
-    private final CarIntegration.TelemetryListener telemetry = value -> {
+    private final CarIntegration.TelemetryListener telemetry = new CarIntegration.TelemetryListener() {
+      @Override public void onTelemetry(CarIntegration.TelemetryValue value) {
         long now = SystemClock.elapsedRealtime();
+        if (!Double.isFinite(value.value)) { onTelemetryUnavailable(value.id); return; }
         if (value.id.equals("ISensor.speed")) { stopped = (int) (Math.abs(value.value) * 3.72) == 0; speedAt = now; }
         else if (value.id.equals("ISensor.gear")) {
             int gear = (int) value.value;
             drive = gear == 2097696 || gear >= 2097665 && gear <= 2097674 || gear <= -10001 && gear >= -10010; gearAt = now;
         }
+      }
+      @Override public void onTelemetryUnavailable(String id) {
+        if (id.equals("ISensor.speed")) { stopped = false; speedAt = 0; }
+        if (id.equals("ISensor.gear")) { drive = false; gearAt = 0; }
+        AutoHoldStateRepository.invalidateCapture(context);
+      }
     };
     private AutoHoldAdbReader(Context context) { this.context = context.getApplicationContext(); }
     public static synchronized void reconcile(Context context) {
@@ -42,6 +50,7 @@ public final class AutoHoldAdbReader {
     }
     private synchronized void restart() {
         long owner = ++generation;
+        drive = stopped = false; speedAt = gearAt = 0;
         if (socket != null) try { socket.close(); } catch (Exception ignored) {}
         if (task != null) task.cancel(true);
         Preferences prefs = new Preferences(context);

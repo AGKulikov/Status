@@ -74,6 +74,8 @@ public class MainActivity extends AppCompatActivity {
     /** Latest snapshot of host scans — refreshed live as the discovery progresses. */
     private List<ShellExecutor.HostScanResult> lastHostScans = null;
     private boolean connectionProbingFinished = false;
+    private java.util.concurrent.Future<?> connectionScan;
+    private int scanGeneration;
 
     /** Live reference to the connection-details dialog body when open, null otherwise. */
     private TextView connectionDetailsBody;
@@ -99,6 +101,13 @@ public class MainActivity extends AppCompatActivity {
         ensureMainActivityEnabled();
         initializeViews();
         // PermissionGate asks contextually when the user attempts to hide apps.
+    }
+
+    @Override
+    protected void onStop() {
+        ++scanGeneration;
+        if (connectionScan != null) { connectionScan.cancel(true); connectionScan = null; }
+        super.onStop();
     }
 
     @Override
@@ -248,12 +257,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkAdbStatus() {
+        if (connectionScan != null) connectionScan.cancel(true);
+        final int generation = ++scanGeneration;
         binding.connectionStatusText.setText(R.string.service_mode_connection_checking);
         binding.connectionStatusText.setTextColor(ContextCompat.getColor(this, R.color.service_mode_text_secondary));
         lastHostScans = null;
         connectionProbingFinished = false;
 
-        ShellExecutor.getInstance(this).checkConnection((hosts, finished) -> postIfAlive(() -> {
+        connectionScan = ShellExecutor.getInstance(this).checkConnection((hosts, finished) -> postIfAlive(() -> {
+            if (generation != scanGeneration) return;
             lastHostScans = hosts;
             connectionProbingFinished = finished;
             updateConnectionStatusText();

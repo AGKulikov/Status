@@ -121,6 +121,7 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
     private void toast(String text) { Toast.makeText(this, text, Toast.LENGTH_LONG).show(); }
     private void fail(String text) { busy = false; toast(text); if (!settings.isEnabled()) stopSelf(); }
     @Override public void onModeChanged(int previous, int current, DriveModeChangeOrigin origin) {
+        if (current < 0) { overlay.hide(); return; }
         if (!busy && settings.isEnabled() && origin == DriveModeChangeOrigin.EXTERNAL && enabled.contains(current))
             overlay.show(enabled, current, settings.getAutoHideSwitchMs());
     }

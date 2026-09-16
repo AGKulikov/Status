@@ -23,7 +23,7 @@ public final class DriveModeRepository {
     private int current = -1, requested = -1;
     private int[] supported = new int[0];
     private long generation;
-    private final CarIntegration.ControlStateListener stateListener = this::receiveState;
+    private CarIntegration.ControlStateListener stateListener;
 
     public interface Listener { void onModeChanged(int previous, int current, @NonNull DriveModeChangeOrigin origin); }
     public interface SupportedModesListener { void onSupportedModesChanged(@NonNull int[] supported); }
@@ -35,17 +35,19 @@ public final class DriveModeRepository {
         if (context == null) { context = ctx.getApplicationContext(); car = CarIntegrations.get(context); }
         if (attached) return;
         attached = true; ++generation;
+        long owner = generation;
+        stateListener = state -> receiveState(state, owner);
         car.subscribeControlStates(Collections.singleton("vehicle.drive_mode"), stateListener);
         refreshCatalog(null);
     }
-    private void receiveState(CarControlState state) {
+    private void receiveState(CarControlState state, long owner) {
         main.post(() -> {
-            if (!attached || !"vehicle.drive_mode".equals(state.controlId)) return;
+            if (!attached || owner != generation || !"vehicle.drive_mode".equals(state.controlId)) return;
             if (state.available && !available) refreshCatalog(null);
             int previous = current;
             current = state.available && state.known && Double.isFinite(state.value)
                     && state.value == (int) state.value ? (int) state.value : -1;
-            if (previous >= 0 && current >= 0 && previous != current) {
+            if (previous >= 0 && previous != current) {
                 DriveModeChangeOrigin origin = writing && requested == current
                         ? DriveModeChangeOrigin.PROGRAMMATIC : DriveModeChangeOrigin.EXTERNAL;
                 for (Listener listener : new ArrayList<>(listeners)) listener.onModeChanged(previous, current, origin);
@@ -116,6 +118,7 @@ public final class DriveModeRepository {
     public void shutdown() {
         if (!listeners.isEmpty() || !supportedListeners.isEmpty()) return;
         ++generation; attached = false; current = -1; available = false;
-        if (car != null) car.unsubscribeControlStates(stateListener);
+        if (car != null && stateListener != null) car.unsubscribeControlStates(stateListener);
+        stateListener = null;
     }
 }

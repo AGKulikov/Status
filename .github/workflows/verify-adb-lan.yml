@@ -2,7 +2,7 @@ name: Verify Natro ADB and local iPhone transfer candidate
 on:
   push:
     branches: ['feature/natro-map-trip-audit-20260912']
-    paths: ['app/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/verify-adb-lan.yml']
+    paths: ['app/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/verify-adb-lan.yml']
 permissions:
   contents: read
 concurrency:
@@ -29,6 +29,17 @@ jobs:
         run: ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon --max-workers=2
       - name: JavaScript syntax
         run: node --check app/src/main/assets/lan/client.js
+      - name: ADB, LAN, service recovery and selector regression tests
+        run: python3 -m unittest tools.tests.test_adb_service_replay tools.tests.test_lan_core_replay tools.tests.test_drive_selector_port tools.tests.test_physical_button_model -v
+      - name: Stage exact candidate and signing tools
+        run: python3 tools/stage_natro_adb_candidate.py
+      - name: Upload verified unsigned candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-2.9.9-offline-signing-${{ github.run_number }}
+          path: ${{ runner.temp }}/natro-2.9.9-candidate/*
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload candidate and reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

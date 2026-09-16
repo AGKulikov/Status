@@ -279,8 +279,9 @@ public class ShellExecutor {
 
     // ── Connection check ──────────────────────────────────────────────
 
-    public void checkConnection(StatusCallback callback) {
-        discoveryExecutor.execute(() -> {
+    public java.util.concurrent.Future<?> checkConnection(StatusCallback callback) {
+        return discoveryExecutor.submit(() -> {
+            if (Thread.currentThread().isInterrupted()) return;
             // Reset any stale factory cached from a previous discovery cycle. Without this
             // a head-unit reboot (which changes the dynamic ADB port) would leave us
             // pointing at a now-dead endpoint until the app process restarts.
@@ -294,21 +295,16 @@ public class ShellExecutor {
             for (String host : hosts) {
                 states.put(host, new HostScanState(host));
             }
-            // Hosts the cache mentions but that aren't currently bound: still report them
-            // so the user sees that "the IP we used last time isn't there now".
-            for (ConnectionStorage.Endpoint e : connectionStorage.loadAll()) {
-                // Never scan a stale address that may now belong to another LAN device.
-                // Only currently bound local interfaces and loopback are eligible.
-            }
-
             publish(callback, states, false);
 
             // Phase 1: re-verify cached endpoints (fast — sets activeFactory ASAP)
             verifyCachedEndpoints(states, callback);
+            if (Thread.currentThread().isInterrupted()) return;
 
             // Phase 2: full per-host scan, regardless of cache result. We always run it
             // so the user gets a complete diagnostic picture.
             scanAllHosts(hosts, states, callback);
+            if (Thread.currentThread().isInterrupted()) return;
 
             // Persist the freshly discovered set for next launch
             persistResults(states);
@@ -336,7 +332,9 @@ public class ShellExecutor {
                 }));
             }
             for (java.util.concurrent.Future<?> f : futures) {
-                try { f.get(); } catch (Exception ignored) {}
+                try { f.get(); }
+                catch (InterruptedException stopped) { Thread.currentThread().interrupt(); return; }
+                catch (Exception ignored) {}
             }
         } finally {
             pool.shutdownNow();
@@ -385,7 +383,9 @@ public class ShellExecutor {
                 }));
             }
             for (java.util.concurrent.Future<?> f : futures) {
-                try { f.get(); } catch (Exception ignored) {}
+                try { f.get(); }
+                catch (InterruptedException stopped) { Thread.currentThread().interrupt(); return; }
+                catch (Exception ignored) {}
             }
         } finally {
             pool.shutdownNow();
@@ -396,6 +396,7 @@ public class ShellExecutor {
     private void scanHost(String host, Map<String, HostScanState> states, StatusCallback callback) {
         // 1) Find every open port (closed ports return RST instantly on local interfaces)
         List<Integer> openPorts = scanOpenPorts(host);
+        if (Thread.currentThread().isInterrupted()) return;
 
         // Pre-populate slots with empty probes so the dialog can show "open, probing…"
         // for each one while we run the protocol checks. Slots already populated by the
@@ -428,7 +429,9 @@ public class ShellExecutor {
                 }));
             }
             for (java.util.concurrent.Future<?> f : futures) {
-                try { f.get(); } catch (Exception ignored) {}
+                try { f.get(); }
+                catch (InterruptedException stopped) { Thread.currentThread().interrupt(); return; }
+                catch (Exception ignored) {}
             }
         } finally {
             pool.shutdownNow();
@@ -585,7 +588,7 @@ public class ShellExecutor {
             selector = Selector.open();
             int port = FIRST_PORT;
             int batchIndex = 0;
-            while (port <= LAST_PORT) {
+            while (port <= LAST_PORT && !Thread.currentThread().isInterrupted()) {
                 int batchSize = effectiveBatchSize();
                 int batchEnd = Math.min(port + batchSize - 1, LAST_PORT);
                 int lastAttempted = scanBatch(host, port, batchEnd, SCAN_BATCH_TIMEOUT_MS, open, selector);
@@ -796,7 +799,7 @@ public class ShellExecutor {
         int lastAttempted = from - 1;
 
         try {
-            for (int p = from; p <= to; p++) {
+            for (int p = from; p <= to && !Thread.currentThread().isInterrupted(); p++) {
                 SocketChannel ch = null;
                 try {
                     ch = SocketChannel.open();
@@ -834,7 +837,7 @@ public class ShellExecutor {
             }
 
             long deadline = System.currentTimeMillis() + timeoutMs;
-            while (!pending.isEmpty()) {
+            while (!pending.isEmpty() && !Thread.currentThread().isInterrupted()) {
                 long left = deadline - System.currentTimeMillis();
                 if (left <= 0) break;
                 int n;
