@@ -34,9 +34,12 @@ public final class Natro2218RoadStabilityContractTest {
         assertTrue(controller.contains("reason=player_boot_gate"));
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));
         assertTrue(command.contains("YANDEX_PLAY_KEY_UP_DELAY_MS = 100L"));
-        assertTrue(command.contains("YandexMusicBrowserStarter.requestPlay(context)"));
+        assertTrue(command.contains("YandexMusicBrowserStarter.requestGuardedPlay(context,"));
+        assertTrue(command.contains("MediaAutoResumeController.browserPlayPermit(context, boot)"));
         assertTrue(browser.contains("MusicBrowserService"));
         assertTrue(browser.contains("playExactSessionOnly"));
+        assertTrue(browser.contains("MediaAutoResumeController.guardedBrowserDispatch("));
+        assertFalse(browser.contains("new Handler(Looper.getMainLooper())"));
     }
 
     @Test public void ancsPreemptsAndRetriesInsteadOfPoisoningHealthyOwner() throws Exception {

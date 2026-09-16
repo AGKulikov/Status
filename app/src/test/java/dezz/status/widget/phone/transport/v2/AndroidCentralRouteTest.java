@@ -340,8 +340,30 @@ public final class AndroidCentralRouteTest {
                     AndroidCentralRoute.deadline(state, state.expected);
             assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION, silence.state.phase);
             assertFalse(hasEffect(silence, BleRouteEffect.Type.CLOSE_GATT));
-            state = AndroidCentralRoute.systemConnectionAdvertisement(
-                    silence.state, silence.state.expected).state;
+            BleRouteTransition<AndroidCentralRoute.State> advertised =
+                    AndroidCentralRoute.systemConnectionAdvertisement(
+                            silence.state, silence.state.expected);
+            assertFalse(hasEffect(advertised, BleRouteEffect.Type.CLOSE_GATT));
+            assertFalse(hasEffect(advertised, BleRouteEffect.Type.CONNECT_GATT));
+            assertFalse(hasEffect(advertised, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+            if (silence.state.sameOwnerReassertions >= AndroidCentralRoute.MAX_FAST_UNPROVEN_REASSERTIONS) {
+                assertFalse(advertised.accepted);
+                assertEquals(AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION, advertised.state.phase);
+                assertEquals(AndroidCentralRoute.UNPROVEN_OWNER_COOLDOWN_MS,
+                        firstEffect(silence, BleRouteEffect.Type.ARM_RETRY).delayMillis);
+                // Only the cooldown timer may resume this owner. A connect deadline cannot
+                // be delivered while no connect attempt is in progress.
+                advertised = AndroidCentralRoute.systemConnectionRecoveryElapsed(
+                        advertised.state, advertised.state.expected);
+                assertTrue(advertised.accepted);
+                assertTrue(hasEffect(advertised, BleRouteEffect.Type.REASSERT_SAME_GATT));
+                assertFalse(hasEffect(advertised, BleRouteEffect.Type.CLOSE_GATT));
+                assertFalse(hasEffect(advertised, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+            } else {
+                assertTrue(advertised.accepted);
+            }
+            state = advertised.state;
+            assertEquals(AndroidCentralRoute.Phase.CONNECTING, state.phase);
             assertEquals(owner, state.activeOwnerId);
         }
     }

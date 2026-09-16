@@ -30,7 +30,8 @@ public final class Natro2219RoadLogRecoveryContractTest {
         assertTrue(command.contains("route=waiting_for_exact_session"));
         assertFalse(command.contains("deferredYandexPlaySession"));
         assertTrue(command.contains("sendKey(context, known"));
-        assertTrue(command.contains("requestYandexBrowserIfUseful(context, target, command)"));
+        assertTrue(command.contains("requestYandexBrowserIfUseful(context, target, command, coldStartEscalation)"));
+        assertTrue(command.contains("MediaAutoResumeController.browserPlayPermit(context, boot)"));
         assertTrue(command.indexOf("route=exact_session_play")
                 < command.indexOf("PackageManager packages"));
         assertTrue(browser.contains("CONNECTION_TIMEOUT_MS = 20_000L"));

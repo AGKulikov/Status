@@ -44,7 +44,9 @@ public final class Natro2217ImmediateMediaContractTest {
         assertTrue(controller.contains("MAX_ATTEMPTS = 5"));
         assertTrue(controller.contains("RETRY_DELAY_MS = 10_000L"));
         assertTrue(command.contains("YANDEX_PLAY_KEY_UP_DELAY_MS = 100L"));
-        assertTrue(command.contains("YandexMusicBrowserStarter.requestPlay(context)"));
+        assertTrue(command.contains("YandexMusicBrowserStarter.requestGuardedPlay(context,"));
+        assertTrue(command.contains("MediaAutoResumeController.browserPlayPermit(context, boot)"));
+        assertTrue(controller.contains("manual == MANUAL_GENERATION.get()"));
         assertTrue(command.contains("sessions=" + "\" + sessionInventory"));
     }
 
