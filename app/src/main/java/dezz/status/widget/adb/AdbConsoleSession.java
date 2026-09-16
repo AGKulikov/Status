@@ -30,12 +30,20 @@ public final class AdbConsoleSession implements AutoCloseable {
         if (closed || !busy.compareAndSet(false, true)) return false;
         cancelled.set(false); stopReason = "Отменено";
         worker.execute(() -> {
-            ScheduledFuture<?> deadline = timer.schedule(() -> cancel("Таймаут 60 секунд"), 60, TimeUnit.SECONDS);
+            ScheduledFuture<?> deadline = null;
             Exception failure = null;
-            try { operation.run(this); checkCancelled(); }
+            try {
+                checkCancelled();
+                deadline = timer.schedule(() -> cancel("Таймаут 60 секунд"), 60, TimeUnit.SECONDS);
+                checkCancelled(); operation.run(this); checkCancelled();
+            }
             catch (Exception error) { failure = cancelled.get() ? new IOException(stopReason
                     + ". Команда не повторялась; проверьте её фактический результат.") : error; }
-            finally { deadline.cancel(false); busy.set(false); listener.completed(failure); }
+            finally {
+                if (deadline != null) deadline.cancel(false);
+                if (cancelled.get() || closed) disconnect();
+                busy.set(false); listener.completed(failure);
+            }
         });
         return true;
     }
@@ -122,6 +130,7 @@ public final class AdbConsoleSession implements AutoCloseable {
         if (pending != null) try { pending.close(); } catch (IOException ignored) {}
     }
     @Override public synchronized void close() {
+        if (closed) return;
         closed = true; cancel("Раздел ADB закрыт");
         worker.execute(this::disconnect); worker.shutdown(); timer.shutdownNow();
     }

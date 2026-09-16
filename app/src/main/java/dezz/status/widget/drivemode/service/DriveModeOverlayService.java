@@ -134,6 +134,7 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
         super.onConfigurationChanged(config);
         if ((config.uiMode & Configuration.UI_MODE_NIGHT_MASK) != theme) {
             recreating = true; overlay.dispose(); createOverlay(); recreating = false;
+            if (!busy && !settings.isEnabled()) stopSelf();
         }
     }
     @Override public void onDestroy() {

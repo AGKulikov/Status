@@ -59,8 +59,10 @@ public final class LanHttpServer implements AutoCloseable {
                 || bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
     }
     private void serve(Socket socket) {
-        ScheduledFuture<?> deadline = deadlines.schedule(() -> { try { socket.close(); } catch (IOException ignored) {} }, 5, TimeUnit.MINUTES);
+        ScheduledFuture<?> deadline = null;
         try (Socket owned = socket) {
+            if (closed) return;
+            deadline = deadlines.schedule(() -> { try { socket.close(); } catch (IOException ignored) {} }, 5, TimeUnit.MINUTES);
             InputStream input = new BufferedInputStream(owned.getInputStream()); OutputStream output = owned.getOutputStream();
             String line = line(input, 4096); String[] start = line.split(" ", -1);
             if (start.length != 3 || !start[2].equals("HTTP/1.1") || !start[1].startsWith("/") || start[1].startsWith("//"))
@@ -85,7 +87,7 @@ public final class LanHttpServer implements AutoCloseable {
             }
             handler.handle(new Request(start[0], start[1], authority, headers, length, input), output);
         } catch (Exception ignored) { /* no request bodies, PINs or tokens in logs */ }
-        finally { deadline.cancel(false); clients.remove(socket); }
+        finally { if (deadline != null) deadline.cancel(false); clients.remove(socket); }
     }
     private static String line(InputStream input, int limit) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream(); int value;

@@ -91,10 +91,10 @@ public class MainActivity extends AppCompatActivity {
         // Do not replace the user's global Natro theme when opening this one section.
         binding = ServiceModeActivityMainBinding.inflate(this.getLayoutInflater());
         setContentView(binding.getRoot());
-        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, binding.getRoot());
         android.widget.Button back = new android.widget.Button(this);
         back.setText("← Назад"); back.setContentDescription("Назад"); back.setOnClickListener(v -> finish());
         ((android.widget.LinearLayout) binding.headerText.getParent()).addView(back, 0);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, binding.getRoot());
 
         ensureMainActivityEnabled();
         initializeViews();

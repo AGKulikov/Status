@@ -20,10 +20,10 @@ public final class LanTransferService extends Service {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, Job> jobs = new LinkedHashMap<>();
     private final Set<String> seenCommands = new HashSet<>();
-    private LanHttpServer server;
-    private LanFileStore files;
-    private AdbConsoleSession adb;
-    private LanPairing pairing;
+    private volatile LanHttpServer server;
+    private volatile LanFileStore files;
+    private volatile AdbConsoleSession adb;
+    private volatile LanPairing pairing;
     private volatile boolean remoteCommands;
     private volatile String clipboard = "", status = "Запуск…";
     private volatile boolean destroyed;

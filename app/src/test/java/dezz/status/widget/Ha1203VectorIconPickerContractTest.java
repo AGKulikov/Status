@@ -82,8 +82,12 @@ public final class Ha1203VectorIconPickerContractTest {
             assertTrue("Persisted automotive id must keep resolving: " + key,
                     resolver.contains("case \"" + key + "\": return R.drawable."));
         }
-        assertEquals("The safe catalog remains 24 choices larger than HA1202",
-                100, occurrences(resolver, "new Preset(\""));
+        assertEquals("100 historical choices plus 24 original drive-mode descriptors",
+                124, dezz.status.widget.launcher.LauncherIconResolver.presets().size());
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        for (dezz.status.widget.launcher.LauncherIconResolver.Preset preset
+                : dezz.status.widget.launcher.LauncherIconResolver.presets())
+            assertTrue("Duplicate persistent key: " + preset.key, keys.add(preset.key));
         assertTrue(resolver.contains("case \"front_car\": return R.drawable.ic_car_front"));
         assertTrue("front_car must remain distinct from the historical car id",
                 resolver.contains("case \"car\": return R.drawable.ic_smart_car"));

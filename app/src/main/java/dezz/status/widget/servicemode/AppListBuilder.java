@@ -33,10 +33,13 @@ final class AppListBuilder {
         List<ApplicationInfo> packages = pm.getInstalledApplications(PackageManager.GET_META_DATA);
         String currentPackageName = context.getPackageName();
         Set<String> appsToKeep = excludeStorage.getAppsToKeep();
+        android.telecom.TelecomManager telecom = context.getSystemService(android.telecom.TelecomManager.class);
+        String dialer = telecom == null ? null : telecom.getDefaultDialerPackage();
 
         List<AppInfo> result = new ArrayList<>();
         for (ApplicationInfo appInfo : packages) {
             if (AlwaysIgnoreAppResolver.alwaysIgnoreApp(appInfo, currentPackageName)) continue;
+            if (appInfo.packageName.equals(dialer)) continue;
             if (!appInfo.enabled) continue;
 
             // Checked = "will be hidden". Apps in appsToKeep are unchecked.
@@ -60,6 +63,7 @@ final class AppListBuilder {
         Map<String, String> tracked = storage.load();
         List<AppInfo> result = new ArrayList<>();
         List<String> toRemoveFromStorage = new ArrayList<>();
+        ServiceModeJournal journal = new ServiceModeJournal(context);
 
         // Hoisted out of the loop — same fallback drawable for every uninstalled package
         Drawable fallbackIcon = ResourcesCompat.getDrawable(
@@ -68,7 +72,9 @@ final class AppListBuilder {
         for (Map.Entry<String, String> entry : tracked.entrySet()) {
             String packageName = entry.getKey();
 
-            if (isAppEnabled(pm, packageName)) {
+            // A baseline can be a write-ahead record whose pm command is still running.
+            // Only confirmed restoration, not this list refresh, may remove that record.
+            if (isAppEnabled(pm, packageName) && !journal.hasBaseline(packageName)) {
                 toRemoveFromStorage.add(packageName);
                 continue;
             }

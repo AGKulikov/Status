@@ -46,12 +46,12 @@ public class AppsToHideStorage {
         return result;
     }
 
-    public void removeAll(Collection<String> packageNames) {
+    public boolean removeAll(Collection<String> packageNames) {
         SharedPreferences.Editor editor = prefs.edit();
         for (String packageName : packageNames) {
             editor.remove(packageName);
         }
-        editor.commit();
+        return editor.commit();
     }
 
     public boolean hasHiddenApps() {

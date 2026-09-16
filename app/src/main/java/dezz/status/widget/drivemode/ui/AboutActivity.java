@@ -60,6 +60,7 @@ public class AboutActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         binding.backButton.setOnClickListener(v -> finish());
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, binding.getRoot());
 
         binding.aboutFallback.setMovementMethod(LinkMovementMethod.getInstance());
         binding.aboutFallback.setText(Html.fromHtml(

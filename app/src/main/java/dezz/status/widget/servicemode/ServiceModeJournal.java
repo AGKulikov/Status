@@ -52,14 +52,20 @@ final class ServiceModeJournal {
                 + " --user 0 " + pkg;
     }
 
+    boolean hasBaseline(String pkg) { return original.contains(pkg); }
+
     boolean confirm(String pkg, boolean disable) {
         int actual = packages.getApplicationEnabledSetting(pkg);
         if (disable) return actual == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER;
         int expected = original.getInt(pkg, PackageManager.COMPONENT_ENABLED_STATE_ENABLED);
         if (actual != expected) return false;
         // This runs on the batch worker even when the settings Activity was destroyed.
-        tracked.removeAll(Collections.singleton(pkg));
-        original.edit().remove(pkg).commit();
+        if (!tracked.removeAll(Collections.singleton(pkg))) return false;
+        if (!original.edit().remove(pkg).commit()) {
+            // Restore was real, but retain a discoverable recovery record on disk failure.
+            tracked.save(Collections.singletonMap(pkg, pkg));
+            return false;
+        }
         if (!tracked.hasHiddenApps()) {
             packages.setComponentEnabledSetting(new ComponentName(context, LauncherTrampolineActivity.class),
                     PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);

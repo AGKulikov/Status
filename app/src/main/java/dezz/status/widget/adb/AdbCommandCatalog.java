@@ -74,6 +74,11 @@ public final class AdbCommandCatalog {
     public static String appendService(String value, String component) {
         String normalized = canonicalComponent(component);
         if (normalized.isEmpty()) throw new IllegalArgumentException("Некорректный сервис");
+        // Do not silently erase an unfamiliar existing accessibility component.
+        if (!value.trim().isEmpty() && !value.trim().equals("null"))
+            for (String entry : value.split(":", -1))
+                if (!entry.trim().isEmpty() && canonicalComponent(entry).isEmpty())
+                    throw new IllegalArgumentException("Список сервисов содержит неизвестную запись; изменение отменено");
         Set<String> existing = enabledServices(value);
         existing.add(normalized);
         return String.join(":", existing);

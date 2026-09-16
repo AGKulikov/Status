@@ -49,6 +49,8 @@ public final class SettingsBackNavigationContractTest {
     };
 
     private static final String[][] EXPLICIT_JAVA_DETAILS = {
+            {"AdbSettingsActivity.java", "button(\"← Назад\", this::finish)", "header.addView(back)"},
+            {"LanTransferActivity.java", "button(\"← Назад\", this::finish)", "root.addView(button(\"← Назад\", this::finish))"},
             {"AboutActivity.java", "binding.backButton",
                     "binding.backButton.setOnClickListener(v -> finish())"},
             {"AppSelectionActivity.java", "binding.backButton",
@@ -95,6 +97,8 @@ public final class SettingsBackNavigationContractTest {
     };
 
     private static final String[] EXPLICIT_SAFE_INSET_DETAILS = {
+            "AdbSettingsActivity.java",
+            "LanTransferActivity.java",
             "AboutActivity.java",
             "AppSelectionActivity.java",
             "AutomationSettingsActivity.java",
@@ -166,6 +170,22 @@ public final class SettingsBackNavigationContractTest {
 
         assertEquals("Every Activity in AndroidManifest must have a navigation contract",
                 expected, declared);
+    }
+
+    @Test
+    public void importedDetailScreensRetainBackAndSafeInsets() throws IOException {
+        String[][] screens = {
+            {"drivemode/ui/MainActivity.java", "binding.toolbar.setNavigationOnClickListener(v -> finish())"},
+            {"drivemode/ui/AboutActivity.java", "binding.backButton.setOnClickListener(v -> finish())"},
+            {"servicemode/MainActivity.java", "back.setOnClickListener(v -> finish())"},
+            {"servicemode/AboutActivity.java", "binding.toolbar.setNavigationOnClickListener(v -> finish())"}
+        };
+        for (String[] screen : screens) {
+            String source = javaSource(screen[0]);
+            assertTrue(screen[0], source.contains(screen[1]));
+            assertTrue(screen[0], source.contains("SettingsBackNavigation.applySafeTopInset("));
+            assertTrue(screen[0], manifest().contains("android:name=\"." + screen[0].replace(".java", "").replace('/', '.') + "\""));
+        }
     }
 
     @Test

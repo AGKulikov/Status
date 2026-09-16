@@ -29,5 +29,7 @@ action('upload',async()=>{const selected=Array.from($('files').files);if(!select
 action('cancelUpload',()=>{cancelled=true;if(upload)upload.abort();});
 action('logout',()=>{token='';sessionStorage.removeItem('natroToken');showPaired(false);tell('Сопряжение забыто на этом телефоне. Для отзыва всех доступов обновите код на магнитоле.');});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token)status().catch(error=>tell(error.message));});
+let checkingStatus=false;
+setInterval(async()=>{if(document.hidden||!token||checkingStatus)return;checkingStatus=true;try{await status();}catch(error){$('connection').textContent='Нет подтверждения связи · '+location.host;}finally{checkingStatus=false;}},5000);
 $('resumeJob').hidden=!sessionStorage.getItem('natroJob');
 if(token)status().then(files).catch(error=>tell(error.message));else showPaired(false);
