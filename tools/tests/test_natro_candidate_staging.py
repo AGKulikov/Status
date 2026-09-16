@@ -22,7 +22,7 @@ class CandidateStagingTest(unittest.TestCase):
         os.chdir(self.root)
         self.addCleanup(os.chdir, self.previous_cwd)
         self.environment = patch.dict(os.environ, {
-            "VERSION_NAME": "2.9.9", "VERSION_CODE": "208021332",
+            "VERSION_NAME": "2.10.0", "VERSION_CODE": "208021333",
             "RUNNER_TEMP": str(self.root), "ANDROID_HOME": str(self.root / "sdk"),
             "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "123",
         })
@@ -39,7 +39,10 @@ class CandidateStagingTest(unittest.TestCase):
             target = sdk / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(name.encode())
-        self.out = self.root / "natro-2.9.9-candidate"
+        self.dex = self.root / "build/navigation-mod/classes19.dex"
+        self.dex.parent.mkdir(parents=True)
+        self.dex.write_bytes(b"dex-fixture" * 1000)
+        self.out = self.root / "natro-2.10.0-candidate"
 
     def write_apk(self, missing=None):
         with zipfile.ZipFile(self.apk, "w") as apk:
@@ -59,8 +62,11 @@ class CandidateStagingTest(unittest.TestCase):
         self.assertEqual(1906, manifest["unitTests"]["tests"])
         self.assertEqual(0, manifest["unitTests"]["failures"])
         self.assertEqual("pending", manifest["physicalKx11Verification"])
-        self.assertFalse(manifest["navigator"]["pairRequired"])
-        self.assertEqual(self.apk.read_bytes(), (self.out / "Natro-2.9.9-unsigned.apk").read_bytes())
+        self.assertTrue(manifest["navigator"]["pairRequired"])
+        self.assertEqual(["classes19.dex"], manifest["navigator"]["allowedPayloadChanges"])
+        self.assertEqual(self.dex.read_bytes(), (self.out / "classes19.dex").read_bytes())
+        self.assertEqual(hashlib.sha256(self.dex.read_bytes()).hexdigest(), manifest["navigator"]["patchSha256"])
+        self.assertEqual(self.apk.read_bytes(), (self.out / "Natro-2.10.0-unsigned.apk").read_bytes())
         self.assertEqual(hashlib.sha256(self.apk.read_bytes()).hexdigest(), manifest["unsignedSha256"])
         self.assertEqual(b"lib/apksigner.jar", (self.out / "tools/lib/apksigner.jar").read_bytes())
         self.assertTrue((self.out / "test-results/TEST-example.xml").is_file())
@@ -68,6 +74,12 @@ class CandidateStagingTest(unittest.TestCase):
     def test_failed_tests_stop_publication(self):
         self.report.write_text('<testsuite tests="1906" failures="1" errors="0"/>')
         with self.assertRaisesRegex(ValueError, "Full test suite must pass"):
+            self.stage()
+        self.assertFalse((self.out / "candidate.json").exists())
+
+    def test_missing_navigator_patch_stops_pair_staging(self):
+        self.dex.unlink()
+        with self.assertRaisesRegex(ValueError, "Compiled Navigator patch"):
             self.stage()
         self.assertFalse((self.out / "candidate.json").exists())
 

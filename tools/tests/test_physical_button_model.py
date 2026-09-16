@@ -47,6 +47,23 @@ public class ButtonReplay {
   }
   static void check(boolean ok,Object why){if(!ok)throw new AssertionError(why);}
   public static void main(String[] args){
+    // Every supported code and every offered multiplicity, including both SRC variants.
+    for(int code:new int[]{210004,200400,119,200231,300001,300002,26}) {
+      String group=VehicleButton.bindingGroup(code);
+      for(int count=1;count<=3;count++) {
+        Fixture all=new Fixture();for(int gesture=1;gesture<=3;gesture++)all.bind(group,""+gesture);
+        for(int n=0;n<count;n++){all.click(code);all.clock.tick(80);}
+        all.clock.tick(600);all.expect(group+count);
+        all.engine.input(code,false);all.clock.tick(2000);all.expect(group+count);
+        Fixture disabled=new Fixture();disabled.bind(group,"1");
+        disabled.enabled.remove(VehicleButton.fromCode(code));disabled.click(code);disabled.clock.tick(600);disabled.expect();
+      }
+      if(VehicleButton.fromCode(code).longPress) {
+        Fixture held=new Fixture();held.bind(group,"1");held.bind(group,"long");held.engine.input(code,true);
+        held.clock.tick(500);held.engine.input(code,true);held.clock.tick(500);held.expect(group+"long");
+        held.engine.input(code,false);held.clock.tick(10000);held.expect(group+"long");
+      }
+    }
     Fixture f=new Fixture(); f.bind("src","1"); f.click(210004); f.expect("src1");
     f=new Fixture(); f.bind("src","1");f.bind("src","2");f.click(210004);f.clock.tick(599);f.expect();f.clock.tick(1);f.expect("src1");
     f=new Fixture();f.bind("src","1");f.bind("src","2");f.click(210004);f.clock.tick(300);f.click(210004);f.expect("src2");f.clock.tick(1000);f.expect("src2");
@@ -128,6 +145,26 @@ public class ButtonReplay {
       byte[] patched=ButtonInputPatch.apply(bytes,b,true);
       check(Arrays.equals(bytes,ButtonInputPatch.apply(patched,b,false)),"roundtrip "+b);
     }
+    byte[] combined=bytes;
+    for(VehicleButton b:new VehicleButton[]{VehicleButton.SRC,VehicleButton.VA,VehicleButton.DM,VehicleButton.POWER})
+      combined=ButtonInputPatch.apply(combined,b,true);
+    for(VehicleButton b:new VehicleButton[]{VehicleButton.SRC,VehicleButton.VA,VehicleButton.DM,VehicleButton.POWER})
+      check(ButtonInputPatch.state(combined,b),"all default paths coexist "+b);
+    for(VehicleButton b:new VehicleButton[]{VehicleButton.SRC,VehicleButton.VA,VehicleButton.DM,VehicleButton.POWER})
+      combined=ButtonInputPatch.apply(combined,b,false);
+    check(Arrays.equals(bytes,combined),"all restored independently");
+    for(String route:new String[]{"handle_voice_action","yandexnavi://ask_alice","handle_we_chat_action","ecarx.intent.action.ECARX_KEY_RSRC_EVENT"}) {
+      VehicleButton b=route.contains("voice")||route.contains("alice")?VehicleButton.VA:VehicleButton.SRC;
+      byte[] one=("vdex000000000000"+route+"\0END").getBytes(StandardCharsets.US_ASCII);
+      byte[] on=ButtonInputPatch.apply(one,b,true);
+      check(ButtonInputPatch.state(on,b)&&ButtonInputPatch.coverage(on,b).equals("1/2"),"single firmware variant "+route);
+      check(Arrays.equals(one,ButtonInputPatch.apply(on,b,false)),"single route restores");
+    }
+    byte[] partial=("vdex000000000000handle_ioice_action\0yandexnavi://ask_alice\0").getBytes(StandardCharsets.US_ASCII);
+    try {ButtonInputPatch.state(partial,VehicleButton.VA);throw new AssertionError("mixed state must be reported");}catch(IllegalArgumentException good){}
+    check(ButtonInputPatch.state(ButtonInputPatch.apply(partial,VehicleButton.VA,true),VehicleButton.VA),"repair interrupted disable");
+    check(!ButtonInputPatch.state(ButtonInputPatch.apply(partial,VehicleButton.VA,false),VehicleButton.VA),"repair interrupted restore");
+    try {ButtonInputPatch.apply("vdex000000000000UNKNOWN".getBytes(),VehicleButton.VA,true);throw new AssertionError("absent hook accepted");}catch(IllegalArgumentException good){}
     try { ButtonInputPatch.apply("not a cache of adequate size".getBytes(),VehicleButton.SRC,true);throw new AssertionError("bad cache accepted"); } catch(IllegalArgumentException good){}
     System.out.println("button timing, routes, action grammar, VDEX round trips: PASS");
   }

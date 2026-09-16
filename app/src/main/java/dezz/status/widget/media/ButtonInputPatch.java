@@ -19,24 +19,33 @@ public final class ButtonInputPatch {
         }
     }
     public static boolean state(byte[] data, VehicleButton button) {
-        if (data.length < 16 || data.length > 64 * 1024 * 1024 || data[0] != 'v'
-                || data[1] != 'd' || data[2] != 'e' || data[3] != 'x')
-            throw new IllegalArgumentException("Unsupported XSFInputService cache");
+        validateCache(data);
         Boolean disabled = null;
         for (String[] pair : routes(button)) {
             boolean stock = count(data, bytes(pair[0])) > 0, custom = count(data, bytes(pair[1])) > 0;
+            // Firmware may contain only one of the two VA/SRC implementations. MConfig's two
+            // independent substitutions do not require the unused alternative to be present.
+            if (!stock && !custom) continue;
             if (stock == custom || (disabled != null && disabled != custom))
-                throw new IllegalArgumentException("Missing/mixed " + button + " route");
+                throw new IllegalArgumentException("Mixed " + button + " route");
             disabled = custom;
         }
-        return Boolean.TRUE.equals(disabled);
+        if (disabled == null) throw new IllegalArgumentException("Missing " + button + " routes");
+        return disabled;
+    }
+
+    private static void validateCache(byte[] data) {
+        if (data.length < 16 || data.length > 64 * 1024 * 1024 || data[0] != 'v'
+                || data[1] != 'd' || data[2] != 'e' || data[3] != 'x')
+            throw new IllegalArgumentException("Unsupported XSFInputService cache");
     }
     public static byte[] apply(byte[] original, VehicleButton button, boolean disabled) {
-        boolean wasDisabled = state(original, button);
+        validateCache(original);
         byte[] result = original.clone();
-        if (wasDisabled == disabled) return result;
         for (String[] pair : routes(button)) {
-            byte[] from = bytes(pair[wasDisabled ? 1 : 0]), to = bytes(pair[disabled ? 1 : 0]);
+            // Normalize every known spelling to the requested state, including a partially
+            // applied earlier operation. No guessed offsets or other buttons are changed.
+            byte[] from = bytes(pair[disabled ? 0 : 1]), to = bytes(pair[disabled ? 1 : 0]);
             if (from.length != to.length) throw new IllegalArgumentException("Route length changed");
             for (int i = 0; i <= original.length - from.length; i++) {
                 if (matches(original, i, from)) {
@@ -47,6 +56,13 @@ public final class ButtonInputPatch {
         }
         if (state(result, button) != disabled) throw new IllegalStateException("Route validation failed");
         return result;
+    }
+
+    public static String coverage(byte[] data, VehicleButton button) {
+        int present = 0;
+        for (String[] pair : routes(button))
+            if (count(data, bytes(pair[0])) + count(data, bytes(pair[1])) > 0) present++;
+        return present + "/" + routes(button).length;
     }
     private static byte[] bytes(String value) { return value.getBytes(StandardCharsets.US_ASCII); }
     private static int count(byte[] data, byte[] value) {

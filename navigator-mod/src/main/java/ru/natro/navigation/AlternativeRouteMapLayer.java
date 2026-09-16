@@ -144,7 +144,16 @@ final class AlternativeRouteMapLayer {
                 List<MapOverlayPlacementCoordinator.Footprint> footprints = marker.footprints;
                 MapOverlayPlacementCoordinator.Placement next = null;
                 AlternativeBranchAnchors.Anchor selected = null;
-                for (AlternativeBranchAnchors.Anchor candidate : marker.model.anchors) {
+                List<AlternativeBranchAnchors.Anchor> candidates = marker.model.anchors;
+                if (marker.anchor != null && candidates.contains(marker.anchor)) {
+                    candidates = new ArrayList<>(candidates);
+                    candidates.remove(marker.anchor);
+                    candidates.add(0, marker.anchor);
+                }
+                marker.visibleCandidates = 0;
+                for (AlternativeBranchAnchors.Anchor candidate : candidates) {
+                    if (!placement.isPointInsideViewport(candidate.latitude, candidate.longitude)) continue;
+                    marker.visibleCandidates++;
                     next = placement.reserveIfClear(OWNER, marker.model.key,
                             candidate.latitude, candidate.longitude,
                             text.bodyWidth, text.bodyHeight, true,
@@ -188,13 +197,17 @@ final class AlternativeRouteMapLayer {
         String slot = marker.placement == null ? "none"
                 : marker.placement.legName + ':' + marker.placement.variant;
         String reason = "blocked".equals(state) ? placement.lastOptionalFailure() : "none";
+        if ("blocked".equals(state) && marker.visibleCandidates == 0) reason = "no_visible_distinct_branch";
         long anchorMeters = marker.anchor == null ? -1L : Math.round(marker.anchor.meters);
         String reportKey = state + ':' + slot + ':' + anchorMeters + ':' + reason;
         if (reportKey.equals(marker.reportedState)) return;
         marker.reportedState = reportKey;
         NavigationBridgeClient.reportDiagnostic("alternative-callout state=" + state
+                + ", marker=" + Integer.toHexString(marker.model.key.hashCode())
                 + ", " + placement.diagnosticContext() + ", reason=" + reason
                 + ", anchorMeters=" + anchorMeters + ", candidates=" + marker.model.anchors.size()
+                + ", visible_candidates=" + marker.visibleCandidates
+                + ", distance_present=" + !marker.model.content.distanceText.isEmpty()
                 + ", slot=" + slot + ", epoch=" + routeEpoch + ", size="
                 + (marker.preparedText == null ? "unknown" : marker.preparedText.bodyWidth
                 + "x" + marker.preparedText.bodyHeight));
@@ -266,7 +279,7 @@ final class AlternativeRouteMapLayer {
                     try {
                         Object point = pointClass.getConstructor(double.class, double.class)
                                 .newInstance(model.latitude, model.longitude);
-                        Object placemark = invoke(calloutCollection, "addPlacemark",
+                        Object placemark = invoke(calloutCollection, "addEmptyPlacemark",
                                 new Class<?>[]{pointClass}, point);
                         invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, false);
                         markers.add(new Marker(placemark, model));
@@ -411,6 +424,10 @@ final class AlternativeRouteMapLayer {
         int base = Color.parseColor(profile.alternativeCalloutTextColor);
         // Selection, localized text, neutral threshold, colors and glyph are from Navigator.
         pieces.add(new TextPiece(model.content.text, model.content.neutral ? base : model.content.color));
+        if (!model.content.distanceText.isEmpty()) {
+            pieces.add(new TextPiece(" · ", base));
+            pieces.add(new TextPiece(model.content.distanceText, model.content.distanceColor));
+        }
 
         float horizontalPadding = (float) profile.alternativeCalloutHorizontalPaddingDp
                 * density * scale;
@@ -790,6 +807,7 @@ final class AlternativeRouteMapLayer {
         long preparedPaletteVersion = Long.MIN_VALUE;
         PreparedText preparedText;
         String reportedState = "";
+        int visibleCandidates;
         List<MapOverlayPlacementCoordinator.Footprint> footprints = Collections.emptyList();
         Marker(Object placemark, CalloutModel model) {
             this.placemark = placemark;

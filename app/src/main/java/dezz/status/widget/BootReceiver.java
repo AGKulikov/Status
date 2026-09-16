@@ -206,7 +206,11 @@ public class BootReceiver extends BroadcastReceiver {
     private static void restoreHudSurfaceImmediately(Context context, String action) {
         try {
             Log.i(TAG, "Reconciling autostart HUD at lifecycle boundary: " + action);
-            HudPresentationService.reconcileAutomaticLifecycle(context);
+            if (ACTION_QUICKBOOT_POWERON.equals(action)) {
+                HudPresentationService.reconcileAfterQuickBoot(context);
+            } else {
+                HudPresentationService.reconcileAutomaticLifecycle(context);
+            }
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not restore autostart HUD at lifecycle boundary", failure);
         }

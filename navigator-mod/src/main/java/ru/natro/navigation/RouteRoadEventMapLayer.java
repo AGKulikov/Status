@@ -68,10 +68,9 @@ final class RouteRoadEventMapLayer implements RoadEventRouteSynchronizer.Sink {
             try {
                 Style style = stockStyle(tags);
                 if (style.image == null) { unavailable++; continue; }
-                Object placemark = invoke(collection, "addPlacemark", new Class<?>[0]);
-                MapObjectLayerFactory.hideUntilTextured(placemark);
-                invoke(placemark, "setGeometry", new Class<?>[]{Class.forName(
+                Object placemark = invoke(collection, "addEmptyPlacemark", new Class<?>[]{Class.forName(
                         "com.yandex.mapkit.geometry.Point")}, event.point);
+                MapObjectLayerFactory.hideUntilTextured(placemark);
                 Class<?> iconClass = Class.forName("com.yandex.mapkit.map.IconStyle");
                 Object icon = iconClass.getConstructor().newInstance();
                 if (style.anchor != null) invoke(icon, "setAnchor", new Class<?>[]{PointF.class}, style.anchor);

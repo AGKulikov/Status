@@ -46,6 +46,7 @@ public final class HudPresentationService extends Service
             "ru.natro.statuswidget.internal.HUD_LIFECYCLE_RECONCILE";
     private static final String EXTRA_CONFIG_JSON =
             "ru.natro.statuswidget.internal.HUD_CONFIG_JSON";
+    private static final String EXTRA_QUICKBOOT = "ru.natro.statuswidget.internal.HUD_QUICKBOOT";
 
     private static final String TAG = "HudPresentation";
     private static final String CHANNEL_ID = "HudDisplayChannel";
@@ -68,6 +69,8 @@ public final class HudPresentationService extends Service
     private long systemSurfaceRetryAfter;
     private boolean runtimeInitialized;
     @Nullable private String shownUniqueId;
+    private long ownerCreatedElapsedMs;
+    private boolean quickBootInvalidation;
     @NonNull private final Runnable retrySystemSurface = new Runnable() {
         @Override public void run() {
             if (!runtimeInitialized || config == null || shownUniqueId == null
@@ -124,7 +127,7 @@ public final class HudPresentationService extends Service
         });
     }
 
-    /** Rebuilds only HUD surfaces after QuickBoot; a cold service start already builds them. */
+    /** Idempotent reconciliation; integration-host retries are not evidence of a QuickBoot. */
     public static void reconcileAutomaticLifecycle(@NonNull Context context) {
         Context app = applicationContext(context);
         Preferences prefs = new Preferences(app);
@@ -134,6 +137,15 @@ public final class HudPresentationService extends Service
         } else {
             apply(app);
         }
+    }
+
+    /** Only the real system QuickBoot boundary may invalidate a surviving Java window. */
+    public static void reconcileAfterQuickBoot(@NonNull Context context) {
+        Context app = applicationContext(context);
+        Preferences prefs = new Preferences(app);
+        if (!prefs.hudPanelEnabled.get() || !prefs.hudPanelAutostart.get()) return;
+        ContextCompat.startForegroundService(app, new Intent(app, HudPresentationService.class)
+                .setAction(ACTION_LIFECYCLE_RECONCILE).putExtra(EXTRA_QUICKBOOT, true));
     }
 
     public static boolean isRunning() {
@@ -243,12 +255,9 @@ public final class HudPresentationService extends Service
         initializeRuntime();
         boolean commandHasConfig = applyCommandConfig(intent);
         if (ACTION_LIFECYCLE_RECONCILE.equals(action)) {
-            // WindowManager/SurfaceFlinger can recreate their state while the service and Java
-            // references survive QuickBoot. Drop only visual owners and reselect the exact
-            // display; data/connectors remain alive.
-            dismissPresentation("automatic lifecycle reconcile");
-            systemSurfaceRetryAfter = 0L;
+            quickBootInvalidation = intent != null && intent.getBooleanExtra(EXTRA_QUICKBOOT, false);
             reloadAndReconcile(true);
+            quickBootInvalidation = false;
         } else if (ACTION_DATA_CHANGED.equals(action)) {
             if (data != null) data.refreshCrossProcessState();
             invalidateHudSurfaces();
@@ -355,9 +364,17 @@ public final class HudPresentationService extends Service
             DiagnosticJournal.warn("hud-runtime", runtimeDetail);
             return;
         }
-        String identity = candidate.uniqueId + "|" + candidate.id;
-        if ((systemSurfaceWindow != null || overlayWindow != null || presentation != null)
-                && identity.equals(shownUniqueId)) {
+        Display display = HudDisplaySelector.display(candidate);
+        boolean validDisplay = display != null && display.isValid();
+        String identity = candidate.uniqueId + "|" + candidate.id + "|"
+                + candidate.width + "x" + candidate.height;
+        boolean hasOwner = systemSurfaceWindow != null || overlayWindow != null || presentation != null;
+        boolean usable = (systemSurfaceWindow != null && systemSurfaceWindow.isReady())
+                || (overlayWindow != null && overlayWindow.hasUsableWindow())
+                || (presentation != null && presentation.hasUsableWindow());
+        if (HudOwnerReconcilePolicy.retain(validDisplay && identity.equals(shownUniqueId),
+                hasOwner, usable, SystemClock.elapsedRealtime() - ownerCreatedElapsedMs,
+                quickBootInvalidation)) {
             if (systemSurfaceWindow != null) systemSurfaceWindow.updateConfig(config);
             if (overlayWindow != null) overlayWindow.updateConfig(config);
             if (presentation != null) presentation.updateConfig(config);
@@ -365,16 +382,17 @@ public final class HudPresentationService extends Service
             updateNotification(runtimeDetail);
             return;
         }
-        dismissPresentation("display selection changed");
+        dismissPresentation(quickBootInvalidation ? "QuickBoot invalidation"
+                : "display or window invalidated");
         systemSurfaceRetryAfter = 0L;
-        Display display = HudDisplaySelector.display(candidate);
-        if (display == null || !display.isValid()) {
+        if (!validDisplay) {
             DiagnosticJournal.warn("hud-runtime",
                     "выбранный HUD display недействителен: id=" + candidate.id);
             return;
         }
         try {
             shownUniqueId = identity;
+            ownerCreatedElapsedMs = SystemClock.elapsedRealtime();
             DiagnosticJournal.info("hud-runtime",
                     "создаём HUD на display id=" + candidate.id + " "
                             + candidate.width + "×" + candidate.height);

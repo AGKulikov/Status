@@ -246,10 +246,11 @@ public final class NavigationHudEndpointService extends Service {
             // Navigator to rebuild that viewport while TextureView retains its last composed
             // frame; mutating metadata alone permanently stretches the old map raster.
             next = new SurfaceLease(surface, width, height, safeDpi,
-                    ++nextSurfaceGeneration);
+                    ++nextSurfaceGeneration, resizedExistingSurface ? current.primer : new MapSurfacePrimer(surface));
             publishedSurface = next;
             MapStartupDiagnostics.begin(false, surface, next.generation, width, height, safeDpi);
         }
+        startPrimer(next, false);
         NavigationHudEndpointService current = instance;
         if (current != null) {
             current.handler.removeCallbacks(current.sendLatestHudSurface);
@@ -294,10 +295,11 @@ public final class NavigationHudEndpointService extends Service {
                 resizedExistingSurface = false;
             }
             next = new SurfaceLease(surface, width, height, safeDpi,
-                    ++nextSurfaceGeneration);
+                    ++nextSurfaceGeneration, resizedExistingSurface ? current.primer : new MapSurfacePrimer(surface));
             publishedClusterSurface = next;
             MapStartupDiagnostics.begin(true, surface, next.generation, width, height, safeDpi);
         }
+        startPrimer(next, true);
         NavigationHudEndpointService current = instance;
         if (current != null) {
             current.handler.post(() -> current.resetClusterSurfaceRecovery(next.generation));
@@ -812,6 +814,18 @@ public final class NavigationHudEndpointService extends Service {
         if (lease != null) sendSurface(lease);
     }
 
+    private static void startPrimer(SurfaceLease lease, boolean cluster) {
+        lease.primer.start(() -> {
+            NavigationHudEndpointService current = instance;
+            if (current == null) return;
+            synchronized (SURFACE_LOCK) {
+                SurfaceLease active = cluster ? publishedClusterSurface : publishedSurface;
+                if (active == null || active.primer != lease.primer) return;
+            }
+            current.handler.post(cluster ? current.sendLatestClusterSurface : current.sendLatestHudSurface);
+        });
+    }
+
     private void sendPublishedClusterSurface() {
         SurfaceLease lease;
         synchronized (SURFACE_LOCK) {
@@ -838,7 +852,7 @@ public final class NavigationHudEndpointService extends Service {
             if (current == null || current.generation != failedGeneration
                     || !current.surface.isValid()) return;
             recovered = new SurfaceLease(current.surface, current.width, current.height,
-                    current.dpi, ++nextSurfaceGeneration);
+                    current.dpi, ++nextSurfaceGeneration, current.primer);
             publishedClusterSurface = recovered;
             MapStartupDiagnostics.begin(true, recovered.surface, recovered.generation,
                     recovered.width, recovered.height, recovered.dpi);
@@ -876,7 +890,8 @@ public final class NavigationHudEndpointService extends Service {
 
     private void sendSurface(@NonNull SurfaceLease lease) {
         Client current = client;
-        if (current == null || !supportsDirectHudMap(current) || !lease.surface.isValid()) return;
+        if (current == null || !supportsDirectHudMap(current) || !lease.surface.isValid()
+                || !lease.primer.complete) return;
         final int width;
         final int height;
         final int dpi;
@@ -917,7 +932,7 @@ public final class NavigationHudEndpointService extends Service {
     private void sendClusterSurface(@NonNull SurfaceLease lease) {
         Client current = client;
         if (current == null || !supportsDirectClusterMap(current)
-                || !lease.surface.isValid()) return;
+                || !lease.surface.isValid() || !lease.primer.complete) return;
         final int width;
         final int height;
         final int dpi;
@@ -1078,16 +1093,18 @@ public final class NavigationHudEndpointService extends Service {
         final int height;
         final int dpi;
         final long generation;
+        final MapSurfacePrimer primer;
         boolean contentReady;
         boolean dispatched;
 
         SurfaceLease(@NonNull Surface surface, int width, int height,
-                     int dpi, long generation) {
+                     int dpi, long generation, MapSurfacePrimer primer) {
             this.surface = surface;
             this.width = width;
             this.height = height;
             this.dpi = dpi;
             this.generation = generation;
+            this.primer = primer;
         }
     }
 }

@@ -18,6 +18,8 @@ TESTS = [
     "dezz.status.widget.Ha1181ExpandedRecorderAndPhonePolicyContractTest",
     "dezz.status.widget.Ha1140NavigatorCrashRegressionTest",
     "dezz.status.widget.launcher.MediaTimelineTest",
+    "dezz.status.widget.launcher.MediaTimelineIdentityTest",
+    "dezz.status.widget.hud.HudOwnerReconcilePolicyTest",
     "dezz.status.widget.launcher.MediaStateFreshnessTest",
     "dezz.status.widget.launcher.media.MediaVolumeMathTest",
 ]
@@ -64,7 +66,8 @@ class SharedMediaContracts(unittest.TestCase):
             paths += [str(ROOT / "app/src/test/java" / (name.replace(".", "/") + ".java")) for name in TESTS]
             paths.append(str(ROOT / "app/src/test/java/dezz/status/widget/ReleaseIdentityContract.java"))
             paths += [str(ROOT / "app/src/main/java/dezz/status/widget/launcher" / name) for name in
-                      ("MediaTimeline.java", "MediaStateFreshness.java", "media/MediaVolumeMath.java")]
+                      ("MediaTimeline.java", "MediaTimelineIdentity.java", "MediaStateFreshness.java", "media/MediaVolumeMath.java")]
+            paths.append(str(ROOT / "app/src/main/java/dezz/status/widget/hud/HudOwnerReconcilePolicy.java"))
             compiled = subprocess.run(["java", "com.sun.tools.javac.Main", "-d", str(folder), *paths], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             result = subprocess.run(["java", "-cp", str(folder), "SharedMediaReplay", *TESTS], cwd=ROOT, capture_output=True, text=True)

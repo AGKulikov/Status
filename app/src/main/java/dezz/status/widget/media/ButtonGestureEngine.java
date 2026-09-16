@@ -36,6 +36,7 @@ public final class ButtonGestureEngine {
         State state = states.get(code);
         if (pressed) {
             if (state == null) { state = new State(); states.put(code, state); }
+            if (state.down) return; // Repeated DOWN must not restart long/10-second timers.
             final State held = state;
             held.down = true; held.longFired = false;
             cancel(held.longTimer); cancel(held.starTimer);

@@ -399,6 +399,9 @@ final class HudMapRenderer {
             Object nextMapWindow = invoke(nextOffscreen, "getMapWindow", new Class<?>[0]);
             mapWindow = nextMapWindow;
             map = invoke(nextMapWindow, "getMap", new Class<?>[0]);
+            // Set the initial clear appearance before optional layers start producing content.
+            // applyProfile below reasserts it, but must not be the first background request.
+            applyMapBackground(map, currentNightMode(), profile.roadsOnly);
             startupStage = "configure_layers";
             traceStartup(startupStage, startupStarted);
             reportMapReady(false);
@@ -526,9 +529,7 @@ final class HudMapRenderer {
         Object currentWindow = mapWindow;
         Object currentMap = map;
         if (currentWindow == null || currentMap == null) return;
-        boolean systemNight = (context.getResources().getConfiguration().uiMode
-                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        boolean night = profile.automaticDayNight ? systemNight : profile.nightMode;
+        boolean night = currentNightMode();
         applyMapBackground(currentMap, night, profile.roadsOnly);
         boolean roadEventScaleChanged = scaledRoadEventStyleProvider != null
                 && scaledRoadEventStyleProvider.setScales(
@@ -606,6 +607,12 @@ final class HudMapRenderer {
     }
 
     /** Basic appearance must not depend on an optional layer or FPS API succeeding first. */
+    private boolean currentNightMode() {
+        boolean systemNight = (context.getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        return profile.automaticDayNight ? systemNight : profile.nightMode;
+    }
+
     private void applyMapBackground(Object currentMap, boolean night, boolean transparent) {
         try {
             invoke(currentMap, "setNightModeEnabled", new Class<?>[]{boolean.class}, night);
@@ -932,7 +939,7 @@ final class HudMapRenderer {
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void addDestinationMarker(Object collection, Object point) throws Exception {
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
-        Object placemark = invoke(collection, "addPlacemark",
+        Object placemark = invoke(collection, "addEmptyPlacemark",
                 new Class<?>[]{pointClass}, point);
         MapObjectLayerFactory.hideUntilTextured(placemark);
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");

@@ -75,21 +75,23 @@ public class BranchReplay {
   double[][] active={p(0,0),p(0,1000)};
   List<AlternativeBranchAnchors.Anchor> anchors=AlternativeBranchAnchors.candidates(
    new double[][]{p(0,0),p(200,0),p(200,400)},0,0,active,0,0);
-  check(anchors.size()==5);AlternativeBranchAnchors.Anchor a=anchors.get(0);
-  check(Math.abs(a.meters-300)<.1 && Math.abs(a.longitude/DEG-200)<.1 && Math.abs(a.latitude/DEG-100)<.1);
+  check(anchors.size()>20);AlternativeBranchAnchors.Anchor a=anchors.get(0);
+  check(Math.abs(a.meters-100)<.1 && Math.abs(a.longitude/DEG-100)<.1 && Math.abs(a.latitude/DEG)<.1);
+  // A visible 10 m slice between the former percentage anchors is now searchable.
+  check(anchors.stream().anyMatch(v -> v.meters>=132 && v.meters<=143));
   anchors=AlternativeBranchAnchors.candidates(new double[][]{p(0,0),p(60,0),p(60,60),p(0,60),p(0,1000)},0,0,active,0,0);
   check(!anchors.isEmpty());
   for(AlternativeBranchAnchors.Anchor shortA:anchors)check(shortA.meters<180&&shortA.longitude/DEG>6);
   check(AlternativeBranchAnchors.candidates(active,0,0,active,0,0).isEmpty());
   double[][] prefix={p(0,-100),p(0,0),p(400,0)};
   anchors=AlternativeBranchAnchors.candidates(prefix,1,0,active,0,0);
-  check(!anchors.isEmpty()&&anchors.get(0).longitude/DEG>299);
+  check(!anchors.isEmpty()&&Math.abs(anchors.get(0).longitude/DEG-100)<.1);
   check(AlternativeBranchAnchors.candidates(prefix,99,0,active,0,0).isEmpty());
   check(AlternativeBranchAnchors.candidates(prefix,1,Double.NaN,active,0,0).isEmpty());
   check(AlternativeBranchAnchors.candidates(new double[][]{p(0,0),p(40,0)},0,0,active,0,0).get(0).meters<40);
   // Fork inside a segment, repeated zero-length vertices and a different route are fenced.
   anchors=AlternativeBranchAnchors.candidates(new double[][]{p(-100,0),p(100,0),p(100,0),p(500,0)},0,.5,active,0,0);
-  check(!anchors.isEmpty()&&Math.abs(anchors.get(0).longitude/DEG-300)<.1);
+  check(!anchors.isEmpty()&&Math.abs(anchors.get(0).longitude/DEG-100)<.1);
   check(AlternativeBranchAnchors.candidates(prefix,1,0,new double[][]{p(1000,0),p(1000,500)},0,0).isEmpty());
  }
 }''', ["navigator-mod/src/main/java/ru/natro/navigation/AlternativeBranchAnchors.java"])

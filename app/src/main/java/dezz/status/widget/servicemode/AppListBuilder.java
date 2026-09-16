@@ -38,6 +38,11 @@ final class AppListBuilder {
 
         List<AppInfo> result = new ArrayList<>();
         for (ApplicationInfo appInfo : packages) {
+            if (appInfo.packageName.equals(currentPackageName)) {
+                result.add(new AppInfo(currentPackageName, NatroSelfVisibility.LABEL,
+                        appInfo.loadIcon(pm), !appsToKeep.contains(currentPackageName)));
+                continue;
+            }
             if (AlwaysIgnoreAppResolver.alwaysIgnoreApp(appInfo, currentPackageName)) continue;
             if (appInfo.packageName.equals(dialer)) continue;
             if (!appInfo.enabled) continue;
@@ -74,7 +79,9 @@ final class AppListBuilder {
 
             // A baseline can be a write-ahead record whose pm command is still running.
             // Only confirmed restoration, not this list refresh, may remove that record.
-            if (isAppEnabled(pm, packageName) && !journal.hasBaseline(packageName)) {
+            if (isAppEnabled(pm, packageName) && !journal.hasBaseline(packageName)
+                    && !(packageName.equals(context.getPackageName())
+                    && new NatroSelfVisibility(context).hasBaseline())) {
                 toRemoveFromStorage.add(packageName);
                 continue;
             }
@@ -85,6 +92,7 @@ final class AppListBuilder {
             try {
                 ApplicationInfo ai = pm.getApplicationInfo(packageName, PackageManager.MATCH_DISABLED_COMPONENTS);
                 appName = ai.loadLabel(pm).toString();
+                if (packageName.equals(context.getPackageName())) appName = NatroSelfVisibility.LABEL;
                 icon = ai.loadIcon(pm);
             } catch (PackageManager.NameNotFoundException ignored) {
                 // Use stored name and default icon as fallback
@@ -113,6 +121,8 @@ final class AppListBuilder {
         Map<String, String> known = storage.load();
 
         Map<String, String> orphans = new HashMap<>();
+        if (new NatroSelfVisibility(context).hasBaseline() && !known.containsKey(currentPackageName))
+            orphans.put(currentPackageName, NatroSelfVisibility.LABEL);
         for (ApplicationInfo appInfo : packages) {
             if (AlwaysIgnoreAppResolver.alwaysIgnoreApp(appInfo, currentPackageName)) continue;
             if (known.containsKey(appInfo.packageName)) continue;

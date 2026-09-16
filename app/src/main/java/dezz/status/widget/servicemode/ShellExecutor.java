@@ -1018,20 +1018,35 @@ public class ShellExecutor {
         // null/swap activeFactory while this batch runs. A local copy keeps the operation
         // consistent even if the field changes mid-flight.
         TransportFactory factory = activeFactory;
-        if (factory == null) {
+        boolean needsTransport = false;
+        for (String pkg : packageNames) if (!pkg.equals(appContext.getPackageName())) needsTransport = true;
+        if (factory == null && needsTransport) {
             callback.onConnectionError("No connection detected");
             return;
         }
 
         ShellTransport transport = null;
         try {
-            transport = factory.open();
+            if (needsTransport) transport = factory.open();
+
+            // Hide our entry points last; restore them first. Deduplicate a caller's list.
+            packageNames = new ArrayList<>(new LinkedHashSet<>(packageNames));
+            if (packageNames.remove(appContext.getPackageName()))
+                packageNames.add(disable ? packageNames.size() : 0, appContext.getPackageName());
 
             Set<String> succeeded = new java.util.LinkedHashSet<>();
             List<String> errors = new ArrayList<>();
 
             for (int i = 0; i < packageNames.size(); i++) {
                 String packageName = packageNames.get(i);
+                if (packageName.equals(appContext.getPackageName())) {
+                    try {
+                        if (new NatroSelfVisibility(appContext).apply(disable)) succeeded.add(packageName);
+                    } catch (Exception failure) {
+                        errors.add(NatroSelfVisibility.LABEL + ": " + failure.getMessage());
+                    }
+                    continue;
+                }
                 try {
                     ServiceModeJournal journal = new ServiceModeJournal(appContext);
                     journal.validateTarget(packageName, disable);

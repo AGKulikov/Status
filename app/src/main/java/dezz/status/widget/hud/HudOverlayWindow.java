@@ -81,6 +81,10 @@ final class HudOverlayWindow {
         if (attached) content.invalidateHud();
     }
 
+    boolean hasUsableWindow() {
+        return attached && content.hasUsableWindow();
+    }
+
     void dismiss() {
         if (!attached) return;
         attached = false;

@@ -67,8 +67,10 @@ final class ServiceModeJournal {
             return false;
         }
         if (!tracked.hasHiddenApps()) {
-            packages.setComponentEnabledSetting(new ComponentName(context, LauncherTrampolineActivity.class),
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);
+            // Recover the 2.9.9 implicit hide, but preserve new explicit self baselines.
+            if (!new NatroSelfVisibility(context).hasExplicitHistory())
+                packages.setComponentEnabledSetting(new ComponentName(context, LauncherTrampolineActivity.class),
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);
             KeepAliveService.stop(context);
         }
         return true;

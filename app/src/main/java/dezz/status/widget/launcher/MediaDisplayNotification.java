@@ -16,6 +16,8 @@ import androidx.annotation.Nullable;
 public final class MediaDisplayNotification {
     public final String key, packageName, title, artist, album;
     public final String trackTitle, trackArtist;
+    public final String mediaId;
+    public final boolean sessionOwnsText;
     @Nullable public final MediaSession.Token token;
     @Nullable public final Icon artworkIcon;
     @Nullable public final Bitmap artwork;
@@ -32,6 +34,7 @@ public final class MediaDisplayNotification {
         receivedElapsedMs = SystemClock.elapsedRealtime();
         postTime = source.getPostTime();
         Bundle metadata = extras.getBundle("android.mediaMetadata");
+        mediaId = text(metadata, MediaMetadata.METADATA_KEY_MEDIA_ID);
         // Navigation notification text is guidance, not a song. Its token's metadata is used
         // by the shared controller instead (the same distinction as the reference player).
         boolean navigation = "ru.yandex.yandexnavi".equals(packageName)
@@ -63,6 +66,7 @@ public final class MediaDisplayNotification {
             parsedTitle += " | " + text(extras, Notification.EXTRA_SUB_TEXT);
         }
         boolean sessionText = navigation || "com.audiobookshelf.app".equals(packageName);
+        sessionOwnsText = sessionText;
         title = sessionText ? "" : bounded(parsedTitle);
         artist = sessionText ? "" : bounded(parsedArtist);
         trackTitle = sessionText ? "" : bounded(identityTitle);
@@ -99,6 +103,7 @@ public final class MediaDisplayNotification {
         return other != null && key.equals(other.key) && packageName.equals(other.packageName)
                 && postTime == other.postTime && title.equals(other.title) && artist.equals(other.artist)
                 && album.equals(other.album) && trackTitle.equals(other.trackTitle) && trackArtist.equals(other.trackArtist)
+                && mediaId.equals(other.mediaId)
                 && java.util.Objects.equals(token, other.token);
     }
     private static String first(String primary, String fallback) {

@@ -49,6 +49,8 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     private volatile Process logProcess;
     private boolean listening, permissionPending;
     private final java.util.Set<VehicleButton> patching = java.util.EnumSet.noneOf(VehicleButton.class);
+    private final java.util.Map<VehicleButton, Boolean> verifiedDefault = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<VehicleButton, String> defaultDetails = new java.util.concurrent.ConcurrentHashMap<>();
     private volatile ButtonActionExecutor executor;
     private final BroadcastReceiver driveReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ignored, Intent intent) {
@@ -106,7 +108,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
             reconcile();
             if (needed() || bool("temperature.visible") || bool("drive.restore")) submit(() -> actionExecutor(), null);
             for (VehicleButton button : VehicleButton.values())
-                if (button != VehicleButton.MEDIA && disabledDefault(button)) setDisableDefault(button, true, null);
+                if (button != VehicleButton.MEDIA && bool(button.key + ".disable_default")) setDisableDefault(button, true, null);
         });
     }
     private ButtonActionExecutor actionExecutor() {
@@ -117,7 +119,14 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     public boolean ready() { return ready; }
     public String status() { return status; }
     @Override public boolean enabled(VehicleButton button) { return bool(button.key + ".enabled"); }
-    public boolean disabledDefault(VehicleButton button) { return bool(button.key + ".disable_default"); }
+    public boolean disabledDefault(VehicleButton button) { return Boolean.TRUE.equals(verifiedDefault.get(button)); }
+    public String defaultStatus(VehicleButton button) {
+        String detail = defaultDetails.get(button);
+        if (detail != null) return detail;
+        return bool(button.key + ".disable_default")
+                ? "Запрос отключения сохранён; применение ещё не подтверждено"
+                : "Штатный путь; состояние обработчика ещё не проверено";
+    }
     @Override public boolean knobVolume() { return bool("knob.volume"); }
     @Override public boolean musicActive() {
         // Event-time predicate, only for a DM release. Never poll AudioManager or call it on MAIN.
@@ -300,10 +309,21 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     public void setDisableDefault(VehicleButton button, boolean disabled, Result callback) {
         input.post(() -> {
             if (!patching.add(button)) { result(callback, false, "Изменение уже выполняется"); return; }
+            defaultDetails.put(button, "Проверка и применение штатного пути…");
             Result finish = (success, detail) -> input.post(() -> {
                 patching.remove(button);
-                if (success) save(storage.edit().putBoolean(button.key + ".disable_default", disabled));
-                status = detail; result(callback, success, detail);
+                String resolved = detail == null || detail.trim().isEmpty()
+                        ? (success ? "Настройка ★ подтверждена ECARX; проверьте физическое нажатие"
+                                : "Применение штатного пути не подтверждено") : detail;
+                if (success) {
+                    verifiedDefault.put(button, disabled);
+                    save(storage.edit().putBoolean(button.key + ".disable_default", disabled));
+                } else verifiedDefault.remove(button);
+                defaultDetails.put(button, resolved);
+                DiagnosticJournal.infoAsync("vehicle-buttons", "default_route button=" + button.name()
+                        + ", requested_disabled=" + disabled + ", applied=" + success
+                        + ", physical_effect=unobserved, detail=" + resolved);
+                status = resolved; result(callback, success, resolved);
             });
             if (button == VehicleButton.STAR) {
                 try { actions.execute(() -> {
@@ -315,16 +335,30 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
             String command = "CLASSPATH=" + MediaButtonController.quote(context.getApplicationInfo().sourceDir)
                     + " app_process /system/bin dezz.status.widget.media.MediaInputPatchMain "
                     + (disabled ? "on " : "off ") + button.name();
-            PrivilegedShell.get(context).runCommand("su 0 sh -c " + MediaButtonController.quote(command), (output, error) -> {
+            PrivilegedShell.get(context).runCommand(MediaButtonController.rootCommand(command), (output, error) -> {
                 String expected = "NATRO_MEDIA_ROUTE=" + button.name() + ":" + (disabled ? "disabled" : "stock");
                 boolean success = error == null && output != null && output.contains(expected)
                         && !output.contains("NATRO_MEDIA_ERROR");
-                finish.finished(success, success ? (disabled ? "Штатное действие отключено" : "Штатное действие восстановлено")
-                        : "Не удалось изменить штатное действие");
+                String coverage = field(output, "NATRO_MEDIA_COVERAGE=");
+                String restarted = field(output, "NATRO_MEDIA_RESTARTED=");
+                finish.finished(success, success ? (disabled ? "Путь отключения записан и проверен" : "Штатный путь записан и проверен")
+                        + "; варианты " + coverage + "; сигналов перезапуска XSF: " + restarted
+                        + ". Проверьте физическое нажатие."
+                        : "Применение не подтверждено: " + shortFailure(error, output));
             });
         });
     }
     private void result(Result callback, boolean success, String detail) {
         if (callback != null) main.post(() -> callback.finished(success, detail));
+    }
+
+    private static String field(String output, String prefix) {
+        if (output != null) for (String line : output.split("[\\r\\n]+"))
+            if (line.startsWith(prefix)) return line.substring(prefix.length()).trim();
+        return "не подтверждено";
+    }
+    private static String shortFailure(String error, String output) {
+        String value = error == null ? field(output, "NATRO_MEDIA_ERROR=") : error;
+        return value.length() > 180 ? value.substring(0, 180) : value;
     }
 }

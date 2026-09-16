@@ -44,10 +44,17 @@ public class DialerCodeReceiver extends BroadcastReceiver {
     }
 
     private void showLauncherIcon(Context context) {
+        NatroSelfVisibility self = new NatroSelfVisibility(context);
+        if (self.hasBaseline()) {
+            try { self.apply(false); }
+            catch (Exception failure) { Log.w(TAG, "Self recovery incomplete; opening recovery settings", failure); }
+            return;
+        }
+        if (self.hasExplicitHistory()) return;
         PackageManager p = context.getPackageManager();
         // Toggle the trampoline, not MainActivity. Toggling MainActivity directly makes
         // the system restart/kill the freshly-launched activity right after the user
-        // opens it from the dialer code — see MainActivity.hideLauncherIcon.
+        // opens it from the dialer code. This branch recovers only the old implicit hide.
         ComponentName componentName = new ComponentName(context, LauncherTrampolineActivity.class);
         p.setComponentEnabledSetting(componentName, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);
     }

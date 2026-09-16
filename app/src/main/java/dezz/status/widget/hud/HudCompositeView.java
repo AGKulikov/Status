@@ -87,6 +87,10 @@ final class HudCompositeView extends FrameLayout
         canvas.invalidate();
     }
 
+    boolean hasUsableWindow() {
+        return isAttachedToWindow() && (leasedSurface == null || leasedSurface.isValid());
+    }
+
     @Override protected boolean drawChild(Canvas target, View child, long drawingTime) {
         if (child != mapTexture || activeMap == null) return super.drawChild(target, child, drawingTime);
         edgeBounds.set(child.getLeft(), child.getTop(), child.getRight(), child.getBottom());

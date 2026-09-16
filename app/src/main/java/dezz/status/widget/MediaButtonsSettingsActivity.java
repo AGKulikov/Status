@@ -64,7 +64,7 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
         }); body.addView(enabled);
         Switch disable = toggle("Отключить действие по умолчанию",
                 tab == VehicleButton.MEDIA ? media.isDisableDefault() : buttons.disabledDefault(tab));
-        TextView status = text(tab == VehicleButton.MEDIA ? media.status() : buttons.status(), 15);
+        TextView status = text(tab == VehicleButton.MEDIA ? media.status() : buttons.defaultStatus(tab), 15);
         boolean[] updating = {false};
         disable.setOnCheckedChangeListener((view, value) -> {
             if (updating[0]) return;

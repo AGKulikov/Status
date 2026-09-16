@@ -51,7 +51,7 @@ public class RoutePinsReplay {
  }
  public static class Collection {
   final List<Pin> pins=new ArrayList<>();
-  public Pin addPlacemark(){Pin pin=new Pin();pins.add(pin);return pin;}
+  public Pin addEmptyPlacemark(Point point){Pin pin=new Pin();pin.point=point;pins.add(pin);return pin;}
   public void clear(){pins.clear();}
   public void setZIndex(float v){}
   public void setConflictResolutionMode(com.yandex.mapkit.ConflictResolutionMode v){}

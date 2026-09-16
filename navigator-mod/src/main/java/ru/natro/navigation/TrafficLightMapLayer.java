@@ -252,7 +252,7 @@ final class TrafficLightMapLayer {
         for (NavigatorStatePublisher.TrafficLightFrame light : values) {
             Object point = pointClass.getConstructor(double.class, double.class)
                     .newInstance(light.latitude, light.longitude);
-            Object placemark = invoke(currentCollection, "addPlacemark",
+            Object placemark = invoke(currentCollection, "addEmptyPlacemark",
                     new Class<?>[]{pointClass}, point);
             MapObjectLayerFactory.hideUntilTextured(placemark);
             markers.add(new Marker(placemark));

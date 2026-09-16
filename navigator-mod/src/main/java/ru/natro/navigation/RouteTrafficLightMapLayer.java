@@ -222,7 +222,7 @@ final class RouteTrafficLightMapLayer {
             for (RouteLight light : routeLights) {
                 Object point = pointClass.getConstructor(double.class, double.class)
                         .newInstance(light.latitude, light.longitude);
-                Object placemark = invoke(currentCollection, "addPlacemark",
+                Object placemark = invoke(currentCollection, "addEmptyPlacemark",
                         new Class<?>[]{pointClass}, point);
                 MapObjectLayerFactory.hideUntilTextured(placemark);
                 Object style = styleClass.getConstructor().newInstance();

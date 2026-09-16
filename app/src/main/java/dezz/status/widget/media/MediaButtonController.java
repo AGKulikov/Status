@@ -39,10 +39,11 @@ public final class MediaButtonController {
     private volatile boolean enabled;
     private volatile boolean defaultSource;
     private volatile boolean isolated;
+    private volatile boolean routeVerified;
     private volatile boolean ready;
     private volatile long generation;
     private boolean changingRoute;
-    private volatile String status = "Штатный путь кнопок";
+    private volatile String status = "Состояние штатного пути ещё не проверено";
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ignored, Intent intent) { receive(intent, () -> {}); }
@@ -119,7 +120,7 @@ public final class MediaButtonController {
 
     public boolean isEnabled() { return enabled; }
     public boolean isDefaultSource() { return defaultSource; }
-    public boolean isDisableDefault() { return isolated; }
+    public boolean isDisableDefault() { return isolated && routeVerified; }
     public String status() { return status; }
 
     public synchronized void setEnabled(boolean value) {
@@ -163,7 +164,7 @@ public final class MediaButtonController {
         // Register before the input service restarts, including bridge-only/off mode.
         ensureReceiver();
         status = "Применение пути кнопок…";
-        String command = "su 0 sh -c " + quote("CLASSPATH=" + quote(context.getApplicationInfo().sourceDir)
+        String command = rootCommand("CLASSPATH=" + quote(context.getApplicationInfo().sourceDir)
                 + " app_process /system/bin " + MediaInputPatchMain.class.getName()
                 + (value ? " on" : " off"));
         PrivilegedShell.get(context).runCommand(command, (output, error) -> {
@@ -174,10 +175,13 @@ public final class MediaButtonController {
                 boolean success = error == null && output != null && output.contains(expected)
                         && !output.contains("NATRO_MEDIA_ERROR=");
                 if (success) {
+                    routeVerified = true;
                     isolated = value;
                     control(() -> preferences.edit().putBoolean("disable_default", value).apply());
-                    status = value ? "Кнопки передаются в Natro" : "Штатный путь восстановлен";
+                    status = (value ? "Путь MEDIA в Natro записан и проверен" : "Штатный путь MEDIA записан и проверен")
+                            + ". Перезапуск XSF запрошен; проверьте физическое нажатие.";
                 } else {
+                    routeVerified = false;
                     status = "Не удалось изменить путь кнопок: " + shortError(error, output);
                 }
                 reconcileReceiver();
@@ -193,6 +197,12 @@ public final class MediaButtonController {
             // These few durable mutations are not physical commands and must not be discarded.
             new Handler(context.getMainLooper()).postDelayed(() -> control(work), 50);
         }
+    }
+
+    /** Root adbd needs no su binary; a shell-UID channel keeps the reviewed MConfig su path. */
+    static String rootCommand(String command) {
+        return "if [ \"$(id -u)\" = 0 ]; then sh -c " + quote(command)
+                + "; else su 0 sh -c " + quote(command) + "; fi";
     }
 
     private void reconcileReceiver() {

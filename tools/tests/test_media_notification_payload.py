@@ -16,7 +16,7 @@ SOURCES = {
     "android/media/session/MediaSession.java": "package android.media.session;public class MediaSession {public static class Token {}}",
     "android/media/MediaMetadata.java": """package android.media;public class MediaMetadata {
  public static final String METADATA_KEY_TITLE="title",METADATA_KEY_ARTIST="artist",METADATA_KEY_AUTHOR="author",
- METADATA_KEY_WRITER="writer",METADATA_KEY_COMPOSER="composer",METADATA_KEY_ALBUM="album";}""",
+ METADATA_KEY_WRITER="writer",METADATA_KEY_COMPOSER="composer",METADATA_KEY_ALBUM="album",METADATA_KEY_MEDIA_ID="media_id";}""",
     "android/app/Notification.java": """package android.app;public class Notification {
  public static final String EXTRA_MEDIA_SESSION="token",EXTRA_TITLE="title",EXTRA_TEXT="text",EXTRA_SUB_TEXT="subtext",EXTRA_TEXT_LINES="lines",EXTRA_LARGE_ICON="large",CATEGORY_TRANSPORT="transport";
  public android.os.Bundle extras=new android.os.Bundle();public String category;

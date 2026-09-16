@@ -47,13 +47,22 @@ def main():
     shutil.copy2(sdk / "lib/apksigner.jar", out / "tools/lib/apksigner.jar")
     shutil.copytree(sdk / "lib64", out / "tools/lib64")
     shutil.copytree(Path("app/build/test-results/testGeelyDebugUnitTest"), out / "test-results")
+    patch = Path("build/navigation-mod/classes19.dex")
+    if not patch.is_file() or patch.stat().st_size < 10000:
+        raise ValueError("Compiled Navigator patch is required for this pair")
+    shutil.copy2(patch, out / "classes19.dex")
     manifest = {
         "versionName": version, "versionCode": code, "package": "ru.natro.statuswidget",
         "sourceCommit": os.environ["GITHUB_SHA"],
         "sourceTree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip(),
         "ciRunId": os.environ["GITHUB_RUN_ID"], "unitTests": counts,
         "unsignedSha256": sha256(unsigned),
-        "navigator": {"pairRequired": False, "unchangedFrom": "2.9.8"},
+        "navigator": {
+            "pairRequired": True, "patch": "classes19.dex", "patchSha256": sha256(patch),
+            "baselineVersion": "30.3.0-Natro-2.9.8",
+            "baselineSha256": "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a",
+            "allowedPayloadChanges": ["classes19.dex"],
+        },
         "physicalKx11Verification": "pending", "browserVisualVerification": "pending",
     }
     (out / "candidate.json").write_text(json.dumps(manifest, indent=2) + "\n")

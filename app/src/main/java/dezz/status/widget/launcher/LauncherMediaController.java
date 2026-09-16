@@ -1530,6 +1530,9 @@ public final class LauncherMediaController {
 
     private android.media.session.MediaSession.Token timelineOwner;
     private String timelineMediaId = "";
+    private long rawSessionDuration, rawSessionPosition, timelineRevision;
+    private String lastTimelineTrace = "";
+    private long lastTimelineTraceElapsed;
 
     private void acceptSession(MediaController controller, MediaMetadata metadata, PlaybackState playback) {
         long observedElapsed = SystemClock.elapsedRealtime();
@@ -1538,6 +1541,8 @@ public final class LauncherMediaController {
             sessionState = null;
             timelineOwner = null;
             timelineMediaId = "";
+            rawSessionDuration = rawSessionPosition = 0L;
+            timelineRevision++;
             publish();
             return;
         }
@@ -1558,6 +1563,8 @@ public final class LauncherMediaController {
             long duration = metadata == null ? 0L
                     : Math.max(0L, metadata.getLong(MediaMetadata.METADATA_KEY_DURATION));
             long position = playback == null ? 0L : Math.max(0L, playback.getPosition());
+            rawSessionDuration = duration;
+            rawSessionPosition = playback == null ? -1L : playback.getPosition();
             long updateElapsed = playback == null ? 0L : playback.getLastPositionUpdateTime();
             long updateWall = System.currentTimeMillis();
             if (updateElapsed > 0L) {
@@ -1578,6 +1585,10 @@ public final class LauncherMediaController {
                     controller.getSessionToken().equals(timelineOwner), timelineMediaId, mediaId,
                     previous.title, previous.artist, title, artist);
             if (duration <= 0L && sameTimeline) duration = previous.durationMs;
+            if (sameTimeline) {
+                if (title.isEmpty()) title = previous.title;
+                if (artist.isEmpty()) artist = previous.artist;
+            } else timelineRevision++;
             timelineOwner = controller.getSessionToken();
             timelineMediaId = sameTimeline && mediaId.isEmpty() ? timelineMediaId : mediaId;
             boolean contentChanged = previous == null || !MediaStateFreshness.sameContent(
@@ -1908,10 +1919,14 @@ public final class LauncherMediaController {
         String title = live.title.isEmpty() && samePlayer ? session.title : live.title;
         if (title.isEmpty()) return false;
         String artist = live.artist.isEmpty() && samePlayer ? session.artist : live.artist;
-        boolean sameTrack = samePlayer && MediaTimelineIdentity.matches(
-                live.trackTitle, live.trackArtist, session.title, session.artist);
+        String evidence = MediaTimelineIdentity.notificationEvidence(samePlayer,
+                live.mediaId, timelineMediaId, live.trackTitle, live.trackArtist,
+                session == null ? "" : session.title, session == null ? "" : session.artist,
+                live.sessionOwnsText);
+        boolean sameTrack = MediaTimelineIdentity.accepts(evidence);
         long duration = sameTrack ? session.durationMs : 0L;
         long position = sameTrack ? session.currentPosition(System.currentTimeMillis()) : 0L;
+        traceTimeline(evidence, duration, position, samePlayer);
         boolean playing = samePlayer && session.playing;
         Bitmap artwork = notificationArtwork;
         if (artwork == null && sameTrack) artwork = session.artwork;
@@ -1923,6 +1938,23 @@ public final class LauncherMediaController {
         MediaPlaybackHistoryStore.record(context, live.packageName, playing);
         scheduleTicker(playing);
         return true;
+    }
+
+    /** No song names, media IDs, session tokens or notification text enter this journal. */
+    private void traceTimeline(String evidence, long duration, long position, boolean sameOwner) {
+        if (!dezz.status.widget.diagnostics.DiagnosticJournal.isEnabled()) return;
+        long now = SystemClock.elapsedRealtime();
+        String key = evidence + ":" + timelineRevision + ":" + rawSessionDuration + ":" + duration;
+        if (key.equals(lastTimelineTrace) && now - lastTimelineTraceElapsed < 5_000L) return;
+        lastTimelineTrace = key;
+        lastTimelineTraceElapsed = now;
+        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("media-timeline",
+                "source=notification+session, owner_match=" + sameOwner + ", evidence=" + evidence
+                        + ", track_revision=" + timelineRevision + ", raw_duration_ms=" + rawSessionDuration
+                        + ", raw_position_ms=" + rawSessionPosition + ", duration_ms=" + duration
+                        + ", position_ms=" + position + ", duration_retained="
+                        + (rawSessionDuration == 0L && duration > 0L)
+                        + ", timeline_hidden=" + (duration == 0L && position == 0L));
     }
 
     @NonNull

@@ -62,6 +62,7 @@ final class CameraDirectionMapLayer {
         if (stockCameraProvider == provider) return;
         stockCameraProvider = provider;
         stockCameraResources.clear();
+        presentationRevision++;
         renderedFingerprint = Long.MIN_VALUE;
         refreshFingerprintAndRender();
     }
@@ -82,9 +83,8 @@ final class CameraDirectionMapLayer {
     private final Context context;
     private final MapOverlayPlacementCoordinator placementCoordinator;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ArrayList<Bitmap> iconBitmaps = new ArrayList<>();
-    private final ArrayList<Object> imageProviders = new ArrayList<>();
     private final ArrayList<CameraSign> cameraSigns = new ArrayList<>();
+    private long presentationRevision;
     private final ArrayList<CameraMarker> visibleScratch = new ArrayList<>(MAX_CAMERAS);
     private Object map;
     /** Ground polygons and placemark signs must never share one ambiguous MapKit root layer. */
@@ -174,7 +174,10 @@ final class CameraDirectionMapLayer {
         zIndex = nextZ;
         MapObjectLayerFactory.setZIndex(sectorCollection, nextZ);
         MapObjectLayerFactory.setZIndex(signCollection, nextZ);
-        if (presentationChanged) renderedFingerprint = Long.MIN_VALUE;
+        if (presentationChanged) {
+            renderedFingerprint = Long.MIN_VALUE;
+            presentationRevision++;
+        }
         if (!yandexEnabled && !externalEnabled) {
             main.removeCallbacks(expire);
             expiryPosted = false;
@@ -255,12 +258,9 @@ final class CameraDirectionMapLayer {
                     sign.placement = next;
                     invoke(sign.style, "setAnchor", new Class<?>[]{PointF.class},
                             new PointF(next.anchorX, next.anchorY));
-                    Class<?> providerClass = Class.forName(
-                            "com.yandex.runtime.image.ImageProvider");
                     Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
-                    invoke(sign.placemark, "setIcon",
-                            new Class<?>[]{providerClass, styleClass},
-                            sign.provider, sign.style);
+                    invoke(sign.placemark, "setIconStyle",
+                            new Class<?>[]{styleClass}, sign.style);
                 }
                 applyAtomicVisibility(sign);
             } catch (Throwable failure) {
@@ -424,30 +424,71 @@ final class CameraDirectionMapLayer {
                         MapObjectLayerFactory.IGNORE, zIndex);
                 sectorCollection = currentSectors;
             }
-            if (currentSectors != null) invoke(currentSectors, "clear", new Class<?>[0]);
-            invoke(currentSigns, "clear", new Class<?>[0]);
             placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_CAMERAS);
-            iconBitmaps.clear();
-            imageProviders.clear();
-            cameraSigns.clear();
+            // Diff by physical identity; changing one camera must not invalidate its neighbours.
+            ArrayList<CameraSign> previous = new ArrayList<>(cameraSigns);
+            boolean complete = true;
             for (CameraMarker camera : visibleScratch) {
-                // Create the sign first. A failed sign aborts and clears the entire generation,
-                // therefore no sector from that identity can survive on its own.
-                CameraSign sign = addSign(currentSigns, camera);
-                // No direction supplied means exactly one sign and no guessed circular plane.
-                for (Double direction : camera.directions) {
-                    if (direction != null && Double.isFinite(direction)) {
-                        sign.sectors.add(addSector(currentSectors, camera.latitude,
-                                camera.longitude, direction.doubleValue()));
-                    }
+                CameraSign sign = null;
+                for (CameraSign old : previous) {
+                    if (old.key.equals(cameraKey(camera))) { sign = old; break; }
                 }
-                applyAtomicVisibility(sign);
+                if (sign != null && sign.revision == markerRevision(camera)) {
+                    previous.remove(sign);
+                    sign.placement = reservePlacement(camera, sign.bitmapWidth, sign.bitmapHeight);
+                    applyAtomicVisibility(sign);
+                    continue;
+                }
+                if (sign != null) { previous.remove(sign); removeSign(sign); }
+                sign = null;
+                try {
+                    sign = addSign(currentSigns, camera);
+                    for (Double direction : camera.directions) {
+                        if (direction != null && Double.isFinite(direction)) {
+                            sign.sectors.add(addSector(currentSectors, camera.latitude,
+                                    camera.longitude, direction.doubleValue()));
+                        }
+                    }
+                    applyAtomicVisibility(sign);
+                } catch (Throwable failure) {
+                    if (sign != null) removeSign(sign);
+                    complete = false;
+                    Log.w(TAG, "One camera image could not be prepared", failure);
+                }
             }
-            renderedFingerprint = latestVisualFingerprint;
+            for (CameraSign removed : previous) removeSign(removed);
+            renderedFingerprint = complete ? latestVisualFingerprint : Long.MIN_VALUE;
         } catch (Throwable failure) {
             Log.w(TAG, "Camera sign/direction update failed", failure);
-            clearVisual();
+            renderedFingerprint = Long.MIN_VALUE;
         }
+    }
+
+    private static String cameraKey(CameraMarker camera) {
+        return camera.source + ":" + camera.id + ":"
+                + Math.round(camera.latitude * 1_000_000d) + ":"
+                + Math.round(camera.longitude * 1_000_000d);
+    }
+
+    private long markerRevision(CameraMarker camera) {
+        return mix(visualFingerprint(Collections.singletonList(camera)), presentationRevision);
+    }
+
+    private void removeSign(CameraSign sign) {
+        sign.active = false;
+        cameraSigns.remove(sign);
+        setAtomicVisibility(sign, false);
+        removeObject(signCollection, sign.placemark);
+        for (Object sector : sign.sectors) removeObject(sectorCollection, sector);
+        sign.sectors.clear();
+        // Do not recycle a bitmap while a native upload may still retain it.
+    }
+
+    private static void removeObject(Object collection, Object object) {
+        if (collection == null || object == null) return;
+        try {
+            invoke(collection, "remove", new Class<?>[]{Class.forName("com.yandex.mapkit.map.MapObject")}, object);
+        } catch (Throwable ignored) { }
     }
 
     private static boolean hasDirections(List<CameraMarker> cameras) {
@@ -488,6 +529,8 @@ final class CameraDirectionMapLayer {
                 .newInstance(ring, Collections.emptyList());
         Object mapObject = invoke(target, "addPolygon",
                 new Class<?>[]{polygonClass}, polygon);
+        try {
+        invoke(mapObject, "setVisible", new Class<?>[]{boolean.class}, false);
         int fillAlpha = Math.round(255f * directionOpacityPercent / 100f);
         int strokeAlpha = Math.min(255, Math.round(fillAlpha * 1.30f));
         invoke(mapObject, "setFillColor", new Class<?>[]{int.class},
@@ -497,8 +540,11 @@ final class CameraDirectionMapLayer {
         invoke(mapObject, "setStrokeWidth", new Class<?>[]{float.class}, 0.8f);
         invoke(mapObject, "setGeodesic", new Class<?>[]{boolean.class}, false);
         invoke(mapObject, "setZIndex", new Class<?>[]{float.class}, zIndex);
-        invoke(mapObject, "setVisible", new Class<?>[]{boolean.class}, true);
         return mapObject;
+        } catch (Exception failure) {
+            removeObject(target, mapObject);
+            throw failure;
+        }
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -506,8 +552,6 @@ final class CameraDirectionMapLayer {
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         Object point = pointClass.getConstructor(double.class, double.class)
                 .newInstance(camera.latitude, camera.longitude);
-        Object placemark = invoke(target, "addPlacemark", new Class<?>[]{pointClass}, point);
-        MapObjectLayerFactory.hideUntilTextured(placemark);
         int displayDiameter = cameraDisplayDiameter();
         int textureDiameter = Math.max(displayDiameter, MIN_CAMERA_TEXTURE_DIAMETER_PX);
         float textureScale = displayDiameter / (float) textureDiameter;
@@ -537,19 +581,36 @@ final class CameraDirectionMapLayer {
         float sourceOffset = SOURCE_HUD_SPEED.equals(camera.source) ? 0.002f : 0.001f;
         invoke(style, "setZIndex", new Class<?>[]{Float.class},
                 Float.valueOf(zIndex + sourceOffset));
-        invoke(placemark, "setIcon", new Class<?>[]{providerClass, styleClass}, provider, style);
-        invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
-        iconBitmaps.add(bitmap);
-        imageProviders.add(provider);
+        // Prepare all Java resources before allocating a native object. The empty overload
+        // never creates MapKit's default pin, even before our image upload callback arrives.
+        Object placemark = invoke(target, "addEmptyPlacemark", new Class<?>[]{pointClass}, point);
+        try { MapObjectLayerFactory.hideUntilTextured(placemark); }
+        catch (Exception failure) { removeObject(target, placemark); throw failure; }
         CameraSign sign = new CameraSign(camera, placemark, provider, style,
                 displayWidth, displayHeight, placement);
+        sign.bitmap = bitmap;
+        sign.key = cameraKey(camera);
+        sign.revision = markerRevision(camera);
         cameraSigns.add(sign);
+        final Object ownerMap = map;
+        try {
+            sign.imageCallback = PlacemarkImageBinding.load(placemark, provider, style, () ->
+                    main.post(() -> {
+                        if (!sign.active || map != ownerMap || !cameraSigns.contains(sign)) return;
+                        sign.textureReady = true;
+                        try { applyAtomicVisibility(sign); }
+                        catch (Throwable failure) { setAtomicVisibility(sign, false); }
+                    }));
+        } catch (Exception failure) {
+            removeSign(sign);
+            throw failure;
+        }
         return sign;
     }
 
     /** One source point owns one placemark and every supplied viewing sector. */
     private void applyAtomicVisibility(CameraSign sign) throws Exception {
-        setAtomicVisibility(sign, placementCoordinator.isPointInsideViewport(
+        setAtomicVisibility(sign, sign.active && sign.textureReady && placementCoordinator.isPointInsideViewport(
                 sign.camera.latitude, sign.camera.longitude));
     }
 
@@ -678,6 +739,7 @@ final class CameraDirectionMapLayer {
     }
 
     private void clearVisual() {
+        for (CameraSign sign : cameraSigns) sign.active = false;
         placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_CAMERAS);
         if (sectorCollection != null) {
             try { invoke(sectorCollection, "clear", new Class<?>[0]); }
@@ -687,8 +749,6 @@ final class CameraDirectionMapLayer {
             try { invoke(signCollection, "clear", new Class<?>[0]); }
             catch (Throwable ignored) {}
         }
-        iconBitmaps.clear();
-        imageProviders.clear();
         cameraSigns.clear();
         renderedFingerprint = Long.MIN_VALUE;
     }
@@ -911,6 +971,11 @@ final class CameraDirectionMapLayer {
     }
 
     private static final class CameraSign {
+        String key;
+        long revision;
+        boolean active = true, textureReady;
+        Bitmap bitmap;
+        Object imageCallback;
         final CameraMarker camera;
         final Object placemark;
         final Object provider;

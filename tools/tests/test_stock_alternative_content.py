@@ -9,9 +9,10 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = {
     "android/content/res/Resources.java": """package android.content.res; public class Resources {
-      public int getIdentifier(String n,String t,String p){return n.startsWith("text_")?1:2;} }""",
+      public int getIdentifier(String n,String t,String p){return n.endsWith("minus_sign")?3:n.endsWith("plus_sign")?4:n.startsWith("text_")?1:2;} }""",
     "android/content/Context.java": """package android.content; public class Context {
       public android.content.res.Resources getResources(){return new android.content.res.Resources();}
+      public String getString(int id){return id==3?"−":"+";}
       public String getPackageName(){return "ru.yandex.yandexnavi";} }""",
     "android/graphics/drawable/Drawable.java": """package android.graphics.drawable;
       public class Drawable { public final String name;public Drawable(String n){name=n;}
@@ -34,6 +35,15 @@ SOURCES = {
       public android.graphics.drawable.Drawable getDrawable(){return drawable;} }""",
     "com/yandex/mapkit/LocalizedValue.java": """package com.yandex.mapkit;public class LocalizedValue {
       final double value;public LocalizedValue(double v,String text){value=v;}public double getValue(){return value;} }""",
+    "com/yandex/runtime/i18n/I18nManagerFactory.java": """package com.yandex.runtime.i18n;
+      public class I18nManagerFactory {public static boolean fail;
+        public static I18nManagerFactory getI18nManagerInstance(){return new I18nManagerFactory();}
+        public String localizeDistance(int meters){if(fail)throw new IllegalStateException();
+          return meters==1400?"1,4 км":meters+" м";} }""",
+    "ru/natro/navigation/StockAlternativePalette.java": """package ru.natro.navigation;
+      class StockAlternativePalette {static int negativeColor(){return 17;}static int positiveColor(){return 23;} }""",
+    "ru/natro/navigation/NavigationBridgeClient.java": """package ru.natro.navigation;
+      class NavigationBridgeClient {static String last;static void reportDiagnostic(String s){last=s;} }""",
     "com/yandex/mapkit/geometry/PolylinePosition.java": """package com.yandex.mapkit.geometry;
       public class PolylinePosition {public final int segment;public PolylinePosition(int s){segment=s;} }""",
     "com/yandex/mapkit/directions/driving/Weight.java": """package com.yandex.mapkit.directions.driving;
@@ -99,11 +109,21 @@ SOURCES = {
           check(first.icon.getState()[0]==7 && first.icon.getLevel()==9 && first.icon.getAlpha()==230);
           check(AlternativeBalloonTextureFactory.last.alternative.relative.time.getValue()==-100);
           check(AlternativeBalloonTextureFactory.last.alternative.relative.distance.getValue()==450);
+          check(first.distanceText.equals("+450 м") && first.distanceColor==23);
           alternative.metadata.flags.badge="";
           StockAlternativeContent.Content second=adapter.read(alternative,new Fork("alt",1000,1000),
             current,new Fork("main",1000,1000),false);
           check(second.neutral && second.icon==null);check(first.icon.name.equals("toll"));
           check(second.text.equals("STOCK:0.0:false"));
+          check(second.distanceText.isEmpty());
+          StockAlternativeContent.Content shorter=adapter.read(alternative,new Fork("alt",1000,600),
+            current,new Fork("main",1000,2000),false);
+          check(shorter.neutral && shorter.distanceText.equals("−1,4 км") && shorter.distanceColor==17);
+          com.yandex.runtime.i18n.I18nManagerFactory.fail=true;
+          StockAlternativeContent.Content unavailable=adapter.read(alternative,new Fork("alt",1000,600),
+            current,new Fork("main",1000,2000),false);
+          check(unavailable.text.equals(shorter.text) && unavailable.distanceText.isEmpty());
+          check(NavigationBridgeClient.last.contains("time_preserved=true"));
         }
         static void staleRouteAndInvalidWeightFailClosed()throws Exception {
           StockAlternativeContent adapter=new StockAlternativeContent(new android.content.Context());

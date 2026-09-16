@@ -35,6 +35,41 @@ public final class ServiceModeRecoveryReplay {
         check(pin.save("987654")&&new PinStorage(c).verify("987654")&&!pin.verify("987653"),"PIN survives new storage owner");
         c.getSharedPreferences(c.getPackageName()+"_pin",0).failCommits=1;
         check(!pin.save("456789")&&pin.verify("987654"),"failed PIN save does not erase recovery PIN");
+        selfRecovery();
         System.out.println("Service recovery: PASS");
+    }
+    static void selfRecovery() throws Exception {
+        String launcher="dezz.status.widget.servicemode.LauncherTrampolineActivity";
+        String home="dezz.status.widget.LauncherActivity";
+        for(int initial=0;initial<=2;initial++) {
+            Context c=new Context();PackageManager pm=c.packages;
+            pm.add("ru.natro.statuswidget",0,0);pm.add("third.app",0,0);
+            pm.components.put(launcher,initial);pm.components.put(home,1);
+            NatroSelfVisibility self=new NatroSelfVisibility(c);
+            check(self.apply(true)&&self.hasBaseline(),"self-only without transport");
+            check(pm.states.get("ru.natro.statuswidget")==0,"own package never disabled");
+            check(pm.components.size()==2&&pm.components.get(home)==2,"only two entry points hidden");
+            self=new NatroSelfVisibility(c);check(self.apply(true),"repeat after process restart");
+            ServiceModeJournal other=new ServiceModeJournal(c);
+            other.beforeDisable("third.app");pm.state("third.app",3);
+            check(self.apply(false),"mixed restore self first");
+            check(pm.components.get(launcher)==initial&&pm.components.get(home)==1,"exact baseline, not force ENABLED");
+            pm.state("third.app",0);check(other.confirm("third.app",false),"last other restored");
+            check(pm.components.get(launcher)==initial,"legacy cleanup cannot overwrite explicit baseline");
+            check(!new AppsToHideStorage(c).hasHiddenApps()&&!self.hasBaseline(),"all records retired");
+        }
+        Context c=new Context();NatroSelfVisibility self=new NatroSelfVisibility(c);
+        c.getSharedPreferences("natro_service_mode_self",0).failCommits=1;
+        reject(()->self.apply(true));check(c.packages.componentWrites==0,"journal failure prevents all writes");
+        c.getSharedPreferences(c.getPackageName()+"_apps_to_hide",0).failCommits=1;
+        reject(()->self.apply(true));check(c.packages.componentWrites==0&&self.hasBaseline(),"tracked write refusal retains baseline");
+        c.packages.failComponentWrite=2;
+        try {self.apply(true);throw new AssertionError("PM failure ignored");} catch(IllegalStateException good){}
+        check(self.hasBaseline()&&new AppsToHideStorage(c).hasHiddenApps(),"partial hide remains recoverable");
+        c.packages.failComponentWrite=0;
+        c.getSharedPreferences("natro_service_mode_self",0).failCommits=1;
+        reject(()->self.apply(false));check(self.hasBaseline()&&new AppsToHideStorage(c).hasHiddenApps(),"restore commit failure retains records");
+        check(new NatroSelfVisibility(c).apply(false),"retry restores after failed cleanup");
+        check(c.packages.components.get(launcher)==0&&c.packages.components.get(home)==0,"DEFAULT survives partial failure");
     }
 }

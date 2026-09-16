@@ -64,6 +64,7 @@ public class Replay {
  Object createOptionalLayer(Object a,Class<?> b,Class<?> c,Object d,String e){return null;}
  void createRoadEventsLayer(Object a,Class<?> b,Class<?> c,Object d){}
  void applyProfile(){applyMapBackground(map,profile.nightMode,profile.roadsOnly);}
+ boolean currentNightMode(){return profile.nightMode;}
  void observeMapLoading(){check(runtimeSurfaceAttached,"observer must not gate attachment");}
  void acknowledgeMapContent(){} void stopRenderer(boolean b){}
  String shortMessage(Throwable t){return t.toString();}

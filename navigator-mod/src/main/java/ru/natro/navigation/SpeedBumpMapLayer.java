@@ -207,7 +207,7 @@ final class SpeedBumpMapLayer {
             for (SpeedBump speedBump : speedBumps) {
                 Object point = pointClass.getConstructor(double.class, double.class)
                         .newInstance(speedBump.latitude, speedBump.longitude);
-                Object placemark = invoke(currentCollection, "addPlacemark",
+                Object placemark = invoke(currentCollection, "addEmptyPlacemark",
                         new Class<?>[]{pointClass}, point);
                 MapObjectLayerFactory.hideUntilTextured(placemark);
                 Object style = styleClass.getConstructor().newInstance();

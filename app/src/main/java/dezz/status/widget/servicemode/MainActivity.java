@@ -441,16 +441,6 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Launcher icon visibility ──────────────────────────────────────
 
-    private void hideLauncherIcon() {
-        PackageManager p = getPackageManager();
-        // Toggle the trampoline, not MainActivity. Disabling MainActivity directly makes
-        // the system restart/kill the running activity even with DONT_KILL_APP — so when
-        // DialerCodeReceiver re-enables it, the activity dies right after the user opens
-        // it (no Java exception, just looks like the app silently exits).
-        ComponentName launcher = new ComponentName(this, LauncherTrampolineActivity.class);
-        p.setComponentEnabledSetting(launcher, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
-    }
-
     /**
      * Migration safety net: re-enable MainActivity in case an older build had disabled
      * it directly. New code never disables MainActivity (only the alias), so on legacy
@@ -503,7 +493,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Step 1: Check ADB/Telnet connection — fail fast, before showing any other dialogs
-        if (!ShellExecutor.getInstance(this).hasWorkingTransport()) {
+        if (selectionNeedsTransport() && !ShellExecutor.getInstance(this).hasWorkingTransport()) {
             Toast.makeText(this, R.string.service_mode_no_connection_detected, Toast.LENGTH_LONG).show();
             return;
         }
@@ -548,6 +538,10 @@ public class MainActivity extends AppCompatActivity {
             if (appNames.length() > 0) appNames.append("\n");
             appNames.append("• ").append(app.getAppName());
         }
+        if (packagesToDisable.containsKey(getPackageName())) appNames.append(
+                "\n\nУ Natro будут скрыты значок и вход HOME. Восстановление — через PIN в звонилке "
+                + "или системные настройки приложений → Natro → дополнительные настройки. "
+                + "Службы восстановления остаются включены.");
 
         new AlertDialog.Builder(this)
                 .setTitle(R.string.service_mode_hide_confirm_title)
@@ -579,11 +573,8 @@ public class MainActivity extends AppCompatActivity {
                             R.string.service_mode_apps_hide_partial, R.string.service_mode_apps_hide_error);
 
                     if (result.hasAnySuccess()) {
-                        // Spinner stays visible until the activity is gone — the user
-                        // is done here. Hide the launcher icon, then close the activity
-                        // ourselves so there's no awkward "app still usable for a few
-                        // seconds before vanishing" window.
-                        hideLauncherIcon();
+                        // Self is now an explicit selection handled on the durable batch worker.
+                        // Hiding some other app must not hide Natro against the user's selection.
                         // Start the keep-alive service so the OEM is less likely to
                         // force-stop us and kill the dialer-PIN reveal path.
                         KeepAliveService.start(getApplicationContext());
@@ -616,7 +607,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.service_mode_list_loading, Toast.LENGTH_SHORT).show();
             return;
         }
-        if (!ShellExecutor.getInstance(this).hasWorkingTransport()) {
+        if (selectionNeedsTransport() && !ShellExecutor.getInstance(this).hasWorkingTransport()) {
             Toast.makeText(this, R.string.service_mode_no_connection_detected, Toast.LENGTH_LONG).show();
             return;
         }
@@ -668,6 +659,13 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
         });
+    }
+
+    private boolean selectionNeedsTransport() {
+        if (adapter == null) return true;
+        for (AppInfo app : adapter.getCheckedApps())
+            if (!app.getPackageName().equals(getPackageName())) return true;
+        return false;
     }
 
     private void showBatchResultToast(ShellExecutor.BatchResult result,

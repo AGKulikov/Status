@@ -59,4 +59,8 @@ final class HudPresentation extends Presentation {
     void invalidateHud() {
         if (content != null) content.invalidateHud();
     }
+
+    boolean hasUsableWindow() {
+        return isShowing() && content != null && content.hasUsableWindow();
+    }
 }

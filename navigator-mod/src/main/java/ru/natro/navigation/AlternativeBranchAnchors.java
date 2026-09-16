@@ -7,7 +7,8 @@ import java.util.List;
 
 /** Geographic anchors on the first distinct alternative branch, never on the shared road. */
 final class AlternativeBranchAnchors {
-    static final double PREFERRED_METERS = 300d;
+    static final double PREFERRED_METERS = 100d;
+    private static final double SEARCH_METERS = 500d;
     private static final double EARTH_METERS = 6_371_000d;
     private static final double SAMPLE_METERS = 5d;
     private static final double SHARED_ROAD_METERS = 6d;
@@ -31,13 +32,13 @@ final class AlternativeBranchAnchors {
         List<double[]> branch = new ArrayList<>();
         branch.add(origin);
         double total = 0d;
-        for (int i = fork + 1; i < alternative.length && total < PREFERRED_METERS + 20d; i++) {
+        for (int i = fork + 1; i < alternative.length && total < SEARCH_METERS; i++) {
             if (!valid(alternative[i])) return Collections.emptyList();
             total += distance(branch.get(branch.size() - 1), alternative[i]);
             branch.add(alternative[i]);
         }
         if (branch.size() < 2 || total < 10d) return Collections.emptyList();
-        // Only nearby active-route segments can overlap the first 320 m of this branch.
+        // Only nearby active-route segments can overlap this bounded branch search.
         // The spatial filter keeps distance tests bounded even for a long intercity route.
         List<double[]> activeSegments = new ArrayList<>();
         double scaleX = Math.cos(Math.toRadians(origin[0])) * EARTH_METERS * Math.PI / 180d;
@@ -49,13 +50,14 @@ final class AlternativeBranchAnchors {
             double y1 = (first[0] - origin[0]) * scaleY;
             double x2 = longitudeDelta(origin[1], current[i + 1][1]) * scaleX;
             double y2 = (current[i + 1][0] - origin[0]) * scaleY;
-            if (Math.min(x1, x2) > 350d || Math.max(x1, x2) < -350d
-                    || Math.min(y1, y2) > 350d || Math.max(y1, y2) < -350d) continue;
+            double radius = SEARCH_METERS + 30d;
+            if (Math.min(x1, x2) > radius || Math.max(x1, x2) < -radius
+                    || Math.min(y1, y2) > radius || Math.max(y1, y2) < -radius) continue;
             activeSegments.add(new double[]{x1, y1, x2, y2});
         }
         if (activeSegments.isEmpty()) return Collections.emptyList();
         boolean diverged = false;
-        double end = Math.min(PREFERRED_METERS + 20d, total);
+        double end = Math.min(SEARCH_METERS, total);
         for (double meters = SAMPLE_METERS; meters <= end; meters += SAMPLE_METERS) {
             double[] point = at(branch, meters);
             double separation = separation(point, origin, scaleX, scaleY, activeSegments);
@@ -68,13 +70,14 @@ final class AlternativeBranchAnchors {
         if (!diverged) return Collections.emptyList();
         double preferred = Math.min(PREFERRED_METERS, Math.max(0d, end - 15d));
         List<Anchor> result = new ArrayList<>();
-        for (double ratio : new double[]{1d, .8d, .6d, .4d, .2d}) {
-            double meters = preferred * ratio;
-            if (meters < 5d) continue;
+        // Dense geographic candidates let each window find its actual visible branch. Five
+        // percentage points skipped perfectly usable short pieces between them on the HUD.
+        for (double meters = SAMPLE_METERS; meters <= end - 5d; meters += SAMPLE_METERS) {
             double[] point = at(branch, meters);
             if (separation(point, origin, scaleX, scaleY, activeSegments) <= SHARED_ROAD_METERS) continue;
             result.add(new Anchor(point[0], point[1], meters));
         }
+        result.sort((a, b) -> Double.compare(Math.abs(a.meters - preferred), Math.abs(b.meters - preferred)));
         return result;
     }
 

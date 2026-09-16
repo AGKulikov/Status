@@ -14,8 +14,14 @@ final class StockAlternativeContent {
         final int color;
         final boolean neutral;
         final Drawable icon;
+        final String distanceText;
+        final int distanceColor;
         Content(String text, int color, boolean neutral, Drawable icon) {
+            this(text, color, neutral, icon, "", color);
+        }
+        Content(String text, int color, boolean neutral, Drawable icon, String distanceText, int distanceColor) {
             this.text = text; this.color = color; this.neutral = neutral; this.icon = icon;
+            this.distanceText = distanceText; this.distanceColor = distanceColor;
         }
     }
 
@@ -81,8 +87,35 @@ final class StockAlternativeContent {
         }
         java.lang.reflect.Field threshold = factory.getClass().getDeclaredField("NEGLECTABLE_TIME_DIFFERENCE");
         threshold.setAccessible(true);
+        // The projected MapKit factory has only a time field. Navigator's main balloon also
+        // displays distance. Localize the verified fork's delta, never a guessed polyline length.
         return new Content(label, text.getCurrentTextColor(),
-                Math.abs(trafficTime) <= threshold.getDouble(null), icon);
+                Math.abs(trafficTime) <= threshold.getDouble(null), icon, localizeRelativeDistance(distance),
+                distance < 0d ? StockAlternativePalette.negativeColor() : StockAlternativePalette.positiveColor());
+    }
+
+    private String localizeRelativeDistance(double meters) {
+        long rounded = Math.round(Math.abs(meters));
+        if (rounded == 0L) return "";
+        try {
+            if (rounded > Integer.MAX_VALUE) throw new IllegalArgumentException("distance_overflow");
+            Object manager = Class.forName("com.yandex.runtime.i18n.I18nManagerFactory")
+                    .getMethod("getI18nManagerInstance").invoke(null);
+            Object localized = ReflectMethods.publicMethod(manager.getClass(),
+                    "localizeDistance", new Class<?>[]{int.class}).invoke(manager, (int) rounded);
+            if (!(localized instanceof String)) throw new IllegalArgumentException("distance_missing");
+            String unitText = (String) localized;
+            if (unitText.trim().isEmpty()) throw new IllegalArgumentException("distance_empty");
+            String resource = "mapkit_styling_automotive_alternative_"
+                    + (meters < 0d ? "minus_sign" : "plus_sign");
+            int id = context.getResources().getIdentifier(resource, "string", context.getPackageName());
+            if (id == 0) throw new IllegalStateException("distance_sign_resource");
+            return context.getString(id) + unitText;
+        } catch (Exception failure) {
+            NavigationBridgeClient.reportDiagnostic("alternative-content distance=unavailable, reason="
+                    + failure.getClass().getSimpleName() + ", time_preserved=true");
+            return "";
+        }
     }
 
     private static Object metadataAt(Object route, Object fork) throws Exception {

@@ -1001,7 +1001,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(trafficLights.contains("MapObjectLayerFactory.create(map"));
         assertTrue(trafficLights.contains("MapObjectLayerFactory.IGNORE"));
         assertFalse(trafficLights.contains("addCollection"));
-        assertTrue(trafficLights.contains("addPlacemark"));
+        assertTrue(trafficLights.contains("addEmptyPlacemark"));
         assertTrue(trafficLights.contains("FRESH_MS = 3_000L"));
         assertTrue(trafficLights.contains("if (fingerprint == latestVisualFingerprint) return"));
         assertTrue(trafficLights.contains("ImageProvider"));
@@ -1239,7 +1239,7 @@ public final class NavigationHudV2ContractTest {
         assertFalse(cursor.contains("UserLocationObjectListener"));
         assertFalse(cursor.contains("ViewProvider"));
         assertFalse(cursor.contains("setView"));
-        assertTrue(cursor.contains("addPlacemark"));
+        assertTrue(cursor.contains("addEmptyPlacemark"));
         assertTrue(cursor.contains("setGeometry"));
         assertTrue(cursor.contains("setDirection"));
         assertTrue(cursor.contains("ImageProvider"));

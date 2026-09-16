@@ -12,6 +12,7 @@ public final class SharedPreferences {
     public final class Editor {
         final Map<String,Object> next = new HashMap<>();
         public Editor putInt(String k,int v) { next.put(k,v);return this; }
+        public Editor putBoolean(String k,boolean v) { next.put(k,v);return this; }
         public Editor putString(String k,String v) { next.put(k,v);return this; }
         public Editor remove(String k) { next.put(k,null);return this; }
         public boolean commit() { synchronized(SharedPreferences.this) {

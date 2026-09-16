@@ -14,7 +14,8 @@ class AdbServiceReplay(unittest.TestCase):
         files = list((ROOT / "tools/tests/runtime_stubs").rglob("*.java"))
         files += [source / (name + ".java") for name in (
             "adb/AdbConsoleSession", "adb/AdbShellResult", "servicemode/ServiceModeJournal",
-            "servicemode/AppsToHideStorage", "servicemode/AlwaysIgnoreAppResolver", "servicemode/PinStorage")]
+            "servicemode/AppsToHideStorage", "servicemode/AlwaysIgnoreAppResolver", "servicemode/PinStorage",
+            "servicemode/NatroSelfVisibility")]
         files += [ROOT / "tools/tests/java" / name for name in ("AdbSessionReplay.java", "ServiceModeRecoveryReplay.java")]
         compiler = ["javac"] if shutil.which("javac") else ["java", "com.sun.tools.javac.Main"]
         result = subprocess.run([*compiler, "-encoding", "UTF-8", "-d", cls.temp.name, *map(str, files)], text=True, capture_output=True)

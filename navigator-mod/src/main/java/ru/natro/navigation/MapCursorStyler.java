@@ -133,7 +133,7 @@ final class MapCursorStyler {
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         Object point = pointClass.getConstructor(double.class, double.class)
                 .newInstance(latitude, longitude);
-        currentPlacemark = invoke(currentCollection, "addPlacemark",
+        currentPlacemark = invoke(currentCollection, "addEmptyPlacemark",
                 new Class<?>[]{pointClass}, point);
         MapObjectLayerFactory.hideUntilTextured(currentPlacemark);
         applyIcon(currentPlacemark);
