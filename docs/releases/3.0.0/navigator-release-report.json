@@ -1,0 +1,25 @@
+{
+  "sourceCommit": "53339a110d49e197895ec738893ada628a5f6b87",
+  "sourceTree": "ebc624d994c381f100ef81a7ada55dc23eea9a61",
+  "ciRunId": "35116517157",
+  "pairVersion": "3.0.0",
+  "apk": "Navigator-30.3.0-Natro-3.0.0-signed.apk",
+  "sha256": "f6c3e4a827210c7588cd508e6fc176072c50056944b280473e3bba0d3d981b55",
+  "size": 156571242,
+  "package": "ru.yandex.yandexnavi",
+  "versionName": "30.3.0",
+  "versionCode": 739564630,
+  "baselineSha256": "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a",
+  "patchSha256": "b73c91580683a0b8ccd85c746f5ee290bd70cc9ea9e54e397839a028be7cf142",
+  "changedPayloadEntries": [
+    "classes19.dex"
+  ],
+  "unchangedPayloadEntries": 17226,
+  "manifestResourcesAndNativeLibrariesUnchanged": true,
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "zipalign16KiB": true,
+  "physicalKx11Verification": "pending",
+  "signingScriptSha256": "c3005ff7921a2f7de8a2c45863dcf6225064c36b2f195f2a0d33b88b981ebaa7"
+}

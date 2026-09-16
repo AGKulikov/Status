@@ -1,0 +1,45 @@
+{
+  "sourceCommit": "53339a110d49e197895ec738893ada628a5f6b87",
+  "sourceTree": "ebc624d994c381f100ef81a7ada55dc23eea9a61",
+  "candidateArtifact": {
+    "id": 10454739348,
+    "sha256": "7ccec7bf469d90232f50a1fa1902da7bd041247ffde07e1d8281b86f381fc208",
+    "downloadHashMatched": true
+  },
+  "compiledMethodChecks": {
+    "natro": {
+      "Ldezz/status/widget/launcher/MediaTimelineIdentity;": [
+        "matches"
+      ],
+      "Ldezz/status/widget/media/InputServiceProcessIdentity;": [
+        "matches"
+      ],
+      "Ldezz/status/widget/navigation/MapSurfacePrimer;": [
+        "start",
+        "clearInitialBuffer"
+      ],
+      "Ldezz/status/widget/servicemode/NatroSelfVisibility;": [
+        "apply",
+        "applyLocked"
+      ]
+    },
+    "navigator": {
+      "Lru/natro/navigation/AlternativeBranchAnchors;": [
+        "candidates"
+      ],
+      "Lru/natro/navigation/CameraDirectionMapLayer;": [
+        "render",
+        "addSign"
+      ],
+      "Lru/natro/navigation/NavigationBridgeClient;": [
+        "sendHello"
+      ],
+      "Lru/natro/navigation/PlacemarkImageBinding;": [
+        "load"
+      ]
+    }
+  },
+  "navigatorHelloMask": "0x1bfe7",
+  "maneuverCommandsCapability": true,
+  "physicalKx11Verification": "pending"
+}
