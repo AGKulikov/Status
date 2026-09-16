@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 25
     env:
       # Compile the exact next pair identity; this workflow makes no installable artifact.
-      VERSION_NAME: '2.10.0'
+      VERSION_NAME: '3.0.0'
       VERSION_CODE: '208021333'
       ALLOW_UNSIGNED_RELEASE: 'true'
     steps:
