@@ -19,7 +19,7 @@ package dezz.status.widget.drivemode.util;
 
 import android.util.Log;
 
-import dezz.status.widget.drivemode.BuildConfig;
+import dezz.status.widget.BuildConfig;
 
 public final class Logs {
 
