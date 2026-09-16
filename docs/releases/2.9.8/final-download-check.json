@@ -1,0 +1,132 @@
+{
+  "source_commit": "8fd2107d26d5db089032cc05939a264dbc20c077",
+  "source_tree": "01107ab40b4d59848dd6d8fdeff372ebe60c5d0a",
+  "release_ci": 35072691417,
+  "files": [
+    {
+      "file": "Natro-2.9.8-signed.apk",
+      "bytes": 28548462,
+      "sha256": "0117f69356135aea14662b8a1f6b996ac3f7d2e46493fbf516842279aa2ba603",
+      "package": "ru.natro.statuswidget",
+      "versionName": "2.9.8",
+      "versionCode": 208021331,
+      "minSdk": "28",
+      "targetSdk": "28",
+      "crc_ok": true,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "v2_block": true,
+      "v3_block": true,
+      "cryptographic_apksigner_verification": "release CI (download hashes match)"
+    },
+    {
+      "file": "Navigator-30.3.0-Natro-2.9.8-signed.apk",
+      "bytes": 155162019,
+      "sha256": "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a",
+      "package": "ru.yandex.yandexnavi",
+      "versionName": "30.3.0",
+      "versionCode": 739564630,
+      "minSdk": "26",
+      "targetSdk": "29",
+      "crc_ok": true,
+      "certificate_sha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "v2_block": true,
+      "v3_block": true,
+      "cryptographic_apksigner_verification": "release CI (download hashes match)"
+    }
+  ],
+  "method_checks": {
+    "Ldezz/status/widget/LatestTaskQueue;": [
+      "submit",
+      "drain"
+    ],
+    "Ldezz/status/widget/instrument/InstrumentOemController;": [
+      "setTsrHidden",
+      "setWhiteBarHidden"
+    ],
+    "Ldezz/status/widget/launcher/LauncherMediaController;": [
+      "adoptNotification",
+      "publishLiveNotification",
+      "requestNotificationArtwork"
+    ],
+    "Ldezz/status/widget/launcher/MediaDisplayNotification;": [
+      "read",
+      "samePublication"
+    ],
+    "Ldezz/status/widget/launcher/MediaTimelineIdentity;": [
+      "matches",
+      "mayRetainDuration"
+    ],
+    "Ldezz/status/widget/launcher/ShortcutActionPicker;": [
+      "showNew",
+      "showPrimary",
+      "chooseKind"
+    ],
+    "Ldezz/status/widget/launcher/YandexColdSessionPolicy;": [
+      "mayPlayUnready"
+    ],
+    "Ldezz/status/widget/media/ButtonActionExecutor;": [
+      "execute",
+      "settingsChanged"
+    ],
+    "Ldezz/status/widget/media/ButtonGestureEngine;": [
+      "input",
+      "reset"
+    ],
+    "Ldezz/status/widget/media/ButtonInputPatch;": [
+      "apply"
+    ],
+    "Ldezz/status/widget/media/VehicleButtonController;": [
+      "readKeys",
+      "invalidateInput",
+      "saveBinding",
+      "driverMenuBindings"
+    ],
+    "Ldezz/status/widget/navigation/MapStartupDiagnostics;": [
+      "begin",
+      "frame",
+      "journalChanged"
+    ],
+    "Ldezz/status/widget/navigation/MapStartupFrameStats;": [
+      "classify",
+      "accept"
+    ],
+    "Lru/natro/navigation/AlternativeBranchAnchors;": [
+      "candidates"
+    ],
+    "Lru/natro/navigation/AlternativeRouteMapLayer;": [
+      "reportPlacement",
+      "footprints",
+      "geometry"
+    ],
+    "Lru/natro/navigation/HudMapRenderer;": [
+      "traceStartup"
+    ],
+    "Lru/natro/navigation/MapObjectLayerFactory;": [
+      "hideUntilTextured"
+    ],
+    "Lru/natro/navigation/MapOverlayPlacementCoordinator$Footprint;": [
+      "collisionBounds"
+    ]
+  },
+  "natro_update_identity": {
+    "previous_version": "2.9.7",
+    "previous_code": 208021330,
+    "same_package": true,
+    "same_certificate": true,
+    "code_increment": 1,
+    "oem_install_policy": "requires KX11 acceptance"
+  },
+  "navigator_payload_comparison": {
+    "previous_version": "2.9.7",
+    "changed": [
+      "classes19.dex"
+    ],
+    "unchanged_entries": 17030,
+    "excluded": "META-INF signatures"
+  },
+  "signed_pair_artifact": {
+    "id": 10437212499,
+    "zip_sha256": "3e02587c47378fb333075e0295af29219a6d91c10d8f74525395780def18c48a",
+    "zip_bytes": 163632416
+  }
+}

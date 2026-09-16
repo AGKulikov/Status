@@ -1,4 +1,4 @@
-"""Verify downloaded Natro 2.9.7 APKs against CI and the previous signed pair.
+"""Verify downloaded Natro APKs against CI and the previous signed pair.
 
 Requires androguard. Cryptographic verification is done with apksigner in CI; this
 verifier binds the checked output to downloaded bytes and inspects APK/DEX identity.
@@ -15,6 +15,14 @@ from androguard.core.apk import APK
 from androguard.core.dex import DEX
 
 CERT = '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
+RELEASES = {
+    '2.9.7': (208021330, '2.9.6',
+              '09547edb8da0a58d4e6671e033ef099e15611ff73f40be237dec70cd5e4bf51b',
+              '74edb329cb1c8baa854bc753a1a5a0dd8de18542a5ca307aaf4081916a5dd1f7'),
+    '2.9.8': (208021331, '2.9.7',
+              'e2898abaa7cc26c5908049516ef82d14028d39d59c1b5b1267ba4c7ee8b3b860',
+              '4603525b3c0c85a99350b4915db812d4c278af4809fd28ee22205aa1df2987ae'),
+}
 METHODS = {
     'Ldezz/status/widget/media/ButtonGestureEngine;': ['input', 'reset'],
     'Ldezz/status/widget/media/VehicleButtonController;': ['readKeys', 'invalidateInput', 'saveBinding', 'driverMenuBindings'],
@@ -34,6 +42,20 @@ def sha(path):
 
 def verify(args):
     logger.remove()
+    version = args.version
+    code, previous_version, previous_natro_sha, previous_navigator_sha = RELEASES[version]
+    required_methods = dict(METHODS)
+    if version == '2.9.8':
+        required_methods.update({
+            'Ldezz/status/widget/LatestTaskQueue;': ['submit', 'drain'],
+            'Ldezz/status/widget/launcher/MediaTimelineIdentity;': ['matches', 'mayRetainDuration'],
+            'Ldezz/status/widget/launcher/YandexColdSessionPolicy;': ['mayPlayUnready'],
+            'Ldezz/status/widget/navigation/MapStartupDiagnostics;': ['begin', 'frame', 'journalChanged'],
+            'Ldezz/status/widget/navigation/MapStartupFrameStats;': ['classify', 'accept'],
+            'Lru/natro/navigation/AlternativeBranchAnchors;': ['candidates'],
+            'Lru/natro/navigation/MapObjectLayerFactory;': ['hideUntilTextured'],
+            'Lru/natro/navigation/HudMapRenderer;': ['traceStartup'],
+        })
     work, deliver = args.work.resolve(), args.deliver.resolve()
     archive = work / 'signed-pair.zip'
     artifact = json.loads((work / 'signed-pair-artifact.json').read_text())
@@ -54,14 +76,14 @@ def verify(args):
     report = json.loads((ci / 'release-report.json').read_text())
     assert report['source'] == dict(repository='AGKulikov/Status', commit=args.commit, tree=args.tree)
     assert report['certificateSha256'] == CERT
-    assert report['natro']['versionName'] == '2.9.7'
-    assert report['natro']['versionCode'] == 208021330
+    assert report['natro']['versionName'] == version
+    assert report['natro']['versionCode'] == code
     assert report['compatibility']['status'] == 'static-gates-passed'
     deliver.mkdir(exist_ok=True)
     facts, found = [], {}
     for kind, filename, package, version, code in [
-        ('natro', 'Natro-2.9.7-signed.apk', 'ru.natro.statuswidget', '2.9.7', '208021330'),
-        ('navigator', 'Navigator-30.3.0-Natro-2.9.7-signed.apk', 'ru.yandex.yandexnavi', '30.3.0', '739564630'),
+        ('natro', f'Natro-{version}-signed.apk', 'ru.natro.statuswidget', version, str(code)),
+        ('navigator', f'Navigator-30.3.0-Natro-{version}-signed.apk', 'ru.yandex.yandexnavi', '30.3.0', '739564630'),
     ]:
         source = (ci / report[kind]['apk']).resolve()
         assert source.is_relative_to(ci)
@@ -89,14 +111,14 @@ def verify(args):
                 if kind == 'navigator' and name != 'classes19.dex':
                     continue
                 raw = z.read(name)
-                relevant = [c for c in METHODS if c.encode() in raw and c not in found]
+                relevant = [c for c in required_methods if c.encode() in raw and c not in found]
                 if not relevant:
                     continue
                 dex = DEX(raw)
                 for cls in dex.get_classes():
                     if cls.get_name() in relevant:
                         names = {m.get_name() for m in cls.get_methods() if m.get_code() is not None}
-                        required = METHODS[cls.get_name()]
+                        required = required_methods[cls.get_name()]
                         assert set(required).issubset(names), (cls.get_name(), required, names)
                         found[cls.get_name()] = required
         facts.append(dict(file=filename, bytes=target.stat().st_size, sha256=sha(target),
@@ -104,15 +126,15 @@ def verify(args):
                           minSdk=apk.get_min_sdk_version(), targetSdk=apk.get_target_sdk_version(),
                           crc_ok=True, certificate_sha256=CERT, v2_block=True, v3_block=True,
                           cryptographic_apksigner_verification='release CI (download hashes match)'))
-    assert set(found) == set(METHODS), set(METHODS) - set(found)
-    assert sha(args.previous_natro) == '09547edb8da0a58d4e6671e033ef099e15611ff73f40be237dec70cd5e4bf51b'
+    assert set(found) == set(required_methods), set(required_methods) - set(found)
+    assert sha(args.previous_natro) == previous_natro_sha
     old_natro = APK(str(args.previous_natro))
     assert old_natro.get_package() == facts[0]['package']
-    assert old_natro.get_androidversion_name() == '2.9.6'
+    assert old_natro.get_androidversion_name() == previous_version
     assert int(old_natro.get_androidversion_code()) + 1 == facts[0]['versionCode']
     for certs in [old_natro.get_certificates_der_v2(), old_natro.get_certificates_der_v3()]:
         assert len(certs) == 1 and hashlib.sha256(certs[0]).hexdigest() == CERT
-    assert sha(args.previous_navigator) == '74edb329cb1c8baa854bc753a1a5a0dd8de18542a5ca307aaf4081916a5dd1f7'
+    assert sha(args.previous_navigator) == previous_navigator_sha
     with zipfile.ZipFile(args.previous_navigator) as old, zipfile.ZipFile(deliver / facts[1]['file']) as new:
         names = {n for n in old.namelist() if not n.startswith('META-INF/')}
         assert names == {n for n in new.namelist() if not n.startswith('META-INF/')}
@@ -120,10 +142,11 @@ def verify(args):
         assert changed == ['classes19.dex'], changed
     result = dict(source_commit=args.commit, source_tree=args.tree, release_ci=args.run,
                   files=facts, method_checks=found,
-                  natro_update_identity=dict(previous_version='2.9.6', previous_code=208021329,
+                  natro_update_identity=dict(previous_version=previous_version,
+                                             previous_code=int(old_natro.get_androidversion_code()),
                                              same_package=True, same_certificate=True, code_increment=1,
                                              oem_install_policy='requires KX11 acceptance'),
-                  navigator_payload_comparison=dict(previous_version='2.9.6', changed=changed,
+                  navigator_payload_comparison=dict(previous_version=previous_version, changed=changed,
                                                      unchanged_entries=len(names)-len(changed),
                                                      excluded='META-INF signatures'),
                   signed_pair_artifact=dict(id=artifact['id'], zip_sha256=sha(archive),
@@ -133,6 +156,7 @@ def verify(args):
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--version', choices=sorted(RELEASES), default='2.9.7')
     p.add_argument('--work', type=Path, required=True)
     p.add_argument('--deliver', type=Path, required=True)
     p.add_argument('--previous-navigator', type=Path, required=True)

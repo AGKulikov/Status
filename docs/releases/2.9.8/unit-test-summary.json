@@ -1,0 +1,32 @@
+{
+  "source_ci": 35072691444,
+  "release_ci": 35072691417,
+  "source": {
+    "tests": 1897,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 372
+  },
+  "release": {
+    "tests": 1897,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 372
+  },
+  "tool_tests": {
+    "tests": 176,
+    "failures": 0,
+    "skipped": 0,
+    "included_java_policy_source_cases": 100
+  },
+  "source_artifact": {
+    "id": 10436992311,
+    "sha256": "f06489e4c97d067ff43016ca01c95069925ba7b015666d07d3b2c0b457e242ed"
+  },
+  "release_test_artifact": {
+    "id": 10436819291,
+    "sha256": "3aa1688c38180890c359b7017c5c3bc9efe97fea7eec4973636b06f18a93af54"
+  }
+}
