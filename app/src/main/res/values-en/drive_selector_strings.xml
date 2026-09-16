@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="drive_selector_app_name">Monjaro Drive Mode Selector</string>
+
+    <string name="drive_selector_title_settings">Drive mode selector</string>
+    <string name="drive_selector_subtitle_settings">Active modes are on top — drag to reorder. Available ones below — tap to add.</string>
+    <string name="drive_selector_reset_order">Reset order</string>
+    <string name="drive_selector_order_reset_toast">Order has been reset</string>
+    <string name="drive_selector_show_overlay_now">Show overlay now</string>
+    <string name="drive_selector_section_enabled_modes">Active modes</string>
+    <string name="drive_selector_section_available_modes">Available modes</string>
+    <string name="drive_selector_available_empty_hint">All catalog modes are already added.</string>
+    <string name="drive_selector_enabled_empty_hint">No active modes — add at least one from the list below.</string>
+    <string name="drive_selector_remove_mode_cd">Remove from active</string>
+
+    <string name="drive_selector_probe_title">Probe supported modes</string>
+    <string name="drive_selector_probe_button">Probe car</string>
+    <string name="drive_selector_probe_confirm_title">Probe modes?</string>
+    <string name="drive_selector_probe_confirm_message">The app will ask the car which of the known drive modes it reports as supported and move them to the active list. The rest stays available for manual add.</string>
+    <string name="drive_selector_probe_confirm_run">Probe</string>
+    <string name="drive_selector_probe_result">Supported modes found: %1$d of %2$d</string>
+    <string name="drive_selector_probe_failed">Probe failed: SDK is not available</string>
+
+    <string name="drive_selector_mconfig_integration_title">MConfig+ integration</string>
+    <string name="drive_selector_mconfig_integration_caption">To block the stock action of the physical selector, use MConfig+: configure the knob to send intents to us.</string>
+    <string name="drive_selector_mconfig_integration_show">Show instructions</string>
+
+    <string name="drive_selector_mconfig_integration_dialog_title">MConfig+ setup</string>
+    <string name="drive_selector_mconfig_integration_dialog_close">Got it</string>
+
+    <string name="drive_selector_mconfig_intro">In MConfig+ pick “Send intent” for the desired slot and use the Intent and Package values from the list below. Tap a row to copy its value to clipboard.</string>
+    <string name="drive_selector_mconfig_section_switch">Switch mode (Click 1)</string>
+    <string name="drive_selector_mconfig_section_series">Quick-click series (MConfig+ v42 and older only)</string>
+    <string name="drive_selector_mconfig_section_show">Show overlay without changing mode</string>
+    <string name="drive_selector_mconfig_section_package">Package — shared by all intents</string>
+
+    <string name="drive_selector_mconfig_label_prev">Previous mode</string>
+    <string name="drive_selector_mconfig_label_next">Next mode</string>
+    <string name="drive_selector_mconfig_label_prev_2">2× previous</string>
+    <string name="drive_selector_mconfig_label_prev_3">3× previous</string>
+    <string name="drive_selector_mconfig_label_next_2">2× next</string>
+    <string name="drive_selector_mconfig_label_next_3">3× next</string>
+    <string name="drive_selector_mconfig_label_show_overlay">Steering wheel button / tap</string>
+    <string name="drive_selector_mconfig_label_package">Package name</string>
+
+    <string name="drive_selector_mconfig_footer">MConfig+ v43+ only needs Click 1 configured — the app listens to our overlay visibility broadcast and decides per click whether to show the overlay or step the mode. The 2× / 3× slots are required only for v42 and older.</string>
+
+    <string name="drive_selector_copy_to_clipboard_cd">Copy</string>
+    <string name="drive_selector_copied_toast">Copied</string>
+
+    <string name="drive_selector_appearance_title">Appearance</string>
+    <string name="drive_selector_appearance_carousel">Carousel: active in center</string>
+    <string name="drive_selector_appearance_carousel_caption">The list rotates cyclically so the current mode always sits in the middle of the overlay.</string>
+
+    <string name="drive_selector_duration_title">Auto-hide duration</string>
+    <string name="drive_selector_duration_preview">Simple overlay show</string>
+    <string name="drive_selector_duration_switch">After mode switch</string>
+    <string name="drive_selector_duration_value_seconds">%1$.1f s</string>
+    <string name="drive_selector_duration_caption">Touching the overlay (tap or scroll) resets the timer.</string>
+
+    <string name="drive_selector_about_title">About</string>
+    <string name="drive_selector_about_close">Close</string>
+    <string name="drive_selector_about_fallback"><![CDATA[
+        <p><b>Monjaro Drive Mode Selector</b><br>
+        An alternative drive-mode selector for the Geely Monjaro head unit.</p>
+        <p><b>Author</b><br>
+        Dezz — Telegram <a href="https://t.me/DezzK">@DezzK</a></p>
+        <p><b>Source code</b><br>
+        <a href="https://github.com/DezzK/monjaro-selector">github.com/DezzK/monjaro-selector</a></p>
+        <p><i>The full About page is available online at <a href="https://dezzk.github.io/monjaro-selector/">dezzk.github.io/monjaro-selector</a> when an internet connection is available.</i></p>
+    ]]></string>
+
+    <string name="drive_selector_notification_channel_name">Drive mode selector</string>
+    <string name="drive_selector_notification_channel_description">Background watcher for drive mode changes</string>
+    <string name="drive_selector_notification_title">Selector is active</string>
+    <string name="drive_selector_notification_text">Watching for drive mode changes</string>
+
+    <string name="drive_selector_permission_overlay_title">Permission required</string>
+    <string name="drive_selector_permission_overlay_message">The overlay needs the “Display over other apps” permission.</string>
+    <string name="drive_selector_permission_overlay_grant">Open settings</string>
+    <string name="drive_selector_permission_overlay_cancel">Later</string>
+
+    <!-- Drive mode labels -->
+    <string name="drive_selector_mode_comfort">Comfort</string>
+    <string name="drive_selector_mode_eco">Eco</string>
+    <string name="drive_selector_mode_eco_plus">Eco+</string>
+    <string name="drive_selector_mode_dynamic">Sport</string>
+    <string name="drive_selector_mode_sport_plus">Sport+</string>
+    <string name="drive_selector_mode_normal">Normal</string>
+    <string name="drive_selector_mode_snow">Snow</string>
+    <string name="drive_selector_mode_offroad">Off-road</string>
+    <string name="drive_selector_mode_mud">Mud</string>
+    <string name="drive_selector_mode_sand">Sand</string>
+    <string name="drive_selector_mode_rock">Rock</string>
+    <string name="drive_selector_mode_power">Power</string>
+    <string name="drive_selector_mode_hybrid">Hybrid</string>
+    <string name="drive_selector_mode_pure">Pure EV</string>
+    <string name="drive_selector_mode_awd">AWD</string>
+    <string name="drive_selector_mode_eawd">eAWD</string>
+    <string name="drive_selector_mode_custom">Custom</string>
+    <string name="drive_selector_mode_adaptive">Adaptive</string>
+    <string name="drive_selector_mode_hdc">HDC</string>
+    <string name="drive_selector_mode_phev">PHEV</string>
+    <string name="drive_selector_mode_eco_hev_phev">Eco HEV</string>
+    <string name="drive_selector_mode_save">Save</string>
+    <string name="drive_selector_mode_xc">XC</string>
+    <string name="drive_selector_mode_unknown">Auto</string>
+</resources>

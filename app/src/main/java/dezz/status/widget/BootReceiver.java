@@ -109,6 +109,11 @@ public class BootReceiver extends BroadcastReceiver {
 
     private void handleReceive(Context context, Intent intent) {
         dezz.status.widget.adb.AdbLocalActions.restore(context);
+        if ((Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
+                || Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction()))
+                && new dezz.status.widget.drivemode.settings.DriveModeSettings(context).isEnabled()) {
+            dezz.status.widget.drivemode.MonjaroSelectorApp.get(context).startServiceIfPermitted();
+        }
         String action = intent == null ? null : intent.getAction();
         dezz.status.widget.diagnostics.ActionRecorder.record(
                 dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,

@@ -4368,6 +4368,8 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         binding.liveIconKey = TrunkControlSafety.isTrunk(shortcut.target)
                 ? TrunkControlSafety.iconKey(shortcut.icon, state) : shortcut.icon;
+        if (dezz.status.widget.drivemode.ui.DriveModeIcons.isDrive(shortcut.target))
+            binding.liveIconKey = dezz.status.widget.drivemode.ui.DriveModeIcons.key(shortcut, state);
         applyLauncherAutomationStyle(binding);
         String tint = binding.liveTint;
         if (binding.titleLabel != null) {

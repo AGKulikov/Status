@@ -173,6 +173,13 @@ public final class LauncherIconResolver {
                                    @NonNull LauncherShortcutStore.Shortcut shortcut,
                                    @Nullable String colorOverride) {
         if ("none".equalsIgnoreCase(shortcut.icon)) return null;
+        dezz.status.widget.drivemode.car.DriveModeDescriptor mode =
+                dezz.status.widget.drivemode.ui.DriveModeIcons.fromKey(shortcut.icon);
+        if (mode != null) return dezz.status.widget.drivemode.ui.DriveModeIcons.drawable(context, mode.code);
+        if (shortcut.kind == LauncherShortcutStore.Kind.CAR
+                && dezz.status.widget.drivemode.ui.DriveModeIcons.isDrive(shortcut.target))
+            return dezz.status.widget.drivemode.ui.DriveModeIcons.drawable(context,
+                    dezz.status.widget.drivemode.ui.DriveModeIcons.value(shortcut, null));
         Drawable source = null;
         if ("app".equals(shortcut.icon) && shortcut.kind == LauncherShortcutStore.Kind.APP) {
             ComponentName component = ComponentName.unflattenFromString(shortcut.target);
@@ -197,6 +204,9 @@ public final class LauncherIconResolver {
     public static Drawable resolvePreset(@NonNull Context context, @NonNull String iconKey,
                                          @Nullable String colorOverride) {
         if ("none".equalsIgnoreCase(iconKey)) return null;
+        dezz.status.widget.drivemode.car.DriveModeDescriptor mode =
+                dezz.status.widget.drivemode.ui.DriveModeIcons.fromKey(iconKey);
+        if (mode != null) return dezz.status.widget.drivemode.ui.DriveModeIcons.drawable(context, mode.code);
         Drawable source = ContextCompat.getDrawable(context, resource(iconKey));
         if (source == null) return null;
         source = DrawableCompat.wrap(source).mutate();
@@ -219,6 +229,9 @@ public final class LauncherIconResolver {
     }
 
     @DrawableRes private static int knownResource(@Nullable String key) {
+        dezz.status.widget.drivemode.car.DriveModeDescriptor drive =
+                dezz.status.widget.drivemode.ui.DriveModeIcons.fromKey(key);
+        if (drive != null) return drive.iconRes;
         int automotive = LauncherAutomotiveCatalog.resource(key);
         if (automotive != 0) return automotive;
         if (key == null) return 0;
@@ -251,7 +264,7 @@ public final class LauncherIconResolver {
             case "defrost_front": return R.drawable.ic_car_defrost_front;
             case "defrost_rear": return R.drawable.ic_car_defrost_rear;
             case "wiper": return R.drawable.ic_car_wiper;
-            case "drive_mode": return R.drawable.ic_car_drive_mode;
+            case "drive_mode": return R.drawable.ic_mode_generic;
             case "fuel_save": return R.drawable.ic_car_fuel_save;
             case "trunk_closed": return R.drawable.ic_car_trunk_closed;
             case "trunk_open": return R.drawable.ic_car_trunk_open;
@@ -343,6 +356,9 @@ public final class LauncherIconResolver {
         List<Preset> values = new ArrayList<>(
                 BasePresetHolder.PRESETS.size() + FluentIconCatalog.presets().size() + 46);
         values.addAll(BasePresetHolder.PRESETS);
+        for (dezz.status.widget.drivemode.car.DriveModeDescriptor mode
+                : dezz.status.widget.drivemode.car.DriveModeCatalog.all())
+            values.add(new Preset("drive_" + mode.key, "Режим: " + mode.key));
         LauncherAutomotiveCatalog.addPresets(values);
         values.addAll(FluentIconCatalog.presets());
         return Collections.unmodifiableList(values);

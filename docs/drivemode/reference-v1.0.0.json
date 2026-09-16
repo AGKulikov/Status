@@ -1,0 +1,83 @@
+{
+  "repository": "DezzK/monjaro-selector",
+  "commit": "2c6c8c010aae6a7eb47c886db4dbd7d76132e959",
+  "sdk_sha256": "33d0c62851e834dbf443f969627973dbc6e00eec3dd1e8fb6fc9dfe5af78e886",
+  "icons": [
+    {
+      "name": "ic_mode_adaptive.xml",
+      "sha256": "908f8acdfb93e5178f1a97312059b52f0f82e56774f2ebbabb2a7c6583c15373"
+    },
+    {
+      "name": "ic_mode_awd.xml",
+      "sha256": "23873247e9738e35a8f4982cd712ebacf0dc350583a193f15dfcdbbd64578d6e"
+    },
+    {
+      "name": "ic_mode_comfort.xml",
+      "sha256": "398d37d507ddedf9122c0afaa7211157962491a0d2e1df02a2ab1a7056d7c7d4"
+    },
+    {
+      "name": "ic_mode_custom.xml",
+      "sha256": "87d3ba2d452c2ba204685afc319681aec812c207f5ab8e32a6f8da0369618157"
+    },
+    {
+      "name": "ic_mode_eco.xml",
+      "sha256": "24d6d40999501fb161f38d4f5ba34afcb947eabd739c79c0d5c3b6521b6085b2"
+    },
+    {
+      "name": "ic_mode_generic.xml",
+      "sha256": "4ed19c79d6e610d65a587f4946d075f7c814d278fab3b5e7cb51d8deb79e08f0"
+    },
+    {
+      "name": "ic_mode_hdc.xml",
+      "sha256": "67fed40d4b73e284b4d9226fbf8e9c9a70ef4f65d8c7fc7efcef9427c48854c3"
+    },
+    {
+      "name": "ic_mode_hybrid.xml",
+      "sha256": "843422be5e058d7af6bcc146894595190c9965b9756b574599fc92461f73e4ea"
+    },
+    {
+      "name": "ic_mode_mud.xml",
+      "sha256": "0a8d55da7da42539ab5225ed1889660ddb5463146d518afe815d2d9e4957de97"
+    },
+    {
+      "name": "ic_mode_offroad.xml",
+      "sha256": "358f59d942558174220bf740ac0d416b21c6a166cd4c105f67da8641193e7210"
+    },
+    {
+      "name": "ic_mode_phev.xml",
+      "sha256": "12c016b1c7261be7d071fbb72fbd8c2be204da9bbf5ba8114973b4a85e223acc"
+    },
+    {
+      "name": "ic_mode_power.xml",
+      "sha256": "fe922e7d7991156e1565ab82223eb16376cf51c14d7ad4e7a631810170724ea7"
+    },
+    {
+      "name": "ic_mode_pure.xml",
+      "sha256": "cf1b736c50a7fbfedf38c59433c4e0943697317feeade2ff988f041e6aa5c87a"
+    },
+    {
+      "name": "ic_mode_rock.xml",
+      "sha256": "6ae11ccdd8a6e7b31adcfaa8c5e0373ca0171e22474de14eea8d4734a1a5817c"
+    },
+    {
+      "name": "ic_mode_sand.xml",
+      "sha256": "3c7f63080c904d6590eec68b37aa122ac5d8e8a2baa4c70ca0a0866bf561108d"
+    },
+    {
+      "name": "ic_mode_save.xml",
+      "sha256": "a27f788f24cae5b21267d8b49d9a3cdbd4843bef5c71a2ed9fddb6634cae63cd"
+    },
+    {
+      "name": "ic_mode_snow.xml",
+      "sha256": "3b0ec0e4fa9c25164629d1abc8bf684d390e70873f86c0e685e9fce161d14b37"
+    },
+    {
+      "name": "ic_mode_sport.xml",
+      "sha256": "bd33df40805cff65daaca46a017ce1be19447a79b7526c3cf126f0a1bfa4db51"
+    },
+    {
+      "name": "ic_mode_xc.xml",
+      "sha256": "e6034a9c490caa98690cc3cd54dd09ac7833e5215ae08f1d3ab92be91577c3d4"
+    }
+  ]
+}

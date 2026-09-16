@@ -274,6 +274,11 @@ public final class VehicleControlActivity extends AppCompatActivity {
             active = state.known && state.active;
             setBackground(rounded(active ? SURFACE_ACTIVE : SURFACE, 20));
             icon.setColorFilter(active ? PRIMARY : Color.rgb(190, 201, 219));
+            if (dezz.status.widget.drivemode.ui.DriveModeIcons.isDrive(descriptor.id)) {
+                icon.clearColorFilter();
+                icon.setImageDrawable(dezz.status.widget.drivemode.ui.DriveModeIcons.drawable(
+                        VehicleControlActivity.this, state.known && state.available ? (int) state.value : 255));
+            }
         }
     }
 
@@ -306,6 +311,23 @@ public final class VehicleControlActivity extends AppCompatActivity {
     private void chooseOption(@NonNull CarControlDescriptor descriptor) {
         if (descriptor.options.isEmpty()) {
             send(descriptor, CarControlCommand.Operation.CYCLE, 0d);
+            return;
+        }
+        if (dezz.status.widget.drivemode.ui.DriveModeIcons.isDrive(descriptor.id)) {
+            android.widget.ArrayAdapter<CarControlDescriptor.Option> adapter = new android.widget.ArrayAdapter<CarControlDescriptor.Option>(
+                    this, android.R.layout.simple_list_item_1, descriptor.options) {
+                @Override public View getView(int position, View recycled, ViewGroup parent) {
+                    TextView row = (TextView) super.getView(position, recycled, parent);
+                    android.graphics.drawable.Drawable icon = dezz.status.widget.drivemode.ui.DriveModeIcons.drawable(
+                            VehicleControlActivity.this, (int) getItem(position).value);
+                    if (icon != null) icon.setBounds(0, 0, dp(48), dp(48));
+                    row.setCompoundDrawables(icon, null, null, null); row.setCompoundDrawablePadding(dp(16));
+                    row.setMinHeight(dp(64)); return row;
+                }
+            };
+            new AlertDialog.Builder(this).setTitle(descriptor.label).setAdapter(adapter,
+                    (dialog, which) -> send(descriptor, CarControlCommand.Operation.SET, descriptor.options.get(which).value))
+                    .setNegativeButton("Отмена", null).show();
             return;
         }
         String[] labels = new String[descriptor.options.size()];
@@ -365,7 +387,7 @@ public final class VehicleControlActivity extends AppCompatActivity {
         if (id.contains("window")) return R.drawable.ic_car_window;
         if (id.contains("sunroof")) return R.drawable.ic_car_sunroof;
         if (id.contains("trunk")) return R.drawable.ic_car_trunk_closed;
-        if (id.contains("drive_mode")) return R.drawable.ic_car_drive_mode;
+        if (id.contains("drive_mode")) return R.drawable.ic_mode_generic;
         if (id.contains("wiper")) return R.drawable.ic_car_wiper;
         if (id.contains("fan")) return R.drawable.ic_car_fan;
         if (id.contains("circulation")) return R.drawable.ic_car_air_recirculation;

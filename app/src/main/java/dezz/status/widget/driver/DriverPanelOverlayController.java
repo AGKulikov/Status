@@ -1790,7 +1790,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 Color.TRANSPARENT);
         binding.button.setBackground(rippleBackground(background, 14));
         String tint = style.tint;
-        if (TrunkControlSafety.isTrunk(shortcut.target)) {
+        if (dezz.status.widget.drivemode.ui.DriveModeIcons.isDrive(shortcut.target)) {
+            binding.icon.clearColorFilter();
+            binding.icon.setImageDrawable("none".equalsIgnoreCase(shortcut.icon) ? null
+                    : dezz.status.widget.drivemode.ui.DriveModeIcons.drawable(appContext,
+                    dezz.status.widget.drivemode.ui.DriveModeIcons.value(shortcut, state)));
+        } else if (TrunkControlSafety.isTrunk(shortcut.target)) {
             binding.icon.setImageDrawable(LauncherIconResolver.resolvePreset(appContext,
                     TrunkControlSafety.iconKey(shortcut.icon, state), tint));
         } else {

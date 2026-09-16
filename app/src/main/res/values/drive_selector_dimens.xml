@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="drive_selector_page_padding">24dp</dimen>
+    <dimen name="drive_selector_card_corner">20dp</dimen>
+    <dimen name="drive_selector_card_padding">16dp</dimen>
+    <dimen name="drive_selector_row_height">72dp</dimen>
+    <dimen name="drive_selector_row_icon">36dp</dimen>
+    <!-- ImageView size for icons rendered through ShadowDrawable. The shadow
+         reserves the outer ~20%, so the actual glyph ends up close to the
+         bare-icon size we used before. -->
+    <dimen name="drive_selector_row_icon_image">28dp</dimen>
+    <dimen name="drive_selector_chip_icon_size">22dp</dimen>
+    <dimen name="drive_selector_overlay_corner">48dp</dimen>
+    <dimen name="drive_selector_overlay_padding_horizontal">56dp</dimen>
+    <dimen name="drive_selector_overlay_padding_vertical">40dp</dimen>
+    <!-- Each pill has two rest-state sizes: active (large) and inactive
+         (small). At rest the views actually take their natural state size, so
+         VectorDrawables rasterize directly at the displayed pixel count and
+         look crisp in both states. Animation between the two uses scaleX/Y
+         on the larger (active) layout — motion masks the bitmap interpolation,
+         and the snap to the target rest layout happens when the animation
+         lands. Inactive values are exactly active * 0.71. -->
+    <dimen name="drive_selector_overlay_pill_icon">152dp</dimen>
+    <dimen name="drive_selector_overlay_pill_icon_image">113dp</dimen>
+    <dimen name="drive_selector_overlay_pill_label">28sp</dimen>
+    <dimen name="drive_selector_overlay_pill_icon_small">108dp</dimen>
+    <dimen name="drive_selector_overlay_pill_icon_image_small">80dp</dimen>
+    <dimen name="drive_selector_overlay_pill_label_small">20sp</dimen>
+    <!-- Fixed pill height keeps the carousel row even regardless of which
+         pills are active; content inside is centered. Sized for the active
+         state plus padding. -->
+    <dimen name="drive_selector_overlay_pill_height">220dp</dimen>
+    <dimen name="drive_selector_overlay_pill_min_width">180dp</dimen>
+    <dimen name="drive_selector_overlay_item_spacing">12dp</dimen>
+</resources>

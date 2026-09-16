@@ -26,9 +26,10 @@ public final class AdbGestureController {
     private float startY;
     private int pointer;
     private final View.OnTouchListener listener = this::touch;
-    private final Runnable hold = () -> { if (tracking && !moved) {
+    private final Runnable hold = this::performHold;
+    private void performHold() { if (tracking && !moved) {
         held = true; service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN);
-    } };
+    } }
 
     private AdbGestureController(WidgetAccessibilityService service) { this.service = service; prefs = new Preferences(service); }
     public static void attach(WidgetAccessibilityService service) {

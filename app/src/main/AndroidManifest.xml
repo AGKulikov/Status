@@ -105,6 +105,11 @@
             android:theme="@style/Theme.StatusWidget.TransparentProxy" />
         <activity android:name=".MediaButtonsSettingsActivity"
             android:exported="false" android:screenOrientation="landscape" />
+        <activity android:name=".drivemode.ui.MainActivity" android:exported="false"
+            android:screenOrientation="landscape" android:theme="@style/drive_selector_Theme.MonjaroDriveModes" />
+        <activity android:name=".drivemode.ui.AboutActivity" android:exported="false"
+            android:theme="@style/drive_selector_Theme.MonjaroDriveModes" />
+        <service android:name=".drivemode.service.DriveModeOverlayService" android:exported="false" />
         <activity android:name=".servicemode.MainActivity" android:exported="false"
             android:screenOrientation="landscape" android:launchMode="singleTask"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />

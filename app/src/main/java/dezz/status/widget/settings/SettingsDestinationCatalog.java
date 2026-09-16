@@ -234,6 +234,10 @@ public final class SettingsDestinationCatalog {
                 "Скрытие и восстановление приложений, исключения и возврат по PIN",
                 "settings", "dezz.status.widget.servicemode.MainActivity",
                 "сервис", "stealth", "скрыть приложения", "восстановить", "PIN"));
+        values.add(activity("panel_drive_selector", Group.PANELS, "Режимы вождения",
+                "Режимы, порядок, карусель, скрытие меню и назначения кнопок",
+                "drive_mode", "dezz.status.widget.drivemode.ui.MainActivity",
+                "режимы движения", "селектор", "monjaro selector", "эко", "спорт", "DM"));
         values.add(activity("app_adb", Group.APP, "ADB",
                 "Терминал, разрешения, специальные возможности и параметры разработчика",
                 "diagnostics", "dezz.status.widget.AdbSettingsActivity",

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="@dimen/drive_selector_overlay_pill_height"
+    android:layout_marginHorizontal="@dimen/drive_selector_overlay_item_spacing"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center"
+    android:minWidth="@dimen/drive_selector_overlay_pill_min_width"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <FrameLayout
+        android:id="@+id/pill_icon_holder"
+        android:layout_width="@dimen/drive_selector_overlay_pill_icon"
+        android:layout_height="@dimen/drive_selector_overlay_pill_icon"
+        android:background="@drawable/drive_selector_bg_pill_inactive">
+
+        <ImageView
+            android:id="@+id/pill_icon"
+            android:layout_width="@dimen/drive_selector_overlay_pill_icon_image"
+            android:layout_height="@dimen/drive_selector_overlay_pill_icon_image"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            tools:src="@drawable/ic_mode_sport"
+            tools:tint="@color/drive_selector_accent_sport" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/pill_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:gravity="center"
+        android:maxLines="1"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="@dimen/drive_selector_overlay_pill_label"
+        android:textStyle="bold"
+        tools:text="Sport" />
+</LinearLayout>

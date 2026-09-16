@@ -107,7 +107,14 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
         // Typed presets in the same action picker: no action/package text entry required.
         java.util.Collections.addAll(actions, DriveSelectorButtonPreset.values());
         Spinner selector = new Spinner(this);
-        selector.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, actions));
+        selector.setAdapter(new ArrayAdapter<Object>(this, android.R.layout.simple_spinner_dropdown_item, actions) {
+            @Override public View getView(int position, View recycled, android.view.ViewGroup parent) {
+                return decorateAction(super.getView(position, recycled, parent), getItem(position));
+            }
+            @Override public View getDropDownView(int position, View recycled, android.view.ViewGroup parent) {
+                return decorateAction(super.getDropDownView(position, recycled, parent), getItem(position));
+            }
+        });
         DriveSelectorButtonPreset originalPreset = DriveSelectorButtonPreset.fromBinding(original);
         selector.setSelection(Math.max(0, actions.indexOf(originalPreset == null ? original.action : originalPreset)));
         fields.addView(selector);
@@ -209,8 +216,15 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
         values.addView(restore);
         int[] driveModes = {-1, 570491138, 570491158, 570491137, 570491139, 570491155, 570491149, 570491145};
         Spinner startupMode = new Spinner(this);
-        startupMode.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"После запуска: последний режим", "Комфорт", "Адаптивный", "Экономичный", "Спорт", "Внедорожный", "Песок", "Снег"}));
+        startupMode.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"После запуска: последний режим", "Комфорт", "Адаптивный", "Экономичный", "Спорт", "Внедорожный", "Песок", "Снег"}) {
+            @Override public View getView(int position, View recycled, android.view.ViewGroup parent) {
+                return decorateDrive(super.getView(position, recycled, parent), driveModes[position] < 0 ? null : driveModes[position]);
+            }
+            @Override public View getDropDownView(int position, View recycled, android.view.ViewGroup parent) {
+                return decorateDrive(super.getDropDownView(position, recycled, parent), driveModes[position] < 0 ? null : driveModes[position]);
+            }
+        });
         for (int i = 0; i < driveModes.length; i++) if (driveModes[i] == buttons.integer("drive.start_mode", -1)) startupMode.setSelection(i);
         values.addView(startupMode);
         values.addView(text("Полноэкранный режим", 16));
@@ -225,6 +239,24 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
                     buttons.put("drive.start_mode", driveModes[startupMode.getSelectedItemPosition()]);
                     buttons.put("drive.restore", restore.isChecked());
                 }).show();
+    }
+    private View decorateAction(View view, Object choice) {
+        ButtonAction action = choice instanceof DriveSelectorButtonPreset
+                ? ((DriveSelectorButtonPreset) choice).action : (ButtonAction) choice;
+        return decorateDrive(view, dezz.status.widget.drivemode.ui.DriveModeIcons.buttonCode(action));
+    }
+    private View decorateDrive(View view, Integer code) {
+        if (view instanceof TextView) {
+            TextView label = (TextView) view;
+            android.graphics.drawable.Drawable icon = code == null ? null
+                    : dezz.status.widget.drivemode.ui.DriveModeIcons.drawable(this, code);
+            int size = Math.round(40 * getResources().getDisplayMetrics().density);
+            if (icon != null) icon.setBounds(0, 0, size, size);
+            label.setCompoundDrawables(icon, null, null, null);
+            label.setCompoundDrawablePadding(size / 3);
+            label.setMinHeight(Math.round(56 * getResources().getDisplayMetrics().density));
+        }
+        return view;
     }
     private String shortcutTitle(String json) {
         try { return json.isEmpty() ? "Не выбрано" : LauncherShortcutStore.decodeAction(json).title; }

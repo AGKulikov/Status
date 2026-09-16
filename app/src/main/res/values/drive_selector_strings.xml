@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="drive_selector_app_name">Monjaro Drive Mode Selector</string>
+
+    <string name="drive_selector_title_settings">Селектор режимов</string>
+    <string name="drive_selector_subtitle_settings">Активные режимы — сверху, можно перетаскивать для изменения порядка. Доступные — снизу, нажмите чтобы добавить.</string>
+    <string name="drive_selector_reset_order">Сбросить порядок</string>
+    <string name="drive_selector_order_reset_toast">Порядок сброшен</string>
+    <string name="drive_selector_show_overlay_now">Показать оверлей сейчас</string>
+    <string name="drive_selector_section_enabled_modes">Активные режимы</string>
+    <string name="drive_selector_section_available_modes">Доступные режимы</string>
+    <string name="drive_selector_available_empty_hint">Все режимы из каталога уже добавлены.</string>
+    <string name="drive_selector_enabled_empty_hint">Нет активных режимов — добавьте хотя бы один из списка ниже.</string>
+    <string name="drive_selector_remove_mode_cd">Убрать режим из активных</string>
+
+    <string name="drive_selector_probe_title">Опрос поддерживаемых режимов</string>
+    <string name="drive_selector_probe_button">Опросить автомобиль</string>
+    <string name="drive_selector_probe_confirm_title">Опросить режимы?</string>
+    <string name="drive_selector_probe_confirm_message">Приложение спросит у автомобиля, какие из известных режимов он поддерживает, и перенесёт их в активный список. Остальные останутся доступными для ручного добавления.</string>
+    <string name="drive_selector_probe_confirm_run">Опросить</string>
+    <string name="drive_selector_probe_result">Найдено поддерживаемых режимов: %1$d из %2$d</string>
+    <string name="drive_selector_probe_failed">Опрос не удался: SDK недоступен</string>
+
+    <string name="drive_selector_mconfig_integration_title">Интеграция с MConfig+</string>
+    <string name="drive_selector_mconfig_integration_caption">Для блокировки штатного действия физического селектора используйте MConfig+: настройте knob так, чтобы он отправлял нам интенты.</string>
+    <string name="drive_selector_mconfig_integration_show">Показать инструкцию</string>
+
+    <string name="drive_selector_mconfig_integration_dialog_title">Настройка MConfig+</string>
+    <string name="drive_selector_mconfig_integration_dialog_close">Понятно</string>
+
+    <string name="drive_selector_mconfig_intro">В MConfig+ для нужного слота выберите действие «Отправить намерение» и укажите Intent и Package из списка ниже. Тап по строке копирует значение в буфер обмена.</string>
+    <string name="drive_selector_mconfig_section_switch">Переключение режима (Click 1)</string>
+    <string name="drive_selector_mconfig_section_series">Серии быстрых кликов (только MConfig+ v42 и старее)</string>
+    <string name="drive_selector_mconfig_section_show">Показать оверлей без смены режима</string>
+    <string name="drive_selector_mconfig_section_package">Package — общее для всех интентов</string>
+
+    <string name="drive_selector_mconfig_label_prev">Предыдущий режим</string>
+    <string name="drive_selector_mconfig_label_next">Следующий режим</string>
+    <string name="drive_selector_mconfig_label_prev_2">2× назад</string>
+    <string name="drive_selector_mconfig_label_prev_3">3× назад</string>
+    <string name="drive_selector_mconfig_label_next_2">2× вперёд</string>
+    <string name="drive_selector_mconfig_label_next_3">3× вперёд</string>
+    <string name="drive_selector_mconfig_label_show_overlay">Кнопка на руле / тап</string>
+    <string name="drive_selector_mconfig_label_package">Имя пакета</string>
+
+    <string name="drive_selector_mconfig_footer">В MConfig+ v43 и новее достаточно настроить только Click 1 — приложение получает наш статус оверлея и само решает: показать его или переключить режим. Слоты 2× / 3× нужны только для версий по v42 включительно.</string>
+
+    <string name="drive_selector_copy_to_clipboard_cd">Скопировать</string>
+    <string name="drive_selector_copied_toast">Скопировано</string>
+
+    <string name="drive_selector_appearance_title">Внешний вид</string>
+    <string name="drive_selector_appearance_carousel">Карусель: активный по центру</string>
+    <string name="drive_selector_appearance_carousel_caption">Список циклически сдвигается так, чтобы текущий режим всегда находился по центру оверлея.</string>
+
+    <string name="drive_selector_duration_title">Длительность отображения</string>
+    <string name="drive_selector_duration_preview">Простой показ оверлея</string>
+    <string name="drive_selector_duration_switch">При переключении режима</string>
+    <string name="drive_selector_duration_value_seconds">%1$.1f с</string>
+    <string name="drive_selector_duration_caption">Касание оверлея (тап или скролл) сбрасывает таймер.</string>
+
+    <string name="drive_selector_about_title">О программе</string>
+    <string name="drive_selector_about_close">Закрыть</string>
+    <string name="drive_selector_about_url" translatable="false">https://dezzk.github.io/monjaro-selector/</string>
+    <string name="drive_selector_about_fallback"><![CDATA[
+        <p><b>Monjaro Drive Mode Selector</b><br>
+        Альтернативный селектор режимов вождения для головного устройства Geely Monjaro.</p>
+        <p><b>Автор</b><br>
+        Dezz — Telegram <a href="https://t.me/DezzK">@DezzK</a></p>
+        <p><b>Исходный код</b><br>
+        <a href="https://github.com/DezzK/monjaro-selector">github.com/DezzK/monjaro-selector</a></p>
+        <p><i>Полная страница «О программе» доступна онлайн по адресу <a href="https://dezzk.github.io/monjaro-selector/">dezzk.github.io/monjaro-selector</a> при наличии подключения к интернету.</i></p>
+    ]]></string>
+
+    <string name="drive_selector_notification_channel_name">Селектор режимов</string>
+    <string name="drive_selector_notification_channel_description">Фоновое отслеживание изменения режима вождения</string>
+    <string name="drive_selector_notification_title">Селектор режимов активен</string>
+    <string name="drive_selector_notification_text">Слежу за переключением режимов</string>
+
+    <string name="drive_selector_permission_overlay_title">Требуется разрешение</string>
+    <string name="drive_selector_permission_overlay_message">Для оверлея поверх других приложений нужно дать разрешение «Поверх других приложений».</string>
+    <string name="drive_selector_permission_overlay_grant">Открыть настройки</string>
+    <string name="drive_selector_permission_overlay_cancel">Позже</string>
+
+
+    <!-- Drive mode labels -->
+    <string name="drive_selector_mode_comfort">Комфорт</string>
+    <string name="drive_selector_mode_eco">Эко</string>
+    <string name="drive_selector_mode_eco_plus">Эко+</string>
+    <string name="drive_selector_mode_dynamic">Спорт</string>
+    <string name="drive_selector_mode_sport_plus">Спорт+</string>
+    <string name="drive_selector_mode_normal">Нормальный</string>
+    <string name="drive_selector_mode_snow">Снег</string>
+    <string name="drive_selector_mode_offroad">Бездорожье</string>
+    <string name="drive_selector_mode_mud">Грязь</string>
+    <string name="drive_selector_mode_sand">Песок</string>
+    <string name="drive_selector_mode_rock">Камни</string>
+    <string name="drive_selector_mode_power">Мощность</string>
+    <string name="drive_selector_mode_hybrid">Гибрид</string>
+    <string name="drive_selector_mode_pure">Электро</string>
+    <string name="drive_selector_mode_awd">AWD</string>
+    <string name="drive_selector_mode_eawd">eAWD</string>
+    <string name="drive_selector_mode_custom">Custom</string>
+    <string name="drive_selector_mode_adaptive">Адаптивный</string>
+    <string name="drive_selector_mode_hdc">HDC</string>
+    <string name="drive_selector_mode_phev">PHEV</string>
+    <string name="drive_selector_mode_eco_hev_phev">Эко HEV</string>
+    <string name="drive_selector_mode_save">SAVE</string>
+    <string name="drive_selector_mode_xc">XC</string>
+    <string name="drive_selector_mode_unknown">Авто</string>
+</resources>
