@@ -9,6 +9,13 @@ import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
 
+def sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
 def main():
     version = os.environ["VERSION_NAME"]
     code = int(os.environ["VERSION_CODE"])
@@ -45,7 +52,7 @@ def main():
         "sourceCommit": os.environ["GITHUB_SHA"],
         "sourceTree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip(),
         "ciRunId": os.environ["GITHUB_RUN_ID"], "unitTests": counts,
-        "unsignedSha256": hashlib.file_digest(unsigned.open("rb"), "sha256").hexdigest(),
+        "unsignedSha256": sha256(unsigned),
         "navigator": {"pairRequired": False, "unchangedFrom": "2.9.8"},
         "physicalKx11Verification": "pending", "browserVisualVerification": "pending",
     }
