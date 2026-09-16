@@ -135,8 +135,9 @@ final class MapCursorStyler {
                 .newInstance(latitude, longitude);
         currentPlacemark = invoke(currentCollection, "addPlacemark",
                 new Class<?>[]{pointClass}, point);
-        placemark = currentPlacemark;
+        MapObjectLayerFactory.hideUntilTextured(currentPlacemark);
         applyIcon(currentPlacemark);
+        placemark = currentPlacemark;
         invoke(currentPlacemark, "setDirection", new Class<?>[]{float.class},
                 bearingDegrees);
         invoke(currentPlacemark, "setVisible", new Class<?>[]{boolean.class}, visible);

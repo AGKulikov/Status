@@ -23,8 +23,8 @@ jobs:
     timeout-minutes: 25
     env:
       # Compile the exact next pair identity; this workflow makes no installable artifact.
-      VERSION_NAME: '2.9.7'
-      VERSION_CODE: '208021330'
+      VERSION_NAME: '2.9.8'
+      VERSION_CODE: '208021331'
       ALLOW_UNSIGNED_RELEASE: 'true'
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5

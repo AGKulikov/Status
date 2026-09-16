@@ -147,6 +147,7 @@ public final class NavigationHudEndpointService extends Service {
         synchronized (SURFACE_LOCK) {
             revoked = publishedClusterSurface;
             publishedClusterSurface = null;
+            if (revoked != null) MapStartupDiagnostics.end(true, revoked.generation, "panel_disabled");
         }
         NavigationHudEndpointService current = instance;
         if (current == null) return;
@@ -247,6 +248,7 @@ public final class NavigationHudEndpointService extends Service {
             next = new SurfaceLease(surface, width, height, safeDpi,
                     ++nextSurfaceGeneration);
             publishedSurface = next;
+            MapStartupDiagnostics.begin(false, surface, next.generation, width, height, safeDpi);
         }
         NavigationHudEndpointService current = instance;
         if (current != null) {
@@ -264,6 +266,7 @@ public final class NavigationHudEndpointService extends Service {
             if (publishedSurface == null || publishedSurface.surface != surface) return;
             generation = publishedSurface.generation;
             publishedSurface = null;
+            MapStartupDiagnostics.end(false, generation, "surface_revoked");
         }
         NavigationHudEndpointService current = instance;
         if (current != null) {
@@ -293,6 +296,7 @@ public final class NavigationHudEndpointService extends Service {
             next = new SurfaceLease(surface, width, height, safeDpi,
                     ++nextSurfaceGeneration);
             publishedClusterSurface = next;
+            MapStartupDiagnostics.begin(true, surface, next.generation, width, height, safeDpi);
         }
         NavigationHudEndpointService current = instance;
         if (current != null) {
@@ -312,6 +316,7 @@ public final class NavigationHudEndpointService extends Service {
                     || publishedClusterSurface.surface != surface) return;
             generation = publishedClusterSurface.generation;
             publishedClusterSurface = null;
+            MapStartupDiagnostics.end(true, generation, "surface_revoked");
         }
         NavigationHudEndpointService current = instance;
         if (current != null) {
@@ -486,6 +491,7 @@ public final class NavigationHudEndpointService extends Service {
                     NavigationBridgeContract.KEY_ERROR_DETAIL, ""));
             lease.contentReady = ready;
             generation = lease.generation;
+            MapStartupDiagnostics.readiness(cluster, generation, ready);
         }
         DiagnosticJournal.info(cluster ? "cluster-map" : "hud-map",
                 "MapKit readiness accepted; generation=" + generation + ", ready=" + ready);
@@ -834,6 +840,8 @@ public final class NavigationHudEndpointService extends Service {
             recovered = new SurfaceLease(current.surface, current.width, current.height,
                     current.dpi, ++nextSurfaceGeneration);
             publishedClusterSurface = recovered;
+            MapStartupDiagnostics.begin(true, recovered.surface, recovered.generation,
+                    recovered.width, recovered.height, recovered.dpi);
         }
         int attempt = ++clusterSurfaceRecoveryAttempts;
         long delay = Math.min(4_000L,
@@ -887,7 +895,10 @@ public final class NavigationHudEndpointService extends Service {
         data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, lease.generation);
         boolean sent = send(current.messenger, NavigationBridgeContract.MSG_ATTACH_HUD_SURFACE, data);
         synchronized (SURFACE_LOCK) {
-            if (publishedSurface == lease && client == current) lease.dispatched = sent;
+            if (publishedSurface == lease && client == current) {
+                lease.dispatched = sent;
+                MapStartupDiagnostics.dispatch(false, lease.generation, sent);
+            }
         }
         DiagnosticJournal.info("hud-map",
                 "HUD surface lease IPC; sent=" + sent + ", generation=" + lease.generation
@@ -925,7 +936,10 @@ public final class NavigationHudEndpointService extends Service {
         data.putLong(NavigationBridgeContract.KEY_SURFACE_GENERATION, lease.generation);
         boolean sent = send(current.messenger, NavigationBridgeContract.MSG_ATTACH_CLUSTER_SURFACE, data);
         synchronized (SURFACE_LOCK) {
-            if (publishedClusterSurface == lease && client == current) lease.dispatched = sent;
+            if (publishedClusterSurface == lease && client == current) {
+                lease.dispatched = sent;
+                MapStartupDiagnostics.dispatch(true, lease.generation, sent);
+            }
         }
         DiagnosticJournal.info("cluster-map",
                 "instrument-cluster surface lease IPC; sent=" + sent + ", generation="
@@ -980,6 +994,7 @@ public final class NavigationHudEndpointService extends Service {
             if (publishedClusterSurface != null) publishedClusterSurface.contentReady = false;
             if (publishedSurface != null) publishedSurface.dispatched = false;
             if (publishedClusterSurface != null) publishedClusterSurface.dispatched = false;
+            MapStartupDiagnostics.bridgeLost();
         }
         if (current == null) return;
         NavigationSnapshotV2 direct = NavigationBridgeStateStore.snapshot();

@@ -234,6 +234,7 @@ final class LaneGuidanceMapLayer {
                 .newInstance(frame.latitude, frame.longitude);
         currentPlacemark = invoke(currentCollection, "addPlacemark",
                 new Class<?>[]{pointClass}, point);
+        MapObjectLayerFactory.hideUntilTextured(currentPlacemark);
         placemark = currentPlacemark;
         return currentPlacemark;
     }

@@ -71,6 +71,9 @@ public final class MediaButtonController {
                     if (route == MediaKeyPolicy.Route.IGNORE || !policy.admit(event.getKeyCode(),
                             event.getAction(), event.getRepeatCount(), event.getDownTime(), event.getEventTime(),
                             event.getDeviceId(), event.getScanCode(), event.getSource())) return;
+                    if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                        dezz.status.widget.launcher.MediaAutoResumeController.onManualTransportControl(context);
+                    }
                     if (route == MediaKeyPolicy.Route.AUDIO_MANAGER) {
                         AudioManager audio = context.getSystemService(AudioManager.class);
                         if (audio == null) throw new IllegalStateException("AudioManager unavailable");

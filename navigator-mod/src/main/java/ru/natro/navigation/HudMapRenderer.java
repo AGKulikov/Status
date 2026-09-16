@@ -125,6 +125,7 @@ final class HudMapRenderer {
         this.adaptiveFrameRate = adaptiveFrameRate;
         cursorStyler = new MapCursorStyler(this.context);
         overlayPlacement = new MapOverlayPlacementCoordinator();
+        overlayPlacement.setDiagnosticProfile(profileSection);
         trafficLightMapLayer = new TrafficLightMapLayer(this.context, overlayPlacement);
         routeTrafficLightMapLayer = new RouteTrafficLightMapLayer(
                 this.context, overlayPlacement);
@@ -384,6 +385,9 @@ final class HudMapRenderer {
 
     private void startRenderer() {
         if (surface == null || !surface.isValid() || mapWindow != null || !profile.enabled) return;
+        long startupStarted = android.os.SystemClock.elapsedRealtime();
+        String startupStage = "create_window";
+        traceStartup(startupStage, startupStarted);
         try {
             Class<?> factoryClass = Class.forName("com.yandex.mapkit.MapKitFactory");
             Object mapKit = factoryClass.getMethod("getInstance").invoke(null);
@@ -395,6 +399,8 @@ final class HudMapRenderer {
             Object nextMapWindow = invoke(nextOffscreen, "getMapWindow", new Class<?>[0]);
             mapWindow = nextMapWindow;
             map = invoke(nextMapWindow, "getMap", new Class<?>[0]);
+            startupStage = "configure_layers";
+            traceStartup(startupStage, startupStarted);
             reportMapReady(false);
             overlayPlacement.attach(nextMapWindow, width, height);
             overlayPlacement.updateRoute(activeRouteEpoch, activeRoute);
@@ -414,6 +420,8 @@ final class HudMapRenderer {
                     "createTrafficLayer");
 
             createRoadEventsLayer(mapKit, mapKitClass, mapWindowClass, nextMapWindow);
+            startupStage = "apply_profile";
+            traceStartup(startupStage, startupStarted);
             applyProfile();
             mapConfigured = true;
 
@@ -427,9 +435,12 @@ final class HudMapRenderer {
             Object nextRuntimeSurface = surfaceFactoryClass.getMethod(
                     "from", Surface.class).invoke(null, surface);
             runtimeSurface = nextRuntimeSurface;
+            startupStage = "add_surface";
+            traceStartup(startupStage, startupStarted);
             invoke(nextMapWindow, "addSurface",
                     new Class<?>[]{runtimeSurfaceClass}, nextRuntimeSurface);
             runtimeSurfaceAttached = true;
+            traceStartup("surface_attached", startupStarted);
             observeMapLoading();
             acknowledgeMapContent();
             Log.i(TAG, "Independent " + displayName
@@ -441,10 +452,24 @@ final class HudMapRenderer {
         } catch (Throwable failure) {
             long failedGeneration = generation;
             String detail = shortMessage(failure);
+            NavigationBridgeClient.reportDiagnostic("map-startup profile=" + profileSection
+                    + ", generation=" + failedGeneration + ", stage=failed, during=" + startupStage
+                    + ", elapsed_ms=" + (android.os.SystemClock.elapsedRealtime() - startupStarted)
+                    + ", reason=" + detail);
             Log.e(TAG, "Could not attach independent " + displayName + " MapWindow", failure);
             stopRenderer(false);
             reporter.onSurfaceLost(failedGeneration, detail);
         }
+    }
+
+    private void traceStartup(String stage, long started) {
+        long now = android.os.SystemClock.elapsedRealtime();
+        NavigationBridgeClient.reportDiagnostic("map-startup profile=" + profileSection
+                + ", generation=" + generation + ", stage=" + stage
+                + ", elapsed_ms=" + (now - started) + ", mono_ms=" + now
+                + ", size=" + width + "x" + height + ", roads_only=" + profile.roadsOnly
+                + ", night_requested=" + profile.nightMode + ", auto_night=" + profile.automaticDayNight
+                + ", configured=" + mapConfigured + ", surface_attached=" + runtimeSurfaceAttached);
     }
 
     /** Tile-completion telemetry must never be a prerequisite for attaching or showing a map. */
@@ -586,12 +611,16 @@ final class HudMapRenderer {
             invoke(currentMap, "setNightModeEnabled", new Class<?>[]{boolean.class}, night);
         } catch (Throwable failure) {
             Log.w(TAG, "Map night mode could not be applied", failure);
+            NavigationBridgeClient.reportDiagnostic("map-startup profile=" + profileSection
+                    + ", generation=" + generation + ", stage=night_mode_failed, reason=" + shortMessage(failure));
         }
         try {
             invoke(currentMap, "setTransparentBackgroundEnabled",
                     new Class<?>[]{boolean.class}, transparent);
         } catch (Throwable failure) {
             Log.w(TAG, "Map transparency could not be applied", failure);
+            NavigationBridgeClient.reportDiagnostic("map-startup profile=" + profileSection
+                    + ", generation=" + generation + ", stage=transparency_failed, reason=" + shortMessage(failure));
         }
     }
 
@@ -905,6 +934,7 @@ final class HudMapRenderer {
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         Object placemark = invoke(collection, "addPlacemark",
                 new Class<?>[]{pointClass}, point);
+        MapObjectLayerFactory.hideUntilTextured(placemark);
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
         Object style = destinationIconStyle;
         if (style == null) {
@@ -1234,9 +1264,8 @@ final class HudMapRenderer {
         routeTrafficLightMapLayer.relayout();
         laneGuidanceMapLayer.relayout();
         trafficLightMapLayer.relayout();
-        // Alternatives are optional context and are placed last. Their callouts first try every
-        // collision-free stock leg, then keep a stable least-conflicting leg so the stock-like
-        // route comparison is never silently lost.
+        // Alternatives are optional context and are placed last, preferably 300 m along their
+        // own distinct branch. Bounded nearer anchors preserve the required objects above.
         alternativeRouteMapLayer.relayout();
     }
 

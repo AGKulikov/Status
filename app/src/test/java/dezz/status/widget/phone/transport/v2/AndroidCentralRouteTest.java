@@ -12,6 +12,26 @@ import org.junit.Test;
 import java.util.UUID;
 
 public final class AndroidCentralRouteTest {
+    @Test public void unprovenOwnerEntersCooldownAndPresenceCannotBypassIt() {
+        AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(42L, 3L));
+        state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
+        long owner = state.activeOwnerId;
+        for (int i = 0; i < 16; i++) {
+            BleRouteTransition<AndroidCentralRoute.State> wait = AndroidCentralRoute.deadline(state, state.expected);
+            state = wait.state;
+            assertEquals(owner, state.activeOwnerId);
+            assertFalse(hasEffect(wait, BleRouteEffect.Type.CLOSE_GATT));
+            if (state.sameOwnerReassertions >= AndroidCentralRoute.MAX_FAST_UNPROVEN_REASSERTIONS) {
+                assertEquals(AndroidCentralRoute.UNPROVEN_OWNER_COOLDOWN_MS,
+                        firstEffect(wait, BleRouteEffect.Type.ARM_RETRY).delayMillis);
+                assertFalse(hasEffect(wait, BleRouteEffect.Type.START_SCAN));
+                assertFalse(AndroidCentralRoute.selectedPhonePresent(state).accepted);
+                assertFalse(AndroidCentralRoute.systemConnectionAdvertisement(state, state.expected).accepted);
+            }
+            state = AndroidCentralRoute.systemConnectionRecoveryElapsed(state, state.expected).state;
+        }
+        assertEquals(owner, state.activeOwnerId);
+    }
     private static final String BOND = "AA:BB:CC:DD:EE:FF";
     private static final String HELPER = "helper-installation-7";
 

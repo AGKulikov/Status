@@ -142,22 +142,34 @@ final class AlternativeRouteMapLayer {
             try {
                 PreparedText text = preparedText(marker);
                 List<MapOverlayPlacementCoordinator.Footprint> footprints = marker.footprints;
-                MapOverlayPlacementCoordinator.Placement next = placement.reserveIfClear(
-                        OWNER, marker.model.key,
-                        marker.model.latitude, marker.model.longitude,
-                        text.bodyWidth, text.bodyHeight, true,
-                        marker.model.routeSegmentIndex, marker.model.routeSegmentPosition,
-                        marker.placement, footprints);
+                MapOverlayPlacementCoordinator.Placement next = null;
+                AlternativeBranchAnchors.Anchor selected = null;
+                for (AlternativeBranchAnchors.Anchor candidate : marker.model.anchors) {
+                    next = placement.reserveIfClear(OWNER, marker.model.key,
+                            candidate.latitude, candidate.longitude,
+                            text.bodyWidth, text.bodyHeight, true,
+                            marker.model.routeSegmentIndex, marker.model.routeSegmentPosition,
+                            marker.placement, footprints);
+                    if (next != null) { selected = candidate; break; }
+                }
                 // Optional information must not displace a safety sign or cover the cursor.
                 // Keep the route line, and retry the balloon on the next camera/layout update.
                 if (next == null) {
                     hide(marker);
-                    reportPlacement(marker, "blocked");
+                    reportPlacement(marker, marker.model.anchors.isEmpty()
+                            ? "no_distinct_branch" : "blocked");
                     continue;
                 }
                 if (marker.placement == null || !marker.placement.sameSlot(next)
                         || marker.paletteVersion != StockAlternativePalette.version()) {
                     applyTexture(marker, text, next);
+                }
+                Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
+                if (marker.anchor != selected) {
+                    Object point = pointClass.getConstructor(double.class, double.class)
+                            .newInstance(selected.latitude, selected.longitude);
+                    invoke(marker.placemark, "setGeometry", new Class<?>[]{pointClass}, point);
+                    marker.anchor = selected;
                 }
                 invoke(marker.placemark, "setVisible",
                         new Class<?>[]{boolean.class}, true);
@@ -175,10 +187,14 @@ final class AlternativeRouteMapLayer {
     private void reportPlacement(Marker marker, String state) {
         String slot = marker.placement == null ? "none"
                 : marker.placement.legName + ':' + marker.placement.variant;
-        String reportKey = state + ':' + slot;
+        String reason = "blocked".equals(state) ? placement.lastOptionalFailure() : "none";
+        long anchorMeters = marker.anchor == null ? -1L : Math.round(marker.anchor.meters);
+        String reportKey = state + ':' + slot + ':' + anchorMeters + ':' + reason;
         if (reportKey.equals(marker.reportedState)) return;
         marker.reportedState = reportKey;
         NavigationBridgeClient.reportDiagnostic("alternative-callout state=" + state
+                + ", " + placement.diagnosticContext() + ", reason=" + reason
+                + ", anchorMeters=" + anchorMeters + ", candidates=" + marker.model.anchors.size()
                 + ", slot=" + slot + ", epoch=" + routeEpoch + ", size="
                 + (marker.preparedText == null ? "unknown" : marker.preparedText.bodyWidth
                 + "x" + marker.preparedText.bodyHeight));
@@ -333,8 +349,23 @@ final class AlternativeRouteMapLayer {
         if (progress.segmentIndex < 0) return null;
         StockAlternativeContent.Content content = stockContent.read(route, forkOnAlternative,
                 activeRoute, forkOnCurrent, nightMode);
+        RouteProgress alternativeProgress = routeProgress(forkOnAlternative, route);
+        List<AlternativeBranchAnchors.Anchor> anchors = AlternativeBranchAnchors.candidates(
+                coordinates(route), alternativeProgress.segmentIndex, alternativeProgress.segmentPosition,
+                coordinates(activeRoute), progress.segmentIndex, progress.segmentPosition);
         return new CalloutModel(key, latitude, longitude,
-                progress.segmentIndex, progress.segmentPosition, content);
+                progress.segmentIndex, progress.segmentPosition, content, anchors);
+    }
+
+    private static double[][] coordinates(Object route) throws Exception {
+        Object geometry = invoke(route, "getGeometry", new Class<?>[0]);
+        List<?> points = list(invoke(geometry, "getPoints", new Class<?>[0]));
+        double[][] result = new double[points.size()][2];
+        for (int i = 0; i < points.size(); i++) {
+            result[i][0] = number(invoke(points.get(i), "getLatitude", new Class<?>[0]));
+            result[i][1] = number(invoke(points.get(i), "getLongitude", new Class<?>[0]));
+        }
+        return result;
     }
 
     private static Object pointOrNull(Object position) {
@@ -754,6 +785,7 @@ final class AlternativeRouteMapLayer {
         final Object placemark;
         final CalloutModel model;
         MapOverlayPlacementCoordinator.Placement placement;
+        AlternativeBranchAnchors.Anchor anchor;
         long paletteVersion = Long.MIN_VALUE;
         long preparedPaletteVersion = Long.MIN_VALUE;
         PreparedText preparedText;
@@ -772,15 +804,18 @@ final class AlternativeRouteMapLayer {
         final int routeSegmentIndex;
         final double routeSegmentPosition;
         final StockAlternativeContent.Content content;
+        final List<AlternativeBranchAnchors.Anchor> anchors;
         CalloutModel(String key, double latitude, double longitude,
                      int routeSegmentIndex, double routeSegmentPosition,
-                     StockAlternativeContent.Content content) {
+                     StockAlternativeContent.Content content,
+                     List<AlternativeBranchAnchors.Anchor> anchors) {
             this.key = key;
             this.latitude = latitude;
             this.longitude = longitude;
             this.routeSegmentIndex = routeSegmentIndex;
             this.routeSegmentPosition = routeSegmentPosition;
             this.content = content;
+            this.anchors = anchors;
         }
     }
 

@@ -43,6 +43,8 @@ import com.yandex.runtime.image.ImageProvider;
 public class RoutePinsReplay {
  public static class Pin {
   ImageProvider image;Point point;float scale;List<?> function;
+  boolean visible=true;
+  public void setVisible(boolean value){if(value && image==null)throw new AssertionError("default pin exposed");visible=value;}
   public void setGeometry(Point p){point=p;}
   public void setIcon(ImageProvider image,IconStyle style){this.image=image;scale=style.scale;}
   public void setScaleFunction(List<?> f){function=f;}
@@ -84,7 +86,7 @@ public class RoutePinsReplay {
   MapObject map=new MapObject();RouteRoadEventMapLayer layer=new RouteRoadEventMapLayer("HUD");
   Stock stock=new Stock();layer.attach(map,stock);layer.configure(modes,true,false,false,150,125,20);
   for(String tag:tags){layer.render(events(tag));check(map.collection.pins.size()==80);
-   for(Pin p:map.collection.pins){check(p.image.tag.equals(tag));check(p.point!=null);check(p.function.size()==2);}}
+   for(Pin p:map.collection.pins){check(p.visible);check(p.image.tag.equals(tag));check(p.point!=null);check(p.function.size()==2);}}
   layer.configure(modes,false,false,false,150,125,20);check(map.collection.pins.isEmpty());
  }
  static void profilesAndMixedTagsStayIndependent() throws Exception {

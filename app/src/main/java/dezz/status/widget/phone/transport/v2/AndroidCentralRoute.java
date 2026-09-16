@@ -33,6 +33,9 @@ public final class AndroidCentralRoute {
     public static final long WAIT_SYSTEM_RECOVERY_MS = 180_000L;
     /** Enrolled Route A must recover during one ignition cycle, not after multi-minute silence. */
     public static final long ENROLLED_WAIT_SYSTEM_RECOVERY_MS = 5_000L;
+    /** A silent/unproven owner cannot be closed safely. Stop the fast loop, retain callbacks. */
+    public static final int MAX_FAST_UNPROVEN_REASSERTIONS = 6;
+    public static final long UNPROVEN_OWNER_COOLDOWN_MS = 180_000L;
     /** A registered Android-P wrapper is retried without allocating another clientIf. */
     public static final long REGISTERED_ERROR_RECOVERY_MS = 5_000L;
     public static final int MAX_ATTEMPTS_PER_EPOCH = 6;
@@ -718,12 +721,13 @@ public final class AndroidCentralRoute {
             if (recovery == null) return counterExhausted(state, token, "operation");
             State blocked = copy(state, Phase.WAIT_SYSTEM_CONNECTION, recovery, token.ownerId,
                     state.nextOwnerId, state.consecutiveFailures,
-                    "sole background owner retained; autonomous same-owner recovery armed");
+                    "sole background owner retained; bounded recovery with cooldown");
             List<BleRouteEffect> effects = new ArrayList<>();
             effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
                     "connect watchdog"));
             effects.add(op(BleRouteEffect.Type.REPORT_ERROR, token,
-                    "OWNER_UNPROVABLE: no second wrapper; periodic recovery remains armed"));
+                    "OWNER_UNPROVABLE: no second wrapper; retryAfterMs="
+                            + waitSystemRecoveryMillis(state)));
             if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
                     && state.sameOwnerReassertions <= SAME_OWNER_REASSERT_MS.length) {
                 effects.add(op(BleRouteEffect.Type.START_SCAN, recovery,
@@ -794,6 +798,9 @@ public final class AndroidCentralRoute {
     }
 
     private static long waitSystemRecoveryMillis(State state) {
+        if (state.sameOwnerReassertions >= MAX_FAST_UNPROVEN_REASSERTIONS) {
+            return UNPROVEN_OWNER_COOLDOWN_MS;
+        }
         return state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
                 ? ENROLLED_WAIT_SYSTEM_RECOVERY_MS : WAIT_SYSTEM_RECOVERY_MS;
     }
@@ -802,7 +809,8 @@ public final class AndroidCentralRoute {
     public static BleRouteTransition<State> systemConnectionAdvertisement(
             State state, BleRouteToken token) {
         if (!expects(state, Phase.WAIT_SYSTEM_CONNECTION, token)
-                || state.acquisitionMode != IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+                || state.acquisitionMode != IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                || state.sameOwnerReassertions >= MAX_FAST_UNPROVEN_REASSERTIONS) {
             return BleRouteTransition.ignored(state);
         }
         BleRouteToken reconnect = nextOperation(token);
@@ -834,6 +842,7 @@ public final class AndroidCentralRoute {
      */
     public static BleRouteTransition<State> selectedPhonePresent(State state) {
         if (state == null || state.expected == null
+                || state.sameOwnerReassertions >= MAX_FAST_UNPROVEN_REASSERTIONS
                 || (state.phase != Phase.CONNECTING
                 && state.phase != Phase.WAIT_REASSERT
                 && state.phase != Phase.WAIT_SYSTEM_CONNECTION)) {

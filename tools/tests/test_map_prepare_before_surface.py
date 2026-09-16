@@ -19,6 +19,7 @@ class MapPrepareBeforeSurfaceTests(unittest.TestCase):
         cls.path = Path(cls.temp.name)
         renderer = (ROOT / "navigator-mod/src/main/java/ru/natro/navigation/HudMapRenderer.java").read_text()
         sources = {
+            "android/os/SystemClock.java": "package android.os; public class SystemClock { public static long elapsedRealtime(){return 1000;} }",
             "android/view/Surface.java": "package android.view; public class Surface { public boolean valid=true; public boolean isValid(){return valid;} }",
             "com/yandex/runtime/view/Surface.java": "package com.yandex.runtime.view; public class Surface {}",
             "com/yandex/runtime/view/SurfaceFactory.java": "package com.yandex.runtime.view; public class SurfaceFactory { public static Surface from(android.view.Surface s){return new Surface();} }",
@@ -45,7 +46,7 @@ class MapPrepareBeforeSurfaceTests(unittest.TestCase):
                 }""",
             "Replay.java": r'''import android.view.Surface;
 public class Replay {
- static class Profile { boolean enabled=true,nightMode,roadsOnly; }
+ static class Profile { boolean enabled=true,nightMode,roadsOnly,automaticDayNight; }
  static class Layer {
   void attach(Object o){} void attach(Object o,int w,int h){} void updateRoute(long e,Object r){}
  }
@@ -55,7 +56,7 @@ public class Replay {
  Surface surface=new Surface(); Profile profile=new Profile(); Reporter reporter=new Reporter();
  int width=800,height=480;long generation=1,activeRouteEpoch=1;
  Object mapWindow,map,offscreenMapWindow,runtimeSurface,trafficLayer,activeRoute;
- boolean runtimeSurfaceAttached,mapConfigured;String TAG="test",displayName="cluster";
+ boolean runtimeSurfaceAttached,mapConfigured;String TAG="test",displayName="cluster",profileSection="clusterMap";
  Layer overlayPlacement=new Layer(),trafficLightMapLayer=new Layer(),routeTrafficLightMapLayer=new Layer(),
   cameraDirectionMapLayer=new Layer(),speedBumpMapLayer=new Layer(),laneGuidanceMapLayer=new Layer(),
   alternativeRouteMapLayer=new Layer(),cursorStyler=new Layer();
@@ -70,6 +71,7 @@ public class Replay {
   return o.getClass().getMethod(n,types).invoke(o,args);
  }
  START_METHOD
+ TRACE_METHOD
  BACKGROUND_METHOD
  static void check(boolean b,String message){if(!b)throw new AssertionError(message);}
  public static void main(String[] args){
@@ -93,6 +95,7 @@ public class Replay {
   }
  }
 }'''.replace("START_METHOD", method(renderer, "private void startRenderer()"))
+                .replace("TRACE_METHOD", method(renderer, "private void traceStartup("))
                 .replace("BACKGROUND_METHOD", method(renderer, "private void applyMapBackground(")),
         }
         files = []

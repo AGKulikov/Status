@@ -531,9 +531,10 @@ public final class MediaPanelView extends FrameLayout {
         }
         if (timeline != null) {
             setTextIfChanged(timeline, MediaTimeline.format(positionMs) + " / "
-                    + MediaTimeline.format(durationMs));
+                    + (durationMs > 0L ? MediaTimeline.format(durationMs) : "—"));
         }
         if (progress != null) {
+            progress.setEnabled(controls != null && layoutEditor == null && durationMs > 0L);
             int nextProgress = MediaTimeline.progress(positionMs, durationMs, 1_000);
             if (!progress.isPressed() && progress.getProgress() != nextProgress) {
                 progress.setProgress(nextProgress);
@@ -541,7 +542,7 @@ public final class MediaPanelView extends FrameLayout {
             View progressRoot = elementViews.get(MediaPanelConfig.PROGRESS);
             if (progressRoot != null) {
                 setVisibilityIfChanged(progressRoot,
-                        globalEditPreview || durationMs > 0L
+                        globalEditPreview || durationMs > 0L || positionMs > 0L
                                 ? View.VISIBLE : View.GONE);
             }
         }

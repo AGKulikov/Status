@@ -611,6 +611,7 @@ public final class LauncherMediaController {
 
     public void playPause() {
         if (shared != null) { shared.engine.playPause(); return; }
+        MediaAutoResumeController.onManualTransportControl(context);
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
         if (!dispatchCurrentPlayPause(target)) {
@@ -654,6 +655,7 @@ public final class LauncherMediaController {
 
     public void previous() {
         if (shared != null) { shared.engine.previous(); return; }
+        MediaAutoResumeController.onManualTransportControl(context);
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
         if (!dispatchCurrentSkip(target, false)) {
@@ -664,6 +666,7 @@ public final class LauncherMediaController {
 
     public void next() {
         if (shared != null) { shared.engine.next(); return; }
+        MediaAutoResumeController.onManualTransportControl(context);
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
         if (!dispatchCurrentSkip(target, true)) {
@@ -1525,11 +1528,16 @@ public final class LauncherMediaController {
         } catch (RejectedExecutionException busy) { sessionReadInFlight = false; publish(); }
     }
 
+    private android.media.session.MediaSession.Token timelineOwner;
+    private String timelineMediaId = "";
+
     private void acceptSession(MediaController controller, MediaMetadata metadata, PlaybackState playback) {
         long observedElapsed = SystemClock.elapsedRealtime();
         lastSessionRefreshElapsedMs = observedElapsed;
         if (controller == null) {
             sessionState = null;
+            timelineOwner = null;
+            timelineMediaId = "";
             publish();
             return;
         }
@@ -1564,6 +1572,14 @@ public final class LauncherMediaController {
                     heartValue(metadata.getRating(MediaMetadata.METADATA_KEY_USER_RATING)));
             long receivedElapsed = observedElapsed;
             MediaState previous = sessionState;
+            String mediaId = metadata == null ? "" : cleanText(
+                    metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID));
+            boolean sameTimeline = previous != null && MediaTimelineIdentity.mayRetainDuration(
+                    controller.getSessionToken().equals(timelineOwner), timelineMediaId, mediaId,
+                    previous.title, previous.artist, title, artist);
+            if (duration <= 0L && sameTimeline) duration = previous.durationMs;
+            timelineOwner = controller.getSessionToken();
+            timelineMediaId = sameTimeline && mediaId.isEmpty() ? timelineMediaId : mediaId;
             boolean contentChanged = previous == null || !MediaStateFreshness.sameContent(
                     previous.packageName, previous.title, previous.artist, previous.album,
                     previous.durationMs, packageName, title, artist, album, duration);
@@ -1892,8 +1908,8 @@ public final class LauncherMediaController {
         String title = live.title.isEmpty() && samePlayer ? session.title : live.title;
         if (title.isEmpty()) return false;
         String artist = live.artist.isEmpty() && samePlayer ? session.artist : live.artist;
-        boolean sameTrack = samePlayer && MediaStateFreshness.sameTrackMetadata(live.trackTitle, live.trackArtist,
-                live.album, session.title, session.artist, session.album);
+        boolean sameTrack = samePlayer && MediaTimelineIdentity.matches(
+                live.trackTitle, live.trackArtist, session.title, session.artist);
         long duration = sameTrack ? session.durationMs : 0L;
         long position = sameTrack ? session.currentPosition(System.currentTimeMillis()) : 0L;
         boolean playing = samePlayer && session.playing;

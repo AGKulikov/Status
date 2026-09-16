@@ -19,6 +19,7 @@ import androidx.annotation.Nullable;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.navigation.MapEdgeFade;
+import dezz.status.widget.navigation.MapStartupDiagnostics;
 
 /**
  * One HUD view tree: a producer-owned map Surface below Natro's independently placed widgets.
@@ -110,6 +111,17 @@ final class HudCompositeView extends FrameLayout
         super.onDetachedFromWindow();
     }
 
+    @Override protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        tracePresentation();
+    }
+
+    private void tracePresentation() {
+        if (mapTexture == null || leasedSurface == null) return;
+        MapStartupDiagnostics.presentation(false, leasedSurface, mapTexture.getAlpha(),
+                mapTexture.getVisibility(), getWindowVisibility(), isAttachedToWindow(), mapTexture.isOpaque());
+    }
+
     private void reconcileMapElement() {
         boolean wasAbsent = activeMap == null;
         activeMap = HudDirectMapGeometry.find(config);
@@ -135,6 +147,7 @@ final class HudCompositeView extends FrameLayout
         mapTexture.setClipToOutline(radius > 0);
         invalidate();
         applyMapGeometry();
+        tracePresentation();
     }
 
     private void applyMapGeometry() {
@@ -171,6 +184,8 @@ final class HudCompositeView extends FrameLayout
     @Override
     public void onSurfaceTextureAvailable(@NonNull SurfaceTexture texture,
                                           int width, int height) {
+        DiagnosticJournal.infoAsync("map-startup", "profile=hud, stage=texture_available, size="
+                + width + "x" + height + ", texture_id=" + System.identityHashCode(texture));
         beginFirstFrameGate();
         publishSurface(texture, width, height);
         mapTexture.post(this::publishLaidOutSurface);
@@ -184,6 +199,8 @@ final class HudCompositeView extends FrameLayout
 
     @Override
     public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture texture) {
+        DiagnosticJournal.infoAsync("map-startup", "profile=hud, stage=texture_destroyed, texture_id="
+                + System.identityHashCode(texture));
         revokeSurface();
         beginFirstFrameGate();
         return true;
@@ -191,6 +208,8 @@ final class HudCompositeView extends FrameLayout
 
     @Override
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture texture) {
+        if (leasedTexture == texture && leasedSurface != null)
+            MapStartupDiagnostics.frame(false, leasedSurface, texture.getTimestamp());
         // Recovery: a current surface update must be enough to show the map. Full tile loading
         // and bitmap heuristics can remain pending forever; neither may block presentation.
         if (awaitingFirstMapFrame && leasedTexture == texture && activeMap != null
@@ -199,6 +218,7 @@ final class HudCompositeView extends FrameLayout
             if (sentGeneration < 0L) return;
             awaitingFirstMapFrame = false;
             mapTexture.setAlpha(desiredMapAlpha);
+            tracePresentation();
             DiagnosticJournal.infoAsync("hud-map", "HUD surface updated; map shown, opacity="
                     + desiredMapAlpha + ", first_update_wait_ms="
                     + (android.os.SystemClock.uptimeMillis() - firstFrameWaitStarted)
@@ -234,6 +254,7 @@ final class HudCompositeView extends FrameLayout
             if (generation >= 0L) {
                 leasedWidth = width;
                 leasedHeight = height;
+                tracePresentation();
             }
             return;
         }
@@ -253,6 +274,7 @@ final class HudCompositeView extends FrameLayout
         leasedTexture = texture;
         leasedWidth = width;
         leasedHeight = height;
+        tracePresentation();
         if (previous != null) {
             NavigationHudEndpointService.revokeHudSurface(previous);
             try { previous.release(); } catch (RuntimeException ignored) {}

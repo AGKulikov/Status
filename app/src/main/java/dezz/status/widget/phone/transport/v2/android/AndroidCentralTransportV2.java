@@ -22,6 +22,7 @@ import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.HandlerThread;
 import android.os.Build;
 import android.os.ParcelUuid;
 import android.os.SystemClock;
@@ -89,12 +90,22 @@ import java.security.SecureRandom;
  * Android framework adapter for Route A (Helper Peripheral / Android Central).
  *
  * <p>All public calls, framework callbacks, reducer inputs, GATT operations, and listener calls
- * are serialized on the main looper.  There is at most one {@link BluetoothGatt} wrapper.  A
+ * are serialized on a process-wide Route-A worker looper. Listener adapters marshal into the
+ * runtime's own scheduler; blocking Android-P GATT/scan IPC never runs on the UI looper.
+ * There is at most one {@link BluetoothGatt} wrapper. A
  * silent asynchronous client registration is retained while it is unprovable. Once a positive
  * clientIf proves registration, that exact wrapper may be retired behind a bounded process-wide
  * settle fence; this adapter never creates a second simultaneous wrapper.</p>
  */
 public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 {
+    private static final class RouteWorker {
+        static final HandlerThread THREAD = create();
+        private static HandlerThread create() {
+            HandlerThread thread = new HandlerThread("NatroAncsRouteA");
+            thread.start();
+            return thread;
+        }
+    }
     private static final long CONTROL_RETRY_DELAY_MS = 150L;
     private static final long IDENTITY_COMMIT_TIMEOUT_MS = 5_000L;
     private static final long BATTERY_PROBE_RETRY_MS = 500L;
@@ -406,7 +417,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         this.context = Objects.requireNonNull(context, "context").getApplicationContext();
         this.preferences = Objects.requireNonNull(preferences, "preferences");
         this.bondAttribution = Objects.requireNonNull(bondAttribution, "bondAttribution");
-        this.main = new Handler(Looper.getMainLooper());
+        // Shared across adapter replacements: no leaked looper per reconnect/epoch.
+        this.main = new Handler(RouteWorker.THREAD.getLooper());
         this.manager =
                 (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
         this.adapter = manager == null ? null : manager.getAdapter();
@@ -2929,8 +2941,8 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void assertMain() {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            throw new IllegalStateException("Route-A adapter must run on main FIFO");
+        if (Looper.myLooper() != main.getLooper()) {
+            throw new IllegalStateException("Route-A adapter must run on its worker FIFO");
         }
     }
 

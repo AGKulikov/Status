@@ -69,6 +69,7 @@ final class RouteRoadEventMapLayer implements RoadEventRouteSynchronizer.Sink {
                 Style style = stockStyle(tags);
                 if (style.image == null) { unavailable++; continue; }
                 Object placemark = invoke(collection, "addPlacemark", new Class<?>[0]);
+                MapObjectLayerFactory.hideUntilTextured(placemark);
                 invoke(placemark, "setGeometry", new Class<?>[]{Class.forName(
                         "com.yandex.mapkit.geometry.Point")}, event.point);
                 Class<?> iconClass = Class.forName("com.yandex.mapkit.map.IconStyle");
@@ -86,6 +87,7 @@ final class RouteRoadEventMapLayer implements RoadEventRouteSynchronizer.Sink {
                 if (!style.zoomFunction.isEmpty()) {
                     invoke(placemark, "setScaleFunction", new Class<?>[]{List.class}, style.zoomFunction);
                 }
+                invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
                 submitted++;
                 for (Object tag : tags) {
                     String name = String.valueOf(tag);

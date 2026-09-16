@@ -73,6 +73,12 @@ final class MapOverlayPlacementCoordinator {
     private double vehicleLongitude = Double.NaN;
     private int cursorFootprintPx;
     private float[][] projectedRoutePoints;
+    private String diagnosticProfile = "unknown";
+    private String optionalFailure = "none";
+
+    void setDiagnosticProfile(String profile) { diagnosticProfile = profile; }
+    String diagnosticContext() { return "profile=" + diagnosticProfile + ", viewport=" + viewportWidth + "x" + viewportHeight; }
+    String lastOptionalFailure() { return optionalFailure; }
 
     void attach(Object nextMapWindow, int width, int height) {
         mapWindow = nextMapWindow;
@@ -244,7 +250,12 @@ final class MapOverlayPlacementCoordinator {
                              int routeSegmentIndex, double routeSegmentPosition,
                              Placement previous, List<Footprint> footprints) {
         float[] screen = projectOrNull(latitude, longitude);
+        optionalFailure = "projection";
         if (screen == null) return null;
+        optionalFailure = "anchor_outside_viewport";
+        if (screen[0] < 0f || screen[1] < 0f || screen[0] >= viewportWidth || screen[1] >= viewportHeight) return null;
+        int clipped = 0, occupiedCount = 0;
+        String blockingOwner = "none";
         int safeWidth = Math.max(1, bitmapWidth);
         int safeHeight = Math.max(1, bitmapHeight);
         Candidate best = null;
@@ -262,7 +273,11 @@ final class MapOverlayPlacementCoordinator {
             for (Footprint footprint : measured) {
                 RectF bounds = rect(screen[0], screen[1], safeWidth, safeHeight, candidate, footprint);
                 RectF body = footprint == null ? bounds : footprint.collisionBounds(bounds);
-                if (!insideSafeViewport(bounds) || overlapsReservation(body)) continue;
+                // Transparent padding and a thin leader may touch an edge; the opaque body
+                // must fit, and its real geographic anchor must remain visible (checked above).
+                if (!insideSafeViewport(body)) { clipped++; continue; }
+                String obstacle = overlappingOwner(body);
+                if (obstacle != null) { occupiedCount++; blockingOwner = obstacle; continue; }
                 int variant = footprint == null ? 0 : footprint.variant;
                 double score = score(body, candidate, index, previous, screen,
                         latitude, longitude, routeSegmentIndex, routeSegmentPosition);
@@ -274,7 +289,11 @@ final class MapOverlayPlacementCoordinator {
                 }
             }
         }
-        if (best == null || bestRect == null) return null;
+        if (best == null || bestRect == null) {
+            optionalFailure = "body_clipped:" + clipped + ";occupied:" + occupiedCount + ";owner:" + blockingOwner;
+            return null;
+        }
+        optionalFailure = "none";
         RectF occupied = new RectF(bestRect);
         occupied.inset(-ITEM_MARGIN_PX, -ITEM_MARGIN_PX);
         reservations.add(new Reservation(owner, key, occupied));
@@ -586,10 +605,14 @@ final class MapOverlayPlacementCoordinator {
     }
 
     private boolean overlapsReservation(RectF bounds) {
+        return overlappingOwner(bounds) != null;
+    }
+
+    private String overlappingOwner(RectF bounds) {
         for (Reservation reservation : reservations) {
-            if (overlapArea(bounds, reservation.bounds) > 0d) return true;
+            if (overlapArea(bounds, reservation.bounds) > 0d) return reservation.owner;
         }
-        return false;
+        return null;
     }
 
     private static RectF rect(float x, float y, int width, int height, Candidate candidate) {

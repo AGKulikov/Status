@@ -44,6 +44,7 @@ class ClusterColdLeaseTest(unittest.TestCase):
  static class Resources {Metrics getDisplayMetrics(){return new Metrics();}}
  static class Metrics {int densityDpi=160;}
  static class DiagnosticJournal {static void infoAsync(String a,String b){}}
+ static class MapStartupDiagnostics {static void frame(boolean c,Surface s,long t){}}
  static class NavigationHudEndpointService {
   static int publications,revocations;static Surface live;static boolean accept=true;
   static void ensureClusterEndpointStarted(Object c){}
@@ -62,6 +63,7 @@ class ClusterColdLeaseTest(unittest.TestCase):
   final Runnable coldLeaseRetry=this::retryColdLease;
   void postDelayed(Runnable r,long delay){posts++;}void removeCallbacks(Runnable r){}
   void requestLayout(){requests++;}void invalidate(){invalidates++;}
+  void tracePresentation(){}
   void logColdWait(String reason){}Object getContext(){return this;}Resources getResources(){return new Resources();}
   int getWidth(){return 1000;}int getHeight(){return 500;}
   InstrumentElementConfig firstMap(){return new InstrumentElementConfig();}

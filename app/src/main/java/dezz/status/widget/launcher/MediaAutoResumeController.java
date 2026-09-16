@@ -96,6 +96,44 @@ public final class MediaAutoResumeController {
     private static final Object EXECUTION_LOCK = new Object();
     private static final Object TIMER_LOCK = new Object();
     private static ScheduledFuture<?> inProcessTimer;
+    private static final java.util.concurrent.atomic.AtomicLong MANUAL_GENERATION =
+            new java.util.concurrent.atomic.AtomicLong();
+    private static volatile long captureManualGeneration;
+
+    /** User transport controls revoke queued boot PLAY, including a late browser callback. */
+    public static void onManualTransportControl(@NonNull Context context) {
+        long manual = MANUAL_GENERATION.incrementAndGet();
+        Context app = applicationContext(context);
+        long capture = state(app).getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE);
+        EXACT_TIMER.execute(() -> {
+            if (manual == MANUAL_GENERATION.get() && captureManualGeneration != manual
+                    && state(app).getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) == capture
+                    && !state(app).getBoolean(KEY_COMPLETED, true)) complete(app, "manual_transport_control");
+        });
+    }
+
+    static java.util.function.BooleanSupplier browserPlayPermit(Context context, boolean boot) {
+        Context app = applicationContext(context);
+        long manual = MANUAL_GENERATION.get();
+        long capture = state(app).getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE);
+        return () -> manual == MANUAL_GENERATION.get() && (!boot
+                || (captureManualGeneration == manual
+                && state(app).getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) == capture
+                && !state(app).getBoolean(KEY_COMPLETED, true)
+                && !state(app).getBoolean(KEY_YANDEX_SESSION_PLAY_ATTEMPTED, false)
+                && new Preferences(app).launcherMediaAutoResumeEnabled.get()));
+    }
+
+    static MediaResumeCommand.DispatchTrace guardedBrowserDispatch(Context context,
+            java.util.function.BooleanSupplier permit,
+            java.util.function.Supplier<MediaResumeCommand.DispatchTrace> dispatch) {
+        synchronized (EXECUTION_LOCK) {
+            if (!permit.getAsBoolean()) return null;
+            MediaResumeCommand.DispatchTrace trace = dispatch.get();
+            onYandexBrowserSessionDispatch(context, trace.result);
+            return trace;
+        }
+    }
 
     private MediaAutoResumeController() {}
 
@@ -142,6 +180,7 @@ public final class MediaAutoResumeController {
 
         MediaPlaybackHistoryStore.Snapshot history = MediaPlaybackHistoryStore.read(app);
         long captureToken = previousToken == Long.MAX_VALUE ? 1L : previousToken + 1L;
+        captureManualGeneration = MANUAL_GENERATION.get();
         state.edit()
                 .putLong(KEY_CAPTURE_TOKEN, captureToken)
                 .putLong(KEY_CAPTURE_ELAPSED, now)
@@ -310,7 +349,8 @@ public final class MediaAutoResumeController {
         long plannedBootToken = state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE);
         long captureToken = state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE);
         int plannedAttempt = state.getInt(KEY_NEXT_ATTEMPT, -1);
-        if (completed || plannedBootToken != bootToken || captureToken != bootToken
+        if (completed || captureManualGeneration != MANUAL_GENERATION.get()
+                || plannedBootToken != bootToken || captureToken != bootToken
                 || plannedAttempt != attempt) {
             PhoneConnectionJournal.append("media-auto-resume",
                     "trace event=attempt_rejected, token=" + bootToken

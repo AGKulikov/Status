@@ -27,17 +27,20 @@ public final class WidgetServiceWatchdogReceiver extends BroadcastReceiver {
         } catch (RuntimeException failure) {
             // Keep one delayed check alive after a transient device-protected-storage failure.
             Log.e(TAG, "Could not read integration-host preferences", failure);
-            WidgetServiceWatchdog.arm(app);
+            PendingResult pending = goAsync();
+            WidgetServiceWatchdog.arm(app).whenComplete((value, error) -> pending.finish());
             return;
         }
         if (!required) {
-            WidgetServiceWatchdog.cancel(app);
+            PendingResult pending = goAsync();
+            WidgetServiceWatchdog.cancel(app).whenComplete((value, error) -> pending.finish());
             return;
         }
 
         // Rearm before starting: a transient OEM foreground-service rejection cannot make this
         // the final recovery attempt.
-        WidgetServiceWatchdog.arm(app);
+        PendingResult pending = goAsync();
+        WidgetServiceWatchdog.arm(app).whenComplete((value, error) -> pending.finish());
         if (WidgetService.isRunning()) return;
 
         PhoneConnectionJournal.initialize(app);

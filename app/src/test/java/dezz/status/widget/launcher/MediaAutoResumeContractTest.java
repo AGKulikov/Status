@@ -60,7 +60,8 @@ public final class MediaAutoResumeContractTest {
                 "new Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(target)"));
         assertTrue(command.contains("KeyEvent.KEYCODE_MEDIA_PLAY"));
         assertTrue(command.contains("YANDEX_PLAY_KEY_UP_DELAY_MS = 100L"));
-        assertTrue(command.contains("YandexMusicBrowserStarter.requestPlay(context)"));
+        assertTrue(command.contains("YandexMusicBrowserStarter.requestGuardedPlay(context,"));
+        assertTrue(command.contains("MediaAutoResumeController.browserPlayPermit(context, boot)"));
         assertTrue(command.contains("Intent.FLAG_INCLUDE_STOPPED_PACKAGES"));
         assertFalse(command.contains("KEYCODE_MEDIA_PLAY_PAUSE"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));

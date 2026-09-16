@@ -156,6 +156,7 @@ public final class DiagnosticJournal {
             }
         }
         SteeringKeyDiagnostics.debugChanged(initiallyEnabled);
+        dezz.status.widget.navigation.MapStartupDiagnostics.journalChanged(initiallyEnabled);
     }
 
     public static void setEnabled(@NonNull Context context, boolean value) {
@@ -171,6 +172,7 @@ public final class DiagnosticJournal {
             }
         }
         SteeringKeyDiagnostics.debugChanged(value);
+        dezz.status.widget.navigation.MapStartupDiagnostics.journalChanged(value);
     }
 
     public static boolean isEnabled() {

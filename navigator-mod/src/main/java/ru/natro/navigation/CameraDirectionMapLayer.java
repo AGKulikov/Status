@@ -507,6 +507,7 @@ final class CameraDirectionMapLayer {
         Object point = pointClass.getConstructor(double.class, double.class)
                 .newInstance(camera.latitude, camera.longitude);
         Object placemark = invoke(target, "addPlacemark", new Class<?>[]{pointClass}, point);
+        MapObjectLayerFactory.hideUntilTextured(placemark);
         int displayDiameter = cameraDisplayDiameter();
         int textureDiameter = Math.max(displayDiameter, MIN_CAMERA_TEXTURE_DIAMETER_PX);
         float textureScale = displayDiameter / (float) textureDiameter;

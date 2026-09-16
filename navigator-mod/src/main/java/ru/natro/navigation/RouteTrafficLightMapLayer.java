@@ -224,6 +224,7 @@ final class RouteTrafficLightMapLayer {
                         .newInstance(light.latitude, light.longitude);
                 Object placemark = invoke(currentCollection, "addPlacemark",
                         new Class<?>[]{pointClass}, point);
+                MapObjectLayerFactory.hideUntilTextured(placemark);
                 Object style = styleClass.getConstructor().newInstance();
                 invoke(style, "setAnchor", new Class<?>[]{PointF.class},
                         new PointF(PIN_ANCHOR_X, PIN_ANCHOR_Y));

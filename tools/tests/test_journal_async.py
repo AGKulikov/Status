@@ -24,6 +24,8 @@ STUBS = {
       public static String getAppVersionName(android.content.Context c){return "test";} }""",
     "dezz/status/widget/diagnostics/SteeringKeyDiagnostics.java": """package dezz.status.widget.diagnostics;
       public class SteeringKeyDiagnostics {public static void debugChanged(boolean b){} }""",
+    "dezz/status/widget/navigation/MapStartupDiagnostics.java": """package dezz.status.widget.navigation;
+      public class MapStartupDiagnostics {public static void journalChanged(boolean b){} }""",
     "dezz/status/widget/diagnostics/JournalReplay.java": r"""package dezz.status.widget.diagnostics;
       import java.io.*; import java.lang.reflect.*; import java.nio.file.*;
       import java.util.concurrent.*; import java.util.concurrent.atomic.*;

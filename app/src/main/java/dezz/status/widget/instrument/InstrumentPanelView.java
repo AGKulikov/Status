@@ -19,6 +19,7 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.navigation.NavigationHudEndpointService;
 import dezz.status.widget.navigation.NavigationIntegrationConfig;
+import dezz.status.widget.navigation.MapStartupDiagnostics;
 
 /**
  * Native-size instrument composition. Navigator renders only into the map element's real pixel
@@ -133,6 +134,7 @@ public final class InstrumentPanelView extends FrameLayout
             mapView.setAlpha(desiredMapAlpha);
         }
         mapView.invalidate();
+        tracePresentation();
     }
 
     public void updateConfig(@NonNull InstrumentPanelConfig value) {
@@ -165,6 +167,7 @@ public final class InstrumentPanelView extends FrameLayout
         invalidate();
         coldLeaseRetryCount = 0;
         mapView.post(this::publishLeaseIfReady);
+        tracePresentation();
     }
 
     @Override protected void onAttachedToWindow() {
@@ -187,6 +190,7 @@ public final class InstrumentPanelView extends FrameLayout
     @Override protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
         windowVisible = visibility == VISIBLE;
+        tracePresentation();
         if (windowVisible) replaceLeaseIfReady();
         // Window visibility on the KX11 briefly changes for system overlays and DIM transitions.
         // Keep the producer lease until the View/Surface is actually detached or destroyed so a
@@ -196,6 +200,8 @@ public final class InstrumentPanelView extends FrameLayout
     @Override public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surfaceTexture,
                                                     int width, int height) {
         if (mapTexture == null || mapTexture.getSurfaceTexture() != surfaceTexture) return;
+        DiagnosticJournal.infoAsync("map-startup", "profile=cluster, stage=texture_available, size="
+                + width + "x" + height + ", texture_id=" + System.identityHashCode(surfaceTexture));
         // Recovery can already have published this exact TextureView surface before Android's
         // delayed callback. Releasing it here would strand a lease pointing at a dead Surface.
         if (ownedTexture == surfaceTexture && mapSurface != null && mapSurface.isValid()) {
@@ -220,6 +226,8 @@ public final class InstrumentPanelView extends FrameLayout
 
     @Override public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surfaceTexture) {
         if (ownedTexture != null && surfaceTexture != ownedTexture) return true;
+        DiagnosticJournal.infoAsync("map-startup", "profile=cluster, stage=texture_destroyed, texture_id="
+                + System.identityHashCode(surfaceTexture));
         removeCallbacks(coldLeaseRetry);
         revokeLease();
         releaseOwnedSurface();
@@ -228,6 +236,8 @@ public final class InstrumentPanelView extends FrameLayout
     }
 
     @Override public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surfaceTexture) {
+        if (surfaceTexture == ownedTexture && mapSurface != null)
+            MapStartupDiagnostics.frame(true, mapSurface, surfaceTexture.getTimestamp());
         // Full tile loading is optional: cached and partially loaded maps must remain visible.
         if (awaitingFirstMapFrame && attached && leasePublished && mapTexture != null
                 && mapTexture.getSurfaceTexture() == surfaceTexture
@@ -239,6 +249,7 @@ public final class InstrumentPanelView extends FrameLayout
             }
             awaitingFirstMapFrame = false;
             mapView.setAlpha(desiredMapAlpha);
+            tracePresentation();
             removeCallbacks(coldLeaseRetry);
             DiagnosticJournal.infoAsync("cluster-map", "cluster surface updated; map shown, opacity="
                     + desiredMapAlpha + ", sent_generation=" + sentGeneration
@@ -253,6 +264,12 @@ public final class InstrumentPanelView extends FrameLayout
         awaitingFirstMapFrame = true;
         firstFrameWaitStarted = android.os.SystemClock.uptimeMillis();
         mapView.setAlpha(0f);
+    }
+
+    private void tracePresentation() {
+        if (mapTexture == null || mapSurface == null) return;
+        MapStartupDiagnostics.presentation(true, mapSurface, mapView.getAlpha(),
+                mapView.getVisibility(), getWindowVisibility(), attached, mapTexture.isOpaque());
     }
 
     private void publishLeaseIfReady() {
@@ -319,6 +336,7 @@ public final class InstrumentPanelView extends FrameLayout
             publishedSurface = mapSurface;
             publishedWidth = width;
             publishedHeight = height;
+            tracePresentation();
             coldLeaseRetryCount = 0;
             removeCallbacks(coldLeaseRetry);
             DiagnosticJournal.infoAsync("cluster-map", "stage=local_surface_published, generation="

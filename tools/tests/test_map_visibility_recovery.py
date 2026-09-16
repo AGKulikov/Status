@@ -49,6 +49,7 @@ public class MapVisibilityReplay {
   Object getBitmap(int w,int h){throw new AssertionError("Readback must not gate visibility");}
  }
  static class DiagnosticJournal {static void info(String tag,String text){} static void infoAsync(String tag,String text){}}
+ static class MapStartupDiagnostics {static void frame(boolean c,Surface s,long t){}}
  static class android {static class os {static class SystemClock {static long uptimeMillis(){return 1000L;}}}}
  static class NavigationHudEndpointService {
   static boolean sent=true;
@@ -60,15 +61,18 @@ public class MapVisibilityReplay {
   TextureView mapTexture=new TextureView(); Surface leasedSurface=new Surface();
   SurfaceTexture leasedTexture=mapTexture.surface; Object activeMap=new Object();
   long firstFrameWaitStarted; boolean awaitingFirstMapFrame=true; float desiredMapAlpha=.72f;
+  void tracePresentation(){}
   HUD_METHODS
  }
  static class Cluster {
   TextureView mapTexture=new TextureView(); View mapView=mapTexture;
   Surface mapSurface=new Surface(); boolean attached=true,leasePublished=true;
+  SurfaceTexture ownedTexture=mapTexture.surface;
   long firstFrameWaitStarted; boolean awaitingFirstMapFrame=true; float desiredMapAlpha=.43f;
   Object coldLeaseRetry=new Object();
   void removeCallbacks(Object callback){}
   void logColdWait(String reason){}
+  void tracePresentation(){}
   CLUSTER_METHODS
  }
  static class Log {static void w(String tag,String text){}}

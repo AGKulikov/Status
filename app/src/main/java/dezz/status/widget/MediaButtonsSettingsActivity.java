@@ -83,11 +83,11 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
         if (tab == VehicleButton.DM) {
             for (String item : new String[]{"L-1X", "L-2X", "L-3X", "R-3X", "R-2X", "R-1X"}) {
                 String group = item.startsWith("L") ? "knobLeft" : "knobRight", gesture = item.substring(2, 3);
-                gestures.addView(button(item, () -> editBinding(group, gesture, item)));
+                gestures.addView(button(bindingLabel(item, group, gesture), () -> editBinding(group, gesture, item)));
             }
         } else {
             for (String gesture : tab.longPress ? new String[]{"1", "2", "3", "long"} : new String[]{"1", "2", "3"})
-                gestures.addView(button("long".equals(gesture) ? "Длинный" : gesture + "X",
+                gestures.addView(button(bindingLabel("long".equals(gesture) ? "Длинный" : gesture + "X", tab.key, gesture),
                         () -> editBinding(tab.key, gesture, tab.title + " · " + gesture)));
         }
         body.addView(horizontal(gestures)); body.addView(button("Параметры действий…", this::actionOptions));
@@ -114,21 +114,28 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
         TextView assigned = text(shortcutTitle(shortcut[0]), 16);
         Button driver = button("Выбрать действие меню водителя…", () -> {
             ShortcutActionPicker picker = new ShortcutActionPicker(this, new Preferences(this), value -> {
-                try { shortcut[0] = LauncherShortcutStore.encodeAction(value); assigned.setText(value.title); }
+                try {
+                    shortcut[0] = LauncherShortcutStore.encodeAction(value);
+                    selector.setSelection(actions.indexOf(ButtonAction.DRIVER_MENU));
+                    assigned.setText(value.title);
+                }
                 catch (org.json.JSONException error) { toast("Не удалось сохранить действие"); }
             });
             if (shortcut[0].isEmpty()) picker.showNew();
             else try { picker.showPrimary(LauncherShortcutStore.decodeAction(shortcut[0])); }
             catch (org.json.JSONException error) { picker.showNew(); }
         });
-        for (View view : new View[]{app, choose, command, target, help, driver, assigned}) fields.addView(view);
+        driver.setText("Действия Natro…");
+        fields.addView(text("Действия Natro — все функции меню экрана водителя", 16), 0);
+        fields.addView(driver, 1);
+        for (View view : new View[]{app, choose, command, target, help, assigned}) fields.addView(view);
         Runnable visibility = () -> {
             ButtonAction.Parameter parameter = ((ButtonAction) selector.getSelectedItem()).parameter;
             visible(app, parameter == ButtonAction.Parameter.APP); visible(choose, parameter == ButtonAction.Parameter.APP);
             boolean intent = parameter == ButtonAction.Parameter.BROADCAST || parameter == ButtonAction.Parameter.ACTIVITY;
             visible(command, intent || parameter == ButtonAction.Parameter.COMMAND || parameter == ButtonAction.Parameter.PHONE);
             visible(target, intent); visible(help, intent);
-            visible(driver, parameter == ButtonAction.Parameter.SHORTCUT); visible(assigned, parameter == ButtonAction.Parameter.SHORTCUT);
+            visible(driver, true); visible(assigned, parameter == ButtonAction.Parameter.SHORTCUT);
             command.setHint(parameter == ButtonAction.Parameter.PHONE ? "Номер телефона"
                     : parameter == ButtonAction.Parameter.ACTIVITY ? "Полное имя Activity" : "Команда");
         };
@@ -144,9 +151,14 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
                     app.getText().toString(), command.getText().toString(), target.getText().toString(), shortcut[0]);
             String error = assignment.validationError();
             if (!error.isEmpty()) { toast(error); return; }
-            buttons.saveBinding(group, gesture, assignment, dialog::dismiss);
+            buttons.saveBinding(group, gesture, assignment, () -> { dialog.dismiss(); showTab(); });
         }));
         dialog.show();
+    }
+    private String bindingLabel(String gesture, String group, String key) {
+        ButtonBinding binding = buttons.binding(group, key);
+        return gesture + "\n" + (binding.action == ButtonAction.DRIVER_MENU
+                ? shortcutTitle(binding.shortcutJson) : binding.action.toString());
     }
     private boolean installed(String pkg) {
         try { getPackageManager().getApplicationInfo(pkg, 0); return true; }

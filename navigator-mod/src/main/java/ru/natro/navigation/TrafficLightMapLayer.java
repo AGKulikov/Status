@@ -254,6 +254,7 @@ final class TrafficLightMapLayer {
                     .newInstance(light.latitude, light.longitude);
             Object placemark = invoke(currentCollection, "addPlacemark",
                     new Class<?>[]{pointClass}, point);
+            MapObjectLayerFactory.hideUntilTextured(placemark);
             markers.add(new Marker(placemark));
         }
         applyOriginalYandexViews(values);

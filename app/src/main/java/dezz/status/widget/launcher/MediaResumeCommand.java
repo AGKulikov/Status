@@ -269,11 +269,13 @@ final class MediaResumeCommand {
                     int playbackState = state == null ? -1 : state.getState();
                     long actions = state == null ? 0L : state.getActions();
                     if (coldStartEscalation && YANDEX_MUSIC_PACKAGE.equals(target)
-                            && command == Command.PLAY && !isUsablePlaySession(state)) {
-                        // Yandex exposes a STATE_NONE token during process bootstrap. Road logs
-                        // show that TransportControls.play() on that token is accepted locally but
-                        // ignored indefinitely. Keep looking, then use the exact receiver/browser
-                        // cold-start routes until a real PAUSED/STOPPED session exists.
+                            && command == Command.PLAY && !isUsablePlaySession(state)
+                            && !YandexColdSessionPolicy.mayPlayUnready(
+                                    yandexColdStartRouteRequested, yandexSessionPlayAttempted)) {
+                        // After the exact receiver/browser has bootstrapped this package, one
+                        // PLAY is allowed even for STATE_NONE (mSaver's callback behaviour).
+                        // Otherwise readiness can depend on the very command we keep waiting to
+                        // send. A ignored PLAY must not become an unbounded command storm.
                         ignoredYandexSessionState = playbackState;
                         ignoredYandexSessionActions = actions;
                         continue;
@@ -333,7 +335,7 @@ final class MediaResumeCommand {
             // Give the one-shot foreground receiver time to create the exact MediaSession. The
             // controller requests this browser fallback only after that grace and only once.
             if (requestYandexBrowserBootstrap) {
-                yandexBootstrap = requestYandexBrowserIfUseful(context, target, command);
+                yandexBootstrap = requestYandexBrowserIfUseful(context, target, command, coldStartEscalation);
                 if ("bootstrap_scheduled".equals(yandexBootstrap)) {
                     return trace(Result.BROWSER_BOOTSTRAP,
                             "route=exact_media_browser_retry, process="
@@ -437,7 +439,7 @@ final class MediaResumeCommand {
                             + ", dispatchError=" + emptyAsNone(dispatchError));
         }
         String browser = "not_requested".equals(yandexBootstrap)
-                ? requestYandexBrowserIfUseful(context, target, command)
+                ? requestYandexBrowserIfUseful(context, target, command, coldStartEscalation)
                 : yandexBootstrap;
         if ("bootstrap_scheduled".equals(browser)) {
             return trace(Result.BROWSER_BOOTSTRAP,
@@ -594,8 +596,9 @@ final class MediaResumeCommand {
     @NonNull
     private static String requestYandexBrowserIfUseful(@NonNull Context context,
                                                         @NonNull String target,
-                                                        @NonNull Command command) {
+                                                        @NonNull Command command, boolean boot) {
         if (!YANDEX_MUSIC_PACKAGE.equals(target) || command != Command.PLAY) return "not_used";
-        return YandexMusicBrowserStarter.requestPlay(context);
+        return YandexMusicBrowserStarter.requestGuardedPlay(context,
+                MediaAutoResumeController.browserPlayPermit(context, boot));
     }
 }

@@ -12,6 +12,11 @@ final class MapObjectLayerFactory {
 
     private MapObjectLayerFactory() {}
 
+    /** MapKit's default pin must not survive a failed/deferred custom texture construction. */
+    static void hideUntilTextured(Object placemark) throws Exception {
+        invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, false);
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     static Object create(Object map, String layerId, String conflictMode, float zIndex)
             throws Exception {
