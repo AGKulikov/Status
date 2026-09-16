@@ -12,6 +12,19 @@ CERT = "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
 PACKAGE = "ru.natro.statuswidget"
 
 
+def signature_entry(name):
+    return re.fullmatch(r"META-INF/(?:MANIFEST\.MF|[^/]+\.(?:RSA|DSA|EC|SF))", name, re.IGNORECASE) is not None
+
+
+def payload_hashes(path):
+    with zipfile.ZipFile(path) as apk:
+        names = apk.namelist()
+        if len(names) != len(set(names)) or apk.testzip() is not None:
+            raise ValueError("APK has duplicate or corrupt ZIP entries")
+        return {entry.filename: hashlib.sha256(apk.read(entry)).hexdigest()
+                for entry in apk.infolist() if not signature_entry(entry.filename)}
+
+
 def sha256(path):
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -110,6 +123,9 @@ def main():
     signed_identity, _ = identity(signed)
     if signed_identity != current:
         raise ValueError("Signed APK identity changed")
+    unsigned_payload = payload_hashes(unsigned)
+    if payload_hashes(signed) != unsigned_payload:
+        raise ValueError("Signing changed the tested Natro payload")
     aligned.unlink()
     idsig = Path(str(signed) + ".idsig")
     if idsig.exists():
@@ -117,6 +133,7 @@ def main():
     report = {**manifest, "signedApk": signed.name, "signedSha256": sha256(signed),
               "certificateSha256": CERT, "signatureV2": True, "signatureV3": True,
               "signerCount": 1, "zipalign16KiB": True,
+              "payloadEntriesUnchanged": len(unsigned_payload),
               "previous": {**previous, "sha256": sha256(args.previous_apk)},
               "installOverMetadataVerified": True, "physicalKx11Verification": "pending",
               "navigatorPairRequired": bool(manifest.get("navigator", {}).get("pairRequired")),

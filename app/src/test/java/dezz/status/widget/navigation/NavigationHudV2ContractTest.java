@@ -1081,7 +1081,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(cameraDirections.contains("directionDegrees + 90d"));
         assertTrue(cameraDirections.contains("opaqueRgb(nextDirectionColor"));
         assertTrue(cameraDirections.contains("directionOpacityPercent"));
-        assertTrue(cameraDirections.contains("No direction supplied means exactly one sign"));
+        assertTrue(cameraDirections.contains("for (Double direction : camera.directions)"));
         assertTrue(cameraDirections.contains("ImageProvider"));
         assertTrue(cameraDirections.contains("createCameraBitmap"));
         assertTrue(cameraDirections.contains("RouteCameraPolicy.showSpeed(camera.controlTags, camera.speedLimit)"));

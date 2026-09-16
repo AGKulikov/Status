@@ -99,6 +99,9 @@ public class CameraReplay {
   CameraSign recovered=r.sign("a");visible(recovered,true);visible(b,true);
   r.update();check(map.signs.values.isEmpty()&&map.sectors.values.isEmpty(),"empty route removes both layers");
   r.ready(recovered);check(!((Visual)recovered.placemark).visible,"clear fences callbacks");
+  CameraMarker directionless=new CameraMarker("plain",50);directionless.directions=Collections.emptyList();
+  r.update(directionless);r.main.drain();CameraSign plain=r.sign("plain");
+  check(plain.sectors.isEmpty(),"missing source direction must not invent sector");visible(plain,true);r.update();
   Pin.sync=false;r.update(new CameraMarker("a",60));CameraSign detached=r.sign("a");
   r.map=new MapFixture();r.ready(detached);visible(detached,false);
  }
@@ -123,4 +126,3 @@ class CameraImageLifecycleTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run(['java', '-cp', temp, 'ru.natro.navigation.CameraReplay'], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-
