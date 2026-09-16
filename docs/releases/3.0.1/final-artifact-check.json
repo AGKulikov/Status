@@ -1,0 +1,80 @@
+{
+  "signedApk": "Natro-3.0.1-signed.apk",
+  "sizeBytes": 29096236,
+  "sha256": "7ffbb0968877ac8897d609f9b56dd0ecb0adaeee6a5663a4e764e0e8dbf75ad3",
+  "newProductionClasses": {
+    "Ldezz/status/widget/media/ButtonActionDeadline;": {
+      "dex": "classes2.dex",
+      "methods": [
+        "<clinit>",
+        "<init>",
+        "current",
+        "lambda$current$0",
+        "run",
+        "valid"
+      ]
+    },
+    "Ldezz/status/widget/media/ButtonRouteBatch;": {
+      "dex": "classes2.dex",
+      "methods": [
+        "<init>"
+      ]
+    },
+    "Ldezz/status/widget/media/ButtonRouteRestorer;": {
+      "dex": "classes2.dex",
+      "methods": [
+        "<clinit>",
+        "<init>",
+        "lambda$restore$0",
+        "lambda$restore$1",
+        "lambda$restore$2",
+        "lambda$restore$3",
+        "lambda$restore$4",
+        "restore"
+      ]
+    },
+    "Ldezz/status/widget/media/RuntimePreferenceWriter;": {
+      "dex": "classes2.dex",
+      "methods": [
+        "<clinit>",
+        "<init>",
+        "flush",
+        "lambda$flush$1",
+        "lambda$put$0",
+        "put",
+        "put"
+      ]
+    },
+    "Ldezz/status/widget/navigation/MapBootstrapPolicy;": {
+      "dex": "classes2.dex",
+      "methods": [
+        "<init>",
+        "mayReveal",
+        "opaqueWhite"
+      ]
+    },
+    "Ldezz/status/widget/navigation/MapStartupPresentation;": {
+      "dex": "classes2.dex",
+      "methods": [
+        "$r8$lambda$-KsB1XbGbSZjICiuG1j5-eVATTI",
+        "$r8$lambda$82_01mPUglzlVY6yRPEDntQg1es",
+        "$r8$lambda$TkcvEpYcvBbe_pKJjeIcR6rPXJ0",
+        "$r8$lambda$bg3NVhXPGEHMfLDIhIss7TtpcSM",
+        "$r8$lambda$s7EOmTJNVMSWEQHz4xpV02R_sLg",
+        "<clinit>",
+        "<init>",
+        "completed",
+        "finish",
+        "lambda$completed$4",
+        "lambda$new$1",
+        "lambda$sample$2",
+        "lambda$sample$3",
+        "lambda$static$0",
+        "sample",
+        "onFrame",
+        "reset"
+      ]
+    }
+  },
+  "physicalKx11Verification": "pending"
+}
