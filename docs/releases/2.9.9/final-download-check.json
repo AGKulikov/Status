@@ -1,0 +1,38 @@
+{
+  "signedBytes": 29055276,
+  "signedSha256": "a3717d7de01ce519645767f18b0d87e84f28709739496a5d0a4d56089e635dc2",
+  "downloadedArtifactId": 10447610878,
+  "downloadedArtifactSha256": "2ad05a71f8f5b0c6e1c49c045046e22f400903a5e33ad28904725afdb155c3a6",
+  "artifactDigestVerified": true,
+  "unsignedPayloadEntriesUnchangedBySigning": 1459,
+  "dexFiles": 3,
+  "definedClassesWithClassData": [
+    "Ldezz/status/widget/AdbSettingsActivity;",
+    "Ldezz/status/widget/adb/AdbConsoleSession;",
+    "Ldezz/status/widget/transfer/LanTransferService;",
+    "Ldezz/status/widget/transfer/LanHttpServer;",
+    "Ldezz/status/widget/transfer/LanFileStore;",
+    "Ldezz/status/widget/drivemode/service/DriveModeOverlayService;",
+    "Ldezz/status/widget/drivemode/car/DriveModeRepository;",
+    "Ldezz/status/widget/drivemode/ui/DriveModeIcons;",
+    "Ldezz/status/widget/servicemode/ServiceModeJournal;",
+    "Ldezz/status/widget/servicemode/LauncherTrampolineActivity;",
+    "Ldezz/status/widget/media/DriveSelectorController;"
+  ],
+  "lanAssetsExactSourceMatch": true,
+  "helperAssetPresent": true,
+  "crc": true,
+  "unitTests": {
+    "tests": 1906,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "unitTestSuites": 374,
+  "toolTests": 193,
+  "profileTests": 14,
+  "packagingTestsIncludedInToolTests": 4,
+  "hardwareKx11": "pending",
+  "safariHotspotAndLan": "pending",
+  "browserVisual": "blocked_ERR_BLOCKED_BY_CLIENT"
+}
