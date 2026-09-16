@@ -123,7 +123,10 @@ def prepareWechatAssets = tasks.register('prepareWechatCompatAssets', Copy) {
 }
 android.sourceSets.main.assets.srcDir(wechatAssetsDirectory)
 tasks.configureEach {
-    if (name.startsWith('merge') && name.endsWith('Assets')) dependsOn(prepareWechatAssets)
+    // Lint models also consume raw assets, not only mergeAssets. Declare their producer
+    // explicitly so release lint is deterministic with parallel/configuration-cache builds.
+    if ((name.startsWith('merge') && name.endsWith('Assets'))
+            || name.contains('Lint') || name.startsWith('lint')) dependsOn(prepareWechatAssets)
 }
 
 dependencies {
