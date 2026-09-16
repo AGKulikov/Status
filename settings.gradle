@@ -16,4 +16,5 @@
  */
 
 include ':app'
+include ':wechat-compat'
 rootProject.name = "Status Widget HA"

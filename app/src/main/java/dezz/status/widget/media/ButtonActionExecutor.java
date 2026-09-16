@@ -46,6 +46,11 @@ final class ButtonActionExecutor {
         settingsChanged();
     }
     void execute(ButtonBinding binding) {
+        DriveSelectorButtonPreset selector = DriveSelectorButtonPreset.fromAction(binding.action);
+        if (selector != null) {
+            DriveSelectorController.request(context, selector.steps);
+            return;
+        }
         switch (binding.action) {
             case NONE: return;
             case APP: launch(binding.application, 0, true); return;

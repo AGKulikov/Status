@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<resources>
+    <color name="service_mode_background">#F5F5F5</color>
+    <color name="service_mode_card_background">@android:color/background_light</color>
+    <color name="service_mode_header_background">#E0E0E0</color>
+    <color name="service_mode_text_primary">@android:color/primary_text_light</color>
+    <color name="service_mode_text_secondary">@android:color/secondary_text_light</color>
+    <color name="service_mode_tab_active">@color/service_mode_background</color>
+    <color name="service_mode_tab_inactive">@color/service_mode_header_background</color>
+    <color name="service_mode_tab_disabled">#BDBDBD</color>
+    <color name="service_mode_adb_ok">#2E7D32</color>
+    <color name="service_mode_adb_error">#C62828</color>
+
+    <color name="service_mode_accent">#1976D2</color>
+    <color name="service_mode_action_hide">#F57C00</color>
+    <color name="service_mode_action_restore">#388E3C</color>
+    <color name="service_mode_divider">#E0E0E0</color>
+</resources>

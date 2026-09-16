@@ -55,6 +55,9 @@
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <!-- Direct DIM-menu calls use ACTION_CALL when granted and safely fall back to the dialer. -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
+    <!-- Optional service-mode PIN recovery; requested only when the user enables hiding. -->
+    <uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
@@ -102,6 +105,39 @@
             android:theme="@style/Theme.StatusWidget.TransparentProxy" />
         <activity android:name=".MediaButtonsSettingsActivity"
             android:exported="false" android:screenOrientation="landscape" />
+        <activity android:name=".servicemode.MainActivity" android:exported="false"
+            android:screenOrientation="landscape" android:launchMode="singleTask"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+        <activity android:name=".servicemode.AboutActivity" android:exported="false"
+            android:theme="@style/service_mode_Theme.Stealth.About" />
+        <activity android:name=".servicemode.LauncherTrampolineActivity" android:exported="true"
+            android:enabled="true" android:noHistory="true" android:excludeFromRecents="true"
+            android:taskAffinity="" android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <receiver android:name=".servicemode.DialerCodeReceiver" android:exported="true">
+            <intent-filter android:priority="999">
+                <action android:name="android.intent.action.NEW_OUTGOING_CALL" />
+            </intent-filter>
+        </receiver>
+        <service android:name=".servicemode.KeepAliveService" android:exported="false"
+            android:directBootAware="true" />
+        <receiver android:name=".servicemode.BootReceiver" android:exported="true" android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <activity android:name=".AdbSettingsActivity"
+            android:exported="false" android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".LanTransferActivity" android:exported="false"
+            android:screenOrientation="landscape" android:windowSoftInputMode="adjustResize" />
+        <service android:name=".transfer.LanTransferService" android:exported="false"
+            android:stopWithTask="false" />
         <receiver android:name=".media.MediaInputReceiver" android:exported="true"
             android:directBootAware="true">
             <intent-filter>
@@ -120,12 +156,7 @@
             android:name=".SettingsHubActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="landscape">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:screenOrientation="landscape" />
 
         <activity
             android:name=".MainActivity"

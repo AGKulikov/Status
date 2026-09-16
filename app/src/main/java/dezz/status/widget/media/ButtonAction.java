@@ -22,7 +22,14 @@ public enum ButtonAction {
     SPORT(24, "Режим Спорт"), OFFROAD(25, "Режим Внедорожный"),
     SAND(26, "Режим Песок"), SNOW(27, "Режим Снег"),
     MNAVI_ASSISTANT(30, "Alice (mNavi)"), DASHBOARD(33, "Dashboard"),
-    DRIVER_MENU(100, "Действие меню экрана водителя", Parameter.SHORTCUT);
+    DRIVER_MENU(100, "Действие меню экрана водителя", Parameter.SHORTCUT),
+    DRIVE_SHOW(101, "Показать меню режимов — без переключения"),
+    DRIVE_PREV_1(102, "Режимы вождения: назад на 1"),
+    DRIVE_PREV_2(103, "Режимы вождения: назад на 2"),
+    DRIVE_PREV_3(104, "Режимы вождения: назад на 3"),
+    DRIVE_NEXT_1(105, "Режимы вождения: вперёд на 1"),
+    DRIVE_NEXT_2(106, "Режимы вождения: вперёд на 2"),
+    DRIVE_NEXT_3(107, "Режимы вождения: вперёд на 3");
     public enum Parameter { NONE, APP, BROADCAST, ACTIVITY, COMMAND, PHONE, SHORTCUT }
     public final int id;
     public final String title;

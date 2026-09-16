@@ -95,21 +95,28 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
     private void editBinding(String group, String gesture, String title) {
         ButtonBinding original = buttons.binding(group, gesture);
         LinearLayout fields = column(); fields.setPadding(20, 12, 20, 12);
-        List<ButtonAction> actions = new ArrayList<>();
+        List<Object> actions = new ArrayList<>();
         for (ButtonAction action : ButtonAction.values()) {
+            if (DriveSelectorButtonPreset.fromAction(action) != null) continue;
             // MConfig kp/vj.gi/ro excludes source cycling from SRC 1X only.
             if (action == ButtonAction.SOURCE && group.equals("src") && gesture.equals("1")) continue;
             if (action == ButtonAction.MNAVI_ASSISTANT && !installed("dd.monjaro.navi")) continue;
             if (action == ButtonAction.DASHBOARD && !installed("com.auto_soft.monjaro_dashboard")) continue;
             actions.add(action);
         }
+        // Typed presets in the same action picker: no action/package text entry required.
+        java.util.Collections.addAll(actions, DriveSelectorButtonPreset.values());
         Spinner selector = new Spinner(this);
         selector.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, actions));
-        selector.setSelection(Math.max(0, actions.indexOf(original.action))); fields.addView(selector);
+        DriveSelectorButtonPreset originalPreset = DriveSelectorButtonPreset.fromBinding(original);
+        selector.setSelection(Math.max(0, actions.indexOf(originalPreset == null ? original.action : originalPreset)));
+        fields.addView(selector);
         EditText app = edit(original.application, "Приложение: пакет / Activity");
         Button choose = button("Выбрать приложение…", () -> chooseApp(app));
         EditText command = edit(original.command, "Команда"), target = edit(original.packageName, "Приложение (пакет получателя)");
         TextView help = text("Параметры: es:имя:текст, ei:имя:число, ez:имя:true. Флаги: ef:flags:число.", 14);
+        TextView driveHelp = text("Число — шаги по списку режимов, независимо от числа нажатий кнопки. "
+                + "Показ меню не меняет режим. Обрабатывает Natro; внешние приложения и ручной ввод интентов не нужны.", 14);
         String[] shortcut = {original.shortcutJson};
         TextView assigned = text(shortcutTitle(shortcut[0]), 16);
         Button driver = button("Выбрать действие меню водителя…", () -> {
@@ -128,9 +135,13 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
         driver.setText("Действия Natro…");
         fields.addView(text("Действия Natro — все функции меню экрана водителя", 16), 0);
         fields.addView(driver, 1);
-        for (View view : new View[]{app, choose, command, target, help, assigned}) fields.addView(view);
+        for (View view : new View[]{app, choose, command, target, help, driveHelp, assigned}) fields.addView(view);
         Runnable visibility = () -> {
-            ButtonAction.Parameter parameter = ((ButtonAction) selector.getSelectedItem()).parameter;
+            Object selectedAction = selector.getSelectedItem();
+            boolean drivePreset = selectedAction instanceof DriveSelectorButtonPreset;
+            ButtonAction.Parameter parameter = drivePreset ? ButtonAction.Parameter.NONE
+                    : ((ButtonAction) selectedAction).parameter;
+            visible(driveHelp, drivePreset);
             visible(app, parameter == ButtonAction.Parameter.APP); visible(choose, parameter == ButtonAction.Parameter.APP);
             boolean intent = parameter == ButtonAction.Parameter.BROADCAST || parameter == ButtonAction.Parameter.ACTIVITY;
             visible(command, intent || parameter == ButtonAction.Parameter.COMMAND || parameter == ButtonAction.Parameter.PHONE);
@@ -147,8 +158,15 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle(title).setView(scroll)
                 .setNegativeButton("Отмена", null).setPositiveButton("Сохранить", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-            ButtonBinding assignment = new ButtonBinding(((ButtonAction) selector.getSelectedItem()).id,
-                    app.getText().toString(), command.getText().toString(), target.getText().toString(), shortcut[0]);
+            Object selectedAction = selector.getSelectedItem();
+            ButtonBinding assignment;
+            if (selectedAction instanceof DriveSelectorButtonPreset) {
+                assignment = new ButtonBinding(((DriveSelectorButtonPreset) selectedAction).action.id,
+                        app.getText().toString(), command.getText().toString(), target.getText().toString(), shortcut[0]);
+            } else {
+                assignment = new ButtonBinding(((ButtonAction) selectedAction).id,
+                        app.getText().toString(), command.getText().toString(), target.getText().toString(), shortcut[0]);
+            }
             String error = assignment.validationError();
             if (!error.isEmpty()) { toast(error); return; }
             buttons.saveBinding(group, gesture, assignment, () -> { dialog.dismiss(); showTab(); });
@@ -157,6 +175,8 @@ public final class MediaButtonsSettingsActivity extends AppCompatActivity {
     }
     private String bindingLabel(String gesture, String group, String key) {
         ButtonBinding binding = buttons.binding(group, key);
+        DriveSelectorButtonPreset preset = DriveSelectorButtonPreset.fromBinding(binding);
+        if (preset != null) return gesture + "\n" + preset.title;
         return gesture + "\n" + (binding.action == ButtonAction.DRIVER_MENU
                 ? shortcutTitle(binding.shortcutJson) : binding.action.toString());
     }

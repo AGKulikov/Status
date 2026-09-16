@@ -279,6 +279,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        dezz.status.widget.adb.AdbGestureController.detach(this);
         if (ActionRecorder.isRecording() && serviceConnected) {
             ActionRecorder.record(ActionRecorder.SOURCE_ACCESSIBILITY,
                     "ACCESSIBILITY_CAPTURE_LOST", ActionRecorder.object(
@@ -314,6 +315,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
         // remember the per-display foreground packages. Otherwise the first event-driven
         // update would have to wait for a real window change.
         serviceConnected = true;
+        dezz.status.widget.adb.AdbGestureController.attach(this);
         if (navigationDemand == null) {
             navigationDemand = new NavigationCollectionDemand(this);
             navigationDemand.start(this::onNavigationDemandChanged);

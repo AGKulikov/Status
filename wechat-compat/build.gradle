@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'dezz.natro.wechatcompat'
+    compileSdk 36
+    buildToolsVersion '36.0.0'
+    defaultConfig {
+        applicationId 'com.tencent.mm'
+        minSdk 28
+        targetSdk 28
+        versionCode 1
+        versionName '1.0'
+    }
+}

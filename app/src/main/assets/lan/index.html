@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark"><title>Natro · локальный обмен</title><link rel="stylesheet" href="/client.css"><script src="/client.js" defer></script></head>
+<body><main>
+<header><span class="eyebrow">NATRO / ЛОКАЛЬНЫЙ ОБМЕН</span><h1>С телефона<br>на магнитолу.</h1><p id="connection">Подключение к серверу Natro</p></header>
+<section id="pairing"><h2>Сопряжение</h2><p>Введите код с экрана «Буфер обмена и файлы» в Natro.</p>
+<form id="pairForm"><label for="pin">Код магнитолы</label><div class="row"><input id="pin" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"><button>Подключиться</button></div></form></section>
+<div id="workspace" hidden>
+<section><h2>Текст и буфер обмена</h2><label for="text">Текст или команда</label><textarea id="text" rows="6" placeholder="Вставьте текст из буфера iPhone…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+<div class="grid"><button id="paste" class="secondary">Вставить с iPhone</button><button id="copy" class="secondary">Скопировать на iPhone</button><button id="sendText">В буфер магнитолы</button><button id="getText" class="secondary">Получить буфер магнитолы</button><button id="draft" class="secondary">В поле ADB, без запуска</button></div>
+<p class="hint">Safari разрешает доступ к буферу только по вашему действию. Если кнопка вставки недоступна — удерживайте поле и выберите «Вставить».</p></section>
+<section><h2>Файлы</h2><label class="filepick" for="files">Выбрать файлы на iPhone<input id="files" type="file" multiple></label><div class="row"><button id="upload">Передать на магнитолу</button><button id="cancelUpload" class="secondary" disabled>Отмена</button></div><progress id="progress" max="100" value="0"></progress><p id="uploadStatus" class="hint">До 256 МиБ на файл. APK не устанавливаются автоматически.</p><button id="refreshFiles" class="secondary">Обновить список</button><ul id="fileList"></ul></section>
+<section><h2>ADB-терминал</h2><p id="adbState">Проверка доступа…</p><p class="hint">Выполняется текст из поля выше. Разрешение удалённых команд включается отдельно на магнитоле.</p>
+<button id="execute" class="danger" disabled>Выполнить команду</button><button id="resumeJob" class="secondary" hidden>Проверить последнюю команду</button>
+<pre id="output" tabindex="0">Результат команды появится здесь.</pre></section>
+<button id="logout" class="secondary">Забыть сопряжение на телефоне</button>
+</div><p id="message" role="status" aria-live="polite"></p>
+<footer>Общая Wi-Fi-сеть или режим модема iPhone.<br>Локальный HTTP — только для доверенной сети. При смене сети используйте новый адрес с магнитолы.</footer>
+</main></body></html>

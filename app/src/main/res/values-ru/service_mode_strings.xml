@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="service_mode_app_name">Сервисный режим</string>
+    <string name="service_mode_notification_content">Служба сервисного режима работает</string>
+    <string name="service_mode_tab_hide">Скрыть</string>
+    <string name="service_mode_tab_restore">Восстановить</string>
+    <string name="service_mode_hide_mode_header">Отметьте приложения для скрытия</string>
+    <string name="service_mode_restore_mode_header">Отметьте приложения для восстановления</string>
+    <string name="service_mode_no_hidden_apps">Нет скрытых приложений для восстановления</string>
+    <string name="service_mode_apps_hidden_successfully">Приложения успешно скрыты</string>
+    <string name="service_mode_apps_hide_error">Ошибка скрытия приложения: %s</string>
+    <string name="service_mode_apps_restored_successfully">Приложения успешно восстановлены. Перезагрузите головное устройство, чтобы все фоновые сервисы запустились корректно.</string>
+    <string name="service_mode_apps_restore_error">Ошибка восстановления приложения: %s</string>
+    <string name="service_mode_no_apps_selected">Приложения не выбраны</string>
+    <string name="service_mode_list_loading">Загрузка списка приложений…</string>
+    <string name="service_mode_no_connection_detected">ADB или Telnet недоступны. Скрыть или восстановить приложения нельзя.</string>
+    <string name="service_mode_hide_apps">Скрыть выбранные приложения</string>
+    <string name="service_mode_restore_apps">Восстановить выбранные приложения</string>
+
+    <string name="service_mode_set_pin">Задать PIN</string>
+    <string name="service_mode_change_pin">Изменить PIN</string>
+    <string name="service_mode_set_pin_title">Задать PIN-код разблокировки</string>
+    <string name="service_mode_change_pin_title">Изменить PIN-код разблокировки</string>
+    <string name="service_mode_pin_dialog_message">Введите цифровой PIN-код (минимум 3 цифры). Чтобы открыть приложение после скрытия, наберите этот PIN на телефонной клавиатуре.</string>
+    <string name="service_mode_pin_dialog_message_warn_hidden">Введите новый цифровой PIN-код (минимум 3 цифры). Чтобы открыть приложение после скрытия, наберите этот PIN на телефонной клавиатуре.\n\nВнимание: приложения сейчас скрыты. Запомните новый PIN — он заменит старый!</string>
+    <string name="service_mode_pin_hint">Введите PIN</string>
+    <string name="service_mode_pin_set_successfully">PIN-код успешно установлен</string>
+    <string name="service_mode_pin_too_short">PIN-код должен содержать минимум 3 цифры</string>
+    <string name="service_mode_pin_no_leading_zero">PIN-код не должен начинаться с 0 — звонилка отклоняет такие номера</string>
+    <string name="service_mode_pin_required">Задайте PIN-код перед скрытием приложений</string>
+    <string name="service_mode_default_pin_hint">PIN по умолчанию: %s (рекомендуем задать свой)</string>
+
+    <string name="service_mode_hide_confirm_title">Подтверждение скрытия</string>
+    <string name="service_mode_hide_confirm_message">Следующие приложения будут скрыты:\n\n%s\n\nПродолжить?</string>
+
+    <string name="service_mode_apps_hide_partial">%1$d приложений скрыто, %2$d не удалось</string>
+    <string name="service_mode_apps_restore_partial">%1$d приложений восстановлено, %2$d не удалось. Перезагрузите головное устройство, чтобы все фоновые сервисы запустились корректно.</string>
+
+    <string name="service_mode_empty_hide_list">Нет пользовательских приложений для скрытия</string>
+    <string name="service_mode_settings_description">Настройки</string>
+    <string name="service_mode_menu_about">О приложении</string>
+    <string name="service_mode_about_fallback"><![CDATA[
+        <p><b>Сервисный режим</b><br>
+        Скрывает пользовательские приложения на головных устройствах Android перед визитом в сервис.</p>
+        <p><b>Автор</b><br>
+        Dezz — Telegram <a href="https://t.me/DezzK">@DezzK</a></p>
+        <p><b>Исходный код</b><br>
+        <a href="https://github.com/DezzK/stealth">github.com/DezzK/stealth</a></p>
+        <p><i>Полная страница «О приложении» доступна онлайн по адресу <a href="https://dezzk.github.io/stealth/">dezzk.github.io/stealth</a> при наличии подключения к интернету.</i></p>
+    ]]></string>
+    <string name="service_mode_connection_details_title">Детали подключения</string>
+    <string name="service_mode_connection_details_intro">Ни одна из ожидаемых служб на головном устройстве не доступна.</string>
+    <string name="service_mode_connection_details_intro_success">Опрошены следующие службы:</string>
+    <string name="service_mode_connection_attempt_success">подключено</string>
+    <string name="service_mode_connection_attempt_active">используется</string>
+    <string name="service_mode_connection_attempt_also_works">тоже работает</string>
+    <string name="service_mode_connection_details_in_progress">…сканирование продолжается</string>
+    <string name="service_mode_connection_scanning_marker">(сканируется…)</string>
+    <string name="service_mode_connection_host_searching">сканирование портов…</string>
+    <string name="service_mode_connection_host_no_match">подходящих служб не найдено</string>
+    <string name="service_mode_connection_host_no_open_ports">открытые порты не найдены</string>
+    <string name="service_mode_connection_port_probing">проверка протоколов…</string>
+    <string name="service_mode_connection_port_no_protocol">открыт, известный протокол не отвечает</string>
+    <string name="service_mode_connection_error_refused">Соединение отклонено</string>
+    <string name="service_mode_connection_error_unreachable">Хост недоступен</string>
+    <string name="service_mode_connection_error_timeout">Таймаут подключения</string>
+    <string name="service_mode_connection_error_pm_unavailable">Команда pm недоступна</string>
+    <string name="service_mode_connection_error_unknown">Ошибка</string>
+
+    <string name="service_mode_pin_required_dialog_message">Для скрытия приложений необходимо задать PIN-код. После скрытия иконка приложения исчезнет. Чтобы снова её отобразить, откройте штатную звонилку, наберите ваш PIN-код и нажмите кнопку вызова.\n\nЗадайте цифровой PIN-код (минимум 3 цифры):</string>
+
+    <string name="service_mode_permissions_required_title">Требуются разрешения</string>
+    <string name="service_mode_permissions_required_message">Разрешения на телефонные вызовы необходимы для разблокировки по PIN-коду. Без них вы не сможете открыть приложение, набрав PIN.</string>
+    <string name="service_mode_permissions_required_to_hide_message">Для скрытия приложений необходимы разрешения на телефонные вызовы. Без них после скрытия вы не сможете отобразить приложение, набрав PIN-код — иконка останется скрытой без возможности восстановления.\n\nВыдать разрешения?</string>
+    <string name="service_mode_grant_permissions">Выдать</string>
+    <string name="service_mode_permissions_open_settings_message">Разрешения на телефонные вызовы были ранее отклонены. Чтобы их выдать, перейдите в настройки приложения и включите их вручную. Без этих разрешений после скрытия вы не сможете отобразить приложение, набрав PIN-код.</string>
+    <string name="service_mode_open_settings">Открыть настройки</string>
+
+    <string name="service_mode_connection_checking">Подключение: проверка…</string>
+    <string name="service_mode_connection_connected">Подключено через %s</string>
+    <string name="service_mode_connection_error">Нет подключения — нажмите для деталей</string>
+
+    <string name="service_mode_keepalive_channel_name">Фоновая служба</string>
+    <string name="service_mode_battery_opt_title">Повысить надёжность</string>
+    <string name="service_mode_battery_opt_message">Через несколько дней головное устройство может выгрузить приложение из памяти, и тогда набор PIN не откроет его. Если разрешить приложению игнорировать оптимизацию батареи, это станет гораздо менее вероятным.\n\nОткрыть системный диалог, чтобы разрешить?</string>
+    <string name="service_mode_battery_opt_grant">Разрешить</string>
+    <string name="service_mode_later">Позже</string>
+</resources>

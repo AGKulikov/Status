@@ -85,6 +85,10 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                 }, "dm:volume");
             }
             @Override public void driveMenu(int direction) {
+                if (DriveSelectorController.isShowing()) {
+                    DriveSelectorController.request(context, direction < 0 ? -1 : 1);
+                    return;
+                }
                 submit(() -> context.sendBroadcast(new Intent("dezz.monjaro.drive_modes."
                         + (direction < 0 ? "PREV_1" : "NEXT_1")).addFlags(0x01000020)), "dm:menu");
             }
@@ -121,11 +125,15 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
         try { return audio != null && audio.isMusicActive(); }
         catch (RuntimeException unavailable) { return false; }
     }
-    @Override public boolean driveMenuShowing() { return driveMenu; }
+    @Override public boolean driveMenuShowing() { return DriveSelectorController.isShowing() || driveMenu; }
     @Override public boolean stockMediaSource() { return MediaButtonController.get(context).isDefaultSource(); }
     @Override public int actionId(String group, String gesture) { return binding(group, gesture).action.id; }
     public int volumeSteps() { return integer("volume_steps", 1); }
     public boolean bool(String key) { return Boolean.TRUE.equals(values.get(key)); }
+    /** Optional accessibility gestures reuse the same original Natro action dispatcher. */
+    public void executeAdbGesture(ButtonAction action) {
+        submit(() -> actionExecutor().execute(new ButtonBinding(action.id, "", "", "", "")), "adb-gesture");
+    }
     public void callNumber(String number) {
         if (number != null) submit(() -> actionExecutor().callNumber(number), "phone");
     }

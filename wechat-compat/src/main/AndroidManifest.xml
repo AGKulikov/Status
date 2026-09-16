@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later
+     Original empty compatibility package. No Tencent/MConfig code, permissions or components.
+     Installed only when com.tencent.mm is absent and the user chooses the WeChat button repair. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="Natro: совместимость кнопки WeChat" android:hasCode="false"
+        android:allowBackup="false" />
+</manifest>

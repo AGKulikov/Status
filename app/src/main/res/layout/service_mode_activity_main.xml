@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ~ Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/service_mode_background"
+    android:orientation="vertical">
+
+    <!-- Header: title + about icon + settings icon -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/service_mode_header_background"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="24sp"
+        android:paddingVertical="12sp">
+
+        <TextView
+            android:id="@+id/headerText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="start"
+            android:text="@string/service_mode_app_name"
+            android:textColor="@color/service_mode_text_primary"
+            android:textSize="32sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/aboutButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/service_mode_menu_about"
+            android:scaleType="centerInside"
+            android:src="@drawable/service_mode_ic_info"
+            android:tint="@color/service_mode_text_primary"
+            tools:ignore="UseAppTint" />
+
+        <ImageButton
+            android:id="@+id/settingsButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/service_mode_settings_description"
+            android:scaleType="centerInside"
+            android:src="@android:drawable/ic_menu_preferences"
+            android:tint="@color/service_mode_text_primary"
+            tools:ignore="UseAppTint" />
+    </LinearLayout>
+
+    <!-- Connection status — single line, tappable for full details -->
+    <TextView
+        android:id="@+id/connectionStatusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:ellipsize="end"
+        android:gravity="start|center_vertical"
+        android:minHeight="36dp"
+        android:paddingHorizontal="24sp"
+        android:paddingVertical="8sp"
+        android:singleLine="true"
+        android:text="@string/service_mode_connection_checking"
+        android:textColor="@color/service_mode_text_secondary"
+        android:textSize="14sp" />
+
+    <!-- Tab bar with active-state indicator under each tab -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/service_mode_header_background"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <TextView
+                android:id="@+id/tabHide"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingVertical="12sp"
+                android:text="@string/service_mode_tab_hide"
+                android:textColor="@color/service_mode_text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <View
+                android:id="@+id/tabHideIndicator"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_gravity="bottom"
+                android:background="@color/service_mode_accent" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <TextView
+                android:id="@+id/tabRestore"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingVertical="12sp"
+                android:text="@string/service_mode_tab_restore"
+                android:textColor="@color/service_mode_text_secondary"
+                android:textSize="20sp" />
+
+            <View
+                android:id="@+id/tabRestoreIndicator"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_gravity="bottom"
+                android:background="@android:color/transparent" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Action buttons row (on regular background, not header) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16sp"
+        android:paddingVertical="12sp">
+
+        <Button
+            android:id="@+id/hideAppsButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8sp"
+            android:layout_weight="1"
+            android:background="@color/service_mode_action_hide"
+            android:paddingVertical="10sp"
+            android:singleLine="true"
+            android:text="@string/service_mode_hide_apps"
+            android:textColor="@android:color/white"
+            tools:ignore="ButtonStyle" />
+
+        <Button
+            android:id="@+id/restoreAppsButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8sp"
+            android:layout_weight="1"
+            android:background="@color/service_mode_action_restore"
+            android:paddingVertical="10sp"
+            android:singleLine="true"
+            android:text="@string/service_mode_restore_apps"
+            android:textColor="@android:color/white"
+            tools:ignore="ButtonStyle" />
+    </LinearLayout>
+
+    <!-- Mode header — instructional, secondary weight -->
+    <TextView
+        android:id="@+id/modeHeaderText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16sp"
+        android:paddingBottom="4sp"
+        android:text="@string/service_mode_hide_mode_header"
+        android:textColor="@color/service_mode_text_secondary"
+        android:textSize="14sp" />
+
+    <!-- PIN hint with info icon (only shown when no custom PIN set); tappable to open PIN dialog -->
+    <LinearLayout
+        android:id="@+id/pinHintRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16sp"
+        android:paddingVertical="6sp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="8sp"
+            android:contentDescription="@null"
+            android:src="@android:drawable/ic_dialog_info"
+            android:tint="@color/service_mode_accent"
+            tools:ignore="UseAppTint" />
+
+        <TextView
+            android:id="@+id/pinHintText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/service_mode_text_secondary"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- App list with progress overlay shown during ADB operations -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Empty state shown when there are no items in the current mode -->
+        <TextView
+            android:id="@+id/emptyStateText"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:padding="32dp"
+            android:textColor="@color/service_mode_text_secondary"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <!-- Touch interceptor — visible only during ADB ops to block list interaction -->
+        <View
+            android:id="@+id/listOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleLarge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

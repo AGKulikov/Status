@@ -144,6 +144,7 @@ public class StatusWidgetApplication extends Application {
             return;
         }
         ensureUnlockedRuntimeInitialized();
+        dezz.status.widget.adb.AdbLocalActions.restore(this);
         if (unlockedRuntimeInitialized) StartupPerformanceTrace.mark("application_runtime_ready");
     }
 

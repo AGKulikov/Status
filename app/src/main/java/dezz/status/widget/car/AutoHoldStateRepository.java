@@ -42,10 +42,24 @@ public final class AutoHoldStateRepository {
 
     /** Returns false for a missing or malformed state; malformed broadcasts never clear truth. */
     public static boolean accept(@NonNull Context context, @Nullable Object rawState) {
+        return accept(context, rawState, false);
+    }
+    public static boolean acceptCapture(@NonNull Context context, boolean state) {
+        return accept(context, state, true);
+    }
+    public static void invalidateCapture(@NonNull Context context) {
+        SharedPreferences prefs = preferences(context);
+        if (prefs.getBoolean("natroCapture", false) && prefs.contains(KEY_OBSERVED_AT)) {
+            prefs.edit().remove(KEY_OBSERVED_AT).apply();
+            context.sendBroadcast(new Intent(ACTION_CHANGED).setPackage(context.getPackageName()));
+        }
+    }
+    private static boolean accept(@NonNull Context context, @Nullable Object rawState, boolean capture) {
         Boolean state = VehicleDerivedMetrics.booleanState(rawState);
         if (state == null) return false;
         long now = System.currentTimeMillis();
         SharedPreferences.Editor editor = preferences(context).edit()
+                .putBoolean("natroCapture", capture)
                 .putBoolean(KEY_VALUE, state)
                 .putLong(KEY_OBSERVED_AT, now)
                 .putLong(KEY_BOOT_EPOCH, bootEpochMillis());

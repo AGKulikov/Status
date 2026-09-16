@@ -288,6 +288,7 @@ int getVersionCode() {
     // Complete physical-button catalog, shared media display owner and fork callout placement.
     if (version == '2.9.7') { return 208021330 }
     if (version == '2.9.8') { return 208021331 }
+    if (version == '2.9.9') { return 208021332 }
     if (version == '2.9.0') { return 208021323 }
     if (version == '2.8.9') { return 208021322 }
     if (version == '2.8.8') {

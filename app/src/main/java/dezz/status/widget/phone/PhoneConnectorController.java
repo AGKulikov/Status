@@ -1185,6 +1185,11 @@ public final class PhoneConnectorController {
 
     private void performStockConnectionRequest(long token, @NonNull String address) {
         if (!isCurrent(token) || !stockConnectionRequestInProgress) return;
+        if (stockConnectionAttempt > 0 && !new Preferences(context).adbBluetoothReconnect.get()) {
+            stockConnectionRequestInProgress = false;
+            stockConnectionStatus = "retry_disabled_by_adb_setting";
+            ensureGatt(token); return;
+        }
         PhoneOemConnectionBridge.RequestResult result =
                 PhoneOemConnectionBridge.requestStockConnection(context, address);
         stockConnectionAttempt++;

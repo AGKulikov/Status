@@ -747,6 +747,16 @@ public class Preferences {
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
     // Current Monjaro driver rail plus the read-only legacy profile used by one-time migration.
     public final Bool driverPanelEnabled = new Bool(this, "driverPanelEnabled", false);
+    // ADB service aliases have real consumers; defaults never activate new capture/gestures.
+    public final Bool adbForceStart = new Bool(this, "adbForceStart", false);
+    public final Bool adbGmcSidebar = new Bool(this, "adbGmcSidebar", false);
+    public final Bool adbHomeHotspotEnabled = new Bool(this, "adbHomeHotspotEnabled", false);
+    public final Bool adbThreeFinger = new Bool(this, "adbThreeFinger", false);
+    public final Bool adbAutoHoldCapture = new Bool(this, "adbAutoHoldCapture", false);
+    public final Bool adbAutoHoldSnapshot = new Bool(this, "adbAutoHoldSnapshot", false);
+    public final Bool adbAutoHoldUseShell = new Bool(this, "adbAutoHoldUseShell", false);
+    public final Bool adbBluetoothReconnect = new Bool(this, "adbBluetoothReconnect", true);
+    public final Bool adbTrafficLights = new Bool(this, "adbTrafficLights", true);
     public final Str driverPanelStyle = new Str(this, "driverPanelStyle",
             DriverPanelStyle.NEW.key);
     public final DriverPanelProfile driverPanelOld = new DriverPanelProfile(

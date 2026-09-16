@@ -108,6 +108,7 @@ public class BootReceiver extends BroadcastReceiver {
     }
 
     private void handleReceive(Context context, Intent intent) {
+        dezz.status.widget.adb.AdbLocalActions.restore(context);
         String action = intent == null ? null : intent.getAction();
         dezz.status.widget.diagnostics.ActionRecorder.record(
                 dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,

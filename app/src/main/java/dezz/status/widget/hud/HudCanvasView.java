@@ -1579,6 +1579,7 @@ public final class HudCanvasView extends View {
 
     private void drawTrafficLights(Canvas canvas, HudElementConfig item, RectF bounds,
                                    int fallbackColor, float scale) {
+        if (!dezz.status.widget.adb.AdbLocalActions.trafficLightsEnabled) return;
         HudNavigationState nav = data.navigation();
         List<HudNavigationState.TrafficLight> lights =
                 nav == null ? Collections.emptyList() : nav.trafficLights;

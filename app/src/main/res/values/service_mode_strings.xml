@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="service_mode_app_name">Stealth Mode</string>
+    <string name="service_mode_notification_content">Stealth Mode service is running</string>
+    <string name="service_mode_tab_hide">Hide</string>
+    <string name="service_mode_tab_restore">Restore</string>
+    <string name="service_mode_hide_mode_header">Check the apps you want to hide</string>
+    <string name="service_mode_restore_mode_header">Check the apps you want to restore</string>
+    <string name="service_mode_no_hidden_apps">No hidden apps to restore</string>
+
+    <string name="service_mode_apps_hidden_successfully">Apps hidden successfully</string>
+    <string name="service_mode_apps_hide_error">Apps hide error: %s</string>
+    <string name="service_mode_apps_restored_successfully">Apps restored successfully. Reboot the head unit so all background services start cleanly.</string>
+    <string name="service_mode_apps_restore_error">Apps restore error: %s</string>
+    <string name="service_mode_no_apps_selected">No apps selected</string>
+    <string name="service_mode_list_loading">Loading apps list…</string>
+    <string name="service_mode_no_connection_detected">No ADB or Telnet connection detected. Cannot hide or restore apps.</string>
+    <string name="service_mode_hide_apps">Hide selected apps</string>
+    <string name="service_mode_restore_apps">Restore selected apps</string>
+
+    <string name="service_mode_set_pin">Set PIN</string>
+    <string name="service_mode_change_pin">Change PIN</string>
+    <string name="service_mode_set_pin_title">Set unlock PIN</string>
+    <string name="service_mode_change_pin_title">Change unlock PIN</string>
+    <string name="service_mode_pin_dialog_message">Enter a numeric PIN (minimum 3 digits). To reveal the app after hiding, dial this PIN on the phone dialer.</string>
+    <string name="service_mode_pin_dialog_message_warn_hidden">Enter a new numeric PIN (minimum 3 digits). To reveal the app after hiding, dial this PIN on the phone dialer.\n\nWarning: apps are currently hidden. Remember your new PIN — it will replace the old one!</string>
+    <string name="service_mode_pin_hint">Enter PIN</string>
+    <string name="service_mode_pin_set_successfully">PIN set successfully</string>
+    <string name="service_mode_pin_too_short">PIN must be at least 3 digits</string>
+    <string name="service_mode_pin_no_leading_zero">PIN must not start with 0 — the dialer rejects such numbers</string>
+    <string name="service_mode_pin_required">Set a PIN code before hiding apps</string>
+    <string name="service_mode_default_pin_hint">Default PIN: %s (set your own for security)</string>
+
+    <string name="service_mode_hide_confirm_title">Confirm hiding</string>
+    <string name="service_mode_hide_confirm_message">The following apps will be hidden:\n\n%s\n\nProceed?</string>
+
+    <string name="service_mode_apps_hide_partial">%1$d apps hidden, %2$d failed</string>
+    <string name="service_mode_apps_restore_partial">%1$d apps restored, %2$d failed. Reboot the head unit so all background services start cleanly.</string>
+
+    <string name="service_mode_empty_hide_list">No user apps to hide</string>
+    <string name="service_mode_settings_description">Settings</string>
+    <string name="service_mode_menu_about">About</string>
+    <string name="service_mode_about_url" translatable="false">https://dezzk.github.io/stealth/</string>
+    <string name="service_mode_about_fallback"><![CDATA[
+        <p><b>Stealth Mode</b><br>
+        Hide user-installed apps on Android car head units before service visits.</p>
+        <p><b>Author</b><br>
+        Dezz — Telegram <a href="https://t.me/DezzK">@DezzK</a></p>
+        <p><b>Source code</b><br>
+        <a href="https://github.com/DezzK/stealth">github.com/DezzK/stealth</a></p>
+        <p><i>The full About page is available online at <a href="https://dezzk.github.io/stealth/">dezzk.github.io/stealth</a> when an internet connection is available.</i></p>
+    ]]></string>
+    <string name="service_mode_connection_details_title">Connection details</string>
+    <string name="service_mode_connection_details_intro">Could not reach the head unit on any expected service.</string>
+    <string name="service_mode_connection_details_intro_success">Probed the following services:</string>
+    <string name="service_mode_connection_attempt_success">connected</string>
+    <string name="service_mode_connection_attempt_active">in use</string>
+    <string name="service_mode_connection_attempt_also_works">also works</string>
+    <string name="service_mode_connection_details_in_progress">…discovery still in progress</string>
+    <string name="service_mode_connection_scanning_marker">(scanning…)</string>
+    <string name="service_mode_connection_host_searching">scanning ports…</string>
+    <string name="service_mode_connection_host_no_match">no supported services found</string>
+    <string name="service_mode_connection_host_no_open_ports">no open ports found</string>
+    <string name="service_mode_connection_port_probing">probing protocols…</string>
+    <string name="service_mode_connection_port_no_protocol">open, no supported protocol</string>
+    <string name="service_mode_connection_error_refused">Connection refused</string>
+    <string name="service_mode_connection_error_unreachable">Host unreachable</string>
+    <string name="service_mode_connection_error_timeout">Connection timeout</string>
+    <string name="service_mode_connection_error_pm_unavailable">pm command not available</string>
+    <string name="service_mode_connection_error_unknown">Failed</string>
+
+    <string name="service_mode_pin_required_dialog_message">A PIN code is required before hiding apps. After hiding, the app icon will disappear. To reveal it again, open the dialer, enter your PIN, and press the call button.\n\nSet a numeric PIN (minimum 3 digits):</string>
+
+    <string name="service_mode_permissions_required_title">Permissions required</string>
+    <string name="service_mode_permissions_required_message">Phone call permissions are required for the PIN unlock feature. Without them, you won\'t be able to reveal the app by dialing your PIN.</string>
+    <string name="service_mode_permissions_required_to_hide_message">To hide apps, the application needs phone call permissions. Without them, after hiding you will not be able to reveal the app by dialing PIN — the app icon will remain hidden with no way to restore it.\n\nGrant the permissions?</string>
+    <string name="service_mode_grant_permissions">Grant</string>
+    <string name="service_mode_permissions_open_settings_message">Phone call permissions were previously denied. To grant them, go to the app settings and enable them manually. Without these permissions, after hiding you will not be able to reveal the app by dialing PIN.</string>
+    <string name="service_mode_open_settings">Open settings</string>
+
+    <string name="service_mode_connection_checking">Connection: checking…</string>
+    <string name="service_mode_connection_connected">Connected via %s</string>
+    <string name="service_mode_connection_error">Not connected — tap for details</string>
+
+    <string name="service_mode_keepalive_channel_name">Background service</string>
+    <string name="service_mode_battery_opt_title">Improve reliability</string>
+    <string name="service_mode_battery_opt_message">After a few days the head unit may unload the app from memory, and then dialing the PIN won\'t reveal it. Letting the app ignore battery optimization makes this much less likely.\n\nOpen the system dialog to allow it?</string>
+    <string name="service_mode_battery_opt_grant">Allow</string>
+    <string name="service_mode_later">Later</string>
+</resources>

@@ -1,5 +1,6 @@
 """Behavioral replay of APK-verified physical-button timing, routing and typed parameters."""
 import pathlib
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -76,6 +77,45 @@ public class ButtonReplay {
     check(new ButtonBinding(4,"","custom.ACTION,ei:x:invalid","","").validationError().isEmpty(),"reference skips invalid extra");
     check(!new ButtonBinding(100,"","","","").validationError().isEmpty(),"missing driver action");
     check(!new ButtonBinding(34,"","  ","","").validationError().isEmpty(),"missing phone number");
+    Set<String> selectorActions=new HashSet<>();
+    Set<Integer> selectorSteps=new HashSet<>();
+    check(DriveSelectorButtonPreset.values().length==7,"seven selector commands");
+    for(DriveSelectorButtonPreset preset:DriveSelectorButtonPreset.values()) {
+      ButtonBinding old=new ButtonBinding(4,"keep app","old command","old target","keep shortcut");
+      ButtonBinding binding=preset.referenceBinding(old);
+      check(binding.validationError().isEmpty(),"preset valid without text entry");
+      check(binding.application.equals("keep app") && binding.shortcutJson.equals("keep shortcut"),"unrelated fields preserved");
+      check(old.command.equals("old command") && old.packageName.equals("old target"),"input not mutated");
+      check(DriveSelectorButtonPreset.fromBinding(binding)==preset,"preset round trip");
+      ButtonBinding nativeBinding=new ButtonBinding(preset.action.id,"","","","");
+      check(nativeBinding.validationError().isEmpty(),"native selector needs no intent parameters");
+      check(DriveSelectorButtonPreset.fromAction(nativeBinding.action)==preset,"native dispatch");
+      check(DriveSelectorButtonPreset.fromBinding(nativeBinding)==preset,"native label after reopen");
+      check(selectorActions.add(binding.command),"unique command");
+      check(selectorSteps.add(preset.steps),"unique step count");
+      check(binding.packageName.equals("dezz.monjaro.drive_modes"),"explicit destination");
+      check(!binding.command.endsWith("ISSHOWING"),"feedback not an action");
+      check(DriveSelectorButtonPreset.fromBinding(new ButtonBinding(4,"",binding.command+",ei:x:1",binding.packageName,""))==null,"manual extras not erased");
+      check(DriveSelectorButtonPreset.fromBinding(new ButtonBinding(4,"",binding.command,"another.app",""))==null,"other target not reinterpreted");
+      check(DriveSelectorButtonPreset.fromBinding(new ButtonBinding(31,"",binding.command,binding.packageName,""))==null,"activity not reinterpreted");
+    }
+    check(DriveSelectorButtonPreset.SHOW.steps==0,"SHOW never steps");
+    for(int step=-3;step<=3;step++)check(selectorSteps.contains(step),"missing selector step "+step);
+    List<Integer> order=Arrays.asList(10,20,30,40,50);
+    check(DriveSelectorStepPolicy.target(order,30,0)==null,"SHOW is read-only");
+    check(DriveSelectorStepPolicy.target(order,null,1)==null,"unknown actual never writes");
+    check(DriveSelectorStepPolicy.target(Collections.emptyList(),30,1)==null,"empty list");
+    check(DriveSelectorStepPolicy.target(Collections.singletonList(10),30,1)==null,"single mode");
+    check(DriveSelectorStepPolicy.target(order,30,1)==40,"next one");
+    check(DriveSelectorStepPolicy.target(order,30,2)==50,"next two");
+    check(DriveSelectorStepPolicy.target(order,30,3)==10,"next three wraps");
+    check(DriveSelectorStepPolicy.target(order,30,-1)==20,"previous one");
+    check(DriveSelectorStepPolicy.target(order,30,-2)==10,"previous two");
+    check(DriveSelectorStepPolicy.target(order,30,-3)==50,"previous three wraps");
+    check(DriveSelectorStepPolicy.target(order,99,1)==10,"known excluded next starts at first");
+    check(DriveSelectorStepPolicy.target(order,99,-1)==50,"known excluded previous starts at last");
+    check(DriveSelectorStepPolicy.target(Arrays.asList(10,20,30),10,3)==null,"full circle does not rewrite");
+    try { DriveSelectorStepPolicy.target(order,30,4);throw new AssertionError("unbounded steps"); } catch(IllegalArgumentException good){}
     Set<Integer> ids=new HashSet<>();for(ButtonAction a:ButtonAction.values())check(ids.add(a.id),"duplicate action");for(int i=0;i<=34;i++)check(ids.contains(i),"missing "+i);
     byte[] bytes=("vdex000000000000"+
       "ecarx.intent.action.ECARX_KEY_RSRC_EVENT\0handle_we_chat_action\0"+
@@ -101,8 +141,9 @@ class ButtonModelReplay(unittest.TestCase):
             (target / "ButtonReplay.java").write_text(HARNESS)
             sources = [str(JAVA / (name + ".java")) for name in (
                 "VehicleButton", "ButtonAction", "ButtonBinding",
-                "ButtonIntentSpec", "ButtonGestureEngine", "ButtonInputPatch")]
-            subprocess.run(["javac", "-encoding", "UTF-8", "-d", str(target),
+                "ButtonIntentSpec", "ButtonGestureEngine", "ButtonInputPatch", "DriveSelectorButtonPreset", "DriveSelectorStepPolicy")]
+            compiler = ["javac"] if shutil.which("javac") else ["java", "com.sun.tools.javac.Main"]
+            subprocess.run([*compiler, "-encoding", "UTF-8", "-d", str(target),
                             *sources, str(target / "ButtonReplay.java")], check=True, capture_output=True)
             result = subprocess.run(["java", "-cp", str(target), "ButtonReplay"], check=True,
                                     capture_output=True, text=True)

@@ -59,6 +59,21 @@ android {
     // the pre-flavor naming users and update instructions already rely on. Any future flavor gets
     // an explicit -<flavor> tag in the file name.
     applicationVariants.configureEach { variant ->
+        def compatAssets = tasks.register("prepare${variant.name.capitalize()}WechatCompat", Copy) {
+            dependsOn ':wechat-compat:assembleDebug'
+            from(project(':wechat-compat').layout.buildDirectory.file('outputs/apk/debug/wechat-compat-debug.apk'))
+            into(layout.buildDirectory.dir("generated/adbAssets/${variant.name}"))
+            rename { 'natro-wechat-compat.apk' }
+        }
+        variant.mergeAssetsProvider.configure {
+            dependsOn compatAssets
+            doLast {
+                copy {
+                    from(layout.buildDirectory.dir("generated/adbAssets/${variant.name}"))
+                    into(outputDir)
+                }
+            }
+        }
         variant.outputs.configureEach {
             def flavorTag = variant.flavorName == "geely" ? "" : "-${variant.flavorName}"
             outputFileName = "status-widget-ha-${variant.versionName}${flavorTag}-${variant.buildType.name}.apk"

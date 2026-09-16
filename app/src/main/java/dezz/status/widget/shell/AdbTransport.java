@@ -81,9 +81,16 @@ public class AdbTransport implements ShellTransport {
      * The RSA key pair is loaded or generated on first call and cached.
      */
     public static AdbTransport connect(Context context, String host, int port) throws Exception {
+        return connect(context, host, port, ignored -> {});
+    }
+
+    /** Publishes the socket before connect so an owning console can cancel AUTH as well as I/O. */
+    public static AdbTransport connect(Context context, String host, int port,
+                                       Consumer<Socket> socketSink) throws Exception {
         AdbCrypto crypto = getOrCreateCrypto(context);
 
         Socket socket = new Socket();
+        socketSink.accept(socket);
         AdbConnection connection = null;
         try {
             socket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
@@ -220,8 +227,30 @@ public class AdbTransport implements ShellTransport {
 
     @Override
     public void close() {
-        try { connection.close(); } catch (Exception ignored) {}
+        // Closing TCP first releases blocked reads before adblib joins its connection thread.
         try { socket.close(); } catch (Exception ignored) {}
+        try { connection.close(); } catch (Exception ignored) {}
+    }
+
+    /** Bounded consumers own buffering and cancellation; a missing exit marker is not success. */
+    public void execRaw(String command, Consumer<byte[]> consumer) throws Exception {
+        readService("shell:" + command, consumer);
+    }
+
+    /** ADB host services such as root: are protocol requests, not shell commands. */
+    public void readService(String service, Consumer<byte[]> consumer) throws Exception {
+        AdbStream stream = connection.open(service);
+        try {
+            while (true) {
+                byte[] chunk;
+                try { chunk = stream.read(); }
+                catch (IOException closed) { break; } // shell-v1 EOF; caller validates completion
+                if (chunk == null) break;
+                if (chunk.length > 0) consumer.accept(chunk);
+            }
+        } finally {
+            try { stream.close(); } catch (Exception ignored) {}
+        }
     }
 
     // ── Key pair management ───────────────────────────────────────────

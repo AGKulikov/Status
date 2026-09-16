@@ -230,6 +230,19 @@ public final class SettingsDestinationCatalog {
                 "intent", "dezz.status.widget.IntentScenarioSettingsActivity",
                 "руль", "broadcast", "android intent", "команда"));
 
+        values.add(activity("app_service_mode", Group.APP, "Сервисный режим",
+                "Скрытие и восстановление приложений, исключения и возврат по PIN",
+                "settings", "dezz.status.widget.servicemode.MainActivity",
+                "сервис", "stealth", "скрыть приложения", "восстановить", "PIN"));
+        values.add(activity("app_adb", Group.APP, "ADB",
+                "Терминал, разрешения, специальные возможности и параметры разработчика",
+                "diagnostics", "dezz.status.widget.AdbSettingsActivity",
+                "adb", "адб", "usb", "терминал", "команды", "mconfig", "мконфиг",
+                "разработчик", "gps", "mock_location", "постоянный adb", "проверка установки"));
+        values.add(activity("app_transfer", Group.APP, "Буфер обмена и файлы",
+                "Локальный сервер для iPhone: текст, файлы и команды ADB",
+                "import", "dezz.status.widget.LanTransferActivity",
+                "буфер", "clipboard", "iphone", "айфон", "модем", "hotspot", "wifi", "lan", "сервер", "файлы", "команды"));
         values.add(action("app_permissions", Group.APP, "Доступы приложения",
                 "Оверлей, уведомления, местоположение, статистика и спецвозможности",
                 "permissions", ACTION_PERMISSIONS,
