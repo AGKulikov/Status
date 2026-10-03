@@ -194,7 +194,15 @@
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
-        "research-2026-09-05/continuation/systems.json"
+        "research-2026-09-05/continuation/systems.json",
+        "../MHUD_7_1_MAP_AND_CONTROLS_AUDIT_RU.md"
+      ],
+      "evidence_updates": [
+        {
+          "date": "2026-10-03",
+          "level": "STATIC",
+          "finding": "mHUD7.1 переключает HUD AR_ENGINE через ECARX/Settings; это не патч vendor .so из прежнего HUD/LCA-скрипта. Связь этой AR-команды с машинкой и крыльями DIM физически не подтверждена. Статус OPEN сохранён."
+        }
       ],
       "coverage_ids": [
         "BASE-DIM",
@@ -213,7 +221,15 @@
       "sources": [
         "display/report.md",
         "research-2026-09-05/continuation/systems.json",
-        "research-2026-09-05/android_platform/systems.json"
+        "research-2026-09-05/android_platform/systems.json",
+        "../MHUD_7_1_MAP_AND_CONTROLS_AUDIT_RU.md"
+      ],
+      "evidence_updates": [
+        {
+          "date": "2026-10-03",
+          "level": "STATIC",
+          "finding": "В mHUD7.1 найдены HUD_ACTIVE0x20110100/manager32922 и HUD_AR_ENGINE0x27020200/manager32928; в AR-пункте показывать=true преобразуется в0. Это подтверждение кода референса, не runtime support. Старое notavailable и неизвестный физический результат не отменены; массовые записи по похожим именам/зонам не разрешены."
+        }
       ],
       "coverage_ids": [
         "BASE-HUD",
