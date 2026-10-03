@@ -104,10 +104,11 @@ public final class MediaAutoResumeController {
     public static void onManualTransportControl(@NonNull Context context) {
         long manual = MANUAL_GENERATION.incrementAndGet();
         Context app = applicationContext(context);
-        long capture = state(app).getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE);
+        // Never wait for SharedPreferences disk loading on the physical MEDIA command lane.
+        long capture = captureManualGeneration;
         EXACT_TIMER.execute(() -> {
-            if (manual == MANUAL_GENERATION.get() && captureManualGeneration != manual
-                    && state(app).getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) == capture
+            if (manual == MANUAL_GENERATION.get() && captureManualGeneration == capture
+                    && capture != manual
                     && !state(app).getBoolean(KEY_COMPLETED, true)) complete(app, "manual_transport_control");
         });
     }

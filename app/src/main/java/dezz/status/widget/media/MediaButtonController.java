@@ -58,13 +58,16 @@ public final class MediaButtonController {
                 && event.getAction() != KeyEvent.ACTION_UP)) { finished.run(); return; }
         final long received = SystemClock.uptimeMillis();
         final long owner = generation;
+        if (!MediaKeyPolicy.freshAt(event.getEventTime(), received)) {
+            record(event, "discarded_source_stale", received, received); finished.run(); return;
+        }
         // Reserve space for settings persistence and readiness callbacks during key bursts.
-        if (commands.getQueue().size() >= 8) { finished.run(); return; }
+        if (commands.getQueue().size() >= 8) { record(event, "queue_full", received, received); finished.run(); return; }
         try {
             commands.execute(() -> {
                 long started = SystemClock.uptimeMillis();
                 try {
-                    if (owner != generation || started - received > 750L) {
+                    if (owner != generation || !MediaKeyPolicy.freshAt(event.getEventTime(), started)) {
                         record(event, "discarded_stale", received, started);
                         return;
                     }
@@ -111,6 +114,22 @@ public final class MediaButtonController {
     /** Invoked by the ordinary startup owner, never by a physical-key callback. */
     public void restoreStored() {
         ButtonRouteRestorer.restore(context);
+    }
+
+    /** Called explicitly at MY_PACKAGE_REPLACED, even if Application already started this singleton. */
+    public void recoverAfterPackageReplacement() {
+        control(() -> {
+            synchronized (this) {
+                generation++;
+                if (registered) { context.unregisterReceiver(receiver); registered = false; }
+                if (inputThread != null) { inputThread.quitSafely(); inputThread = null; }
+                reconcileReceiver();
+                DiagnosticJournal.infoAsync("media-buttons", "receiver_reconnected reason=package_replaced"
+                        + ", enabled=" + enabled + ", registered=" + registered);
+            }
+            VehicleButtonController.get(context).reconnectAfterUpdate("package_replaced");
+            ButtonRouteRestorer.restore(context, true);
+        });
     }
 
     synchronized boolean beginStoredRestore() {
@@ -246,7 +265,8 @@ public final class MediaButtonController {
         DiagnosticJournal.infoAsync("media-buttons", "code=" + event.getKeyCode()
                 + ", action=" + event.getAction() + ", repeat=" + event.getRepeatCount()
                 + ", event_uptime=" + event.getEventTime() + ", down_uptime=" + event.getDownTime()
-                + ", received_uptime=" + received + ", queue_ms=" + (started - received)
+                + ", received_uptime=" + received + ", source_age_ms=" + (received - event.getEventTime())
+                + ", queue_ms=" + (started - received) + ", dispatch_ms=" + (SystemClock.uptimeMillis() - started)
                 + ", result=" + result + ", audio_output=unobserved");
     }
     public static String quote(String value) { return "'" + value.replace("'", "'\\''") + "'"; }

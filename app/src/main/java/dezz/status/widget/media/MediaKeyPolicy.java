@@ -25,6 +25,11 @@ public final class MediaKeyPolicy {
         return NATRO.equals(action) ? Route.STOCK_BROADCAST : Route.IGNORE;
     }
 
+    /** KeyEvent and SystemClock use uptime; reject upstream backlog as well as our own queue. */
+    public static boolean freshAt(long eventUptime, long nowUptime) {
+        return eventUptime > 0 && eventUptime <= nowUptime && nowUptime - eventUptime <= 750L;
+    }
+
     /** Identity excludes broadcast action: a returned MEDIA event is the same original key. */
     public synchronized boolean admit(int code, int action, int repeat, long downTime,
                                       long eventTime, int device, int scan, int source) {

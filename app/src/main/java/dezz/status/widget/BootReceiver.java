@@ -84,6 +84,9 @@ public class BootReceiver extends BroadcastReceiver {
             // Record this before admitting the new foreground host. The UI may appear immediately,
             // while only its BLE/GATT transport waits for the killed process registration to drain.
             PackageReplaceBleRecoveryGate.mark(receiverContext);
+            // Input recovery is independent of UI, BLE and the shared startup queue.
+            dezz.status.widget.media.MediaButtonController.get(receiverContext)
+                    .recoverAfterPackageReplacement();
         }
         // Admit media to its dedicated exact-timer lane before submitting shared startup work.
         // Putting timer creation there let unrelated restoration postpone seconds by minutes.

@@ -335,7 +335,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java": {
-      "sha256": "00032967ae807eb4577472ffd90da567ba338c95e169cb6747723ec904c9488f",
+      "sha256": "70ed0b7eb2d3a01fe2782b4fda34492d233a92f928f1b8e9d2610b66898d3b82",
       "access_kinds": [
         "preferences"
       ]
@@ -373,13 +373,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/ButtonRouteRestorer.java": {
-      "sha256": "306fecdc7349bc71481fcdf2a0876a50e596bbb8c36be235bf39a70cd114671a",
+      "sha256": "bb6f938259230b9e0e3f17c06e49ffdedaf5898a08b7d7b36903618a9ada47ec",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/media/MediaButtonController.java": {
-      "sha256": "c5b709b8007df158bc6bb2910c5b0bb97ff48b1f4bcd46123307e4e559f8c97d",
+      "sha256": "1b310e4d49f58e65eb013a5e76f99bf6a9305abbb453a3dfff2da28e76a724fb",
       "access_kinds": [
         "preferences"
       ]
@@ -391,7 +391,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java": {
-      "sha256": "bf61c54f066c1d70d8704b5e05ac89093fb7e24288691e16cea48a3d8086dcbb",
+      "sha256": "3fdecaa83713513768c0c2a4d7ed7678b743fc451c75efaa9ead867c68fd7cf4",
       "access_kinds": [
         "preferences"
       ]
