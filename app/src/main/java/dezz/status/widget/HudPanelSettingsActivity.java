@@ -538,8 +538,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 profile.maximumFps, 5, 60, 1, " кадр/с");
 
         form.addView(section("Состав и цвет карты HUD"), marginTop(16));
-        Spinner dayNight = dayNightSpinner(profile.automaticDayNight, profile.nightMode);
-        form.addView(label("Оформление день / ночь"), marginTop(8));
+        Spinner dayNight = dayNightSpinner(false, true);
+        dayNight.setEnabled(false);
+        form.addView(label("Оформление карты HUD — всегда ночь"), marginTop(8));
         form.addView(dayNight);
         Switch showRoute = switchView("Маршрут", profile.showRoute);
         Switch showAlternativeRoutes = switchView(

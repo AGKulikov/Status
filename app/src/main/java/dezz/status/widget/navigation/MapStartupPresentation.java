@@ -13,8 +13,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
 
-/** Optional, bounded first-presentation protection. No dependency on diagnostic sampling. */
+/** Reject confirmed white startup frames; unavailable readback has a bounded fallback. */
 public final class MapStartupPresentation {
+    private static final long COPY_TIMEOUT_MS = 400;
     private static final ThreadPoolExecutor copy = new ThreadPoolExecutor(2, 2, 10,
             TimeUnit.SECONDS, new ArrayBlockingQueue<>(2), r -> {
                 Thread t = new Thread(r, "natro-map-bootstrap-copy"); t.setDaemon(true); return t;
@@ -25,18 +26,21 @@ public final class MapStartupPresentation {
     }
     static { copy.allowCoreThreadTimeOut(true); }
     private final Handler main = new Handler(Looper.getMainLooper());
-    private long epoch, started, timestamp = Long.MIN_VALUE;
+    private long epoch, started, sampleSerial, timestamp = Long.MIN_VALUE;
     private int differentFrames;
-    private boolean sampling, finished;
+    private boolean sampling, finished, lastCopied, lastWhite;
     private Surface surface;
     private Runnable reveal;
-    private final Runnable timeout = () -> finish("bounded_fallback");
+    private Runnable copyTimeout;
+    private final Runnable timeout = this::deadlineReached;
     private final Runnable sample = this::sample;
 
     public void reset() {
         epoch++; main.removeCallbacks(timeout); main.removeCallbacks(sample);
+        cancelCopyTimeout();
         surface = null; reveal = null; differentFrames = 0;
         timestamp = Long.MIN_VALUE; sampling = false; finished = false;
+        lastCopied = false; lastWhite = false;
     }
     public void onFrame(Surface current, long frameTimestamp, Runnable show) {
         if (surface != null && surface != current) reset();
@@ -53,8 +57,11 @@ public final class MapStartupPresentation {
     private void sample() {
         if (finished || sampling || surface == null || !surface.isValid()) return;
         final long owner = epoch;
+        final long attempt = ++sampleSerial;
         final Surface target = surface;
         sampling = true;
+        copyTimeout = () -> completed(owner, attempt, false, false);
+        main.postDelayed(copyTimeout, COPY_TIMEOUT_MS);
         try {
             copy.execute(() -> {
                 Bitmap bitmap = null;
@@ -72,29 +79,50 @@ public final class MapStartupPresentation {
                             }
                         } catch (RuntimeException failed) { copied = false; }
                         finally { result.recycle(); }
-                        completed(owner, copied, white);
+                        completed(owner, attempt, copied, white);
                     }, CallbackThread.handler);
                 } catch (RuntimeException | OutOfMemoryError unavailable) {
                     if (bitmap != null) bitmap.recycle();
-                    completed(owner, false, false);
+                    completed(owner, attempt, false, false);
                 }
             });
         } catch (java.util.concurrent.RejectedExecutionException busy) {
-            sampling = false; // The independent deadline remains armed.
+            completed(owner, attempt, false, false);
         }
     }
-    private void completed(long owner, boolean copied, boolean white) {
+    private void completed(long owner, long attempt, boolean copied, boolean white) {
         main.post(() -> {
-            if (owner != epoch || finished) return;
+            if (owner != epoch || attempt != sampleSerial || !sampling || finished) return;
+            cancelCopyTimeout();
             sampling = false;
+            lastCopied = copied;
+            lastWhite = copied && white;
             long elapsed = SystemClock.uptimeMillis() - started;
-            if (MapBootstrapPolicy.mayReveal(elapsed, differentFrames, copied, white)) finish("sample_accepted");
-            else main.postDelayed(sample, 50);
+            if (MapBootstrapPolicy.mayReveal(elapsed, differentFrames, copied, white))
+                finish(copied ? "sample_accepted" : "readback_unavailable");
+            else main.postDelayed(sample, elapsed >= MapBootstrapPolicy.MAX_WAIT_MS ? 200 : 50);
         });
+    }
+    private void deadlineReached() {
+        if (finished || reveal == null) return;
+        if (lastCopied && lastWhite) {
+            // A deadline cannot turn a positively identified white buffer into a usable map.
+            // Sampling continues without waiting for tiles/ACK. Each attempt has its own
+            // watchdog, so broken PixelCopy cannot turn this into an unavailable-readback gate.
+            DiagnosticJournal.infoAsync("map-startup", "presentation=white_frame_held");
+            if (!sampling) { main.removeCallbacks(sample); sample(); }
+        } else {
+            finish("bounded_fallback");
+        }
+    }
+    private void cancelCopyTimeout() {
+        if (copyTimeout != null) main.removeCallbacks(copyTimeout);
+        copyTimeout = null;
     }
     private void finish(String reason) {
         if (finished || reveal == null) return;
         finished = true; main.removeCallbacks(timeout); main.removeCallbacks(sample);
+        cancelCopyTimeout();
         Runnable show = reveal; reveal = null;
         if (surface == null || !surface.isValid()) return;
         DiagnosticJournal.infoAsync("map-startup", "presentation=" + reason + ", wait_ms="

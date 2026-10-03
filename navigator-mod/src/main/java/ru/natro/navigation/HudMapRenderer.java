@@ -2,7 +2,6 @@
 package ru.natro.navigation;
 
 import android.content.Context;
-import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -472,6 +471,7 @@ final class HudMapRenderer {
                 + ", elapsed_ms=" + (now - started) + ", mono_ms=" + now
                 + ", size=" + width + "x" + height + ", roads_only=" + profile.roadsOnly
                 + ", night_requested=" + profile.nightMode + ", auto_night=" + profile.automaticDayNight
+                + ", night_effective=" + currentNightMode()
                 + ", configured=" + mapConfigured + ", surface_attached=" + runtimeSurfaceAttached);
     }
 
@@ -608,9 +608,9 @@ final class HudMapRenderer {
 
     /** Basic appearance must not depend on an optional layer or FPS API succeeding first. */
     private boolean currentNightMode() {
-        boolean systemNight = (context.getResources().getConfiguration().uiMode
-                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        return profile.automaticDayNight ? systemNight : profile.nightMode;
+        // Both independent displays stay dark, including before configuration arrives.
+        // MainMapController owns the main Navigator map and keeps its separate theme policy.
+        return true;
     }
 
     private void applyMapBackground(Object currentMap, boolean night, boolean transparent) {
@@ -773,10 +773,8 @@ final class HudMapRenderer {
     }
 
     private void applyRoadEventVisibility() {
-        boolean systemNight = (context.getResources().getConfiguration().uiMode
-                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         routeRoadEventMapLayer.configure(profile.roadEventModes, routeGuidanceActive,
-                profile.automaticDayNight ? systemNight : profile.nightMode,
+                currentNightMode(),
                 routeGuidanceActive && cameraDirectionMapLayer.hasRouteInventory(),
                 profile.roadEventScalePercent, profile.cameraScalePercent,
                 profile.effectiveRoadEventPriority());

@@ -18,6 +18,31 @@ import dezz.status.widget.hud.HudElementConfig;
 import dezz.status.widget.hud.HudElementType;
 
 public final class NavigationHudV2ContractTest {
+    @Test public void externalMapsAlwaysUseNightAcrossLegacyImportAndRoundTrip() throws Exception {
+        for (boolean automatic : new boolean[]{false, true}) {
+            for (boolean night : new boolean[]{false, true}) {
+                String profile = "{\"automaticDayNight\":" + automatic
+                        + ",\"nightMode\":" + night + "}";
+                NavigationIntegrationConfig config = NavigationIntegrationConfig.fromJson(
+                        "{\"mainMap\":" + profile + ",\"hudMap\":" + profile
+                                + ",\"clusterMap\":" + profile + "}");
+                for (int pass = 0; pass < 2; pass++) {
+                    assertEquals(automatic, config.mainMap.automaticDayNight);
+                    assertEquals(night, config.mainMap.nightMode);
+                    assertFalse(config.hudMap.automaticDayNight);
+                    assertTrue(config.hudMap.nightMode);
+                    assertFalse(config.clusterMap.automaticDayNight);
+                    assertTrue(config.clusterMap.nightMode);
+                    config = NavigationIntegrationConfig.fromJson(config.toJson().toString());
+                }
+            }
+        }
+        NavigationIntegrationConfig defaults = new NavigationIntegrationConfig();
+        assertTrue(defaults.hudMap.nightMode);
+        assertTrue(defaults.clusterMap.nightMode);
+        assertTrue(defaults.mainMap.automaticDayNight);
+    }
+
     @Test public void mainAndHudProfilesAreIndependentAndRoundTrip() throws Exception {
         NavigationIntegrationConfig config = new NavigationIntegrationConfig();
         config.mainMap.zoomDelta = 2.5d;

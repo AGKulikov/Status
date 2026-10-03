@@ -694,8 +694,9 @@ public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
                 map.maximumFps, 5, 60, 1, " кадр/с");
 
         content.addView(section("Состав карты"), marginTop(14));
-        Spinner dayNight = dayNightSpinner(map.automaticDayNight, map.nightMode);
-        content.addView(label("Оформление день / ночь"), marginTop(6));
+        Spinner dayNight = dayNightSpinner(false, true);
+        dayNight.setEnabled(false);
+        content.addView(label("Оформление карты приборки — всегда ночь"), marginTop(6));
         content.addView(dayNight);
         Switch route = switchView("Маршрут", map.showRoute);
         Switch alternativeRoutes = switchView(

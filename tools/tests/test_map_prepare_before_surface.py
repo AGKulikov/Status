@@ -63,8 +63,8 @@ public class Replay {
  void reportMapReady(boolean v){} void syncOverlayNavigationState(){}
  Object createOptionalLayer(Object a,Class<?> b,Class<?> c,Object d,String e){return null;}
  void createRoadEventsLayer(Object a,Class<?> b,Class<?> c,Object d){}
- void applyProfile(){applyMapBackground(map,profile.nightMode,profile.roadsOnly);}
- boolean currentNightMode(){return profile.nightMode;}
+ void applyProfile(){applyMapBackground(map,currentNightMode(),profile.roadsOnly);}
+ NIGHT_METHOD
  void observeMapLoading(){check(runtimeSurfaceAttached,"observer must not gate attachment");}
  void acknowledgeMapContent(){} void stopRenderer(boolean b){}
  String shortMessage(Throwable t){return t.toString();}
@@ -77,10 +77,13 @@ public class Replay {
  static void check(boolean b,String message){if(!b)throw new AssertionError(message);}
  public static void main(String[] args){
   String scenario=args[0];
+  for(String target:new String[]{"hudMap","clusterMap"})
+  for(boolean automatic:new boolean[]{false,true})
   for(boolean night:new boolean[]{false,true})for(boolean transparent:new boolean[]{false,true}){
    com.yandex.mapkit.map.MapWindow.Map.rejectNight=scenario.equals("nightFailure");
    com.yandex.mapkit.map.MapWindow.Map.rejectTransparency=scenario.equals("transparencyFailure");
    Replay r=new Replay();r.profile.nightMode=night;r.profile.roadsOnly=transparent;
+   r.profileSection=target;r.profile.automaticDayNight=automatic;
    if(scenario.equals("invalid"))r.surface.valid=false;
    if(scenario.equals("disabled"))r.profile.enabled=false;
    r.startRenderer();
@@ -90,12 +93,13 @@ public class Replay {
    }
    com.yandex.mapkit.map.MapWindow window=(com.yandex.mapkit.map.MapWindow)r.mapWindow;
    check(window.frames==1,"attach exactly once");
-   check(window.firstNight==(night&&!scenario.equals("nightFailure")),"first buffer night mode");
+   check(window.firstNight==!scenario.equals("nightFailure"),"first buffer always night on "+target);
    check(window.firstTransparent==(transparent&&!scenario.equals("transparencyFailure")),"first buffer transparency");
    r.startRenderer();check(window.frames==1,"reconcile must not attach twice");
   }
  }
 }'''.replace("START_METHOD", method(renderer, "private void startRenderer()"))
+                .replace("NIGHT_METHOD", method(renderer, "private boolean currentNightMode()"))
                 .replace("TRACE_METHOD", method(renderer, "private void traceStartup("))
                 .replace("BACKGROUND_METHOD", method(renderer, "private void applyMapBackground(")),
         }

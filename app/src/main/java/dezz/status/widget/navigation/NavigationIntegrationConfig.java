@@ -307,6 +307,10 @@ public final class NavigationIntegrationConfig {
 
         private MapProfile(@NonNull Target target) {
             this.target = target;
+            if (target != Target.MAIN) {
+                automaticDayNight = false;
+                nightMode = true;
+            }
             resetRoadEventModes();
         }
 
@@ -692,6 +696,11 @@ public final class NavigationIntegrationConfig {
         }
 
         void normalize() {
+            // Migrates saved/imported day or automatic profiles for the two external maps.
+            if (target != Target.MAIN) {
+                automaticDayNight = false;
+                nightMode = true;
+            }
             cameraMode = enumText(cameraMode, "FOLLOW_ROUTE",
                     "FOLLOW_ROUTE", "NORTH_UP", "HEADING_UP", "FREE");
             fixedZoomLevel = clamp(fixedZoomLevel, 2d, 21d, 16d);

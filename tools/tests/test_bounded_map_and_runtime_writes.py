@@ -53,6 +53,7 @@ import dezz.status.widget.media.RuntimePreferenceWriter;
 public class OwnersReplay {
  static void check(boolean v,String why){if(!v)throw new AssertionError(why);}
  static void waitCopy()throws Exception {long stop=System.nanoTime()+2_000_000_000L;while(PixelCopy.calls==0&&System.nanoTime()<stop)Thread.sleep(1);check(PixelCopy.calls>0,"copy worker ran");Handler.advance(Handler.now);}
+ static void waitNextCopy(int previous)throws Exception {long stop=System.nanoTime()+2_000_000_000L;while(PixelCopy.calls<=previous&&System.nanoTime()<stop)Thread.sleep(1);check(PixelCopy.calls>previous,"next copy worker ran");Handler.advance(Handler.now);}
  static class Prefs implements SharedPreferences {
   Map<String,Object> data=new HashMap<>();int commits,failures;
   public Editor edit(){return new Editor(){Map<String,Object> changes=new HashMap<>();
@@ -80,12 +81,25 @@ public class OwnersReplay {
    check(MapBootstrapPolicy.opaqueWhite(new int[]{-1,-1,-1}),"opaque white rejected");
    for(int c:new int[]{0,0x00ffffff,0xff101010,0xff808080,0xffe0e0e0,0xff0099ff})check(!MapBootstrapPolicy.opaqueWhite(new int[]{c,c,c}),"transparent, dark and normal maps allowed");return;
   }
-  PixelCopy.mode=test.equals("white_timeout")?"white":test.equals("copy_failed")?"failed":test.equals("copy_blocked")?"blocked":test.equals("revoked_callback")?"late":"transparent";
+  PixelCopy.mode=test.startsWith("white_")?"white":test.equals("copy_failed")?"failed":test.equals("copy_blocked")?"blocked":test.equals("revoked_callback")?"late":"transparent";
   MapStartupPresentation owner=new MapStartupPresentation();Surface surface=new Surface();AtomicInteger shown=new AtomicInteger();
   owner.onFrame(surface,10,shown::incrementAndGet);
   if(!test.equals("single_initial_buffer"))owner.onFrame(surface,11,shown::incrementAndGet);
   Handler.advance(199);check(shown.get()==0,"settle period protects initial callback");
   Handler.advance(200);waitCopy();
+  if(test.startsWith("white_")){
+   check(!MapBootstrapPolicy.mayReveal(800,2,true,true),"deadline must not admit confirmed white");
+   for(long t=250;t<=800;t+=50){int previous=PixelCopy.calls;Handler.advance(t);waitNextCopy(previous);}
+   check(shown.get()==0,"both policy and independent timeout keep known white hidden");
+   PixelCopy.mode=test.equals("white_copy_failed")?"failed":test.equals("white_copy_blocked")?"blocked":test.equals("white_late_callback")?"late":"transparent";
+   int previous=PixelCopy.calls;Handler.advance(1000);waitNextCopy(previous);
+   if(test.equals("white_copy_blocked")||test.equals("white_late_callback")){
+    check(shown.get()==0,"wait for new sample within its bounded budget");Handler.advance(1400);
+   }
+   check(shown.get()==1,"nonwhite or unavailable readback recovers without tile ACK");
+   if(test.equals("white_late_callback")){PixelCopy.late.run();Handler.advance(1500);check(shown.get()==1,"late timed-out sample cannot reveal twice");}
+   owner.onFrame(surface,99,shown::incrementAndGet);Handler.advance(2000);check(shown.get()==1,"live map never regated");return;
+  }
   if(test.equals("transparent_map")){check(shown.get()==1,"transparent roads-only must not need content heuristic");Handler.advance(1000);check(shown.get()==1,"show once");return;}
   if(test.equals("revoked_callback")){
    owner.reset();surface.valid=false;PixelCopy.late.run();Handler.advance(1000);check(shown.get()==0,"old result cannot show revoked surface");
@@ -121,7 +135,8 @@ class BoundedOwnersTest(unittest.TestCase):
 
     def test_bounded_presentation_and_persistence(self):
         for name in ['coalesced_writes', 'failed_write_retries', 'white_classifier',
-                     'white_timeout', 'copy_failed', 'copy_blocked', 'transparent_map',
+                     'white_timeout', 'white_copy_failed', 'white_copy_blocked',
+                     'white_late_callback', 'copy_failed', 'copy_blocked', 'transparent_map',
                      'single_initial_buffer', 'revoked_callback']:
             with self.subTest(name=name):
                 r = subprocess.run(['java', '-cp', str(self.out), 'OwnersReplay', name], capture_output=True, text=True, timeout=8)

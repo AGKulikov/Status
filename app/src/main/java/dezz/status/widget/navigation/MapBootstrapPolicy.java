@@ -14,6 +14,7 @@ public final class MapBootstrapPolicy {
         return white * 100L >= pixels.length * 99L;
     }
     public static boolean mayReveal(long elapsed, int differentFrames, boolean copied, boolean white) {
-        return elapsed >= MAX_WAIT_MS || (elapsed >= SETTLE_MS && differentFrames >= 2 && copied && !white);
+        if (copied && white) return false;
+        return elapsed >= MAX_WAIT_MS || (elapsed >= SETTLE_MS && differentFrames >= 2 && copied);
     }
 }
