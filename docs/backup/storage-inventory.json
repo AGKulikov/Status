@@ -6,7 +6,7 @@
   "shared_preferences": [
     {
       "name": "{package}_preferences",
-      "contents": "Основные настройки, JSON документов, маршруты, сценарии, назначения экранных кнопок, HUD, DIM, шторка, телефон, ADB-флаги.",
+      "contents": "Основные настройки, JSON документов, маршруты, сценарии, назначения экранных кнопок, HUD, DIM, шторка, телефон, ADB-флаги. Пассажирская панель, независимое избранное/документы ячеек, каталог приложений и PASSENGER-сценарии.",
       "restore_policy_to_implement": "Частично: исключены 13 секретных/локальных ключей и 9 ключей SystemUI.",
       "source": "app/src/main/java/dezz/status/widget/Preferences.java"
     },
@@ -188,7 +188,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/AppRuntimeBootstrap.java": {
-      "sha256": "593b35b34c84beb97fa8bd675adea098ac5b7c6e9444a8188f8691f7b88b68a3",
+      "sha256": "dff92a0c81eb18974ea08205fc4e59b484306375c48e4ed152428729a1de32b7",
       "access_kinds": [
         "files"
       ]
@@ -212,14 +212,14 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/Preferences.java": {
-      "sha256": "a2ca6f45803c24573488691cfe241c478dc5c2cf0817be34dfcd75177c4f6646",
+      "sha256": "7a6de36134cf85a9c87cb9a57e7e8c5c64926fd020419866d7e10343aed63bb7",
       "access_kinds": [
         "keystore",
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/PresetsActivity.java": {
-      "sha256": "8cd6432e9e375584c60e6b4d247904e7724914015669b22678e0829945921572",
+      "sha256": "dfae2534cae76bdaa484c503774c385faeb192b34f3ab437439b583b161a4f39",
       "access_kinds": [
         "external_resource",
         "files"
@@ -238,7 +238,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/SettingsHubActivity.java": {
-      "sha256": "3491350237bff0d77dab20e74ca22007d9777bd2931d915129b39758f8879ce6",
+      "sha256": "f505cd7dc8934d8e2087008bbd4b5f7472b071b9a42c9aea7f5f9845463ad2b4",
       "access_kinds": [
         "external_resource",
         "files"

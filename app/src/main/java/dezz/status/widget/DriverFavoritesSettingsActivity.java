@@ -40,7 +40,11 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Editor for the independent mixed-content Favorites drawer on the driver rail. */
-public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
+public class DriverFavoritesSettingsActivity extends AppCompatActivity {
+    protected boolean passengerPanel() { return false; }
+    private Preferences.Str selectedPanel() {
+        return passengerPanel() ? preferences.passengerFavoritesSelectedPanelId : preferences.driverFavoritesSelectedPanelId;
+    }
     private Preferences preferences;
     private DriverFavoritesPanelStore panelStore;
     private DriverFavoritesPanelConfig panel;
@@ -53,12 +57,12 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
-        panelStore = new DriverFavoritesPanelStore(preferences);
-        panel = panelStore.resolve(preferences.driverFavoritesSelectedPanelId.get());
-        preferences.driverFavoritesSelectedPanelId.set(panel.id);
-        store = LauncherShortcutStore.forDriverFavorites(preferences, panel.id);
+        panelStore = new DriverFavoritesPanelStore(preferences, passengerPanel());
+        panel = panelStore.resolve(selectedPanel().get());
+        selectedPanel().set(panel.id);
+        store = LauncherShortcutStore.forPanelFavorites(preferences, panel.id, passengerPanel());
         picker = new ShortcutActionPicker(this, preferences, store, this::changed);
-        setTitle("Избранное водителя · " + panel.title);
+        setTitle((passengerPanel() ? "Избранное пассажира · " : "Избранное водителя · ") + panel.title);
         View content = buildContent();
         setContentView(content);
         SettingsBackNavigation.install(this, content);
@@ -82,7 +86,7 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
         root.setBackgroundColor(0xFF0B0E13);
         scroll.addView(root, new ScrollView.LayoutParams(match(), wrap()));
 
-        root.addView(text("Избранное водителя · " + panel.title, 25, Color.WHITE));
+        root.addView(text((passengerPanel() ? "Избранное пассажира · " : "Избранное водителя · ") + panel.title, 25, Color.WHITE));
         root.addView(text("Можно создать любое количество независимых компактных панелей. "
                 + "Каждая вызывающая кнопка привязывается к выбранной панели, а автоматизация "
                 + "может адресно показать или скрыть её без нажатия.",
@@ -416,7 +420,7 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
     }
 
     private void openPanel(@NonNull String id) {
-        preferences.driverFavoritesSelectedPanelId.set(id);
+        selectedPanel().set(id);
         recreate();
     }
 
@@ -547,7 +551,8 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
     }
 
     private void applyPanel() {
-        if (preferences.driverPanelEnabled.get()) DriverPanelService.apply(this);
+        if (passengerPanel()) dezz.status.widget.driver.PassengerPanelService.apply(this);
+        else if (preferences.driverPanelEnabled.get()) DriverPanelService.apply(this);
     }
 
     @NonNull
@@ -565,7 +570,7 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
                 if (LauncherShortcutStore.isDriverFavoritesTarget(shortcut.target)) {
                     DriverFavoritesPanelConfig target = panelStore.resolve(
                             LauncherShortcutStore.driverFavoritesPanelId(shortcut.target));
-                    return "Избранное водителя · " + target.title;
+                    return (passengerPanel() ? "Избранное пассажира · " : "Избранное водителя · ") + target.title;
                 }
                 return LauncherShortcutStore.Builtin.fromKey(shortcut.target).label;
         }

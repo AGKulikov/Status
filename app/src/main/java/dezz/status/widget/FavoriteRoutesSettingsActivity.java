@@ -27,7 +27,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
@@ -47,7 +46,7 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual autosaving editor for the idle state of the combined navigation HOME panel. */
-public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
+public final class FavoriteRoutesSettingsActivity extends LauncherProfileActivity {
     private interface IntChange { void set(int value); }
 
     private Preferences preferences;
@@ -64,7 +63,7 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        preferences = new Preferences(this);
+        preferences = createLauncherPreferences(true);
         store = new FavoriteRoutesConfigStore(preferences);
         routes.addAll(store.load());
         editScheduler = PanelEditScheduler.onMainThread(this::applyPreviewState, () -> {

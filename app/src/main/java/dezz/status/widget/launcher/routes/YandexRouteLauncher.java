@@ -42,6 +42,20 @@ public final class YandexRouteLauncher {
             return false;
         }
 
+        if (context instanceof dezz.status.widget.LauncherProfileActivity
+                && ((dezz.status.widget.LauncherProfileActivity) context).isPassengerLauncherProfile()) {
+            // The ECARX ddnavwin/MAIN bridge owns the driver's window only.
+            String pkg = route.product == FavoriteRouteConfig.Product.MAPS
+                    ? "ru.yandex.yandexmaps" : "ru.yandex.yandexnavi";
+            try {
+                context.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, deepLink)
+                        .setPackage(pkg).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+                return true;
+            } catch (RuntimeException error) {
+                dezz.status.widget.launcher.PassengerHomeLauncher.reportFailure(context, error);
+                return false;
+            }
+        }
         if (!route.floating) {
             return startDeepLink(
                     context, route.product, deepLink, alternateDeepLink, false);
@@ -80,7 +94,7 @@ public final class YandexRouteLauncher {
     }
 
     @NonNull
-    static Uri deepLink(@NonNull FavoriteRouteConfig.Product product,
+    public static Uri deepLink(@NonNull FavoriteRouteConfig.Product product,
                         @Nullable String address, @Nullable String coordinates) {
         String coordinateValue = coordinates == null ? "" : coordinates.trim();
         String scheme = product == FavoriteRouteConfig.Product.MAPS

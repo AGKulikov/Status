@@ -101,7 +101,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     private static final String TAG = "DriverPanelOverlay";
-    private static final int DISPLAY_ID = Display.DEFAULT_DISPLAY;
+    private final int displayId;
+    private final boolean passenger;
     /** Let a busy ECARX rail process the same outside-touch before closing its open drawer. */
     private static final long FAVORITES_OUTSIDE_DISMISS_DELAY_MS = 450L;
 
@@ -192,7 +193,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                                      @NonNull LauncherAppCatalog.App app) {
             try {
                 dismissAllApps();
-                context.startActivity(LauncherAppCatalog.launchIntent(app));
+                PanelDisplayLauncher.start(context, LauncherAppCatalog.launchIntent(app), displayId);
                 scheduleRaiseAfterExternalLaunch();
             } catch (RuntimeException error) {
                 Toast.makeText(context, "Не удалось открыть " + app.label,
@@ -210,7 +211,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     context, app.packageName, app.systemApp)) return;
             AttachedWindow current = drawerWindow;
             if (current != null) current.setTouchable(false);
-            if (!AppUninstallLauncher.request(context, app, attachedType)
+            if (!AppUninstallLauncher.request(PanelDisplayLauncher.scoped(context, displayId), app, attachedType)
                     && current != null) {
                 current.setTouchable(true);
             }
@@ -225,10 +226,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     DriverPanelOverlayController(@NonNull Context context,
                                  @NonNull Preferences preferences,
                                  @NonNull StatusListener statusListener) {
+        this(context, preferences, statusListener, false);
+    }
+
+    DriverPanelOverlayController(@NonNull Context context, @NonNull Preferences preferences,
+            @NonNull StatusListener statusListener, boolean passenger) {
+        this.passenger = passenger;
+        this.displayId = passenger ? PassengerPanelPlacement.DISPLAY_ID : Display.DEFAULT_DISPLAY;
         this.appContext = context.getApplicationContext();
         this.preferences = preferences;
         this.statusListener = statusListener;
-        this.actions = new DriverPanelActionExecutor(appContext, preferences, this);
+        this.actions = new DriverPanelActionExecutor(appContext, preferences, this, displayId);
         this.carIntegration = CarIntegrations.get(appContext);
     }
 
@@ -258,7 +266,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         smartHomeRules = loadSmartHomeRules();
         mainHandler.removeCallbacks(ensureSmartHomeValueSubscription);
         mainHandler.post(ensureSmartHomeValueSubscription);
-        if (!preferences.driverPanelEnabled.get()) {
+        if (!panelEnabled()) {
             removeWindows(previousWindows);
             dismissAllApps();
             dismissAllFavoritePanels();
@@ -274,12 +282,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             panelCarBindings.putAll(previousCarBindings);
             favoritePanelAnchors.putAll(previousFavoriteAnchors);
             refreshFavoriteWindows();
-            statusListener.onStatus("error", "Основной дисплей не найден");
+            statusListener.onStatus("error", "Дисплей " + displayId + " не найден");
             return;
         }
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
-        Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
+        Preferences.DriverPanelProfile profile = panelProfile();
         LauncherShortcutStore store = LauncherShortcutStore.forDriverPanel(preferences, profile);
         WidgetService widgetService = WidgetService.getInstance();
         List<LauncherShortcutStore.Shortcut> informational = new ArrayList<>();
@@ -287,7 +295,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         int interactiveCount = 0;
         for (LauncherShortcutStore.Shortcut shortcut : store.all()) {
             boolean scenarioVisible = widgetService == null
-                    || widgetService.driverShortcutVisible(shortcut.id, true);
+                    || (passenger ? widgetService.passengerShortcutVisible(shortcut.id, true) : widgetService.driverShortcutVisible(shortcut.id, true));
             if (!shortcut.enabled || !scenarioVisible) continue;
             if (shortcut.kind == LauncherShortcutStore.Kind.INFO) {
                 informational.add(shortcut);
@@ -382,7 +390,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         navigationHidden = hidden;
         // Fullscreen/system-bar events are treated as z-order hints only. The replacement panel
         // never disappears merely because an app asked Android to hide navigation chrome.
-        if (preferences.driverPanelEnabled.get()) {
+        if (panelEnabled()) {
             applyPreferences();
             return true;
         }
@@ -390,7 +398,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     void raise() {
-        if (!preferences.driverPanelEnabled.get()) return;
+        if (!panelEnabled()) return;
         applyPreferences();
     }
 
@@ -439,7 +447,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
-        Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
+        Preferences.DriverPanelProfile profile = panelProfile();
         int minimumReferenceWidth = DriverPanelLayoutPolicy.referencePanelWidth(
                 profile.style == Preferences.DriverPanelStyle.NEW);
         int referenceWidth = Math.max(minimumReferenceWidth,
@@ -447,7 +455,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         int physicalWidth = DriverPanelLayoutPolicy.scaleReferenceWidth(
                 metrics.widthPixels, referenceWidth);
         int appsGridScalePercent = Math.max(60, Math.min(180,
-                preferences.launcherAllAppsIconScalePercent.get()));
+                (passenger ? preferences.passengerAllAppsIconScalePercent : preferences.launcherAllAppsIconScalePercent).get()));
         drawerAppsGridScalePercent = appsGridScalePercent;
         drawerEditMode = false;
         FrameLayout root = new FrameLayout(context);
@@ -503,8 +511,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
         GridView grid = new GridView(context);
         grid.setNumColumns(Math.max(3,
-                Math.min(8, preferences.launcherAllAppsColumns.get())));
-        int gridGap = Math.max(0, Math.min(40, preferences.launcherAllAppsGapPx.get()));
+                Math.min(8, (passenger ? preferences.passengerAllAppsColumns : preferences.launcherAllAppsColumns).get())));
+        int gridGap = Math.max(0, Math.min(40, (passenger ? preferences.passengerAllAppsGapPx : preferences.launcherAllAppsGapPx).get()));
         grid.setVerticalSpacing(dp(context, gridGap));
         grid.setHorizontalSpacing(dp(context, gridGap));
         grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
@@ -594,7 +602,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private void showFavoritePanel(@NonNull String panelId, @Nullable View requestedAnchor) {
         DriverFavoritesPanelConfig config =
-                new DriverFavoritesPanelStore(preferences).find(panelId);
+                new DriverFavoritesPanelStore(preferences, passenger).find(panelId);
         if (config == null || favoriteWindows.containsKey(panelId)) return;
         Display display = defaultDisplay();
         if (display == null) return;
@@ -603,7 +611,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (manager == null) return;
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
-        Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
+        Preferences.DriverPanelProfile profile = panelProfile();
         FavoritePanelRoot root = new FavoritePanelRoot(context);
         boolean panelOnRight = profile.side.get() == 1;
         root.setBackground(favoritePanelBackground(context, profile, panelOnRight));
@@ -669,7 +677,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     config, grid, new AttachedWindow(root, params, manager), itemIds));
             scheduleFavoriteIdleDismiss(panelId);
             dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
-                    "driver_favorites:" + panelId, "OPENED", "driver panel button");
+                    (passenger ? "passenger_favorites:" : "driver_favorites:") + panelId, "OPENED", "driver panel button");
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not show driver favorites", error);
             manuallyOpenFavorites.remove(panelId);
@@ -691,6 +699,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             return;
         }
         dismissAllApps();
+        if (passenger) {
+            Intent intent = appContext.getPackageManager().getLaunchIntentForPackage(
+                    dezz.status.widget.climate.StockHvacPopupClient.SERVICE_PACKAGE);
+            try {
+                if (intent == null) throw new IllegalStateException("No climate activity");
+                PanelDisplayLauncher.start(appContext, intent, displayId);
+            } catch (RuntimeException error) {
+                Toast.makeText(appContext, "Штатный климат недоступен на пассажирском экране. Используйте кнопки управления климатом.", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         DriverPanelService.triggerStockClimate(appContext);
     }
 
@@ -744,7 +763,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     @NonNull
     private AppDrawerData loadAppDrawerData() {
         List<LauncherAppCatalog.App> apps =
-                LauncherAppCatalog.loadVisible(appContext, preferences);
+                LauncherAppCatalog.loadVisible(appContext, preferences, passenger);
         Map<String, Drawable> icons = new HashMap<>();
         Set<String> uninstallable = new LinkedHashSet<>();
         for (LauncherAppCatalog.App app : apps) {
@@ -816,7 +835,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         scheduleCarStateSubscriptionRefresh();
         value.window.remove();
         dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
-                "driver_favorites:" + panelId, "CLOSED", "dismiss");
+                (passenger ? "passenger_favorites:" : "driver_favorites:") + panelId, "CLOSED", "dismiss");
     }
 
     private void dismissAllFavoritePanels() {
@@ -903,8 +922,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         WidgetService service = WidgetService.getInstance();
         if (service == null) return;
         for (DriverFavoritesPanelConfig panel :
-                new DriverFavoritesPanelStore(preferences).load()) {
-            Boolean visible = service.driverFavoritePanelVisibility(panel.id);
+                new DriverFavoritesPanelStore(preferences, passenger).load()) {
+            Boolean visible = (passenger ? service.passengerFavoritePanelVisibility(panel.id) : service.driverFavoritePanelVisibility(panel.id));
             if (Boolean.TRUE.equals(visible)) {
                 if (!manuallyClosedFavorites.contains(panel.id)) {
                     showFavoritePanel(panel.id, favoritePanelAnchors.get(panel.id));
@@ -923,9 +942,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         List<LauncherShortcutStore.Shortcut> values = new ArrayList<>();
         WidgetService widgetService = WidgetService.getInstance();
         for (LauncherShortcutStore.Shortcut shortcut :
-                LauncherShortcutStore.forDriverFavorites(preferences, panelId).all()) {
+                LauncherShortcutStore.forPanelFavorites(preferences, panelId, passenger).all()) {
             boolean scenarioVisible = widgetService == null
-                    || widgetService.driverShortcutVisible(shortcut.id, true);
+                    || (passenger ? widgetService.passengerShortcutVisible(shortcut.id, true) : widgetService.driverShortcutVisible(shortcut.id, true));
             if (shortcut.enabled && scenarioVisible) values.add(shortcut);
         }
         return values;
@@ -1368,7 +1387,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
         WidgetService widgetService = WidgetService.getInstance();
         boolean actionEnabled = widgetService == null
-                || widgetService.driverShortcutActionEnabled(shortcut.id, true);
+                || (passenger ? widgetService.passengerShortcutActionEnabled(shortcut.id, true) : widgetService.driverShortcutActionEnabled(shortcut.id, true));
         button.setAlpha(actionEnabled ? 1f : .42f);
         if (actionEnabled) {
             if (isPanelOverlayToggle(shortcut)) {
@@ -1463,7 +1482,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
      */
     private void scheduleRaiseAfterExternalLaunch() {
         mainHandler.postDelayed(() -> {
-            if (preferences.driverPanelEnabled.get()) raise();
+            if (panelEnabled()) raise();
         }, 650L);
     }
 
@@ -1523,7 +1542,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             @NonNull Preferences.DriverPanelProfile profile) {
         WidgetService service = WidgetService.getInstance();
         AutomationState automation = service == null ? AutomationState.missing()
-                : service.driverAutomationState(DriverPanelStylePolicy.PANEL_TARGET_ID);
+                : (passenger ? service.passengerAutomationState(DriverPanelStylePolicy.PANEL_TARGET_ID) : service.driverAutomationState(DriverPanelStylePolicy.PANEL_TARGET_ID));
         return DriverPanelStylePolicy.panel(profile.backgroundColor.get(),
                 profile.borderColor.get(), profile.borderWidthPx.get(), automation);
     }
@@ -1541,7 +1560,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private AutomationState automationState(@NonNull String targetId) {
         WidgetService service = WidgetService.getInstance();
         return service == null ? AutomationState.missing()
-                : service.driverAutomationState(targetId);
+                : (passenger ? service.passengerAutomationState(targetId) : service.driverAutomationState(targetId));
     }
 
     @NonNull
@@ -1568,7 +1587,11 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         params.x = DriverPanelLayoutPolicy.panelWindowX(
                 screenWidth, width, profile.side.get() == 1);
         params.y = 0;
-        params.setTitle("Natro driver panel");
+        if (passenger) {
+            params.gravity = Gravity.TOP | Gravity.LEFT;
+            params.x = PassengerPanelPlacement.x(screenWidth, width, profile.side.get() == 1);
+        }
+        params.setTitle(passenger ? "Natro passenger panel" : "Natro driver panel");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             params.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
@@ -1635,11 +1658,19 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         return params;
     }
 
+    private boolean panelEnabled() {
+        return passenger ? preferences.passengerPanelEnabled.get() : preferences.driverPanelEnabled.get();
+    }
+
+    private Preferences.DriverPanelProfile panelProfile() {
+        return passenger ? preferences.passengerPanel : preferences.activeDriverPanelProfile();
+    }
+
     @Nullable
     private Display defaultDisplay() {
         DisplayManager manager = (DisplayManager) appContext.getSystemService(
                 Context.DISPLAY_SERVICE);
-        return manager == null ? null : manager.getDisplay(DISPLAY_ID);
+        return manager == null ? null : manager.getDisplay(displayId);
     }
 
     @NonNull
@@ -2019,7 +2050,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     dp(context, 8), dp(context, 8));
             WidgetService widgetService = WidgetService.getInstance();
             boolean enabled = widgetService == null
-                    || widgetService.driverShortcutActionEnabled(shortcut.id, true);
+                    || (passenger ? widgetService.passengerShortcutActionEnabled(shortcut.id, true) : widgetService.driverShortcutActionEnabled(shortcut.id, true));
             if (enabled && LauncherShortcutStore.isInteractive(shortcut)) {
                 tile.setOnClickListener(view -> {
                     executeShortcut(shortcut, view);

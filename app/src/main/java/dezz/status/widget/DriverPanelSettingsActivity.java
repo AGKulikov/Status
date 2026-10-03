@@ -60,11 +60,13 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual editor for the unified current-generation Monjaro driver panel. */
-public final class DriverPanelSettingsActivity extends AppCompatActivity {
+public class DriverPanelSettingsActivity extends AppCompatActivity {
     private interface IntSetter { void set(int value); }
     private interface ShortcutSetter {
         void set(@NonNull LauncherShortcutStore.Shortcut shortcut);
     }
+
+    protected boolean passengerPanel() { return false; }
 
     private Preferences preferences;
     private Preferences.DriverPanelProfile profile;
@@ -85,7 +87,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     private final Runnable statusRefresh = new Runnable() {
         @Override public void run() {
             if (runtimeLabel == null) return;
-            String detail = DriverPanelService.getRuntimeDetail();
+            String detail = passengerPanel() ? dezz.status.widget.driver.PassengerPanelService.getRuntimeDetail() : DriverPanelService.getRuntimeDetail();
             runtimeLabel.setText(detail == null || detail.trim().isEmpty()
                     ? "Состояние: панель ещё не запускалась"
                     : "Состояние: " + detail);
@@ -97,13 +99,13 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
-        profile = preferences.activeDriverPanelProfile();
+        profile = passengerPanel() ? preferences.passengerPanel : preferences.activeDriverPanelProfile();
         store = LauncherShortcutStore.forDriverPanel(preferences, profile);
         actionPicker = new ShortcutActionPicker(this, preferences, store, () -> {
             refreshButtons();
             applyPanel();
         });
-        setTitle("Панель водителя");
+        setTitle(passengerPanel() ? "Панель пассажира" : "Панель водителя");
         View content = buildContent();
         setContentView(content);
         SettingsBackNavigation.install(this, content);
@@ -149,13 +151,13 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         settings.setPadding(dp(10), 0, dp(22), dp(96));
         scroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
-        title(settings, "Панель водителя");
+        title(settings, passengerPanel() ? "Панель пассажира" : "Панель водителя");
         hint(settings, "До 10 кнопок поверх любых приложений. Домой, Назад и полный список "
                 + "приложений уже добавлены по умолчанию.");
 
-        addSwitch(settings, "Включить панель водителя",
-                preferences.driverPanelEnabled.get(), value -> {
-                    preferences.driverPanelEnabled.set(value);
+        addSwitch(settings, passengerPanel() ? "Включить панель пассажира" : "Включить панель водителя",
+                panelEnabled().get(), value -> {
+                    panelEnabled().set(value);
                     applyPanel();
                 });
         addSwitch(settings, "Показывать справа",
@@ -164,7 +166,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     refreshPreview();
                     applyPanel();
                 });
-        hint(settings, "Панель всегда цельная и закрывает штатную. Добавьте функцию "
+        hint(settings, passengerPanel() ? "Панель на экране пассажира. Настройки кнопок и оформления независимы от водительской панели." : "Панель всегда цельная и закрывает штатную. Добавьте функцию "
                 + "«Штатный климат» в любое из 10 мест: перед нажатием наша панель временно "
                 + "перестаёт перехватывать касания и имитирует тап в исходном центре кнопки "
                 + "на 37,5% высоты экрана.");
@@ -271,13 +273,13 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         addRow.addView(addFunction, functionParams);
         settings.addView(addRow, rowParams());
 
-        MaterialButton allAppsSettings = button("Общие настройки меню «Все приложения»");
+        MaterialButton allAppsSettings = button(passengerPanel() ? "Приложения пассажира" : "Общие настройки меню «Все приложения»");
         allAppsSettings.setOnClickListener(view ->
-                startActivity(new android.content.Intent(this, AllAppsSettingsActivity.class)));
+                startActivity(new android.content.Intent(this, passengerPanel() ? PassengerAllAppsSettingsActivity.class : AllAppsSettingsActivity.class)));
         settings.addView(allAppsSettings, rowParams());
-        MaterialButton favoritesSettings = button("Настроить «Избранное» панели водителя");
+        MaterialButton favoritesSettings = button(passengerPanel() ? "Настроить «Избранное» пассажира" : "Настроить «Избранное» панели водителя");
         favoritesSettings.setOnClickListener(view -> startActivity(
-                new android.content.Intent(this, DriverFavoritesSettingsActivity.class)));
+                new android.content.Intent(this, passengerPanel() ? PassengerFavoritesSettingsActivity.class : DriverFavoritesSettingsActivity.class)));
         settings.addView(favoritesSettings, rowParams());
 
         buttonsHost = new LinearLayout(this);
@@ -1644,7 +1646,16 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         }
     }
 
+    private Preferences.Bool panelEnabled() {
+        return passengerPanel() ? preferences.passengerPanelEnabled : preferences.driverPanelEnabled;
+    }
+
     private void applyPanel() {
+        if (passengerPanel()) {
+            AppRuntimeBootstrap.reconcileServices(this, preferences);
+            dezz.status.widget.driver.PassengerPanelService.apply(this);
+            return;
+        }
         if (preferences.driverPanelEnabled.get()) {
             // Also restores the headless connector/scenario host when the status row itself is
             // disabled. The same reconciliation starts the rail on its ECARX window tier.

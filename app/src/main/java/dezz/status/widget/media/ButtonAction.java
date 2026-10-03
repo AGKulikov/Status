@@ -29,7 +29,8 @@ public enum ButtonAction {
     DRIVE_PREV_3(104, "Режимы вождения: назад на 3"),
     DRIVE_NEXT_1(105, "Режимы вождения: вперёд на 1"),
     DRIVE_NEXT_2(106, "Режимы вождения: вперёд на 2"),
-    DRIVE_NEXT_3(107, "Режимы вождения: вперёд на 3");
+    DRIVE_NEXT_3(107, "Режимы вождения: вперёд на 3"),
+    NATRO_PASSENGER_HOME(108, "Домой пассажир");
     public enum Parameter { NONE, APP, BROADCAST, ACTIVITY, COMMAND, PHONE, SHORTCUT }
     public final int id;
     public final String title;

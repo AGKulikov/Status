@@ -440,6 +440,10 @@ public class WidgetService extends Service {
                 }
             }
         }
+        if (changed.containsKey(AutomationContract.SCOPE_PASSENGER)
+                && prefs != null && prefs.passengerPanelEnabled.get()) {
+            dezz.status.widget.driver.PassengerPanelService.apply(this);
+        }
         if (changed.containsKey(AutomationContract.SCOPE_DRIVER)
                 && prefs != null && prefs.driverPanelEnabled.get()) {
             DriverPanelService.apply(this);
@@ -1534,6 +1538,10 @@ public class WidgetService extends Service {
                         target.substring(target.indexOf('|') + 1))) {
                     phoneFieldsChanged = true;
                 }
+                if (target.startsWith(AutomationContract.SCOPE_PASSENGER + "|")
+                        && prefs.passengerPanelEnabled.get()) {
+                    dezz.status.widget.driver.PassengerPanelService.apply(this);
+                }
                 if (target.startsWith(AutomationContract.SCOPE_DRIVER + "|")) {
                     driverTargetsChanged = true;
                 }
@@ -2178,6 +2186,7 @@ public class WidgetService extends Service {
         // driver rail once after that consolidated evaluation so boot-time visibility/action
         // overrides are already reflected in its very first stable configuration.
         automaticSurfaceReconcilePending = false;
+        if (prefs.passengerPanelEnabled.get()) dezz.status.widget.driver.PassengerPanelService.apply(this);
         if (prefs.driverPanelEnabled.get()) DriverPanelService.apply(this);
         if (prefs.dimMenuPanelEnabled.get() && prefs.dimMenuPanelAutostart.get()) {
             DimMenuPanelService.reconcileAutomatic(this);
@@ -2991,6 +3000,9 @@ public class WidgetService extends Service {
                 || initialIntegrationStartupInProgress || !integrationsStarted) return;
         automaticSurfaceReconcilePending = false;
         reconcileAutomaticInstrumentPanel();
+        if (prefs.passengerPanelEnabled.get() || dezz.status.widget.driver.PassengerPanelService.isRunning()) {
+            runIntegrationStep("passenger panel", () -> dezz.status.widget.driver.PassengerPanelService.apply(this));
+        }
         if (prefs.driverPanelEnabled.get()) {
             runIntegrationStep("automatic Driver surface reconcile",
                     () -> DriverPanelService.apply(this));
@@ -8265,12 +8277,25 @@ public class WidgetService extends Service {
                 AutomationContract.SCOPE_DRIVER, shortcutId, defaultValue);
     }
 
+    public boolean passengerShortcutVisible(@NonNull String shortcutId, boolean defaultValue) {
+        AutomationStateStore current = automationStates;
+        return current == null ? defaultValue : current.effectiveVisibility(
+                AutomationContract.SCOPE_PASSENGER, shortcutId, defaultValue);
+    }
+
     /** Scenario-resolved interaction gate for one driver-panel shortcut. */
     public boolean driverShortcutActionEnabled(@NonNull String shortcutId,
                                                boolean defaultValue) {
         AutomationStateStore current = automationStates;
         return current == null ? defaultValue : current.effectiveActionEnabled(
                 AutomationContract.SCOPE_DRIVER, shortcutId, defaultValue);
+    }
+
+    public boolean passengerShortcutActionEnabled(@NonNull String shortcutId,
+                                               boolean defaultValue) {
+        AutomationStateStore current = automationStates;
+        return current == null ? defaultValue : current.effectiveActionEnabled(
+                AutomationContract.SCOPE_PASSENGER, shortcutId, defaultValue);
     }
 
     /** Complete effective driver style, including the in-memory scenario precedence layer. */
@@ -8281,12 +8306,24 @@ public class WidgetService extends Service {
                 AutomationContract.SCOPE_DRIVER, targetId);
     }
 
+    public AutomationState passengerAutomationState(@NonNull String targetId) {
+        AutomationStateStore current = automationStates;
+        return current == null ? AutomationState.missing() : current.get(
+                AutomationContract.SCOPE_PASSENGER, targetId);
+    }
+
     /** Complete effective HOME shortcut style, including the in-memory scenario layer. */
     @NonNull
     public AutomationState launcherAutomationState(@NonNull String targetId) {
+        return launcherAutomationState(targetId, false);
+    }
+
+    @NonNull
+    public AutomationState launcherAutomationState(@NonNull String targetId, boolean passenger) {
         AutomationStateStore current = automationStates;
         return current == null ? AutomationState.missing() : current.get(
-                AutomationContract.SCOPE_LAUNCHER, targetId);
+                passenger ? AutomationContract.SCOPE_PASSENGER_LAUNCHER
+                        : AutomationContract.SCOPE_LAUNCHER, targetId);
     }
 
     /** Explicit automation decision for one transient Favorites panel; null preserves manual UI. */
@@ -8295,6 +8332,12 @@ public class WidgetService extends Service {
         AutomationStateStore current = automationStates;
         return current == null ? null : current.explicitVisibility(
                 AutomationContract.SCOPE_DRIVER, panelId);
+    }
+
+    public Boolean passengerFavoritePanelVisibility(@NonNull String panelId) {
+        AutomationStateStore current = automationStates;
+        return current == null ? null : current.explicitVisibility(
+                AutomationContract.SCOPE_PASSENGER, panelId);
     }
 
     private static Rect getBounds(View view) {

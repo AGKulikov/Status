@@ -165,7 +165,7 @@ public final class WidgetServiceStarter {
                 || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresIntegrationHost(
                 preferences.widgetEnabled.get(),
-                preferences.driverPanelEnabled.get(),
+                preferences.driverPanelEnabled.get() || preferences.passengerPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
                 preferences.phoneConnectorEnabled.get(),
                 preferences.mqttEnabled.get(),
@@ -183,7 +183,7 @@ public final class WidgetServiceStarter {
                 || preferences.dimMenuPanelEnabled.get()
                 || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresHeadlessHost(
-                preferences.driverPanelEnabled.get(),
+                preferences.driverPanelEnabled.get() || preferences.passengerPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
                 preferences.phoneConnectorEnabled.get(),
                 preferences.mqttEnabled.get(),
@@ -199,7 +199,7 @@ public final class WidgetServiceStarter {
                 || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresAutomaticIntegrationHost(
                 preferences.widgetEnabled.get(),
-                preferences.driverPanelEnabled.get(),
+                preferences.driverPanelEnabled.get() || preferences.passengerPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
                 preferences.hudPanelAutostart.get(),
                 preferences.phoneConnectorEnabled.get(),
@@ -215,7 +215,7 @@ public final class WidgetServiceStarter {
                 && preferences.dimMenuPanelAutostart.get())
                 || hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
                 || requiresAutomaticHeadlessHost(
-                preferences.driverPanelEnabled.get(),
+                preferences.driverPanelEnabled.get() || preferences.passengerPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
                 preferences.hudPanelAutostart.get(),
                 preferences.phoneConnectorEnabled.get(),

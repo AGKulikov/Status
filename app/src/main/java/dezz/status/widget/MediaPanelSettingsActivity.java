@@ -25,7 +25,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
@@ -49,7 +48,7 @@ import dezz.status.widget.performance.PerformanceExecutors;
 import dezz.status.widget.performance.PerformancePickerTask;
 
 /** Visual, immediate editor for every element inside the HOME media panel. */
-public final class MediaPanelSettingsActivity extends AppCompatActivity {
+public final class MediaPanelSettingsActivity extends LauncherProfileActivity {
     private interface IntChange { void set(int value); }
     private interface ElementIntChange { int set(int value); }
     private interface ColorChange { void set(@NonNull String value); }
@@ -72,7 +71,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        preferences = new Preferences(this);
+        preferences = createLauncherPreferences(true);
         store = new MediaPanelConfigStore(preferences);
         config = store.load();
         editScheduler = PanelEditScheduler.onMainThread(this::updatePreviewNow, this::saveNow);

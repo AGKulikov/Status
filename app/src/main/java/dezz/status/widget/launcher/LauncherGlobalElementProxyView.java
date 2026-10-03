@@ -173,6 +173,10 @@ public final class LauncherGlobalElementProxyView extends View {
                     && tapAction == LauncherGlobalElementLayoutStore.TapAction.APP) {
                 launchConfiguredApp();
                 performClick();
+            } else if (action == MotionEvent.ACTION_UP
+                    && tapAction == LauncherGlobalElementLayoutStore.TapAction.PASSENGER_HOME) {
+                PassengerHomeLauncher.open(getContext());
+                performClick();
             }
             return true;
         }

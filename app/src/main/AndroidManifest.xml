@@ -197,6 +197,21 @@
             android:theme="@style/Theme.StatusWidget.TransparentProxy" />
 
         <activity
+            android:name=".PassengerLauncherActivity"
+            android:label="Лаунчер пассажира"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.passenger.home"
+            android:resizeableActivity="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.StatusWidget.Launcher" />
+        <activity
+            android:name=".PassengerLauncherSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".LauncherSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
@@ -205,6 +220,16 @@
             android:name=".LauncherShortcutSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
+
+        <activity android:name=".PassengerAllAppsSettingsActivity"
+            android:exported="false" android:screenOrientation="landscape" />
+        <activity android:name=".PassengerFavoritesSettingsActivity"
+            android:exported="false" android:screenOrientation="landscape" />
+        <activity android:name=".PassengerPanelSettingsActivity"
+            android:exported="false" android:screenOrientation="landscape" />
+        <service android:name=".driver.PassengerPanelService"
+            android:directBootAware="true" android:enabled="true"
+            android:exported="false" android:stopWithTask="false" />
 
         <activity
             android:name=".DriverPanelSettingsActivity"

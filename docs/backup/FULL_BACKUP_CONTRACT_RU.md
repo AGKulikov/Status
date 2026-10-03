@@ -174,3 +174,29 @@ automaticDownloadManifest содержит полный перечень ран�
 LiveActivityApnsSettingsActivity (входной .p8), чтение импорта SettingsHubActivity
 и чтение графики MediaBroadcastRepository. Это существующие пути импорта, их
 назначения уже описаны; импортёр и хранилище новых значков добавлены отдельно.
+
+## 03.10.2026 — пассажирские панели
+
+Все passengerPanel*, passengerFavorites*, passengerAllApps* и
+passengerSystemAppsDefaultApplied принадлежат существующему основному prefs.
+Включать динамические документы избранного, включая сохранённые после удаления
+из коллекции, новые scope PASSENGER внутри сценариев и эффективные defaults.
+Никаких новых исключений. Локально проверен JSON round-trip новых значений;
+общая полнота архива от этого не считается доказанной. Активация UI только после
+успешного завершения восстановления. Изменённые PresetsActivity/SettingsHubActivity
+добавляют пересогласование пассажирской службы; формат источника не меняют.
+
+## 03.10.2026 — отдельный HOME пассажира
+
+Ревизия Preferences: новый профиль автоматически отображает собственные launcher*
+ключи в passengerLauncher.* в том же DE preferences. Глобальные player/auto-resume
+и system-bar политики сохраняют старые ключи. Defaults собственного HOME совпадают
+с основным; данные основного профиля не копируются и не перезаписываются.
+Профильный migration marker и legacy snapshot также раздельны; пассажирский запуск
+не потребляет перенос основного launcherClimateConfigJson в floatingClimateConfigJson.
+Архивировать все новые ключи, неизвестные будущие параметры и документы целиком,
+включая TapAction.PASSENGER_HOME и сценарный scope PASSENGER_LAUNCHER. Это добавочные
+значения существующих документов; старые значения и ID не переименовываются.
+JVM проверяет типы, независимость, существующий JSON round-trip и этот случай
+миграции. Изменение fingerprint Preferences принято после этой ревизии; ни оно,
+ни тест JSON не закрывают общий gate полного runtime backup/restore.

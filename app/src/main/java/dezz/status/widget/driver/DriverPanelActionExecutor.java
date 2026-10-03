@@ -53,10 +53,17 @@ public final class DriverPanelActionExecutor {
     private final Context context;
     private final Preferences preferences;
     private final Host host;
+    private final int displayId;
 
     public DriverPanelActionExecutor(@NonNull Context context,
                                      @NonNull Preferences preferences,
                                      @NonNull Host host) {
+        this(context, preferences, host, android.view.Display.DEFAULT_DISPLAY);
+    }
+
+    public DriverPanelActionExecutor(@NonNull Context context, @NonNull Preferences preferences,
+            @NonNull Host host, int displayId) {
+        this.displayId = displayId;
         this.context = context.getApplicationContext();
         this.preferences = preferences;
         this.host = host;
@@ -97,7 +104,7 @@ public final class DriverPanelActionExecutor {
                                         ? "Команда автомобиля не выполнена" : message);
                             });
                     if (TrunkControlSafety.confirmOpeningIfNeeded(
-                            context, resolved, executeCar)) return;
+                            anchor != null ? anchor.getContext() : context, resolved, executeCar)) return;
                     executeCar.run();
                     return;
                 case INFO:
@@ -136,13 +143,21 @@ public final class DriverPanelActionExecutor {
                                 @NonNull String rawTarget,
                                 @Nullable View anchor) {
         switch (action) {
+            case PASSENGER_HOME:
+                dezz.status.widget.launcher.PassengerHomeLauncher.open(context);
+                return;
             case HOME:
-                context.startActivity(new Intent(Intent.ACTION_MAIN)
+                if (displayId == dezz.status.widget.launcher.PassengerHomeLauncher.DISPLAY_ID) {
+                    dezz.status.widget.launcher.PassengerHomeLauncher.open(context);
+                    return;
+                }
+                startActivity(new Intent(Intent.ACTION_MAIN)
                         .addCategory(Intent.CATEGORY_HOME)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                                 | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
                 return;
             case BACK:
+                if (displayId != 0) { passengerKey(KeyEvent.KEYCODE_BACK); return; }
                 if (!WidgetAccessibilityService.performGlobalBack()) {
                     PrivilegedShell.get(context).runCommand("input keyevent 4",
                             (output, error) -> {
@@ -151,6 +166,7 @@ public final class DriverPanelActionExecutor {
                 }
                 return;
             case RECENTS:
+                if (displayId != 0) { passengerKey(KeyEvent.KEYCODE_APP_SWITCH); return; }
                 if (!WidgetAccessibilityService.performGlobalRecents(
                         accepted -> {
                             if (!accepted) openRecentsWithShell();
@@ -171,6 +187,13 @@ public final class DriverPanelActionExecutor {
                         new FavoriteRoutesConfigStore(preferences).load()) {
                     if (!route.enabled || !route.id.equals(
                             LauncherShortcutStore.favoriteRouteId(rawTarget))) continue;
+                    if (displayId != 0) {
+                        android.net.Uri uri = YandexRouteLauncher.deepLink(route.product, route.address, route.coordinates);
+                        startActivity(new Intent(Intent.ACTION_VIEW, uri).setPackage(
+                                route.product == FavoriteRouteConfig.Product.MAPS ? "ru.yandex.yandexmaps" : "ru.yandex.yandexnavi")
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                        return;
+                    }
                     if (!YandexRouteLauncher.launch(context, route)) {
                         toast("Не удалось открыть маршрут");
                     }
@@ -205,7 +228,7 @@ public final class DriverPanelActionExecutor {
                 }
                 return;
             case NOTIFICATION_ACCESS:
-                context.startActivity(new Intent(
+                startActivity(new Intent(
                         android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 return;
@@ -230,6 +253,13 @@ public final class DriverPanelActionExecutor {
     }
 
     private void launchYandex(YandexWindowLauncher.Product product, boolean full) {
+        if (displayId != 0) {
+            String pkg = product == YandexWindowLauncher.Product.MAPS ? "ru.yandex.yandexmaps" : "ru.yandex.yandexnavi";
+            Intent intent = context.getPackageManager().getLaunchIntentForPackage(pkg);
+            if (intent == null) { toast("Приложение Яндекса не найдено"); return; }
+            startActivity(intent);
+            return;
+        }
         if (!YandexWindowLauncher.launchOverLauncher(context, product, full)) {
             toast("Приложение Яндекса не найдено");
         }
@@ -245,7 +275,7 @@ public final class DriverPanelActionExecutor {
     }
 
     private void openSettings(SettingsDestinationCatalog.Group group) {
-        context.startActivity(new Intent()
+        startActivity(new Intent()
                 .setClassName(context.getPackageName(),
                         "dezz.status.widget.SettingsHubActivity")
                 .putExtra("dezz.status.widget.extra.SETTINGS_GROUP", group.id)
@@ -256,7 +286,7 @@ public final class DriverPanelActionExecutor {
     private void launchComponent(String flattened) {
         ComponentName component = ComponentName.unflattenFromString(flattened);
         if (component == null) throw new IllegalArgumentException("Invalid component");
-        context.startActivity(new Intent(Intent.ACTION_MAIN)
+        startActivity(new Intent(Intent.ACTION_MAIN)
                 .addCategory(Intent.CATEGORY_LAUNCHER)
                 .setComponent(component)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
@@ -292,7 +322,18 @@ public final class DriverPanelActionExecutor {
                 Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED;
         Intent intent = new Intent(direct ? Intent.ACTION_CALL : Intent.ACTION_DIAL, uri)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(intent);
+        startActivity(intent);
+    }
+
+    private void startActivity(Intent intent) {
+        PanelDisplayLauncher.start(context, intent, displayId);
+    }
+
+    private void passengerKey(int key) {
+        PrivilegedShell.get(context).runCommand("input -d " + displayId + " keyevent " + key,
+                (output, error) -> {
+                    if (error != null) toast("Не удалось отправить кнопку на пассажирский экран");
+                });
     }
 
     private void toast(String text) {

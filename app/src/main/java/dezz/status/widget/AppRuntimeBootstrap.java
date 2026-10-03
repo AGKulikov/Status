@@ -93,6 +93,14 @@ public final class AppRuntimeBootstrap {
             }
         }
 
+        if (preferences.passengerPanelEnabled.get() || dezz.status.widget.driver.PassengerPanelService.isRunning()) {
+            try {
+                dezz.status.widget.driver.PassengerPanelService.apply(appContext);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Could not reconcile passenger panel service", error);
+            }
+        }
+
         if (preferences.hudPanelEnabled.get()) {
             try {
                 HudPresentationService.apply(appContext);

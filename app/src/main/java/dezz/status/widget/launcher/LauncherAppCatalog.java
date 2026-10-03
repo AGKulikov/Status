@@ -111,9 +111,13 @@ public final class LauncherAppCatalog {
     @NonNull
     public static List<App> loadVisible(@NonNull Context context,
                                         @NonNull Preferences preferences) {
+        return loadVisible(context, preferences, false);
+    }
+
+    public static List<App> loadVisible(Context context, Preferences preferences, boolean passenger) {
         List<App> catalog = loadIncludingSystem(context);
-        ensureDefaultSystemVisibility(context, preferences, catalog);
-        Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
+        ensureDefaultSystemVisibility(context, preferences, catalog, passenger);
+        Set<String> hidden = (passenger ? preferences.passengerAllAppsHiddenComponents : preferences.launcherAllAppsHiddenComponents).get();
         List<App> visible = new ArrayList<>();
         for (App app : catalog) {
             if (!hidden.contains(app.component.flattenToString())) visible.add(app);
@@ -129,10 +133,15 @@ public final class LauncherAppCatalog {
             @NonNull Context context,
             @NonNull Preferences preferences,
             @NonNull List<App> catalog) {
-        if (preferences.launcherSystemAppsDefaultApplied.get()) return;
+        ensureDefaultSystemVisibility(context, preferences, catalog, false);
+    }
+
+    public static void ensureDefaultSystemVisibility(Context context, Preferences preferences,
+            List<App> catalog, boolean passenger) {
+        if ((passenger ? preferences.passengerSystemAppsDefaultApplied : preferences.launcherSystemAppsDefaultApplied).get()) return;
         synchronized (LauncherAppCatalog.class) {
-            if (preferences.launcherSystemAppsDefaultApplied.get()) return;
-            Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
+            if ((passenger ? preferences.passengerSystemAppsDefaultApplied : preferences.launcherSystemAppsDefaultApplied).get()) return;
+            Set<String> hidden = (passenger ? preferences.passengerAllAppsHiddenComponents : preferences.launcherAllAppsHiddenComponents).get();
             String defaultDialer = "";
             try {
                 TelecomManager telecom =
@@ -150,8 +159,8 @@ public final class LauncherAppCatalog {
                     hidden.add(app.component.flattenToString());
                 }
             }
-            preferences.launcherAllAppsHiddenComponents.set(hidden);
-            preferences.launcherSystemAppsDefaultApplied.set(true);
+            (passenger ? preferences.passengerAllAppsHiddenComponents : preferences.launcherAllAppsHiddenComponents).set(hidden);
+            (passenger ? preferences.passengerSystemAppsDefaultApplied : preferences.launcherSystemAppsDefaultApplied).set(true);
         }
     }
 

@@ -29,14 +29,20 @@ public final class DriverFavoritesPanelStore {
     public static final int SCHEMA_VERSION = 1;
 
     private final Preferences preferences;
+    private final Preferences.Str document;
 
     public DriverFavoritesPanelStore(@NonNull Preferences preferences) {
+        this(preferences, false);
+    }
+
+    public DriverFavoritesPanelStore(@NonNull Preferences preferences, boolean passenger) {
         this.preferences = preferences;
+        this.document = passenger ? preferences.passengerFavoritesPanelsJson : preferences.driverFavoritesPanelsJson;
     }
 
     @NonNull
     public List<DriverFavoritesPanelConfig> load() {
-        String raw = preferences.driverFavoritesPanelsJson.get();
+        String raw = document.get();
         if (raw == null || raw.trim().isEmpty()) {
             return Collections.singletonList(defaultPanel());
         }
@@ -145,7 +151,7 @@ public final class DriverFavoritesPanelStore {
                         .put("borderColor", fallback.borderColor)
                         .put("autoCloseSeconds", fallback.autoCloseSeconds));
             }
-            preferences.driverFavoritesPanelsJson.set(new JSONObject()
+            document.set(new JSONObject()
                     .put("version", SCHEMA_VERSION)
                     .put("items", items).toString());
         } catch (JSONException ignored) {

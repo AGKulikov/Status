@@ -108,7 +108,7 @@ public class Preferences {
 
         public Preference(Preferences preferences, String key) {
             this.preferences = preferences;
-            this.key = key;
+            this.key = preferences.preferenceKey(key);
         }
 
         public void reset() {
@@ -518,8 +518,14 @@ public class Preferences {
                                    @NonNull DriverPanelStyle style,
                                    @NonNull String prefix,
                                    int defaultWidthPx) {
+            this(preferences, style, prefix, defaultWidthPx, 0);
+        }
+
+        private DriverPanelProfile(@NonNull Preferences preferences,
+                @NonNull DriverPanelStyle style, @NonNull String prefix,
+                int defaultWidthPx, int defaultSide) {
             this.style = style;
-            side = new Int(preferences, prefix + "Side", 0);
+            side = new Int(preferences, prefix + "Side", defaultSide);
             widthPx = new Int(preferences, prefix + "WidthPx", defaultWidthPx);
             topPaddingPx = new Int(preferences, prefix + "TopPaddingPx", 8);
             bottomPaddingPx = new Int(preferences, prefix + "BottomPaddingPx", 8);
@@ -746,6 +752,24 @@ public class Preferences {
     public final Bool climateButtonLocked = new Bool(this, "climateButtonLocked", false);
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
     // Current Monjaro driver rail plus the read-only legacy profile used by one-time migration.
+    public final Str passengerFavoritesPanelsJson = new Str(this, "passengerFavoritesPanelsJson", "");
+    public final Str passengerFavoritesSelectedPanelId = new Str(this, "passengerFavoritesSelectedPanelId", "favorites_default");
+    public Str passengerFavoritesShortcuts(@Nullable String panelId) {
+        String id = panelId == null || panelId.trim().isEmpty() ? "favorites_default" : panelId.trim();
+        if (!id.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) throw new IllegalArgumentException("Invalid Favorites panel id");
+        return new Str(this, "passengerFavoritesShortcutsJson." + id, "");
+    }
+
+    public final Int passengerAllAppsColumns = new Int(this, "passengerAllAppsColumns", 5);
+    public final Int passengerAllAppsIconScalePercent = new Int(this, "passengerAllAppsIconScalePercent", 100);
+    public final Int passengerAllAppsGapPx = new Int(this, "passengerAllAppsGapPx", 8);
+    public final StringSet passengerAllAppsHiddenComponents = new StringSet(this, "passengerAllAppsHiddenComponents");
+    public final Bool passengerSystemAppsDefaultApplied = new Bool(this, "passengerSystemAppsDefaultApplied", false);
+
+    public final Bool passengerPanelEnabled = new Bool(this, "passengerPanelEnabled", false);
+    public final DriverPanelProfile passengerPanel = new DriverPanelProfile(
+            this, DriverPanelStyle.NEW, "passengerPanel", 150, 1);
+
     public final Bool driverPanelEnabled = new Bool(this, "driverPanelEnabled", false);
     // ADB service aliases have real consumers; defaults never activate new capture/gestures.
     public final Bool adbForceStart = new Bool(this, "adbForceStart", false);
@@ -1209,6 +1233,30 @@ public class Preferences {
         this(context, true);
     }
 
+    /** Launcher profiles share integrations, but never share their editable HOME documents. */
+    public static Preferences forPassengerLauncher(Context context) {
+        return new PassengerLauncherPreferences(context, true);
+    }
+
+    static Preferences forLauncher(Context context, boolean passenger, boolean migrate) {
+        return passenger ? new PassengerLauncherPreferences(context, migrate)
+                : new Preferences(context, migrate);
+    }
+
+    protected String preferenceKey(String key) { return key; }
+
+    public final boolean isPassengerLauncherProfile() {
+        return !preferenceKey("launcherLayoutJson").equals("launcherLayoutJson");
+    }
+
+    private static final class PassengerLauncherPreferences extends Preferences {
+        PassengerLauncherPreferences(Context context, boolean migrate) { super(context, migrate); }
+        // Pure mapping: used during field initialization, before the constructor body runs.
+        @Override protected String preferenceKey(String key) {
+            return dezz.status.widget.launcher.PassengerLauncherProfile.storageKey(key);
+        }
+    }
+
     /** Visual-only service bootstrap may defer migrations to its background runtime barrier. */
     Preferences(Context context, boolean runStartupMigrations) {
         appContext = context.getApplicationContext();
@@ -1391,6 +1439,7 @@ public class Preferences {
             JSONObject values = new JSONObject();
             Map<String, ?> stored = prefs.getAll();
             for (String key : LauncherSettingsMigrationRegistry.storageKeys()) {
+                key = preferenceKey(key);
                 if (!stored.containsKey(key)) continue;
                 Object value = stored.get(key);
                 if (value instanceof Set) {
@@ -1409,7 +1458,8 @@ public class Preferences {
             }
             // The old build shared one climate document between HOME and the floating panel.
             // Copy it once, then both surfaces evolve independently.
-            if (!prefs.contains(floatingClimateConfigJson.key)) {
+            if (preferenceKey("launcherClimateConfigJson").equals("launcherClimateConfigJson")
+                    && !prefs.contains(floatingClimateConfigJson.key)) {
                 editor.putString(floatingClimateConfigJson.key,
                         launcherClimateConfigJson.get());
             }

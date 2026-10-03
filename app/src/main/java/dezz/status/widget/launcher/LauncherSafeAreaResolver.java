@@ -29,7 +29,7 @@ public final class LauncherSafeAreaResolver {
             int systemRightInset, int systemBottomInset,
             int launcherDisplayId) {
         WidgetService service = WidgetService.getInstance();
-        boolean running = service != null && WidgetService.isRunning();
+        boolean running = launcherDisplayId == 0 && service != null && WidgetService.isRunning();
         int measuredHeight = running ? service.getStatusBarOverlayHeight() : 0;
         String climateStatus = ClimatePanelService.getRuntimeStatus();
         return LauncherSafeAreaPolicy.insets(

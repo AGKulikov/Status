@@ -32,7 +32,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -50,7 +49,7 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /** Immediate editor for either HOME climate widgets or the independent floating surface. */
-public final class ClimatePanelSettingsActivity extends AppCompatActivity {
+public final class ClimatePanelSettingsActivity extends LauncherProfileActivity {
     public static final String EXTRA_LAUNCHER_ONLY =
             "dezz.status.widget.extra.CLIMATE_LAUNCHER_ONLY";
 
@@ -87,7 +86,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        preferences = new Preferences(this);
+        preferences = createLauncherPreferences(true);
         launcherOnly = getIntent().getBooleanExtra(EXTRA_LAUNCHER_ONLY, false);
         store = launcherOnly
                 ? new ClimatePanelConfigStore(preferences)

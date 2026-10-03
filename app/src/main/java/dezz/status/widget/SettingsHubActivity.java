@@ -671,6 +671,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
             WidgetServiceStarter.startIfNeeded(this);
         }
         dezz.status.widget.driver.DriverPanelService.apply(this);
+        dezz.status.widget.driver.PassengerPanelService.apply(this);
         dezz.status.widget.dim.DimMenuPanelService.apply(this);
         ClimatePanelService.apply(this);
         Toast.makeText(this, R.string.import_success_toast, Toast.LENGTH_SHORT).show();

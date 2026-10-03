@@ -32,7 +32,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -76,7 +75,7 @@ import dezz.status.widget.performance.PerformanceExecutors;
 import dezz.status.widget.performance.PerformancePickerTask;
 
 /** Visual, code-free editor for arbitrary HOME icons. */
-public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
+public final class LauncherShortcutSettingsActivity extends LauncherProfileActivity {
     public static final String EXTRA_ADD_NEW = "dezz.status.widget.extra.ADD_HOME_SHORTCUT";
     public static final String EXTRA_SYSTEM_SHADE =
             "dezz.status.widget.extra.EDIT_SYSTEM_SHADE_SHORTCUTS";
@@ -119,7 +118,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        preferences = new Preferences(this);
+        preferences = createLauncherPreferences(true);
         systemShadeMode = getIntent().getBooleanExtra(EXTRA_SYSTEM_SHADE, false);
         store = systemShadeMode ? LauncherShortcutStore.forSystemShade(preferences)
                 : new LauncherShortcutStore(preferences);
@@ -1502,12 +1501,13 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
 
     private void chooseDriverFavorites(@NonNull LauncherShortcutStore.Shortcut value) {
         List<DriverFavoritesPanelConfig> panels =
-                new DriverFavoritesPanelStore(preferences).load();
+                new DriverFavoritesPanelStore(preferences, isPassengerLauncherProfile()).load();
         String[] labels = new String[panels.size()];
         for (int index = 0; index < panels.size(); index++) {
             labels[index] = panels.get(index).title;
         }
-        new AlertDialog.Builder(this).setTitle("Избранное водителя")
+        new AlertDialog.Builder(this).setTitle(isPassengerLauncherProfile()
+                ? "Избранное пассажира" : "Избранное водителя")
                 .setItems(labels, (dialog, which) -> {
                     DriverFavoritesPanelConfig panel = panels.get(which);
                     String target = LauncherShortcutStore.driverFavoritesTarget(panel.id);

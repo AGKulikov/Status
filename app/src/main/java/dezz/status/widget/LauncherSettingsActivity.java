@@ -23,7 +23,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -48,7 +47,7 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
  * <p>There are deliberately no media/climate/navigation panel subsections. Global behavior lives
  * in this one scroll; a concrete widget's appearance is edited by tapping it in layout mode.</p>
  */
-public final class LauncherSettingsActivity extends AppCompatActivity {
+public class LauncherSettingsActivity extends LauncherProfileActivity {
     private interface IntSetter {
         void set(int value);
     }
@@ -72,8 +71,8 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        preferences = new Preferences(this);
-        setTitle("Лаунчер");
+        preferences = createLauncherPreferences(true);
+        setTitle(isPassengerLauncherProfile() ? "Лаунчер пассажира" : "Лаунчер");
         View screen = buildContent();
         setContentView(screen);
         dezz.status.widget.settings.SettingsBackNavigation.install(this, screen);
@@ -103,22 +102,26 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         content.setBackgroundColor(0xFF0B0E13);
         scroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
 
-        addTitle("Лаунчер");
+        addTitle(isPassengerLauncherProfile() ? "Лаунчер пассажира" : "Лаунчер");
         addHint("Один свободный холст и один общий пул кнопок, приложений, информации, "
                 + "медиа, навигации, климата, автомобиля, умного дома, групп и подложек. "
                 + "Настройки выбранного элемента открываются тапом по нему в режиме компоновки.");
         homeStatus = addHint("");
-        addButton("Открыть и проверить HOME", view ->
+        addButton(isPassengerLauncherProfile() ? "Домой пассажир" : "Открыть и проверить HOME", view ->
                 startActivity(new Intent(this, LauncherActivity.class)));
         addButton("＋ Добавить элемент", view -> openLayoutEditor(true));
         addButton("Режим компоновки", view -> openLayoutEditor(false));
-        addButton("Выбрать домашний экран по умолчанию", view -> chooseDefaultHome());
+        if (!isPassengerLauncherProfile())
+            addButton("Выбрать домашний экран по умолчанию", view -> chooseDefaultHome());
 
         addSwitch("Полноэкранный режим", preferences.launcherImmersive);
         addSwitch("Показывать сетку в режиме компоновки", preferences.launcherShowGrid);
-        addSwitch("HOME → наш лаунчер → оконный Навигатор",
+        addSwitch(isPassengerLauncherProfile() ? "Открывать Навигатор при возврате домой"
+                        : "HOME → наш лаунчер → оконный Навигатор",
                 preferences.launcherHomeOpensWindowedNavigator);
-        addHint("Оконный Навигатор создаёт ECARX внутри чужого процесса Яндекса. Natro "
+        addHint(isPassengerLauncherProfile()
+                ? "Навигатор открывается на экране пассажира."
+                : "Оконный Навигатор создаёт ECARX внутри чужого процесса Яндекса. Natro "
                 + "не владеет его Window/Surface, поэтому радиус углов задаётся самой прошивкой, "
                 + "а не настройкой лаунчера.");
         addIntControl("Шаг привязки", 1, 100,
@@ -128,7 +131,9 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         AppleColorPickerDialog.decorateButton(backgroundColorButton, "Цвет фона",
                 preferences.launcherBackgroundColor.get());
 
-        addHint("Параметры ниже общие для меню «Все приложения» на HOME и панели водителя.");
+        addHint(isPassengerLauncherProfile()
+                ? "Параметры меню «Все приложения» пассажирского лаунчера."
+                : "Параметры ниже общие для меню «Все приложения» на HOME и панели водителя.");
         addIntControl("Столбцы «Все приложения»", 3, 8,
                 clamp(preferences.launcherAllAppsColumns.get(), 3, 8), "",
                 preferences.launcherAllAppsColumns::set);
@@ -192,6 +197,10 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
 
     private void updateHomeStatus() {
         if (homeStatus == null) return;
+        if (isPassengerLauncherProfile()) {
+            homeStatus.setText("Отдельный домашний экран пассажира. Компоновка и оформление сохраняются независимо.");
+            return;
+        }
         Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
         String selected = "";
         try {

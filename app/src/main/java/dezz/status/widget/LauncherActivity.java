@@ -46,7 +46,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
@@ -152,7 +151,15 @@ import dezz.status.widget.shell.PrivilegedShell;
 import dezz.status.widget.sprut.SprutHubController;
 
 /** Full HOME implementation that coexists with the original Status Widget settings activity. */
-public final class LauncherActivity extends AppCompatActivity {
+public class LauncherActivity extends LauncherProfileActivity {
+    private boolean launcherDisplayRejected;
+
+    @Override public boolean isPassengerLauncherProfile() { return false; }
+
+    private String launcherAutomationScope() {
+        return isPassengerLauncherProfile() ? AutomationContract.SCOPE_PASSENGER_LAUNCHER
+                : AutomationContract.SCOPE_LAUNCHER;
+    }
     private static final String TAG = "LauncherActivity";
     public static final String EXTRA_EDIT_MODE = "dezz.status.widget.extra.EDIT_HOME";
     public static final String EXTRA_SHOW_WIDGET_CATALOG =
@@ -399,7 +406,7 @@ public final class LauncherActivity extends AppCompatActivity {
     };
     private final WidgetService.AutomationPresentationListener launcherAutomationListener =
             (scope, ids) -> {
-                if (!AutomationContract.SCOPE_LAUNCHER.equals(scope)) return;
+                if (!launcherAutomationScope().equals(scope)) return;
                 Set<String> copy = new LinkedHashSet<>(ids);
                 navigationUiHandler.post(() -> applyLauncherAutomationStyles(copy));
             };
@@ -487,7 +494,7 @@ public final class LauncherActivity extends AppCompatActivity {
                     || isFinishing() || isDestroyed()) return;
             switch (deferredLauncherRuntimeStage++) {
                 case 0:
-                    if (!ecarxPhoneWakeSentForStart) {
+                    if (!isPassengerLauncherProfile() && !ecarxPhoneWakeSentForStart) {
                         ecarxPhoneWakeSentForStart = true;
                         EcarxBtPhoneBridge.onLauncherVisible(LauncherActivity.this);
                     }
@@ -525,11 +532,18 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        homeRootInvocation = isHomeInvocation(getIntent());
+        if (isPassengerLauncherProfile() && getWindowManager().getDefaultDisplay().getDisplayId()
+                != dezz.status.widget.launcher.PassengerHomeLauncher.DISPLAY_ID) {
+            launcherDisplayRejected = true;
+            DiagnosticJournal.warn("passenger-home", "rejected_wrong_display");
+            finish();
+            return;
+        }
+        homeRootInvocation = isPassengerLauncherProfile() || isHomeInvocation(getIntent());
         // Opening SharedPreferences is asynchronous, but the default constructor immediately
         // performs JSON migrations and synchronous commit(). HOME needs none of that to attach its
         // shell, so the one shared Preferences graph is submitted to launcherWorker immediately.
-        preferences = new Preferences(this, false);
+        preferences = createLauncherPreferences(false);
         configureWindow();
         View root = buildRoot();
         setContentView(root);
@@ -678,6 +692,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        if (launcherDisplayRejected) return;
         activityStarted = true;
         applyPendingLauncherBootstrapAfterFirstDraw();
         if (launcherBootstrapReady && !panelsInitialized) {
@@ -964,7 +979,7 @@ public final class LauncherActivity extends AppCompatActivity {
     /** Issues all startup work immediately; only optional UI attachment waits for shell draw. */
     private void startImmediateHomeRuntime() {
         if (!activityStarted || isFinishing() || isDestroyed()) return;
-        if (!ecarxPhoneWakeSentForStart) {
+        if (!isPassengerLauncherProfile() && !ecarxPhoneWakeSentForStart) {
             ecarxPhoneWakeSentForStart = true;
             EcarxBtPhoneBridge.onLauncherVisible(this);
         }
@@ -992,7 +1007,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         // Defensive cleanup for vendor lifecycle teardown that omits a matching pause callback.
-        StatusBarSurfaceContext.setLauncherHomeForeground(false);
+        if (!isPassengerLauncherProfile()) StatusBarSurfaceContext.setLauncherHomeForeground(false);
         dismissAllAppsDialog();
         launcherBootstrapGeneration++;
         panelInitializationGeneration++;
@@ -1034,6 +1049,11 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (isPassengerLauncherProfile() && getWindowManager().getDefaultDisplay().getDisplayId()
+                != dezz.status.widget.launcher.PassengerHomeLauncher.DISPLAY_ID) {
+            finish();
+            return;
+        }
         // ECARX can resume HOME under a still-visible freeform Navigator. Surface ownership is
         // therefore published only by onWindowFocusChanged (and cleared defensively on pause).
         if (!launcherBootstrapReady) {
@@ -1059,7 +1079,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         // Any Activity which pauses HOME also removes it from the interactive top surface.
-        StatusBarSurfaceContext.setLauncherHomeForeground(false);
+        if (!isPassengerLauncherProfile()) StatusBarSurfaceContext.setLauncherHomeForeground(false);
         super.onPause();
     }
 
@@ -1068,7 +1088,7 @@ public final class LauncherActivity extends AppCompatActivity {
         super.onWindowFocusChanged(hasFocus);
         // Focus is the reliable close signal for the ECARX freeform task: HOME may be RESUMED
         // underneath Navigator, but it regains window focus only after that window is gone.
-        StatusBarSurfaceContext.setLauncherHomeForeground(hasFocus);
+        if (!isPassengerLauncherProfile()) StatusBarSurfaceContext.setLauncherHomeForeground(hasFocus);
     }
 
     private void registerNavigationReceiver() {
@@ -2116,7 +2136,7 @@ public final class LauncherActivity extends AppCompatActivity {
         tap.setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Действие виджета")
                 .setItems(new String[]{"Исходное действие", "Без действия",
-                        "Открыть приложение…"}, (dialog, which) -> {
+                        "Открыть приложение…", "Домой пассажир"}, (dialog, which) -> {
                     if (which == 0) {
                         appearance.tapAction =
                                 LauncherGlobalElementLayoutStore.TapAction.INHERIT;
@@ -2126,6 +2146,12 @@ public final class LauncherActivity extends AppCompatActivity {
                     } else if (which == 1) {
                         appearance.tapAction =
                                 LauncherGlobalElementLayoutStore.TapAction.NONE;
+                        appearance.appComponent = "";
+                        tap.setText("Нажатие: " + widgetTapActionLabel(appearance));
+                        saveLauncherWidgetAppearance(id, appearance);
+                    } else if (which == 3) {
+                        appearance.tapAction =
+                                LauncherGlobalElementLayoutStore.TapAction.PASSENGER_HOME;
                         appearance.appComponent = "";
                         tap.setText("Нажатие: " + widgetTapActionLabel(appearance));
                         saveLauncherWidgetAppearance(id, appearance);
@@ -3076,6 +3102,9 @@ public final class LauncherActivity extends AppCompatActivity {
     @NonNull
     private String widgetTapActionLabel(
             @NonNull LauncherGlobalElementLayoutStore.Appearance appearance) {
+        if (appearance.tapAction == LauncherGlobalElementLayoutStore.TapAction.PASSENGER_HOME) {
+            return "Домой пассажир";
+        }
         if (appearance.tapAction == LauncherGlobalElementLayoutStore.TapAction.NONE) {
             return "без действия";
         }
@@ -4274,7 +4303,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private void applyLauncherAutomationStyle(@NonNull ShortcutTileBinding binding) {
         WidgetService service = WidgetService.getInstance();
         AutomationState automation = service == null ? AutomationState.missing()
-                : service.launcherAutomationState(binding.shortcut.id);
+                : service.launcherAutomationState(binding.shortcut.id, isPassengerLauncherProfile());
         DriverPanelStylePolicy.IconStyle style = DriverPanelStylePolicy.icon(
                 binding.liveTint, binding.liveBackground, automation);
         try { binding.card.setCardBackgroundColor(Color.parseColor(style.backgroundColor)); }
@@ -4483,24 +4512,49 @@ public final class LauncherActivity extends AppCompatActivity {
     private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action,
                                 @NonNull String rawTarget) {
         switch (action) {
+            case PASSENGER_HOME:
+                dezz.status.widget.launcher.PassengerHomeLauncher.open(this);
+                break;
             case HOME:
+                if (isPassengerLauncherProfile()) {
+                    dezz.status.widget.launcher.PassengerHomeLauncher.open(this);
+                    break;
+                }
                 startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                                 | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
                 break;
             case BACK:
+                if (isPassengerLauncherProfile()) { onBackPressed(); break; }
                 if (!WidgetAccessibilityService.performGlobalBack()) onBackPressed();
                 break;
             case RECENTS:
+                if (isPassengerLauncherProfile()) {
+                    PrivilegedShell.get(this).runCommand("input -d 3 keyevent 187",
+                            (output, error) -> {
+                                if (error != null) dezz.status.widget.launcher.PassengerHomeLauncher
+                                        .reportFailure(this, new IllegalStateException("Passenger recents unavailable"));
+                            });
+                    break;
+                }
                 if (!WidgetAccessibilityService.performGlobalRecents(
                         accepted -> {
                             if (!accepted) openRecentsWithShell();
                         })) openRecentsWithShell();
                 break;
             case STOCK_CLIMATE:
+                if (isPassengerLauncherProfile()) {
+                    dezz.status.widget.driver.PassengerPanelService.triggerStockClimate(this);
+                    break;
+                }
                 dezz.status.widget.driver.DriverPanelService.triggerStockClimate(this);
                 break;
             case FAVORITES:
+                if (isPassengerLauncherProfile()) {
+                    dezz.status.widget.driver.PassengerPanelService.showFavorites(this,
+                            LauncherShortcutStore.driverFavoritesPanelId(rawTarget));
+                    break;
+                }
                 dezz.status.widget.driver.DriverPanelService.showFavorites(this,
                         LauncherShortcutStore.driverFavoritesPanelId(rawTarget));
                 break;
@@ -4531,6 +4585,10 @@ public final class LauncherActivity extends AppCompatActivity {
                 break;
             case EDIT_HOME: setEditMode(true); break;
             case HOME_SETTINGS:
+                if (isPassengerLauncherProfile()) {
+                    startActivity(new Intent(this, PassengerLauncherSettingsActivity.class));
+                    break;
+                }
                 startActivity(SettingsHubActivity.intent(this,
                         dezz.status.widget.settings.SettingsDestinationCatalog.Group.HOME));
                 break;
@@ -5166,6 +5224,14 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void launchYandex(YandexWindowLauncher.Product product, boolean full) {
+        if (isPassengerLauncherProfile()) {
+            String pkg = product == YandexWindowLauncher.Product.MAPS
+                    ? "ru.yandex.yandexmaps" : "ru.yandex.yandexnavi";
+            Intent launch = getPackageManager().getLaunchIntentForPackage(pkg);
+            if (launch != null) startActivity(launch);
+            else Toast.makeText(this, "Яндекс-приложение не найдено", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (!YandexWindowLauncher.launch(this, product, full)) {
             Toast.makeText(this, "Яндекс-приложение не найдено", Toast.LENGTH_SHORT).show();
         }
@@ -5221,7 +5287,8 @@ public final class LauncherActivity extends AppCompatActivity {
         gridParams.topMargin = dp(84);
         root.addView(grid, gridParams);
         boolean overlay = Permissions.checkOverlayPermission(this);
-        Context dialogContext = overlay ? getApplicationContext() : this;
+        Context dialogContext = overlay ? getApplicationContext().createDisplayContext(
+                getWindowManager().getDefaultDisplay()) : this;
         android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(dialogContext,
                 android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen)
                 .setView(root)

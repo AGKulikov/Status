@@ -32,9 +32,10 @@ import dezz.status.widget.launcher.LauncherAppCatalog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** One shared editor for the HOME and driver-panel all-applications catalogs. */
-public final class AllAppsSettingsActivity extends AppCompatActivity {
+public class AllAppsSettingsActivity extends AppCompatActivity {
     private interface IntSetter { void set(int value); }
 
+    protected boolean passengerPanel() { return false; }
     private Preferences preferences;
     private LinearLayout applications;
     private TextView visibleCount;
@@ -73,7 +74,7 @@ public final class AllAppsSettingsActivity extends AppCompatActivity {
 
         TextView title = text("Меню «Все приложения»", 25, Color.WHITE);
         root.addView(title);
-        TextView hint = text("Эти параметры одновременно применяются в лаунчере и в панели "
+        TextView hint = text(passengerPanel() ? "Сетка и видимость приложений только для пассажирской панели." : "Эти параметры одновременно применяются в лаунчере и в панели "
                 + "водителя. По умолчанию системные приложения скрыты, кроме «Телефона»; "
                 + "любой системный экран можно включить ниже.", 14, 0xFF9A9AA0);
         LinearLayout.LayoutParams hintParams = rowParams();
@@ -81,17 +82,17 @@ public final class AllAppsSettingsActivity extends AppCompatActivity {
         root.addView(hint, hintParams);
 
         slider(root, "Столбцы", 3, 8,
-                clamp(preferences.launcherAllAppsColumns.get(), 3, 8), "", value -> {
-                    preferences.launcherAllAppsColumns.set(value);
+                clamp((passengerPanel() ? preferences.passengerAllAppsColumns : preferences.launcherAllAppsColumns).get(), 3, 8), "", value -> {
+                    (passengerPanel() ? preferences.passengerAllAppsColumns : preferences.launcherAllAppsColumns).set(value);
                 });
         slider(root, "Масштаб иконок", 60, 180,
-                clamp(preferences.launcherAllAppsIconScalePercent.get(), 60, 180), "%",
+                clamp((passengerPanel() ? preferences.passengerAllAppsIconScalePercent : preferences.launcherAllAppsIconScalePercent).get(), 60, 180), "%",
                 value -> {
-                    preferences.launcherAllAppsIconScalePercent.set(value);
+                    (passengerPanel() ? preferences.passengerAllAppsIconScalePercent : preferences.launcherAllAppsIconScalePercent).set(value);
                 });
         slider(root, "Расстояние между иконками", 0, 40,
-                clamp(preferences.launcherAllAppsGapPx.get(), 0, 40), " px", value -> {
-                    preferences.launcherAllAppsGapPx.set(value);
+                clamp((passengerPanel() ? preferences.passengerAllAppsGapPx : preferences.launcherAllAppsGapPx).get(), 0, 40), " px", value -> {
+                    (passengerPanel() ? preferences.passengerAllAppsGapPx : preferences.launcherAllAppsGapPx).set(value);
                 });
 
         TextView section = text("Показывать приложения", 21, Color.WHITE);
@@ -110,7 +111,7 @@ public final class AllAppsSettingsActivity extends AppCompatActivity {
         loader.execute(() -> {
             List<LauncherAppCatalog.App> values =
                     LauncherAppCatalog.loadIncludingSystem(this);
-            LauncherAppCatalog.ensureDefaultSystemVisibility(this, preferences, values);
+            LauncherAppCatalog.ensureDefaultSystemVisibility(this, preferences, values, passengerPanel());
             runOnUiThread(() -> renderApplications(values));
         });
     }
@@ -118,7 +119,7 @@ public final class AllAppsSettingsActivity extends AppCompatActivity {
     private void renderApplications(@NonNull List<LauncherAppCatalog.App> values) {
         if (isFinishing() || isDestroyed()) return;
         applications.removeAllViews();
-        Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
+        Set<String> hidden = (passengerPanel() ? preferences.passengerAllAppsHiddenComponents : preferences.launcherAllAppsHiddenComponents).get();
         for (LauncherAppCatalog.App app : values) {
             MaterialCardView card = new MaterialCardView(this);
             card.setCardBackgroundColor(0xFF1C1C1E);
@@ -149,10 +150,10 @@ public final class AllAppsSettingsActivity extends AppCompatActivity {
             visible.setTextColor(Color.WHITE);
             visible.setChecked(!hidden.contains(key));
             visible.setOnCheckedChangeListener((button, checked) -> {
-                Set<String> current = preferences.launcherAllAppsHiddenComponents.get();
+                Set<String> current = (passengerPanel() ? preferences.passengerAllAppsHiddenComponents : preferences.launcherAllAppsHiddenComponents).get();
                 if (checked) current.remove(key);
                 else current.add(key);
-                preferences.launcherAllAppsHiddenComponents.set(current);
+                (passengerPanel() ? preferences.passengerAllAppsHiddenComponents : preferences.launcherAllAppsHiddenComponents).set(current);
                 visible.setText(checked ? "В меню" : "Скрыто");
                 updateCount(values);
             });
@@ -164,7 +165,7 @@ public final class AllAppsSettingsActivity extends AppCompatActivity {
     }
 
     private void updateCount(@NonNull List<LauncherAppCatalog.App> values) {
-        Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
+        Set<String> hidden = (passengerPanel() ? preferences.passengerAllAppsHiddenComponents : preferences.launcherAllAppsHiddenComponents).get();
         int hiddenCurrent = 0;
         for (LauncherAppCatalog.App app : values) {
             if (hidden.contains(app.component.flattenToString())) hiddenCurrent++;

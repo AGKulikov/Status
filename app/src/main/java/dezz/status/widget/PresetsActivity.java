@@ -212,6 +212,7 @@ public class PresetsActivity extends AppCompatActivity {
         }
         // A complete user preset may also switch the driver rail profile or disable it.
         dezz.status.widget.driver.DriverPanelService.apply(this);
+        dezz.status.widget.driver.PassengerPanelService.apply(this);
         // Applying a complete user preset may switch reserved/compact/off climate modes. Do not
         // rely on a particular next Activity to reconcile WindowManager state.
         dezz.status.widget.climate.ClimatePanelService.apply(this);

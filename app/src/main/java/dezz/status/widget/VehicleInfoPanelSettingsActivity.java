@@ -26,7 +26,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
@@ -45,7 +44,7 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Human-friendly, immediate visual editor for the HOME vehicle-information panel. */
-public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
+public final class VehicleInfoPanelSettingsActivity extends LauncherProfileActivity {
     private interface IntChange { void set(int value); }
     private interface TextChange { void set(@NonNull String value); }
     private interface TextValue { String get(); }
@@ -64,7 +63,7 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        preferences = new Preferences(this);
+        preferences = createLauncherPreferences(true);
         store = new VehicleInfoPanelConfigStore(preferences);
         config = store.load();
         integration = CarIntegrations.get(this);

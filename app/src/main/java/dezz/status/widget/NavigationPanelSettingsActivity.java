@@ -22,7 +22,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
@@ -38,7 +37,7 @@ import dezz.status.widget.launcher.panels.PanelGridLayout;
 /**
  * Precise companion controls for the primary, full-size WYSIWYG navigation editor on HOME.
  */
-public final class NavigationPanelSettingsActivity extends AppCompatActivity {
+public final class NavigationPanelSettingsActivity extends LauncherProfileActivity {
     private interface ValueChange { boolean set(int value); }
     private interface ValueRead { int get(); }
     private interface ValueLabel { String format(int value); }
@@ -55,7 +54,7 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        preferences = new Preferences(this);
+        preferences = createLauncherPreferences(true);
         store = new NavigationPanelConfigStore(preferences);
         config = store.load();
         setTitle("Сетка навигации");

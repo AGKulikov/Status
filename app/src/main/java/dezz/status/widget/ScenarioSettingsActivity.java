@@ -116,13 +116,14 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             "актуально", "устарело", "всегда"
     };
     private static final String[] TARGET_VALUES = {
-            "MAIN", "POPUP", "BUILTIN", "OVERLAY", "LAUNCHER", "DRIVER", "HUD"
+            "MAIN", "POPUP", "BUILTIN", "OVERLAY", "LAUNCHER", "DRIVER", "HUD", "PASSENGER", "PASSENGER_LAUNCHER"
     };
     private static final String[] TARGET_LABELS = {
             "Элемент основной строки", "Плитка плавающего оверлея",
             "Штатный элемент", "Весь плавающий оверлей", "Кнопка HOME",
             "Панель / кнопка водителя",
-            "Элемент отдельного HUD-дисплея"
+            "Элемент отдельного HUD-дисплея",
+            "Панель / кнопка пассажира", "Кнопка HOME пассажира"
     };
     private static final String[] FIELD_VALUES = {
             "VISIBLE", "TEXT", "TEXT_COLOR", "BACKGROUND_COLOR", "ICON", "ACTION_ENABLED",
@@ -836,20 +837,21 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 throw new IllegalArgumentException("Видимость настраивается для всего "
                         + "плавающего оверлея. Выберите «Весь плавающий оверлей»");
             }
-            if (targetScope == TargetScope.DRIVER
-                    && !isDriverFieldSupported(selectedTargetId, field)) {
+            if ((targetScope == TargetScope.DRIVER || targetScope == TargetScope.PASSENGER)
+                    && !isDriverFieldSupported(selectedTargetId, field, TargetScope.PASSENGER.jsonName().equals(mappedValue(target, TARGET_VALUES)))) {
                 throw new IllegalArgumentException("Выбранное оформление не поддерживается "
                         + "этой целью панели водителя");
             }
-            if (targetScope == TargetScope.LAUNCHER
+            if ((targetScope == TargetScope.LAUNCHER || targetScope == TargetScope.PASSENGER_LAUNCHER)
                     && (!isLauncherFieldSupported(field)
                     || ((field == LocalField.ICON_OUTLINE_COLOR
                     || field == LocalField.ICON_OUTLINE_WIDTH)
-                    && !isLauncherGlyphTarget(selectedTargetId)))) {
+                    && !isLauncherGlyphTarget(selectedTargetId, targetScope == TargetScope.PASSENGER_LAUNCHER)))) {
                 throw new IllegalArgumentException("Для кнопки HOME доступны только цвет "
                         + "иконки, фон и контур");
             }
-            if (targetScope != TargetScope.DRIVER && targetScope != TargetScope.LAUNCHER
+            if (targetScope != TargetScope.DRIVER && targetScope != TargetScope.PASSENGER && targetScope != TargetScope.LAUNCHER
+                    && targetScope != TargetScope.PASSENGER_LAUNCHER
                     && isShortcutSurfaceStyleField(field)) {
                 throw new IllegalArgumentException("Это оформление доступно только для кнопок "
                         + "HOME и панели водителя");
@@ -999,14 +1001,15 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 field = LocalField.VISIBLE;
             }
             String selectedScope = mappedValue(target, TARGET_VALUES);
-            if (TargetScope.LAUNCHER.jsonName().equals(selectedScope)) {
+            if (TargetScope.LAUNCHER.jsonName().equals(selectedScope)
+                    || TargetScope.PASSENGER_LAUNCHER.jsonName().equals(selectedScope)) {
                 if (!isLauncherFieldSupported(field)) {
                     selectSpinnerValue(localField, FIELD_VALUES,
                             LocalField.ICON_TINT.jsonName());
                 }
                 return;
             }
-            if (!TargetScope.DRIVER.jsonName().equals(selectedScope)) {
+            if (!TargetScope.DRIVER.jsonName().equals(selectedScope) && !TargetScope.PASSENGER.jsonName().equals(selectedScope)) {
                 if (isShortcutSurfaceStyleField(field)) {
                     selectSpinnerValue(localField, FIELD_VALUES,
                             LocalField.VISIBLE.jsonName());
@@ -1014,7 +1017,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 return;
             }
             String selectedTargetId = text(targetId);
-            if (isDriverFieldSupported(selectedTargetId, field)) return;
+            if (isDriverFieldSupported(selectedTargetId, field, TargetScope.PASSENGER.jsonName().equals(mappedValue(target, TARGET_VALUES)))) return;
             selectSpinnerValue(localField, FIELD_VALUES,
                     DriverPanelStylePolicy.PANEL_TARGET_ID.equals(selectedTargetId)
                             ? LocalField.BACKGROUND_COLOR.jsonName()
@@ -1708,12 +1711,15 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 }
                 break;
             case LAUNCHER:
+            case PASSENGER_LAUNCHER:
+                Preferences homePrefs = scope == TargetScope.PASSENGER_LAUNCHER
+                        ? Preferences.forPassengerLauncher(this) : prefs;
                 for (LauncherShortcutStore.Shortcut shortcut :
-                        new LauncherShortcutStore(prefs).all()) {
+                        new LauncherShortcutStore(homePrefs).all()) {
                     if (shortcut.kind == LauncherShortcutStore.Kind.INFO
                             || shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) continue;
                     result.add(new TargetOption(shortcut.id,
-                            "HOME · " + shortcut.title + " [" + shortcut.id + "]"));
+                            (scope == TargetScope.PASSENGER_LAUNCHER ? "HOME пассажира · " : "HOME · ") + shortcut.title + " [" + shortcut.id + "]"));
                 }
                 break;
             case DRIVER:
@@ -1728,6 +1734,24 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                                     + " [" + panel.id + "]"));
                     for (LauncherShortcutStore.Shortcut shortcut :
                             LauncherShortcutStore.forDriverFavorites(prefs, panel.id).all()) {
+                        result.add(new TargetOption(shortcut.id,
+                                panel.title + " · " + shortcut.title
+                                        + " [" + shortcut.id + "]"));
+                    }
+                }
+                break;
+            case PASSENGER:
+                result.add(new TargetOption(DriverPanelStylePolicy.PANEL_TARGET_ID,
+                        "Панель пассажира · фон и граница"));
+                addDriverTargets(result, prefs.passengerPanel,
+                        "Панель пассажира");
+                for (dezz.status.widget.driver.DriverFavoritesPanelConfig panel :
+                        new dezz.status.widget.driver.DriverFavoritesPanelStore(prefs, true).load()) {
+                    result.add(new TargetOption(panel.id,
+                            "Панель избранного · " + panel.title
+                                    + " [" + panel.id + "]"));
+                    for (LauncherShortcutStore.Shortcut shortcut :
+                            LauncherShortcutStore.forPanelFavorites(prefs, panel.id, true).all()) {
                         result.add(new TargetOption(shortcut.id,
                                 panel.title + " · " + shortcut.title
                                         + " [" + shortcut.id + "]"));
@@ -2185,14 +2209,14 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         return field == LocalField.BORDER_WIDTH || field == LocalField.ICON_OUTLINE_WIDTH;
     }
 
-    private boolean isDriverFieldSupported(@Nullable String targetId, LocalField field) {
+    private boolean isDriverFieldSupported(@Nullable String targetId, LocalField field, boolean passenger) {
         if (DriverPanelStylePolicy.PANEL_TARGET_ID.equals(targetId)) {
             return field == LocalField.BACKGROUND_COLOR || field == LocalField.BORDER_COLOR
                     || field == LocalField.BORDER_WIDTH;
         }
         if ((field == LocalField.ICON_OUTLINE_COLOR
                 || field == LocalField.ICON_OUTLINE_WIDTH)
-                && !isDriverGlyphTarget(targetId)) {
+                && !isDriverGlyphTarget(targetId, passenger)) {
             // INFO/DIVIDER/panel targets have no single icon glyph. DriverClimateShortcutView is
             // a multi-part live readout. Never fall back to outlining their whole container.
             return false;
@@ -2203,17 +2227,17 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 || field == LocalField.ICON_OUTLINE_WIDTH;
     }
 
-    private boolean isDriverGlyphTarget(@Nullable String targetId) {
+    private boolean isDriverGlyphTarget(@Nullable String targetId, boolean passenger) {
         if (targetId == null || targetId.isEmpty()) return false;
         for (LauncherShortcutStore.Shortcut shortcut :
-                LauncherShortcutStore.forDriverPanel(prefs).all()) {
+                LauncherShortcutStore.forDriverPanel(prefs, passenger ? prefs.passengerPanel : prefs.activeDriverPanelProfile()).all()) {
             if (targetId.equals(shortcut.id)) return hasScenarioOutlineGlyph(shortcut);
         }
         for (dezz.status.widget.driver.DriverFavoritesPanelConfig panel :
-                new dezz.status.widget.driver.DriverFavoritesPanelStore(prefs).load()) {
+                new dezz.status.widget.driver.DriverFavoritesPanelStore(prefs, passenger).load()) {
             if (targetId.equals(panel.id)) return false;
             for (LauncherShortcutStore.Shortcut shortcut :
-                    LauncherShortcutStore.forDriverFavorites(prefs, panel.id).all()) {
+                    LauncherShortcutStore.forPanelFavorites(prefs, panel.id, passenger).all()) {
                 if (targetId.equals(shortcut.id)) return hasScenarioOutlineGlyph(shortcut);
             }
         }
@@ -2234,9 +2258,10 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 || field == LocalField.ICON_OUTLINE_WIDTH;
     }
 
-    private boolean isLauncherGlyphTarget(@Nullable String targetId) {
+    private boolean isLauncherGlyphTarget(@Nullable String targetId, boolean passenger) {
         if (targetId == null || targetId.isEmpty()) return false;
-        for (LauncherShortcutStore.Shortcut shortcut : new LauncherShortcutStore(prefs).all()) {
+        Preferences homePrefs = passenger ? Preferences.forPassengerLauncher(this) : prefs;
+        for (LauncherShortcutStore.Shortcut shortcut : new LauncherShortcutStore(homePrefs).all()) {
             if (!targetId.equals(shortcut.id)) continue;
             return shortcut.kind != LauncherShortcutStore.Kind.INFO
                     && shortcut.kind != LauncherShortcutStore.Kind.DIVIDER;

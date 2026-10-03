@@ -76,6 +76,8 @@ final class ButtonActionExecutor {
                 if (!binding.command.trim().isEmpty()) shell(binding.command.trim());
                 return;
             case HOME: platform.home(); return;
+            case NATRO_PASSENGER_HOME:
+                dezz.status.widget.launcher.PassengerHomeLauncher.open(context); return;
             case BACK:
                 if (!WidgetAccessibilityService.performGlobalBack(ok -> { if (!ok) shell("input keyevent 4"); })) shell("input keyevent 4");
                 return;

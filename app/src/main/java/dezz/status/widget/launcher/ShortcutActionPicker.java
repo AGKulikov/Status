@@ -276,7 +276,7 @@ public final class ShortcutActionPicker {
     private void chooseDriverFavorites(
             @NonNull LauncherShortcutStore.Shortcut value) {
         List<DriverFavoritesPanelConfig> panels =
-                new DriverFavoritesPanelStore(preferences).load();
+                new DriverFavoritesPanelStore(preferences, store != null && store.isPassengerPanel()).load();
         String[] labels = new String[panels.size()];
         for (int index = 0; index < panels.size(); index++) {
             DriverFavoritesPanelConfig panel = panels.get(index);

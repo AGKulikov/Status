@@ -56,7 +56,9 @@ public final class LauncherGlobalElementLayoutStore {
         /** Keep the widget informational. */
         NONE,
         /** Open the selected Android activity. */
-        APP
+        APP,
+        /** Open Natro HOME in the separate passenger task. */
+        PASSENGER_HOME
     }
 
     /** Deep per-widget rendering and interaction settings, independent of its rectangle. */

@@ -11,7 +11,9 @@ public enum TargetScope {
     OVERLAY,
     LAUNCHER,
     DRIVER,
-    HUD;
+    HUD,
+    PASSENGER,
+    PASSENGER_LAUNCHER;
 
     public String jsonName() {
         return name();

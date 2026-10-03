@@ -215,6 +215,8 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
             case BUILTIN: stateScope = AutomationContract.SCOPE_BUILTIN; break;
             case OVERLAY: stateScope = AutomationContract.SCOPE_OVERLAY; break;
             case LAUNCHER: stateScope = AutomationContract.SCOPE_LAUNCHER; break;
+            case PASSENGER_LAUNCHER: stateScope = AutomationContract.SCOPE_PASSENGER_LAUNCHER; break;
+            case PASSENGER: stateScope = AutomationContract.SCOPE_PASSENGER; break;
             case DRIVER: stateScope = AutomationContract.SCOPE_DRIVER; break;
             case HUD: stateScope = AutomationContract.SCOPE_HUD; break;
             default: throw new IllegalArgumentException("Unsupported target scope");

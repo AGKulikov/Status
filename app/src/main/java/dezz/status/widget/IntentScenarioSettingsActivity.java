@@ -386,6 +386,12 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
             collectRuleReferences(references,
                     LauncherShortcutStore.forDriverFavorites(prefs, panel.id), ruleId);
         }
+        collectRuleReferences(references, LauncherShortcutStore.forDriverPanel(prefs, prefs.passengerPanel), ruleId);
+        for (dezz.status.widget.driver.DriverFavoritesPanelConfig panel :
+                new dezz.status.widget.driver.DriverFavoritesPanelStore(prefs, true).load()) {
+            collectRuleReferences(references,
+                    LauncherShortcutStore.forPanelFavorites(prefs, panel.id, true), ruleId);
+        }
         return references;
     }
 

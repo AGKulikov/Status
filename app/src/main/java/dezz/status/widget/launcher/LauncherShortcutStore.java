@@ -231,6 +231,7 @@ public final class LauncherShortcutStore {
 
     public enum Builtin {
         HOME("home", "Домой", "home"),
+        PASSENGER_HOME("passenger_home", "Домой пассажир", "home"),
         BACK("back", "Назад", "back"),
         RECENTS("recents", "Недавние приложения", "apps"),
         STOCK_CLIMATE("stock_climate", "Штатный климат", "climate"),
@@ -318,6 +319,8 @@ public final class LauncherShortcutStore {
     private final Preferences.Str storage;
     private final boolean driverPanel;
     private final boolean driverFavorites;
+    private boolean passenger;
+    public boolean isPassengerPanel() { return passenger || preferences.isPassengerLauncherProfile(); }
     private final boolean dimMenu;
     private final boolean systemShade;
     private final List<Shortcut> shortcuts = new ArrayList<>();
@@ -350,8 +353,10 @@ public final class LauncherShortcutStore {
     public static LauncherShortcutStore forDriverPanel(
             @NonNull Preferences preferences,
             @NonNull Preferences.DriverPanelProfile profile) {
-        return new LauncherShortcutStore(preferences, profile.shortcutsJson,
+        LauncherShortcutStore result = new LauncherShortcutStore(preferences, profile.shortcutsJson,
                 true, false, false, false);
+        result.passenger = profile == preferences.passengerPanel;
+        return result;
     }
 
     @NonNull
@@ -363,8 +368,16 @@ public final class LauncherShortcutStore {
     @NonNull
     public static LauncherShortcutStore forDriverFavorites(
             @NonNull Preferences preferences, @NonNull String panelId) {
-        return new LauncherShortcutStore(preferences,
-                preferences.driverFavoritesShortcuts(panelId), false, true, false, false);
+        return forPanelFavorites(preferences, panelId, false);
+    }
+
+    @NonNull public static LauncherShortcutStore forPanelFavorites(
+            @NonNull Preferences preferences, @NonNull String panelId, boolean passenger) {
+        LauncherShortcutStore result = new LauncherShortcutStore(preferences,
+                passenger ? preferences.passengerFavoritesShortcuts(panelId) : preferences.driverFavoritesShortcuts(panelId),
+                false, true, false, false);
+        result.passenger = passenger;
+        return result;
     }
 
     /** Actions presented in the independent DIM navigation-tab menu. */

@@ -52,6 +52,8 @@ public final class AutomationContract {
     public static final String SCOPE_POPUP = "popup";
     public static final String SCOPE_OVERLAY = "overlay";
     public static final String SCOPE_LAUNCHER = "launcher";
+    public static final String SCOPE_PASSENGER = "passenger";
+    public static final String SCOPE_PASSENGER_LAUNCHER = "passenger_launcher";
     public static final String SCOPE_DRIVER = "driver";
     public static final String SCOPE_HUD = "hud";
 
@@ -75,6 +77,8 @@ public final class AutomationContract {
             case SCOPE_POPUP:
             case SCOPE_OVERLAY:
             case SCOPE_LAUNCHER:
+            case SCOPE_PASSENGER_LAUNCHER:
+            case SCOPE_PASSENGER:
             case SCOPE_DRIVER:
             case SCOPE_HUD:
                 return scope;

@@ -32,7 +32,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -55,7 +54,7 @@ import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
 
 /** Code-free, autosaving editor for applications shown in the HOME favourites panel. */
-public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
+public final class FavoriteAppsSettingsActivity extends LauncherProfileActivity {
     private interface IntChange { void set(int value); }
 
     private final ExecutorService catalogExecutor = Executors.newSingleThreadExecutor();
@@ -81,7 +80,7 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        preferences = new Preferences(this);
+        preferences = createLauncherPreferences(true);
         store = new FavoriteAppsConfigStore(preferences);
         setTitle("Избранные приложения HOME");
         View screen = buildScreen();

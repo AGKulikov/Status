@@ -136,6 +136,10 @@ public final class SettingsDestinationCatalog {
                 "климат", "информация", "кнопки", "размеры", "позиции кнопок",
                 "столбцы", "все приложения", "скрыть системные", "подложка",
                 "горизонтальный ряд"));
+        values.add(activity("passenger_home", Group.HOME, "Лаунчер пассажира",
+                "Домашний экран пассажира: собственные элементы, фон, компоновка и приложения",
+                "home", "dezz.status.widget.PassengerLauncherSettingsActivity",
+                "домой пассажир", "пассажирский экран", "лаунчер", "компоновка"));
         values.add(activity("vehicle_control", Group.HOME, "Пульт автомобиля",
                 "Обзор Monjaro и контекстные разделы климата, сидений, автомобиля и комфорта",
                 "vehicle", "dezz.status.widget.VehicleControlActivity",
@@ -179,6 +183,12 @@ public final class SettingsDestinationCatalog {
                 "навигатор", "яндекс навигатор", "оконный режим", "окно",
                 "скругление", "углы", "фиксация", "зафиксировать", "ручка",
                 "перетаскивание", "уголок", "прозрачный фон"));
+        values.add(activity("passenger_favorites", Group.PANELS, "Избранное пассажира",
+                "Независимые панели, сетка, кнопки и автозакрытие", "apps",
+                "dezz.status.widget.PassengerFavoritesSettingsActivity", "пассажир избранное"));
+        values.add(activity("passenger_panel", Group.PANELS, "Панель пассажира",
+                "Кнопки и оформление на пассажирском экране", "apps",
+                "dezz.status.widget.PassengerPanelSettingsActivity", "пассажир экран боковая панель"));
         values.add(activity("driver_panel", Group.PANELS, "Панель водителя",
                 "Единая боковая панель: до 10 кнопок, Домой, Назад и штатный климат",
                 "apps", "dezz.status.widget.DriverPanelSettingsActivity",

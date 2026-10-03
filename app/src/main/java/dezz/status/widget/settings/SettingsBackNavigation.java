@@ -193,7 +193,8 @@ public final class SettingsBackNavigation {
                 baseTop[0] = observedTop;
             }
             int systemTop = systemTopInset(content);
-            int extra = Math.max(0, statusOverlayHeight() - systemTop);
+            int extra = activity.getWindowManager().getDefaultDisplay().getDisplayId() == 0
+                    ? Math.max(0, statusOverlayHeight() - systemTop) : 0;
             int desiredTop = baseTop[0] + reservedTop + extra;
             if (desiredTop != lastAppliedTop[0]) {
                 lastAppliedTop[0] = desiredTop;
