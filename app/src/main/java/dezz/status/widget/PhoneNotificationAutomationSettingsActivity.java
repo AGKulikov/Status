@@ -152,6 +152,10 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         popup.setOnCheckedChangeListener((button, checked) -> persist());
         onlyWhenLocked.setOnCheckedChangeListener((button, checked) -> persist());
 
+        Button icons = button("Иконки приложений телефона");
+        icons.setOnClickListener(view -> startActivity(new Intent(this, PhoneAppIconsActivity.class)));
+        page.addView(icons, topMargin(14));
+
         Button fields = button("Состав текста уведомления");
         fields.setOnClickListener(view -> chooseFields());
         page.addView(fields, topMargin(14));

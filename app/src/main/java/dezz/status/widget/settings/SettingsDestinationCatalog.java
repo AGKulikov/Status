@@ -224,6 +224,10 @@ public final class SettingsDestinationCatalog {
                 "phone", "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
                 "iphone", "ancs", "уведомления", "оверлей", "всплывающие",
                 "шрифт", "время", "пассажир"));
+        values.add(activity("phone_app_icons", Group.AUTOMATION, "Иконки приложений телефона",
+                "Все сопоставления, свои PNG/JPEG и приложения без иконок",
+                "phone", "dezz.status.widget.PhoneAppIconsActivity",
+                "иконки", "значки", "png", "jpeg", "iphone", "уведомления"));
         values.add(activity("automation_intent", Group.AUTOMATION,
                 "Внешние кнопки и Intent",
                 "Команды с кнопок руля и других Android-событий",

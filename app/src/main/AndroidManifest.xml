@@ -339,6 +339,9 @@
             android:exported="false"
             android:screenOrientation="landscape" />
 
+        <activity android:name=".PhoneAppIconsActivity" android:exported="false"
+            android:screenOrientation="landscape" />
+
         <activity
             android:name=".PhoneNotificationAutomationSettingsActivity"
             android:exported="false"

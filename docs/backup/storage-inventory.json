@@ -199,6 +199,12 @@
         "external_resource"
       ]
     },
+    "app/src/main/java/dezz/status/widget/LiveActivityApnsSettingsActivity.java": {
+      "sha256": "6ec6e1608646d70625fe02a314aa901ea3a64daed8e9c3e6125e938642488a08",
+      "access_kinds": [
+        "external_resource"
+      ]
+    },
     "app/src/main/java/dezz/status/widget/PhoneConnectorSettingsActivity.java": {
       "sha256": "36d89b910c47ea0ff72cdca870bbfd27cb3914e3835b5f5ade1f768855156c8d",
       "access_kinds": [
@@ -234,6 +240,7 @@
     "app/src/main/java/dezz/status/widget/SettingsHubActivity.java": {
       "sha256": "3491350237bff0d77dab20e74ca22007d9777bd2931d915129b39758f8879ce6",
       "access_kinds": [
+        "external_resource",
         "files"
       ]
     },
@@ -336,6 +343,7 @@
     "app/src/main/java/dezz/status/widget/launcher/MediaBroadcastRepository.java": {
       "sha256": "251fd3b385f0643c662b555ff7ce4b34f21091ff2b292d56ab097cfd88a03b1e",
       "access_kinds": [
+        "external_resource",
         "files",
         "preferences"
       ]
@@ -401,13 +409,25 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/PhoneAppIconStore.java": {
-      "sha256": "84f5905260dc3f4d97e76c5fc1f3213eaba701416a3718959f7a28073a1f6ea9",
+      "sha256": "3b4ec3914462967ea40322a8cfc3b3e4ee943ef704d69762efba17f4111487d4",
       "access_kinds": [
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/PhoneConnectionJournal.java": {
       "sha256": "d31c8b4c7e6f02bec06fbd38065eac8160d7e436429c4b0865734386f9e1e43a",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/PhoneIconImporter.java": {
+      "sha256": "c71781c157c6565cde34f7cb4df77e56dc605df057694f95271ec87220cf38d3",
+      "access_kinds": [
+        "external_resource"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/PhoneIconOverrides.java": {
+      "sha256": "3d5f91d859d2bcff28a8817e32f867a4dbc55544a9efec841b08d967f9a13bf0",
       "access_kinds": [
         "files"
       ]
@@ -510,5 +530,13 @@
         "preferences"
       ]
     }
+  },
+  "user_icon_resources": {
+    "directory": "files/phone-icon-overrides",
+    "schema": 1,
+    "include": "catalog.json and all referenced PNG files; preserve explicit custom priority",
+    "automatic_download_manifest": "PhoneAppIconStore.automaticDownloadManifest(); ANCS-icons/catalog.json source_url",
+    "restore": "Read activated catalog and enqueue missing automatic images; no network during isolated verification",
+    "status": "Runtime full backup adapter not implemented"
   }
 }

@@ -102,6 +102,8 @@ public final class PhoneAppIconStore {
         public final long lastSeen;
         public final int notifications;
         public final boolean iconCached;
+        public boolean customIcon;
+        public boolean customIconAvailable;
 
         App(Record record, boolean iconCached) {
             identifier = record.identifier;
@@ -123,24 +125,28 @@ public final class PhoneAppIconStore {
         int notifications;
         String iconFile = "";
         String iconType = "";
+        String sourceUrl = "";
     }
 
     private static final class Download {
         final byte[] bytes;
         final String type;
+        final String sourceUrl;
 
-        Download(byte[] bytes, String type) {
+        Download(byte[] bytes, String type, String sourceUrl) {
             this.bytes = bytes;
             this.type = type;
+            this.sourceUrl = sourceUrl;
         }
     }
 
     private final Context context;
+    private final PhoneIconOverrides overrides;
     private final OkHttpClient http = new OkHttpClient.Builder()
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(12, TimeUnit.SECONDS)
             .build();
-    private final ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
+    private final java.util.concurrent.ScheduledExecutorService worker = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(() -> {
             try {
                 android.os.Process.setThreadPriority(
@@ -159,12 +165,54 @@ public final class PhoneAppIconStore {
 
     private PhoneAppIconStore(Context context) {
         this.context = context;
+        overrides = new PhoneIconOverrides(new File(context.getFilesDir(), PhoneIconOverrides.DIRECTORY));
         synchronized (this) {
             mergeCatalog(privateDirectory());
             File external = externalDirectory(false);
             if (external != null) {
                 mergeCatalog(external);
                 migrateToExternalLocked();
+            }
+        }
+        // Catalog is the durable desired list, including entries restored before first notification.
+        worker.scheduleWithFixedDelay(this::retryMissingIcons, 0, 15, TimeUnit.MINUTES);
+    }
+
+    public PhoneIconOverrides overrides() { return overrides; }
+
+    /** Desired download list for the future full archive, not a replacement for custom files. */
+    public synchronized JSONObject automaticDownloadManifest() throws org.json.JSONException {
+        JSONArray apps = new JSONArray();
+        for (Record record : records.values()) {
+            apps.put(new JSONObject().put("id", record.identifier).put("name", record.name)
+                    .put("source_url", record.sourceUrl).put("icon_type", record.iconType));
+        }
+        return new JSONObject().put("schema", 1).put("apps", apps);
+    }
+
+
+    public synchronized void requestAutomaticIcon(String identifier, String name) {
+        String id = normalizeIdentifier(identifier);
+        if (id.isEmpty()) return;
+        if (!records.containsKey(id)) {
+            Record record = new Record(); record.identifier = id; record.name = clean(name, 256);
+            record.firstSeen = System.currentTimeMillis(); record.lastSeen = record.firstSeen;
+            records.put(id, record); saveCatalogLocked();
+        }
+        retryMissingIcons();
+    }
+
+    private File customIcon(String identifier) {
+        try { return overrides.icon(identifier); }
+        catch (IOException error) { Log.w(TAG, "Cannot read custom icon catalog", error); return null; }
+    }
+
+    public synchronized void retryMissingIcons() {
+        for (Record record : records.values()) {
+            if (customIcon(record.identifier) == null && iconFile(record) == null
+                    && downloads.add(record.identifier)) {
+                String identifier = record.identifier;
+                worker.execute(() -> downloadIcon(identifier));
             }
         }
     }
@@ -190,7 +238,7 @@ public final class PhoneAppIconStore {
         record.categoryId = PhoneNotificationFilter.normalizeCategoryId(categoryId);
         record.lastSeen = now;
         record.notifications = Math.min(Integer.MAX_VALUE, record.notifications + 1);
-        boolean cached = iconFile(record) != null;
+        boolean cached = customIcon(normalized) != null || iconFile(record) != null;
         saveCatalogLocked();
         if (!cached && downloads.add(normalized)) {
             Record captured = record;
@@ -215,22 +263,38 @@ public final class PhoneAppIconStore {
         for (Record record : records.values()) {
             apps.add(new App(record, iconFile(record) != null));
         }
+        try {
+            for (PhoneIconOverrides.Entry entry : overrides.entries().values()) {
+                Record record = records.get(entry.identifier);
+                if (record == null) { record = new Record(); record.identifier = entry.identifier; }
+                Record display = new Record();
+                display.identifier = record.identifier; display.name = entry.name;
+                display.categoryId = record.categoryId; display.firstSeen = record.firstSeen;
+                display.lastSeen = record.lastSeen; display.notifications = record.notifications;
+                App custom = new App(display, customIcon(entry.identifier) != null || iconFile(record) != null);
+                custom.customIcon = !entry.file.isEmpty();
+                custom.customIconAvailable = customIcon(entry.identifier) != null;
+                apps.removeIf(app -> app.identifier.equals(entry.identifier));
+                apps.add(custom);
+            }
+        } catch (IOException error) { Log.w(TAG, "Cannot list custom icons", error); }
         apps.sort(Comparator.comparing(app -> app.name, String.CASE_INSENSITIVE_ORDER));
         return Collections.unmodifiableList(apps);
     }
 
     public synchronized boolean hasIcon(@Nullable String identifier) {
         Record record = records.get(normalizeIdentifier(identifier));
-        return record != null && iconFile(record) != null;
+        return customIcon(normalizeIdentifier(identifier)) != null || (record != null && iconFile(record) != null);
     }
 
     @Nullable
     public synchronized Drawable drawable(@Nullable String identifier) {
         Record record = records.get(normalizeIdentifier(identifier));
-        File icon = record == null ? null : iconFile(record);
+        File custom = customIcon(normalizeIdentifier(identifier));
+        File icon = custom != null ? custom : (record == null ? null : iconFile(record));
         if (icon == null) return null;
         try {
-            if ("svg".equals(record.iconType)) {
+            if (custom == null && record != null && "svg".equals(record.iconType)) {
                 String xml = new String(readBounded(icon), StandardCharsets.UTF_8);
                 Matcher pathMatcher = PATH_DATA.matcher(xml);
                 if (!pathMatcher.find()) return null;
@@ -265,7 +329,12 @@ public final class PhoneAppIconStore {
                 snapshot = records.get(identifier);
                 if (snapshot == null) return;
             }
-            Download downloaded = downloadSimpleIcon(identifier, snapshot.name);
+            Download downloaded = null;
+            if (!snapshot.iconType.isEmpty() && trustedSource(snapshot.sourceUrl)) {
+                byte[] cachedSource = download(snapshot.sourceUrl);
+                if (cachedSource != null) downloaded = new Download(cachedSource, snapshot.iconType, snapshot.sourceUrl);
+            }
+            if (downloaded == null) downloaded = downloadSimpleIcon(identifier, snapshot.name);
             if (downloaded == null) downloaded = downloadAppleArtwork(identifier);
             if (downloaded == null) return;
             synchronized (this) {
@@ -282,6 +351,7 @@ public final class PhoneAppIconStore {
                 }
                 current.iconFile = fileName;
                 current.iconType = downloaded.type;
+                current.sourceUrl = downloaded.sourceUrl;
                 saveCatalogLocked();
             }
         } catch (Exception error) {
@@ -295,13 +365,13 @@ public final class PhoneAppIconStore {
     private Download downloadSimpleIcon(String identifier, String name) throws IOException {
         String slug = simpleIconSlug(identifier, name);
         if (slug.isEmpty()) return null;
-        byte[] bytes = download("https://cdn.jsdelivr.net/npm/simple-icons@16/icons/"
-                + slug + ".svg");
+        String url = "https://cdn.jsdelivr.net/npm/simple-icons@16/icons/" + slug + ".svg";
+        byte[] bytes = download(url);
         if (bytes == null
                 || !PATH_DATA.matcher(new String(bytes, StandardCharsets.UTF_8)).find()) {
             return null;
         }
-        return new Download(bytes, "svg");
+        return new Download(bytes, "svg", url);
     }
 
     @Nullable
@@ -318,7 +388,7 @@ public final class PhoneAppIconStore {
         String url = result.optString(
                 "artworkUrl512", result.optString("artworkUrl100", "")).trim();
         byte[] bytes = url.isEmpty() ? null : download(url);
-        return bytes == null ? null : new Download(bytes, "png");
+        return bytes == null ? null : new Download(bytes, "png", url);
     }
 
     @Nullable
@@ -328,9 +398,27 @@ public final class PhoneAppIconStore {
             if (!response.isSuccessful()) return null;
             ResponseBody body = response.body();
             if (body == null || body.contentLength() > MAX_ICON_BYTES) return null;
-            byte[] bytes = body.bytes();
-            return bytes.length == 0 || bytes.length > MAX_ICON_BYTES ? null : bytes;
+            try (java.io.InputStream input = body.byteStream();
+                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192]; int count;
+                while ((count = input.read(buffer)) != -1) {
+                    if (output.size() + count > MAX_ICON_BYTES) return null;
+                    output.write(buffer, 0, count);
+                }
+                return output.size() == 0 ? null : output.toByteArray();
+            }
         }
+    }
+
+    private static boolean trustedSource(String url) {
+        try {
+            java.net.URI uri = new java.net.URI(url);
+            String host = uri.getHost();
+            return "https".equals(uri.getScheme()) && uri.getUserInfo() == null
+                    && (uri.getPort() == -1 || uri.getPort() == 443) && host != null
+                    && (("cdn.jsdelivr.net".equals(host) && uri.getPath().startsWith("/npm/simple-icons@"))
+                    || host.endsWith(".mzstatic.com"));
+        } catch (Exception invalid) { return false; }
     }
 
     private synchronized void mergeCatalog(@Nullable File directory) {
@@ -358,6 +446,7 @@ public final class PhoneAppIconStore {
                 value.notifications = Math.max(0, json.optInt("notifications", 0));
                 value.iconFile = safeFileName(json.optString("icon_file"));
                 value.iconType = normalizeType(json.optString("icon_type"));
+                value.sourceUrl = json.optString("source_url", "");
                 Record old = records.get(identifier);
                 if (old == null || value.lastSeen >= old.lastSeen) {
                     records.put(identifier, value);
@@ -385,7 +474,8 @@ public final class PhoneAppIconStore {
                         .put("last_seen", record.lastSeen)
                         .put("notifications", record.notifications)
                         .put("icon_file", record.iconFile)
-                        .put("icon_type", record.iconType));
+                        .put("icon_type", record.iconType)
+                        .put("source_url", record.sourceUrl));
             }
             byte[] bytes = new JSONObject().put("schema", 1).put("apps", apps)
                     .toString(2).getBytes(StandardCharsets.UTF_8);
@@ -432,10 +522,10 @@ public final class PhoneAppIconStore {
         File external = externalDirectory(false);
         if (external != null) {
             File candidate = new File(external, name);
-            if (candidate.isFile()) return candidate;
+            if (candidate.isFile() && candidate.length() > 0 && candidate.length() <= MAX_ICON_BYTES) return candidate;
         }
         File candidate = new File(privateDirectory(), name);
-        return candidate.isFile() ? candidate : null;
+        return candidate.isFile() && candidate.length() > 0 && candidate.length() <= MAX_ICON_BYTES ? candidate : null;
     }
 
     private File writableDirectory() {

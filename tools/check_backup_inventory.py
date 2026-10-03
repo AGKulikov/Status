@@ -15,7 +15,7 @@ PATTERNS = {
     'preferences': r'\b(?:getSharedPreferences|getDefaultSharedPreferences)\s*\(|RuntimeSnapshotPreferences\s*\.\s*open\s*\(',
     'files': r'\b(?:getFilesDir|getNoBackupFilesDir|getExternalFilesDir|getExternalFilesDirs|getExternalStorageDirectory|openFileOutput|openFileInput)\s*\(|\bnew\s+(?:File|FileOutputStream|FileWriter|RandomAccessFile|AtomicFile)\s*\(|\bFiles\s*\.\s*(?:write|move|copy|newOutputStream|createFile)\s*\(',
     'database': r'\b(?:SQLiteOpenHelper|RoomDatabase|DataStore|openOrCreateDatabase|getDatabasePath)\b',
-    'external_resource': r'\b(?:takePersistableUriPermission|openOutputStream|openFileDescriptor)\s*\(',
+    'external_resource': r'\b(?:takePersistableUriPermission|openInputStream|openOutputStream|openFileDescriptor)\s*\(',
     'keystore': r'\b(?:AndroidKeyStore|SecretStore)\b',
 }
 
