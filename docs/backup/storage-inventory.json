@@ -1,0 +1,514 @@
+{
+  "schema_version": 1,
+  "status": "DESIGN_INVENTORY_NOT_RUNTIME_BACKUP",
+  "baseline_commit": "d76ddacd1db7a009aa17b9a1572526a1b0eaa1be",
+  "scope": "Repository-owned production Java/Kotlin source; runtime discovery and strict restore adapters not yet implemented",
+  "shared_preferences": [
+    {
+      "name": "{package}_preferences",
+      "contents": "Основные настройки, JSON документов, маршруты, сценарии, назначения экранных кнопок, HUD, DIM, шторка, телефон, ADB-флаги.",
+      "restore_policy_to_implement": "Частично: исключены 13 секретных/локальных ключей и 9 ключей SystemUI.",
+      "source": "app/src/main/java/dezz/status/widget/Preferences.java"
+    },
+    {
+      "name": "instrument_panel",
+      "contents": "Включение/автозапуск, активный и пять сохранённых вариантов приборки, карта, OEM-настройки; также временный launch token.",
+      "restore_policy_to_implement": "Нет. Пользовательскую часть включить; временный token не активировать.",
+      "source": "app/src/main/java/dezz/status/widget/instrument/InstrumentPanelStore.java"
+    },
+    {
+      "name": "media_buttons",
+      "contents": "Включение MEDIA, отключение штатного действия, текущий SRC-режим.",
+      "restore_policy_to_implement": "Нет. Настройки и проверку системного применения разделить.",
+      "source": "app/src/main/java/dezz/status/widget/media/MediaButtonController.java"
+    },
+    {
+      "name": "vehicle_buttons",
+      "contents": "Все остальные физические кнопки, жесты, параметры действий, DM и громкость.",
+      "restore_policy_to_implement": "Нет. Включить все назначения и связи.",
+      "source": "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java"
+    },
+    {
+      "name": "monjaro_drive_modes_prefs",
+      "contents": "Наблюдение режимов, порядок/включённость, карусель, таймеры, скрытие меню, отладка.",
+      "restore_policy_to_implement": "Нет. Включить пользовательские значения.",
+      "source": "app/src/main/java/dezz/status/widget/drivemode/settings/DriveModeSettings.java"
+    },
+    {
+      "name": "{package}_apps_to_hide",
+      "contents": "Отслеживаемые скрытые приложения и подписи.",
+      "restore_policy_to_implement": "Нет. Включить в привязанный к устройству блок восстановления.",
+      "source": "app/src/main/java/dezz/status/widget/servicemode/AppsToHideStorage.java"
+    },
+    {
+      "name": "{package}_exclude",
+      "contents": "Исключения сервисного режима.",
+      "restore_policy_to_implement": "Нет. Включить.",
+      "source": "app/src/main/java/dezz/status/widget/servicemode/ExcludeAppsStorage.java"
+    },
+    {
+      "name": "{package}_pin",
+      "contents": "Хеш пользовательского PIN сервисного режима.",
+      "restore_policy_to_implement": "Нет. Сохранить в зашифрованной личной копии.",
+      "source": "app/src/main/java/dezz/status/widget/servicemode/PinStorage.java"
+    },
+    {
+      "name": "{package}_connection",
+      "contents": "Найденные ADB/Telnet endpoints сервисного режима.",
+      "restore_policy_to_implement": "Нет. Архивировать как локальное состояние; адреса проверять заново.",
+      "source": "app/src/main/java/dezz/status/widget/servicemode/ConnectionStorage.java"
+    },
+    {
+      "name": "natro_service_mode_original",
+      "contents": "Исходные состояния пакетов перед скрытием.",
+      "restore_policy_to_implement": "Нет. Для отката той же установки критично; чужой машине не применять.",
+      "source": "app/src/main/java/dezz/status/widget/servicemode/ServiceModeJournal.java"
+    },
+    {
+      "name": "natro_service_mode_self",
+      "contents": "Исходная видимость входов Natro и история скрытия.",
+      "restore_policy_to_implement": "Нет. Локальный журнал возврата, не команда скрыть приложение.",
+      "source": "app/src/main/java/dezz/status/widget/servicemode/NatroSelfVisibility.java"
+    },
+    {
+      "name": "{package}_privileged_shell",
+      "contents": "Сохранённый endpoint привилегированного shell.",
+      "restore_policy_to_implement": "Нет. Архивировать отдельно от действительного разрешения Android.",
+      "source": "app/src/main/java/dezz/status/widget/shell/ConnectionStorage.java"
+    },
+    {
+      "name": "live_activity_apns_metadata_v1",
+      "contents": "Team ID, Key ID, topic и окружение APNs.",
+      "restore_policy_to_implement": "Нет. Включить вместе с переносимым секретом .p8.",
+      "source": "app/src/main/java/dezz/status/widget/phone/liveactivity/ApnsCredentialStore.java"
+    },
+    {
+      "name": "live_activity_push_provisioning_v1",
+      "contents": "Настройки Live Activity и выданные iPhone push/activity tokens.",
+      "restore_policy_to_implement": "Нет. Настройки сохранить; действительность tokens перепроверить.",
+      "source": "app/src/main/java/dezz/status/widget/phone/liveactivity/LiveActivityProvisioningStore.java"
+    },
+    {
+      "name": "{package}_mqtt_shortcut_catalog_v1",
+      "contents": "Метаданные известных MQTT ресурсов для выбора в редакторах.",
+      "restore_policy_to_implement": "Нет. Включить как каталог с пометкой устаревших данных.",
+      "source": "app/src/main/java/dezz/status/widget/mqtt/MqttShortcutCatalogStore.java"
+    },
+    {
+      "name": "{package}_automation_state_v1",
+      "contents": "Последние состояния коннекторов и управление видимостью.",
+      "restore_policy_to_implement": "Нет. Это не определения сценариев; после восстановления не считать свежими.",
+      "source": "app/src/main/java/dezz/status/widget/automation/AutomationStateStore.java"
+    },
+    {
+      "name": "{package}_screen_reservation_state_v1",
+      "contents": "Исходное/управляемое резервирование экрана под климат.",
+      "restore_policy_to_implement": "Нет. Локальный журнал возврата, привязанный к устройству.",
+      "source": "app/src/main/java/dezz/status/widget/climate/ScreenReservationStateStore.java"
+    },
+    {
+      "name": "launcher_media_playback_history",
+      "contents": "Последний плеер и факт воспроизведения для возобновления.",
+      "restore_policy_to_implement": "Нет. Можно сохранить историю; восстановление не должно само запускать музыку.",
+      "source": "app/src/main/java/dezz/status/widget/launcher/MediaPlaybackHistoryStore.java"
+    },
+    {
+      "name": "launcher_media_auto_resume_state",
+      "contents": "Состояние текущей процедуры автозапуска медиа.",
+      "restore_policy_to_implement": "Нет. Старую процедуру не воспроизводить.",
+      "source": "app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java"
+    },
+    {
+      "name": "launcher_navigation",
+      "contents": "Последний снимок навигационных данных.",
+      "restore_policy_to_implement": "Нет. Кэш, не текущий маршрут после восстановления.",
+      "source": "app/src/main/java/dezz/status/widget/launcher/NavigationDataRepository.java"
+    },
+    {
+      "name": "launcher_media_broadcast_v1",
+      "contents": "Последний снимок медиаданных.",
+      "restore_policy_to_implement": "Нет. Кэш; заново получить живую сессию.",
+      "source": "app/src/main/java/dezz/status/widget/launcher/MediaBroadcastRepository.java"
+    },
+    {
+      "name": "{package}_phone_telemetry",
+      "contents": "Последняя телеметрия телефона.",
+      "restore_policy_to_implement": "Нет. Кэш; не выдавать старые данные за актуальные.",
+      "source": "app/src/main/java/dezz/status/widget/phone/PhoneTelemetryStore.java"
+    },
+    {
+      "name": "vehicle_external_state",
+      "contents": "Подтверждённые ранее внешние состояния автомобиля.",
+      "restore_policy_to_implement": "Нет. Кэш; получить фактическое состояние заново.",
+      "source": "app/src/main/java/dezz/status/widget/car/AutoHoldStateRepository.java"
+    },
+    {
+      "name": "startup_work_state",
+      "contents": "Поколения и этапы запуска.",
+      "restore_policy_to_implement": "Нет. Восстанавливать старую очередь запуска не требуется.",
+      "source": "app/src/main/java/dezz/status/widget/StartupWorkCoordinator.java"
+    },
+    {
+      "name": "phone_package_replace_recovery",
+      "contents": "Состояние восстановления BLE после обновления пакета.",
+      "restore_policy_to_implement": "Нет. Истёкшие таймеры и старые операции не активировать.",
+      "source": "app/src/main/java/dezz/status/widget/phone/PackageReplaceBleRecoveryGate.java"
+    },
+    {
+      "name": "status_widget_hud_mode_fallback_v1",
+      "contents": "Сохранённое включение/целевой режим штатного HUD и статус fallback.",
+      "restore_policy_to_implement": "Нет. Включить настройки; применение к ECARX проверять отдельно.",
+      "source": "app/src/geely/java/dezz/status/widget/car/HudModeFallbackStore.java"
+    },
+    {
+      "name": "hud_fallback_startup_lane",
+      "contents": "Таймер отложенного запуска fallback.",
+      "restore_policy_to_implement": "Нет. Не переносить как действующую задачу.",
+      "source": "app/src/geely/java/dezz/status/widget/car/HudModeFallbackBootReceiver.java"
+    }
+  ],
+  "navigator_owned_preferences": [
+    {
+      "name": "natro_floating_window_v3",
+      "source": "navigator-mod/src/main/java/ru/natro/navigation/FloatingWindowController.java",
+      "restore_policy_to_implement": "Export own window geometry via authenticated module bridge; no Yandex private data."
+    }
+  ],
+  "source_owners": {
+    "app/src/geely/java/dezz/status/widget/car/HudModeFallbackBootReceiver.java": {
+      "sha256": "073aa2ab8635a0f1e94a8b0659cea10991b594f92bf48b7b7fd4de8355f5e234",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/geely/java/dezz/status/widget/car/HudModeFallbackStore.java": {
+      "sha256": "647eda389980bfd16ffac41c80a60c200792148b7c5e010dd4d7176945959fcd",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/AppRuntimeBootstrap.java": {
+      "sha256": "593b35b34c84beb97fa8bd675adea098ac5b7c6e9444a8188f8691f7b88b68a3",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java": {
+      "sha256": "477c56234257a60d57435dee883b71052acf82fa5299e93aa7e6d56243665a63",
+      "access_kinds": [
+        "external_resource"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/PhoneConnectorSettingsActivity.java": {
+      "sha256": "36d89b910c47ea0ff72cdca870bbfd27cb3914e3835b5f5ade1f768855156c8d",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/Preferences.java": {
+      "sha256": "a2ca6f45803c24573488691cfe241c478dc5c2cf0817be34dfcd75177c4f6646",
+      "access_kinds": [
+        "keystore",
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/PresetsActivity.java": {
+      "sha256": "8cd6432e9e375584c60e6b4d247904e7724914015669b22678e0829945921572",
+      "access_kinds": [
+        "external_resource",
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/RuntimeSnapshotPreferences.java": {
+      "sha256": "f6c4b0139b2c4c701a65b29a8268da9bcf5fbdddae018259e1e5f62c12593607",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/SecretStore.java": {
+      "sha256": "97ae7e9f75812db9249f003955d61dfc343ae983df83cfbe432bb5a85a41a937",
+      "access_kinds": [
+        "keystore"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/SettingsHubActivity.java": {
+      "sha256": "3491350237bff0d77dab20e74ca22007d9777bd2931d915129b39758f8879ce6",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/StartupWorkCoordinator.java": {
+      "sha256": "dad35787f1b913dcb6c81ad81ae9d219b24afcb7b6d439c61455fcfc2110c56f",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/StatusWidgetApplication.java": {
+      "sha256": "2167339d624928393081c549b617ba4ab2aa5d039bd941736fa043f27e0a194a",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/UserPresets.java": {
+      "sha256": "f1c79d33867973061390b15474bc27f13a757eaac07f7da994cfe15f628b0dae",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/adb/AdbLocalActions.java": {
+      "sha256": "fd96cd839848ac51b00cf18a73f09adc398de74dfe3bbfa1c830590d5314c5b6",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/automation/AutomationStateStore.java": {
+      "sha256": "1ead8e03105575b04324ab7175e3c8c3d7536c47eb3d8d2b421028797eea4700",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/car/AutoHoldStateRepository.java": {
+      "sha256": "ccab46cf546e11e8e48455839e7fc1290fd9d98cdd403f9c15866f32b84a36b3",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/climate/ScreenReservationStateStore.java": {
+      "sha256": "a9faa359934bf25c8176743af1a9079fb715490fc399a5cfd9d071f41b93a090",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/diagnostics/ActionRecorder.java": {
+      "sha256": "d882e878f8bd41a612440bc5f36a9b4bb2f3eb068e21d959f8c8373e031c863d",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/diagnostics/BoundedUtf8Tail.java": {
+      "sha256": "8865015edd442d5d15f4c76512515c2fee9af7c5d4d81a16afeade67dea85be4",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticJournal.java": {
+      "sha256": "3719f34325d0eee50d0c50a57d4417e89e9846f27876536ea6eb3fcf4c5f3512",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/drivemode/settings/DriveModeSettings.java": {
+      "sha256": "fa7638066c1c1e44f818e569c7b34b8bd4e91f64b385d0c3675c3f911e0a3294",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/hud/HudCanvasView.java": {
+      "sha256": "16ddf0c78550851b0067d2292f1eac3486d99cd18a3243e9a1694ff961a59038",
+      "access_kinds": [
+        "external_resource"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/hud/HudRuntimeStatusStore.java": {
+      "sha256": "e75d642d89650a402d8b908bda063fd02deb07ad1a8d6842ac006a965a21c4f4",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/instrument/InstrumentOemController.java": {
+      "sha256": "95cebf881893d51cf6a72d0ddffca36d322acf1eaf0eab15f5626875caefe12b",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/instrument/InstrumentPanelStore.java": {
+      "sha256": "bf6e60e904af513bd4b6b88e30f7aea816a32c36b0ace3ec8957be03db720e7b",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java": {
+      "sha256": "00032967ae807eb4577472ffd90da567ba338c95e169cb6747723ec904c9488f",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/launcher/MediaBroadcastRepository.java": {
+      "sha256": "251fd3b385f0643c662b555ff7ce4b34f21091ff2b292d56ab097cfd88a03b1e",
+      "access_kinds": [
+        "files",
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/launcher/MediaPlaybackHistoryStore.java": {
+      "sha256": "46039a4febf7c8c0befd5699c1a8d1638d311225d3f40cc1d367e5947b33a70a",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/launcher/NavigationCollectionDemand.java": {
+      "sha256": "c68e2fd608a41613d887b3ca2a560b16846c2393570b9c88e159272fae6a3bd0",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/launcher/NavigationDataRepository.java": {
+      "sha256": "07be76945ef403e74f96b742ef8b575ff5f02a77bacd461aa87e405b9e8069c4",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/launcher/NavigationGraphicStore.java": {
+      "sha256": "6c6384c9cb9d9ab424a77b6add704019dfc4576633fbf22cc85485d8a8c43e23",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/media/ButtonRouteRestorer.java": {
+      "sha256": "306fecdc7349bc71481fcdf2a0876a50e596bbb8c36be235bf39a70cd114671a",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/media/MediaButtonController.java": {
+      "sha256": "c5b709b8007df158bc6bb2910c5b0bb97ff48b1f4bcd46123307e4e559f8c97d",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/media/MediaInputPatchMain.java": {
+      "sha256": "86b12805b6ae6c06dcc9ed81f83dff0ae09b5356f2b4666c1c62f77f21c4a1f2",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java": {
+      "sha256": "bf61c54f066c1d70d8704b5e05ac89093fb7e24288691e16cea48a3d8086dcbb",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/mqtt/MqttShortcutCatalogStore.java": {
+      "sha256": "72446b6315cf20793a443618daf0eba3e7df5e2d111b025dcc7848adff487de9",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/PackageReplaceBleRecoveryGate.java": {
+      "sha256": "98bd23e03d5f1cfdb5475725c42c0f68b9370790448f13b82bc3d114feaf3880",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/PhoneAppIconStore.java": {
+      "sha256": "84f5905260dc3f4d97e76c5fc1f3213eaba701416a3718959f7a28073a1f6ea9",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/PhoneConnectionJournal.java": {
+      "sha256": "d31c8b4c7e6f02bec06fbd38065eac8160d7e436429c4b0865734386f9e1e43a",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/PhoneTelemetryStore.java": {
+      "sha256": "8b9129617f55114ebef11a229e297c97d68c819d2330f77da7433859158383dc",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/liveactivity/ApnsCredentialStore.java": {
+      "sha256": "f38df47b4ff7b12a74e17c0a1a46336f987b4ec5f9e2c0d3e2b66bab2e2f63ee",
+      "access_kinds": [
+        "files",
+        "keystore",
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/liveactivity/LiveActivityProvisioningStore.java": {
+      "sha256": "10ea490eb5c292bc63076589fb47fd171f8cefc22bf316ca2b5aa417b8858276",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2.java": {
+      "sha256": "3fa1847a2ed5818b2a7fa8a0eb4a4a6832d80e1e5445f236879da456d0bc8803",
+      "access_kinds": [
+        "keystore"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/servicemode/AppsToHideStorage.java": {
+      "sha256": "75ed31752d49b53b20e09abb0e15ff0320e142242d54cb57e5b92d13d282c8cf",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/servicemode/ConnectionStorage.java": {
+      "sha256": "ac430b111a07b7ebf039fe99748448f76548ea0362653059b32e7a0085f0a4b7",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/servicemode/ExcludeAppsStorage.java": {
+      "sha256": "ec614e1ee0a7da5263cfc205fe80e3b4de5478360f88e2f7e62b3544fc9547e5",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/servicemode/NatroSelfVisibility.java": {
+      "sha256": "bbe489f7e8a1826281963edb280b00658dde0e275f7b047028419ebc28e1a5b4",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/servicemode/PinStorage.java": {
+      "sha256": "077f74e8ec631380292c8c69e96a7b32016d1693e0c18ab83d9566d0af17b814",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/servicemode/ServiceModeJournal.java": {
+      "sha256": "2b46c3a16995681c801af3ab53a78ab4a2e2181ec7341fdb85b6cba6373b6570",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/shell/AdbTransport.java": {
+      "sha256": "7bcb7b7e69a7533e455f1ad7977502353cb117d5f45954af73e735e380086766",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/shell/ConnectionStorage.java": {
+      "sha256": "6869a8769b4d89623e2c831fa10b1b307d1bd3c53ff387d4540765950f989965",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/sprut/SprutHubCatalogStore.java": {
+      "sha256": "1946130b2fbbafe4bf300bc56d9b5d0b7bec141145b5edf2b335a93ce7c6494c",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/transfer/LanFileStore.java": {
+      "sha256": "bcfd51f1d4300099fe4fdc782ea90bb3a341cc3d68d22fec6f8d991e0f7c087c",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/transfer/LanTransferService.java": {
+      "sha256": "e1f31a2833cd53fb8aa8e69f611686997261ef1a74671b5931f14f03766aba6e",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "navigator-mod/src/main/java/ru/natro/navigation/FloatingWindowController.java": {
+      "sha256": "3b501ef970cf8c6c795ae588db1d93f74e3e160b1cb230745dacf87800a17777",
+      "access_kinds": [
+        "preferences"
+      ]
+    }
+  }
+}

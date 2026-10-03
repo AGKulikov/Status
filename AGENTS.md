@@ -18,3 +18,10 @@ relevant catalog/open question in `docs/geely-kx11/` before choosing IDs, zones,
 or interpreting status. Preserve source hashes, firmware scope, and the distinction
 between static routes, observed feedback, and independently verified physical effects.
 Update the knowledge base with new evidence together with the requirements ledger.
+
+Backup coverage gate: run `python tools/check_backup_inventory.py` after production
+storage changes. New/changed/removed owners require review of
+`docs/backup/FULL_BACKUP_CONTRACT_RU.md` and the source inventory. Never update
+fingerprints merely to silence the check or describe this static check as proof
+of full runtime backup/restore. New settings must be included automatically by
+the future storage adapters; changing a schema/default requires migration review.
