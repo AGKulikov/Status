@@ -345,7 +345,7 @@ public class OverlayController {
                 && adapter.getItemCount() == realCount * CAROUSEL_REPEATS;
 
         if (!stripReady) {
-            rebuildCarousel(realCodes, realIdx);
+            rebuildCarousel(realCodes, realIdx, requestedCode);
             return;
         }
 
@@ -364,20 +364,20 @@ public class OverlayController {
         int target = basePos + diff;
 
         if (needsRebase(target, realCount)) {
-            rebuildCarousel(realCodes, realIdx);
+            rebuildCarousel(realCodes, realIdx, requestedCode);
         } else {
             adapter.setActiveCode(requestedCode);
             scrollToCenterIndex(target, /* animate */ true);
         }
     }
 
-    private void rebuildCarousel(@NonNull List<Integer> realCodes, int realIdx) {
+    private void rebuildCarousel(@NonNull List<Integer> realCodes, int realIdx, int activeCode) {
         int realCount = realCodes.size();
         int total = realCount * CAROUSEL_REPEATS;
         List<Integer> display = new ArrayList<>(total);
         for (int i = 0; i < total; i++) display.add(realCodes.get(i % realCount));
         int center = realCount * (CAROUSEL_REPEATS / 2) + realIdx;
-        adapter.setData(display, realCodes.get(realIdx));
+        adapter.setData(display, activeCode);
         currentRealCodes = new ArrayList<>(realCodes);
         // No animation on rebuild — the underlying data just changed wholesale.
         scrollToCenterIndex(center, /* animate */ false);

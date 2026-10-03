@@ -280,6 +280,35 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:text="@string/drive_selector_duration_tap"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
+                    <TextView
+                        android:id="@+id/duration_tap_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                        android:textColor="?attr/colorPrimary" />
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/slider_tap"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:stepSize="250"
+                        android:valueFrom="250"
+                        android:valueTo="5000" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_wake_first"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/drive_selector_wake_first" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/drive_selector_wake_first_caption"
+                        android:textAppearance="@style/TextAppearance.Material3.BodySmall" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="@string/drive_selector_duration_caption"
                         android:textAppearance="@style/TextAppearance.Material3.BodySmall"

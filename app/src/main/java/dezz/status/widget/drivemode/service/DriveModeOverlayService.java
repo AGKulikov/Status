@@ -16,7 +16,6 @@ import dezz.status.widget.drivemode.car.*;
 import dezz.status.widget.drivemode.knob.KnobReceiver;
 import dezz.status.widget.drivemode.settings.*;
 import dezz.status.widget.drivemode.ui.overlay.OverlayController;
-import dezz.status.widget.media.DriveSelectorStepPolicy;
 
 /** Original presentation, Natro's single vehicle owner, confirmed values only. */
 public final class DriveModeOverlayService extends Service implements DriveModeRepository.Listener,
@@ -29,14 +28,15 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
     private DriveModeSettings settings;
     private OverlayController overlay;
     private List<Integer> enabled = Collections.emptyList();
-    private boolean busy, destroyed, recreating;
+    private boolean destroyed, recreating;
+    private DriveModeSelection selection;
     private int theme;
     private long operation;
     public static boolean isRunning() { return instance != null; }
     public static void onVisibilityChanged(boolean visible) {
         dezz.status.widget.media.DriveSelectorController.setShowing(visible);
         DriveModeOverlayService service = instance;
-        if (!visible && service != null && !service.busy && !service.recreating && !service.settings.isEnabled())
+        if (!visible && service != null && service.selection != null && !service.selection.busy() && !service.recreating && !service.settings.isEnabled())
             service.stopSelf();
     }
     @Override public void onCreate() {
@@ -46,6 +46,17 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
         repository.addListener(this); repository.addSupportedModesListener(this);
         settings.getPrefs().registerOnSharedPreferenceChangeListener(this);
         createOverlay(); refreshOrder();
+        selection = new DriveModeSelection(new DriveModeSelection.Host() {
+            @Override public void write(int mode, java.util.function.Consumer<Boolean> done) {
+                repository.setModeConfirmed(mode, done);
+            }
+            @Override public void confirmed(int mode, boolean tapped) {
+                if (!destroyed) overlay.show(enabled, mode,
+                        tapped ? settings.getAutoHideTapMs() : settings.getAutoHideSwitchMs());
+            }
+            @Override public void rejected() { recoverActualMode(); }
+        }, android.os.SystemClock::uptimeMillis);
+        selection.observe(repository.getLastKnownMode());
     }
     private void createOverlay() {
         theme = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
@@ -58,7 +69,7 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
         long deadline = intent == null ? Long.MAX_VALUE
                 : intent.getLongExtra(EXTRA_ACTION_DEADLINE, Long.MAX_VALUE);
         if (android.os.SystemClock.uptimeMillis() > deadline) {
-            if (!settings.isEnabled() && !busy) stopSelf();
+            if (!settings.isEnabled() && !selection.busy()) stopSelf();
             return START_NOT_STICKY;
         }
         if (intent != null && ACTION_SHOW_PREVIEW.equals(intent.getAction())) preview();
@@ -79,63 +90,70 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
         enabled = Collections.unmodifiableList(next);
     }
     private void preview() {
-        if (busy) return;
-        long owner = ++operation;
+        long owner = operation;
         repository.readCurrentModeAsync(actual -> {
             if (destroyed || owner != operation) return;
-            if (enabled.isEmpty()) { fail("Выберите активные режимы в настройках селектора"); return; }
-            // Unknown or excluded actual is never substituted with an invented first mode.
+            if (enabled.isEmpty()) { toast("Выберите активные режимы в настройках селектора"); return; }
+            selection.observe(actual);
             overlay.show(enabled, actual, settings.getAutoHidePreviewMs());
         });
     }
     private void step(int steps, long deadline) {
-        if (busy) { toast("Дождитесь подтверждения режима"); return; }
-        busy = true; long owner = ++operation;
-        repository.readCurrentModeAsync(actual -> {
-            if (destroyed || owner != operation) return;
-            if (android.os.SystemClock.uptimeMillis() > deadline) { busy = false; return; }
-            if (actual < 0) { fail("Текущий режим неизвестен — переключение не выполнено"); return; }
-            List<Integer> order = new ArrayList<>(enabled);
-            Integer target = DriveSelectorStepPolicy.target(order, actual, steps);
-            if (target == null) {
-                busy = false;
-                if (order.isEmpty()) fail("Нет активных режимов");
-                else overlay.show(order, actual, settings.getAutoHideSwitchMs());
-                return;
-            }
-            repository.setModeConfirmed(target, ok -> {
-                if (destroyed || owner != operation) return;
-                busy = false;
-                if (!ok) { fail("Режим не подтверждён автомобилем"); return; }
-                List<Integer> sequence = new ArrayList<>();
-                int start = order.indexOf(actual);
-                if (start < 0) start = steps > 0 ? -1 : order.size();
-                for (int n = 1; n <= Math.abs(steps); n++)
-                    sequence.add(order.get(Math.floorMod(start + Integer.signum(steps) * n, order.size())));
-                overlay.animateStepsTo(order, actual, sequence, settings.getAutoHideSwitchMs());
+        if (android.os.SystemClock.uptimeMillis() > deadline) return;
+        if (enabled.isEmpty()) { toast("Нет активных режимов"); return; }
+        int actual = selection.selected();
+        if (actual < 0) {
+            long owner = operation;
+            repository.readCurrentModeAsync(mode -> {
+                if (destroyed || owner != operation || android.os.SystemClock.uptimeMillis() > deadline) return;
+                if (mode < 0) { toast("Текущий режим неизвестен — переключение не выполнено"); return; }
+                selection.observe(mode); step(steps, deadline);
             });
-        });
+            return;
+        }
+        if (settings.isWakeFirstOnKnob()
+                && !dezz.status.widget.media.DriveSelectorController.isShowing()
+                && !selection.busy()) {
+            overlay.show(enabled, actual, settings.getAutoHideSwitchMs());
+            return;
+        }
+        if (enabled.size() < 2) {
+            overlay.show(enabled, repository.getLastKnownMode(), settings.getAutoHideSwitchMs());
+            return;
+        }
+        selection.step(new ArrayList<>(enabled), steps, deadline);
     }
     private void tap(int code) {
-        if (busy || !enabled.contains(code)) return;
-        busy = true; long owner = ++operation;
-        repository.setModeConfirmed(code, ok -> {
-            if (destroyed || owner != operation) return;
-            busy = false;
-            if (ok) overlay.show(enabled, code, 500);
-            else fail("Режим не подтверждён автомобилем");
-        });
+        if (!enabled.contains(code)) return;
+        selection.select(code, android.os.SystemClock.uptimeMillis() + 750L, true);
     }
     private void toast(String text) { Toast.makeText(this, text, Toast.LENGTH_LONG).show(); }
-    private void fail(String text) { busy = false; toast(text); if (!settings.isEnabled()) stopSelf(); }
+    private void recoverActualMode() {
+        toast("Режим не подтверждён автомобилем");
+        long owner = operation;
+        repository.readCurrentModeAsync(actual -> {
+            if (destroyed || owner != operation || selection.busy()) return;
+            selection.observe(actual);
+            if (actual >= 0 && enabled.contains(actual))
+                overlay.show(enabled, actual, settings.getAutoHideSwitchMs());
+            else {
+                overlay.hide();
+                if (!settings.isEnabled()) stopSelf();
+            }
+        });
+    }
     @Override public void onModeChanged(int previous, int current, DriveModeChangeOrigin origin) {
-        if (current < 0) { overlay.hide(); return; }
-        if (!busy && settings.isEnabled() && origin == DriveModeChangeOrigin.EXTERNAL && enabled.contains(current))
+        if (destroyed || selection == null) return;
+        selection.observe(current);
+        if (current < 0) { if (!selection.busy()) overlay.hide(); return; }
+        if (previous >= 0 && !selection.busy() && settings.isEnabled() && origin == DriveModeChangeOrigin.EXTERNAL && enabled.contains(current))
             overlay.show(enabled, current, settings.getAutoHideSwitchMs());
     }
     @Override public void onSupportedModesChanged(int[] supported) { if (repository != null) refreshOrder(); }
     @Override public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
-        if (PreferenceKeys.KEY_MODE_ORDER.equals(key)) refreshOrder();
+        if (PreferenceKeys.KEY_MODE_ORDER.equals(key)) {
+            ++operation; selection.cancel(); refreshOrder();
+        }
         if (PreferenceKeys.KEY_CAROUSEL_MODE.equals(key) && overlay != null) overlay.setCarouselMode(settings.isCarouselMode());
         if ("natro_observe_enabled".equals(key) && !settings.isEnabled()) stopSelf();
     }
@@ -143,11 +161,12 @@ public final class DriveModeOverlayService extends Service implements DriveModeR
         super.onConfigurationChanged(config);
         if ((config.uiMode & Configuration.UI_MODE_NIGHT_MASK) != theme) {
             recreating = true; overlay.dispose(); createOverlay(); recreating = false;
-            if (!busy && !settings.isEnabled()) stopSelf();
+            if (!selection.busy() && !settings.isEnabled()) stopSelf();
         }
     }
     @Override public void onDestroy() {
         destroyed = true; ++operation; instance = null;
+        if (selection != null) selection.cancel();
         dezz.status.widget.media.DriveSelectorController.setShowing(false);
         if (settings != null) settings.getPrefs().unregisterOnSharedPreferenceChangeListener(this);
         if (overlay != null) overlay.dispose();

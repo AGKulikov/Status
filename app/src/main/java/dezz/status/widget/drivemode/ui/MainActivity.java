@@ -97,6 +97,8 @@ public class MainActivity extends AppCompatActivity {
         setupList();
         setupControls();
         setupDurationSliders();
+        binding.switchWakeFirst.setChecked(settings.isWakeFirstOnKnob());
+        binding.switchWakeFirst.setOnCheckedChangeListener((button, checked) -> settings.setWakeFirstOnKnob(checked));
     }
 
     @Override
@@ -124,6 +126,8 @@ public class MainActivity extends AppCompatActivity {
                 binding.durationSwitchValue,
                 settings.getAutoHideSwitchMs(),
                 settings::setAutoHideSwitchMs);
+        bindDurationSlider(binding.sliderTap, binding.durationTapValue,
+                settings.getAutoHideTapMs(), settings::setAutoHideTapMs);
     }
 
     private void bindDurationSlider(@NonNull Slider slider,

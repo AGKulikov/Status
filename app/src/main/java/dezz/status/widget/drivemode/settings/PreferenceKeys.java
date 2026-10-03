@@ -36,5 +36,11 @@ public final class PreferenceKeys {
     public static final int AUTO_HIDE_MIN_MS = 1500;
     public static final int AUTO_HIDE_MAX_MS = 10000;
 
+    public static final String KEY_AUTO_HIDE_TAP_MS = "auto_hide_tap_ms";
+    public static final String KEY_WAKE_FIRST_ON_KNOB = "wake_first_on_knob";
+    public static final int DEFAULT_AUTO_HIDE_TAP_MS = 500;
+    public static final int AUTO_HIDE_TAP_MIN_MS = 250;
+    public static final int AUTO_HIDE_TAP_MAX_MS = 5000;
+
     private PreferenceKeys() {}
 }

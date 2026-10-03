@@ -46,8 +46,9 @@ public final class DriveModeRepository {
             if (state.available && !available) refreshCatalog(null);
             int previous = current;
             current = state.available && state.known && Double.isFinite(state.value)
-                    && state.value == (int) state.value ? (int) state.value : -1;
-            if (previous >= 0 && previous != current) {
+                    && state.value == (int) state.value && state.value != 255
+                    && DriveModeCatalog.byCode((int) state.value) != null ? (int) state.value : -1;
+            if (previous != current) {
                 DriveModeChangeOrigin origin = writing && requested == current
                         ? DriveModeChangeOrigin.PROGRAMMATIC : DriveModeChangeOrigin.EXTERNAL;
                 for (Listener listener : new ArrayList<>(listeners)) listener.onModeChanged(previous, current, origin);
@@ -89,7 +90,8 @@ public final class DriveModeRepository {
             if (done[0]) return; done[0] = true; main.removeCallbacks(timeout);
             car.unsubscribeControlStates(once[0]);
             callback.accept(owner == generation && state.available && state.known
-                    && Double.isFinite(state.value) && state.value == (int) state.value ? (int) state.value : -1);
+                    && Double.isFinite(state.value) && state.value == (int) state.value && state.value != 255
+                    && DriveModeCatalog.byCode((int) state.value) != null ? (int) state.value : -1);
         });
         car.subscribeControlStates(Collections.singleton("vehicle.drive_mode"), once[0]);
         main.postDelayed(timeout, 3000);

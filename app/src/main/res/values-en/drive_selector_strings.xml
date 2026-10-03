@@ -105,4 +105,7 @@
     <string name="drive_selector_mode_save">Save</string>
     <string name="drive_selector_mode_xc">XC</string>
     <string name="drive_selector_mode_unknown">Auto</string>
+    <string name="drive_selector_duration_tap">After selecting a mode on screen</string>
+    <string name="drive_selector_wake_first">First click opens the panel</string>
+    <string name="drive_selector_wake_first_caption">When hidden, the first click only shows the current mode. Following clicks switch modes.</string>
 </resources>

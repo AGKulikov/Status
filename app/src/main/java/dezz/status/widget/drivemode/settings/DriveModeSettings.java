@@ -81,6 +81,19 @@ public final class DriveModeSettings {
         prefs.edit().putInt(PreferenceKeys.KEY_AUTO_HIDE_SWITCH_MS, clampAutoHide(ms)).apply();
     }
 
+    public int getAutoHideTapMs() {
+        return clampTap(prefs.getInt(PreferenceKeys.KEY_AUTO_HIDE_TAP_MS, PreferenceKeys.DEFAULT_AUTO_HIDE_TAP_MS));
+    }
+    public void setAutoHideTapMs(int ms) {
+        prefs.edit().putInt(PreferenceKeys.KEY_AUTO_HIDE_TAP_MS, clampTap(ms)).apply();
+    }
+    private static int clampTap(int ms) {
+        int bounded = Math.max(PreferenceKeys.AUTO_HIDE_TAP_MIN_MS, Math.min(PreferenceKeys.AUTO_HIDE_TAP_MAX_MS, ms));
+        return Math.round(bounded / 250f) * 250;
+    }
+    public boolean isWakeFirstOnKnob() { return prefs.getBoolean(PreferenceKeys.KEY_WAKE_FIRST_ON_KNOB, false); }
+    public void setWakeFirstOnKnob(boolean value) { prefs.edit().putBoolean(PreferenceKeys.KEY_WAKE_FIRST_ON_KNOB, value).apply(); }
+
     private static int clampAutoHide(int ms) {
         return Math.max(PreferenceKeys.AUTO_HIDE_MIN_MS,
                 Math.min(PreferenceKeys.AUTO_HIDE_MAX_MS, ms));

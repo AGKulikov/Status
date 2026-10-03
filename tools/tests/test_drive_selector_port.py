@@ -40,8 +40,9 @@ class DriveSelectorPortTests(unittest.TestCase):
         self.assertNotIn("setMode", preview)
         self.assertNotIn("get(0)", preview)
         self.assertIn("overlay.show(enabled, actual", preview)
-        self.assertIn("setModeConfirmed(target", source)
-        self.assertLess(source.index("if (!ok)"), source.index("overlay.animateStepsTo"))
+        self.assertIn("repository.setModeConfirmed(mode, done)", source)
+        self.assertIn("selection.step(", source)
+        self.assertIn("private void recoverActualMode()", source)
 
     def test_native_actions_never_use_external_broadcast(self):
         bridge = (JAVA / "media/DriveSelectorController.java").read_text()

@@ -107,4 +107,7 @@
     <string name="drive_selector_mode_save">SAVE</string>
     <string name="drive_selector_mode_xc">XC</string>
     <string name="drive_selector_mode_unknown">Авто</string>
+    <string name="drive_selector_duration_tap">После выбора режима на экране</string>
+    <string name="drive_selector_wake_first">Первый щелчок открывает панель</string>
+    <string name="drive_selector_wake_first_caption">Если панель скрыта, первый щелчок только показывает текущий режим. Следующие переключают режимы.</string>
 </resources>
