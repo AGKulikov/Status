@@ -23,9 +23,10 @@ public final class SettingsDialogBuilder extends AlertDialog.Builder {
     @Override public SettingsDialogBuilder setTitle(CharSequence title) {
         this.title = title; super.setTitle(title); return this;
     }
+    @Override public SettingsDialogBuilder setTitle(int title) { return setTitle(getContext().getText(title)); }
     @Override public SettingsDialogBuilder setView(View view) { content = view; return this; }
     @Override public SettingsDialogBuilder setPositiveButton(CharSequence text,DialogInterface.OnClickListener listener){
-        super.setPositiveButton(text,listener==null?null:(dialog,which)->{listener.onClick(dialog,which);accept(dialog);});return this;
+        super.setPositiveButton(text,(dialog,which)->{if(listener!=null)listener.onClick(dialog,which);accept(dialog);});return this;
     }
     @Override public SettingsDialogBuilder setPositiveButton(int text,DialogInterface.OnClickListener listener){return setPositiveButton(getContext().getText(text),listener);}
     @Override public SettingsDialogBuilder setItems(CharSequence[] items,DialogInterface.OnClickListener listener){
@@ -67,7 +68,7 @@ public final class SettingsDialogBuilder extends AlertDialog.Builder {
                 @Override public void onViewDetachedFromWindow(View view){checkpoint.finish();checkpoints.remove(dialog);}
             });
         }
-        if (content != null) content.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+        dialog.getWindow().getDecorView().addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
             @Override public void onViewAttachedToWindow(View view) {
                 view.post(() -> {
                     if (dialog.getWindow() != null) SettingsAppearance.apply(getContext(), dialog.getWindow().getDecorView());

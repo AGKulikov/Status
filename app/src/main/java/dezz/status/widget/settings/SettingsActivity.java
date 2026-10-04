@@ -6,6 +6,8 @@ import androidx.appcompat.app.AppCompatActivity;
 public abstract class SettingsActivity extends AppCompatActivity implements SettingsPreviewProvider {
     private SettingsEditSession settingsSession;
     private boolean settingsReady;
+    private long pausedRevision;
+    private boolean wasPaused;
     @Override protected void onCreate(Bundle state){
         SettingsAppearance.configure(this);super.onCreate(state);
         settingsSession=SettingsEditSession.begin(this,getLastCustomNonConfigurationInstance());
@@ -32,6 +34,17 @@ public abstract class SettingsActivity extends AppCompatActivity implements Sett
     @Override protected void onDestroy(){
         if(settingsSession!=null&&!isChangingConfigurations())settingsSession.cancel(this);
         super.onDestroy();
+    }
+    @Override protected void onPause(){
+        if(settingsSession!=null){flushSettingsDraft();pausedRevision=settingsSession.revision();wasPaused=true;}
+        super.onPause();
+    }
+    @Override protected void onResume(){
+        super.onResume();
+        if(settingsSession!=null&&wasPaused&&settingsSession.revision()!=pausedRevision){
+            wasPaused=false;settingsSession.invalidateOldControls();recreate();return;
+        }
+        wasPaused=false;
     }
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)SettingsAppearance.apply(this,getWindow().getDecorView());}
 }

@@ -227,6 +227,7 @@ public final class AppleColorPickerDialog {
                 });
             });
             dialog.show();
+            dialog.getWindow().setLayout(Math.min(dp(activity,1200),activity.getResources().getDisplayMetrics().widthPixels-dp(activity,48)),wrap());
             SettingsAppearance.apply(activity, dialog.getWindow().getDecorView());
         }
 
@@ -244,20 +245,28 @@ public final class AppleColorPickerDialog {
             root.setPadding(dp(context, 22), dp(context, 8), dp(context, 22), dp(context, 18));
             scroll.addView(root, new ScrollView.LayoutParams(match(), wrap()));
 
+            LinearLayout split=new LinearLayout(context);split.setOrientation(LinearLayout.HORIZONTAL);
+            split.setMinimumHeight(Math.max(dp(context,320),context.getResources().getDisplayMetrics().heightPixels-dp(context,190)));
+            ScrollView samplesScroll=new ScrollView(context);
+            LinearLayout samples=new LinearLayout(context);samples.setOrientation(LinearLayout.VERTICAL);
+            samples.setPadding(dp(context,18),dp(context,8),dp(context,18),dp(context,16));samplesScroll.addView(samples);
+            split.addView(samplesScroll,new LinearLayout.LayoutParams(0,match(),.38f));
+            split.addView(scroll,new LinearLayout.LayoutParams(0,match(),.62f));
+
             preview = new PreviewView(context);
             preview.setColor(currentArgb());
             LinearLayout.LayoutParams previewLp = new LinearLayout.LayoutParams(match(), dp(context, 108));
             previewLp.bottomMargin = dp(context, 16);
-            root.addView(preview, previewLp);
+            samples.addView(preview, previewLp);
 
-            addSpecialChoices(root);
+            addSpecialChoices(samples);
             TextView paletteTitle = sectionLabel(context, "ЦВЕТА");
-            root.addView(paletteTitle, topMargin(context, 8));
+            samples.addView(paletteTitle, topMargin(context, 8));
             GridLayout palette = new GridLayout(context);
-            palette.setColumnCount(10);
+            palette.setColumnCount(5);
             palette.setUseDefaultMargins(false);
             for (int color : SWATCHES) palette.addView(swatch(context, color));
-            root.addView(palette, new LinearLayout.LayoutParams(match(), wrap()));
+            samples.addView(palette, new LinearLayout.LayoutParams(match(), wrap()));
 
             hue = slider(root, "Оттенок", 360, Math.round(hsv[0]), value -> {
                 hsv[0] = value;
@@ -307,26 +316,26 @@ public final class AppleColorPickerDialog {
                 }
             });
             root.addView(hex, new LinearLayout.LayoutParams(match(), dp(context, 54)));
-            return scroll;
+            return split;
         }
 
         private void addSpecialChoices(@NonNull LinearLayout root) {
             if (!options.allowTransparent && !options.allowNone && !options.allowInherit) return;
             LinearLayout row = new LinearLayout(activity);
-            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setOrientation(LinearLayout.VERTICAL);
             if (options.allowInherit) {
                 row.addView(specialButton(options.inheritLabel, SettingsColorValue.Kind.INHERIT),
-                        weighted());
+                        new LinearLayout.LayoutParams(match(),wrap()));
             }
             if (options.allowNone) {
                 row.addView(specialButton("Без окрашивания", SettingsColorValue.Kind.NONE),
-                        weighted());
+                        new LinearLayout.LayoutParams(match(),wrap()));
             }
             if (options.allowTransparent) {
                 row.addView(specialButton("Прозрачный", SettingsColorValue.Kind.TRANSPARENT),
-                        weighted());
+                        new LinearLayout.LayoutParams(match(),wrap()));
             }
-            root.addView(row, new LinearLayout.LayoutParams(match(), dp(activity, 46)));
+            root.addView(row, new LinearLayout.LayoutParams(match(), wrap()));
         }
 
         @NonNull
@@ -335,7 +344,7 @@ public final class AppleColorPickerDialog {
             MaterialButton button = new MaterialButton(activity);
             button.setAllCaps(false);
             button.setText(label);
-            button.setTextSize(13);
+            button.setTextSize(20);button.setMinHeight(dp(activity,54));
             button.setInsetTop(0);
             button.setInsetBottom(0);
             button.setOnClickListener(v -> {
@@ -364,7 +373,7 @@ public final class AppleColorPickerDialog {
             });
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
             lp.width = 0;
-            lp.height = dp(context, 42);
+            lp.height = dp(context, 54);
             lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
             lp.setMargins(dp(context, 4), dp(context, 4), dp(context, 4), dp(context, 4));
             swatch.setLayoutParams(lp);

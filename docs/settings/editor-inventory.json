@@ -936,73 +936,73 @@
         },
         {
           "dialogs": 2,
-          "line": 234,
+          "line": 231,
           "method": "chooseDisplay",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 271,
+          "line": 268,
           "method": "addElement",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 321,
+          "line": 318,
           "method": "editElement",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 475,
+          "line": 472,
           "method": "editMapSurface",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1006,
+          "line": 1003,
           "method": "editHudRoadEvents",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1080,
+          "line": 1083,
           "method": "editNavigatorIntegration",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1661,
+          "line": 1664,
           "method": "editHorizontalGroup",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1897,
+          "line": 1900,
           "method": "editBackdrop",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2084,
+          "line": 2087,
           "method": "editGlobalOptions",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2192,
+          "line": 2195,
           "method": "editStockHudControls",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2329,
+          "line": 2332,
           "method": "confirmReset",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2380,
+          "line": 2383,
           "method": "deleteSelected",
           "numeric_controls": 0
         }
@@ -1019,7 +1019,6 @@
         "Drive Environment · машинка и окружение",
         "ECARX не подтвердил команду",
         "HUD не запущен",
-        "HUD сохранён",
         "HUD-дисплей",
         "ID подключения",
         "ID телеметрии автомобиля",
@@ -1243,6 +1242,7 @@
         "Понятно",
         "Пороги топлива",
         "Порядок слоёв",
+        "Предпросмотр обновлён · сохранение по «Применить»",
         "Приближение: 0 — стандартное, + ближе, − дальше",
         "Применить",
         "Пробки на линии маршрута",
@@ -1323,7 +1323,6 @@
         "Снизу",
         "Собственная стрелка для этой карточки не рисуется.",
         "Состав и цвет карты HUD",
-        "Сохранить",
         "Справа",
         "Степень размытия края",
         "Стиль светофора",
@@ -1455,7 +1454,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java",
-      "sha256": "1bf1fb3e2b46ad40daba48bd18a01b433ce19e5a5fd56b5e9427598c9ce004f4"
+      "sha256": "98fc541bff12e2831920692ed9f0ffcc24c9c5a1ecd0b13138dc9d27ea09dbb7"
     },
     {
       "class": "dezz.status.widget.InformationPanelSettingsActivity",
@@ -1573,43 +1572,43 @@
         },
         {
           "dialogs": 1,
-          "line": 242,
+          "line": 239,
           "method": "addElement",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 273,
+          "line": 270,
           "method": "choosePanelPreset",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 292,
+          "line": 289,
           "method": "editModules",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 314,
+          "line": 313,
           "method": "editBackground",
           "numeric_controls": 1
         },
         {
           "dialogs": 1,
-          "line": 348,
+          "line": 347,
           "method": "editSelected",
           "numeric_controls": 2
         },
         {
           "dialogs": 1,
-          "line": 639,
+          "line": 638,
           "method": "editMapPerformance",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1123,
+          "line": 1122,
           "method": "editClusterRoadEvents",
           "numeric_controls": 0
         }
@@ -1734,7 +1733,6 @@
         "Оформление карты приборки — всегда ночь",
         "Панель",
         "Панель приборов",
-        "Панель сохранена",
         "Парки",
         "Перекрыто",
         "Плавность (на стоянке автоматически не выше 15)",
@@ -1750,6 +1748,7 @@
         "Полезные места",
         "Положение значений по высоте",
         "Порядок слоёв",
+        "Предпросмотр обновлён · сохранение по «Применить»",
         "Приближение: 0 — стандартное, + ближе, − дальше",
         "Применение…",
         "Применить",
@@ -1809,7 +1808,6 @@
         "Снизу",
         "Состав аналогового прибора",
         "Состав карты",
-        "Сохранить",
         "Сохранять место, пока знак ещё не пришёл",
         "Справа",
         "Степень размытия края",
@@ -1905,7 +1903,7 @@
       ],
       "numeric_controls": 4,
       "path": "app/src/main/java/dezz/status/widget/InstrumentPanelSettingsActivity.java",
-      "sha256": "49c7c32cac00e070db5bc20b6515109de82b3f1be21cd6e97dc1448ec8c8bd8f"
+      "sha256": "1322f2326a232e3413c2f4e8d2d6051f791e5d924dc0ffc243441b14013af6de"
     },
     {
       "class": "dezz.status.widget.IntentScenarioSettingsActivity",
@@ -2077,97 +2075,97 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 531,
+          "line": 536,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 8,
-          "line": 1949,
+          "line": 1974,
           "method": "showLauncherWidgetEditor",
           "numeric_controls": 0
         },
         {
           "dialogs": 2,
-          "line": 2272,
+          "line": 2297,
           "method": "showLauncherBackdropEditor",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2381,
+          "line": 2406,
           "method": "createLauncherHorizontalGroup",
           "numeric_controls": 0
         },
         {
           "dialogs": 5,
-          "line": 2452,
+          "line": 2477,
           "method": "showLauncherHorizontalGroupEditor",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2580,
+          "line": 2605,
           "method": "chooseLauncherHorizontalGroupMembers",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2641,
+          "line": 2666,
           "method": "showLauncherWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2763,
+          "line": 2788,
           "method": "showRemovedLauncherWidgets",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2794,
+          "line": 2819,
           "method": "showFavoriteAppWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2827,
+          "line": 2852,
           "method": "showSimpleWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2863,
+          "line": 2888,
           "method": "showMediaWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2894,
+          "line": 2919,
           "method": "showNavigationWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2926,
+          "line": 2951,
           "method": "showClimateWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 3019,
+          "line": 3044,
           "method": "chooseLauncherWidgetApp",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 3963,
+          "line": 4028,
           "method": "onStopTrackingTouch",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 5239,
+          "line": 5306,
           "method": "showAllApps",
           "numeric_controls": 0
         }
@@ -2204,10 +2202,6 @@
         "Выравнивание элементов",
         "Горизонтальный ряд",
         "Готово",
-        "Готово · закрепить компоновку",
-        "Готово · сохранить сетку кнопок",
-        "Готово · сохранить элементы медиаблока",
-        "Готово · сохранить элементы навигации",
         "Данные автомобиля",
         "Дата",
         "Действие виджета",
@@ -2235,6 +2229,7 @@
         "Зелёный",
         "Избранная точка не найдена",
         "Избранное",
+        "Изменения остаются в черновике",
         "Интервал",
         "Информация",
         "Исходное действие",
@@ -2243,7 +2238,6 @@
         "Климат",
         "Команда не выполнена",
         "Компактно",
-        "Компоновка сохранена",
         "Красный",
         "Красный + жёлтый",
         "Курсив",
@@ -2308,9 +2302,6 @@
         "Сверху",
         "Светофор",
         "Светофор:",
-        "Сетка кнопок сохранена",
-        "Сетка медиаблока сохранена",
-        "Сетка навигации сохранена",
         "Скругление",
         "Слева",
         "Смещение тени X",
@@ -2372,7 +2363,7 @@
       ],
       "numeric_controls": 2,
       "path": "app/src/main/java/dezz/status/widget/LauncherActivity.java",
-      "sha256": "ddde10492aec25ace77c094d3625ca91f11c2712640e8d297894c8858e57965b"
+      "sha256": "046138b058cc82b4bca3cd8c3e86af2cb5a46bd87de945b2896c8ff22d45ad68"
     },
     {
       "class": "dezz.status.widget.LauncherSettingsActivity",
@@ -5115,7 +5106,7 @@
         },
         {
           "dialogs": 0,
-          "line": 236,
+          "line": 237,
           "method": "buildContent",
           "numeric_controls": 0
         }
@@ -5140,7 +5131,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/settings/AppleColorPickerDialog.java",
-      "sha256": "cf8fdd87a5d23d215def1bffa20bb1a0e0330f5db8e963c06ed9ab2bc2a1a0aa"
+      "sha256": "9edf4c7e3695cff835ee4dc9106efa351e9e7917c2ac97d631b13f6522953d33"
     },
     {
       "class": "dezz.status.widget.settings.SettingsActivity",
@@ -5148,7 +5139,7 @@
       "labels": [],
       "numeric_controls": 0,
       "path": "app/src/main/java/dezz/status/widget/settings/SettingsActivity.java",
-      "sha256": "f3852bf06ab41731088ec67c1a34cdaab8bc914b4f1a4bc3ca10241074ffe6b8"
+      "sha256": "e5f8b477e357a0c31d8f5fd87e66be4d27cb3ba2d01f7ba3bfa17da1e282df53"
     },
     {
       "class": "dezz.status.widget.settings.VectorIconPickerDialog",

@@ -40,6 +40,7 @@ public final class SettingsEditSession {
     private Runnable flush=()->{};
     private Runnable reload=()->{};
     private int generation;
+    private long revision;
     private boolean primed;
     private final Map<SharedPreferences,Map<String,Object>> initialChanges=new HashMap<>();
     private TextView state;
@@ -47,7 +48,12 @@ public final class SettingsEditSession {
     private SettingsEditSession(SettingsEditSession parent){this.parent=parent;}
     public static synchronized SettingsEditSession begin(Activity activity, Object retained) {
         if(!EDITORS.contains(activity.getClass().getSimpleName()))return null;
+        return beginEditor(activity,retained);
+    }
+    /** HOME starts a draft only for an explicitly requested editing mode. */
+    public static synchronized SettingsEditSession beginEditor(Activity activity,Object retained) {
         SettingsEditSession session=retained instanceof SettingsEditSession?(SettingsEditSession)retained:null;
+        if(session!=null&&session.closed)session=null;
         if(session==null){
             String parentId=activity.getIntent().getStringExtra(EXTRA_PARENT);
             SettingsEditSession parent=null;
@@ -95,6 +101,9 @@ public final class SettingsEditSession {
         SettingsDraft draft=drafts.get(store);return closed||draft==null?original:draft.overlay(original);
     }
     synchronized int generation() { return generation; }
+    public synchronized long revision() { return revision; }
+    public synchronized boolean isClosed() { return closed; }
+    public synchronized void invalidateOldControls() { generation++; }
     synchronized void write(SharedPreferences store,Map<String,Object> edits,boolean clear,int generation) {
         if(generation!=this.generation)return;
         write(store,edits,clear);
@@ -106,6 +115,7 @@ public final class SettingsEditSession {
         Map<String,?> original=parent==null?store.getAll():parent.read(store);
         if(clear)for(String key:read(store).keySet())draft.put(key,null,original);
         for(Map.Entry<String,Object> entry:edits.entrySet())draft.put(entry.getKey(),entry.getValue(),original);
+        revision++;
         updateState();
     }
     public synchronized boolean dirty(){
@@ -150,13 +160,16 @@ public final class SettingsEditSession {
         active.remove(this);
         if(changed)refresh(activity);
     }
-    public void install(Activity activity,Runnable flush,Runnable reload,Runnable finish) {
+    public void bind(Runnable flush,Runnable reload) {
         this.flush=flush;this.reload=reload;
         if(!primed){
             flush.run();
             for(Map.Entry<SharedPreferences,SettingsDraft> entry:drafts.entrySet())initialChanges.put(entry.getKey(),entry.getValue().changes());
             primed=true;
         }
+    }
+    public void install(Activity activity,Runnable flush,Runnable reload,Runnable finish) {
+        bind(flush,reload);
         ViewGroup content=activity.findViewById(android.R.id.content);
         if(content==null||content.getChildCount()==0)return;
         if("natro.settings.draft".equals(content.getChildAt(0).getTag()))return;

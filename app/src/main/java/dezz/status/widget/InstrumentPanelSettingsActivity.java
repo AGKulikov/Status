@@ -234,9 +234,6 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         Button delete = button("Удалить");
         delete.setOnClickListener(view -> deleteSelected());
         row.addView(delete);
-        Button save = button("Сохранить");
-        save.setOnClickListener(view -> persist(true));
-        row.addView(save);
         return row;
     }
 
@@ -301,7 +298,9 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Модули панели")
                 .setMultiChoiceItems(labels, checked,
-                        (dialog, which, value) -> checked[which] = value)
+                        (dialog, which, value) -> {
+                            checked[which] = value;config.elements.get(which).enabled=value;refresh(null,true);
+                        })
                 .setPositiveButton("Применить", (dialog, which) -> {
                     for (int index = 0; index < config.elements.size(); index++) {
                         config.elements.get(index).enabled = checked[index];
@@ -1204,7 +1203,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         store.save(config);
         sendBroadcast(new android.content.Intent(InstrumentPanelStore.ACTION_CONFIG_CHANGED)
                 .setPackage(getPackageName()));
-        if (toast) Toast.makeText(this, "Панель сохранена", Toast.LENGTH_SHORT).show();
+        if (toast) Toast.makeText(this, "Предпросмотр обновлён · сохранение по «Применить»", Toast.LENGTH_SHORT).show();
     }
 
     @Override protected void flushSettingsDraft() { persist(false); }

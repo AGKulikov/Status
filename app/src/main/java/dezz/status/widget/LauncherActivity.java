@@ -221,6 +221,11 @@ public class LauncherActivity extends LauncherProfileActivity {
     private boolean globalElementGeometryPending;
     @Nullable private String lastFavoriteProjectionState;
     private boolean activityStarted;
+    private dezz.status.widget.settings.SettingsEditSession homeDraft;
+    private MaterialButton cancelEditorButton;
+    private boolean editorRestartPending;
+    private long homeDraftRevisionOnPause;
+    private boolean homeDraftPaused;
     private final Runnable globalElementRefresh = () -> {
         globalElementRefreshPosted = false;
         if (!activityStarted || !globalElementsActivated
@@ -540,6 +545,11 @@ public class LauncherActivity extends LauncherProfileActivity {
             return;
         }
         homeRootInvocation = isPassengerLauncherProfile() || isHomeInvocation(getIntent());
+        Object retainedDraft=getLastCustomNonConfigurationInstance();
+        if(requestsAnyHomeEditor(getIntent()) || retainedDraft instanceof dezz.status.widget.settings.SettingsEditSession
+                && !((dezz.status.widget.settings.SettingsEditSession)retainedDraft).isClosed()) {
+            homeDraft=dezz.status.widget.settings.SettingsEditSession.beginEditor(this,retainedDraft);
+        }
         // Opening SharedPreferences is asynchronous, but the default constructor immediately
         // performs JSON migrations and synchronous commit(). HOME needs none of that to attach its
         // shell, so the one shared Preferences graph is submitted to launcherWorker immediately.
@@ -607,6 +617,11 @@ public class LauncherActivity extends LauncherProfileActivity {
         super.onNewIntent(intent);
         lastFavoriteProjectionState = null;
         setIntent(intent);
+        if(requestsAnyHomeEditor(intent) && homeDraft==null) {
+            editorRestartPending=true;
+            recreate();
+            return;
+        }
         if (isHomeInvocation(intent)) homeRootInvocation = true;
         handleStagedOrHomeNavigation(intent);
         if (panelsInitialized) {
@@ -833,6 +848,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         vehicleInfoConfigStore = loaded.vehicleInfoConfigStore;
         informationConfigStore = loaded.informationConfigStore;
         inflateEditorChromeAfterFirstDraw();
+        if(homeDraft!=null)homeDraft.bind(()->{},this::recreateHomeEditor);
         launcherBootstrapReady = true;
         applyConfiguredWindowMode();
         if (launcherRoot != null) launcherRoot.setBackground(buildBackground());
@@ -855,13 +871,22 @@ public class LauncherActivity extends LauncherProfileActivity {
         launcherRoot.addView(editorGrid, 0, match());
 
         doneButton = new MaterialButton(this);
-        doneButton.setText("Готово · закрепить компоновку");
+        doneButton.setText("Применить");
         doneButton.setOnClickListener(v -> finishActiveEditor());
         doneButton.setVisibility(View.GONE);
-        FrameLayout.LayoutParams doneLp = new FrameLayout.LayoutParams(dp(420), dp(56),
+        FrameLayout.LayoutParams doneLp = new FrameLayout.LayoutParams(dp(220), dp(56),
                 Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        doneLp.leftMargin=dp(230);
         doneLp.topMargin = dp(12);
         launcherRoot.addView(doneButton, doneLp);
+
+        cancelEditorButton=new MaterialButton(this);
+        cancelEditorButton.setText("Отмена");cancelEditorButton.setAllCaps(false);
+        cancelEditorButton.setOnClickListener(v->leaveHomeEditor(false));
+        cancelEditorButton.setVisibility(View.GONE);
+        FrameLayout.LayoutParams cancelLp=new FrameLayout.LayoutParams(dp(220),dp(56),Gravity.TOP|Gravity.CENTER_HORIZONTAL);
+        cancelLp.rightMargin=dp(230);cancelLp.topMargin=dp(12);
+        launcherRoot.addView(cancelEditorButton,cancelLp);
 
         widgetCatalogButton = new MaterialButton(this);
         widgetCatalogButton.setText("＋ Виджет");
@@ -1006,6 +1031,7 @@ public class LauncherActivity extends LauncherProfileActivity {
 
     @Override
     protected void onDestroy() {
+        if(homeDraft!=null&&!isChangingConfigurations())homeDraft.cancel(this);
         // Defensive cleanup for vendor lifecycle teardown that omits a matching pause callback.
         if (!isPassengerLauncherProfile()) StatusBarSurfaceContext.setLauncherHomeForeground(false);
         dismissAllAppsDialog();
@@ -1049,6 +1075,10 @@ public class LauncherActivity extends LauncherProfileActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if(homeDraft!=null&&homeDraftPaused&&homeDraft.revision()!=homeDraftRevisionOnPause) {
+            homeDraftPaused=false;homeDraft.invalidateOldControls();recreateHomeEditor();return;
+        }
+        homeDraftPaused=false;
         if (isPassengerLauncherProfile() && getWindowManager().getDefaultDisplay().getDisplayId()
                 != dezz.status.widget.launcher.PassengerHomeLauncher.DISPLAY_ID) {
             finish();
@@ -1078,6 +1108,7 @@ public class LauncherActivity extends LauncherProfileActivity {
 
     @Override
     protected void onPause() {
+        if(homeDraft!=null){homeDraftRevisionOnPause=homeDraft.revision();homeDraftPaused=true;}
         // Any Activity which pauses HOME also removes it from the interactive top surface.
         if (!isPassengerLauncherProfile()) StatusBarSurfaceContext.setLauncherHomeForeground(false);
         super.onPause();
@@ -1383,14 +1414,8 @@ public class LauncherActivity extends LauncherProfileActivity {
 
     @Override
     public void onBackPressed() {
-        if (mediaContentEditMode) {
-            setMediaContentEditMode(false);
-        } else if (navigationContentEditMode) {
-            setNavigationContentEditMode(false);
-        } else if (actionsContentEditMode) {
-            setActionsContentEditMode(false);
-        } else if (editMode) {
-            setEditMode(false);
+        if (homeDraft!=null&&!homeDraft.isClosed()) {
+            if(!homeDraft.requestFinish(this,()->leaveHomeEditor(false)))leaveHomeEditor(false);
         } else if (!isTaskRoot() || !homeRootInvocation) {
             super.onBackPressed();
         } else {
@@ -3123,15 +3148,55 @@ public class LauncherActivity extends LauncherProfileActivity {
     }
 
     private void finishActiveEditor() {
-        if (mediaContentEditMode) {
-            setMediaContentEditMode(false);
-        } else if (navigationContentEditMode) {
-            setNavigationContentEditMode(false);
-        } else if (actionsContentEditMode) {
-            setActionsContentEditMode(false);
-        } else {
-            setEditMode(false);
+        leaveHomeEditor(true);
+    }
+
+    private void leaveHomeEditor(boolean apply) {
+        if(homeDraft!=null) {
+            if(apply&&!homeDraft.apply(this))return;
+            homeDraft.cancel(this);
         }
+        clearHomeEditorRequest();
+        editorRestartPending=true;
+        recreate();
+    }
+
+    private void clearHomeEditorRequest() {
+        Intent intent=getIntent();if(intent==null)return;
+        intent.removeExtra(EXTRA_EDIT_MODE);intent.removeExtra(EXTRA_SHOW_WIDGET_CATALOG);
+        intent.removeExtra(EXTRA_EDIT_MEDIA_CONTENT);intent.removeExtra(EXTRA_EDIT_NAVIGATION_CONTENT);
+        intent.removeExtra(EXTRA_EDIT_ACTIONS_CONTENT);
+    }
+
+    private void recreateHomeEditor() {
+        clearHomeEditorRequest();
+        String mode=mediaContentEditMode?EXTRA_EDIT_MEDIA_CONTENT:navigationContentEditMode?EXTRA_EDIT_NAVIGATION_CONTENT:
+                actionsContentEditMode?EXTRA_EDIT_ACTIONS_CONTENT:EXTRA_EDIT_MODE;
+        getIntent().putExtra(mode,true);editorRestartPending=true;recreate();
+    }
+
+    /** Rebind every store to a draft before the first drag, including an already visible HOME. */
+    private boolean startHomeDraftIfNeeded(String mode) {
+        if(homeDraft!=null&&!homeDraft.isClosed())return false;
+        if(editorRestartPending)return true;
+        getIntent().putExtra(mode,true);editorRestartPending=true;recreate();return true;
+    }
+
+    @Override public Object onRetainCustomNonConfigurationInstance(){
+        if(homeDraft!=null&&!homeDraft.isClosed()) {
+            if(!requestsAnyHomeEditor(getIntent())) {
+                String mode=mediaContentEditMode?EXTRA_EDIT_MEDIA_CONTENT:navigationContentEditMode?EXTRA_EDIT_NAVIGATION_CONTENT:
+                        actionsContentEditMode?EXTRA_EDIT_ACTIONS_CONTENT:EXTRA_EDIT_MODE;
+                getIntent().putExtra(mode,true);
+            }
+            return homeDraft;
+        }
+        return null;
+    }
+
+    @Override public void startActivityForResult(Intent intent,int requestCode,Bundle options){
+        dezz.status.widget.settings.SettingsEditSession.carry(this,intent);
+        super.startActivityForResult(intent,requestCode,options);
     }
 
     private Drawable buildBackground() {
@@ -4627,6 +4692,7 @@ public class LauncherActivity extends LauncherProfileActivity {
     }
 
     private void setEditMode(boolean enabled) {
+        if(enabled&&startHomeDraftIfNeeded(EXTRA_EDIT_MODE))return;
         if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
         if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
@@ -4640,9 +4706,10 @@ public class LauncherActivity extends LauncherProfileActivity {
         editorGrid.setStepPx(snap);
         editorGrid.setVisibility(enabled && preferences.launcherShowGrid.get()
                 ? View.VISIBLE : View.GONE);
-        doneButton.setText("Готово · закрепить компоновку");
+        doneButton.setText("Применить");
         doneButton.setVisibility(enabled || navigationContentEditMode || mediaContentEditMode
                 || actionsContentEditMode ? View.VISIBLE : View.GONE);
+        cancelEditorButton.setVisibility(doneButton.getVisibility());
         widgetCatalogButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
         for (LauncherElementFrame frame : panels.values()) frame.setEditMode(false, snap);
         suppressSourcePanels();
@@ -4666,10 +4733,11 @@ public class LauncherActivity extends LauncherProfileActivity {
         });
         Toast.makeText(this, enabled
                 ? "Тащите любой элемент по всему HOME; размер меняется за четыре угла"
-                : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
+                : "Изменения остаются в черновике", Toast.LENGTH_SHORT).show();
     }
 
     private void setNavigationContentEditMode(boolean enabled) {
+        if(enabled&&startHomeDraftIfNeeded(EXTRA_EDIT_NAVIGATION_CONTENT))return;
         if (enabled && editMode) setEditMode(false);
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
         if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
@@ -4678,11 +4746,10 @@ public class LauncherActivity extends LauncherProfileActivity {
             navigationContentEditOverlay.setEditing(enabled);
         }
         editorGrid.setVisibility(View.GONE);
-        doneButton.setText(enabled
-                ? "Готово · сохранить элементы навигации"
-                : "Готово · закрепить компоновку");
+        doneButton.setText("Применить");
         doneButton.setVisibility(enabled || editMode || mediaContentEditMode
                 || actionsContentEditMode ? View.VISIBLE : View.GONE);
+        cancelEditorButton.setVisibility(doneButton.getVisibility());
         widgetCatalogButton.setVisibility(View.GONE);
         updateLauncherSafeArea();
         if (enabled) {
@@ -4699,7 +4766,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         refreshGlobalElementVisibility();
         Toast.makeText(this, enabled
                 ? "Тащите элементы; потяните любой выделенный угол для размера"
-                : "Сетка навигации сохранена", Toast.LENGTH_SHORT).show();
+                : "Изменения остаются в черновике", Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -4708,6 +4775,7 @@ public class LauncherActivity extends LauncherProfileActivity {
      * intercepts every touch while moving/resizing an outer panel.
      */
     private void setMediaContentEditMode(boolean enabled) {
+        if(enabled&&startHomeDraftIfNeeded(EXTRA_EDIT_MEDIA_CONTENT))return;
         if (enabled && editMode) setEditMode(false);
         if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
         if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
@@ -4717,11 +4785,10 @@ public class LauncherActivity extends LauncherProfileActivity {
             mediaPanel.setInPlaceEditMode(enabled);
         }
         editorGrid.setVisibility(View.GONE);
-        doneButton.setText(enabled
-                ? "Готово · сохранить элементы медиаблока"
-                : "Готово · закрепить компоновку");
+        doneButton.setText("Применить");
         doneButton.setVisibility(enabled || editMode || navigationContentEditMode
                 || actionsContentEditMode ? View.VISIBLE : View.GONE);
+        cancelEditorButton.setVisibility(doneButton.getVisibility());
         widgetCatalogButton.setVisibility(View.GONE);
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.MEDIA, true);
@@ -4735,11 +4802,12 @@ public class LauncherActivity extends LauncherProfileActivity {
         refreshGlobalElementVisibility();
         Toast.makeText(this, enabled
                 ? "Тащите элементы; любой из четырёх углов изменяет размер"
-                : "Сетка медиаблока сохранена", Toast.LENGTH_SHORT).show();
+                : "Изменения остаются в черновике", Toast.LENGTH_SHORT).show();
     }
 
     /** Edits the actual mixed buttons/smart-home grid without touching the outer panel rectangle. */
     private void setActionsContentEditMode(boolean enabled) {
+        if(enabled&&startHomeDraftIfNeeded(EXTRA_EDIT_ACTIONS_CONTENT))return;
         if (enabled && editMode) setEditMode(false);
         if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
@@ -4752,11 +4820,10 @@ public class LauncherActivity extends LauncherProfileActivity {
             actionsContentEditOverlay.setEditing(enabled);
         }
         editorGrid.setVisibility(View.GONE);
-        doneButton.setText(enabled
-                ? "Готово · сохранить сетку кнопок"
-                : "Готово · закрепить компоновку");
+        doneButton.setText("Применить");
         doneButton.setVisibility(enabled || editMode || navigationContentEditMode
                 || mediaContentEditMode ? View.VISIBLE : View.GONE);
+        cancelEditorButton.setVisibility(doneButton.getVisibility());
         widgetCatalogButton.setVisibility(View.GONE);
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.ACTIONS, true);
@@ -4771,7 +4838,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         Toast.makeText(this, enabled
                 ? "Тащите плитки по сетке; потяните любой из четырёх углов. "
                 + "Нажатие на плитку меняет размер её иконки."
-                : "Сетка кнопок сохранена", Toast.LENGTH_SHORT).show();
+                : "Изменения остаются в черновике", Toast.LENGTH_SHORT).show();
     }
 
     private void updateMedia(@NonNull LauncherMediaController.Snapshot state) {

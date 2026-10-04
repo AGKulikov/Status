@@ -199,9 +199,6 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         Button options = button("Параметры");
         options.setOnClickListener(view -> editGlobalOptions());
         row.addView(options);
-        Button save = button("Сохранить");
-        save.setOnClickListener(view -> persist(true));
-        row.addView(save);
         return row;
     }
 
@@ -1032,6 +1029,12 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
             controls.add(new RoadEventModeControl(spec.tag, mode));
         }
 
+        Runnable updateDraftPreview=()->{
+            for (RoadEventModeControl control : controls) profile.setRoadEventMode(control.tag,
+                    roadEventModeValue(control.spinner.getSelectedItemPosition()));
+            persistNavigationConfiguration(navigation);
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(scroll,updateDraftPreview);
         AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Дорожные события HUD")
                 .setView(scroll)
@@ -2408,7 +2411,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         if (runtime != null) runtime.updateConfig(config);
         if (canvas != null) canvas.updateConfig(config);
         HudPresentationService.notifyConfigChanged(this);
-        if (toast) Toast.makeText(this, "HUD сохранён", Toast.LENGTH_SHORT).show();
+        if (toast) Toast.makeText(this, "Предпросмотр обновлён · сохранение по «Применить»", Toast.LENGTH_SHORT).show();
     }
 
     @Override protected void flushSettingsDraft() { persist(false); }
