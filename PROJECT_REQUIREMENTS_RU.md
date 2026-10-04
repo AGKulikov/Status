@@ -27,6 +27,18 @@ docs/diagnostics/LOGGING_AUDIT_2026_10_04_RU.md. LOCAL/CI/APK проверяют
 аппаратные FIELD-gates остаются открытыми. Разрыв корреляции после process death,
 недоступность чужого процесса и ограничения очередей отмечены в матрице и manifest.
 
+### Выпуск диагностики 3.0.5: SOURCE / TEST / APK
+
+Сборка `cc1de05305bdba36410dee8449aae30a3c62d23a`, tree
+`24e7e3b25790869d7d9776f37b16121250d84adc`; CI 37209352140 и 37209352111 SUCCESS.
+2071 Android test / 403 suites, 220 tool tests и 108 Java replay cases PASS.
+Подписанный APK 3.0.5 / 208021338 имеет прежний сертификат; проверен metadata
+install-over относительно 3.0.4, v2/v3/API28, zipalign16KiB и неизменность 1515
+payload entries при подписи. SHA-256:
+`5d4e97923548c000ae42bf9c1f906e7026fee4832a2ce4aabaa225182d04c171`.
+Матрица и пределы — в аудите, полный provenance — docs/3.0.5-release-report.json.
+FIELD остаётся OPEN: причинность VA/полосы и физическое устранение не доказаны.
+
 ## 04.10.2026 — продолжение завершено до подписанного кандидата 3.0.4
 
 По поручению «Продолжай доделывать то что не сделал» исходники HOME overlay,

@@ -34,9 +34,37 @@
 
 ## Проверка и выпуск
 
-SOURCE реализован; точные результаты тестов, CI, provenance и подписи добавляются
-после проверки кандидата. До этого файл не объявляется готовым устанавливаемым
-выпуском. KX11/iPhone приёмка остаётся OPEN; причина общего отказа VA/полосы не
-объявляется установленной. Изменений iPhone Helper и Navigator bridge нет.
+SOURCE опубликован: `cc1de05305bdba36410dee8449aae30a3c62d23a`, tree
+`24e7e3b25790869d7d9776f37b16121250d84adc`.
 
-LOCAL: 2071 Android/JUnit/Robolectric tests, 403 suites, 0 failures/errors/skips; 220 tool tests и 108 Java replay cases PASS. Storage inventory 81 owner; settings inventory 48 sources / 253 forms / 2996 labels PASS. CI и подпись ещё проверяются.
+Актуальные CI: [сборка 37209352140](https://github.com/AGKulikov/Status/actions/runs/37209352140)
+и [настройки 37209352111](https://github.com/AGKulikov/Status/actions/runs/37209352111) — SUCCESS.
+По XML скачанного build-артефакта независимо пересчитаны 2071 Android/JUnit/Robolectric
+тест в 403 suites, failures/errors/skips=0. Локально тот же полный набор прошёл;
+220 tool tests и 108 Java replay cases PASS. Source inventory: 81 owner;
+settings inventory: 48 sources / 253 forms / 2996 labels. Android-матрица редакторов
+сохраняет 72 варианта. Эти проверки не заменяют использование на KX11.
+
+Скачанные ZIP сверены с GitHub digest и ZIP CRC. APK проверен после подписи:
+единственный прежний signer, v2/v3 для API 28, zipalign 16 KiB; package и label,
+versionCode +1 относительно фактической 3.0.4, SDK 28, отсутствие debug-флага.
+1515 payload entries неизменны после подписи; aapt читает таблицу ресурсов,
+1427 файлов res/ на месте. Новые диагностические классы/маркеры проверены в DEX.
+
+| Параметр | Значение |
+|---|---|
+| APK | Natro-3.0.5-signed.apk |
+| Размер | 29 465 029 байт |
+| SHA-256 | `5d4e97923548c000ae42bf9c1f906e7026fee4832a2ce4aabaa225182d04c171` |
+| Сертификат | `6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75` |
+| Версия | 3.0.5 / 208021338, поверх 3.0.4 без удаления и очистки данных |
+
+[Машиночитаемый отчёт](3.0.5-release-report.json) сохраняет происхождение и проверки.
+Navigator bridge совпадает побайтно с выданной парой 3.0.2: замена Navigator ради
+этого обновления не нужна. iPhone Helper v70 не изменён; его последняя подтверждённая
+Apple SDK проверка — CI 37184234544. Автоматически запускаемые исторические workflows
+Helper v53–64 продолжают иметь ранее описанные несовместимые проверки; общая
+зелёная проверка всех старых Helper workflows не заявляется.
+
+KX11/iPhone приёмка OPEN. Причина совместного отказа VA/белой полосы ещё не доказана;
+это обновление диагностического механизма, не заявление об устранении полевого отказа.
