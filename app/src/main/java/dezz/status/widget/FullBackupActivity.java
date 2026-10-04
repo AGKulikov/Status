@@ -134,7 +134,7 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
             if(archived.getBoolean("installed")) {
                 frozen=bridge.freeze();if(!frozen.optBoolean("installed"))throw new IOException("Установите совместимый Навигатор перед восстановлением его настроек");
                 transaction.put("navigatorToken",frozen.getString("token")).put("navigatorValues",archived.getJSONArray("values"));
-                BackupFiles.atomicWrite(new File(BackupMaintenance.control(this),"navigator-rollback.json"),frozen.toString().getBytes(StandardCharsets.UTF_8));
+                transaction.put("participantBefore",frozen);
             }
             BackupMaintenance.markRestored(this);
             journalOwns=true;storage.transaction().apply(data,transaction);
@@ -151,11 +151,11 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
                     BackupStorage storage=new BackupStorage(this);
                     try(BackupMaintenance session=BackupMaintenance.begin(this)) {
                         storage.transaction().recover();storage.transaction().copyRollbackPoint(point);
-                        JSONObject transaction=new JSONObject();File nav=new File(BackupMaintenance.control(this),"navigator-rollback.json");
-                        if(nav.isFile()) {
-                            JSONObject previous=new JSONObject(new String(BackupFiles.read(nav,1024*1024),StandardCharsets.UTF_8));
+                        JSONObject transaction=new JSONObject();JSONObject previous=storage.transaction().rollbackParticipant();
+                        if(previous.optBoolean("installed")) {
                             frozen=bridge.freeze();if(!frozen.optBoolean("installed"))throw new IOException("Для возврата геометрии откройте Навигатор");
                             transaction.put("navigatorToken",frozen.getString("token")).put("navigatorValues",previous.getJSONArray("values"));
+                            transaction.put("participantBefore",frozen);
                         }
                         BackupMaintenance.markRestored(this);storage.transaction().apply(point,transaction);
                     }catch(Exception failure){throw failure;}

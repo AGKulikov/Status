@@ -194,7 +194,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/FullBackupActivity.java": {
-      "sha256": "1bbea7a1d464244163e9533cd99b2bbb538d56464a85be4805d1f6927e48eedb",
+      "sha256": "242add848f8bdf645484f061fc3fd194ab2e58dfead1cec4d26a410caaac0171",
       "access_kinds": [
         "external_resource",
         "files"
@@ -326,7 +326,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupTransaction.java": {
-      "sha256": "ff45a3feb49f2920524bf5e7153d3d16ae72c1f3cec55e365ef036d3d398becd",
+      "sha256": "81af57b54f1d6adfb8ee465eb9f8a00adbb1e537515e84ec8933858c057b8ae1",
       "access_kinds": [
         "files"
       ]

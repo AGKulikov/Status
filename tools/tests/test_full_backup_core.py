@@ -84,8 +84,9 @@ public class BackupReplay {
        public void apply(JSONObject m)throws Exception{if(!failCommit)throw new IOException("participant interrupted before commit");}
        public void finish(JSONObject m,boolean committed)throws Exception{throw new IOException("participant unavailable");}
      });
-   try{txp.apply(replacement,new JSONObject());throw new AssertionError("participant interruption lost");}catch(IOException expected){}
+   try{txp.apply(replacement,new JSONObject().put("participantBefore",new JSONObject().put("generation","previous")));throw new AssertionError("participant interruption lost");}catch(IOException expected){}
    check(txp.hasUnfinishedRestore(),"participant keeps recovery journal");
+   check(txp.rollbackParticipant().getString("generation").equals("previous"),"rollback participant belongs to file generation");
    final boolean[] decision={false};
    BackupTransaction recovery=new BackupTransaction(new File(scope,"control"),owners,Collections.emptyMap(),null)
      .withParticipant(new BackupTransaction.Participant(){public void apply(JSONObject m){}public void finish(JSONObject m,boolean committed){check(committed==failCommit,"durable participant decision");decision[0]=true;}});

@@ -86,6 +86,11 @@ public final class BackupTransaction {
     public boolean hasUnfinishedRestore() { return new File(journalDirectory, "journal.json").isFile(); }
     public boolean hasRollbackPoint() { return new File(journalDirectory, "last-rollback.json").isFile(); }
 
+    public JSONObject rollbackParticipant() throws Exception {
+        String id=rollbackId(json(new File(journalDirectory,"last-rollback.json")).getString("id"));
+        return json(new File(journalDirectory,"rollback-"+id+"-participant.json"));
+    }
+
     public void copyRollbackPoint(File destination) throws Exception {
         String id=rollbackId(json(new File(journalDirectory,"last-rollback.json")).getString("id"));
         File source=new File(journalDirectory,"rollback-"+id);
@@ -104,6 +109,9 @@ public final class BackupTransaction {
         snapshot(rollback);
         JSONObject old = BackupArchive.manifest(rollback, new JSONObject());
         BackupFiles.atomicWrite(new File(journalDirectory, "rollback-" + rollbackId + ".json"), bytes(old));
+        JSONObject participantBefore=metadata.optJSONObject("participantBefore");
+        BackupFiles.atomicWrite(new File(journalDirectory,"rollback-"+rollbackId+"-participant.json"),
+                bytes(participantBefore==null?new JSONObject():participantBefore));
         BackupFiles.atomicWrite(new File(journalDirectory, "last-rollback.json"),
                 bytes(new JSONObject().put("id", rollbackId)));
         Map<String, File> replacement = BackupFiles.inventory(checkedSnapshot);
