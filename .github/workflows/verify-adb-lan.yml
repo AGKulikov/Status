@@ -46,7 +46,16 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Natro-3.0.2-offline-signing-${{ github.run_number }}
-          path: ${{ runner.temp }}/natro-3.0.2-candidate/*
+          path: |
+            ${{ runner.temp }}/natro-3.0.2-candidate/*
+            !${{ runner.temp }}/natro-3.0.2-candidate/tools/**
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload signing tools separately
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-3.0.2-signing-tools-${{ github.run_number }}
+          path: ${{ runner.temp }}/natro-3.0.2-candidate/tools/*
           if-no-files-found: error
           retention-days: 7
       - name: Upload candidate and reports
