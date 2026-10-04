@@ -3297,19 +3297,19 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 33,
+          "line": 34,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 89,
+          "line": 90,
           "method": "choose",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 100,
+          "line": 102,
           "method": "addApplication",
           "numeric_controls": 0
         }
@@ -3325,11 +3325,12 @@
         "Для приложения из списка ID уже известен. При ручном добавлении он должен точно совпадать с ID в уведомлении.",
         "Добавить иконку приложения",
         "Добавить приложение",
+        "Доступ к общей памяти не разрешён. Доступны собственные файлы Natro; разрешение можно включить в настройках Android.",
         "Загрузка каталога…",
+        "Из памяти ГУ или USB",
         "Иконка не найдена — можно добавить свою",
         "Иконка сохранена. Будет использована в следующих уведомлениях.",
         "Иконки приложений телефона",
-        "На устройстве нет выбора файлов",
         "Название приложения",
         "Не удалось сохранить иконку",
         "Отмена",
@@ -3343,7 +3344,7 @@
       ],
       "numeric_controls": 0,
       "path": "app/src/main/java/dezz/status/widget/PhoneAppIconsActivity.java",
-      "sha256": "bff5da722673cd4b6574bf65a83f133b07a217eb60fbae48064fd7f9ca552d08"
+      "sha256": "84a8581740e650da6a5feb2f6fd26fb1f3b084411ba8f0205ec48f222c3081af"
     },
     {
       "class": "dezz.status.widget.PhoneConnectorSettingsActivity",

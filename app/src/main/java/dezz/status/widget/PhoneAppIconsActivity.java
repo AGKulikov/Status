@@ -23,6 +23,7 @@ import dezz.status.widget.phone.PhoneIconImporter;
 /** User mappings and local PNG/JPEG replacement without changing ANCS identities. */
 public final class PhoneAppIconsActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final int PICK_ICON = 71;
+    private static final int READ_ICONS = 72;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private PhoneAppIconStore store;
     private final List<PhoneAppIconStore.App> apps = new ArrayList<>(), visible = new ArrayList<>();
@@ -87,10 +88,11 @@ public final class PhoneAppIconsActivity extends dezz.status.widget.settings.Set
         adapter.notifyDataSetChanged();
     }
     private void choose(PhoneAppIconStore.App app) {
-        String[] actions = app.customIcon ? new String[]{"Выбрать PNG/JPEG", "Вернуть автоматическую иконку"}
-                : new String[]{"Выбрать PNG/JPEG"};
+        String[] actions = app.customIcon ? new String[]{"Выбрать PNG/JPEG", "Из памяти ГУ или USB", "Вернуть автоматическую иконку"}
+                : new String[]{"Выбрать PNG/JPEG", "Из памяти ГУ или USB"};
         new AlertDialog.Builder(this).setTitle(app.name).setItems(actions, (dialog, which) -> {
             if (which == 0) pick(app.identifier, app.name);
+            else if(which == 1){pendingId=app.identifier;pendingName=app.name;pickLocal();}
             else worker.execute(() -> {
                 try { store.overrides().reset(app.identifier); store.requestAutomaticIcon(app.identifier, app.name); reload(); }
                 catch (Exception error) { report(error); }
@@ -121,13 +123,40 @@ public final class PhoneAppIconsActivity extends dezz.status.widget.settings.Set
                 .addCategory(Intent.CATEGORY_OPENABLE)
                 .putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/png", "image/jpeg"});
         try { startActivityForResult(intent, PICK_ICON); }
-        catch (android.content.ActivityNotFoundException unavailable) { report(new Exception("На устройстве нет выбора файлов")); }
+        catch (android.content.ActivityNotFoundException unavailable) {
+            // Some head units have a gallery/provider but no DocumentsUI.
+            intent.setAction(Intent.ACTION_GET_CONTENT);
+            try { startActivityForResult(intent,PICK_ICON); }
+            catch(android.content.ActivityNotFoundException alsoUnavailable){pickLocal();}
+        }
+    }
+    private void pickLocal(){
+        if(checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+            requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE},READ_ICONS);return;
+        }
+        showLocalPicker();
+    }
+    private void showLocalPicker(){
+        final String id=pendingId,name=pendingName;pendingId="";pendingName="";
+        if(id.isEmpty())return;
+        new dezz.status.widget.phone.LocalImagePicker(this,worker,uri->importIcon(id,name,uri)).show();
+    }
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
+        super.onRequestPermissionsResult(request,permissions,results);
+        if(request!=READ_ICONS||isDestroyed()||isFinishing())return;
+        if(results.length==0||results[0]!=android.content.pm.PackageManager.PERMISSION_GRANTED)
+            Toast.makeText(this,"Доступ к общей памяти не разрешён. Доступны собственные файлы Natro; разрешение можно включить в настройках Android.",Toast.LENGTH_LONG).show();
+        showLocalPicker();
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
-        if (request != PICK_ICON || result != RESULT_OK || data == null || data.getData() == null || pendingId.isEmpty()) return;
+        if (request != PICK_ICON) return;
         final String id = pendingId, name = pendingName;
-        final android.net.Uri uri = data.getData(); pendingId = ""; pendingName = "";
+        pendingId = ""; pendingName = "";
+        if(result!=RESULT_OK||data==null||data.getData()==null||id.isEmpty())return;
+        importIcon(id,name,data.getData());
+    }
+    private void importIcon(String id,String name,android.net.Uri uri){
         worker.execute(() -> {
             try {
                 byte[] png = PhoneIconImporter.read(getApplicationContext(), uri);

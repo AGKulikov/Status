@@ -259,3 +259,9 @@ createDeviceProtectedStorageContext, без скрытого Android API. При
 в качестве default context отвергается явно, как в BackupStorage. Имена, типы,
 defaults и формат журнала не изменены. HUD/LCA сохраняет тот же last-report.txt;
 новые сообщения ошибок не означают наличие резервного оригинала на устройстве.
+
+FIELD-006: встроенный LocalImagePicker только читает выбранный PNG/JPEG; исходная
+папка/URI не становится постоянной зависимостью и не архивируется целиком. Итоговые
+байты по-прежнему нормализует PhoneIconImporter и сохраняет прежний override-store
+files/phone-icon-overrides. Отказ/отмена выбора ничего туда не записывает. Новых
+ключей, defaults или формата каталога нет; общая полнота backup остаётся OPEN.
