@@ -32,7 +32,7 @@ import dezz.status.widget.launcher.LauncherAppCatalog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** One shared editor for the HOME and driver-panel all-applications catalogs. */
-public class AllAppsSettingsActivity extends AppCompatActivity {
+public class AllAppsSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private interface IntSetter { void set(int value); }
 
     protected boolean passengerPanel() { return false; }

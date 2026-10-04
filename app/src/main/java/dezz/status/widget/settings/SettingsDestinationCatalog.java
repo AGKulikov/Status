@@ -32,18 +32,20 @@ public final class SettingsDestinationCatalog {
     public static final String ACTION_RESET = "action.reset";
 
     public enum Group {
-        STATUS("status", "Строка состояния",
-                "Положение, состав и оформление верхней строки", "status"),
-        HOME("home", "Лаунчер",
-                "Все кнопки, виджеты, информация и компоновка в одном разделе", "home"),
-        PANELS("panels", "Панели",
-                "Панель водителя, HUD и независимые плавающие панели", "panels"),
-        SMART_HOME("smart_home", "Умный дом",
-                "Подключения Home Assistant, Sprut.hub, MQTT и iPhone", "smart_home"),
-        AUTOMATION("automation", "Автоматизация",
-                "Сценарии и команды с внешних кнопок", "automation"),
-        APP("app", "Приложение",
-                "Доступы, резервная копия и диагностика", "app");
+        HOME("home", "Главный экран", "Лаунчеры водителя и пассажира, строка состояния", "home"),
+        HUD("hud", "HUD", "Проекция и её независимый редактор", "hud"),
+        DRIVER("driver", "Экран водителя", "Пять вариантов приборки и меню DIM", "vehicle"),
+        PANELS("panels", "Панели и шторка", "Боковые панели, избранное, климат и оверлеи", "panels"),
+        NAVIGATION_MEDIA("navigation_media", "Навигация и музыка", "Окно Навигатора, маршруты и медиаплеер", "navigation"),
+        VEHICLE("vehicle", "Автомобиль и кнопки", "Пульт, режимы вождения и физические кнопки", "vehicle"),
+        PHONE("phone", "Телефон и обмен", "iPhone, уведомления, иконки и передача файлов", "phone"),
+        SMART_HOME("smart_home", "Умный дом", "Home Assistant, Sprut.hub и MQTT", "smart_home"),
+        AUTOMATION("automation", "Сценарии и команды", "Условия, действия и внешние команды", "automation"),
+        BACKUP("backup", "Копии и профили", "Полная личная копия, восстановление и оформление", "preset"),
+        APP("app", "Приложение и обслуживание", "Оформление настроек, доступы, ADB и диагностика", "app");
+
+        /** Legacy deep links remain valid after moving the status row under Home. */
+        public static final Group STATUS=HOME;
 
         @NonNull public final String id;
         @NonNull public final String title;
@@ -60,6 +62,7 @@ public final class SettingsDestinationCatalog {
 
         @NonNull
         public static Group fromId(@Nullable String id) {
+            if ("status".equals(id)) return HOME;
             if (id != null) {
                 for (Group value : values()) if (value.id.equals(id)) return value;
             }
@@ -123,7 +126,7 @@ public final class SettingsDestinationCatalog {
                 "Добавление устройств, подписи, правила состояний, цвета и порядок",
                 "smart_home", "dezz.status.widget.AutomationSettingsActivity",
                 "кирпичики", "элементы", "home assistant", "sprut", "mqtt", "статус"));
-        values.add(activity("status_presets", Group.STATUS, "Профили оформления",
+        values.add(activity("status_presets", Group.BACKUP, "Профили оформления",
                 "Сохранение и быстрое переключение вариантов строки",
                 "preset", "dezz.status.widget.PresetsActivity",
                 "пресеты", "профили", "шаблоны", "оформление"));
@@ -140,7 +143,7 @@ public final class SettingsDestinationCatalog {
                 "Домашний экран пассажира: собственные элементы, фон, компоновка и приложения",
                 "home", "dezz.status.widget.PassengerLauncherSettingsActivity",
                 "домой пассажир", "пассажирский экран", "лаунчер", "компоновка"));
-        values.add(activity("vehicle_control", Group.HOME, "Пульт автомобиля",
+        values.add(activity("vehicle_control", Group.VEHICLE, "Пульт автомобиля",
                 "Обзор Monjaro и контекстные разделы климата, сидений, автомобиля и комфорта",
                 "vehicle", "dezz.status.widget.VehicleControlActivity",
                 "автомобиль", "пульт", "monjaro", "климат", "сиденья", "обогрев",
@@ -151,22 +154,22 @@ public final class SettingsDestinationCatalog {
                 "climate", "dezz.status.widget.ClimatePanelSettingsActivity",
                 "климат", "оверлей", "плавающая", "кондиционер", "вентилятор",
                 "сиденья", "руль", "резервирование"));
-        values.add(activity("panel_hud", Group.PANELS, "Отдельный HUD-дисплей",
+        values.add(activity("panel_hud", Group.HUD, "Отдельный HUD-дисплей",
                 "Живой редактор с сеткой, стабильный ID дисплея, навигация, автомобиль и умный дом",
                 "hud", "dezz.status.widget.HudPanelSettingsActivity",
                 "hud", "проекция", "внешний дисплей", "стрелки", "светофоры",
                 "полосы", "телеметрия", "умный дом", "сценарии", "сетка"));
-        values.add(activity("media_buttons", Group.AUTOMATION, "Кнопки руля · MEDIA",
-                "Обработка медиакнопок и отключение штатного действия",
+        values.add(activity("media_buttons", Group.VEHICLE, "Физические кнопки",
+                "MEDIA, SRC, DM, остальные кнопки и короткие/долгие нажатия",
                 "automation", "dezz.status.widget.MediaButtonsSettingsActivity",
                 "media", "mconfig", "руль", "кнопки", "музыка", "src"));
-        values.add(activity("panel_instrument_cluster", Group.PANELS, "Панель приборов",
+        values.add(activity("panel_instrument_cluster", Group.DRIVER, "Панель приборов",
                 "Живой редактор 1920×720, аналоговые и цифровые приборы и независимая карта",
                 "vehicle", "dezz.status.widget.InstrumentPanelSettingsActivity",
                 "приборка", "панель приборов", "спидометр", "тахометр", "одометр",
                 "аналоговый", "цифровой", "карта", "display 2", "dim", "1920 720",
                 "белая полоса", "ограничение скорости", "штатный знак", "tsr"));
-        values.add(activity("panel_dim_menu", Group.PANELS, "Меню экрана водителя",
+        values.add(activity("panel_dim_menu", Group.DRIVER, "Меню экрана водителя",
                 "Отдельная панель во вкладке навигации с управлением кнопками руля",
                 "navigation", "dezz.status.widget.DimMenuPanelSettingsActivity",
                 "dim", "mNavi", "руль", "меню водителя", "экран водителя",
@@ -176,7 +179,7 @@ public final class SettingsDestinationCatalog {
                 "panels", "dezz.status.widget.shade.SystemShadeSettingsActivity",
                 "шторка", "уведомления", "ecarx", "яркость", "громкость", "медиа",
                 "жест сверху", "компоновка"));
-        values.add(activity("navigator_window", Group.PANELS,
+        values.add(activity("navigator_window", Group.NAVIGATION_MEDIA,
                 "Оконный режим Навигатора",
                 "Размер, положение, скругление, прозрачный фон и фиксация окна",
                 "popup", "dezz.status.widget.NavigatorWindowSettingsActivity",
@@ -218,7 +221,7 @@ public final class SettingsDestinationCatalog {
                 "Брокер, авторизация, топики, QoS и состояние соединения",
                 "mqtt", "dezz.status.widget.MqttSettingsActivity",
                 "broker", "брокер", "topic", "топик", "qos"));
-        values.add(activity("connector_phone", Group.SMART_HOME, "Телефон",
+        values.add(activity("connector_phone", Group.PHONE, "Телефон",
                 "Конкретный iPhone по Bluetooth: данные, уведомления, сообщения и присутствие",
                 "phone", "dezz.status.widget.PhoneConnectorSettingsActivity",
                 "iphone", "айфон", "телефон", "bluetooth", "ancs", "уведомления",
@@ -228,13 +231,13 @@ public final class SettingsDestinationCatalog {
                 "Триггеры, условия и действия между всеми коннекторами",
                 "scenario", "dezz.status.widget.ScenarioSettingsActivity",
                 "правила", "триггер", "условие", "действие"));
-        values.add(activity("automation_phone_notifications", Group.AUTOMATION,
+        values.add(activity("automation_phone_notifications", Group.PHONE,
                 "Уведомления телефона",
                 "Строка состояния, настраиваемый оверлей, длительность и условия показа",
                 "phone", "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
                 "iphone", "ancs", "уведомления", "оверлей", "всплывающие",
                 "шрифт", "время", "пассажир"));
-        values.add(activity("phone_app_icons", Group.AUTOMATION, "Иконки приложений телефона",
+        values.add(activity("phone_app_icons", Group.PHONE, "Иконки приложений телефона",
                 "Все сопоставления, свои PNG/JPEG и приложения без иконок",
                 "phone", "dezz.status.widget.PhoneAppIconsActivity",
                 "иконки", "значки", "png", "jpeg", "iphone", "уведомления"));
@@ -248,7 +251,7 @@ public final class SettingsDestinationCatalog {
                 "Скрытие и восстановление приложений, исключения и возврат по PIN",
                 "settings", "dezz.status.widget.servicemode.MainActivity",
                 "сервис", "stealth", "скрыть приложения", "восстановить", "PIN"));
-        values.add(activity("panel_drive_selector", Group.PANELS, "Режимы вождения",
+        values.add(activity("panel_drive_selector", Group.VEHICLE, "Режимы вождения",
                 "Режимы, порядок, карусель, скрытие меню и назначения кнопок",
                 "drive_mode", "dezz.status.widget.drivemode.ui.MainActivity",
                 "режимы движения", "селектор", "monjaro selector", "эко", "спорт", "DM"));
@@ -257,7 +260,7 @@ public final class SettingsDestinationCatalog {
                 "diagnostics", "dezz.status.widget.AdbSettingsActivity",
                 "adb", "адб", "usb", "терминал", "команды", "mconfig", "мконфиг",
                 "разработчик", "gps", "mock_location", "постоянный adb", "проверка установки"));
-        values.add(activity("app_transfer", Group.APP, "Буфер обмена и файлы",
+        values.add(activity("app_transfer", Group.PHONE, "Буфер обмена и файлы",
                 "Локальный сервер для iPhone: текст, файлы и команды ADB",
                 "import", "dezz.status.widget.LanTransferActivity",
                 "буфер", "clipboard", "iphone", "айфон", "модем", "hotspot", "wifi", "lan", "сервер", "файлы", "команды"));
@@ -265,10 +268,10 @@ public final class SettingsDestinationCatalog {
                 "Оверлей, уведомления, местоположение, статистика и спецвозможности",
                 "permissions", ACTION_PERMISSIONS,
                 "разрешения", "notification listener", "usage access", "accessibility"));
-        values.add(action("app_export", Group.APP, "Экспорт резервной копии",
+        values.add(action("app_export", Group.BACKUP, "Экспорт старого JSON (неполная копия)",
                 "Сохранить интерфейс, панели и сценарии в JSON; секреты останутся на устройстве",
                 "export", ACTION_EXPORT, "backup", "резервная копия", "json"));
-        values.add(action("app_import", Group.APP, "Импорт резервной копии",
+        values.add(action("app_import", Group.BACKUP, "Импорт старого JSON (неполная копия)",
                 "Восстановить несекретные настройки из ранее сохранённого JSON",
                 "import", ACTION_IMPORT, "restore", "восстановление", "json"));
         values.add(activity("app_diagnostics", Group.APP, "Отладка и регистратор действий",
@@ -283,6 +286,22 @@ public final class SettingsDestinationCatalog {
         values.add(action("app_reset", Group.APP, "Сбросить все настройки",
                 "Вернуть исходные значения после явного подтверждения",
                 "reset", ACTION_RESET, "удалить", "очистить", "по умолчанию"));
+
+        values.add(activity("full_backup", Group.BACKUP, "Полная личная копия",
+                "Пароль, проверка файла, восстановление и точка отката", "export",
+                "dezz.status.widget.FullBackupActivity", "backup", "резервная копия", "пароли", "восстановить", "архив"));
+        values.add(activity("settings_appearance", Group.APP, "Оформление настроек",
+                "Светлая и тёмная темы, размер текста и образцы элементов", "layout",
+                "dezz.status.widget.SettingsAppearanceActivity", "шрифт", "тема", "mconfig", "крупный текст"));
+        values.add(activity("navigation_media_panel", Group.NAVIGATION_MEDIA, "Медиаплеер",
+                "Приложение музыки, управление, оформление и автовозобновление", "media",
+                "dezz.status.widget.MediaPanelSettingsActivity", "музыка", "плеер", "обложка", "автозапуск"));
+        values.add(activity("navigation_routes", Group.NAVIGATION_MEDIA, "Любимые маршруты",
+                "Адреса и кнопки запуска навигации", "routes",
+                "dezz.status.widget.FavoriteRoutesSettingsActivity", "маршруты", "дом", "работа", "адрес"));
+        values.add(activity("hud_lca_patch", Group.APP, "Системный патч HUD/LCA",
+                "Проверка совместимости, оригинал, режимы и отдельное восстановление", "hud",
+                "dezz.status.widget.HudLcaPatchActivity", "hud", "lca", "машинка", "патч", "simple", "ar"));
 
         DESTINATIONS = Collections.unmodifiableList(values);
     }

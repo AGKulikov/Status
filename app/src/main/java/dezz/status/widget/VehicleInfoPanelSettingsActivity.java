@@ -44,7 +44,7 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Human-friendly, immediate visual editor for the HOME vehicle-information panel. */
-public final class VehicleInfoPanelSettingsActivity extends LauncherProfileActivity {
+public final class VehicleInfoPanelSettingsActivity extends SettingsLauncherProfileActivity {
     private interface IntChange { void set(int value); }
     private interface TextChange { void set(@NonNull String value); }
     private interface TextValue { String get(); }

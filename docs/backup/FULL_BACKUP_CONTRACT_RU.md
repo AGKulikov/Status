@@ -200,3 +200,27 @@ passengerSystemAppsDefaultApplied принадлежат существующе�
 JVM проверяет типы, независимость, существующий JSON round-trip и этот случай
 миграции. Изменение fingerprint Preferences принято после этой ревизии; ни оно,
 ни тест JSON не закрывают общий gate полного runtime backup/restore.
+
+## Реализация 3.0.2: ревизия владельцев хранения
+
+Новые BackupFiles/Archive/Transaction/Maintenance/Storage и FullBackupActivity
+владеют только зашифрованным экспортом, приватным staging и журналом
+DE/no_backup/natro-backup. Последний исключён из рекурсивного снимка во избежание
+самокопирования; исходные rollback поколения сохраняются отдельно. Рекурсивные
+CE/DE namespaces включают новые пользовательские файлы и типы автоматически.
+PortableBackupSecrets экспортирует расшифрованные секреты только внутрь
+зашифрованного контейнера, PortableBackupDefaults читает defaults без записи.
+RuntimeSnapshotPreferences получил явный flush; bootstrap проверяет журнал до
+контроллеров. Старые telemetry/startup snapshot при импорте архивируются как история.
+SettingsAppearance хранит natro_settings_ui_v1 (theme/textSp), автоматически
+включаемое typed-адаптером. Остальные изменённые редакторы получили общий UI-host,
+ключи и defaults их панелей не изменены. HudLcaPatchActivity сохраняет только отчёт
+в files/hud-lca-patch; системные оригиналы остаются отдельным внешним владельцем.
+NavigatorBackupBridge владеет только natro_floating_window_v3 и своим AtomicFile
+журналом; FloatingWindowController останавливает запись геометрии на период операции.
+Новый протокол не читает и не экспортирует частные данные Яндекса.
+
+Статус реализации/испытаний уточняется по результату Android CI. Исторические
+утверждения «ещё не реализовано» выше относятся к состоянию до команды собирать.
+Сверка fingerprints ниже выполнена после этой ревизии, а не заменяет проверку
+декодеров, Keystore, URI, crash recovery и устройства KX11.

@@ -65,7 +65,7 @@ import dezz.status.widget.settings.SettingsBackNavigation;
  * Main-display, live HUD editor. Dragging/resizing is projected onto the selected external display
  * after a short write debounce; the HUD itself never hosts editor controls or receives touch.
  */
-public final class HudPanelSettingsActivity extends AppCompatActivity {
+public final class HudPanelSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final int PICK_FONT = 0x4846;
     @NonNull private final Handler main = new Handler(Looper.getMainLooper());
     private Preferences preferences;

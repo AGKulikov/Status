@@ -20,7 +20,7 @@ import androidx.core.widget.NestedScrollView;
 import dezz.status.widget.mqtt.MqttController;
 
 /** Human-facing MQTT connection editor. Brick appearance is deliberately kept elsewhere. */
-public final class MqttSettingsActivity extends AppCompatActivity {
+public final class MqttSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private Preferences prefs;
     private CheckBox enabled;
     private CheckBox tls;

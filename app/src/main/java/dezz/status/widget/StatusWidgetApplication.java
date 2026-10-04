@@ -60,6 +60,7 @@ public class StatusWidgetApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        if (!dezz.status.widget.backup.BackupMaintenance.prepareApplication(this)) return;
         hudProcess = AppProcessPolicy.isHudProcess();
         StartupPerformanceTrace.beginProcess(AppProcessPolicy.currentProcessLabel());
         // Keep Application.onCreate minimal. Preferences, recorder recovery and vendor status-bar

@@ -61,6 +61,15 @@ public final class RuntimeSnapshotPreferences implements SharedPreferences {
         }
     }
 
+    /** Maintenance runs on a worker after settings UI paused; telemetry is checkpointed once. */
+    public static void flushForBackup() throws java.io.IOException {
+        synchronized (STORES) {
+            for (RuntimeSnapshotPreferences store : STORES.values()) {
+                if (!store.persistLatest()) throw new java.io.IOException("Runtime checkpoint failed");
+            }
+        }
+    }
+
     RuntimeSnapshotPreferences(SharedPreferences disk, Consumer<Runnable> schedule,
                                Consumer<Runnable> callbacks, Consumer<String> report) {
         this.disk = disk;

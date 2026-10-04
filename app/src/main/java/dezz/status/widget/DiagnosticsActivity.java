@@ -56,7 +56,7 @@ import dezz.status.widget.diagnostics.PrivilegedDiagnosticsAccess;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /** Human-readable diagnostic journal and structured action-recorder controls. */
-public final class DiagnosticsActivity extends AppCompatActivity {
+public final class DiagnosticsActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final String ALL = "Все";
 
     private Preferences preferences;

@@ -54,7 +54,7 @@ import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
 
 /** Code-free, autosaving editor for applications shown in the HOME favourites panel. */
-public final class FavoriteAppsSettingsActivity extends LauncherProfileActivity {
+public final class FavoriteAppsSettingsActivity extends SettingsLauncherProfileActivity {
     private interface IntChange { void set(int value); }
 
     private final ExecutorService catalogExecutor = Executors.newSingleThreadExecutor();

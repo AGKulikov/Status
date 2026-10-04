@@ -88,6 +88,9 @@
         </intent>
     </queries>
 
+    <permission android:name="${applicationId}.permission.BACKUP_INTERNAL" android:protectionLevel="signature" />
+    <uses-permission android:name="${applicationId}.permission.BACKUP_INTERNAL" />
+
     <application
         android:name=".StatusWidgetApplication"
         android:allowBackup="true"
@@ -100,6 +103,13 @@
         <!-- ECARX/SEC multi-display capability declarations used by the known-good KX11
              dashboard. They let the instrument task remain an independent DIM page. -->
         <meta-data android:name="eos_resizeableActivity" android:value="true" />
+        <activity android:name=".SettingsAppearanceActivity" android:exported="false" />
+        <activity android:name=".HudLcaPatchActivity" android:exported="false" />
+        <activity android:name=".FullBackupActivity" android:configChanges="orientation|screenSize|keyboardHidden" android:exported="false"
+            android:process=":backup" android:excludeFromRecents="true" />
+        <provider android:name=".backup.NavigatorBackupProvider"
+            android:authorities="${applicationId}.backup.navigator" android:process=":backup"
+            android:exported="true" />
         <activity android:name=".media.ButtonPromptActivity"
             android:exported="false"
             android:theme="@style/Theme.StatusWidget.TransparentProxy" />

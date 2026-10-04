@@ -57,7 +57,7 @@ import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.databinding.ActivityMainBinding;
 import dezz.status.widget.systemui.SystemStatusBarContentPolicy;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final String TAG = "MainActivity";
 
     public static final int FOREGROUND_PERMISSION_REQUEST_CODE = 1001;

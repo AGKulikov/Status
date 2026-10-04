@@ -30,7 +30,7 @@ import dezz.status.widget.phone.liveactivity.LiveActivityProvisioningStore;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Post-install APNs key import. The .p8 bytes are encrypted and never copied into preferences. */
-public final class LiveActivityApnsSettingsActivity extends AppCompatActivity {
+public final class LiveActivityApnsSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final int REQUEST_P8 = 0xA963;
     private static final int MAX_IMPORT_BYTES = 16 * 1024;
 

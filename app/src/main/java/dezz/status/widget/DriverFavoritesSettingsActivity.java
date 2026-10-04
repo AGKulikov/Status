@@ -40,7 +40,7 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Editor for the independent mixed-content Favorites drawer on the driver rail. */
-public class DriverFavoritesSettingsActivity extends AppCompatActivity {
+public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     protected boolean passengerPanel() { return false; }
     private Preferences.Str selectedPanel() {
         return passengerPanel() ? preferences.passengerFavoritesSelectedPanelId : preferences.driverFavoritesSelectedPanelId;

@@ -51,7 +51,7 @@ import dezz.status.widget.settings.OptionalColorButton;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Live editor for the native 1920x720 driver instrument panel. */
-public final class InstrumentPanelSettingsActivity extends AppCompatActivity {
+public final class InstrumentPanelSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     @NonNull private final Handler main = new Handler(Looper.getMainLooper());
     private InstrumentPanelStore store;
     private InstrumentPanelConfig config;

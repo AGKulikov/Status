@@ -7,10 +7,10 @@ import android.content.pm.PackageManager;
 import androidx.annotation.NonNull;
 
 /** Package/UID/signature boundary for the explicit Navigator-to-Natro Binder endpoint. */
-final class NavigationBridgeCallerVerifier {
+public final class NavigationBridgeCallerVerifier {
     private NavigationBridgeCallerVerifier() {}
 
-    static boolean isTrustedNavigator(@NonNull Context context, int sendingUid) {
+    public static boolean isTrustedNavigator(@NonNull Context context, int sendingUid) {
         if (sendingUid <= 0) return false;
         PackageManager packages = context.getPackageManager();
         String[] names;

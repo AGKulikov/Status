@@ -47,7 +47,7 @@ import dezz.status.widget.scenario.RuleSet;
 import dezz.status.widget.scenario.ScenarioPresets;
 
 /** Catalog-first settings and binding wizard for the direct Home Assistant connector. */
-public final class HomeAssistantSettingsActivity extends AppCompatActivity {
+public final class HomeAssistantSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final int MAX_RENDERED_ENTITIES = 200;
 
     private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());

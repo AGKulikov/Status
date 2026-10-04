@@ -75,7 +75,7 @@ import dezz.status.widget.performance.PerformanceExecutors;
 import dezz.status.widget.performance.PerformancePickerTask;
 
 /** Visual, code-free editor for arbitrary HOME icons. */
-public final class LauncherShortcutSettingsActivity extends LauncherProfileActivity {
+public final class LauncherShortcutSettingsActivity extends SettingsLauncherProfileActivity {
     public static final String EXTRA_ADD_NEW = "dezz.status.widget.extra.ADD_HOME_SHORTCUT";
     public static final String EXTRA_SYSTEM_SHADE =
             "dezz.status.widget.extra.EDIT_SYSTEM_SHADE_SHORTCUTS";

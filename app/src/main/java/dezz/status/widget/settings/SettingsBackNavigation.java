@@ -90,6 +90,14 @@ public final class SettingsBackNavigation {
                 dp(activity, BACK_BUTTON_HEIGHT_DP), Gravity.TOP | Gravity.START);
         buttonParams.leftMargin = dp(activity, 14);
         activity.addContentView(back, buttonParams);
+        View oldSections=activity.getWindow().getDecorView().findViewWithTag("natro.settings.sections");
+        if(oldSections!=null&&oldSections.getParent() instanceof ViewGroup)((ViewGroup)oldSections.getParent()).removeView(oldSections);
+        MaterialButton sections=new MaterialButton(activity);sections.setTag("natro.settings.sections");sections.setText("Разделы");sections.setAllCaps(false);sections.setTextSize(18);
+        FrameLayout.LayoutParams sectionsParams=new FrameLayout.LayoutParams(dp(activity,170),dp(activity,50),Gravity.TOP|Gravity.END);
+        sectionsParams.rightMargin=dp(activity,14);sectionsParams.topMargin=dp(activity,8);
+        activity.addContentView(sections,sectionsParams);
+        sections.setOnClickListener(v->SettingsSections.show(activity,content));
+
 
         trackSafeTop(activity, content, baseTop, dp(activity, 66), extra -> {
             ViewGroup.LayoutParams raw = back.getLayoutParams();
@@ -97,6 +105,7 @@ public final class SettingsBackNavigation {
                 FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) raw;
                 params.topMargin = dp(activity, 8) + extra;
                 back.setLayoutParams(params);
+                sectionsParams.topMargin=dp(activity,8)+extra;sections.setLayoutParams(sectionsParams);
             }
         });
     }

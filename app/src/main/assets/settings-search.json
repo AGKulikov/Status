@@ -1,0 +1,3334 @@
+[
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "Connecting… / Выполнение…"
+  },
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "Введите команду без \"adb\""
+  },
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "Включить"
+  },
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "Выполнить"
+  },
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "Отключить"
+  },
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "Открыть"
+  },
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "Показать"
+  },
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "Режим не подтверждён."
+  },
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "Скрыть"
+  },
+  {
+    "activity": "dezz.status.widget.AdbSettingsActivity",
+    "text": "← Назад"
+  },
+  {
+    "activity": "dezz.status.widget.AllAppsSettingsActivity",
+    "text": "В меню"
+  },
+  {
+    "activity": "dezz.status.widget.AllAppsSettingsActivity",
+    "text": "Масштаб иконок"
+  },
+  {
+    "activity": "dezz.status.widget.AllAppsSettingsActivity",
+    "text": "Отображается"
+  },
+  {
+    "activity": "dezz.status.widget.AllAppsSettingsActivity",
+    "text": "Расстояние между иконками"
+  },
+  {
+    "activity": "dezz.status.widget.AllAppsSettingsActivity",
+    "text": "Скрыто"
+  },
+  {
+    "activity": "dezz.status.widget.AllAppsSettingsActivity",
+    "text": "Столбцы"
+  },
+  {
+    "activity": "dezz.status.widget.AutomationSettingsActivity",
+    "text": "Topic состояния можно указать целиком. Цвета и оформление задаются"
+  },
+  {
+    "activity": "dezz.status.widget.AutomationSettingsActivity",
+    "text": "Добавьте устройство из нужной системы. После выбора сразу откроется"
+  },
+  {
+    "activity": "dezz.status.widget.AutomationSettingsActivity",
+    "text": "Оформление"
+  },
+  {
+    "activity": "dezz.status.widget.AutomationSettingsActivity",
+    "text": "Пока нет добавленных элементов. Выберите HA, MQTT или Sprut.hub."
+  },
+  {
+    "activity": "dezz.status.widget.AutomationSettingsActivity",
+    "text": "Показывать"
+  },
+  {
+    "activity": "dezz.status.widget.AutomationSettingsActivity",
+    "text": "Условия автоматизации"
+  },
+  {
+    "activity": "dezz.status.widget.AutomationSettingsActivity",
+    "text": "Шрифт"
+  },
+  {
+    "activity": "dezz.status.widget.AutomationSettingsActivity",
+    "text": "Элементы основной строки"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Активный цвет"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Блок внутри HOME"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "В редакторе HOME блок перемещается целиком. Маркер в правом нижнем углу меняет его ширину и высоту в пикселях."
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Вернуть кнопку в исходное положение"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Вернуть оформление по умолчанию"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Включить постоянную климатическую панель"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Высота"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Высота раскрытой панели"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Другие приложения получают уменьшенную рабочую область и не рисуют содержимое под климатической панелью."
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Если прошивка не поддерживает системное резервирование, сервис безопасно вернёт полную область экрана."
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "ЖИВОЙ ПРЕДПРОСМОТР"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Заблокировать перемещение кнопки"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Иконка/текст"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Кнопка остаётся поверх приложений. Нажмите её, чтобы открыть климатическую панель заданного размера."
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Неактивные иконки"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Непрозрачность фона"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Общий масштаб блока"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Обычно основной дисплей — 0. На некоторых магнитолах центральный экран может иметь другой ID."
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Оверлей с маленькой кнопкой"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Отключить постоянную панель и вернуть полный экран"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Оформление"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Панель с резервированием места"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Показывать блок на HOME"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Показывать заголовок"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Положение кнопки: X ="
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Постоянная панель в приложениях"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "При включённом цвете уровня подогревы и вентиляция меняют оттенок вместе с реальным уровнем."
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Прозрачность неактивных плиток"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Размер занятой полосы"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Размер и положение на HOME…"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Размер маленькой кнопки"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Расстояние между плитками"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Скругление"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Скругление плиток"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Состояние:"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Текст"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Уровни по нажатию"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Цвет уровня от автомобиля"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Что показывать"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Ширина"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Ширина раскрытой панели"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Экран (Display ID)"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "Яркость активной плитки"
+  },
+  {
+    "activity": "dezz.status.widget.ClimatePanelSettingsActivity",
+    "text": "✓ Изменения сохраняются автоматически"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Вернуть расположение и оформление по умолчанию"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Видимых строк"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Включить панель"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Внутренний отступ"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Высота"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Высота строки"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Действий пока нет"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Действия"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Дисплей"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Добавить действие"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Заголовок:"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Замыкать список"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Запускать автоматически"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Меню на экране водителя"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Не конфликтовать с mNavi"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Оформление списка как в mNavi"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Поведение штатного экрана"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Показывать заголовок"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Показывать иконки"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Показывать подписи"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Положение и размеры"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Поменять направление прокрутки"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Предпросмотр"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Прозрачность фона"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Размер заголовка"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Размер иконок"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Размер текста"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Разрешить прямые звонки"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Расстояние между строками"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Скругление"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Скрывать после выполнения"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Скрывать при звонке и штатном медиаменю"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Состав и оформление"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Состояние:"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Толщина рамки"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Только вкладка «Навигация»"
+  },
+  {
+    "activity": "dezz.status.widget.DimMenuPanelSettingsActivity",
+    "text": "Ширина"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Видимая сетка"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Закрывать панель после нажатия"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Избранное пассажира ·"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Можно создать любое количество независимых компактных панелей."
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Например: Климат и поездка"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Показывать границы ячеек"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Показывать значок слева"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Показывать подпись"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Размер иконки:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Размер текста информационного элемента"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Таймер запускается при открытии этой панели и начинается заново"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Фон этой панели всегда совпадает с фоном панели водителя."
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Цвет границы ячеек"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Элементов пока нет."
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "Ячейки · без ограничения количества"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "элементов · без лимита"
+  },
+  {
+    "activity": "dezz.status.widget.DriverFavoritesSettingsActivity",
+    "text": "＋ Добавить элемент"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Без группы · отдельная строка"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Верхний отступ"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Включить панель пассажира"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Внешние отступы ряда"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Внутренние отступы ряда"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Выравнивание элементов:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Высота кнопки: авто"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Добавить в «"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Жирный текст"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Иконка, цвет, обводка и бейдж как в статусной строке"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Информационная иконка"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Кнопки"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Курсив"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Например: Связь или Статусы"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Настроить «Избранное» пассажира"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Нижний отступ"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Обновить панель поверх приложений"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Отступ между основной и расширенной информацией"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Отступы содержимого"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Панель пассажира"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "По вертикали:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "По горизонтали:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Показывать значение"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Показывать значок слева"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Показывать название оператора"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Показывать подпись на узкой панели"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Показывать ряд только при подключении ANCS"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Показывать справа"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Показывать тип сети (LTE/3G/5G)"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Показывать шкалу сигнала"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Положение ряда:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Положение содержимого:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Приложения пассажира"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Прозрачность иконки"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Прозрачность обводки"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Размер значения"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Размер иконки"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Размер иконки:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Размер подписи"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Расположение:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Расстояние между кнопками"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Скругление панели"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Скругление фона ряда"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Состав блока оператора и сигнала"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Толщина границы панели"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Толщина обводки"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Цвет границы панели"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Цвет панели"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Ширина панели"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Ширина элементов:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Шрифт:"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "Элементы одного ряда располагаются слева направо."
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "кнопок из"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "＋ Действие"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "＋ Приложение"
+  },
+  {
+    "activity": "dezz.status.widget.DriverPanelSettingsActivity",
+    "text": "＋ Создать новый горизонтальный ряд"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteAppsSettingsActivity",
+    "text": "+  Добавить приложение"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteAppsSettingsActivity",
+    "text": "Поиск приложения"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteAppsSettingsActivity",
+    "text": "Показывать название приложения"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteAppsSettingsActivity",
+    "text": "Размер иконки"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteAppsSettingsActivity",
+    "text": "Размер подписи"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteAppsSettingsActivity",
+    "text": "✓ Сохранено автоматически"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Без названия"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Видимость и данные активного маршрута настраиваются один раз в разделе"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Домой"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "ЖИВОЙ ПРЕДПРОСМОТР"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Иконка"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Координаты имеют приоритет над адресом. Формат: 55.7558,37.6176. Можно указать несколько точек через пробел."
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "МАРШРУТ И ИЗБРАННОЕ"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "НАСТРОЙКА КНОПКИ"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Новый маршрут"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Открывать в"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Открывать в плавающем окне"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Проверьте формат и диапазон координат"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Работа"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Размер и положение объединённой плитки на HOME…"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Размер иконки"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Размер подписи"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Слева добавьте первый маршрут. Для максимальной точности используйте координаты."
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Столбцов в блоке"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Укажите адрес или координаты"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Цвет иконки"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Цвет плитки"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "Цвет текста"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "✓ Адрес будет передан Яндекс Навигатору"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "✓ Координаты распознаны:"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "✓ Сохранено автоматически"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "＋ Домой"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "＋ Другой"
+  },
+  {
+    "activity": "dezz.status.widget.FavoriteRoutesSettingsActivity",
+    "text": "＋ Работа"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Home Assistant — прямое подключение"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Атрибут:"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Для каждого элемента выберите точный источник: основное состояние"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Каталог пока пуст. Сохраните подключение, дождитесь"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Ничего не найдено"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Обновить сущности"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Показаны первые"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Приложение подключается напрямую к Home Assistant WebSocket API,"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Состояние"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Состояние:"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Сохранить и подключиться"
+  },
+  {
+    "activity": "dezz.status.widget.HomeAssistantSettingsActivity",
+    "text": "Сущности и значения"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "+ Подложка"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "+ Элемент"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "2D сверху"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "3D город"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "3D трасса"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Автомобиль по вертикали"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Автомобиль по горизонтали"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Быстрые варианты камеры"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Включить все пять разделов"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Включён"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Внутренние отступы"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Внутри сверху"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Внутри слева"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Внутри снизу"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Внутри справа"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Выбрать файл шрифта"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Выключено: порядок как в Навигаторе 30.3.0 — маршрут ниже"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Выравнивание"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Выравнивание элементов по вертикали"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Высота"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Высота окна"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Группа прозрачна. Для цвета, рамки и скругления добавьте отдельную"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Длина перехода цветов пробок"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Для каждой отметки: скрыть, показывать всегда или только вдоль"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Дополнительные маршруты и выносной знак"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Дополнительные настройки элемента"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Дорожные события — выбрать типы и режимы"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Задержка скрытия навигации"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Знак передаётся из Яндекс Навигатора как есть."
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Как карта следует за автомобилем"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Камера HUD"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Карта плавно становится прозрачной у границ. Центр и отдельные"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Кнопка режима находится слева под штатными кнопками дорожного"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Кнопки окна"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Колонки сетки"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Компоновка карточки"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Копия"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Левый верхний угол остаётся на месте. Автоширина растёт"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Маршрут, пробки и стрелка основной карты остаются штатными. Их"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Между элементами"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Навигатор 30.3"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Названия, шрифт, контур и изгиб текста рисует сам слой карты"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Наклон карты: 0° — сверху, 60° — перспектива"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Настроить"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Насыщенность шрифта"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Непрозрачность заливки"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Непрозрачность карты"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Непрозрачность окна"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Непрозрачность рамки"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Общая насыщенность шрифта"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Общая яркость"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Общие для виджетов «Остаток топлива» и «Долить» на этом HUD."
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Основной экран использует штатные маршрут, стрелку и ведение камеры"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Остальные объекты карты"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Отдельная сводка маршрута: расстояние, время прибытия,"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Отметьте элементы. Стрелками меняется порядок; кнопка ⚙ открывает"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Отступы"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Отступы исходного знака"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Отступы текстового блока"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Оформление день / ночь"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Оформление знака полос"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Оформление карты HUD — всегда ночь"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Параметры"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Плавающее окно Навигатора"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Плавность основной карты"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Подложка всегда рисуется ниже всех HUD-виджетов."
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Позиция сверху"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Позиция слева"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Показывать навигацию до расстояния"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Положение в сетке HUD"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Положение в сетке HUD. Карту также можно перетащить и растянуть"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Положение и размер"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Положение и размер фрейма"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Положение содержимого по горизонтали"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Пороги топлива"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Порядок слоёв"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Радиус тени"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Разделы штатного HUD"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Размер зоны размытия"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Размер каждого слоя"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Размер курсора"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Размер подписей и объектов карты"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Размер текста"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Распределение"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Режим «Только на маршруте» проверяет штатный признак MapKit"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Режим по умолчанию активен. Используется: 64 л"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Ручной объём. Используется:"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Сбросить HUD к исходной раскладке"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Сверху"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Скругление"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Скругление знака"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Скругление карты"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Скругление окна"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Слева"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Снаружи сверху"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Снаружи слева"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Снаружи снизу"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Снаружи справа"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Состав и цвет карты HUD"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Сохранить"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Степень размытия края"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Строки сетки"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Технические JSON-стили скрыты из обычных настроек. Цвета и состав"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Толщина контура маршрута"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Толщина обводки"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Толщина рамки"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Точка фокуса по вертикали"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Точка фокуса по горизонтали"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "У виджета нет собственной подложки. Размер фрейма меняет место"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Умный дом / внешний источник"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Фон панели всегда полностью прозрачный. Непрозрачными могут быть"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Фон снаружи карты всегда прозрачный — элементы главного экрана и"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Цвета выигрыша и проигрыша времени/расстояния берутся с живой"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Цвета загруженности дорог"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Цвета линии маршрута"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Ширина"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Ширина меняет только дальнее широкое основание треугольника;"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Ширина окна"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Ширина стрелки всегда равна толщине линии маршрута. Длина меняет"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Шрифты и строки"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Штатные режимы и разделы HUD"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Элемент не выбран"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "Элементы слева направо"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "↑ слой"
+  },
+  {
+    "activity": "dezz.status.widget.HudPanelSettingsActivity",
+    "text": "↓ слой"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "+  Добавить статус из каталога"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Масштаб:"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Отступ внутри, px"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Показывать блок на HOME"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Показывать иконку"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Показывать подпись"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Показывать статус"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Прозрачность фона"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Промежуток, px"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Сбросить блок"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Скругление, px"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Сохранить"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Столбцы"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Строки"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Цвет значения"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Цвет иконки"
+  },
+  {
+    "activity": "dezz.status.widget.InformationPanelSettingsActivity",
+    "text": "Цвет подписи"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "+ Элемент"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "2D сверху"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "3D город"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "3D трасса"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "5 вариантов"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Автомобиль по вертикали"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Автомобиль по горизонтали"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Быстрые варианты камеры"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Визуальный стиль"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Внутренние отступы"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Выключено: порядок как в Навигаторе 30.3.0 — маршрут ниже"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Данные ближайшего манёвра"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Длина перехода цветов пробок"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Для каждого события: не показывать, показывать всегда или только"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Дополнительные маршруты и выносной знак"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Дорожные события — типы и режимы"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Запустить"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Исходный знак Навигатора"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Как в MConfig: выключает штатную настройку TSR; при отключении возвращает её."
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Как карта следует за автомобилем"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Камера"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Карта"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Карта плавно становится прозрачной у границ. Центр и отдельные"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Карта приборной панели полностью независима от основного экрана"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Карточка и внутренние отступы"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Компоновка исходного знака"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Копия"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Коснитесь элемента: перетаскивание меняет положение, синий угол —"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Левый верхний угол остаётся на месте. Автоширина"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Модули"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Модуль показывается только пока Яндекс Навигатор передаёт"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Названия, шрифт, контур и изгиб текста рисует сам слой карты"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Настроить"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Непрозрачность:"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Остальные объекты карты"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Отдельная сводка как в Навигаторе — без боковых"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Отклик стрелки:"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Отступы знака"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Отступы исходного знака"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Отступы текста"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Оформление знака полос"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Оформление карты приборки — всегда ночь"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Плашка"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Порядок слоёв"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Применение…"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Прогресс маршрута"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Размер зоны размытия"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Размер каждого слоя"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Размер курсора"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Сверху всегда чистый чёрный. Ниже начинается плавный переход"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Скругление знака"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Скрывает наложения штатного меню в режиме навигации. При выходе возвращает их."
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Состав аналогового прибора"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Состав карты"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Сохранить"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Степень размытия края"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Строка"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Табличка манёвра"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Текст"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Толщина контура маршрута"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Толщина обводки"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Цвета выигрыша и проигрыша времени/расстояния берутся с живой"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Цвета загруженности дорог"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Чисто чёрная зона:"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Ширина меняет только дальнее широкое основание треугольника;"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Ширина стрелки всегда равна толщине линии маршрута. Длина меняет"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Шрифты данных"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Штатные элементы"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "Элемент не выбран"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "↑ слой"
+  },
+  {
+    "activity": "dezz.status.widget.InstrumentPanelSettingsActivity",
+    "text": "↓ слой"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "0 — выключить / false"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "1 — включить / true"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Актуальный каталог:"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "В Sprut.hub уйдёт типизированное значение, а не текст подписи."
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Вкл."
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Выбрать устройство и сервис"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Действие"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Значение"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Изменить"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Каждое правило сопоставляет Android Intent action с одной командой."
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Кнопки руля → Sprut.hub"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Конфигурация не открыта:"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Копировать полное action"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Например: 22.5"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Обновить список"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Показан последний сохранённый каталог:"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Правил пока нет."
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Правила"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "При сохранении приложение добавит обязательный случайный"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Резервный запуск после выгрузки процесса: action"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Сохранённая цель не найдена в каталоге:"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Цели Sprut.hub не загружены."
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Цель Sprut.hub"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Цель не выбрана"
+  },
+  {
+    "activity": "dezz.status.widget.IntentScenarioSettingsActivity",
+    "text": "Цель:"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Автоматически продолжать музыку после загрузки"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Всегда управлять выбранным плеером"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Выбрать домашний экран по умолчанию"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Выбрать музыкальный плеер"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Домой пассажир"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Доступ к уведомлениям нужен медиасессиям и данным маршрута из Яндекс"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Задержка команды PLAY"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Интервал иконок «Все приложения»"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Лаунчер пассажира"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Масштаб иконок «Все приложения»"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Медиа-команды всегда направляются конкретному Android-плееру, а не общему"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Один свободный холст и один общий пул кнопок, приложений, информации,"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Отдельный домашний экран пассажира. Компоновка и оформление сохраняются независимо."
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Открывать Навигатор при возврате домой"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Открыть доступ к уведомлениям"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Показывается"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Показывать сетку в режиме компоновки"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Полноэкранный режим"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Режим компоновки"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Сбросить только компоновку"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Столбцы «Все приложения»"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Текущая цель:"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Цвет фона"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "Шаг привязки"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherSettingsActivity",
+    "text": "＋ Добавить элемент"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "+  Добавить"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "+  Добавить иконку"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "+  Добавить кнопку"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "· нет места"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "В шторке"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Все настройки этого блока собраны здесь. Справа показана та же ячеистая"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Выбрать собственный набор уровней…"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Иконка включена"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Иконок пока нет. Нажмите «+», чтобы добавить первую."
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Интервал"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Кнопки и умный дом"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Кнопки системной шторки"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Переключать Вкл / Выкл"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Переключать только выбранные режимы…"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Плитка «+»"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Плитки"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Подписи"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Показывать блок кнопок и умного дома на HOME"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Показывать кнопки и устройства в блоке"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Показывать название"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Показывать плитку «Добавить»"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Показывать текущий режим / уровень"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Предпросмотр сетки"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Размер и положение всего блока на HOME…"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Размер иконки"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Расположение плиток внутри блока на HOME…"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Сетка"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Системное"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Столбцы"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Столбцы и строки задают точность размещения. Интервал меняет только"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Строки"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Установить:"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Цвет уровня задаёт автомобиль"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Цикл уровней 0 → 1 → 2 → 3"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Цикл уровней 3 → 2 → 1 → 0"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Это отдельный набор: изменения не затрагивают кнопки HOME. Доступны"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "Это редактируемая схема реального блока. Нажмите плитку для её"
+  },
+  {
+    "activity": "dezz.status.widget.LauncherShortcutSettingsActivity",
+    "text": "←  Назад"
+  },
+  {
+    "activity": "dezz.status.widget.LiveActivityApnsSettingsActivity",
+    "text": "APNs для Live Activity"
+  },
+  {
+    "activity": "dezz.status.widget.LiveActivityApnsSettingsActivity",
+    "text": "APNs-ключ:"
+  },
+  {
+    "activity": "dezz.status.widget.LiveActivityApnsSettingsActivity",
+    "text": "Выбрать и зашифровать .p8"
+  },
+  {
+    "activity": "dezz.status.widget.LiveActivityApnsSettingsActivity",
+    "text": "Удалить APNs-ключ с магнитолы"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Выбрать действие меню водителя…"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Выбрать приложение…"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Действия Natro — все функции меню экрана водителя"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Действия Natro…"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Загрузка настроек…"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Запоминать и восстанавливать режим движения"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Камера 360 через broadcast"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Кнопки"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Номер телефона"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Отключить действие по умолчанию"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Параметры действий…"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Перенесите назначения и отключите соответствующую обработку в MConfig."
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Подключение к выбранной сети Wi-Fi"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Полноэкранный режим"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Пользовательские действия"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Применение…"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "Регулировка громкости"
+  },
+  {
+    "activity": "dezz.status.widget.MediaButtonsSettingsActivity",
+    "text": "← Назад"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "· занято"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "· предел"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Автоматически продолжать музыку после загрузки"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Акцент активной кнопки"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Вернуть медиаблок по умолчанию"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Внутренний отступ"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Все кнопки — включая ручной PLAY — отправляются только пакету"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Всегда управлять выбранным плеером"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Выбрать плеер ·"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Высота"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Геометрия и цвета"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "ЖИВОЙ РЕДАКТОР · ТАЩИТЕ ЭЛЕМЕНТЫ"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Задержка команды"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Исполнитель, альбом, время и приложение"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Кнопки"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Медиаблок"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Название"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Отступ времени от полосы"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Перетаскивайте элементы в предпросмотре справа; потяните за любой"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Позиция: столбец"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Показывать кружок громкости"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Показывать медиаблок на HOME"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "После загрузки магнитолы"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Последний плеер:"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Прокручивать длинный текст"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Размер и положение блока на HOME…"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Размер кружка"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Расположение и размер элементов можно менять и здесь, в живом"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Расположение элементов внутри блока на HOME…"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Расстояние между элементами"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Сетка"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Скругление обложки"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Содержимое"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Столбцы"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Строки"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Толщина полосы"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "У медиавиджетов нет автоматических подложек и рамок. При"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Число столбцов и строк задаёт точность свободных фреймов."
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Ширина"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "Элементы"
+  },
+  {
+    "activity": "dezz.status.widget.MediaPanelSettingsActivity",
+    "text": "✓ Изменения сохраняются автоматически"
+  },
+  {
+    "activity": "dezz.status.widget.MqttSettingsActivity",
+    "text": "Дополнительные параметры"
+  },
+  {
+    "activity": "dezz.status.widget.MqttSettingsActivity",
+    "text": "Подключение MQTT"
+  },
+  {
+    "activity": "dezz.status.widget.MqttSettingsActivity",
+    "text": "После сохранения виджет переподключится сам. Старое состояние"
+  },
+  {
+    "activity": "dezz.status.widget.MqttSettingsActivity",
+    "text": "Состояние:"
+  },
+  {
+    "activity": "dezz.status.widget.MqttSettingsActivity",
+    "text": "Сохранить и подключиться"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Вернуть сетку по умолчанию"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Высота"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Графика стрелки манёвра и графика полос движения — независимые"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "ЖИВОЙ РЕДАКТОР СЕТКИ"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Масштаб"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Настроить кнопки избранных маршрутов…"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Показывать «Маршрут и избранное» на HOME"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Положение считается от левого верхнего угла. Ширина и высота занимают"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Размер и положение всего блока на HOME…"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Редактировать прямо на HOME"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Редактируйте сетку прямо в предпросмотре справа или на реальном HOME."
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Столбец"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Столбцы сетки"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Строка"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Строки сетки"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Тащите элементы. Потяните выбранный элемент за любой"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Точная сетка"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Точные параметры элементов"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Ширина"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "Элементы навигации"
+  },
+  {
+    "activity": "dezz.status.widget.NavigationPanelSettingsActivity",
+    "text": "✓ Изменения сохраняются автоматически"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Внешний вид"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Высота окна"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Запоминать положение и размер"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Зафиксировать окно"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Здесь настраивается именно окно Навигатора на основном экране."
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Значение 0 оставляет прямоугольное окно. Скругление применяется"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Кнопка закрытия"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Кнопка окно / полный экран"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Кнопка режима находится слева под штатными кнопками дорожного"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Непрозрачность окна"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Отступ сверху"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Отступ слева"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Положение и размер"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "При фиксации одновременно блокируются перемещение и изменение"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Радиус тени"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Разрешить оконный режим"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Режим окна"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Ручка перемещения, когда окно не зафиксировано"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Скругление углов"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Сохранить и применить"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Сохранять пропорции при изменении размера"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Толщина рамки"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Уголок размера, когда окно не зафиксировано"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Фон вне скруглённого окна остаётся прозрачным; лаунчер, строка"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Цвет рамки"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Цвет тени"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Ширина окна"
+  },
+  {
+    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
+    "text": "Элементы управления"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Блок пуст"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Вернуть состав и размеры по умолчанию"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Добавить и настроить отдельные плитки…"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Добавить, убрать и переставить приложения…"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "ЖИВОЙ ПРЕДПРОСМОТР"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Здесь собраны блоки с общим редактором состава. Медиа, навигация,"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Иконки и действия"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Настроить кнопки избранных маршрутов…"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Приложения"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Размер"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "СОСТАВ БЛОКОВ"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Столбцов избранного"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Столбцов плиток"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Столбцов приложений"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Убрать"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "Часы"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "✓ Сохраняется автоматически"
+  },
+  {
+    "activity": "dezz.status.widget.PanelElementSettingsActivity",
+    "text": "＋ Добавить элемент"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "ID приложения iPhone, например org.telegram.telegram"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "Для приложения из списка ID уже известен. При ручном добавлении он должен точно совпадать с ID в уведомлении."
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "Добавить приложение"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "Загрузка каталога…"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "Иконки приложений телефона"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "Название приложения"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "Поиск по названию или ID приложения"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "Приложений:"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "Скачать недостающие и обновить список"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneAppIconsActivity",
+    "text": "‹ Назад"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneConnectorSettingsActivity",
+    "text": "Журнал подключения к телефону"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneConnectorSettingsActivity",
+    "text": "Настроить защищённый APNs-ключ"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneConnectorSettingsActivity",
+    "text": "Обновить"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneConnectorSettingsActivity",
+    "text": "Очистить"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneConnectorSettingsActivity",
+    "text": "Показ уведомлений — в разделе «Автоматизации»"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneConnectorSettingsActivity",
+    "text": "Экспорт"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Всплывающий оверлей"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Выбрано полей:"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Длительность показа"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Доступны время, присутствие пассажира, видимость элементов других"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Иконки приложений телефона"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Категории и приложения iPhone"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Настроить первое уведомление · без иконки"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Настроить повторные · с иконкой"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Новейшее уведомление iPhone может независимо появляться в строке"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Показывать"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Приложение, тема и текст проверяются независимо. Одно условие"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Размер и положение окна, компоновка иконки и текста, шрифты,"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Состав текста уведомления"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Состояние блокировки передаёт KX11 ANCS Helper v50."
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Уведомления телефона"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Условия · Приложение"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Условия · Текст"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Условия · Тема"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Условия всего всплывающего окна"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Условия отдельных полей"
+  },
+  {
+    "activity": "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+    "text": "Фильтры определяют, какие уведомления телефон передаёт."
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "+ Штатный"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Возможно, он был удалён в другом окне."
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Всплывающие оверлеи"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Выберите источник, затем настройте каждую плитку визуально."
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Высота оверлея"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Добавить оверлей"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Если «Показывать без сценария» выключено, окно останется скрытым,"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Живой тестовый оверлей уже показан поверх этого экрана."
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Каждый оверлей — отдельное плавающее окно со своей сеткой,"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Копия"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Название"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Например: Подъезд к дому"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Настроить"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Оверлеев пока нет. Нажмите «Добавить оверлей»."
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Оверлей не найден"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Отступ сетки сверху"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Отступ сетки слева"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Отступ сетки снизу"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Отступ сетки справа"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Оформление и правила"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Плитки"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Плиток в этом оверлее пока нет."
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Прозрачность фона"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Промежуток между ячейками"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Размер и сетка"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Сетка:"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Скругление окна"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Сначала переместите окно в нужное место, затем включите блокировку."
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Столбцов в сетке"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Строк в сетке"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Условия показа этого оверлея"
+  },
+  {
+    "activity": "dezz.status.widget.PopupSettingsActivity",
+    "text": "Ширина оверлея"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "1. Источник условия"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "2. При каком условии"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "3. Что сделать"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Вкл."
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Выберите плавающий оверлей целиком"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Выберите цвет и толщину для выполненного условия"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Выбрано:"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Выбрать источник условия"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Выбрать элемент"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Если условие НЕ выполняется"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Если условие выполняется"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Изменить"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Конфигурация не открыта:"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Локальные сценарии"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Найдено:"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Намерения руля: Android Intent → команды"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Ничего не найдено"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Показаны первые"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Соберите правило из трёх шагов: выберите устройство,"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Список"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Сценариев пока нет."
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Толщина 0–64 px"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Устройство ещё не выбрано"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Цвет:"
+  },
+  {
+    "activity": "dezz.status.widget.ScenarioSettingsActivity",
+    "text": "Элемент ещё не выбран"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Sprut.hub — прямое подключение"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Автовыбор живого хаба (очистить сохранённый serial)"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "В выбранном устройстве нет характеристик, подходящих под поиск."
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Выберите не только устройство, но и конкретное значение, которое"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Ничего не найдено"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Обновить устройства"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Показаны"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Показаны первые"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Показаны устройства"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Приложение подключается напрямую к /spruthub, получает"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Сервис"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Состояние:"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Сохранить и подключиться"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Страница"
+  },
+  {
+    "activity": "dezz.status.widget.SprutHubSettingsActivity",
+    "text": "Устройства и характеристики"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Белый фон при превышении"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Вернуть настройки блока по умолчанию"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Включайте показатели, меняйте порядок стрелками и размер ползунком."
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Внутренний отступ"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Выберите только нужные показатели. Изменения сохраняются сразу и"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Данные автомобиля / HUD"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Дополнительно"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Допуск сверх лимита"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Единица измерения"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "ЖИВОЙ ПРЕДПРОСМОТР"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Знаков после запятой"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Значение"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Источник Auto Hold"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Колонки"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Комбинированный индикатор"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Мигать при превышении"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Множитель"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Название"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Название в блоке"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Настроить"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Непрозрачность фона"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Обновить список датчиков"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Обновляем список датчиков…"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Оставьте поле пустым, чтобы использовать название или единицу,"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Остаток приходит из автомобиля. В автоматическом режиме объём бака"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Показатели"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Показывать блок на HOME"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Показывать названия показателей"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Показывать только на передаче P"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Получаем список датчиков автомобиля…"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Получать объём бака из автомобиля (резерв 64 л)"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Предупреждение о скорости"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Принимается совместимый broadcast plus.monjaro.AUTOHOLD."
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Размер"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Размер и положение блока на HOME…"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Расстояние между плитками"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Расчёт дозаправки"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Ручной объём бака, л"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Сетка и оформление"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Скругление"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Скрывать блок до первых данных"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Смещение"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Текущая скорость приходит из ECARX, лимит — из активной"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Только при активном маршруте"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Формула отображения: значение × множитель + смещение."
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Цвет превышения"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Цвет фона"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "Цвета"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "← левый · → правый · ↔ аварийная сигнализация. Тёмная фаза"
+  },
+  {
+    "activity": "dezz.status.widget.VehicleInfoPanelSettingsActivity",
+    "text": "✓ Автосохранение · значения поступают напрямую из автомобиля"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Высота открытой панели"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Закрывать после нажатия кнопки"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Запускать автоматически после загрузки"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Затемнение фона"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Зона жеста сверху"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Использовать шторку Natro"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Компоновка"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Настроить кнопки и действия…"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Открыть живой редактор…"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Прозрачность панели"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Разрешить изменение яркости…"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Системная шторка Natro"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "Штатная шторка ECARX"
+  },
+  {
+    "activity": "dezz.status.widget.shade.SystemShadeSettingsActivity",
+    "text": "←  Назад"
+  }
+]

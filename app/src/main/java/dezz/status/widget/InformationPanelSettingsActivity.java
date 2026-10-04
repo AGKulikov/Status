@@ -46,7 +46,7 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual editor for the read-only HOME “Information” grid. */
-public final class InformationPanelSettingsActivity extends LauncherProfileActivity {
+public final class InformationPanelSettingsActivity extends SettingsLauncherProfileActivity {
     private Preferences preferences;
     private InformationPanelConfigStore store;
     private InformationPanelConfig config;

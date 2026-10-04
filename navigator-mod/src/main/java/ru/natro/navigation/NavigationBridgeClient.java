@@ -187,6 +187,7 @@ final class NavigationBridgeClient {
 
     private NavigationBridgeClient(Context context) {
         this.context = context.getApplicationContext();
+        NavigatorBackupBridge.start(this.context);
         main = new Handler(Looper.getMainLooper());
         callbacks = new Messenger(new Handler(Looper.getMainLooper(), this::onMessage));
         mainMapController = new MainMapController(this.context);

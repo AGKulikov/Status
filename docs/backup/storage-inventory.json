@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "DESIGN_INVENTORY_NOT_RUNTIME_BACKUP",
+  "status": "SOURCE_IMPLEMENTATION_ANDROID_AND_DEVICE_GATES_PENDING",
   "baseline_commit": "d76ddacd1db7a009aa17b9a1572526a1b0eaa1be",
-  "scope": "Repository-owned production Java/Kotlin source; runtime discovery and strict restore adapters not yet implemented",
+  "scope": "Production owners reviewed for 3.0.2; runtime archive/recovery certification remains a separate gate",
   "shared_preferences": [
     {
       "name": "{package}_preferences",
@@ -193,22 +193,47 @@
         "files"
       ]
     },
+    "app/src/main/java/dezz/status/widget/FullBackupActivity.java": {
+      "sha256": "1bbea7a1d464244163e9533cd99b2bbb538d56464a85be4805d1f6927e48eedb",
+      "access_kinds": [
+        "external_resource",
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/HudLcaPatchActivity.java": {
+      "sha256": "8aca1a6883e197bb717b19e6017db0fef82112a21fc287703034d0367deb567e",
+      "access_kinds": [
+        "files"
+      ]
+    },
     "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java": {
-      "sha256": "477c56234257a60d57435dee883b71052acf82fa5299e93aa7e6d56243665a63",
+      "sha256": "bdcf76890220fff425cedd26352283d4dc69337dbc604962b0ad6b05a366cd8a",
       "access_kinds": [
         "external_resource"
       ]
     },
     "app/src/main/java/dezz/status/widget/LiveActivityApnsSettingsActivity.java": {
-      "sha256": "6ec6e1608646d70625fe02a314aa901ea3a64daed8e9c3e6125e938642488a08",
+      "sha256": "5e3c2216968c4cb129974e9843597dec53694ad16f950f0f720ae58dda8ea668",
       "access_kinds": [
         "external_resource"
       ]
     },
     "app/src/main/java/dezz/status/widget/PhoneConnectorSettingsActivity.java": {
-      "sha256": "36d89b910c47ea0ff72cdca870bbfd27cb3914e3835b5f5ade1f768855156c8d",
+      "sha256": "bc618b4a4398e5b557a1bf766266ff6d940865ee1bf4ae4f8b91247964440e34",
       "access_kinds": [
         "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/PortableBackupDefaults.java": {
+      "sha256": "8d55373858b5722999eabcf17a26e80023d7b33978b82c1301a96fb8b379da87",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/PortableBackupSecrets.java": {
+      "sha256": "f3f0aa695b1ad30b506b5e336c700fec6a7cf87608f4e909b2f8dd8f3ee26a65",
+      "access_kinds": [
+        "keystore"
       ]
     },
     "app/src/main/java/dezz/status/widget/Preferences.java": {
@@ -219,14 +244,14 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/PresetsActivity.java": {
-      "sha256": "dfae2534cae76bdaa484c503774c385faeb192b34f3ab437439b583b161a4f39",
+      "sha256": "6ef4d22dab08a2c1accd53ec78348e09e47749c32f0ba1cfe1b444ac1efac7bf",
       "access_kinds": [
         "external_resource",
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/RuntimeSnapshotPreferences.java": {
-      "sha256": "f6c4b0139b2c4c701a65b29a8268da9bcf5fbdddae018259e1e5f62c12593607",
+      "sha256": "8f665cf8bf05f1937bd7767c46828a1cc61e0ed87b29779a12e942970445348d",
       "access_kinds": [
         "preferences"
       ]
@@ -238,7 +263,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/SettingsHubActivity.java": {
-      "sha256": "f505cd7dc8934d8e2087008bbd4b5f7472b071b9a42c9aea7f5f9845463ad2b4",
+      "sha256": "739aea87c0e8a9d365946893b8b57f78d91fbeac418aaa499ce97645b3b90975",
       "access_kinds": [
         "external_resource",
         "files"
@@ -251,7 +276,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/StatusWidgetApplication.java": {
-      "sha256": "2167339d624928393081c549b617ba4ab2aa5d039bd941736fa043f27e0a194a",
+      "sha256": "f323a2e4b2296b10e05e5ba672d73893c92f759785b640569ee2f0d9d337290c",
       "access_kinds": [
         "files"
       ]
@@ -272,6 +297,44 @@
       "sha256": "1ead8e03105575b04324ab7175e3c8c3d7536c47eb3d8d2b421028797eea4700",
       "access_kinds": [
         "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/backup/BackupArchive.java": {
+      "sha256": "0ea6976b01ead18d8ec02dba875ca05473dbbfdf0d075f1990609bafd70894d5",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/backup/BackupFiles.java": {
+      "sha256": "677399e87e7e689a7cbb39d3296ed597e8ee8a0f5187b8f53ee5c954dada9f3e",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/backup/BackupMaintenance.java": {
+      "sha256": "180f6672571656ea9c6243498c447e8768c03c0917502abd33ebea47615b0760",
+      "access_kinds": [
+        "files",
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/backup/BackupStorage.java": {
+      "sha256": "937744ee3b2ceba0eb127a3fb56f000eb07c310580d1017567f7d7d3f19639c1",
+      "access_kinds": [
+        "external_resource",
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/backup/BackupTransaction.java": {
+      "sha256": "ff45a3feb49f2920524bf5e7153d3d16ae72c1f3cec55e365ef036d3d398becd",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/backup/NavigatorBackupProvider.java": {
+      "sha256": "a84cac64c2079a5363028dc5305278699a751f49eeb2c97894abae346b2122d3",
+      "access_kinds": [
+        "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/car/AutoHoldStateRepository.java": {
@@ -335,7 +398,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java": {
-      "sha256": "70ed0b7eb2d3a01fe2782b4fda34492d233a92f928f1b8e9d2610b66898d3b82",
+      "sha256": "ea58ff3dbc3ca06ea269463fedf75dd00eb92d066eff57c252c454ab847d2457",
       "access_kinds": [
         "preferences"
       ]
@@ -494,6 +557,12 @@
         "preferences"
       ]
     },
+    "app/src/main/java/dezz/status/widget/settings/SettingsAppearance.java": {
+      "sha256": "935ac1a597042c2c7b497580be51855668e68ca37a92950d4606a4a805c8777e",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
     "app/src/main/java/dezz/status/widget/shell/AdbTransport.java": {
       "sha256": "7bcb7b7e69a7533e455f1ad7977502353cb117d5f45954af73e735e380086766",
       "access_kinds": [
@@ -525,8 +594,15 @@
       ]
     },
     "navigator-mod/src/main/java/ru/natro/navigation/FloatingWindowController.java": {
-      "sha256": "3b501ef970cf8c6c795ae588db1d93f74e3e160b1cb230745dacf87800a17777",
+      "sha256": "510c9ca967e391049ad3fb01a8583a1fa2a379fbfde2e43ff18cd46a8a4c6b2c",
       "access_kinds": [
+        "preferences"
+      ]
+    },
+    "navigator-mod/src/main/java/ru/natro/navigation/NavigatorBackupBridge.java": {
+      "sha256": "80c77719edc3fc417722cd1ce58bfb663996bfe6234299614ee8ffd4022216b4",
+      "access_kinds": [
+        "files",
         "preferences"
       ]
     }

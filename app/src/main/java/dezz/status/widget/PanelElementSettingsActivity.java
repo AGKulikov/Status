@@ -35,7 +35,7 @@ import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
 
 /** Visual, code-free editor for the functional elements placed inside HOME panels. */
-public final class PanelElementSettingsActivity extends AppCompatActivity {
+public final class PanelElementSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     public static final String EXTRA_PANEL_ID =
             "dezz.status.widget.extra.PANEL_ELEMENT_SETTINGS_ID";
     private Preferences preferences;

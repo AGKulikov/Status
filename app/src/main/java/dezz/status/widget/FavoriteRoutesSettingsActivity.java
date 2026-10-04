@@ -46,7 +46,7 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual autosaving editor for the idle state of the combined navigation HOME panel. */
-public final class FavoriteRoutesSettingsActivity extends LauncherProfileActivity {
+public final class FavoriteRoutesSettingsActivity extends SettingsLauncherProfileActivity {
     private interface IntChange { void set(int value); }
 
     private Preferences preferences;

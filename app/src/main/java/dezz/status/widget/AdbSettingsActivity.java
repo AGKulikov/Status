@@ -17,7 +17,7 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import java.util.*;
 
 /** Two-pane ADB console matching the v46.1 groups, with retained jobs and explicit cancellation. */
-public final class AdbSettingsActivity extends AppCompatActivity {
+public final class AdbSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private AdbConsoleModel model;
     private TextView status, properties;
     private Spinner commands, services, persistent;

@@ -87,7 +87,7 @@ import dezz.status.widget.sprut.SprutProtocolAdapter;
  * shown as read-only cards, so opening this screen cannot discard a newer or more advanced valid
  * scenario written by another version of the application.</p>
  */
-public final class ScenarioSettingsActivity extends AppCompatActivity {
+public final class ScenarioSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     public static final String EXTRA_TARGET_SCOPE = "scenario_target_scope";
     public static final String EXTRA_TARGET_ID = "scenario_target_id";
     private static final String DEFAULT_CONNECTOR_ID = "default";

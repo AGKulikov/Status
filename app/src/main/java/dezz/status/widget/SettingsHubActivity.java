@@ -92,7 +92,7 @@ import dezz.status.widget.systemui.SystemStatusBarContentPolicy;
  * Existing detail editors remain responsible for their preference values, so installing this
  * update does not migrate or reset a single user setting.</p>
  */
-public final class SettingsHubActivity extends AppCompatActivity {
+public final class SettingsHubActivity extends dezz.status.widget.settings.SettingsActivity {
     public static final String EXTRA_GROUP = "dezz.status.widget.extra.SETTINGS_GROUP";
     public static final String EXTRA_SHOW_BACK = "dezz.status.widget.extra.SETTINGS_SHOW_BACK";
     private static final String TAG = "SettingsHub";
@@ -121,6 +121,8 @@ public final class SettingsHubActivity extends AppCompatActivity {
     private LinearLayout root;
     private LinearLayout content;
     private EditText search;
+    private ScrollView contentScroll;
+    private final Map<Group,Integer> scrollPositions=new EnumMap<>(Group.class);
     private MaterialButton hubBackButton;
     @Nullable private AlertDialog permissionsDialog;
     private Group selectedGroup = Group.STATUS;
@@ -148,7 +150,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
-        selectedGroup = Group.fromId(getIntent().getStringExtra(EXTRA_GROUP));
+        selectedGroup = Group.fromId(savedInstanceState==null?getIntent().getStringExtra(EXTRA_GROUP):savedInstanceState.getString("settings.group"));
         showBack = getIntent().getBooleanExtra(EXTRA_SHOW_BACK, false);
         splitPane = SettingsResponsiveLayoutPolicy.useSplitPane(
                 getResources().getConfiguration().screenWidthDp);
@@ -172,6 +174,11 @@ public final class SettingsHubActivity extends AppCompatActivity {
         applySafeInsets();
         renderNavigationSelection();
         renderContent();
+        if(savedInstanceState!=null) {
+            search.setText(savedInstanceState.getString("settings.search", ""));
+            for(Group group:Group.values())scrollPositions.put(group,savedInstanceState.getInt("settings.scroll."+group.id,0));
+            contentScroll.post(()->contentScroll.scrollTo(0,scrollPositions.getOrDefault(selectedGroup,0)));
+        }
         updateBackVisibility();
         AppRuntimeBootstrap.run(this, preferences);
     }
@@ -187,7 +194,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
         } else {
             hasResumed = true;
         }
-        if (content != null) renderContent();
+        if (content != null) {int y=contentScroll.getScrollY();renderContent();contentScroll.post(()->contentScroll.scrollTo(0,y));}
         if (root != null) {
             root.removeCallbacks(safeInsetRefresh);
             root.post(safeInsetRefresh);
@@ -199,6 +206,14 @@ public final class SettingsHubActivity extends AppCompatActivity {
     protected void onPause() {
         if (root != null) root.removeCallbacks(safeInsetRefresh);
         super.onPause();
+    }
+
+    @Override protected void onSaveInstanceState(@NonNull Bundle state) {
+        state.putString("settings.group",selectedGroup.id);
+        state.putString("settings.search",search==null?"":search.getText().toString());
+        if(contentScroll!=null)scrollPositions.put(selectedGroup,contentScroll.getScrollY());
+        for(Map.Entry<Group,Integer> entry:scrollPositions.entrySet())state.putInt("settings.scroll."+entry.getKey().id,entry.getValue());
+        super.onSaveInstanceState(state);
     }
 
     @Override
@@ -214,9 +229,9 @@ public final class SettingsHubActivity extends AppCompatActivity {
     protected void onNewIntent(@NonNull Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        selectedGroup = Group.fromId(intent.getStringExtra(EXTRA_GROUP));
+        if(intent.hasExtra(EXTRA_GROUP))selectedGroup = Group.fromId(intent.getStringExtra(EXTRA_GROUP));
         showBack = intent.getBooleanExtra(EXTRA_SHOW_BACK, false);
-        if (search != null && search.length() > 0) search.setText("");
+        if (intent.hasExtra(EXTRA_GROUP) && search != null && search.length() > 0) search.setText("");
         renderNavigationSelection();
         renderContent();
         updateBackVisibility();
@@ -313,6 +328,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
     @NonNull
     private View buildContentPane() {
         ScrollView scroll = new ScrollView(this);
+        contentScroll=scroll;
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);
         content = column();
@@ -380,11 +396,13 @@ public final class SettingsHubActivity extends AppCompatActivity {
     }
 
     private void selectGroup(@NonNull Group group) {
+        scrollPositions.put(selectedGroup,contentScroll.getScrollY());
         selectedGroup = group;
         if (search != null && search.length() > 0) search.setText("");
         hideKeyboard();
         renderNavigationSelection();
         renderContent();
+        contentScroll.post(()->contentScroll.scrollTo(0,scrollPositions.getOrDefault(group,0)));
     }
 
     private void renderNavigationSelection() {
@@ -429,6 +447,16 @@ public final class SettingsHubActivity extends AppCompatActivity {
                 content.addView(emptyCard(), topMargin(18));
             } else {
                 content.addView(destinationCard(matches, true), topMargin(18));
+            }
+            List<dezz.status.widget.settings.SettingsNestedSearch.Match> fields=dezz.status.widget.settings.SettingsNestedSearch.search(this,query);
+            if(!fields.isEmpty()) {
+                content.addView(text("Параметры в редакторах",24,Typeface.BOLD),topMargin(20));
+                for(dezz.status.widget.settings.SettingsNestedSearch.Match field:fields) {
+                    MaterialButton button=new MaterialButton(this);button.setAllCaps(false);button.setText(field.label);button.setTextSize(19);
+                    button.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+                    button.setOnClickListener(v->{try{startActivity(new Intent().setClassName(this,field.activity).putExtra(dezz.status.widget.settings.SettingsAppearance.EXTRA_FOCUS,field.label));}catch(RuntimeException error){Toast.makeText(this,"Не удалось открыть редактор",Toast.LENGTH_SHORT).show();}});
+                    content.addView(button,matchWrap());
+                }
             }
             return;
         }
@@ -878,9 +906,6 @@ public final class SettingsHubActivity extends AppCompatActivity {
     @NonNull
     private static String sectionFooter(@NonNull Group group) {
         switch (group) {
-            case STATUS:
-                return "Внешний вид каждого элемента настраивается визуально. "
-                        + "Старые значения и порядок полностью сохраняются.";
             case HOME:
                 return "Размер и положение блоков меняются на самом HOME, поэтому "
                         + "результат редактора совпадает с реальным экраном.";
@@ -895,8 +920,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
                         + "Секретные команды и ключи остаются только на устройстве.";
             case APP:
             default:
-                return "Экспорт включает интерфейс, HOME, блоки, панели и обычные сценарии. "
-                        + "Пароли, токены и секретные команды не покидают устройство.";
+                return "Полная личная копия и прежний JSON находятся в разделе «Копии и профили».";
         }
     }
 
@@ -971,7 +995,6 @@ public final class SettingsHubActivity extends AppCompatActivity {
     @DrawableRes
     private int groupIcon(@NonNull Group group) {
         switch (group) {
-            case STATUS: return R.drawable.ic_section_widget;
             case HOME: return R.drawable.ic_launcher_home;
             case PANELS: return R.drawable.ic_section_content;
             case SMART_HOME: return R.drawable.ic_smart_plug;
@@ -1019,7 +1042,6 @@ public final class SettingsHubActivity extends AppCompatActivity {
     @ColorInt
     private int groupColor(@NonNull Group group) {
         switch (group) {
-            case STATUS: return color(R.color.settings_accent);
             case HOME: return color(R.color.settings_indigo);
             case PANELS: return color(R.color.settings_warning);
             case SMART_HOME: return color(R.color.settings_success);

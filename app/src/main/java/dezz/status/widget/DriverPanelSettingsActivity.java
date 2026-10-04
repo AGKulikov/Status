@@ -60,7 +60,7 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual editor for the unified current-generation Monjaro driver panel. */
-public class DriverPanelSettingsActivity extends AppCompatActivity {
+public class DriverPanelSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private interface IntSetter { void set(int value); }
     private interface ShortcutSetter {
         void set(@NonNull LauncherShortcutStore.Shortcut shortcut);

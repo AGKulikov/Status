@@ -30,7 +30,7 @@ import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.scenario.ScenarioPresets;
 
 /** Visual catalog of connector-neutral main-row elements. */
-public final class AutomationSettingsActivity extends AppCompatActivity {
+public final class AutomationSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private Preferences prefs;
     private HaBrickConfigStore store;
     private List<HaBrickConfig> items = new ArrayList<>();

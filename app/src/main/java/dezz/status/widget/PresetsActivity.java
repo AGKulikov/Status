@@ -57,7 +57,7 @@ import java.util.List;
  * exports, imports, and deletes user presets. Replaces the popup-menu flow that used to live in
  * {@link MainActivity}.
  */
-public class PresetsActivity extends AppCompatActivity {
+public class PresetsActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final String TAG = "PresetsActivity";
     private static final String EXPORT_MIME_TYPE = "application/json";
 

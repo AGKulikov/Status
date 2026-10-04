@@ -37,7 +37,7 @@ import dezz.status.widget.launcher.panels.PanelGridLayout;
 /**
  * Precise companion controls for the primary, full-size WYSIWYG navigation editor on HOME.
  */
-public final class NavigationPanelSettingsActivity extends LauncherProfileActivity {
+public final class NavigationPanelSettingsActivity extends SettingsLauncherProfileActivity {
     private interface ValueChange { boolean set(int value); }
     private interface ValueRead { int get(); }
     private interface ValueLabel { String format(int value); }

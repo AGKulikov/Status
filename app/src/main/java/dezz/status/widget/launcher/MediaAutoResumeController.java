@@ -343,6 +343,7 @@ public final class MediaAutoResumeController {
     }
 
     private static void executeSerialized(@NonNull Context context, long bootToken, int attempt) {
+        if (dezz.status.widget.backup.BackupMaintenance.suppressAutomaticPlayback()) return;
         Context app = applicationContext(context);
         SharedPreferences state = state(app);
         long executeAt = SystemClock.elapsedRealtime();

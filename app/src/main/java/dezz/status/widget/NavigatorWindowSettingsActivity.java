@@ -27,7 +27,7 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Human-facing editor for the Navigator window shown on the main KX11 display. */
-public final class NavigatorWindowSettingsActivity extends AppCompatActivity {
+public final class NavigatorWindowSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private interface IntValue { int get(); }
 
     private Preferences preferences;

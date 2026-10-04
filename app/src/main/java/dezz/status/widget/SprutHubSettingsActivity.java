@@ -64,7 +64,7 @@ import dezz.status.widget.scenario.RuleSet;
 import dezz.status.widget.scenario.ScenarioPresets;
 
 /** Connection setup and catalog-first brick wizard for the direct Sprut.hub connector. */
-public final class SprutHubSettingsActivity extends AppCompatActivity {
+public final class SprutHubSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final int CATALOG_PAGE_SIZE = 24;
     private static final int MAX_RENDERED_SERVICES = 40;
     private static final int MAX_RENDERED_CHARACTERISTICS = 80;

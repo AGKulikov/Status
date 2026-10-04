@@ -90,7 +90,7 @@ import dezz.status.widget.sprut.SprutProtocolAdapter;
  * Android notification-listener or SMS permission. Every adapter/device read is allowed to fail
  * because vendor Android 9 Bluetooth stacks frequently throw while starting up.</p>
  */
-public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
+public final class PhoneConnectorSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final String PHONE_MIRROR_CHANNEL_ID = "phone_mirror";
     private static final int REQUEST_ICON_STORAGE = 11135;
     /** Deliberate diagnostics-only escape hatch; normal settings expose production Route A. */

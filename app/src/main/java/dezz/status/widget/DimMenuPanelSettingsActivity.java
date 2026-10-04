@@ -41,7 +41,7 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Complete editor for the independent mNavi-style steering-wheel menu. */
-public final class DimMenuPanelSettingsActivity extends AppCompatActivity {
+public final class DimMenuPanelSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private interface IntSetter { void set(int value); }
     private interface ColorSetter { void set(@NonNull String value); }
 

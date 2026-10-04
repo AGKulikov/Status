@@ -21,7 +21,7 @@ import dezz.status.widget.phone.PhoneAppIconStore;
 import dezz.status.widget.phone.PhoneIconImporter;
 
 /** User mappings and local PNG/JPEG replacement without changing ANCS identities. */
-public final class PhoneAppIconsActivity extends AppCompatActivity {
+public final class PhoneAppIconsActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final int PICK_ICON = 71;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private PhoneAppIconStore store;

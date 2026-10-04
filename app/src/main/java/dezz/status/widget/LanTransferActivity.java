@@ -12,7 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 
 /** Pairing is visible only on the head unit. Server and remote shell permissions are separate. */
-public final class LanTransferActivity extends AppCompatActivity {
+public final class LanTransferActivity extends dezz.status.widget.settings.SettingsActivity {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService network = Executors.newSingleThreadExecutor();
     private TextView status, address, code;

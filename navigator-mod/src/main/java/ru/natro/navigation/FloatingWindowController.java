@@ -1894,6 +1894,8 @@ final class FloatingWindowController {
     }
 
     private void saveGeometry() {
+        synchronized (NavigatorBackupBridge.LOCK) {
+        if (NavigatorBackupBridge.frozen()) return;
         WindowManager.LayoutParams attributes = window.getAttributes();
         preferences.edit()
                 .putInt("x", attributes.x)
@@ -1901,6 +1903,7 @@ final class FloatingWindowController {
                 .putInt("width", attributes.width)
                 .putInt("height", attributes.height)
                 .apply();
+        }
     }
 
     private DisplayMetrics realDisplayMetrics() {

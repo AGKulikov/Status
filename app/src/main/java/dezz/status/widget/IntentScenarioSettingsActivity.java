@@ -50,7 +50,7 @@ import dezz.status.widget.sprut.SprutPath;
 import dezz.status.widget.sprut.SprutProtocolAdapter;
 
 /** Editor for one-shot, exact Android Intent action to Sprut.hub command mappings. */
-public final class IntentScenarioSettingsActivity extends AppCompatActivity {
+public final class IntentScenarioSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private Preferences prefs;
     private IntentActionRuleStore store;
     private SprutCatalog catalog = SprutCatalog.empty();

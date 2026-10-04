@@ -47,7 +47,7 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
  * <p>There are deliberately no media/climate/navigation panel subsections. Global behavior lives
  * in this one scroll; a concrete widget's appearance is edited by tapping it in layout mode.</p>
  */
-public class LauncherSettingsActivity extends LauncherProfileActivity {
+public class LauncherSettingsActivity extends SettingsLauncherProfileActivity {
     private interface IntSetter {
         void set(int value);
     }

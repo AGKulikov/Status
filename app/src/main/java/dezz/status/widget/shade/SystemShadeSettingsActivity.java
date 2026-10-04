@@ -21,7 +21,7 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.LauncherShortcutSettingsActivity;
 
 /** User-facing enable/safety/geometry entry point for the replacement system shade. */
-public final class SystemShadeSettingsActivity extends AppCompatActivity {
+public final class SystemShadeSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private Preferences preferences;
     private SystemShadeStore store;
     private LinearLayout content;

@@ -16,7 +16,7 @@ import dezz.status.widget.media.*;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** All physical groups; the MEDIA tab retains only its original two switches. */
-public final class MediaButtonsSettingsActivity extends AppCompatActivity {
+public final class MediaButtonsSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private VehicleButtonController buttons;
     private MediaButtonController media;
     private LinearLayout body;

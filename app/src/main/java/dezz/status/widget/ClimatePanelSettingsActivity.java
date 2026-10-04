@@ -49,7 +49,7 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /** Immediate editor for either HOME climate widgets or the independent floating surface. */
-public final class ClimatePanelSettingsActivity extends LauncherProfileActivity {
+public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileActivity {
     public static final String EXTRA_LAUNCHER_ONLY =
             "dezz.status.widget.extra.CLIMATE_LAUNCHER_ONLY";
 

@@ -44,7 +44,7 @@ import dezz.status.widget.scenario.TargetScope;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 
 /** Presentation and conditions of live iPhone notifications, kept in the Automations section. */
-public final class PhoneNotificationAutomationSettingsActivity extends AppCompatActivity {
+public final class PhoneNotificationAutomationSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private Preferences prefs;
     private Switch statusRow;
     private Switch popup;

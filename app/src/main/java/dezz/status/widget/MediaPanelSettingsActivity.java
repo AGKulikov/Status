@@ -48,7 +48,7 @@ import dezz.status.widget.performance.PerformanceExecutors;
 import dezz.status.widget.performance.PerformancePickerTask;
 
 /** Visual, immediate editor for every element inside the HOME media panel. */
-public final class MediaPanelSettingsActivity extends LauncherProfileActivity {
+public final class MediaPanelSettingsActivity extends SettingsLauncherProfileActivity {
     private interface IntChange { void set(int value); }
     private interface ElementIntChange { int set(int value); }
     private interface ColorChange { void set(@NonNull String value); }

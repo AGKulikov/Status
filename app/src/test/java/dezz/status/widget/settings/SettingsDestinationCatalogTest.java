@@ -23,6 +23,11 @@ import java.util.Set;
 public final class SettingsDestinationCatalogTest {
     private static final Set<String> USER_FACING_ACTIVITIES = new HashSet<>(Arrays.asList(
             "dezz.status.widget.AboutActivity",
+            "dezz.status.widget.FullBackupActivity",
+            "dezz.status.widget.HudLcaPatchActivity",
+            "dezz.status.widget.SettingsAppearanceActivity",
+            "dezz.status.widget.MediaPanelSettingsActivity",
+            "dezz.status.widget.FavoriteRoutesSettingsActivity",
             "dezz.status.widget.AdbSettingsActivity",
             "dezz.status.widget.LanTransferActivity",
             "dezz.status.widget.drivemode.ui.MainActivity",
@@ -131,12 +136,20 @@ public final class SettingsDestinationCatalogTest {
         SettingsDestinationCatalog.Destination launcher =
                 SettingsDestinationCatalog.byId("home_behavior");
         assertNotNull(launcher);
-        assertEquals(3, SettingsDestinationCatalog.forGroup(
+        assertEquals(4, SettingsDestinationCatalog.forGroup(
                 SettingsDestinationCatalog.Group.HOME).size());
         assertNotNull(SettingsDestinationCatalog.byId("vehicle_control"));
         assertTrue(launcher.subtitle.contains("Один плоский экран"));
         assertTrue(launcher.keywords.contains("размеры"));
         assertTrue(launcher.keywords.contains("позиции кнопок"));
+    }
+
+    @Test public void elevenSectionsKeepOldDeepLinksAndMoveOwnership() {
+        assertEquals(11,SettingsDestinationCatalog.Group.values().length);
+        assertEquals(SettingsDestinationCatalog.Group.HOME,SettingsDestinationCatalog.Group.fromId("status"));
+        assertEquals(SettingsDestinationCatalog.Group.PHONE,SettingsDestinationCatalog.byId("connector_phone").group);
+        assertEquals(SettingsDestinationCatalog.Group.VEHICLE,SettingsDestinationCatalog.byId("media_buttons").group);
+        assertEquals(SettingsDestinationCatalog.Group.BACKUP,SettingsDestinationCatalog.byId("full_backup").group);
     }
 
     private static void assertSearchContains(String query, String expectedId) {

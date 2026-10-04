@@ -46,7 +46,7 @@ import dezz.status.widget.scenario.ScenarioPresets;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 
 /** Human-facing catalog and editor for any number of independent floating overlays. */
-public final class PopupSettingsActivity extends AppCompatActivity {
+public final class PopupSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     public static final String EXTRA_OVERLAY_ID = "popup_overlay_id";
     public static final String EXTRA_PHONE_NOTIFICATION_PREVIEW_ID =
             "phone_notification_preview_id";
