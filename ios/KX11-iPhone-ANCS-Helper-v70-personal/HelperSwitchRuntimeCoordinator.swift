@@ -117,6 +117,7 @@ public final class HelperSwitchRuntimeCoordinator {
     private var peerReady = false
     private var bootDetail = "Инициализация единственного BLE-владельца"
     private var runtimeFailure: String?
+    private var lateStopRecovery = HelperLateStopRecoveryGate()
     private var pendingStartupEffects: [BleRoleSwitchPolicy.Effect] = []
     private var deferredRestorationFreeze: BleRoleSwitchPolicy.Effect?
     private var releasedSource: ReleasedSource?
@@ -438,8 +439,18 @@ public final class HelperSwitchRuntimeCoordinator {
     }
 
     public func retryFailedSwitch() {
+        retryFailedSwitch(expectedEpoch: nil)
+    }
+
+    private func retryFailedSwitch(expectedEpoch: BleRoleSwitchPolicy.Sequence?) {
         queue.async { [weak self] in
             guard let self else { return }
+            if let expectedEpoch {
+                guard self.policy.state.epoch == expectedEpoch,
+                      self.policy.state.failure == .stopTimeout,
+                      self.runtimeFailure == "Fail-closed: stopTimeout",
+                      self.origin == .localOnlyRestore else { return }
+            }
             guard self.policy.state.phase == .failed else {
                 self.publishSnapshot()
                 return
@@ -479,7 +490,9 @@ public final class HelperSwitchRuntimeCoordinator {
             self.telemetryRefreshPending = false
             self.releasedSource = nil
             self.pendingTransmit = nil
-            self.bootDetail = "Явный retry: новый epoch, точный owner-zero и полный drain"
+            self.bootDetail = expectedEpoch == nil
+                ? "Явный retry: новый epoch, точный owner-zero и полный drain"
+                : "Поздняя остановка подтверждена: один автоматический retry, новый epoch и полный drain"
             self.reduce(nextOrigin: retryOrigin, nextToken: retryToken) { policy in
                 switch retryOrigin {
                 case .remote:
@@ -520,6 +533,7 @@ public final class HelperSwitchRuntimeCoordinator {
     }
 
     private func handle(_ event: HelperBleRuntimeCoordinator.Event) {
+        defer { observeLateStopRecovery(event) }
         onDiagnosticEvent?(Self.diagnosticDescription(event))
         if policy.state.phase == .closed, closedCleanup != nil {
             handleClosedCleanup(event)
@@ -936,6 +950,7 @@ public final class HelperSwitchRuntimeCoordinator {
         _ role: BleRoleSwitchPolicy.Role,
         generation: BleRoleSwitchPolicy.Sequence
     ) {
+        guard runtimeFailure == nil else { return }
         if let deferred = deferredRestorationFreeze,
            deferred.role == role, deferred.generation == generation {
             deferredRestorationFreeze = nil
@@ -955,6 +970,7 @@ public final class HelperSwitchRuntimeCoordinator {
                policy.state.activeRole == role,
                policy.state.activeGeneration == generation {
                 peerReady = true
+                lateStopRecovery.authenticatedPeerReady()
                 requestFreshTelemetrySample()
                 bootDetail = "Точный v2 CONTROL owner подтверждён"
                 publishSnapshot()
@@ -966,6 +982,7 @@ public final class HelperSwitchRuntimeCoordinator {
               policy.state.activeRole == role,
               policy.state.activeGeneration == generation else { return }
         peerReady = true
+        lateStopRecovery.authenticatedPeerReady()
         if telemetryGeneration != generation {
             telemetryGeneration = generation
             telemetrySequence = 0
@@ -1566,6 +1583,36 @@ public final class HelperSwitchRuntimeCoordinator {
                     nowMs: Self.nowMs()
                 )
             }
+        }
+    }
+
+    private func observeLateStopRecovery(_ event: HelperBleRuntimeCoordinator.Event) {
+        let epoch: BleRoleSwitchPolicy.Sequence
+        let generation: BleRoleSwitchPolicy.Sequence
+        let role: BleRoleSwitchPolicy.Role
+        let evidence: HelperLateStopRecoveryGate.Evidence
+        switch event {
+        case .sourceIngressFrozen(let e, let g), .sourceFrozenWithoutRemoteOwner(let e, let g):
+            (epoch, generation, role, evidence) = (e, g, .helperPeripheralAndroidCentral, .frozen)
+        case .routeBIngressFrozen(let e, let g), .routeBFrozenWithoutRemoteOwner(let e, let g):
+            (epoch, generation, role, evidence) = (e, g, .helperCentralAndroidPeripheral, .frozen)
+        case .sourceLocalTerminal(let e, let g):
+            (epoch, generation, role, evidence) = (e, g, .helperPeripheralAndroidCentral, .terminal)
+        case .routeBLocalTerminal(let e, let g):
+            (epoch, generation, role, evidence) = (e, g, .helperCentralAndroidPeripheral, .terminal)
+        case .sourceLocalOwnerCount(let count, let e, let g):
+            (epoch, generation, role, evidence) = (e, g, .helperPeripheralAndroidCentral, .owners(count))
+        case .routeBLocalOwnerCount(let count, let e, let g):
+            (epoch, generation, role, evidence) = (e, g, .helperCentralAndroidPeripheral, .owners(count))
+        default: return
+        }
+        if lateStopRecovery.observe(
+            state: policy.state, epoch: epoch, generation: generation, role: role,
+            evidence: evidence, localOnly: origin == .localOnlyRestore,
+            runtimeFailureIsStopTimeout: runtimeFailure == "Fail-closed: stopTimeout"
+        ) {
+            onDiagnosticEvent?("ble_recovery late_stop_confirmed retry_once epoch=\(epoch), generation=\(generation)")
+            retryFailedSwitch(expectedEpoch: epoch)
         }
     }
 

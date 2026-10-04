@@ -1002,3 +1002,57 @@ public struct BleRoleSwitchPolicy {
         UInt64.max - lhs < rhs ? UInt64.max : lhs + rhs
     }
 }
+
+/// Runtime-only admission gate. It does not change the shared reducer or turn late
+/// callbacks into successful stop evidence inside an expired epoch. An admitted
+/// retry must enter a NEW persisted epoch and repeat the complete confirmed drain.
+struct HelperLateStopRecoveryGate {
+    enum Evidence { case frozen, terminal, owners(Int) }
+    private var epoch: BleRoleSwitchPolicy.Sequence?
+    private var generation: BleRoleSwitchPolicy.Sequence?
+    private var role: BleRoleSwitchPolicy.Role?
+    private var frozen = false
+    private var terminal = false
+    private var zero = false
+    private var contradictory = false
+    private(set) var consumed = false
+
+    mutating func authenticatedPeerReady() { self = Self() }
+
+    mutating func observe(
+        state: BleRoleSwitchPolicy.State,
+        epoch eventEpoch: BleRoleSwitchPolicy.Sequence,
+        generation eventGeneration: BleRoleSwitchPolicy.Sequence,
+        role eventRole: BleRoleSwitchPolicy.Role,
+        evidence: Evidence,
+        localOnly: Bool,
+        runtimeFailureIsStopTimeout: Bool
+    ) -> Bool {
+        guard !consumed, localOnly, state.controlFrame == nil,
+              state.sourceRole == state.targetRole,
+              state.desiredRole == state.sourceRole,
+              state.epoch == eventEpoch, state.sourceGeneration == eventGeneration,
+              state.sourceRole == eventRole else { return false }
+        guard [.freezing, .waitingLocalTerminal, .waitingRemoteAck, .failed].contains(state.phase)
+        else { return false }
+        if state.phase == .failed && state.failure != .stopTimeout { return false }
+        if epoch != eventEpoch || generation != eventGeneration || role != eventRole {
+            epoch = eventEpoch; generation = eventGeneration; role = eventRole
+            frozen = false; terminal = false; zero = false; contradictory = false
+        }
+        frozen = frozen || state.ingressFrozen
+        terminal = terminal || state.localTerminal
+        zero = zero || state.localOwnersZero
+        switch evidence {
+        case .frozen: frozen = true
+        case .terminal: terminal = true
+        case .owners(let count):
+            if count < 0 || count > 1 || (zero && count != 0) { contradictory = true }
+            zero = count == 0
+        }
+        guard state.phase == .failed, runtimeFailureIsStopTimeout,
+              frozen, terminal, zero, !contradictory else { return false }
+        consumed = true
+        return true
+    }
+}

@@ -1,0 +1,29 @@
+name: Verify Helper field recovery candidate
+on:
+  push:
+    branches: ['feature/natro-settings-complete-20261004', 'feature/natro-map-trip-audit-20260912']
+    paths: ['ios/KX11-iPhone-ANCS-Helper-v70-personal/**', '.github/workflows/verify-helper-field-recovery.yml']
+permissions:
+  contents: read
+jobs:
+  helper:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Portable source contracts
+        run: bash ios/KX11-iPhone-ANCS-Helper-v70-personal/verify-v70-personal-contract.sh
+      - name: Execute production Swift late-stop regression
+        run: |
+          swiftc ios/KX11-iPhone-ANCS-Helper-v70-personal/BleRoleSwitchPolicy.swift \
+            ios/KX11-iPhone-ANCS-Helper-v70-personal/tests/LateStopRecoveryTests.swift \
+            -o "$RUNNER_TEMP/helper-late-stop-tests"
+          "$RUNNER_TEMP/helper-late-stop-tests"
+      - name: Compile unsigned app and extension with Apple SDK
+        run: |
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v70-personal/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper -configuration Release -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/Helper70Products" OBJROOT="$RUNNER_TEMP/Helper70Intermediates" \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES CODE_SIGNING_ALLOWED=NO clean build
+          test -d "$RUNNER_TEMP/Helper70Products/Release-iphonesimulator/KX11ANCSHelper.app/PlugIns/NatroLiveActivityExtension.appex"

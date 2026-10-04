@@ -350,6 +350,7 @@ def verify_app_and_single_owner() -> None:
         "verify_car_remote_v1.py",
         "verify_role_switch_policy.py",
         "verify_wire_protocol.py",
+        "tests/LateStopRecoveryTests.swift",
     }
     actual_files = {
         str(path.relative_to(ROOT))
