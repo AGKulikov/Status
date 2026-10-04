@@ -14,6 +14,10 @@ public final class SettingsPreferences implements SharedPreferences {
         this.durable = durable; this.session = session;this.generation=session==null?0:session.generation();
     }
     public static SharedPreferences wrap(Context context, SharedPreferences actual) {
+        return wrap(context,actual,context.getPackageName()+"_preferences",true);
+    }
+    public static SharedPreferences wrap(Context context,SharedPreferences actual,String namespace,boolean deviceProtected) {
+        SettingsApplyJournal.register(actual,namespace,deviceProtected);
         return new SettingsPreferences(actual, SettingsEditSession.find(context));
     }
     @Override public Map<String, ?> getAll() {

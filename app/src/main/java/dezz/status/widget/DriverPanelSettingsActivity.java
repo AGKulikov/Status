@@ -73,6 +73,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
     private LauncherShortcutStore store;
     private LinearLayout buttonsHost;
     private FrameLayout preview;
+    @Override public View settingsPreview(){return preview;}
     private TextView countLabel;
     private TextView runtimeLabel;
     private MaterialButton addApplication;
@@ -657,6 +658,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
                 .show();
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(choices="store.all()")
     private void editColors(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         String[] choices = {"Фон кнопки", "Цвет векторной иконки", "Цвет подписи"};
         new dezz.status.widget.settings.SettingsDialogBuilder(this)

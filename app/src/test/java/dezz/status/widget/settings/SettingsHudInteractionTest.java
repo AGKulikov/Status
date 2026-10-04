@@ -40,7 +40,7 @@ public class SettingsHudInteractionTest {
     @Before public void noVehicleCommands(){ReflectionHelpers.setStaticField(CarIntegrations.class,"instance",new NoCarIntegration());}
     @Test public void openingAndLeavingHudDoesNotWriteAConfig() {
         try(ActivityController<HudPanelSettingsActivity> controller=Robolectric.buildActivity(HudPanelSettingsActivity.class)){
-            HudPanelSettingsActivity activity=controller.create().start().resume().visible().get();idle();
+            HudPanelSettingsActivity activity=controller.setup().visible().get();idle();
             SharedPreferences disk=durable(activity);Map<String,?> before=disk.getAll();
             assertFalse("Opening is not an edit",SettingsEditSession.find(activity).dirty());
             SettingsEditSession.find(activity).cancel(activity);controller.pause().stop();
@@ -49,7 +49,7 @@ public class SettingsHudInteractionTest {
     }
     @Test public void appearancePreviewCanBeCancelledWithoutLosingTheOuterDraft() throws Exception {
         try(ActivityController<HudPanelSettingsActivity> controller=Robolectric.buildActivity(HudPanelSettingsActivity.class)){
-            HudPanelSettingsActivity activity=controller.create().start().resume().visible().get();idle();
+            HudPanelSettingsActivity activity=controller.setup().visible().get();idle();
             SharedPreferences disk=durable(activity);Map<String,?> before=disk.getAll();
             HudPanelConfig config=ReflectionHelpers.getField(activity,"config");
             HudElementConfig item=new HudElementConfig("test_backdrop",HudElementType.BACKDROP);

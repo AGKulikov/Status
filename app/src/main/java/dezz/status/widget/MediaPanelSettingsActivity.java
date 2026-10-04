@@ -59,6 +59,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
     private MediaPanelConfigStore store;
     private MediaPanelConfig config;
     private MediaPanelView preview;
+    @Override public View settingsPreview(){return previewHost;}
     private LinearLayout elementList;
     private PanelEditScheduler editScheduler;
     private boolean resumedOnce;

@@ -27,7 +27,25 @@ jobs:
       - name: Source inventory
         run: python3 tools/audit_settings_editors.py --check
       - name: Android interactions and regression tests
-        run: ./gradlew testGeelyDebugUnitTest --no-daemon --max-workers=2
+        timeout-minutes: 10
+        run: |
+          ./gradlew testGeelyDebugUnitTest --no-daemon --max-workers=2 &
+          settings_task=$!
+          (
+            for sample in 1 2 3 4 5 6; do sleep 30; done
+            mkdir -p app/build/settings-diagnostics
+            jps -l | while read -r settings_pid settings_main; do
+              if [[ "$settings_main" == *GradleWorkerMain* ]]; then
+                jstack -l "$settings_pid" > "app/build/settings-diagnostics/worker-$settings_pid.txt" || true
+              fi
+            done
+          ) &
+          settings_watchdog=$!
+          set +e
+          wait "$settings_task"
+          settings_result=$?
+          kill "$settings_watchdog" 2>/dev/null || true
+          exit "$settings_result"
       - name: Interaction reports and rendered screens
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -37,4 +55,5 @@ jobs:
             app/build/reports/tests/**
             app/build/test-results/**
             app/build/settings-screenshots/**
+            app/build/settings-diagnostics/**
           retention-days: 14

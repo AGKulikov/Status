@@ -27,6 +27,7 @@ public final class SystemShadeEditorActivity extends dezz.status.widget.settings
     private SystemShadeStore store;
     private SystemShadeConfig config;
     private FrameLayout canvas;
+    @Override public View settingsPreview(){return canvas;}
     private LinearLayout controls;
     @Nullable private SystemShadeConfig.Element selected;
     private boolean rebuildingControls;

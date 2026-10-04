@@ -55,6 +55,7 @@ public final class VehicleInfoPanelSettingsActivity extends SettingsLauncherProf
     private VehicleInfoPanelConfig config;
     private CarIntegration integration;
     private VehicleInfoPanelView preview;
+    @Override public View settingsPreview(){return preview;}
     private LinearLayout metricList;
     private TextView catalogStatus;
     private PanelEditScheduler editScheduler;

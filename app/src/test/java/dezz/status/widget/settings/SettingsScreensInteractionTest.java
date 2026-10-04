@@ -49,18 +49,19 @@ public class SettingsScreensInteractionTest {
     private final Class<? extends Activity> type;
     private final int theme;
     public SettingsScreensInteractionTest(Class<? extends Activity> type,int theme){this.type=type;this.theme=theme;}
-    @Test public void screenAndRealSectionsRemainUsableAndCancelDoesNotWrite()throws Exception {
+    @Test(timeout=30000) public void screenAndRealSectionsRemainUsableAndCancelDoesNotWrite()throws Exception {
         ReflectionHelpers.setStaticField(CarIntegrations.class,"instance",new NoCarIntegration());
         SettingsAppearance.preferences(RuntimeEnvironment.getApplication()).edit().putInt("theme",theme).putInt("textSp",26).commit();
         try(ActivityController<? extends Activity> controller=Robolectric.buildActivity(type)){
-            Activity activity=controller.create().start().resume().visible().get();idle();
-            View decor=activity.getWindow().getDecorView();measure(decor);idle();measure(decor);
+            System.out.println("EDITOR_BEGIN "+type.getSimpleName()+" theme="+theme);
+            Activity activity=controller.setup().visible().get();System.out.println("EDITOR_CREATED "+type.getSimpleName());idle();
+            View decor=activity.getWindow().getDecorView();measure(decor);idle();measure(decor);System.out.println("EDITOR_MEASURED "+type.getSimpleName());
             SettingsEditSession session=SettingsEditSession.find(activity);assertNotNull("Every layout editor has a draft",session);
             android.content.SharedPreferences disk=activity.createDeviceProtectedStorageContext().getSharedPreferences(activity.getPackageName()+"_preferences",0);
             Map<String,?> before=disk.getAll();
+            snapshot(decor,type.getSimpleName()+"-"+(theme==1?"light":"dark"));
             Button apply=find(decor,"Применить");assertNotNull("Reachable Apply",apply);assertTrue(apply.isShown());
             assertNotNull("Reachable Cancel",find(decor,"Отмена"));
-            snapshot(decor,type.getSimpleName()+"-"+(theme==1?"light":"dark"));
             for(SettingsSection section:SettingsSection.values()){
                 Button tab=find(decor,section.title);if(tab==null||!tab.isShown())continue;
                 tab.performClick();measure(decor);assertTrue(tab.isSelected());

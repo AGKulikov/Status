@@ -180,13 +180,13 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 85,
+          "line": 86,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 156,
+          "line": 157,
           "method": "buildContent",
           "numeric_controls": 0
         }
@@ -271,7 +271,7 @@
       ],
       "numeric_controls": 2,
       "path": "app/src/main/java/dezz/status/widget/ClimatePanelSettingsActivity.java",
-      "sha256": "bdee10e137a6b369eff782b3e8638e39260508344c9e55799592a056dcf9e5e7"
+      "sha256": "6884b154aca990daa03642f7b4ffe6d411cfaa92dfaa8a4d32194a37ecba1356"
     },
     {
       "class": "dezz.status.widget.DimMenuPanelSettingsActivity",
@@ -367,7 +367,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/DimMenuPanelSettingsActivity.java",
-      "sha256": "c308cad160cde8105d15d4374530a5e0ca4651f7659a57ff168661adeba38220"
+      "sha256": "1ba96c151de8aa874dcbf930ee54667583a42f1bb5d24b275fc23306e3a92c4b"
     },
     {
       "class": "dezz.status.widget.DriverFavoritesSettingsActivity",
@@ -392,25 +392,25 @@
         },
         {
           "dialogs": 1,
-          "line": 369,
+          "line": 370,
           "method": "choosePanel",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 382,
+          "line": 383,
           "method": "createPanel",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 396,
+          "line": 397,
           "method": "renamePanel",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 411,
+          "line": 412,
           "method": "removePanel",
           "numeric_controls": 0
         }
@@ -482,68 +482,68 @@
       ],
       "numeric_controls": 4,
       "path": "app/src/main/java/dezz/status/widget/DriverFavoritesSettingsActivity.java",
-      "sha256": "82c53fbdbee6cc128e466a00a3b03c230d02147e95eb64af19c6c952ed5c7d91"
+      "sha256": "a646e3bf6f82c264a6e5c6e838f2f260eb028b4fb63a6a8203e1f8fc0ddabaf7"
     },
     {
       "class": "dezz.status.widget.DriverPanelSettingsActivity",
       "forms": [
         {
           "dialogs": 0,
-          "line": 97,
+          "line": 98,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 0,
-          "line": 137,
+          "line": 138,
           "method": "buildContent",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 589,
+          "line": 590,
           "method": "showBuiltinPicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 624,
+          "line": 625,
           "method": "showApplicationPicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 659,
+          "line": 660,
           "method": "editColors",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 703,
+          "line": 705,
           "method": "chooseInformationGroup",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 750,
+          "line": 752,
           "method": "createInformationGroup",
           "numeric_controls": 0
         },
         {
           "dialogs": 4,
-          "line": 792,
+          "line": 794,
           "method": "showInformationGroupSettings",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 946,
+          "line": 948,
           "method": "onSelected",
           "numeric_controls": 0
         },
         {
           "dialogs": 6,
-          "line": 1031,
+          "line": 1033,
           "method": "editInformationAppearance",
           "numeric_controls": 0
         }
@@ -721,7 +721,7 @@
       ],
       "numeric_controls": 5,
       "path": "app/src/main/java/dezz/status/widget/DriverPanelSettingsActivity.java",
-      "sha256": "ef5b71208a8f48a69978f2a16de4f03a1a2ba816b61e291837b870f9d3040f5f"
+      "sha256": "2277c47167aadac813aa91429f32dcb539db029861c06533a0311d7ce7ecc8e2"
     },
     {
       "class": "dezz.status.widget.FavoriteAppsSettingsActivity",
@@ -954,55 +954,55 @@
         },
         {
           "dialogs": 1,
-          "line": 472,
+          "line": 473,
           "method": "editMapSurface",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1003,
+          "line": 1005,
           "method": "editHudRoadEvents",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1083,
+          "line": 1091,
           "method": "editNavigatorIntegration",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1664,
+          "line": 1673,
           "method": "editHorizontalGroup",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1900,
+          "line": 1910,
           "method": "editBackdrop",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2087,
+          "line": 2098,
           "method": "editGlobalOptions",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2195,
+          "line": 2207,
           "method": "editStockHudControls",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2332,
+          "line": 2346,
           "method": "confirmReset",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2383,
+          "line": 2397,
           "method": "deleteSelected",
           "numeric_controls": 0
         }
@@ -1125,6 +1125,7 @@
         "Кнопка режима находится слева под штатными кнопками дорожного",
         "Кнопки окна",
         "Колонки сетки",
+        "Команды отправляются только по «Применить» внизу основного редактора. До этого «Отмена» отбрасывает выбор.",
         "Компактно",
         "Компоновка карточки",
         "Конечная точка маршрута",
@@ -1454,38 +1455,38 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java",
-      "sha256": "98fc541bff12e2831920692ed9f0ffcc24c9c5a1ecd0b13138dc9d27ea09dbb7"
+      "sha256": "1670eee99f822cc6d4bc3f2555e8cd2583992051dd0db3cf37d802224d8b3c7d"
     },
     {
       "class": "dezz.status.widget.InformationPanelSettingsActivity",
       "forms": [
         {
           "dialogs": 0,
-          "line": 56,
+          "line": 57,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 0,
-          "line": 86,
+          "line": 87,
           "method": "buildScreen",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 243,
+          "line": 244,
           "method": "editItem",
           "numeric_controls": 1
         },
         {
           "dialogs": 1,
-          "line": 457,
+          "line": 459,
           "method": "confirmDelete",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 468,
+          "line": 470,
           "method": "confirmReset",
           "numeric_controls": 0
         }
@@ -1553,7 +1554,7 @@
       ],
       "numeric_controls": 3,
       "path": "app/src/main/java/dezz/status/widget/InformationPanelSettingsActivity.java",
-      "sha256": "40834c980172e94d6aacc8ae381c227d0beeff92599f8d468aa868a522f1f522"
+      "sha256": "6f24b4e2b2098b2fef09801b5d8db3cbbca9d189b6b1c637de1d81ffecb9f4ee"
     },
     {
       "class": "dezz.status.widget.InstrumentPanelSettingsActivity",
@@ -1572,43 +1573,43 @@
         },
         {
           "dialogs": 1,
-          "line": 239,
+          "line": 225,
           "method": "addElement",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 270,
+          "line": 256,
           "method": "choosePanelPreset",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 289,
+          "line": 275,
           "method": "editModules",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 313,
+          "line": 300,
           "method": "editBackground",
           "numeric_controls": 1
         },
         {
           "dialogs": 1,
-          "line": 347,
+          "line": 335,
           "method": "editSelected",
           "numeric_controls": 2
         },
         {
           "dialogs": 1,
-          "line": 638,
+          "line": 631,
           "method": "editMapPerformance",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1122,
+          "line": 1116,
           "method": "editClusterRoadEvents",
           "numeric_controls": 0
         }
@@ -1641,7 +1642,6 @@
         "Высота области",
         "Высота строки расстояния",
         "Горизонтальный отступ внутри знака",
-        "Готово",
         "Данные ближайшего манёвра",
         "Длина перехода цветов пробок",
         "Длина стрелок поворотов на маршруте",
@@ -1750,7 +1750,6 @@
         "Порядок слоёв",
         "Предпросмотр обновлён · сохранение по «Применить»",
         "Приближение: 0 — стандартное, + ближе, − дальше",
-        "Применение…",
         "Применить",
         "Пробки на линии маршрута",
         "Пробки на остальных дорогах",
@@ -1878,6 +1877,7 @@
         "Штатное скругление знака",
         "Штатные названия улиц Яндекса",
         "Штатные элементы",
+        "Штатные элементы не меняются при предпросмотре. Команды отправляются по «Применить» внизу основного редактора.",
         "Штатные элементы панели приборов",
         "Штатный цвет Яндекса",
         "Элемент не выбран",
@@ -1903,7 +1903,7 @@
       ],
       "numeric_controls": 4,
       "path": "app/src/main/java/dezz/status/widget/InstrumentPanelSettingsActivity.java",
-      "sha256": "1322f2326a232e3413c2f4e8d2d6051f791e5d924dc0ffc243441b14013af6de"
+      "sha256": "258e7341c1e4f3edbb7fb3c77f3e09c89431fb5f9e06c12713a546f354c9e7a8"
     },
     {
       "class": "dezz.status.widget.IntentScenarioSettingsActivity",
@@ -1934,31 +1934,31 @@
         },
         {
           "dialogs": 1,
-          "line": 341,
+          "line": 342,
           "method": "showUnsupportedConnectorDialog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 353,
+          "line": 354,
           "method": "showReferencedRuleDialog",
           "numeric_controls": 0
         },
         {
           "dialogs": 2,
-          "line": 733,
+          "line": 734,
           "method": "chooseAccessory",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 769,
+          "line": 770,
           "method": "chooseService",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 790,
+          "line": 791,
           "method": "chooseCharacteristic",
           "numeric_controls": 0
         }
@@ -2068,7 +2068,7 @@
       ],
       "numeric_controls": 0,
       "path": "app/src/main/java/dezz/status/widget/IntentScenarioSettingsActivity.java",
-      "sha256": "c3bc1cbadf6faecfd3b6debdc0591f9c5d2ee64af46b8f59495e433a6a363168"
+      "sha256": "85252a12523d450cd361677cea2f23a23420d11d87160d29847abf53dbcfe31e"
     },
     {
       "class": "dezz.status.widget.LauncherActivity",
@@ -2471,133 +2471,133 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 117,
+          "line": 118,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 0,
-          "line": 164,
+          "line": 165,
           "method": "buildScreen",
           "numeric_controls": 0
         },
         {
           "dialogs": 0,
-          "line": 321,
+          "line": 322,
           "method": "buildShadeScreen",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 874,
+          "line": 875,
           "method": "chooseKindForNew",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 893,
+          "line": 894,
           "method": "showItemMenu",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 905,
+          "line": 906,
           "method": "chooseKindForExisting",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 959,
+          "line": 960,
           "method": "chooseLongKind",
           "numeric_controls": 0
         },
         {
           "dialogs": 3,
-          "line": 982,
+          "line": 983,
           "method": "chooseCarControl",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1013,
+          "line": 1014,
           "method": "chooseCarControlBehavior",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1059,
+          "line": 1060,
           "method": "chooseCarThreeLevelBehavior",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1086,
+          "line": 1087,
           "method": "chooseCarCycleSubset",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1160,
+          "line": 1161,
           "method": "onStopTrackingTouch",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1237,
+          "line": 1238,
           "method": "chooseRule",
           "numeric_controls": 0
         },
         {
           "dialogs": 2,
-          "line": 1251,
+          "line": 1252,
           "method": "chooseExistingRule",
           "numeric_controls": 0
         },
         {
           "dialogs": 2,
-          "line": 1407,
+          "line": 1408,
           "method": "chooseApplication",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1470,
+          "line": 1471,
           "method": "chooseBuiltin",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1501,
+          "line": 1502,
           "method": "chooseDriverFavorites",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1528,
+          "line": 1529,
           "method": "chooseFavoriteRoute",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1564,
+          "line": 1565,
           "method": "editIntentTarget",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1620,
+          "line": 1621,
           "method": "editAppearance",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1768,
+          "line": 1770,
           "method": "confirmDelete",
           "numeric_controls": 0
         },
         {
           "dialogs": 0,
-          "line": 1876,
+          "line": 1878,
           "method": "scrollDialog",
           "numeric_controls": 0
         }
@@ -2738,7 +2738,7 @@
       ],
       "numeric_controls": 4,
       "path": "app/src/main/java/dezz/status/widget/LauncherShortcutSettingsActivity.java",
-      "sha256": "2cc768ba31e157369ba93715725d491ff98ae5f90407241bfd75c545d0705f44"
+      "sha256": "1aeb391e4931f7751788de7f0afbfc86104e3933a060932c9c54b286daea9e5a"
     },
     {
       "class": "dezz.status.widget.LiveActivityApnsSettingsActivity",
@@ -2901,25 +2901,25 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 95,
+          "line": 96,
           "method": "installContent",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 101,
+          "line": 102,
           "method": "buildContent",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 594,
+          "line": 595,
           "method": "showMediaPlayerPicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 641,
+          "line": 642,
           "method": "showMediaPlayerChoices",
           "numeric_controls": 0
         }
@@ -3002,7 +3002,7 @@
       ],
       "numeric_controls": 3,
       "path": "app/src/main/java/dezz/status/widget/MediaPanelSettingsActivity.java",
-      "sha256": "cfe999573112798fd8418caf46018aa666e4bb861be5b12391eb51ad3f5ee85c"
+      "sha256": "8f7d1efad494d14fef048e89b749dd7b42fec514090ad08ae633874cfc0b36de"
     },
     {
       "class": "dezz.status.widget.MqttSettingsActivity",
@@ -3054,13 +3054,13 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 73,
+          "line": 74,
           "method": "showContent",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 87,
+          "line": 88,
           "method": "buildContent",
           "numeric_controls": 0
         }
@@ -3111,7 +3111,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/NavigationPanelSettingsActivity.java",
-      "sha256": "ed779a606e1c6c7b1a8dc53d277c221ad1fd2ac85ec452fa37912cd9228a89f3"
+      "sha256": "3fcdb765ee61ed80422f297131ab601fed81db937b7c5cd4d1af24ae615be7ce"
     },
     {
       "class": "dezz.status.widget.NavigatorWindowSettingsActivity",
@@ -3180,25 +3180,25 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 48,
+          "line": 49,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 0,
-          "line": 88,
+          "line": 89,
           "method": "buildContent",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 172,
+          "line": 173,
           "method": "renderEditor",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 336,
+          "line": 337,
           "method": "showAddDialog",
           "numeric_controls": 0
         }
@@ -3258,7 +3258,7 @@
       ],
       "numeric_controls": 2,
       "path": "app/src/main/java/dezz/status/widget/PanelElementSettingsActivity.java",
-      "sha256": "cf095bb126aa1bb4ecf6859d2b61cde5ecf27fa11c939ef55b9dbcd20bbfc125"
+      "sha256": "780e216d0f9688f8ca1053173fdda5434487d4365dee1769a0d18fc639658381"
     },
     {
       "class": "dezz.status.widget.PassengerAllAppsSettingsActivity",
@@ -3813,85 +3813,85 @@
         },
         {
           "dialogs": 1,
-          "line": 423,
+          "line": 424,
           "method": "confirmDelete",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 442,
+          "line": 443,
           "method": "showEditor",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1026,
+          "line": 1028,
           "method": "showSourcePicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1062,
+          "line": 1064,
           "method": "showSystemSourcePicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1096,
+          "line": 1098,
           "method": "showTimeRangePicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1129,
+          "line": 1131,
           "method": "showVisibleAutomationScopePicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1139,
+          "line": 1141,
           "method": "showVisibleAutomationTargetPicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1177,
+          "line": 1179,
           "method": "showHomeAssistantSourcePicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1232,
+          "line": 1234,
           "method": "showSprutSourcePicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1258,
+          "line": 1260,
           "method": "showMissingSprutCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1469,
+          "line": 1471,
           "method": "showManualMqttSourcePicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1612,
+          "line": 1614,
           "method": "onSelected",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1650,
+          "line": 1652,
           "method": "showTargetPicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1816,
+          "line": 1818,
           "method": "getView",
           "numeric_controls": 0
         }
@@ -4153,7 +4153,7 @@
       ],
       "numeric_controls": 0,
       "path": "app/src/main/java/dezz/status/widget/ScenarioSettingsActivity.java",
-      "sha256": "ac16e44de5a69cf4a9ce8a2a12fe84cd8063cba1015330b0541d84f7d3d6ec99"
+      "sha256": "30144126b101ca03edf2bc9d674dfa8561ac34bb811803477ddb66ce58bbbe1f"
     },
     {
       "class": "dezz.status.widget.SprutHubSettingsActivity",
@@ -4251,19 +4251,19 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 62,
+          "line": 63,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 103,
+          "line": 104,
           "method": "buildContent",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 319,
+          "line": 320,
           "method": "showMetricDialog",
           "numeric_controls": 0
         }
@@ -4353,7 +4353,7 @@
       ],
       "numeric_controls": 2,
       "path": "app/src/main/java/dezz/status/widget/VehicleInfoPanelSettingsActivity.java",
-      "sha256": "6405a97efd04dd152731b12759d03ac7705a95aefd26441528a371e33603645b"
+      "sha256": "f81d64d28773854defd9feb8e725eb67e5376eefff4fc8a70da13e79c0d01698"
     },
     {
       "class": "dezz.status.widget.ViewBinder",
@@ -5139,7 +5139,7 @@
       "labels": [],
       "numeric_controls": 0,
       "path": "app/src/main/java/dezz/status/widget/settings/SettingsActivity.java",
-      "sha256": "e5f8b477e357a0c31d8f5fd87e66be4d27cb3ba2d01f7ba3bfa17da1e282df53"
+      "sha256": "24f6b425ce9130149fc0fa8b7b97ba4783cad12106a431a76385cd729decf0fc"
     },
     {
       "class": "dezz.status.widget.settings.VectorIconPickerDialog",
@@ -5168,7 +5168,7 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 33,
+          "line": 34,
           "method": "onCreate",
           "numeric_controls": 0
         }
@@ -5193,7 +5193,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/shade/SystemShadeEditorActivity.java",
-      "sha256": "1d80399d51cc6af68ff7d505a10a8e65bf02b159ede9582e682aa09b8e788bb3"
+      "sha256": "7b78688385983eabe7b77512dd0bc160965054cbf2626c4b0b3fc97c6828c67d"
     },
     {
       "class": "dezz.status.widget.shade.SystemShadeSettingsActivity",

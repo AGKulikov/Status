@@ -44,6 +44,7 @@ public final class BackupMaintenance implements AutoCloseable {
                 try {test=file.getChannel().tryLock();}catch(OverlappingFileLockException busy){test=null;}
                 if(test==null) {android.os.Process.killProcess(android.os.Process.myPid());return false;}
                 try {
+                    dezz.status.widget.settings.SettingsApplyJournal.recover(context);
                     File journal=new File(control,"restore/journal.json");
                     if(journal.isFile())new BackupStorage(context).transaction().recover();
                     if(lease.exists())BackupFiles.delete(lease);
@@ -115,6 +116,7 @@ public final class BackupMaintenance implements AutoCloseable {
                 while(processExists(manager,process.pid)&&SystemClock.uptimeMillis()<deadline)Thread.sleep(20);
                 if(processExists(manager,process.pid))throw new IOException("Application writer is still running");
             }
+            dezz.status.widget.settings.SettingsApplyJournal.recover(context);
             return session;
         } catch(Exception failure){session.close();throw failure;}
     }

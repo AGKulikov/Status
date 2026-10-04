@@ -296,6 +296,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
                 .show();
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(choices="rules",index=true)
     private void showEditor(int index) {
         if (loadError != null) {
             Toast.makeText(this, "Сначала исправьте конфигурацию", Toast.LENGTH_LONG).show();

@@ -351,6 +351,7 @@ public final class DimMenuPanelSettingsActivity extends dezz.status.widget.setti
         }
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm
     private void editTitle() {
         EditText field = new EditText(this);
         field.setSingleLine(true);

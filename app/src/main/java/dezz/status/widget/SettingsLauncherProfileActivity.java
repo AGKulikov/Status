@@ -20,6 +20,7 @@ public abstract class SettingsLauncherProfileActivity extends LauncherProfileAct
         settingsReady=true;installSettings();
     }
     private void installSettings(){
+        if(settingsPreview()!=null)settingsPreview().setTag(SettingsEditorLayout.PREVIEW_TAG);
         SettingsEditorLayout.install(findViewById(android.R.id.content),getClass().getName());
         if(settingsSession!=null)settingsSession.install(this,this::flushSettingsDraft,this::recreate,()->super.finish());
         SettingsAppearance.attach(this);

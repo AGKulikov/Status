@@ -452,9 +452,11 @@ public final class SettingsHubActivity extends dezz.status.widget.settings.Setti
             if(!fields.isEmpty()) {
                 content.addView(text("Параметры в редакторах",24,Typeface.BOLD),topMargin(20));
                 for(dezz.status.widget.settings.SettingsNestedSearch.Match field:fields) {
-                    MaterialButton button=new MaterialButton(this);button.setAllCaps(false);button.setText(field.label);button.setTextSize(19);
+                    MaterialButton button=new MaterialButton(this);button.setAllCaps(false);button.setText(field.owner()+" · "+field.label);button.setTextSize(19);
                     button.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
-                    button.setOnClickListener(v->{try{startActivity(new Intent().setClassName(this,field.activity).putExtra(dezz.status.widget.settings.SettingsAppearance.EXTRA_FOCUS,field.label));}catch(RuntimeException error){Toast.makeText(this,"Не удалось открыть редактор",Toast.LENGTH_SHORT).show();}});
+                    button.setOnClickListener(v->{try{startActivity(new Intent().setClassName(this,field.activity)
+                            .putExtra(dezz.status.widget.settings.SettingsAppearance.EXTRA_FOCUS,field.label)
+                            .putExtra(dezz.status.widget.settings.SettingsSearchNavigator.EXTRA_ROUTE,field.route));}catch(RuntimeException error){Toast.makeText(this,"Не удалось открыть редактор",Toast.LENGTH_SHORT).show();}});
                     content.addView(button,matchWrap());
                 }
             }

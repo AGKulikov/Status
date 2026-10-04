@@ -52,6 +52,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
     private InformationPanelConfig config;
     private CarIntegration carIntegration;
     private InformationPanelView preview;
+    @Override public View settingsPreview(){return preview;}
     private LinearLayout itemHost;
 
     @Override
@@ -241,6 +242,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
         return card;
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(choices="config.items()")
     private void editItem(@NonNull InformationPanelConfig.Item item) {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();

@@ -30,8 +30,7 @@ public final class SettingsAppearance {
         View root=activity.findViewById(android.R.id.content);if(root==null)return;
         if(!attached.add(root))return;
         root.getViewTreeObserver().addOnGlobalLayoutListener(()->apply(activity,root));
-        root.post(()->{apply(activity,root);String query=activity.getIntent().getStringExtra(EXTRA_FOCUS);
-            if(query!=null&&!query.isEmpty())focus(root,query);});
+        root.post(()->{apply(activity,root);SettingsSearchNavigator.open(activity,root);});
     }
     public static void apply(Context context,View view) {
         if(SettingsEditorLayout.PREVIEW_TAG.equals(view.getTag()))return;
@@ -81,6 +80,7 @@ public final class SettingsAppearance {
         found.sendAccessibilityEvent(android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED);return true;
     }
     private static View find(View root,String query) {
+        if(root.getVisibility()==View.GONE&&!SettingsEditorLayout.FIELD_GROUP_TAG.equals(root.getTag()))return null;
         if(root instanceof TextView&&((TextView)root).getText().toString().toLowerCase(Locale.ROOT).replace('ё','е').contains(query))return root;
         if(root instanceof ViewGroup){ViewGroup group=(ViewGroup)root;for(int i=0;i<group.getChildCount();i++){View value=find(group.getChildAt(i),query);if(value!=null)return value;}}return null;
     }

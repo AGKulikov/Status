@@ -41,7 +41,7 @@ public final class InstrumentPanelStore {
         // is unlocked so opening Settings is never the event that makes the panel appear.
         Context storage = app.createDeviceProtectedStorageContext();
         preferences = dezz.status.widget.settings.SettingsPreferences.wrap(context,
-                storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE));
+                storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE),PREFS,true);
     }
 
     public boolean isEnabled() {

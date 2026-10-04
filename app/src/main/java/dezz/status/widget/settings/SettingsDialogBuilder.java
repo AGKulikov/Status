@@ -72,6 +72,7 @@ public final class SettingsDialogBuilder extends AlertDialog.Builder {
             @Override public void onViewAttachedToWindow(View view) {
                 view.post(() -> {
                     if (dialog.getWindow() != null) SettingsAppearance.apply(getContext(), dialog.getWindow().getDecorView());
+                    if(content!=null)SettingsSearchNavigator.focusDialog(getContext(),dialog);
                 });
             }
             @Override public void onViewDetachedFromWindow(View view) {}

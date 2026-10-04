@@ -43,6 +43,8 @@ public final class SettingsEditSession {
     private long revision;
     private boolean primed;
     private final Map<SharedPreferences,Map<String,Object>> initialChanges=new HashMap<>();
+    private final Map<String,Runnable> applyActions=new LinkedHashMap<>();
+    private final Map<String,Object> actionValues=new LinkedHashMap<>();
     private TextView state;
 
     private SettingsEditSession(SettingsEditSession parent){this.parent=parent;}
@@ -79,11 +81,18 @@ public final class SettingsEditSession {
         Map<String,?> result=store.getAll();
         for(SettingsEditSession session:active){
             SettingsDraft draft=session.drafts.get(store);
-            if(!session.closed&&draft!=null)result=draft.overlay(result);
+            if(!session.closed&&draft!=null){
+                Map<String,Object> next=new LinkedHashMap<>(result);
+                for(Map.Entry<String,Object> value:draft.changes().entrySet())if(previewEligible(value.getKey())){
+                    if(value.getValue()==null)next.remove(value.getKey());else next.put(value.getKey(),value.getValue());
+                }
+                result=next;
+            }
         }
         return result;
     }
     static Object previewValue(SharedPreferences store,String key) {
+        if(!previewEligible(key))return NO_OVERRIDE;
         Object result=NO_OVERRIDE;
         for(SettingsEditSession session:active){
             SettingsDraft draft=session.drafts.get(store);
@@ -119,6 +128,7 @@ public final class SettingsEditSession {
         updateState();
     }
     public synchronized boolean dirty(){
+        if(!applyActions.isEmpty())return true;
         for(Map.Entry<SharedPreferences,SettingsDraft> entry:drafts.entrySet()){
             Map<String,Object> initial=initialChanges.get(entry.getKey());
             if(initial==null)initial=Collections.emptyMap();
@@ -141,22 +151,28 @@ public final class SettingsEditSession {
                         .setPositiveButton("Продолжить редактирование",null).show();return false;
             }
         }
-        List<Map.Entry<SharedPreferences,SettingsDraft>> committed=new ArrayList<>();
+        Map<SharedPreferences,Map<String,Object>> changes=new LinkedHashMap<>();
         for(Map.Entry<SharedPreferences,SettingsDraft> entry:drafts.entrySet()){
             if(!entry.getValue().dirty())continue;
             if(parent!=null){parent.write(entry.getKey(),entry.getValue().changes(),false);continue;}
-            committed.add(entry);
-            if(!SettingsPreferences.commit(entry.getKey(),entry.getValue().changes())){
-                for(Map.Entry<SharedPreferences,SettingsDraft> rollback:committed)
-                    SettingsPreferences.commit(rollback.getKey(),rollback.getValue().original());
-                Toast.makeText(activity,"Не удалось сохранить. Черновик остаётся открыт.",Toast.LENGTH_LONG).show();return false;
-            }
+            changes.put(entry.getKey(),entry.getValue().changes());
         }
-        for(SettingsDraft draft:drafts.values())draft.applied();initialChanges.clear();updateState();refresh(activity);
+        if(parent==null&&!SettingsApplyJournal.commit(activity,changes)){
+            Toast.makeText(activity,"Не удалось сохранить. Черновик остаётся открыт; повторите после завершения обслуживания.",Toast.LENGTH_LONG).show();return false;
+        }
+        for(SettingsDraft draft:drafts.values())draft.applied();initialChanges.clear();
+        Map<String,Runnable> commands=new LinkedHashMap<>(applyActions);applyActions.clear();
+        if(parent!=null){parent.applyActions.putAll(commands);parent.actionValues.putAll(actionValues);if(!commands.isEmpty())parent.revision++;}
+        else for(Runnable command:commands.values())try{command.run();}catch(RuntimeException failure){
+            android.util.Log.e("SettingsApply","Explicit operation failed",failure);
+            Toast.makeText(activity,"Настройки сохранены, но операция не выполнена. Проверьте её состояние.",Toast.LENGTH_LONG).show();
+        }
+        actionValues.clear();
+        updateState();refresh(activity);
         return true;
     }
     public synchronized void cancel(Activity activity){
-        if(closed)return;boolean changed=dirty();closed=true;for(SettingsDraft draft:drafts.values())draft.close();
+        if(closed)return;boolean changed=dirty();closed=true;for(SettingsDraft draft:drafts.values())draft.close();applyActions.clear();actionValues.clear();
         active.remove(this);
         if(changed)refresh(activity);
     }
@@ -188,13 +204,34 @@ public final class SettingsEditSession {
         column.addView(footer,new LinearLayout.LayoutParams(-1,-2));content.addView(column,0,old);updateState();
     }
     public Savepoint checkpoint(){flush.run();return new Savepoint(this);}
+    /** Explicit external operations are never run by preview or by a nested dialog's Apply. */
+    public static void afterApply(Activity activity,String key,Runnable command){
+        afterApply(activity,key,null,command);
+    }
+    public static void afterApply(Activity activity,String key,Object value,Runnable command){
+        SettingsEditSession session=find(activity);
+        if(session==null){command.run();return;}
+        synchronized(session){if(!session.closed){session.applyActions.put(key,command);session.actionValues.put(key,value);session.revision++;session.updateState();}}
+    }
+    public static boolean pendingBoolean(Activity activity,String key,boolean fallback){
+        SettingsEditSession session=find(activity);
+        while(session!=null){Object value=session.actionValues.get(key);if(value instanceof Boolean)return(Boolean)value;session=session.parent;}
+        return fallback;
+    }
+    private static boolean previewEligible(String key){
+        return !key.startsWith("hudStock")&&!key.startsWith("hide_oem_")&&!key.startsWith("oem_");
+    }
     public static final class Savepoint {
         private final SettingsEditSession session;
         private final Map<SharedPreferences,Map<String,Object>> changes=new HashMap<>();
         private final Map<SharedPreferences,Map<String,?>> values=new HashMap<>();
+        private final Map<String,Runnable> actions;
+        private final Map<String,Object> actionValues;
         private boolean accepted,finished;
         private Savepoint(SettingsEditSession session){
             this.session=session;
+            actions=new LinkedHashMap<>(session.applyActions);
+            actionValues=new LinkedHashMap<>(session.actionValues);
             for(Map.Entry<SharedPreferences,SettingsDraft> entry:session.drafts.entrySet()){
                 changes.put(entry.getKey(),entry.getValue().changes());values.put(entry.getKey(),session.read(entry.getKey()));
             }
@@ -202,7 +239,9 @@ public final class SettingsEditSession {
         public void accept(){accepted=true;}
         public void finish(){
             if(finished)return;finished=true;if(accepted||session.closed)return;
-            boolean changed=false;
+            boolean changed=!actions.equals(session.applyActions);
+            session.applyActions.clear();session.applyActions.putAll(actions);
+            session.actionValues.clear();session.actionValues.putAll(actionValues);
             for(Map.Entry<SharedPreferences,SettingsDraft> entry:session.drafts.entrySet()){
                 Map<String,Object> before=changes.get(entry.getKey());if(before==null)before=Collections.emptyMap();
                 Map<String,Object> after=entry.getValue().changes();

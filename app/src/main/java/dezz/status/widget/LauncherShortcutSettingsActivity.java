@@ -93,6 +93,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
     private PanelGridLayout previewGrid;
     private PanelContentEditOverlay previewOverlay;
     private FrameLayout previewHost;
+    @Override public View settingsPreview(){return previewHost;}
     private GridSlider columnsSlider;
     private GridSlider rowsSlider;
     private GridSlider gapSlider;
@@ -1618,6 +1619,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         Toast.makeText(this, "Долгое нажатие настроено", Toast.LENGTH_SHORT).show();
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(choices="store.all()")
     private void editAppearance(@NonNull LauncherShortcutStore.Shortcut value) {
         LinearLayout form = dialogForm();
         EditText title = field("Название", value.title);

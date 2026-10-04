@@ -49,6 +49,7 @@ public final class NavigationPanelSettingsActivity extends SettingsLauncherProfi
     private PanelGridLayout previewGrid;
     private PanelContentEditOverlay previewOverlay;
     private FrameLayout previewHost;
+    @Override public View settingsPreview(){return previewHost;}
     private boolean resumedOnce;
 
     @Override

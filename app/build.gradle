@@ -30,6 +30,7 @@ android {
     testOptions {
         unitTests.includeAndroidResources = true
         unitTests.all {
+            testLogging { events 'failed', 'skipped'; showStandardStreams = true; exceptionFormat = 'full' }
             jvmArgs += [
                     '--add-opens=java.base/java.lang=ALL-UNNAMED',
                     '--add-opens=java.base/java.util=ALL-UNNAMED',

@@ -168,14 +168,17 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         return row;
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm
     private void editStockElements() {
         dezz.status.widget.instrument.InstrumentOemController controller =
                 dezz.status.widget.instrument.InstrumentOemController.get(this);
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(dp(18), dp(12), dp(18), dp(12));
-        Switch sign = switchView("Скрыть штатный знак ограничения скорости", controller.isTsrHidden());
-        Switch bar = switchView("Скрыть белую полосу внизу экрана водителя", controller.isWhiteBarHidden());
+        Switch sign = switchView("Скрыть штатный знак ограничения скорости",
+                dezz.status.widget.settings.SettingsEditSession.pendingBoolean(this,"instrument.tsr",controller.isTsrHidden()));
+        Switch bar = switchView("Скрыть белую полосу внизу экрана водителя",
+                dezz.status.widget.settings.SettingsEditSession.pendingBoolean(this,"instrument.white",controller.isWhiteBarHidden()));
         TextView signStatus = label(controller.tsrStatus());
         TextView barStatus = label(controller.whiteStatus());
         body.addView(sign);
@@ -184,33 +187,16 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         body.addView(bar, marginTop(16));
         body.addView(label("Скрывает наложения штатного меню в режиме навигации. При выходе возвращает их."));
         body.addView(barStatus);
-        boolean[] updating = {false};
-        sign.setOnCheckedChangeListener((button, value) -> {
-            if (updating[0]) return;
-            sign.setEnabled(false);
-            signStatus.setText("Применение…");
-            controller.setTsrHidden(value, (success, detail) -> {
-                if (isDestroyed()) return;
-                updating[0] = true;
-                sign.setChecked(controller.isTsrHidden());
-                updating[0] = false;
-                sign.setEnabled(true); signStatus.setText(detail);
-            });
-        });
-        bar.setOnCheckedChangeListener((button, value) -> {
-            if (updating[0]) return;
-            bar.setEnabled(false); barStatus.setText("Применение…");
-            controller.setWhiteBarHidden(value, (success, detail) -> {
-                if (isDestroyed()) return;
-                updating[0] = true;
-                bar.setChecked(controller.isWhiteBarHidden());
-                updating[0] = false;
-                bar.setEnabled(true); barStatus.setText(detail);
-            });
-        });
+        body.addView(label("Штатные элементы не меняются при предпросмотре. Команды отправляются по «Применить» внизу основного редактора."));
         ScrollView scroll = new ScrollView(this); scroll.addView(body);
         new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Штатные элементы панели приборов")
-                .setView(scroll).setPositiveButton("Готово", null).show();
+                .setView(scroll).setNegativeButton("Отмена",null).setPositiveButton("Применить",(dialog,which)->{
+                    boolean signValue=sign.isChecked(),barValue=bar.isChecked();
+                    dezz.status.widget.settings.SettingsEditSession.afterApply(this,"instrument.tsr",signValue,
+                            ()->controller.setTsrHidden(signValue,(success,detail)->Toast.makeText(getApplicationContext(),detail,Toast.LENGTH_LONG).show()));
+                    dezz.status.widget.settings.SettingsEditSession.afterApply(this,"instrument.white",barValue,
+                            ()->controller.setWhiteBarHidden(barValue,(success,detail)->Toast.makeText(getApplicationContext(),detail,Toast.LENGTH_LONG).show()));
+                }).show();
     }
 
     private View selectionBar() {
@@ -287,6 +273,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
                 .show();
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm
     private void editModules() {
         String[] labels = new String[config.elements.size()];
         boolean[] checked = new boolean[config.elements.size()];
@@ -311,6 +298,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
                 .show();
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm
     private void editBackground() {
         LinearLayout content = dialogColumn();
         content.addView(text("Сверху всегда чистый чёрный. Ниже начинается плавный переход "
@@ -572,6 +560,11 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         dialog.show();
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(value="editSelected",choices="config.elements")
+    private void searchElement(InstrumentElementConfig element){
+        preview.instruments().select(element.id);editSelected();
+    }
+
     private void duplicateSelected() {
         InstrumentElementConfig selected = preview.instruments().selected();
         if (selected == null) return;
@@ -636,6 +629,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         return null;
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm
     private void editMapPerformance() {
         Preferences preferences = new Preferences(this);
         NavigationIntegrationConfig navigation;

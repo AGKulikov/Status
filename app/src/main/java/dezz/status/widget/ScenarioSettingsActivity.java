@@ -240,6 +240,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
     }
 
     /** Advanced escape hatch for ALL/ANY and multiple conditions/actions supported by the engine. */
+    @dezz.status.widget.settings.SettingsSearchForm
     private void showRawEditor() {
         EditText editor = new EditText(this);
         editor.setText(prefs.localScenariosJson.get());
@@ -440,6 +441,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                 .show();
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(choices="entries",index=true,label="scenario.id")
     private void showEditor(int index) {
         if (loadError != null) {
             Toast.makeText(this, "Сначала исправьте JSON конфигурации", Toast.LENGTH_LONG).show();

@@ -42,6 +42,7 @@ public final class PanelElementSettingsActivity extends dezz.status.widget.setti
     private PanelElementConfigStore store;
     private LinearLayout editor;
     private FrameLayout previewHost;
+    @Override public View settingsPreview(){return previewHost;}
     @NonNull private String selectedPanel = LauncherLayoutStore.APPS;
     @Nullable private PanelElementConfigStore.Panel current;
     @Nullable private PanelEditScheduler editScheduler;

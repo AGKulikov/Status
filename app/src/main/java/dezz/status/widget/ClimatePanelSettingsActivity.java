@@ -61,6 +61,7 @@ public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileA
     private ClimatePanelConfigStore store;
     private ClimatePanelConfig config;
     private ClimatePanelView preview;
+    @Override public View settingsPreview(){return preview;}
     private LinearLayout elementHost;
     private LinearLayout compactModeSettings;
     private LinearLayout reservedModeSettings;

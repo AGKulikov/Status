@@ -16,6 +16,7 @@ import java.util.*;
 public final class SettingsEditorLayout extends LinearLayout {
     public static final String CONTROL_ROW_TAG = "natro.settings.numeric.row";
     public static final String PREVIEW_TAG = "natro.settings.preview";
+    public static final String FIELD_GROUP_TAG = "natro.settings.field.group";
     private static final String FORM_TAG = "natro.settings.form";
     private final View scroll;
     private final LinearLayout form;
@@ -30,7 +31,7 @@ public final class SettingsEditorLayout extends LinearLayout {
     private static final class FieldGroup extends LinearLayout {
         final SettingsSection section;
         FieldGroup(Context context, SettingsSection section) {
-            super(context); this.section = section; setOrientation(VERTICAL);
+            super(context); this.section = section; setOrientation(VERTICAL);setTag(FIELD_GROUP_TAG);
         }
     }
 

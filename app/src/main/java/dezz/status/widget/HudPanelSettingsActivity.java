@@ -316,6 +316,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         editElement(item);
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(choices="config.elements")
     private void editElement(@NonNull HudElementConfig item) {
         if (item.type == HudElementType.BACKDROP) {
             editBackdrop(item);
@@ -469,6 +470,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
     }
 
     /** Geometry belongs to the HUD element; rendering settings belong to the HUD MapProfile. */
+    @dezz.status.widget.settings.SettingsSearchForm(choices="config.elements",kind="NAV_MAP")
     private void editMapSurface(@NonNull HudElementConfig item) {
         NavigationIntegrationConfig navigation = loadNavigationIntegrationConfig();
         NavigationIntegrationConfig.MapProfile profile = navigation.hudMap;
@@ -1052,6 +1054,12 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         showSafeDialog(dialog);
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(value="editHudRoadEvents")
+    private void searchRoadEvents(){
+        NavigationIntegrationConfig navigation=loadNavigationIntegrationConfig();
+        editHudRoadEvents(navigation,navigation.hudMap);
+    }
+
     private static int roadEventModePosition(
             @NonNull NavigationIntegrationConfig.RoadEventMode mode) {
         switch (mode) {
@@ -1080,6 +1088,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
     }
 
     /** Main-map and floating-window profile; HUD map stays independent in its own element dialog. */
+    @dezz.status.widget.settings.SettingsSearchForm
     private void editNavigatorIntegration() {
         NavigationIntegrationConfig navigation = loadNavigationIntegrationConfig();
         NavigationIntegrationConfig.MapProfile map = navigation.mainMap;
@@ -1661,6 +1670,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
     }
 
     /** Configures a real geometry container; it never paints its own surface or shadow. */
+    @dezz.status.widget.settings.SettingsSearchForm(choices="config.elements",kind="HORIZONTAL_GROUP")
     private void editHorizontalGroup(@NonNull HudElementConfig group) {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
@@ -1898,6 +1908,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         return value == 1 ? "По центру" : value == 2 ? "Снизу" : "Сверху";
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(choices="config.elements",kind="BACKDROP")
     private void editBackdrop(@NonNull HudElementConfig item) {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
@@ -2085,6 +2096,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         return new HudFuelSettings();
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm
     private void editGlobalOptions() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
@@ -2193,6 +2205,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         showSafeDialog(dialog);
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm
     private void editStockHudControls() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
@@ -2200,6 +2213,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         scroll.addView(form);
 
         form.addView(section("ProfileTransfer · CB33278"));
+        form.addView(text("Команды отправляются только по «Применить» внизу основного редактора. До этого «Отмена» отбрасывает выбор.",20,0xFFB8C0CC));
         form.addView(text(
                 "Четыре штатных режима, найденные в ECARX: 0 Guide, 1 Drive, 2 AR, "
                         + "3 Simple. Команда меняет только выбранный режим и не передаёт "
@@ -2272,15 +2286,15 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                     preferences.hudStockProfileModeAutoRepeat.set(repeat);
                     CarIntegration integration = CarIntegrations.get(this);
                     if (selectedMode >= 0) {
-                        integration.setStockHudProfileMode(selectedMode, repeat,
+                        dezz.status.widget.settings.SettingsEditSession.afterApply(this,"hud.profile",()->integration.setStockHudProfileMode(selectedMode, repeat,
                                 (success, message) -> showStockHudResult(
-                                        "Режим " + selectedMode, success, message));
+                                        "Режим " + selectedMode, success, message)));
                     } else {
-                        integration.stopStockHudProfileModeAutoRepeat(
+                        dezz.status.widget.settings.SettingsEditSession.afterApply(this,"hud.profile",()->integration.stopStockHudProfileModeAutoRepeat(
                                 (success, message) -> {
                                     if (!success) showStockHudResult(
                                             "Автоповтор", false, message);
-                                });
+                                }));
                     }
 
                     applyStockHudCategoryIfChanged(integration,
@@ -2315,9 +2329,9 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
             @NonNull Preferences.Bool preference) {
         preference.set(desired);
         if (!force && original == desired) return;
-        integration.setStockHudDisplayCategory(category, desired, (success, message) -> {
+        dezz.status.widget.settings.SettingsEditSession.afterApply(this,"hud.category."+category.name(),()->integration.setStockHudDisplayCategory(category, desired, (success, message) -> {
             if (!success) showStockHudResult(category.name(), false, message);
-        });
+        }));
     }
 
     private void showStockHudResult(String operation, boolean success,

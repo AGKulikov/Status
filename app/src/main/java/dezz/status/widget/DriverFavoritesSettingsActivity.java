@@ -320,6 +320,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
         return card;
     }
 
+    @dezz.status.widget.settings.SettingsSearchForm(choices="store.all()")
     private void editAppearance(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         String[] choices = {"Иконка", "Фон", "Цвет иконки", "Цвет подписи"};
         new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Оформление · " + shortcut.title)
