@@ -1032,6 +1032,7 @@ public class LauncherActivity extends LauncherProfileActivity {
     @Override
     protected void onDestroy() {
         if(homeDraft!=null&&!isChangingConfigurations())homeDraft.cancel(this);
+        dezz.status.widget.settings.SettingsEditSession.detach(this);
         // Defensive cleanup for vendor lifecycle teardown that omits a matching pause callback.
         if (!isPassengerLauncherProfile()) StatusBarSurfaceContext.setLauncherHomeForeground(false);
         dismissAllAppsDialog();

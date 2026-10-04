@@ -30,6 +30,11 @@ android {
     testOptions {
         unitTests.includeAndroidResources = true
         unitTests.all {
+            // Native-rendered API-28 screens share a Robolectric worker. Bound its lifetime
+            // between suites; retain the entire regression matrix and every assertion.
+            maxHeapSize = '1536m'
+            maxParallelForks = 1
+            forkEvery = 40
             testLogging { events 'failed', 'skipped'; showStandardStreams = true; exceptionFormat = 'full' }
             jvmArgs += [
                     '--add-opens=java.base/java.lang=ALL-UNNAMED',

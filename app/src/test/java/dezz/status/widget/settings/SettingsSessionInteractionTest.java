@@ -81,4 +81,26 @@ public class SettingsSessionInteractionTest {
             assertTrue(session.apply(p.get()));assertEquals(1,calls[0]);session.cancel(p.get());
         }
     }
+    @Test public void retainedDraftReleasesOldControlsAndRebindsWithoutWriting(){
+        try(ActivityController<Editor> old=Robolectric.buildActivity(Editor.class).setup();
+            ActivityController<Editor> replacement=Robolectric.buildActivity(Editor.class).setup()){
+            SettingsEditSession session=SettingsEditSession.beginEditor(old.get(),null);
+            int[] stale={0},fresh={0};
+            session.bind(()->stale[0]++,()->stale[0]++);
+            SharedPreferences oldControls=wrapped(old.get());
+            oldControls.edit().putInt("width",80).commit();
+            int count=stale[0];
+            SettingsEditSession.detach(old.get());
+            assertNull(SettingsEditSession.find(old.get()));
+            session.checkpoint().finish();assertEquals(count,stale[0]);
+            assertSame(session,SettingsEditSession.beginEditor(replacement.get(),session));
+            session.bind(()->fresh[0]++,()->fresh[0]++);
+            oldControls.edit().putInt("width",999).commit();
+            assertEquals(80,wrapped(replacement.get()).getInt("width",0));
+            assertFalse(durable().contains("width"));
+            assertTrue(session.apply(replacement.get()));assertEquals(1,fresh[0]);
+            assertEquals(80,durable().getInt("width",0));
+            session.cancel(replacement.get());SettingsEditSession.detach(replacement.get());
+        }
+    }
 }

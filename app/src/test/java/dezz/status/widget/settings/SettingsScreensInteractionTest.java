@@ -77,7 +77,8 @@ public class SettingsScreensInteractionTest {
                 }
                 tab.performClick();measure(decor);assertTrue(tab.isSelected());
             }
-            session.cancel(activity);controller.pause().stop();idle();
+            session.cancel(activity);controller.pause().stop().destroy();idle();
+            assertNull("Destroyed editor must release its registry entry",SettingsEditSession.find(activity));
             assertEquals("Cancellation and late callbacks keep working settings",before,disk.getAll());
         }
     }

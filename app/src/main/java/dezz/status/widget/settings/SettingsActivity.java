@@ -34,6 +34,7 @@ public abstract class SettingsActivity extends AppCompatActivity implements Sett
     }
     @Override protected void onDestroy(){
         if(settingsSession!=null&&!isChangingConfigurations())settingsSession.cancel(this);
+        SettingsEditSession.detach(this);
         super.onDestroy();
     }
     @Override protected void onPause(){

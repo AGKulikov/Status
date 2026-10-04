@@ -46,6 +46,7 @@ public final class SettingsEditSession {
     private final Map<String,Runnable> applyActions=new LinkedHashMap<>();
     private final Map<String,Object> actionValues=new LinkedHashMap<>();
     private TextView state;
+    private java.lang.ref.WeakReference<Activity> boundActivity = new java.lang.ref.WeakReference<>(null);
 
     private SettingsEditSession(SettingsEditSession parent){this.parent=parent;}
     public static synchronized SettingsEditSession begin(Activity activity, Object retained) {
@@ -62,7 +63,27 @@ public final class SettingsEditSession {
             for(SettingsEditSession candidate:active)if(candidate.id.equals(parentId)&&!candidate.closed)parent=candidate;
             session=new SettingsEditSession(parent);active.add(session);
         }
+        session.boundActivity = new java.lang.ref.WeakReference<>(activity);
         activities.put(activity,session);return session;
+    }
+    /** Release the old view tree even when the draft survives a configuration change.
+     * WeakHashMap alone is insufficient: its value's listeners can retain the key. */
+    public static void detach(Activity activity) {
+        SettingsEditSession session;
+        synchronized (SettingsEditSession.class) { session = activities.remove(activity); }
+        if (session == null) return;
+        synchronized (session) {
+            if (session.boundActivity.get() == activity) {
+                session.generation++;
+                session.releaseViews();
+            }
+        }
+    }
+    private void releaseViews() {
+        state = null;
+        flush = () -> {};
+        reload = () -> {};
+        boundActivity.clear();
     }
     public static synchronized SettingsEditSession find(Context context) {
         while(context!=null){
@@ -174,7 +195,7 @@ public final class SettingsEditSession {
     public synchronized void cancel(Activity activity){
         if(closed)return;boolean changed=dirty();closed=true;for(SettingsDraft draft:drafts.values())draft.close();applyActions.clear();actionValues.clear();
         active.remove(this);
-        if(changed)refresh(activity);
+        try { if(changed)refresh(activity); } finally { releaseViews(); }
     }
     public void bind(Runnable flush,Runnable reload) {
         this.flush=flush;this.reload=reload;
