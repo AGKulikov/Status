@@ -26,6 +26,13 @@ jobs:
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Source inventory
         run: python3 tools/audit_settings_editors.py --check
+      - name: Focused icon import and recovery regressions
+        timeout-minutes: 5
+        run: |
+          ./gradlew testGeelyDebugUnitTest --no-daemon --max-workers=2 \
+            --tests 'dezz.status.widget.phone.LocalImage*Test' \
+            --tests 'dezz.status.widget.HudLcaPatchMessageTest' \
+            --tests 'dezz.status.widget.settings.SettingsApplyJournalTest'
       - name: Android interactions and regression tests
         timeout-minutes: 10
         run: |
