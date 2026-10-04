@@ -2285,14 +2285,15 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                     preferences.hudStockProfileMode.set(selectedMode);
                     preferences.hudStockProfileModeAutoRepeat.set(repeat);
                     CarIntegration integration = CarIntegrations.get(this);
+                    android.content.Context application = getApplicationContext();
                     if (selectedMode >= 0) {
                         dezz.status.widget.settings.SettingsEditSession.afterApply(this,"hud.profile",()->integration.setStockHudProfileMode(selectedMode, repeat,
-                                (success, message) -> showStockHudResult(
+                                (success, message) -> showStockHudResult(application,
                                         "Режим " + selectedMode, success, message)));
                     } else {
                         dezz.status.widget.settings.SettingsEditSession.afterApply(this,"hud.profile",()->integration.stopStockHudProfileModeAutoRepeat(
                                 (success, message) -> {
-                                    if (!success) showStockHudResult(
+                                    if (!success) showStockHudResult(application,
                                             "Автоповтор", false, message);
                                 }));
                     }
@@ -2329,17 +2330,22 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
             @NonNull Preferences.Bool preference) {
         preference.set(desired);
         if (!force && original == desired) return;
+        android.content.Context application = getApplicationContext();
         dezz.status.widget.settings.SettingsEditSession.afterApply(this,"hud.category."+category.name(),()->integration.setStockHudDisplayCategory(category, desired, (success, message) -> {
-            if (!success) showStockHudResult(category.name(), false, message);
+            if (!success) showStockHudResult(application, category.name(), false, message);
         }));
     }
 
     private void showStockHudResult(String operation, boolean success,
                                     @Nullable String message) {
+        showStockHudResult(getApplicationContext(), operation, success, message);
+    }
+    private static void showStockHudResult(android.content.Context application, String operation,
+                                    boolean success, @Nullable String message) {
         String detail = message == null || message.trim().isEmpty()
                 ? (success ? "команда принята" : "ECARX не подтвердил команду")
                 : message.trim();
-        Toast.makeText(getApplicationContext(),
+        Toast.makeText(application,
                 operation + ": " + detail, success ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG)
                 .show();
     }

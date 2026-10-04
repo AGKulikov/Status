@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "status": "SOURCE_IMPLEMENTATION_ANDROID_AND_DEVICE_GATES_PENDING",
-  "baseline_commit": "d76ddacd1db7a009aa17b9a1572526a1b0eaa1be",
-  "scope": "Production owners reviewed for 3.0.2; runtime archive/recovery certification remains a separate gate",
+  "baseline_commit": "c4d3ffc121a0a69ba21094abe2987f889926505c",
+  "scope": "Production owners reviewed for the 2026-10-04 continuation toward 3.0.3; see FULL_BACKUP_CONTRACT_RU.md. Runtime archive/recovery certification remains a separate gate.",
   "shared_preferences": [
     {
       "name": "{package}_preferences",
@@ -194,32 +194,32 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/FullBackupActivity.java": {
-      "sha256": "242add848f8bdf645484f061fc3fd194ab2e58dfead1cec4d26a410caaac0171",
+      "sha256": "e877c02c42cc699353a0b559c9d7d198c1d3727cc1a000cefc9b3caea3a3fc4a",
       "access_kinds": [
         "external_resource",
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/HudLcaPatchActivity.java": {
-      "sha256": "8aca1a6883e197bb717b19e6017db0fef82112a21fc287703034d0367deb567e",
+      "sha256": "ce3768537e1a4d8e1720830a96d5d73af489dfd690b02338a09967faba85fd57",
       "access_kinds": [
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java": {
-      "sha256": "bdcf76890220fff425cedd26352283d4dc69337dbc604962b0ad6b05a366cd8a",
+      "sha256": "a46a76f3339ebee81b5d0af98c3e8834669112b40265c65f15e09b86eca3c0b6",
       "access_kinds": [
         "external_resource"
       ]
     },
     "app/src/main/java/dezz/status/widget/LiveActivityApnsSettingsActivity.java": {
-      "sha256": "5e3c2216968c4cb129974e9843597dec53694ad16f950f0f720ae58dda8ea668",
+      "sha256": "9e7575d0574fe7a43db60404eb19c01c06c57284d8dbcf1b07a7b60aaa3beb29",
       "access_kinds": [
         "external_resource"
       ]
     },
     "app/src/main/java/dezz/status/widget/PhoneConnectorSettingsActivity.java": {
-      "sha256": "bc618b4a4398e5b557a1bf766266ff6d940865ee1bf4ae4f8b91247964440e34",
+      "sha256": "ed0e2bf72ca3520d3d310ce81dc0870f521707b13b16180baa5db94573825a5b",
       "access_kinds": [
         "files"
       ]
@@ -237,7 +237,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/Preferences.java": {
-      "sha256": "7a6de36134cf85a9c87cb9a57e7e8c5c64926fd020419866d7e10343aed63bb7",
+      "sha256": "eec759819f7d00699610e8ac5e92e4171dbf161ffea28eaf2a160e8f58b373db",
       "access_kinds": [
         "keystore",
         "preferences"
@@ -263,7 +263,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/SettingsHubActivity.java": {
-      "sha256": "739aea87c0e8a9d365946893b8b57f78d91fbeac418aaa499ce97645b3b90975",
+      "sha256": "801d7861f1c601607d385e8a0f952b064112cb1c574b48d9291539b9a162dfb0",
       "access_kinds": [
         "external_resource",
         "files"
@@ -305,14 +305,26 @@
         "files"
       ]
     },
+    "app/src/main/java/dezz/status/widget/backup/BackupFilePicker.java": {
+      "sha256": "c2062eb37d1a1d8b17113de53b49fd75bb03e5d283162d785f1922b35e3090d8",
+      "access_kinds": [
+        "files"
+      ]
+    },
     "app/src/main/java/dezz/status/widget/backup/BackupFiles.java": {
       "sha256": "677399e87e7e689a7cbb39d3296ed597e8ee8a0f5187b8f53ee5c954dada9f3e",
       "access_kinds": [
         "files"
       ]
     },
+    "app/src/main/java/dezz/status/widget/backup/BackupLocalFiles.java": {
+      "sha256": "7364bc77adf1a0ae5878d8b11eddc4e04258054b20c49e90e766a33c9d23e34e",
+      "access_kinds": [
+        "files"
+      ]
+    },
     "app/src/main/java/dezz/status/widget/backup/BackupMaintenance.java": {
-      "sha256": "ed303d3e832e7c24269111ef81b14000076b387fc6773c69f6df1df690f36953",
+      "sha256": "071d6baa14b35caf18ba57f1f061d3731390beac3bce8a4b8f3dbc9af27cb8d1",
       "access_kinds": [
         "files",
         "preferences"
@@ -392,7 +404,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/instrument/InstrumentPanelStore.java": {
-      "sha256": "bf6e60e904af513bd4b6b88e30f7aea816a32c36b0ace3ec8957be03db720e7b",
+      "sha256": "37027a1e8b19f327cc1abb17974bd06feca0cc33f54d3bf6bb9b8b44a185264f",
       "access_kinds": [
         "preferences"
       ]
@@ -463,6 +475,12 @@
       "sha256": "72446b6315cf20793a443618daf0eba3e7df5e2d111b025dcc7848adff487de9",
       "access_kinds": [
         "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/phone/LocalImagePicker.java": {
+      "sha256": "ad9c46cb4e87fb7a1fc43a986880afcc08d1caa105f7d972b4249b11928944d0",
+      "access_kinds": [
+        "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/PackageReplaceBleRecoveryGate.java": {
@@ -558,8 +576,15 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/settings/SettingsAppearance.java": {
-      "sha256": "935ac1a597042c2c7b497580be51855668e68ca37a92950d4606a4a805c8777e",
+      "sha256": "e8fc472c0921acc4e9212c0a904fc1a1304ca3bbe01239a7ecd0095ba78359cb",
       "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/settings/SettingsApplyJournal.java": {
+      "sha256": "863bc987b3df20b95ddecb163aec495ad1ba00fbcb5fb54ecf6797bc1765c21e",
+      "access_kinds": [
+        "files",
         "preferences"
       ]
     },

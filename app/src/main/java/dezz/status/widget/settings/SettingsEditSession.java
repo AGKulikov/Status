@@ -21,6 +21,8 @@ import java.util.*;
 public final class SettingsEditSession {
     private static final String EXTRA_PARENT="dezz.status.widget.SETTINGS_DRAFT_PARENT";
     private static final Map<Activity,SettingsEditSession> activities=new WeakHashMap<>();
+    private static final SettingsEditSession detachedSession=new SettingsEditSession(null);
+    static { detachedSession.closed=true; }
     static final Object NO_OVERRIDE=new Object();
     private static final List<SettingsEditSession> active=new java.util.concurrent.CopyOnWriteArrayList<>();
     private static final Set<String> EDITORS=new HashSet<>(Arrays.asList(
@@ -70,8 +72,13 @@ public final class SettingsEditSession {
      * WeakHashMap alone is insufficient: its value's listeners can retain the key. */
     public static void detach(Activity activity) {
         SettingsEditSession session;
-        synchronized (SettingsEditSession.class) { session = activities.remove(activity); }
-        if (session == null) return;
+        synchronized (SettingsEditSession.class) {
+            session = activities.get(activity);
+            // A weak, view-free tombstone also blocks a delayed callback constructing a NEW
+            // Preferences wrapper from the destroyed Activity. It cannot fall through to disk.
+            if(session!=null)activities.put(activity,detachedSession);
+        }
+        if (session == null || session == detachedSession) return;
         synchronized (session) {
             if (session.boundActivity.get() == activity) {
                 session.generation++;

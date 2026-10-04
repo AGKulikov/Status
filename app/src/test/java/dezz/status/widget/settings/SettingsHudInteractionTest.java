@@ -66,7 +66,12 @@ public class SettingsHudInteractionTest {
             assertNotEquals("Slider updates the live draft before Apply",outer,new dezz.status.widget.Preferences(activity).hudPanelConfigJson.get());
             assertEquals("Preview must not write the working preferences",before,disk.getAll());
             snapshot(decor,"hud-backdrop-position");
+            SettingsEditSession outerSession=SettingsEditSession.find(activity);
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick();idle();
+            // Rollback rebuilds the editor; the destroyed Activity deliberately has no writable draft.
+            assertTrue(SettingsEditSession.find(activity).isClosed());
+            activity=controller.get();
+            assertSame("Rebuilt editor retains its outer draft",outerSession,SettingsEditSession.find(activity));
             assertEquals("Nested Cancel restores the outer draft",outer,new dezz.status.widget.Preferences(activity).hudPanelConfigJson.get());
             SettingsEditSession.find(activity).cancel(activity);controller.pause().stop();
             assertEquals(before,disk.getAll());

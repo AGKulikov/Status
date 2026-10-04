@@ -60,6 +60,7 @@ public class SettingsScreensInteractionTest {
             System.out.println("EDITOR_BEGIN "+type.getSimpleName()+" theme="+theme);
             Activity activity=controller.setup().visible().get();System.out.println("EDITOR_CREATED "+type.getSimpleName());idle();
             View decor=activity.getWindow().getDecorView();measure(decor);idle();measure(decor);System.out.println("EDITOR_MEASURED "+type.getSimpleName());
+            assertReadableSwitches(decor);
             SettingsEditSession session=SettingsEditSession.find(activity);assertNotNull("Every layout editor has a draft",session);
             android.content.SharedPreferences disk=activity.createDeviceProtectedStorageContext().getSharedPreferences(activity.getPackageName()+"_preferences",0);
             Map<String,?> before=disk.getAll();
@@ -75,14 +76,26 @@ public class SettingsScreensInteractionTest {
                     back.getGlobalVisibleRect(backBounds);tab.getGlobalVisibleRect(tabBounds);
                     assertFalse("Back must not cover a section",android.graphics.Rect.intersects(backBounds,tabBounds));
                 }
-                tab.performClick();measure(decor);assertTrue(tab.isSelected());
+                tab.performClick();measure(decor);assertTrue(tab.isSelected());assertReadableSwitches(decor);
             }
             session.cancel(activity);controller.pause().stop().destroy();idle();
-            assertNull("Destroyed editor must release its registry entry",SettingsEditSession.find(activity));
+            assertTrue("Destroyed editor must leave only a closed, view-free marker",SettingsEditSession.find(activity).isClosed());
             assertEquals("Cancellation and late callbacks keep working settings",before,disk.getAll());
         }
     }
     static void idle(){Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(32));}
+    static void assertReadableSwitches(View view){
+        if(!view.isShown()||SettingsEditorLayout.PREVIEW_TAG.equals(view.getTag()))return;
+        if(view instanceof android.widget.CompoundButton){
+            TextView label=(TextView)view;
+            if(label.getText().length()>2){
+                int surface=androidx.core.content.ContextCompat.getColor(view.getContext(),dezz.status.widget.R.color.settings_background);
+                assertTrue("Unreadable switch label: "+label.getText(),
+                        androidx.core.graphics.ColorUtils.calculateContrast(label.getCurrentTextColor(),surface)>=4.5);
+            }
+        }
+        if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++)assertReadableSwitches(((ViewGroup)view).getChildAt(i));
+    }
     static void measure(View view){view.measure(View.MeasureSpec.makeMeasureSpec(1760,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(656,View.MeasureSpec.EXACTLY));view.layout(0,0,1760,656);}
     static Button find(View root,String text){
         if(root instanceof Button&&text.equals(((TextView)root).getText().toString()))return(Button)root;

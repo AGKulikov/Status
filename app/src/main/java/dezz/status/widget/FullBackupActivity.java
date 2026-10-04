@@ -19,7 +19,7 @@ import org.json.*;
 
 /** Explicit maintenance UI. SAF/password/check do not start controllers or execute restored actions. */
 public final class FullBackupActivity extends dezz.status.widget.settings.SettingsActivity {
-    private static final int CREATE=701,OPEN=702;
+    private static final int CREATE=701,OPEN=702,STORAGE_PERMISSION=703;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private TextView status;
     private Button apply;
@@ -27,6 +27,8 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
     private char[] password;
     private File checkedStage;
     private JSONObject checkedMetadata;
+    private BackupFilePicker localPicker;
+    private boolean pendingLocalCreate;
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);setTitle("Полная резервная копия");
         ScrollView scroll=new ScrollView(this);LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(24,20,24,24);scroll.addView(root);
@@ -61,16 +63,38 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
             char[] entered=field.getText().toString().toCharArray();
             if(entered.length<8){Arrays.fill(entered,'\0');field.setError("Не менее 8 символов");return;}
             clearPassword();password=entered;field.setText("");dialog.dismiss();
-            Intent intent=new Intent(create?Intent.ACTION_CREATE_DOCUMENT:Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream");
-            if(create)intent.putExtra(Intent.EXTRA_TITLE,"Natro-"+BuildConfig.VERSION_NAME+"-"+System.currentTimeMillis()+".natrobackup");
-            startActivityForResult(intent,create?CREATE:OPEN);
+            chooseDocument(create);
         }));dialog.show();
+    }
+    private void chooseDocument(boolean create) {
+        Intent intent=new Intent(create?Intent.ACTION_CREATE_DOCUMENT:Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream");
+        if(create)intent.putExtra(Intent.EXTRA_TITLE,backupName());
+        try { startActivityForResult(intent,create?CREATE:OPEN); }
+        catch(ActivityNotFoundException missing) { chooseLocal(create); }
+    }
+    private String backupName(){return "Natro-"+BuildConfig.VERSION_NAME+"-"+System.currentTimeMillis()+"-"+UUID.randomUUID().toString().substring(0,8)+".natrobackup";}
+    private void chooseLocal(boolean create) {
+        String permission=create?android.Manifest.permission.WRITE_EXTERNAL_STORAGE:android.Manifest.permission.READ_EXTERNAL_STORAGE;
+        if(checkSelfPermission(permission)!=android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            pendingLocalCreate=create;requestPermissions(new String[]{permission},STORAGE_PERMISSION);return;
+        }
+        localPicker=new BackupFilePicker(this,worker,uri->selectedDocument(create?CREATE:OPEN,uri),this::clearPassword);
+        localPicker.show(create?backupName():null);
+    }
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results) {
+        super.onRequestPermissionsResult(request,permissions,results);
+        if(request!=STORAGE_PERMISSION)return;
+        if(results.length>0&&results[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)chooseLocal(pendingLocalCreate);
+        else {clearPassword();status.setText("Доступ к памяти не разрешён. Создание или проверка копии не запускались.");}
     }
     @Override protected void onActivityResult(int request,int result,Intent data) {
         super.onActivityResult(request,result,data);
         if(request!=CREATE&&request!=OPEN)return;
         if(result!=RESULT_OK||data==null||data.getData()==null){clearPassword();return;}
-        Uri uri=data.getData();char[] key=password;password=null;
+        selectedDocument(request,data.getData());
+    }
+    private void selectedDocument(int request,Uri uri) {
+        char[] key=password;password=null;
         if(key==null){status.setText("Введите пароль повторно.");return;}
         runOperation(()->{
             try{return request==CREATE?create(uri,key):check(uri,key);}finally{Arrays.fill(key,'\0');}
@@ -94,18 +118,22 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
                 try(FileInputStream input=new FileInputStream(archive)) {
                     JSONObject checked=BackupArchive.read(input,key,verification);storage.validate(new File(verification,"data"),checked);
                 }finally{BackupFiles.removeTree(verification);}
-                try(InputStream input=new FileInputStream(archive);OutputStream output=getContentResolver().openOutputStream(uri,"wt")) {
-                    if(output==null)throw new IOException("Не удалось открыть файл назначения");BackupFiles.copy(input,output,BackupFiles.MAX_TOTAL_BYTES+64L*1024*1024);
+                if("file".equals(uri.getScheme()))BackupLocalFiles.copyVerified(archive,new File(uri.getPath()));
+                else {
+                    try(InputStream input=new FileInputStream(archive);OutputStream output=getContentResolver().openOutputStream(uri,"wt")) {
+                        if(output==null)throw new IOException("Не удалось открыть файл назначения");BackupFiles.copy(input,output,BackupFiles.MAX_TOTAL_BYTES+64L*1024*1024);
+                    }
+                    String written;
+                    try(InputStream input=getContentResolver().openInputStream(uri)) {
+                        if(input==null)throw new IOException("Нельзя проверить сохранённый файл");
+                        java.security.MessageDigest hash=java.security.MessageDigest.getInstance("SHA-256");byte[] buffer=new byte[65536];int count;
+                        while((count=input.read(buffer))!=-1)hash.update(buffer,0,count);
+                        StringBuilder hex=new StringBuilder();for(byte b:hash.digest())hex.append(String.format(Locale.ROOT,"%02x",b&255));written=hex.toString();
+                    }
+                    if(!written.equals(BackupFiles.sha256(archive)))throw new IOException("Сохранённая копия не прошла обратное чтение");
                 }
-                String written;
-                try(InputStream input=getContentResolver().openInputStream(uri)) {
-                    if(input==null)throw new IOException("Нельзя проверить сохранённый файл");
-                    java.security.MessageDigest hash=java.security.MessageDigest.getInstance("SHA-256");byte[] buffer=new byte[65536];int count;
-                    while((count=input.read(buffer))!=-1)hash.update(buffer,0,count);
-                    StringBuilder hex=new StringBuilder();for(byte b:hash.digest())hex.append(String.format(Locale.ROOT,"%02x",b&255));written=hex.toString();
-                }
-                if(!written.equals(BackupFiles.sha256(archive)))throw new IOException("Сохранённая копия не прошла обратное чтение");
-                return "Копия сохранена и повторно проверена. Файлов: "+BackupFiles.inventory(snapshot).size()+". Версия: "+BuildConfig.VERSION_NAME+". Сохраните пароль отдельно.";
+                return "Копия сохранена и повторно проверена. Файлов: "+BackupFiles.inventory(snapshot).size()+". Версия: "+BuildConfig.VERSION_NAME+". Сохраните пароль отдельно."
+                        +("file".equals(uri.getScheme())?"\nФайл: "+uri.getPath():"");
             }finally{BackupFiles.delete(archive);}
         }finally {
             try{if(navigator!=null)bridge.release(navigator);}finally{BackupFiles.removeTree(snapshot);}
@@ -176,5 +204,5 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
     private void clearChecked()throws IOException{if(checkedStage!=null)BackupFiles.removeTree(checkedStage);checkedStage=null;checkedMetadata=null;}
     @Override public void finish(){if(!busy)super.finish();}
     @Override public void onBackPressed(){if(!busy)super.onBackPressed();}
-    @Override protected void onDestroy(){clearPassword();if(!busy){try{clearChecked();}catch(IOException ignored){}worker.shutdown();}super.onDestroy();}
+    @Override protected void onDestroy(){clearPassword();if(localPicker!=null)localPicker.close();if(!busy){try{clearChecked();}catch(IOException ignored){}worker.shutdown();}super.onDestroy();}
 }

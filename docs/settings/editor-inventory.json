@@ -996,13 +996,13 @@
         },
         {
           "dialogs": 1,
-          "line": 2346,
+          "line": 2352,
           "method": "confirmReset",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2397,
+          "line": 2403,
           "method": "deleteSelected",
           "numeric_controls": 0
         }
@@ -1455,7 +1455,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java",
-      "sha256": "1670eee99f822cc6d4bc3f2555e8cd2583992051dd0db3cf37d802224d8b3c7d"
+      "sha256": "a46a76f3339ebee81b5d0af98c3e8834669112b40265c65f15e09b86eca3c0b6"
     },
     {
       "class": "dezz.status.widget.InformationPanelSettingsActivity",
@@ -1573,43 +1573,43 @@
         },
         {
           "dialogs": 1,
-          "line": 225,
+          "line": 226,
           "method": "addElement",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 256,
+          "line": 257,
           "method": "choosePanelPreset",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 275,
+          "line": 276,
           "method": "editModules",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 300,
+          "line": 301,
           "method": "editBackground",
           "numeric_controls": 1
         },
         {
           "dialogs": 1,
-          "line": 335,
+          "line": 336,
           "method": "editSelected",
           "numeric_controls": 2
         },
         {
           "dialogs": 1,
-          "line": 631,
+          "line": 632,
           "method": "editMapPerformance",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1116,
+          "line": 1117,
           "method": "editClusterRoadEvents",
           "numeric_controls": 0
         }
@@ -1903,7 +1903,7 @@
       ],
       "numeric_controls": 4,
       "path": "app/src/main/java/dezz/status/widget/InstrumentPanelSettingsActivity.java",
-      "sha256": "258e7341c1e4f3edbb7fb3c77f3e09c89431fb5f9e06c12713a546f354c9e7a8"
+      "sha256": "38ecafd1b066a0ab8e199ca3ec22edcdd63c20b5869b11d620c1d023eedb0dba"
     },
     {
       "class": "dezz.status.widget.IntentScenarioSettingsActivity",

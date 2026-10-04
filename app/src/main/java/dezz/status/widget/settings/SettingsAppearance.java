@@ -50,7 +50,9 @@ public final class SettingsAppearance {
                     float minimum=Math.max(18,Math.min(26,preferences(context).getInt("textSp",20)));
                     float current=text.getTextSize()/context.getResources().getDisplayMetrics().scaledDensity;
                     if(current<minimum)text.setTextSize(minimum);
-                    if(!(view instanceof Button)&&neutral(text.getCurrentTextColor()))text.setTextColor(foreground);
+                    // CompoundButton also extends Button, but its label sits on the form's
+                    // surface, not a filled action button. Keep it readable in both themes.
+                    if((!(view instanceof Button)||view instanceof CompoundButton)&&neutral(text.getCurrentTextColor()))text.setTextColor(foreground);
                     ViewGroup.LayoutParams params=text.getLayoutParams();
                     if(params!=null&&params.height>0&&params.height<dp(context,48)){params.height=ViewGroup.LayoutParams.WRAP_CONTENT;text.setLayoutParams(params);}
                 }

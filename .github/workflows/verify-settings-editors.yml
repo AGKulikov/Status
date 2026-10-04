@@ -2,7 +2,7 @@ name: Verify complete settings redesign
 on:
   push:
     branches: ['feature/natro-settings-complete-20261004', 'feature/natro-map-trip-audit-20260912']
-    paths: ['app/**', 'tools/audit_settings_editors.py', 'docs/settings/**', '.github/workflows/verify-settings-editors.yml']
+    paths: ['app/**', 'tools/audit_settings_editors.py', 'tools/check_backup_inventory.py', 'tools/tests/test_*backup*.py', 'tools/tests/test_hud_lca_inspection.py', 'docs/settings/**', 'docs/backup/**', '.github/workflows/verify-settings-editors.yml']
 permissions:
   contents: read
 concurrency:
@@ -25,7 +25,9 @@ jobs:
       - name: Android toolchain
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Source inventory
-        run: python3 tools/audit_settings_editors.py --check
+        run: |
+          python3 tools/audit_settings_editors.py --check
+          python3 tools/check_backup_inventory.py
       - name: Focused icon import and recovery regressions
         timeout-minutes: 5
         run: |
@@ -53,6 +55,20 @@ jobs:
           settings_result=$?
           kill "$settings_watchdog" 2>/dev/null || true
           exit "$settings_result"
+      - name: Portable archive, recovery and read-only module inspection
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          jars = list((Path.home() / '.gradle/caches/modules-2/files-2.1/org.json/json/20240303').glob('*/json-20240303.jar'))
+          if len(jars) != 1:
+              raise SystemExit('Expected the org.json dependency resolved by the Android regression run')
+          environment = dict(os.environ, NATRO_ANDROID_JSON_JAR=str(jars[0]))
+          subprocess.run(['python3', '-m', 'unittest', '-v',
+                          'tools.tests.test_backup_inventory',
+                          'tools.tests.test_full_backup_core',
+                          'tools.tests.test_hud_lca_inspection'], env=environment, check=True)
+          PY
       - name: Interaction reports and rendered screens
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

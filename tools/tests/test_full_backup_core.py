@@ -99,12 +99,36 @@ public class BackupReplay {
   BackupTransaction tx=new BackupTransaction(new File(root,"attack-control"),roots,Collections.emptyMap(),null);
   try{tx.apply(attack,new JSONObject());throw new AssertionError("unknown namespace activated");}catch(IOException expected){}
   check(read(roots.get("prefs"),"keep").equals("unchanged"),"prevalidation preserves active files");
+  File volume=new File(root,"volume"), outside=new File(root,"outside");volume.mkdirs();outside.mkdirs();
+  Files.write(new File(volume,"unrelated.txt").toPath(),new byte[]{1});
+  Files.write(new File(volume,".hidden.natrobackup").toPath(),new byte[]{1});
+  File original=new File(volume,"previous.NATROBACKUP");Files.write(original.toPath(),archive);
+  Files.createSymbolicLink(new File(volume,"escape").toPath(),outside.toPath());
+  List<File> choices=BackupLocalFiles.list(volume,volume);
+  check(choices.equals(Collections.singletonList(original)),"only archives; hidden and escaping paths excluded");
+  try{BackupLocalFiles.list(volume,outside);throw new AssertionError("outside folder accepted");}catch(IOException expected){}
+  try{BackupLocalFiles.destination(volume,"../overwritten.natrobackup");throw new AssertionError("unsafe destination accepted");}catch(IOException expected){}
+  File export=BackupLocalFiles.destination(volume,"new.natrobackup");
+  BackupLocalFiles.copyVerified(original,export);
+  check(Arrays.equals(Files.readAllBytes(export.toPath()),archive),"export fully read back");
+  for(int collision=0;collision<2;collision++) {
+   try{BackupLocalFiles.copyVerified(original,export);throw new AssertionError("existing export overwritten");}catch(IOException expected){}
+   check(Arrays.equals(Files.readAllBytes(export.toPath()),archive),"previous export preserved");
+   if(collision==0){Files.delete(export.toPath());Files.createSymbolicLink(export.toPath(),original.toPath());}
+  }
+  File dangling=BackupLocalFiles.destination(volume,"dangling.natrobackup");
+  Files.createSymbolicLink(dangling.toPath(),new File(outside,"missing").toPath());
+  try{BackupLocalFiles.create(dangling);throw new AssertionError("dangling link overwritten");}catch(IOException expected){}
+  check(!new File(outside,"missing").exists(),"symlink target untouched");
+  File secondVolume=new File(root,"second-volume");secondVolume.mkdirs();
+  Files.createSymbolicLink(new File(secondVolume,"Natro-Backups").toPath(),outside.toPath());
+  try{BackupLocalFiles.destination(secondVolume,"escaped.natrobackup");throw new AssertionError("symlink export folder accepted");}catch(IOException expected){}
   System.out.println("Archive auth/size/path/JSON, multi-frame round-trip, 7 interruption points, rollback PASS");
  }
 }'''
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);(root/'BackupReplay.java').write_text(harness)
-            classes=['BackupFiles','BackupJson','BackupCipher','BackupArchive','BackupTransaction','BackupPreferencesXml']
+            classes=['BackupFiles','BackupJson','BackupCipher','BackupArchive','BackupTransaction','BackupPreferencesXml','BackupLocalFiles']
             sources=[str(ROOT/'app/src/main/java/dezz/status/widget/backup'/f'{name}.java') for name in classes]
             build=subprocess.run(['java','com.sun.tools.javac.Main','-cp',jar,'-d',tmp,str(root/'BackupReplay.java'),*sources],capture_output=True,text=True)
             self.assertEqual(build.returncode,0,build.stderr)

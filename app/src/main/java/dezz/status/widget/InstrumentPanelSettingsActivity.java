@@ -192,10 +192,11 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Штатные элементы панели приборов")
                 .setView(scroll).setNegativeButton("Отмена",null).setPositiveButton("Применить",(dialog,which)->{
                     boolean signValue=sign.isChecked(),barValue=bar.isChecked();
+                    android.content.Context application=getApplicationContext();
                     dezz.status.widget.settings.SettingsEditSession.afterApply(this,"instrument.tsr",signValue,
-                            ()->controller.setTsrHidden(signValue,(success,detail)->Toast.makeText(getApplicationContext(),detail,Toast.LENGTH_LONG).show()));
+                            ()->controller.setTsrHidden(signValue,(success,detail)->Toast.makeText(application,detail,Toast.LENGTH_LONG).show()));
                     dezz.status.widget.settings.SettingsEditSession.afterApply(this,"instrument.white",barValue,
-                            ()->controller.setWhiteBarHidden(barValue,(success,detail)->Toast.makeText(getApplicationContext(),detail,Toast.LENGTH_LONG).show()));
+                            ()->controller.setWhiteBarHidden(barValue,(success,detail)->Toast.makeText(application,detail,Toast.LENGTH_LONG).show()));
                 }).show();
     }
 

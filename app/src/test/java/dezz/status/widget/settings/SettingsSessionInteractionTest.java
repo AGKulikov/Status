@@ -91,11 +91,13 @@ public class SettingsSessionInteractionTest {
             oldControls.edit().putInt("width",80).commit();
             int count=stale[0];
             SettingsEditSession.detach(old.get());
-            assertNull(SettingsEditSession.find(old.get()));
+            assertTrue(SettingsEditSession.find(old.get()).isClosed());
             session.checkpoint().finish();assertEquals(count,stale[0]);
             assertSame(session,SettingsEditSession.beginEditor(replacement.get(),session));
             session.bind(()->fresh[0]++,()->fresh[0]++);
             oldControls.edit().putInt("width",999).commit();
+            wrapped(old.get()).edit().putInt("width",777).commit();
+            SettingsEditSession.afterApply(old.get(),"late-physical",()->fail("Destroyed editor must not execute commands"));
             assertEquals(80,wrapped(replacement.get()).getInt("width",0));
             assertFalse(durable().contains("width"));
             assertTrue(session.apply(replacement.get()));assertEquals(1,fresh[0]);
